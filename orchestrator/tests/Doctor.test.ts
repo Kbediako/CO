@@ -44,6 +44,10 @@ async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<s
       'if [ "$1" = "cloud" ] && [ "$2" = "--help" ]; then',
       '  exit 0',
       'fi',
+      'if [ "$1" = "cloud" ] && [ "$2" = "list" ]; then',
+      '  echo "{\\"tasks\\":[{\\"id\\":\\"task-test\\",\\"environment_id\\":\\"$4\\"}]}"',
+      '  exit 0',
+      'fi',
       'exit 0'
     ].join('\n'),
     'utf8'

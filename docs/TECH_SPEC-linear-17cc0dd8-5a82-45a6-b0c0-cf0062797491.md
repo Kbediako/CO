@@ -1,0 +1,58 @@
+---
+id: 20260425-linear-17cc0dd8-5a82-45a6-b0c0-cf0062797491
+title: CO Cloud Env Missing Vs Not-Found Classification
+relates_to: docs/PRD-linear-17cc0dd8-5a82-45a6-b0c0-cf0062797491.md
+risk: high
+owners:
+  - Codex
+last_review: 2026-04-25
+---
+
+## Summary
+- Objective: give the parent lane a precise implementation contract for distinguishing absent cloud env configuration from configured env ids rejected by `codex cloud list` / `codex cloud exec`.
+- Scope: doctor cloud preflight, required cloud canary classification, focused regressions, and promotion-gate docs.
+- Constraints: preserve `missing_environment` for absent `CODEX_CLOUD_ENV_ID`; do not weaken required cloud canary, fallback canary, or promotion gates.
+
+## Issue-Shaping Contract
+- User-request translation carried forward: CO-358 is a classification and evidence-quality lane for Codex Cloud readiness, not a request to make cloud optional or to promote a candidate without cloud evidence.
+- Protected terms / exact artifact and surface names: `codex-orchestrator doctor --cloud-preflight`, `CODEX_CLOUD_ENV_ID`, `codex cloud exec`, `environment ... not found`, `required cloud canary`, `missing_environment`, promotion gates, `cloud_preflight`, `cloud_execution`, `cloud_fallback`, `CODEX_CLOUD_CANARY_REQUIRED=1`, and `CLOUD_CANARY_EXPECT_FALLBACK=1`.
+- Nearby wrong interpretations to reject: relaxing required cloud evidence, bypassing cloud canary failures, renaming cloud modes, changing model defaults, treating fallback as cloud execution proof, or collapsing not-found env ids into `missing_environment`.
+- Explicit non-goals carried forward: no broad cloud runtime redesign, no provider-worker supervision change, no model/default posture change, and no version promotion in this lane.
+
+## Parity / Alignment Matrix
+- Current truth: `runCloudPreflight(...)` reports `missing_environment` when no env id exists and otherwise checks Codex CLI and branch readiness. Required canary failure may later expose `environment ... not found` from `codex cloud exec`.
+- Reference truth: promotion gates require both required cloud canary and fallback canary evidence. The fallback canary expects `missing_environment` only when it intentionally clears env configuration.
+- Target truth / intended delta: preflight/canary evidence separates absent env config from configured-but-not-found or inaccessible env ids, preserving distinct `environment_not_found` / `environment_unavailable` machine-readable blockers for the latter.
+- Explicitly out-of-scope differences: changing cloud/mcp mode names, weakening canary gates, modifying model defaults, or promoting Codex/model posture.
+
+## Readiness Gate
+- Not done if: `environment ... not found` remains classified as `missing_environment`; a present but unusable `CODEX_CLOUD_ENV_ID` yields readiness output indistinguishable from a usable env; required cloud canary and fallback canary blockers are mixed together; or promotion gates clear without required evidence.
+- Pre-implementation issue-quality review evidence: approved for parent implementation. The issue is not a micro-task because correctness depends on protected wording, exact surfaces, and required cloud/fallback gate semantics.
+- Safeguard ownership split: child lane owns docs packet files only. Parent owns implementation, tests, docs-review, standalone review, elegance pass, Linear/workpad state, PR lifecycle, and any registry updates.
+
+## Technical Requirements
+- Functional requirements:
+  Preserve `missing_environment` only for absent env id; probe configured ids with non-mutating `codex cloud list --env <id> --limit 1 --json` before `codex cloud exec`; expose distinct `cloud_preflight.issues[]` and human doctor guidance for not-found/inaccessible ids without leaking secrets; keep required cloud canary fatal for configured env failures; keep fallback canary strict for assertion-proven absent-env `missing_environment`; and preserve promotion gates unless required cloud and fallback evidence pass or an explicit waiver exists.
+- Non-functional requirements (performance, reliability, security):
+  - Keep any cloud env validation bounded and non-interactive.
+  - Sanitize env ids and auth details where logs are persisted.
+  - Avoid extra network behavior in unit tests by using fake Codex CLI fixtures.
+- Interfaces / contracts:
+  `codex-orchestrator doctor --cloud-preflight`; `codex-orchestrator doctor --cloud-preflight --format json`; `codex cloud exec`; `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`; `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`.
+
+## Architecture & Data
+- Architecture / design adjustments: parent adds `environment_not_found` and `environment_unavailable` to the cloud preflight issue union. Both remain distinct from `missing_environment`.
+- Data model changes / migrations: no persistent data migration; manifest/run-summary fields should retain existing `cloud_preflight`, `cloud_execution`, and `cloud_fallback` shapes unless parent proves a small additive field is needed.
+- External dependencies / integrations: Codex CLI cloud commands, git remote branch checks, task-scoped manifests, and version-policy promotion evidence.
+
+## Validation Plan
+- Tests / checks: focused cloud preflight regressions for absent `CODEX_CLOUD_ENV_ID` and configured env id plus fake `codex cloud list` `environment ... not found`; required cloud canary fatal/blocking regression; fallback canary absent-env `missing_environment` regression; `npm run docs:check`; manifest-backed standalone review; explicit elegance pass.
+- Rollout verification: parent records the final blocker/pass classification in the task checklist, workpad, and PR summary with manifest/log evidence.
+- Monitoring / alerts: existing doctor output, cloud canary logs, manifests, and run summaries.
+
+## Open Questions
+- Exact issue-code spelling is parent-owned. Acceptance requires a non-`missing_environment` code or classification for `environment ... not found`.
+
+## Approvals
+- Reviewer: bounded docs child lane.
+- Date: 2026-04-25
