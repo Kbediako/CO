@@ -519,10 +519,7 @@ function cloneProviderWorkflowPayload(
             : null
         }
       : null,
-    worker_hosts: (payload.worker_hosts ?? []).map((host) => ({
-      ...host,
-      ssh_options: [...host.ssh_options]
-    })),
+    worker_hosts: cloneProviderWorkerHostConfigs(payload.worker_hosts ?? []),
     operator_autopilot: payload.operator_autopilot
       ? {
           enabled: payload.operator_autopilot.enabled,
@@ -948,11 +945,26 @@ function cloneStatusTextField(value: string | null, boundStatusDataset: boolean)
   if (!boundStatusDataset || value === null || value.length <= OPERATOR_AUTOPILOT_STATUS_TEXT_FIELD_LIMIT) {
     return value;
   }
-  const omitted = value.length - OPERATOR_AUTOPILOT_STATUS_TEXT_FIELD_LIMIT;
-  return `${value.slice(
-    0,
-    OPERATOR_AUTOPILOT_STATUS_TEXT_FIELD_LIMIT
-  )}\n[truncated ${omitted} chars; full output remains in operator-autopilot execution audit]`;
+  let omitted = value.length - OPERATOR_AUTOPILOT_STATUS_TEXT_FIELD_LIMIT;
+  let marker = buildStatusTextTruncationMarker(omitted);
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const headLimit = Math.max(0, OPERATOR_AUTOPILOT_STATUS_TEXT_FIELD_LIMIT - marker.length);
+    const nextOmitted = value.length - headLimit;
+    if (nextOmitted === omitted) {
+      break;
+    }
+    omitted = nextOmitted;
+    marker = buildStatusTextTruncationMarker(omitted);
+  }
+  const headLimit = Math.max(0, OPERATOR_AUTOPILOT_STATUS_TEXT_FIELD_LIMIT - marker.length);
+  if (headLimit === 0) {
+    return marker.slice(0, OPERATOR_AUTOPILOT_STATUS_TEXT_FIELD_LIMIT);
+  }
+  return `${value.slice(0, headLimit)}${marker}`;
+}
+
+function buildStatusTextTruncationMarker(omitted: number): string {
+  return `\n[truncated ${omitted} chars; full output remains in operator-autopilot execution audit]`;
 }
 
 function buildStatusDatasetBounds(

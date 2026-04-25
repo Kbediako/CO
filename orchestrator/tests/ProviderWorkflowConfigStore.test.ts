@@ -767,7 +767,13 @@ describe('providerWorkflowConfigStore', () => {
     ).toContain('[truncated ');
     expect(
       snapshottedStatus?.local_rollout_execution_attempts?.[0]?.stdout?.length ?? 0
-    ).toBeLessThan(OPERATOR_AUTOPILOT_STATUS_TEXT_FIELD_LIMIT + 120);
+    ).toBeLessThanOrEqual(OPERATOR_AUTOPILOT_STATUS_TEXT_FIELD_LIMIT);
+    expect(
+      snapshottedStatus?.local_rollout_execution_attempts?.[0]?.stderr
+    ).toContain('[truncated ');
+    expect(
+      snapshottedStatus?.local_rollout_execution_attempts?.[0]?.stderr?.length ?? 0
+    ).toBeLessThanOrEqual(OPERATOR_AUTOPILOT_STATUS_TEXT_FIELD_LIMIT);
 
     await writeRepoConfig(buildValidProviderConfig('v2'));
     const refreshed = await store.refresh();
