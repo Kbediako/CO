@@ -30,6 +30,20 @@
   - manifests/status proof omit selected runtime, app-server thread/turn ids, sticky env id, or resume/fork outcomes
   - JSONL/session-log truth is removed before parity is proven
   - CO-358 is treated as a hard blocker without exact canary-path cloud preflight evidence
+- Non-goals:
+  - CO-360 does not make app-server the default provider-worker supervision path.
+  - CO-360 does not remove `codex exec` / `codex exec resume` fallback.
+  - CO-360 does not remove JSONL/session-log truth surfaces before parity is proven.
+  - CO-360 does not make CO-358 a blocker unless the exact canary path requires cloud preflight.
+- Nearby wrong interpretations:
+  - Wrong: CO-360 proves app-server startup and therefore replaces provider-worker supervision.
+    Correct: CO-360 requires configured provider-worker turns plus sticky environment and persisted-turn proof or exact blockers.
+  - Wrong: a configured environment id alone proves sticky app-server behavior.
+    Correct: the proof must surface the real id and the behavior outcome, or retain an exact blocker/fallback reason.
+  - Wrong: CLI fallback means app-server proof dimensions are irrelevant.
+    Correct: fallback must remain fail-closed and machine-readable while preserving the blocked app-server proof dimensions.
+  - Wrong: session-log truth can be dropped once app-server proof fields exist.
+    Correct: JSONL/session-log truth remains until parity is proven and reviewed.
 - Pre-implementation issue-quality review:
   - 2026-04-25: CO-360 acceptance criteria and non-goals are mirrored verbatim in the PRD/spec readiness gates.
   - 2026-04-25: micro-task path is unavailable because correctness depends on exact provider-worker surfaces, app-server proof artifacts, preserved fallback semantics, and regression coverage.

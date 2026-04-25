@@ -5138,6 +5138,11 @@ function buildProviderLinearWorkerAppServerSupervisionProof(
   const selectedRuntime = normalizeProviderLinearWorkerRuntimeProof(proof);
   const selectedMode = selectedRuntime.selected_mode ?? proof.auth_provenance?.runtime_mode ?? null;
   const appserverSelected = selectedMode === 'appserver';
+  const appserverIntended =
+    appserverSelected ||
+    selectedRuntime.requested_mode === 'appserver' ||
+    selectedRuntime.fallback?.from_mode === 'appserver' ||
+    proof.auth_provenance?.runtime_mode === 'appserver';
   const stickyEnvironmentId =
     normalizeOptionalString(proof.auth_provenance?.cloud_env_id) ?? null;
   const sessionLogThreadId = normalizeOptionalString(proof.session_log_thread_id) ?? null;
@@ -5155,7 +5160,7 @@ function buildProviderLinearWorkerAppServerSupervisionProof(
     normalizeOptionalString(proof.resident_session?.source_thread_id) ?? null;
   const recordedResumeSourceThreadId =
     normalizeOptionalString(proof.resume_source_thread_id) ?? null;
-  const inRunResumeRequested = appserverSelected && proof.turn_count > 1;
+  const inRunResumeRequested = appserverIntended && proof.turn_count > 1;
   const supervisionCommand =
     residentResumeSourceThreadId || recordedResumeSourceThreadId || proof.turn_count > 1
       ? 'codex_exec_resume'
@@ -5184,28 +5189,28 @@ function buildProviderLinearWorkerAppServerSupervisionProof(
     session_log_turn_id: sessionLogTurnId,
     session_log_session_id: sessionLogSessionId,
     sticky_environment_id: stickyEnvironmentId,
-    sticky_environment_status: appserverSelected
+    sticky_environment_status: appserverIntended
       ? stickyEnvironmentId
         ? 'proven'
         : 'blocked'
       : 'not_applicable',
     sticky_environment_blocker:
-      appserverSelected && !stickyEnvironmentId
+      appserverIntended && !stickyEnvironmentId
         ? 'configured_environment_id_missing'
         : null,
-    turn_persistence_status: appserverSelected
+    turn_persistence_status: appserverIntended
       ? hasTurnPersistence
         ? 'proven'
         : 'blocked'
       : 'not_applicable',
-    turn_persistence_source: appserverSelected && hasTurnPersistence ? 'session_log_hydration' : null,
+    turn_persistence_source: appserverIntended && hasTurnPersistence ? 'session_log_hydration' : null,
     turn_persistence_blocker:
-      appserverSelected && !hasTurnPersistence
+      appserverIntended && !hasTurnPersistence
         ? 'session_log_hydration_missing'
         : null,
-    pagination_status: appserverSelected ? 'blocked' : 'not_applicable',
-    pagination_blocker: appserverSelected ? 'appserver_pagination_probe_not_implemented' : null,
-    resume_status: appserverSelected
+    pagination_status: appserverIntended ? 'blocked' : 'not_applicable',
+    pagination_blocker: appserverIntended ? 'appserver_pagination_probe_not_implemented' : null,
+    resume_status: appserverIntended
       ? resumeRequested
         ? resumePersistedTurnObserved
           ? 'proven'
@@ -5215,17 +5220,17 @@ function buildProviderLinearWorkerAppServerSupervisionProof(
     resume_source_thread_id: resumeSourceThreadId,
     resume_observed_thread_id: resumeRequested ? proof.thread_id : null,
     resume_blocker:
-      appserverSelected && resumeRequested && resumeThreadMismatch
+      appserverIntended && resumeRequested && resumeThreadMismatch
         ? 'guarded_resume_thread_mismatch'
-        : appserverSelected && resumeRequested && !resumeSourceThreadId
+        : appserverIntended && resumeRequested && !resumeSourceThreadId
           ? 'resume_source_thread_id_missing'
-        : appserverSelected && resumeRequested && !proof.thread_id
+        : appserverIntended && resumeRequested && !proof.thread_id
           ? 'resume_thread_id_missing'
-          : appserverSelected && resumeRequested && !resumePersistedTurnObserved
+          : appserverIntended && resumeRequested && !resumePersistedTurnObserved
             ? 'resume_session_log_hydration_missing'
           : null,
-    fork_status: appserverSelected ? 'blocked' : 'not_applicable',
-    fork_blocker: appserverSelected ? 'appserver_fork_probe_not_implemented' : null,
+    fork_status: appserverIntended ? 'blocked' : 'not_applicable',
+    fork_blocker: appserverIntended ? 'appserver_fork_probe_not_implemented' : null,
     jsonl_truth_retained: true,
     session_log_truth_retained: appserverSelected,
     updated_at: proof.updated_at ?? null

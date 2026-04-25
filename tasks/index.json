@@ -22,10 +22,7 @@
       "paths": {
         "spec": "tasks/specs/linear-17451947-1b72-4d01-9e3d-86dcaab46c39-provider-worker-codex-0125-appserver-supervision-gate.md",
         "task": "tasks/tasks-linear-17451947-1b72-4d01-9e3d-86dcaab46c39.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-17451947-1b72-4d01-9e3d-86dcaab46c39.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-17451947-1b72-4d01-9e3d-86dcaab46c39.md"
-        }
+        "docs": "tasks/specs/linear-17451947-1b72-4d01-9e3d-86dcaab46c39-provider-worker-codex-0125-appserver-supervision-gate.md"
       }
     },
     {

@@ -5742,19 +5742,19 @@ describe('SelectedRunProjection', () => {
         session_log_turn_id: null,
         session_log_session_id: null,
         sticky_environment_id: null,
-        sticky_environment_status: 'not_applicable',
-        sticky_environment_blocker: null,
-        turn_persistence_status: 'not_applicable',
+        sticky_environment_status: 'blocked',
+        sticky_environment_blocker: 'configured_environment_id_missing',
+        turn_persistence_status: 'blocked',
         turn_persistence_source: null,
-        turn_persistence_blocker: null,
-        pagination_status: 'not_applicable',
-        pagination_blocker: null,
-        resume_status: 'not_applicable',
+        turn_persistence_blocker: 'session_log_hydration_missing',
+        pagination_status: 'blocked',
+        pagination_blocker: 'appserver_pagination_probe_not_implemented',
+        resume_status: 'not_requested',
         resume_source_thread_id: null,
         resume_observed_thread_id: null,
         resume_blocker: null,
-        fork_status: 'not_applicable',
-        fork_blocker: null,
+        fork_status: 'blocked',
+        fork_blocker: 'appserver_fork_probe_not_implemented',
         jsonl_truth_retained: true,
         session_log_truth_retained: false,
         updated_at: '2026-04-17T00:35:00.000Z'
@@ -5778,7 +5778,8 @@ describe('SelectedRunProjection', () => {
         selected_mode: 'cli'
       },
       session_log_truth_retained: false,
-      turn_persistence_status: 'not_applicable'
+      turn_persistence_status: 'blocked',
+      turn_persistence_blocker: 'session_log_hydration_missing'
     });
     await expect(readFile(proofPath, 'utf8')).resolves.toBe(proofRaw);
   });

@@ -4565,7 +4565,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
         CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
         CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
-        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_CLOUD_ENV_ID: 'env-appserver-fallback'
       },
       {
         readTrackedIssue: vi
@@ -4631,10 +4632,16 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           provider: 'CliRuntimeProvider',
           fallback
         },
-        sticky_environment_status: 'not_applicable',
-        turn_persistence_status: 'not_applicable',
-        resume_status: 'not_applicable',
-        fork_status: 'not_applicable',
+        sticky_environment_id: 'env-appserver-fallback',
+        sticky_environment_status: 'proven',
+        sticky_environment_blocker: null,
+        turn_persistence_status: 'blocked',
+        turn_persistence_blocker: 'session_log_hydration_missing',
+        pagination_status: 'blocked',
+        pagination_blocker: 'appserver_pagination_probe_not_implemented',
+        resume_status: 'not_requested',
+        fork_status: 'blocked',
+        fork_blocker: 'appserver_fork_probe_not_implemented',
         jsonl_truth_retained: true,
         session_log_truth_retained: false
       }
