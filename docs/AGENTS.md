@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 5b560d16510db54bd283c14675f4d55dfde40175c71043a85ae8e9af94daca7f -->
+<!-- codex:instruction-stamp 16efdd06e2c9935fd4d0737f8b06063269054b39f9a28ae3e305483ec806b61c -->
 # Repository Agent Guidance
 
 Task-specific historical project blocks were removed from this file in `CO-88`. Use the active task packet under `.agent/task/**` for lane-scoped instructions instead of treating old project ids as repo-wide defaults.
@@ -42,7 +42,7 @@ Task-specific historical project blocks were removed from this file in `CO-88`. 
 - Follow `.agent/SOPs/oracle-usage.md` for Oracle runs (tool cap: 11 attachments; unique basenames; attachments-first workflow).
 
 ## Codex Version Policy (Execution)
-- Current CO-local ChatGPT-auth/appserver and marketplace posture is Codex CLI `0.125.0` after CO-351/CO-352/CO-355 evidence; release-facing cloud pins stay on the explicit promoted candidate recorded in `docs/guides/codex-version-policy.md`.
+- Current CO compatibility/adoption target is stable Codex CLI (`0.124.0`).
 - Current `0.124.0` CO-local posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, live `gpt-5.5` `xhigh` availability, and a post-build runtime-mode canary pass (`20/20` per scenario, `ready_for_default_flip=true`).
 - Release-facing downstream-smoke workflows and `cloud-canary` pin the explicit promoted candidate recorded in `docs/guides/codex-version-policy.md`.
 - Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.

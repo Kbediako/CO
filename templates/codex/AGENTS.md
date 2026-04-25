@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp eefb3c9980bc28a34317ba3584e0edfff4757cce2a3ed823c353d7d60a9714e4 -->
+<!-- codex:instruction-stamp d279303f908ab6985704b241e3905b6447ab23fe423a9d2e836d01b7eeaa35ba -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
@@ -54,7 +54,7 @@
 - Built-in roles are `default`, `explorer`, `worker`, and `awaiter`; `researcher` is user-defined.
 - `spawn_agent` defaults to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
 - For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
-- Current CO-local ChatGPT-auth/appserver and marketplace posture is Codex CLI `0.125.0` after CO-351/CO-352/CO-355 evidence; release-facing cloud pins stay on the explicit promoted candidate recorded in `docs/guides/codex-version-policy.md`.
+- Current CO compatibility/adoption target is stable Codex CLI `0.124.0`.
 - Current `0.124.0` CO posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, packaged `gpt-5.4` `xhigh` defaults, and a post-build runtime-mode canary pass.
 - Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
 - Portable generated defaults still seed `model = "gpt-5.4"` and `model_reasoning_effort = "xhigh"` in `~/.codex/config.toml`; operators may explicitly opt into newer local models after access smoke.

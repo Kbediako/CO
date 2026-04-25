@@ -21,9 +21,9 @@ Node.js `>=20` is required. npm remains the supported baseline install path.
 
 ## Current Posture
 
-- Current Codex CLI `0.125.0` local ChatGPT-auth/appserver and marketplace/downstream-smoke posture; cloud execution remains separately gated
+- Current Codex CLI `0.124.0` compatibility target
 - Current model posture: `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions
-- Portable packaged/generated defaults keep `gpt-5.4` / `xhigh` as fallback values when `gpt-5.5`, API, or cloud portability is unavailable
+- Portable packaged/generated defaults still seed `gpt-5.4` / `xhigh`; use them when `gpt-5.5`, API, or cloud portability is unavailable
 - Local default runtime: `appserver`
 - Unsupported combination: `executionMode=cloud` with explicit `runtimeMode=appserver`
 

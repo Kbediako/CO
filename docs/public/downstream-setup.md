@@ -6,10 +6,10 @@ This guide is the downstream-safe setup path shipped in the npm package.
 
 - Once per machine: install Codex CLI and authenticate.
 - Once per repo: seed the CO templates, run setup with the repo root so delegation is repo-scoped while bundled skills are installed and DevTools wiring is applied at the machine level, review the generated config, and start using task-scoped runs.
-- CO currently uses Codex CLI `0.125.0` for validated local ChatGPT-auth/appserver posture and marketplace/downstream-smoke compatibility; cloud execution and provider-supervision replacement remain separately gated in the version policy.
-- Portable generated downstream defaults keep `gpt-5.4` / `xhigh` as fallback values when `gpt-5.5`, API/cloud portability, or downstream/no-network access is unavailable.
-- Local ChatGPT-auth `gpt-5.5` / `xhigh` is the current CO posture after live access smoke; fall back to `gpt-5.4` only on concrete access or portability failure.
-- `codex-orchestrator doctor` accepts `gpt-5.5` as non-drift when current model access is verified, and additive defaults preserve compatible prior `gpt-5.5` role files.
+- CO currently targets Codex CLI `0.124.0`; newer candidates stay evidence-gated in the version policy.
+- Portable generated downstream defaults stay on `gpt-5.4` / `xhigh` because API/cloud portability is not proven and app-server model/list still reports it as `isDefault`.
+- Local ChatGPT-auth `gpt-5.5` / `xhigh` remains marker-backed opt-in only after `codex debug models` verifies current model access.
+- `codex-orchestrator doctor` accepts the marker-backed local `gpt-5.5` opt-in as non-drift only when `codex debug models` verifies current model access, and additive defaults preserve matching prior `gpt-5.5` role files when the top-level config is explicitly opted in.
 - CO-196 posture lineage remains unchanged: npm is the supported baseline because it is the simplest supported CLI install path, and marketplace packaging is an additive registration path for newer Codex releases. `0.121.0` accepts both `codex marketplace add` and `codex plugin marketplace add`; `0.122.0+` require `codex plugin marketplace add`, and current `0.125.0` also exposes `codex plugin marketplace upgrade` / `remove`.
 
 ## Once per machine
