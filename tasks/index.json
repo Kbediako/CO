@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260425-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83",
+      "title": "CO: repair archive automation auto-merge token",
+      "relates_to": "tasks/tasks-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-25",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-25",
+          "status": "produced",
+          "manifest": ".runs/linear-fd4bf705-11a9-4717-948c-addfb4fa3f83-docs-packet-cli/cli/2026-04-25T06-07-45-642Z-4500fa92/manifest.json",
+          "source_anchor": "ctx:sha256:becfd8cba79308cf736ffb09357d004b9d8b428a1389367239b753c92a9107d6#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-362 as the archive auto-merge credential repair lane for `ARCHIVE_AUTOMERGE_TOKEN`, `tasks-archive-automation`, `implementation-docs-archive-automation`, archive auto-merge, and `401 Bad credentials`; parent owns GitHub secret or permission repair, required `Core Lane` archive PR evidence, auto-merge verification, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
+        "task": "tasks/tasks-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
+        "agent_task": ".agent/task/linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
+        "docs": "docs/TECH_SPEC-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md"
+      }
+    },
+    {
       "id": "20260425-linear-17451947-1b72-4d01-9e3d-86dcaab46c39",
       "title": "CO-360 provider-worker Codex 0.125 app-server supervision gate",
       "relates_to": "tasks/tasks-linear-17451947-1b72-4d01-9e3d-86dcaab46c39.md",
