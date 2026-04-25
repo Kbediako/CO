@@ -17,6 +17,12 @@ import {
   resolveCodexCliReadiness,
   type CodexCliReadiness
 } from './utils/codexCli.js';
+import {
+  codexFeatureProbeDisablesMultiAgentV2,
+  codexFeatureProbeRejectsAgentMaxThreads,
+  readCodexFeatureProbe,
+  type CodexFeatureProbeResult
+} from './utils/codexFeatures.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
 import { resolveOptionalDependency, type OptionalResolutionSource } from './utils/optionalDeps.js';
 import {
@@ -128,9 +134,10 @@ export interface DoctorCodexDefaultsAdvisory {
       actual: string | null;
     };
     max_threads: {
-      status: 'ok' | 'advisory';
+      status: 'ok' | 'advisory' | 'skipped';
       expected_minimum: number;
       actual: number | null;
+      detail?: string;
     };
     max_depth: {
       status: 'ok' | 'advisory';
@@ -370,9 +377,9 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
   const codexBin = resolveCodexCliBin(process.env);
   const managedOptIn = isManagedCodexCliEnabled(process.env);
   const managedCodex = resolveCodexCliReadiness(process.env);
-  const codexDefaults = inspectCodexDefaultsAdvisory(process.env, codexBin);
-
-  const features = readCodexFeatureFlags(codexBin);
+  const featureProbe = readCodexFeatureProbe(codexBin, process.env);
+  const features = featureProbe.flags;
+  const codexDefaults = inspectCodexDefaultsAdvisory(process.env, codexBin, featureProbe);
   const collabFeatureKey: DoctorResult['collab']['feature_key'] =
     features === null
       ? null
@@ -817,9 +824,19 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
   lines.push(
     `  - model_reasoning_effort: ${result.codex_defaults.checks.model_reasoning_effort.status} (actual: ${result.codex_defaults.checks.model_reasoning_effort.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.model_reasoning_effort.expected_minimum})`
   );
-  lines.push(
-    `  - agents.max_threads: ${result.codex_defaults.checks.max_threads.status} (actual: ${result.codex_defaults.checks.max_threads.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.max_threads.expected_minimum})`
-  );
+  if (result.codex_defaults.checks.max_threads.status === 'skipped') {
+    lines.push(
+      `  - agents.max_threads: skipped (actual: ${result.codex_defaults.checks.max_threads.actual ?? '<unset>'}; ${result.codex_defaults.checks.max_threads.detail ?? 'omitted by policy'})`
+    );
+  } else if (result.codex_defaults.checks.max_threads.detail) {
+    lines.push(
+      `  - agents.max_threads: ${result.codex_defaults.checks.max_threads.status} (actual: ${result.codex_defaults.checks.max_threads.actual ?? '<unset>'}; ${result.codex_defaults.checks.max_threads.detail})`
+    );
+  } else {
+    lines.push(
+      `  - agents.max_threads: ${result.codex_defaults.checks.max_threads.status} (actual: ${result.codex_defaults.checks.max_threads.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.max_threads.expected_minimum})`
+    );
+  }
   lines.push(
     `  - agents.max_depth: ${result.codex_defaults.checks.max_depth.status} (actual: ${result.codex_defaults.checks.max_depth.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.max_depth.expected_minimum} when set; <unset> accepted)`
   );
@@ -1059,7 +1076,8 @@ function inspectProviderReadiness(
 
 function inspectCodexDefaultsAdvisory(
   env: NodeJS.ProcessEnv = process.env,
-  codexBin: string = resolveCodexCliBin(env)
+  codexBin: string = resolveCodexCliBin(env),
+  featureProbe: CodexFeatureProbeResult | null = readCodexFeatureProbe(codexBin, env)
 ): DoctorCodexDefaultsAdvisory {
   const configPath = join(resolveCodexHome(env), 'config.toml');
   const checks: DoctorCodexDefaultsAdvisory['checks'] = {
@@ -1077,9 +1095,22 @@ function inspectCodexDefaultsAdvisory(
   const guidance: string[] = [
     'Run `codex-orchestrator codex defaults --yes` to apply additive baseline defaults.',
     'Additive policy: unrelated config keys are preserved; existing role files stay untouched unless `--force` is set or they exactly match a prior CO-managed model baseline.',
+    'When `features.multi_agent_v2=true`, omit `agents.max_threads`; Codex CLI 0.125+ rejects that key.',
     'Current CO baseline no longer seeds or expects `agents.max_spawn_depth`; keep it only as a legacy local override when an older parser/runtime still honors it.',
     'Leaving `agents.max_depth` unset remains accepted when local parser/runtime constraints require it.'
   ];
+  const featureProbeDisablesMultiAgentV2 =
+    featureProbe ? codexFeatureProbeDisablesMultiAgentV2(featureProbe) : false;
+  const featureProbeIndicatesMultiAgentV2 =
+    !featureProbeDisablesMultiAgentV2
+    && (featureProbe?.flags?.multi_agent_v2 === true
+      || (featureProbe ? codexFeatureProbeRejectsAgentMaxThreads(featureProbe) : false));
+  if (featureProbeIndicatesMultiAgentV2) {
+    checks.max_threads.status = 'skipped';
+    checks.max_threads.actual = null;
+    checks.max_threads.detail =
+      'features.multi_agent_v2=true; omit agents.max_threads because Codex CLI 0.125+ rejects it';
+  }
 
   if (!existsSync(configPath)) {
     return {
@@ -1160,13 +1191,26 @@ function inspectCodexDefaultsAdvisory(
     : 'advisory';
 
   const agents = isRecord(parsed.agents) ? parsed.agents : {};
+  const multiAgentV2Enabled =
+    featureProbeIndicatesMultiAgentV2
+    || (!featureProbeDisablesMultiAgentV2
+      && readBooleanValue(readRecordValue(parsed, 'features')?.multi_agent_v2) === true);
   const maxThreads = readNumberValue(agents.max_threads);
   const maxDepth = readNumberValue(agents.max_depth);
   const maxSpawnDepth = readNumberValue(agents.max_spawn_depth);
+  const hasMaxThreads = Object.prototype.hasOwnProperty.call(agents, 'max_threads');
 
   checks.max_threads.actual = maxThreads;
-  checks.max_threads.status =
-    typeof maxThreads === 'number' && maxThreads >= BASELINE_AGENTS.max_threads ? 'ok' : 'advisory';
+  if (multiAgentV2Enabled) {
+    checks.max_threads.status = hasMaxThreads ? 'advisory' : 'skipped';
+    checks.max_threads.detail =
+      hasMaxThreads
+        ? 'features.multi_agent_v2=true; remove agents.max_threads because Codex CLI 0.125+ rejects it'
+        : 'features.multi_agent_v2=true; omit agents.max_threads because Codex CLI 0.125+ rejects it';
+  } else {
+    checks.max_threads.status =
+      typeof maxThreads === 'number' && maxThreads >= BASELINE_AGENTS.max_threads ? 'ok' : 'advisory';
+  }
   checks.max_depth.actual = maxDepth;
   checks.max_depth.status =
     maxDepth === null || (typeof maxDepth === 'number' && maxDepth >= BASELINE_AGENTS.max_depth) ? 'ok' : 'advisory';
@@ -1183,7 +1227,7 @@ function inspectCodexDefaultsAdvisory(
   }
 
   const allChecksOk =
-    Object.values(checks).every((check) => check.status === 'ok')
+    Object.values(checks).every((check) => check.status === 'ok' || check.status === 'skipped')
     && unverifiedLocalModels.length === 0
     && legacyMaxSpawnDepth?.status !== 'advisory';
   return {
@@ -1648,40 +1692,6 @@ function buildCloudPreflightGuidance(issues: CloudPreflightIssue[]): string[] {
   }
 
   return [...new Set(guidance)];
-}
-
-function readCodexFeatureFlags(codexBin: string): Record<string, boolean> | null {
-  const result = spawnSync(codexBin, ['features', 'list'], {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: 5000
-  });
-  if (result.error || result.status !== 0) {
-    return null;
-  }
-  const stdout = String(result.stdout ?? '');
-  const flags: Record<string, boolean> = {};
-  for (const line of stdout.split(/\r?\n/u)) {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      continue;
-    }
-    const tokens = trimmed.split(/\s+/u);
-    if (tokens.length < 2) {
-      continue;
-    }
-    const name = tokens[0] ?? '';
-    const enabledToken = tokens[tokens.length - 1] ?? '';
-    if (!name) {
-      continue;
-    }
-    if (enabledToken === 'true') {
-      flags[name] = true;
-    } else if (enabledToken === 'false') {
-      flags[name] = false;
-    }
-  }
-  return flags;
 }
 
 function canRunCommand(command: string, args: string[]): boolean {
