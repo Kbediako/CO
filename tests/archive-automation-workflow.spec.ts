@@ -120,7 +120,8 @@ describe('archive automation workflow required checks', () => {
     expect(workflow.jobs?.archive?.permissions).toMatchObject({
       actions: 'write',
       contents: 'write',
-      'pull-requests': 'write'
+      'pull-requests': 'write',
+      statuses: 'write'
     });
 
     const dispatchStep = getStep(workflow, 'archive', 'Dispatch Core Lane for archive PR');
@@ -140,7 +141,30 @@ describe('archive automation workflow required checks', () => {
     expect(dispatchStep.run).toContain('-f "archive_pr_number=${PR_NUMBER}"');
     expect(dispatchStep.run).toContain('-f "archive_pr_branch=${PR_BRANCH}"');
     expect(dispatchStep.run).toContain('-f "archive_pr_head_sha=${PR_HEAD_SHA}"');
+    expect(dispatchStep.run).toContain('DISPATCH_STATUS=$?');
+    expect(dispatchStep.run).toContain('Core Lane dispatch failed');
     expect(dispatchStep.run).toContain('Archive PR branch input or create-pull-request head SHA is missing');
+  });
+
+  it('publishes a PR-visible Core Lane status from the dispatched run conclusion', async () => {
+    const workflow = await readWorkflow('.github/workflows/archive-automation-base.yml');
+    const dispatchStep = getStep(workflow, 'archive', 'Dispatch Core Lane for archive PR');
+
+    expect(dispatchStep.run).toContain('set_core_lane_status()');
+    expect(dispatchStep.run).toContain('gh api "repos/${GH_REPO}/statuses/${PR_HEAD_SHA}"');
+    expect(dispatchStep.run).toContain('-f "context=Core Lane"');
+    expect(dispatchStep.run).toContain('set_core_lane_status "pending"');
+    expect(dispatchStep.run).toContain('find_dispatched_run_id()');
+    expect(dispatchStep.run).toContain('--workflow core-lane.yml');
+    expect(dispatchStep.run).toContain('--commit "${PR_HEAD_SHA}"');
+    expect(dispatchStep.run).toContain('--event workflow_dispatch');
+    expect(dispatchStep.run).toContain('select(.createdAt >= \\"${DISPATCH_STARTED_AT}\\")');
+    expect(dispatchStep.run).toContain('gh run watch "${RUN_ID}"');
+    expect(dispatchStep.run).toContain('gh run view "${RUN_ID}"');
+    expect(dispatchStep.run).toContain('set_core_lane_status "success"');
+    expect(dispatchStep.run).toContain('set_core_lane_status "failure"');
+    expect(dispatchStep.run).toContain('Dispatched Core Lane run was not found');
+    expect(dispatchStep.run).toContain('Core Lane did not pass');
   });
 
   it('grants reusable archive callers permission to dispatch Core Lane', async () => {
@@ -151,7 +175,8 @@ describe('archive automation workflow required checks', () => {
       expect(workflow.jobs?.archive?.permissions).toMatchObject({
         actions: 'write',
         contents: 'write',
-        'pull-requests': 'write'
+        'pull-requests': 'write',
+        statuses: 'write'
       });
     }
   });

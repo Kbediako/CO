@@ -61,6 +61,7 @@ jobs:
       actions: write
       contents: write
       pull-requests: write
+      statuses: write
     steps:
       - name: Checkout (full history for diffs)
         uses: actions/checkout@v4
@@ -186,14 +187,88 @@ jobs:
             exit 1
           fi
 
+          set_core_lane_status() {
+            local state="$1"
+            local description="$2"
+            local target_url="$3"
+
+            gh api "repos/${GH_REPO}/statuses/${PR_HEAD_SHA}" \
+              -f "state=${state}" \
+              -f "context=Core Lane" \
+              -f "description=${description}" \
+              -f "target_url=${target_url}" >/dev/null
+          }
+
+          find_dispatched_run_id() {
+            gh run list \
+              --repo "${GH_REPO}" \
+              --workflow core-lane.yml \
+              --branch "${PR_BRANCH}" \
+              --commit "${PR_HEAD_SHA}" \
+              --event workflow_dispatch \
+              --limit 20 \
+              --json databaseId,createdAt \
+              --jq ".[] | select(.createdAt >= \"${DISPATCH_STARTED_AT}\") | .databaseId" \
+              | head -n 1
+          }
+
+          ACTIONS_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/core-lane.yml"
+          DISPATCH_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          set_core_lane_status "pending" "Archive automation dispatched Core Lane." "${ACTIONS_URL}"
+
+          set +e
           gh workflow run core-lane.yml \
             --repo "${GH_REPO}" \
             --ref "${PR_BRANCH}" \
             -f "archive_pr_number=${PR_NUMBER}" \
             -f "archive_pr_branch=${PR_BRANCH}" \
             -f "archive_pr_head_sha=${PR_HEAD_SHA}"
+          DISPATCH_STATUS=$?
+          set -e
 
-          echo "Dispatched Core Lane for archive PR #${PR_NUMBER} (${PR_BRANCH} @ ${PR_HEAD_SHA})." >> "$GITHUB_STEP_SUMMARY"
+          if [ "${DISPATCH_STATUS}" -ne 0 ]; then
+            set_core_lane_status "error" "Core Lane dispatch failed for archive PR #${PR_NUMBER}." "${ACTIONS_URL}"
+            echo "::error::Core Lane dispatch failed for archive PR #${PR_NUMBER} (${PR_BRANCH} @ ${PR_HEAD_SHA})."
+            exit "${DISPATCH_STATUS}"
+          fi
+
+          RUN_ID=""
+          for _ in $(seq 1 40); do
+            RUN_ID="$(find_dispatched_run_id)"
+            if [ -n "${RUN_ID}" ]; then
+              break
+            fi
+            sleep 15
+          done
+
+          if [ -z "${RUN_ID}" ]; then
+            set_core_lane_status "error" "Dispatched Core Lane run was not found." "${ACTIONS_URL}"
+            echo "::error::Dispatched Core Lane run was not found for ${PR_BRANCH} @ ${PR_HEAD_SHA}."
+            exit 1
+          fi
+
+          echo "Dispatched Core Lane run ${RUN_ID} for archive PR #${PR_NUMBER} (${PR_BRANCH} @ ${PR_HEAD_SHA})." >> "$GITHUB_STEP_SUMMARY"
+
+          set +e
+          gh run watch "${RUN_ID}" --repo "${GH_REPO}" --exit-status --interval 30
+          WATCH_STATUS=$?
+          set -e
+
+          RUN_FIELDS="$(gh run view "${RUN_ID}" --repo "${GH_REPO}" --json conclusion,url --jq '[.conclusion, .url] | @tsv')"
+          IFS=$'\t' read -r RUN_CONCLUSION RUN_URL <<< "${RUN_FIELDS}"
+
+          if [ "${RUN_CONCLUSION}" = "success" ]; then
+            set_core_lane_status "success" "Core Lane passed for archive PR #${PR_NUMBER}." "${RUN_URL}"
+            echo "Core Lane passed for archive PR #${PR_NUMBER}: ${RUN_URL}" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          set_core_lane_status "failure" "Core Lane ${RUN_CONCLUSION:-failed} for archive PR #${PR_NUMBER}." "${RUN_URL:-${ACTIONS_URL}}"
+          echo "::error::Core Lane did not pass for archive PR #${PR_NUMBER}; conclusion=${RUN_CONCLUSION:-unknown}; run=${RUN_URL:-${RUN_ID}}."
+          if [ "${WATCH_STATUS}" -ne 0 ]; then
+            exit "${WATCH_STATUS}"
+          fi
+          exit 1
 
       - name: Check auto-merge token
         if: steps.changes.outputs.changed == 'true' && inputs.enable_auto_merge
