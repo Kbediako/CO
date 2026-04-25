@@ -39,7 +39,7 @@ last_review: 2026-04-26
 - Not done if:
   - version bump lands without the public/package-surface truth fixes
   - docs claim cloud proof that this lane did not produce
-  - release-prep changes require a publish step to validate
+  - release-prep changes require a publishing step to validate
 - Pre-implementation issue-quality review evidence: current audit shows the real blocker is stale public release posture wording, not missing runtime or release-workflow support on `origin/main`.
 - Safeguard ownership split: this worker owns only the clean worktree and the release-prep docs/files created there.
 
