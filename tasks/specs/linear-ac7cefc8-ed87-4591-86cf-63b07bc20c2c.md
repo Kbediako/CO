@@ -65,7 +65,7 @@ task_checklists:
 - A stale owner still appears only as `provider-linear-worker could not request control-host refresh`, `refresh request timeout`, or `fetch failed`.
 - No `control-host-stale-owner.json` artifact exists for stale-owner diagnosis.
 - `control-host-stale-owner.json` omits `owner pid/host/task/run` or `attempted pid/host`.
-- `stale_reclaimed` is recorded but `co-status freshness` / `control-host` freshness still times out or reports stale state without a failure artifact.
+- `stale_reclaimed` is recorded, but `co-status freshness` / `control-host` freshness still times out or reports stale state without a failure artifact.
 - Persistent refresh failure after reclaim does not write `provider-control-host-refresh-failure.json`.
 - Owner reclaim can run against an active owner or without liveness evidence.
 - Provider refresh queue state is dropped, duplicated, or marked terminal during reclaim.
