@@ -139,8 +139,24 @@ function compactCloudPreflightOutput(output: string): string {
   return output.length > 500 ? `${output.slice(0, 497)}...` : output;
 }
 
+function redactCloudPreflightOutput(output: string): string {
+  return output
+    .replace(/\b(?:authorization|bearer)\s*[:=]\s*bearer\s+[^\s,;]+/giu, 'authorization: Bearer <redacted>')
+    .replace(/\bbearer\s+[A-Za-z0-9._~+/-]{10,}/gu, 'Bearer <redacted>')
+    .replace(/\b(?:sk|sess|eyJ)[A-Za-z0-9._~+/-]{12,}/gu, '<redacted-token>')
+    .replace(
+      /\b(?:CODEX|OPENAI|CHATGPT|GITHUB|GH)_[A-Z0-9_]*(?:API_KEY|AUTH_TOKEN|ACCESS_TOKEN|REFRESH_TOKEN|TOKEN|SECRET|PASSWORD)\s*=\s*[^\s,;]+/gu,
+      (match) => `${match.split('=')[0] ?? 'secret'}=<redacted>`
+    )
+    .replace(
+      /\b(?:api[_ -]?key|auth[_ -]?token|access[_ -]?token|refresh[_ -]?token|bearer[_ -]?token|password|secret|credential)\s*[:=]\s*[^\s,;]+/giu,
+      (match) => `${match.split(/[:=]/u)[0]?.trim() ?? 'secret'}=<redacted>`
+    )
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/giu, '<redacted-email>');
+}
+
 function compactCloudPreflightCommandOutput(result: CommandResult): string {
-  return compactCloudPreflightOutput(readCloudPreflightCommandOutput(result));
+  return compactCloudPreflightOutput(redactCloudPreflightOutput(readCloudPreflightCommandOutput(result)));
 }
 
 function isEnvironmentNotFoundSignal(signal: string, environmentId: string): boolean {
@@ -259,10 +275,11 @@ function buildEnvironmentProbePayloadIssue(
   environmentId: string,
   detail: string
 ): CloudPreflightIssue {
+  const safeDetail = compactCloudPreflightOutput(redactCloudPreflightOutput(detail));
   return {
     code: 'environment_unavailable',
     message:
-      `Configured CODEX_CLOUD_ENV_ID '${environmentId}' could not be verified by codex cloud before codex cloud exec: ${detail}`
+      `Configured CODEX_CLOUD_ENV_ID '${environmentId}' could not be verified by codex cloud before codex cloud exec: ${safeDetail}`
   };
 }
 

@@ -271,4 +271,23 @@ describe('buildCloudPreflightRequest', () => {
     );
     expect(result.issues.map((issue) => issue.code)).not.toContain('environment_not_found');
   });
+
+  it('redacts sensitive cloud probe output before embedding issue messages', async () => {
+    const { result } = await runCloudPreflightWithCloudList({
+      environmentId: 'env-forbidden',
+      stderr:
+        'Error: environment env-forbidden not found; forbidden for active account user@example.com OPENAI_API_KEY=sk-testsecret1234567890 Authorization: Bearer sess-secret1234567890',
+      exitCode: 1
+    });
+
+    expect(result.ok).toBe(false);
+    const message = result.issues.map((issue) => issue.message).join('\n');
+    expect(message).toContain('forbidden for active account');
+    expect(message).toContain('<redacted-email>');
+    expect(message).toContain('OPENAI_API_KEY=<redacted>');
+    expect(message).toContain('authorization: Bearer <redacted>');
+    expect(message).not.toContain('user@example.com');
+    expect(message).not.toContain('sk-testsecret1234567890');
+    expect(message).not.toContain('sess-secret1234567890');
+  });
 });
