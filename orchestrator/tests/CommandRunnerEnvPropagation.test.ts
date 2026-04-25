@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import process from 'node:process';
@@ -9,6 +9,12 @@ const mockState = vi.hoisted(() => ({
     command?: string;
     args?: string[];
     env?: NodeJS.ProcessEnv;
+  } | null,
+  providerWorkerProofTokens: null as {
+    input_tokens: number | null;
+    output_tokens: number | null;
+    total_tokens: number | null;
+    reasoning_output_tokens?: number | null;
   } | null
 }));
 
@@ -22,6 +28,41 @@ vi.mock('../src/cli/services/execRuntime.js', () => {
     },
     async run(input: { command?: string; args?: string[]; env?: NodeJS.ProcessEnv }) {
       mockState.lastRunInput = input;
+      if (mockState.providerWorkerProofTokens && input.env?.CODEX_ORCHESTRATOR_MANIFEST_PATH) {
+        const [{ dirname, join }, { mkdir, writeFile }] = await Promise.all([
+          import('node:path'),
+          import('node:fs/promises')
+        ]);
+        const runDir = dirname(input.env.CODEX_ORCHESTRATOR_MANIFEST_PATH);
+        await mkdir(runDir, { recursive: true });
+        await writeFile(
+          join(runDir, 'provider-linear-worker-proof.json'),
+          `${JSON.stringify({
+            issue_id: 'issue-provider-worker',
+            issue_identifier: 'CO-999',
+            attempt_started_at: '2030-01-01T00:00:00.000Z',
+            current_turn_started_at: '2030-01-01T00:00:00.000Z',
+            pid: 'pid-provider-worker',
+            thread_id: 'thread-provider-worker',
+            latest_turn_id: 'turn-provider-worker',
+            latest_session_id: 'session-provider-worker',
+            latest_session_id_source: 'derived_from_thread_and_turn',
+            turn_count: 1,
+            last_event: 'turn.completed',
+            last_message: 'done',
+            last_event_at: '2030-01-01T00:00:00.000Z',
+            tokens: mockState.providerWorkerProofTokens,
+            rate_limits: null,
+            owner_phase: 'ended',
+            owner_status: 'succeeded',
+            workspace_path: null,
+            linear_audit: null,
+            end_reason: 'done',
+            updated_at: '2030-01-01T00:00:00.000Z'
+          })}\n`,
+          'utf8'
+        );
+      }
       return {
         correlationId: 'corr-env-propagation',
         stdout: 'ok\n',
@@ -96,6 +137,7 @@ beforeEach(async () => {
   process.env.CODEX_ORCHESTRATOR_OUT_DIR = join(workspaceRoot, 'out');
   process.env.MCP_RUNNER_TASK_ID = 'top-level-parent-task';
   mockState.lastRunInput = null;
+  mockState.providerWorkerProofTokens = null;
 });
 
 afterEach(async () => {
@@ -178,6 +220,49 @@ describe('runCommandStage environment propagation', () => {
       'orchestrator/src/cli/providerLinearWorkerRunner.ts'
     );
     expect(mockState.lastRunInput?.env?.CODEX_ORCHESTRATOR_NODE_BIN).toBe(process.execPath);
+  });
+
+  it('copies provider worker reasoning-token usage into the run manifest', async () => {
+    mockState.providerWorkerProofTokens = {
+      input_tokens: 120,
+      output_tokens: 45,
+      total_tokens: 165,
+      reasoning_output_tokens: 31
+    };
+    const baseEnv = normalizeEnvironmentPaths(resolveEnvironmentPaths());
+    const env = { ...baseEnv, taskId: 'provider-worker-token-task' };
+    const pipeline: PipelineDefinition = {
+      id: 'provider-linear-worker',
+      title: 'Provider Worker',
+      stages: [
+        {
+          kind: 'command',
+          id: 'provider-linear-worker',
+          title: 'Run provider linear worker',
+          command: 'node "$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/providerLinearWorkerRunner.js"'
+        }
+      ]
+    };
+
+    const { manifest, paths } = await bootstrapManifest('run-provider-worker-tokens', {
+      env,
+      pipeline,
+      parentRunId: null,
+      taskSlug: env.taskId,
+      approvalPolicy: null
+    });
+
+    const stage = pipeline.stages[0] as CommandStage;
+    await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(manifest.provider_linear_worker_tokens).toEqual({
+      input_tokens: 120,
+      output_tokens: 45,
+      total_tokens: 165,
+      reasoning_output_tokens: 31
+    });
+    const onDiskManifest = JSON.parse(await readFile(paths.manifestPath, 'utf8')) as typeof manifest;
+    expect(onDiskManifest.provider_linear_worker_tokens).toEqual(manifest.provider_linear_worker_tokens);
   });
 
   it('honors explicit foreign package roots for provider worker stages', async () => {

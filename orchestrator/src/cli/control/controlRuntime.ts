@@ -1358,6 +1358,8 @@ function buildCompatibilityTelemetrySnapshot(
   let hasOutputTokens = false;
   let totalTokens = 0;
   let hasTotalTokens = false;
+  let reasoningOutputTokens = 0;
+  let hasReasoningOutputTokens = false;
   let secondsRunning = 0;
   let latestAuthoritativeRateLimits: Record<string, unknown> | null = polling?.linear_budget
     ? { ...polling.linear_budget }
@@ -1384,6 +1386,13 @@ function buildCompatibilityTelemetrySnapshot(
       totalTokens += Math.max(0, tokenUsage.total_tokens);
       hasTotalTokens = true;
     }
+    if (
+      typeof tokenUsage?.reasoning_output_tokens === 'number' &&
+      Number.isFinite(tokenUsage.reasoning_output_tokens)
+    ) {
+      reasoningOutputTokens += Math.max(0, tokenUsage.reasoning_output_tokens);
+      hasReasoningOutputTokens = true;
+    }
     secondsRunning += computeCompatibilityRuntimeSeconds(source, now);
 
     const linearBudget = proof?.linear_budget ? { ...proof.linear_budget } : null;
@@ -1407,13 +1416,18 @@ function buildCompatibilityTelemetrySnapshot(
     }
   }
 
+  const codexTotals: ControlCodexTotalsPayload = {
+    input_tokens: hasInputTokens ? inputTokens : null,
+    output_tokens: hasOutputTokens ? outputTokens : null,
+    total_tokens: hasTotalTokens ? totalTokens : null,
+    seconds_running: Number(secondsRunning.toFixed(3))
+  };
+  if (hasReasoningOutputTokens) {
+    codexTotals.reasoning_output_tokens = reasoningOutputTokens;
+  }
+
   return {
-    codexTotals: {
-      input_tokens: hasInputTokens ? inputTokens : null,
-      output_tokens: hasOutputTokens ? outputTokens : null,
-      total_tokens: hasTotalTokens ? totalTokens : null,
-      seconds_running: Number(secondsRunning.toFixed(3))
-    },
+    codexTotals,
     rateLimits: combineCompatibilityRateLimits({
       codex: latestCodexRateLimits,
       linearBudget: latestAuthoritativeRateLimits
