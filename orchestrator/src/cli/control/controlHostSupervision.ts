@@ -785,13 +785,16 @@ function buildControlHostSupervisionRestartSignature(
 function buildControlHostSupervisionRestartReasonKey(
   polling: ControlHostSupervisionPollingDiagnostic
 ): string | null {
+  if (polling.reason) {
+    return polling.reason;
+  }
   if (isActiveProviderRefreshProbeTimeoutDiagnostic(polling)) {
     return 'active_provider_refresh_probe_timeout';
   }
   if (isProviderRefreshLifecycleRestartRequiredDiagnostic(polling)) {
     return 'provider_refresh_lifecycle_stuck';
   }
-  return polling.reason ?? polling.last_error ?? null;
+  return polling.last_error ?? null;
 }
 
 function buildControlHostSupervisionWorkerSeriesKey(

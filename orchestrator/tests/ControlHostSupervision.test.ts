@@ -818,6 +818,49 @@ describe('controlHostSupervision helpers', () => {
     });
   });
 
+  it('does not quarantine a new restart_required reason because of a retained provider-refresh last_error', () => {
+    const diagnostic = buildProbeTimeoutDiagnosticFixture();
+    expect(
+      evaluateControlHostSupervisionHealthPayload(
+        {
+          counts: diagnostic.counts,
+          running: diagnostic.running_workers,
+          polling: {
+            ...diagnostic.polling,
+            restart_required: true,
+            reason: 'provider_poll_lifecycle_stuck',
+            last_error: 'provider_refresh_lifecycle_stuck',
+            updated_at: '2026-04-14T05:07:38.000Z',
+            refresh_phase: 'poll:issue_snapshot',
+            refresh_request_class: 'poll:issues',
+            checking: true,
+            queued: true,
+            operation_elapsed_ms: 47_000,
+            stalled_after_ms: 45_000
+          }
+        },
+        {
+          restartHistory: [
+            {
+              requested_at: '2026-04-14T05:06:30.000Z',
+              reason: 'restart_required',
+              message: 'launchd restart requested',
+              consecutive_unhealthy_samples: 3,
+              child_pid: 4321,
+              diagnostic
+            }
+          ],
+          activeWorkerRestartQuarantineMs: 10 * 60 * 1000,
+          now: '2026-04-14T05:07:45.000Z'
+        }
+      )
+    ).toEqual({
+      healthy: false,
+      reason: 'restart_required',
+      message: 'co-status reported restart_required=true.'
+    });
+  });
+
   it('keeps provider refresh restart_required unhealthy when the active worker series changes', () => {
     expect(
       evaluateControlHostSupervisionHealthPayload(
