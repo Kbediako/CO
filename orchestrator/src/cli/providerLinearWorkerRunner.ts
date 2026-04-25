@@ -285,6 +285,8 @@ export interface ProviderLinearWorkerChildLaneRecord {
   runner_alive?: boolean | null;
   runtime_event?: string | null;
   runtime_event_at?: string | null;
+  appserver_startup_observed?: boolean | null;
+  appserver_startup_observed_at?: string | null;
   stale_invalidation_candidate?: boolean | null;
   stale_invalidation_reason?: string | null;
   issue_id: string;
@@ -5207,6 +5209,8 @@ interface ProviderLinearWorkerChildLaneManifestHydrationCandidate {
   runnerAlive: boolean | null;
   runtimeEvent: string | null;
   runtimeEventAt: string | null;
+  appserverStartupObserved: boolean | null;
+  appserverStartupObservedAt: string | null;
   staleInvalidationCandidate: boolean | null;
   staleInvalidationReason: string | null;
 }
@@ -5344,6 +5348,8 @@ function preserveProviderLinearWorkerLaunchReservationLedgerIdentity(
       runner_alive: hydrated.runner_alive,
       runtime_event: hydrated.runtime_event,
       runtime_event_at: hydrated.runtime_event_at,
+      appserver_startup_observed: hydrated.appserver_startup_observed,
+      appserver_startup_observed_at: hydrated.appserver_startup_observed_at,
       stale_invalidation_candidate: hydrated.stale_invalidation_candidate,
       stale_invalidation_reason: hydrated.stale_invalidation_reason
     };
@@ -5453,6 +5459,8 @@ async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
     runner_alive: candidate.runnerAlive,
     runtime_event: candidate.runtimeEvent,
     runtime_event_at: candidate.runtimeEventAt,
+    appserver_startup_observed: candidate.appserverStartupObserved,
+    appserver_startup_observed_at: candidate.appserverStartupObservedAt,
     stale_invalidation_candidate: candidate.staleInvalidationCandidate,
     stale_invalidation_reason: candidate.staleInvalidationReason
   };
@@ -5774,6 +5782,15 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
   const runtimeEventAt = normalizeOptionalString(
     runtimeDiagnostics?.provider_linear_child_lane_runtime_event_at ?? parsed.provider_linear_child_lane_runtime_event_at
   );
+  const appserverStartupObserved =
+    runtimeEvent === 'appserver_startup_observed' ||
+    runtimeDiagnostics?.provider_linear_child_lane_appserver_startup_observed === true ||
+    parsed.provider_linear_child_lane_appserver_startup_observed === true;
+  const appserverStartupObservedAt = normalizeOptionalString(
+    runtimeDiagnostics?.provider_linear_child_lane_appserver_startup_observed_at ??
+      parsed.provider_linear_child_lane_appserver_startup_observed_at ??
+      (runtimeEvent === 'appserver_startup_observed' ? runtimeEventAt : null)
+  );
   const successfulStatus = isSuccessfulProviderLinearWorkerChildLaneStatus(status);
   const patchBytes = proofMetadata?.patchBytes ?? null;
   const patchReady = Boolean(proofMetadata?.patchArtifactPath && patchBytes !== null && patchBytes > 0);
@@ -5787,6 +5804,8 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
     runnerAlive,
     runtimeEvent,
     runtimeEventAt,
+    appserverStartupObserved,
+    appserverStartupObservedAt,
     patchReady,
     now: options.now
   });
@@ -5834,6 +5853,8 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
     runnerAlive,
     runtimeEvent,
     runtimeEventAt,
+    appserverStartupObserved,
+    appserverStartupObservedAt,
     staleInvalidationCandidate: staleDiagnostic ? true : null,
     staleInvalidationReason: staleDiagnostic?.reason ?? null
   };
@@ -5895,13 +5916,15 @@ function resolveProviderLinearWorkerChildLanePostStartupNoOutputDiagnostic(input
   runnerAlive: boolean | null;
   runtimeEvent: string | null;
   runtimeEventAt: string | null;
+  appserverStartupObserved: boolean | null;
+  appserverStartupObservedAt: string | null;
   patchReady: boolean;
   now: () => string;
 }): { observedAt: string; reason: string; summary: string } | null {
   if (
     !isActiveLookingProviderLinearWorkerChildLaneStatus(input.status) ||
     input.runtimeMode !== 'appserver' ||
-    input.runtimeEvent !== 'appserver_startup_observed' ||
+    input.appserverStartupObserved !== true ||
     input.patchReady
   ) {
     return null;
@@ -5927,7 +5950,7 @@ function resolveProviderLinearWorkerChildLanePostStartupNoOutputDiagnostic(input
     input.runnerPid !== null
       ? `providerLinearChildLaneRunner pid ${input.runnerPid} is not live`
       : 'providerLinearChildLaneRunner pid was not recorded';
-  const startupAt = input.runtimeEventAt ?? 'unknown time';
+  const startupAt = input.appserverStartupObservedAt ?? input.runtimeEventAt ?? 'unknown time';
   const reason = input.runnerPid !== null
     ? 'post_startup_no_output_heartbeat_stale_runner_dead'
     : 'post_startup_no_output_heartbeat_stale_runner_unknown';
@@ -6325,6 +6348,9 @@ function normalizeProviderLinearWorkerChildLaneRecord(
     runner_alive: typeof value.runner_alive === 'boolean' ? value.runner_alive : null,
     runtime_event: normalizeOptionalString(value.runtime_event),
     runtime_event_at: normalizeOptionalString(value.runtime_event_at),
+    appserver_startup_observed:
+      typeof value.appserver_startup_observed === 'boolean' ? value.appserver_startup_observed : null,
+    appserver_startup_observed_at: normalizeOptionalString(value.appserver_startup_observed_at),
     stale_invalidation_candidate:
       typeof value.stale_invalidation_candidate === 'boolean'
         ? value.stale_invalidation_candidate

@@ -2072,9 +2072,12 @@ export async function runProviderLinearChildLane(
             logger.info(
               `[provider-linear-child-lane-runtime] appserver startup observed via session log ${basename(startupRace.sessionLogPath)}`
             );
+            const startupObservedAt = deps.now();
             await writeProviderLinearChildLaneDiagnostics(context, {
               provider_linear_child_lane_runtime_event: 'appserver_startup_observed',
-              provider_linear_child_lane_runtime_event_at: deps.now(),
+              provider_linear_child_lane_runtime_event_at: startupObservedAt,
+              provider_linear_child_lane_appserver_startup_observed: true,
+              provider_linear_child_lane_appserver_startup_observed_at: startupObservedAt,
               provider_linear_child_lane_appserver_session_log: basename(startupRace.sessionLogPath)
             });
           }

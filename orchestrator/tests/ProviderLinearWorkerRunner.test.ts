@@ -4927,8 +4927,10 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         parent_run_id: 'run-child',
         stream: 'docs-packet',
         provider_linear_child_lane_runner_pid: 4242,
-        provider_linear_child_lane_runtime_event: 'appserver_startup_observed',
-        provider_linear_child_lane_runtime_event_at: '2026-04-17T00:34:12.000Z'
+        provider_linear_child_lane_runtime_event: 'codex_exec_completed',
+        provider_linear_child_lane_runtime_event_at: '2026-04-17T00:34:40.000Z',
+        provider_linear_child_lane_appserver_startup_observed: true,
+        provider_linear_child_lane_appserver_startup_observed_at: '2026-04-17T00:34:12.000Z'
       }),
       'utf8'
     );
@@ -4952,7 +4954,9 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       heartbeat_at: '2026-04-17T00:34:39.000Z',
       runner_pid: 4242,
       runner_alive: false,
-      runtime_event: 'appserver_startup_observed',
+      runtime_event: 'codex_exec_completed',
+      appserver_startup_observed: true,
+      appserver_startup_observed_at: '2026-04-17T00:34:12.000Z',
       stale_invalidation_candidate: true,
       stale_invalidation_reason: 'post_startup_no_output_heartbeat_stale_runner_dead'
     });
@@ -4969,6 +4973,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       artifact_root: matchingChildRunDir,
       runtime_mode: 'appserver',
       runner_pid: 4242,
+      appserver_startup_observed: true,
       stale_invalidation_candidate: true,
       stale_invalidation_reason: 'post_startup_no_output_heartbeat_stale_runner_dead'
     });
@@ -5010,6 +5015,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       decision: 'invalidated',
       runtime_mode: 'appserver',
       runner_pid: 4242,
+      appserver_startup_observed: true,
       stale_invalidation_candidate: true,
       stale_invalidation_reason: 'post_startup_no_output_heartbeat_stale_runner_dead'
     });
