@@ -58,6 +58,7 @@ export function readCurrentCodexPosture(
 ): Promise<{
   source_path: string;
   cli_version: string | null;
+  cli_compatibility_versions: string[];
   model: string | null;
   default_runtime: string | null;
   explorer_fast_model: string | null;
