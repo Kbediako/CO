@@ -290,7 +290,7 @@ describe('buildCloudPreflightRequest', () => {
     const { result } = await runCloudPreflightWithCloudList({
       environmentId: 'env-forbidden',
       stderr:
-        'Error: environment env-forbidden not found; forbidden for active account user@example.com OPENAI_API_KEY=sk-testsecret1234567890 Authorization: Bearer sess-secret1234567890',
+        'Error: environment env-forbidden not found; forbidden for active account user@example.com OPENAI_API_KEY=sk-testsecret1234567890 Authorization: Bearer sess-secret1234567890 Bearer standalonesecret1234567890',
       exitCode: 1
     });
 
@@ -303,5 +303,6 @@ describe('buildCloudPreflightRequest', () => {
     expect(message).not.toContain('user@example.com');
     expect(message).not.toContain('sk-testsecret1234567890');
     expect(message).not.toContain('sess-secret1234567890');
+    expect(message).not.toContain('standalonesecret1234567890');
   });
 });

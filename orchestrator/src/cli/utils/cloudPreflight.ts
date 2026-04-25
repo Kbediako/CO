@@ -142,7 +142,7 @@ function compactCloudPreflightOutput(output: string): string {
 function redactCloudPreflightOutput(output: string): string {
   return output
     .replace(/\b(?:authorization|bearer)\s*[:=]\s*bearer\s+[^\s,;]+/giu, 'authorization: Bearer <redacted>')
-    .replace(/\bbearer\s+[A-Za-z0-9._~+/-]{10,}/gu, 'Bearer <redacted>')
+    .replace(/\bbearer\s+[A-Za-z0-9._~+/-]{10,}/giu, 'Bearer <redacted>')
     .replace(/\b(?:sk|sess|eyJ)[A-Za-z0-9._~+/-]{12,}/gu, '<redacted-token>')
     .replace(
       /\b(?:CODEX|OPENAI|CHATGPT|GITHUB|GH)_[A-Z0-9_]*(?:API_KEY|AUTH_TOKEN|ACCESS_TOKEN|REFRESH_TOKEN|TOKEN|SECRET|PASSWORD)\s*=\s*[^\s,;]+/gu,
