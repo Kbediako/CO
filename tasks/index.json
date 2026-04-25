@@ -15058,6 +15058,32 @@
       }
     },
     {
+      "id": "20260425-linear-8a991d5a-8f02-4e50-9216-a5718569bf4a",
+      "title": "CO appserver child-lane stale invalidation must prove runner identity before candidate emission",
+      "relates_to": "tasks/tasks-linear-8a991d5a-8f02-4e50-9216-a5718569bf4a.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-25",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-25",
+          "status": "produced",
+          "manifest": ".runs/linear-8a991d5a-8f02-4e50-9216-a5718569bf4a-docs-packet/cli/2026-04-25T13-29-35-913Z-88cc9756/manifest.json",
+          "source_anchor": "ctx:sha256:66a6cc3b9ceee1998def43ba374bd15a5cb4586ea54de754de30f8c48dbfe7ba#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-371 as an appserver child-lane stale-invalidation safety lane: `providerLinearChildLaneRunner` must expose `provider_linear_child_lane_runner_pid` and `provider_linear_child_lane_runner_started_at`, `runner_alive` must be tied to that same process identity, and `stale_invalidation_candidate` must not be emitted from `runtime_mode=appserver`, `heartbeat stale`, and `no proof output` when PID reuse or ambiguous/unknown process identity is possible. The expected shared source payload was absent in this child checkout, so the packet is anchored on the protected handoff wording; parent owns implementation, validation, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-8a991d5a-8f02-4e50-9216-a5718569bf4a.md",
+        "task": "tasks/tasks-linear-8a991d5a-8f02-4e50-9216-a5718569bf4a.md",
+        "agent_task": ".agent/task/linear-8a991d5a-8f02-4e50-9216-a5718569bf4a.md",
+        "docs": "docs/TECH_SPEC-linear-8a991d5a-8f02-4e50-9216-a5718569bf4a.md"
+      }
+    },
+    {
       "id": "20260425-linear-12ae0840-e4dc-4181-8db6-2fdf02ef270b",
       "title": "CO: harden cloud preflight command spawn ETXTBSY handling",
       "relates_to": "tasks/tasks-linear-12ae0840-e4dc-4181-8db6-2fdf02ef270b.md",
