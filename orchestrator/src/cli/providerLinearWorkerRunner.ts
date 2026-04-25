@@ -4396,6 +4396,35 @@ function observeProviderWorkerSessionLogLines(
   };
 }
 
+function sessionLogLinesContainTurnContext(lines: readonly string[]): boolean {
+  for (const line of lines) {
+    const parsed = parseProviderWorkerSessionJsonlLine(line);
+    if (!parsed || parsed.type !== 'turn_context') {
+      continue;
+    }
+    const payload = isRecord(parsed.payload) ? parsed.payload : null;
+    if (normalizeOptionalString(payload?.turn_id)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function observeProviderWorkerSessionLogAppliedLines(input: {
+  lines: readonly string[];
+  linesToApply: readonly string[];
+  bootstrapPending: boolean;
+}): Pick<ProviderWorkerSessionLogApplyResult, 'observed' | 'observedThreadId' | 'observedTurnId'> {
+  if (
+    !input.bootstrapPending ||
+    input.linesToApply.length === input.lines.length ||
+    sessionLogLinesContainTurnContext(input.lines)
+  ) {
+    return observeProviderWorkerSessionLogLines(input.lines);
+  }
+  return observeProviderWorkerSessionLogLines(input.linesToApply);
+}
+
 function selectProviderWorkerSessionBootstrapLines(
   lines: string[],
   options: {
@@ -4463,7 +4492,11 @@ function applyProviderWorkerSessionLogDelta(
     tailState.bootstrapPending && lines.length > 0
       ? selectProviderWorkerSessionBootstrapLines(lines, { requireTurnContext })
       : lines;
-  const observation = observeProviderWorkerSessionLogLines(lines);
+  const observation = observeProviderWorkerSessionLogAppliedLines({
+    lines,
+    linesToApply,
+    bootstrapPending: tailState.bootstrapPending
+  });
   let changed = false;
   for (const line of linesToApply) {
     const parsed = parseProviderWorkerSessionJsonlLine(line);
@@ -4497,7 +4530,11 @@ function flushProviderWorkerSessionLogTail(
   const trailingLines = shouldBootstrap
     ? selectProviderWorkerSessionBootstrapLines([trailingLine], { requireTurnContext })
     : [trailingLine];
-  const observation = observeProviderWorkerSessionLogLines([trailingLine]);
+  const observation = observeProviderWorkerSessionLogAppliedLines({
+    lines: [trailingLine],
+    linesToApply: trailingLines,
+    bootstrapPending: shouldBootstrap
+  });
   let changed = false;
   for (const line of trailingLines) {
     const parsed = parseProviderWorkerSessionJsonlLine(line);

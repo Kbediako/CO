@@ -3934,6 +3934,103 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
+  it('does not observe a discarded bootstrap tail line as live session-log proof', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-app.jsonl');
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Merging',
+          state_type: 'started',
+          assignee_id: null,
+          assignee_name: null
+        })
+      )
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed',
+          assignee_id: null,
+          assignee_name: null
+        })
+      );
+
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+        turnIndex: 1
+      });
+      await mkdir(sessionDir, { recursive: true });
+      await writeFile(
+        sessionLogPath,
+        [
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:00.000Z',
+            type: 'session_meta',
+            payload: {
+              id: 'thread-app',
+              cwd: tempRoot,
+              initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+            }
+          }),
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:01.000Z',
+            type: 'event_msg',
+            payload: { type: 'task_complete', turn_id: 'turn-app-stale' }
+          })
+        ].join('\n'),
+        'utf8'
+      );
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return {
+        exitCode: 0,
+        stdout: '{"type":"thread.started","thread_id":"thread-app"}',
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_CLOUD_ENV_ID: 'env-appserver-proof',
+        CODEX_HOME: tempRoot ?? undefined
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () =>
+          createAppServerRuntimeContext({
+            runtime_session_id: 'appserver-run-child'
+          })
+        ),
+        execRunner,
+        sleep: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+        },
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof).toMatchObject({
+      thread_id: 'thread-app',
+      latest_turn_id: null,
+      session_log_thread_id: 'thread-app',
+      session_log_turn_id: null,
+      session_log_session_id: null,
+      appserver_supervision: {
+        turn_persistence_status: 'blocked',
+        turn_persistence_blocker: 'session_log_hydration_missing'
+      }
+    });
+  });
+
   it('preserves prior-turn session-log proof when an appserver resume launch fails before new turn data', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
     const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');

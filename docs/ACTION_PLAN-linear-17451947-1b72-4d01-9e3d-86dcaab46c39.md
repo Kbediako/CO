@@ -37,7 +37,7 @@
   - CO-360 does not make CO-358 a blocker unless the exact canary path requires cloud preflight.
 - Nearby wrong interpretations:
   - Wrong: CO-360 proves app-server startup and therefore replaces provider-worker supervision.
-    Correct: CO-360 requires configured provider-worker turns plus sticky environment and persisted-turn proof or exact blockers.
+    Correct: CO-360 requires a configured provider-worker turn set plus sticky environment and persisted-turn proof or exact blockers.
   - Wrong: a configured environment id alone proves sticky app-server behavior.
     Correct: the proof must surface the real id and the behavior outcome, or retain an exact blocker/fallback reason.
   - Wrong: CLI fallback means app-server proof dimensions are irrelevant.
