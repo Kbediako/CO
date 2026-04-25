@@ -314,26 +314,29 @@ describe('archive automation workflow required checks', () => {
     expect(run).not.toContain('| head -n 1');
   });
 
-  it('does not stop discovery on the first lone post-baseline run candidate', async () => {
+  it('stops discovery on the first lone post-baseline run candidate', async () => {
     const workflow = await readWorkflow('.github/workflows/archive-automation-base.yml');
     const dispatchStep = getStep(workflow, 'archive', 'Dispatch Core Lane for archive PR');
     const run = dispatchStep.run ?? '';
 
     const runDiscovery = run.indexOf('CANDIDATE_RUN_ID="$(find_dispatched_run_id)"');
     const candidateCapture = run.indexOf('RUN_ID="${CANDIDATE_RUN_ID}"', runDiscovery);
-    const discoveryLoopEnd = run.indexOf('done', candidateCapture);
+    const candidateBreak = run.indexOf('break', candidateCapture);
+    const sleepAfterCandidate = run.indexOf('sleep 15', candidateCapture);
+    const discoveryLoopEnd = run.indexOf('done', sleepAfterCandidate);
     const notFoundStatus = run.indexOf(
       'set_core_lane_status "error" "Dispatched Core Lane run was not found."'
     );
 
     expect(runDiscovery).toBeGreaterThan(run.indexOf('gh workflow run core-lane.yml'));
     expect(candidateCapture).toBeGreaterThan(runDiscovery);
+    expect(candidateBreak).toBeGreaterThan(candidateCapture);
+    expect(candidateBreak).toBeLessThan(sleepAfterCandidate);
     expect(discoveryLoopEnd).toBeGreaterThan(candidateCapture);
     expect(notFoundStatus).toBeGreaterThan(discoveryLoopEnd);
     expect(run).toContain('for attempt in $(seq 1 40); do');
     expect(run).toContain('if [ "${attempt}" -lt 40 ]; then');
     expect(run).toContain('sleep 15');
-    expect(run).not.toContain('if [ -n "${RUN_ID}" ]; then\n    break');
     expect(run).toContain('Multiple new Core Lane workflow_dispatch runs matched');
   });
 
