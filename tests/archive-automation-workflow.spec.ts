@@ -189,6 +189,42 @@ describe('archive automation workflow required checks', () => {
     expect(run).toContain('exit "${RUN_VIEW_STATUS}"');
   });
 
+  it('publishes a terminal Core Lane status when dispatched run discovery fails', async () => {
+    const workflow = await readWorkflow('.github/workflows/archive-automation-base.yml');
+    const dispatchStep = getStep(workflow, 'archive', 'Dispatch Core Lane for archive PR');
+    const run = dispatchStep.run ?? '';
+
+    const pendingStatus = run.indexOf('set_core_lane_status "pending"');
+    const runDiscovery = run.indexOf('RUN_ID="$(find_dispatched_run_id)"');
+    const discoveryStatusCapture = run.indexOf('RUN_DISCOVERY_STATUS=$?');
+    const terminalErrorStatus = run.indexOf(
+      'set_core_lane_status "error" "Core Lane run discovery failed for archive PR #${PR_NUMBER}."'
+    );
+    const notFoundStatus = run.indexOf(
+      'set_core_lane_status "error" "Dispatched Core Lane run was not found."'
+    );
+    const guardedDiscovery = [
+      'for _ in $(seq 1 40); do',
+      '  set +e',
+      '  RUN_ID="$(find_dispatched_run_id)"',
+      '  RUN_DISCOVERY_STATUS=$?',
+      '  set -e'
+    ].join('\n');
+
+    expect(pendingStatus).toBeGreaterThanOrEqual(0);
+    expect(runDiscovery).toBeGreaterThan(pendingStatus);
+    expect(run).toContain(guardedDiscovery);
+    expect(discoveryStatusCapture).toBeGreaterThan(runDiscovery);
+    expect(run.indexOf('set -e', discoveryStatusCapture)).toBeGreaterThan(discoveryStatusCapture);
+    expect(terminalErrorStatus).toBeGreaterThan(discoveryStatusCapture);
+    expect(terminalErrorStatus).toBeLessThan(notFoundStatus);
+    expect(run).toContain('if [ "${RUN_DISCOVERY_STATUS}" -ne 0 ]; then');
+    expect(run).toContain(
+      'Failed to discover dispatched Core Lane run for archive PR #${PR_NUMBER}; gh run list exited ${RUN_DISCOVERY_STATUS}.'
+    );
+    expect(run).toContain('exit "${RUN_DISCOVERY_STATUS}"');
+  });
+
   it('grants reusable archive callers permission to dispatch Core Lane', async () => {
     const taskArchive = await readWorkflow('.github/workflows/tasks-archive-automation.yml');
     const docsArchive = await readWorkflow('.github/workflows/implementation-docs-archive-automation.yml');

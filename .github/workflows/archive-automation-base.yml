@@ -234,7 +234,17 @@ jobs:
 
           RUN_ID=""
           for _ in $(seq 1 40); do
+            set +e
             RUN_ID="$(find_dispatched_run_id)"
+            RUN_DISCOVERY_STATUS=$?
+            set -e
+
+            if [ "${RUN_DISCOVERY_STATUS}" -ne 0 ]; then
+              set_core_lane_status "error" "Core Lane run discovery failed for archive PR #${PR_NUMBER}." "${ACTIONS_URL}"
+              echo "::error::Failed to discover dispatched Core Lane run for archive PR #${PR_NUMBER}; gh run list exited ${RUN_DISCOVERY_STATUS}."
+              exit "${RUN_DISCOVERY_STATUS}"
+            fi
+
             if [ -n "${RUN_ID}" ]; then
               break
             fi
