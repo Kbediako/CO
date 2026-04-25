@@ -108,6 +108,13 @@ describe('cloud-canary-ci failure classification', () => {
     expect(classifyFailure(cases[0][0]).guidance).not.toContain('Set CODEX_CLOUD_ENV_ID');
   });
 
+  it('does not classify generic environment-not-found prose as cloud env config', () => {
+    const diagnosis = classifyFailure('Runtime error: environment variable not found');
+
+    expect(formatCloudCanaryFailureClass(diagnosis)).toBe('execution (provider_runtime)');
+    expect(diagnosis.diagnostic_category).not.toBe('environment_not_found');
+  });
+
   it('normalizes human and hyphenated connector drift labels', () => {
     for (const signal of ['cloud connector auth drift', 'cloud-connector-auth-drift']) {
       const diagnosis = classifyFailure(signal);

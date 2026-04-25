@@ -202,7 +202,20 @@ const MACHINE_READABLE_CLOUD_DETAILS = new Set([
 ]);
 
 function isEnvironmentNotFoundSignal(signal: string): boolean {
-  return /\benvironment\s+(?:['"][^'"]+['"]|[^\s'"]+)\s+not\s+found\b/u.test(signal.toLowerCase());
+  const lowercase = signal.toLowerCase();
+  if (/\benvironment_not_found\b/u.test(lowercase)) {
+    return true;
+  }
+  if (!/\benvironment\s+(?:['"][^'"]+['"]|[^\s'"]+)\s+not\s+found\b/u.test(lowercase)) {
+    return false;
+  }
+  return (
+    lowercase.includes('codex_cloud_env_id') ||
+    lowercase.includes('codex cloud env id') ||
+    lowercase.includes('codex cloud') ||
+    lowercase.includes('is not visible to codex cloud') ||
+    lowercase.includes('could not be verified by codex cloud')
+  );
 }
 
 function matchesCloudFailureRule(rule: CloudFailureRule, lowercase: string, normalized: string): boolean {

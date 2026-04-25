@@ -29,7 +29,7 @@ describe('diagnoseCloudFailure', () => {
         'configuration',
         'environment_not_found'
       ],
-      ['Error: environment env-missing not found', 'configuration', 'environment_not_found'],
+      ['codex cloud: Error: environment env-missing not found', 'configuration', 'environment_not_found'],
       [
         "Configured CODEX_CLOUD_ENV_ID 'env-credential' is not visible to codex cloud: environment 'env-credential' not found",
         'configuration',
@@ -145,6 +145,17 @@ describe('diagnoseCloudFailure', () => {
       expect(diagnoseCloudFailure({ status: 'failed', error: null, statusDetail }).diagnostic_category)
         .toBe(diagnosticCategory);
     }
+  });
+
+  it('does not classify generic environment-not-found prose as cloud env config', () => {
+    const diagnosis = diagnoseCloudFailure({
+      status: 'failed',
+      error: 'Runtime error: environment variable not found',
+      statusDetail: null
+    });
+
+    expect(diagnosis.category).toBe('execution');
+    expect(diagnosis.diagnostic_category).toBe('provider_runtime');
   });
 
   it('keeps machine-readable cloud status details stable when prose mentions quota', () => {

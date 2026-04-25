@@ -124,9 +124,18 @@ function hasCloudConnectorAuthDriftSignal(normalizedSignal) {
 }
 
 function hasEnvironmentNotFoundSignal(normalizedSignal) {
+  if (normalizedSignal.includes('environment_not_found')) {
+    return true;
+  }
+  if (!/\benvironment\s+(?:['"][^'"]+['"]|[^\s'"]+)\s+not\s+found\b/u.test(normalizedSignal)) {
+    return false;
+  }
   return (
-    normalizedSignal.includes('environment_not_found') ||
-    /\benvironment\s+(?:['"][^'"]+['"]|[^\s'"]+)\s+not\s+found\b/u.test(normalizedSignal)
+    normalizedSignal.includes('codex_cloud_env_id') ||
+    normalizedSignal.includes('codex cloud env id') ||
+    normalizedSignal.includes('codex cloud') ||
+    normalizedSignal.includes('is not visible to codex cloud') ||
+    normalizedSignal.includes('could not be verified by codex cloud')
   );
 }
 
