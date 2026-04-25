@@ -6232,6 +6232,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         parent_run_id: 'run-child',
         stream: 'docs-packet',
         provider_linear_child_lane_runner_pid: 4242,
+        provider_linear_child_lane_runner_started_at: '2026-04-17T00:34:05.000Z',
         provider_linear_child_lane_runtime_selected_mode: 'appserver',
         provider_linear_child_lane_runtime_provider: 'AppServerRuntimeProvider',
         provider_linear_child_lane_runtime_event: 'codex_exec_completed',
@@ -6250,7 +6251,12 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       { CODEX_HOME: tempRoot! },
       {
         skipSessionLogHydration: true,
-        isProcessAlive: (pid) => pid !== 4242
+        inspectProcess: (pid) => ({
+          alive: pid !== 4242,
+          startedAt: null,
+          commandLine: null,
+          error: null
+        })
       }
     );
 
@@ -6262,7 +6268,10 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       runtime_provider: 'AppServerRuntimeProvider',
       heartbeat_at: '2026-04-17T00:34:39.000Z',
       runner_pid: 4242,
+      runner_started_at: '2026-04-17T00:34:05.000Z',
       runner_alive: false,
+      runner_identity_status: 'not_live',
+      runner_identity_reason: 'runner_pid_not_live',
       runtime_event: 'codex_exec_completed',
       appserver_startup_observed: true,
       appserver_startup_observed_at: '2026-04-17T00:34:12.000Z',
@@ -6284,6 +6293,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       runtime_mode: 'appserver',
       runtime_provider: 'AppServerRuntimeProvider',
       runner_pid: 4242,
+      runner_started_at: '2026-04-17T00:34:05.000Z',
+      runner_identity_status: 'not_live',
       appserver_startup_observed: true,
       stale_invalidation_candidate: true,
       stale_invalidation_reason: 'post_startup_no_output_heartbeat_stale_runner_dead'
@@ -6303,7 +6314,12 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       { CODEX_HOME: tempRoot! },
       {
         skipSessionLogHydration: true,
-        isProcessAlive: (pid) => pid !== 4242
+        inspectProcess: (pid) => ({
+          alive: pid !== 4242,
+          startedAt: null,
+          commandLine: null,
+          error: null
+        })
       }
     );
     expect(rehydrated?.child_lanes?.[0]).toMatchObject({
@@ -6335,7 +6351,12 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       { CODEX_HOME: tempRoot! },
       {
         skipSessionLogHydration: true,
-        isProcessAlive: (pid) => pid !== 4242
+        inspectProcess: (pid) => ({
+          alive: pid !== 4242,
+          startedAt: null,
+          commandLine: null,
+          error: null
+        })
       }
     );
     expect(invalidated?.child_lanes?.[0]).toMatchObject({
@@ -6345,6 +6366,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       runtime_mode: 'appserver',
       runtime_provider: 'AppServerRuntimeProvider',
       runner_pid: 4242,
+      runner_started_at: '2026-04-17T00:34:05.000Z',
+      runner_identity_status: 'not_live',
       appserver_startup_observed: true,
       stale_invalidation_candidate: true,
       stale_invalidation_reason: 'post_startup_no_output_heartbeat_stale_runner_dead'
@@ -6353,7 +6376,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(invalidated?.child_lanes?.[0]?.summary).toContain('providerLinearChildLaneRunner pid 4242 is not live');
   });
 
-  it('keeps zero-byte proof lanes and unknown-runner lanes out of stale invalidation', async () => {
+  it('keeps zero-byte proof lanes, unknown runners, and ambiguous runner identity out of stale invalidation', async () => {
     const { runDir } = await createManifestRoot();
     const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
     await writeFile(
@@ -6378,6 +6401,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       taskId: string;
       runId: string;
       runnerPid?: number;
+      runnerStartedAt?: string;
       patchBytes?: number;
     }) => {
       const childCliDir = join(tempRoot!, '.runs', input.taskId, 'cli');
@@ -6455,6 +6479,9 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       if (input.runnerPid !== undefined) {
         diagnostics.provider_linear_child_lane_runner_pid = input.runnerPid;
       }
+      if (input.runnerStartedAt !== undefined) {
+        diagnostics.provider_linear_child_lane_runner_started_at = input.runnerStartedAt;
+      }
       await writeFile(
         join(childRunDir, PROVIDER_LINEAR_CHILD_LANE_DIAGNOSTICS_FILENAME),
         JSON.stringify(diagnostics),
@@ -6484,12 +6511,43 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       taskId: 'linear-lin-issue-1-noop-proof',
       runId: '2026-04-17T00-34-04-191Z-noop',
       runnerPid: 4242,
+      runnerStartedAt: '2026-04-17T00:34:05.000Z',
       patchBytes: 0
     });
     await writeCompletedAppserverLane({
       stream: 'unknown-runner',
       taskId: 'linear-lin-issue-1-unknown-runner',
       runId: '2026-04-17T00-34-04-191Z-unknown',
+      patchBytes: undefined
+    });
+    await writeCompletedAppserverLane({
+      stream: 'reused-runner-pid',
+      taskId: 'linear-lin-issue-1-reused-runner-pid',
+      runId: '2026-04-17T00-34-04-191Z-reused',
+      runnerPid: 4243,
+      runnerStartedAt: '2026-04-17T00:34:05.000Z',
+      patchBytes: undefined
+    });
+    await writeCompletedAppserverLane({
+      stream: 'same-command-reused-runner-pid',
+      taskId: 'linear-lin-issue-1-same-command-reused-runner-pid',
+      runId: '2026-04-17T00-34-04-191Z-same-command-reused',
+      runnerPid: 4246,
+      runnerStartedAt: '2026-04-17T00:34:05.000Z',
+      patchBytes: undefined
+    });
+    await writeCompletedAppserverLane({
+      stream: 'missing-runner-start',
+      taskId: 'linear-lin-issue-1-missing-runner-start',
+      runId: '2026-04-17T00-34-04-191Z-missing-start',
+      runnerPid: 4244,
+      patchBytes: undefined
+    });
+    await writeCompletedAppserverLane({
+      stream: 'dead-missing-runner-start',
+      taskId: 'linear-lin-issue-1-dead-missing-runner-start',
+      runId: '2026-04-17T00-34-04-191Z-dead-missing-start',
+      runnerPid: 4245,
       patchBytes: undefined
     });
 
@@ -6501,7 +6559,54 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       { CODEX_HOME: tempRoot! },
       {
         skipSessionLogHydration: true,
-        isProcessAlive: (pid) => pid !== 4242
+        inspectProcess: (pid) => {
+          if (pid === 4242) {
+            return {
+              alive: false,
+              startedAt: null,
+              commandLine: null,
+              error: null
+            };
+          }
+          if (pid === 4243) {
+            return {
+              alive: true,
+              startedAt: '2026-04-17T00:34:06.000Z',
+              commandLine: 'node /tmp/unrelated-runner.js',
+              error: null
+            };
+          }
+          if (pid === 4244) {
+            return {
+              alive: true,
+              startedAt: '2026-04-17T00:34:04.000Z',
+              commandLine: 'node /repo/dist/orchestrator/src/cli/providerLinearChildLaneRunner.js',
+              error: null
+            };
+          }
+          if (pid === 4246) {
+            return {
+              alive: true,
+              startedAt: '2026-04-17T00:34:06.000Z',
+              commandLine: 'node /repo/dist/orchestrator/src/cli/providerLinearChildLaneRunner.js',
+              error: null
+            };
+          }
+          if (pid === 4245) {
+            return {
+              alive: false,
+              startedAt: null,
+              commandLine: null,
+              error: null
+            };
+          }
+          return {
+            alive: null,
+            startedAt: null,
+            commandLine: null,
+            error: 'unexpected_pid'
+          };
+        }
       }
     );
 
@@ -6510,7 +6615,9 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       status: 'completed',
       patch_bytes: 0,
       runner_pid: 4242,
+      runner_started_at: '2026-04-17T00:34:05.000Z',
       runner_alive: false,
+      runner_identity_status: 'not_live',
       stale_invalidation_candidate: null,
       stale_invalidation_reason: null
     });
@@ -6525,6 +6632,64 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       stale_invalidation_reason: null
     });
     expect(lanesByStream.get('unknown-runner')?.summary).toBe(
+      'Child lane completed; waiting for patch proof metadata.'
+    );
+    expect(lanesByStream.get('reused-runner-pid')).toMatchObject({
+      status: 'in_progress',
+      runner_pid: 4243,
+      runner_started_at: '2026-04-17T00:34:05.000Z',
+      runner_alive: null,
+      runner_identity_status: 'pid_reuse_suspected',
+      runner_identity_reason: 'process_command_line_mismatch',
+      runner_observed_started_at: '2026-04-17T00:34:06.000Z',
+      runner_command_line_matches: false,
+      stale_invalidation_candidate: null,
+      stale_invalidation_reason: null
+    });
+    expect(lanesByStream.get('reused-runner-pid')?.summary).toBe(
+      'Child lane completed; waiting for patch proof metadata.'
+    );
+    expect(lanesByStream.get('same-command-reused-runner-pid')).toMatchObject({
+      status: 'in_progress',
+      runner_pid: 4246,
+      runner_started_at: '2026-04-17T00:34:05.000Z',
+      runner_alive: null,
+      runner_identity_status: 'pid_reuse_suspected',
+      runner_identity_reason: 'process_started_after_recorded_runner_start',
+      runner_observed_started_at: '2026-04-17T00:34:06.000Z',
+      runner_command_line_matches: true,
+      stale_invalidation_candidate: null,
+      stale_invalidation_reason: null
+    });
+    expect(lanesByStream.get('same-command-reused-runner-pid')?.summary).toBe(
+      'Child lane completed; waiting for patch proof metadata.'
+    );
+    expect(lanesByStream.get('missing-runner-start')).toMatchObject({
+      status: 'in_progress',
+      runner_pid: 4244,
+      runner_started_at: null,
+      runner_alive: null,
+      runner_identity_status: 'ambiguous',
+      runner_identity_reason: 'runner_started_at_missing',
+      runner_observed_started_at: '2026-04-17T00:34:04.000Z',
+      runner_command_line_matches: true,
+      stale_invalidation_candidate: null,
+      stale_invalidation_reason: null
+    });
+    expect(lanesByStream.get('missing-runner-start')?.summary).toBe(
+      'Child lane completed; waiting for patch proof metadata.'
+    );
+    expect(lanesByStream.get('dead-missing-runner-start')).toMatchObject({
+      status: 'in_progress',
+      runner_pid: 4245,
+      runner_started_at: null,
+      runner_alive: null,
+      runner_identity_status: 'ambiguous',
+      runner_identity_reason: 'runner_started_at_missing',
+      stale_invalidation_candidate: null,
+      stale_invalidation_reason: null
+    });
+    expect(lanesByStream.get('dead-missing-runner-start')?.summary).toBe(
       'Child lane completed; waiting for patch proof metadata.'
     );
   });
