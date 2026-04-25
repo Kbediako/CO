@@ -171,6 +171,39 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     }
   }, 15000);
 
+  it('skips missing-config max_threads recommendation when Codex feature output enables multi_agent_v2', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-missing-config-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempHome, 'multi_agent_v2 experimental true');
+    try {
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('advisory');
+      expect(result.codex_defaults.config.status).toBe('missing');
+      expect(result.codex_defaults.checks.max_threads.status).toBe('skipped');
+      expect(result.codex_defaults.checks.max_threads.actual).toBeNull();
+      expect(result.codex_defaults.checks.max_threads.detail).toContain('omit agents.max_threads');
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('agents.max_threads: skipped');
+      expect(summary).toContain('features.multi_agent_v2=true; omit agents.max_threads');
+      expect(summary).not.toContain('agents.max_threads: advisory');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
   it('reports devtools readiness when config and skill exist', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));

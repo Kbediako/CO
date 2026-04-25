@@ -71,7 +71,12 @@ async function isMultiAgentV2Enabled(env: NodeJS.ProcessEnv): Promise<boolean> {
   if (!existsSync(configPath)) {
     return false;
   }
-  const raw = await readFile(configPath, 'utf8');
+  let raw: string;
+  try {
+    raw = await readFile(configPath, 'utf8');
+  } catch {
+    return false;
+  }
   let parsed: unknown;
   try {
     parsed = getTomlLibrary().parse(raw);
@@ -86,12 +91,31 @@ async function isMultiAgentV2Enabled(env: NodeJS.ProcessEnv): Promise<boolean> {
 
 async function omitAgentMaxThreads(configPath: string): Promise<void> {
   const raw = await readFile(configPath, 'utf8');
-  const parsed = getTomlLibrary().parse(raw);
-  if (!isRecord(parsed) || !isRecord(parsed.agents)) {
+  const { removed, text } = removeAgentMaxThreadsFromToml(raw);
+  if (!removed) {
     return;
   }
-  delete parsed.agents.max_threads;
-  await writeFile(configPath, `${getTomlLibrary().stringify(parsed)}\n`, 'utf8');
+  await writeFile(configPath, text, 'utf8');
+}
+
+function removeAgentMaxThreadsFromToml(raw: string): { removed: boolean; text: string } {
+  const lines = raw.split(/(?<=\n)/u);
+  let inAgentsTable = false;
+  let removed = false;
+  const kept: string[] = [];
+  for (const line of lines) {
+    const withoutEol = line.replace(/\r?\n$/u, '');
+    const trimmed = withoutEol.trim();
+    if (/^\[[^\]]+\]\s*(?:#.*)?$/u.test(trimmed)) {
+      inAgentsTable = /^\[agents\]\s*(?:#.*)?$/u.test(trimmed);
+    }
+    if (inAgentsTable && /^[ \t]*max_threads\s*=/u.test(withoutEol)) {
+      removed = true;
+      continue;
+    }
+    kept.push(line);
+  }
+  return { removed, text: kept.join('') };
 }
 
 function getTomlLibrary(): {

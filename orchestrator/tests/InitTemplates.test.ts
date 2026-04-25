@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -202,6 +202,34 @@ describe('initCodexTemplates', () => {
         force: false,
         env: buildInitEnv(codexHome)
       });
+
+      const codexConfig = await readFile(path.join(tempDir, '.codex', 'config.toml'), 'utf8');
+      expect(codexConfig).toContain('max_threads = 12');
+      const orchestratorConfig = await readFile(path.join(tempDir, 'codex.orchestrator.json'), 'utf8');
+      expect(orchestratorConfig).toContain('"pipelines"');
+    } finally {
+      await rm(codexHome, { recursive: true, force: true });
+    }
+  });
+
+  it('does not fail repo init when fallback global Codex config cannot be read', async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-init-unreadable-global-config-'));
+    const codexHome = await mkdtemp(path.join(os.tmpdir(), 'codex-home-init-unreadable-config-'));
+
+    try {
+      await mkdir(path.join(codexHome, 'config.toml'));
+
+      await initCodexTemplates({
+        template: 'codex',
+        cwd: tempDir,
+        force: false,
+        env: buildInitEnv(codexHome)
+      });
+
+      const codexConfig = await readFile(path.join(tempDir, '.codex', 'config.toml'), 'utf8');
+      expect(codexConfig).toContain('max_threads = 12');
+      const orchestratorConfig = await readFile(path.join(tempDir, 'codex.orchestrator.json'), 'utf8');
+      expect(orchestratorConfig).toContain('"pipelines"');
     } finally {
       await rm(codexHome, { recursive: true, force: true });
     }
