@@ -34,6 +34,87 @@ describe('cloud-canary-ci failure classification', () => {
     expect(formatCloudCanaryFailureClass(diagnosis)).toBe('configuration (env_config)');
   });
 
+  it('classifies configured environment probe wrapper signals with precedence', () => {
+    const cases = [
+      [
+        "Configured CODEX_CLOUD_ENV_ID 'env-missing' is not visible to codex cloud: environment 'env-missing' not found",
+        'configuration (environment_not_found)'
+      ],
+      [
+        'Configured CODEX_CLOUD_ENV_ID env-missing is not visible to codex cloud: environment env-missing not found',
+        'configuration (environment_not_found)'
+      ],
+      [
+        'Error: environment env-other not found; forbidden for active account',
+        'credentials (auth_mismatch)'
+      ],
+      [
+        'Error: environment env-other not found; HTTP 400 missing_github_connector_link: GitHub connection not found for user',
+        'credentials (cloud_connector_auth_drift)'
+      ],
+      [
+        'Error: environment env-other not found; cloud execution denied for this branch',
+        'credentials (cloud_denial)'
+      ],
+      [
+        'Error: environment env-other not found; rate limit exceeded',
+        'execution (quota_rate_limit)'
+      ],
+      [
+        'Error: environment env-other not found; network timeout while contacting the endpoint',
+        'connectivity (network_connectivity)'
+      ],
+      [
+        "Configured CODEX_CLOUD_ENV_ID 'env-503' is not visible to codex cloud: environment 'env-503' not found",
+        'configuration (environment_not_found)'
+      ],
+      [
+        "Configured CODEX_CLOUD_ENV_ID 'env-missing' could not be verified by codex cloud before codex cloud exec: HTTP 503 service unavailable",
+        'connectivity (network_connectivity)'
+      ],
+      [
+        "Configured CODEX_CLOUD_ENV_ID 'env-503' could not be verified by codex cloud before codex cloud exec: no output",
+        'configuration (environment_unavailable)'
+      ],
+      ...['env-network', 'env-timeout', 'env-enotfound', 'env-econnreset'].map((environmentId) => [
+        `Configured CODEX_CLOUD_ENV_ID '${environmentId}' could not be verified by codex cloud before codex cloud exec: no output`,
+        'configuration (environment_unavailable)'
+      ]),
+      [
+        "Configured CODEX_CLOUD_ENV_ID 'env-prod' could not be verified by codex cloud before codex cloud exec: network timeout while contacting the endpoint",
+        'connectivity (network_connectivity)'
+      ],
+      [
+        "Configured CODEX_CLOUD_ENV_ID 'env-prod' could not be verified by codex cloud before codex cloud exec: Timed out after 10s.",
+        'connectivity (network_connectivity)'
+      ],
+      [
+        "Configured CODEX_CLOUD_ENV_ID 'env-credential' is not visible to codex cloud: environment 'env-credential' not found",
+        'configuration (environment_not_found)'
+      ],
+      [
+        "Configured CODEX_CLOUD_ENV_ID 'env-prod' could not be verified by codex cloud before codex cloud exec: forbidden for active account",
+        'credentials (auth_mismatch)'
+      ],
+      [
+        "Configured CODEX_CLOUD_ENV_ID 'env-prod' could not be verified by codex cloud before codex cloud exec: rate limit exceeded",
+        'execution (quota_rate_limit)'
+      ]
+    ] as const;
+
+    for (const [signal, expected] of cases) {
+      expect(formatCloudCanaryFailureClass(classifyFailure(signal))).toBe(expected);
+    }
+    expect(classifyFailure(cases[0][0]).guidance).not.toContain('Set CODEX_CLOUD_ENV_ID');
+  });
+
+  it('does not classify generic environment-not-found prose as cloud env config', () => {
+    const diagnosis = classifyFailure('codex cloud: Runtime error: environment variable not found');
+
+    expect(formatCloudCanaryFailureClass(diagnosis)).toBe('execution (provider_runtime)');
+    expect(diagnosis.diagnostic_category).not.toBe('environment_not_found');
+  });
+
   it('normalizes human and hyphenated connector drift labels', () => {
     for (const signal of ['cloud connector auth drift', 'cloud-connector-auth-drift']) {
       const diagnosis = classifyFailure(signal);

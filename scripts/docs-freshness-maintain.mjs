@@ -2,7 +2,7 @@
 
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { access, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
@@ -16,9 +16,12 @@ const execFileAsync = promisify(execFile);
 
 const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
 const GIT_COMMAND_TIMEOUT_MS = 60_000;
+const LINEAR_ISSUE_CONTEXT_TIMEOUT_MS = 60_000;
 const PASSING_DECISIONS = new Set(['clean', 'pass_with_owned_rolling_debt']);
 const CANONICAL_OWNER_MARKER_PREFIX = 'codex-orchestrator:canonical-owner-key=';
 const CANONICAL_OWNER_KEY_MAX_LENGTH = 512;
+const TERMINAL_WORKFLOW_STATE_TYPES = new Set(['completed', 'canceled', 'cancelled', 'duplicate']);
+const TERMINAL_WORKFLOW_STATES = new Set(['done', 'completed', 'canceled', 'cancelled', 'duplicate']);
 
 function showUsage() {
   console.log(`Usage: node scripts/docs-freshness-maintain.mjs [options]
@@ -78,6 +81,14 @@ function sortedObject(map) {
   return Object.fromEntries([...map.entries()].sort(([left], [right]) => String(left).localeCompare(String(right))));
 }
 
+function formatHumanList(values) {
+  const normalized = uniqueSorted(values);
+  if (normalized.length <= 2) {
+    return normalized.join(' and ');
+  }
+  return `${normalized.slice(0, -1).join(', ')}, and ${normalized.at(-1)}`;
+}
+
 function sampleLines(value, limit = 20) {
   if (typeof value !== 'string') {
     return [];
@@ -87,6 +98,270 @@ function sampleLines(value, limit = 20) {
     .map((line) => line.trim())
     .filter(Boolean)
     .slice(0, limit);
+}
+
+function normalizeOptionalString(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeOptionalBoolean(value) {
+  return typeof value === 'boolean' ? value : null;
+}
+
+function isTerminalWorkflowState({ state = null, stateType = null, isTerminal = null } = {}) {
+  if (typeof isTerminal === 'boolean') {
+    return isTerminal;
+  }
+  const normalizedType = normalizeOptionalString(stateType)?.toLowerCase() ?? null;
+  if (normalizedType && TERMINAL_WORKFLOW_STATE_TYPES.has(normalizedType)) {
+    return true;
+  }
+  const normalizedState = normalizeOptionalString(state)?.toLowerCase() ?? null;
+  return Boolean(normalizedState && TERMINAL_WORKFLOW_STATES.has(normalizedState));
+}
+
+function deriveOwnerIssueVerificationFromPolicy(policy) {
+  const issue = normalizeOptionalString(policy?.owner_issue);
+  const state = normalizeOptionalString(policy?.owner_issue_state);
+  const stateType = normalizeOptionalString(policy?.owner_issue_state_type);
+  const isTerminal = normalizeOptionalBoolean(policy?.owner_issue_is_terminal);
+  if (!issue || (!state && !stateType && isTerminal === null)) {
+    return null;
+  }
+  const terminal = isTerminalWorkflowState({ state, stateType, isTerminal });
+  return {
+    issue,
+    issue_id: null,
+    state,
+    state_type: stateType,
+    is_terminal: terminal,
+    usable: !terminal,
+    verification_status: 'policy_metadata',
+    checked_at: null,
+    source: 'rolling_freshness_policy',
+    error: null
+  };
+}
+
+function deriveOwnerIssueVerification(policy, explicitVerification = null) {
+  const policyVerification = deriveOwnerIssueVerificationFromPolicy(policy);
+  if (explicitVerification && typeof explicitVerification === 'object') {
+    if (explicitVerification.verification_status === 'unavailable' && policyVerification) {
+      return {
+        ...explicitVerification,
+        issue: normalizeOptionalString(explicitVerification.issue) ?? policyVerification.issue,
+        state: normalizeOptionalString(explicitVerification.state) ?? policyVerification.state,
+        state_type: normalizeOptionalString(explicitVerification.state_type) ?? policyVerification.state_type,
+        is_terminal:
+          normalizeOptionalBoolean(explicitVerification.is_terminal) ?? policyVerification.is_terminal,
+        usable: normalizeOptionalBoolean(explicitVerification.usable) ?? policyVerification.usable,
+        source: policyVerification.source
+      };
+    }
+    return explicitVerification;
+  }
+  return policyVerification;
+}
+
+function buildOwnerIssueAction(policy, ownerIssueVerification = null) {
+  const configuredIssue = normalizeOptionalString(policy?.owner_issue);
+  const verification = deriveOwnerIssueVerification(policy, ownerIssueVerification);
+  if (!configuredIssue) {
+    return {
+      mode: 'create_required',
+      issue: null,
+      existing_issue: null,
+      duplicate_policy: 'one_owner_issue_per_historical_batch',
+      policy_doc: policy?.policy_doc ?? null,
+      reason: 'missing_owner_issue'
+    };
+  }
+  if (verification?.usable === false) {
+    return {
+      mode: 'create_required',
+      issue: null,
+      existing_issue: configuredIssue,
+      duplicate_policy: 'one_owner_issue_per_historical_batch',
+      policy_doc: policy?.policy_doc ?? null,
+      reason: 'configured_owner_terminal',
+      issue_state: verification.state ?? null,
+      issue_state_type: verification.state_type ?? null
+    };
+  }
+  if (verification?.verification_status === 'failed' && verification.usable !== true) {
+    return {
+      mode: 'create_required',
+      issue: null,
+      existing_issue: configuredIssue,
+      duplicate_policy: 'one_owner_issue_per_historical_batch',
+      policy_doc: policy?.policy_doc ?? null,
+      reason: 'owner_verification_failed',
+      verification_status: verification.verification_status ?? null,
+      verification_error: verification.error ?? null
+    };
+  }
+  return {
+    mode: 'update_existing',
+    issue: configuredIssue,
+    existing_issue: null,
+    duplicate_policy: 'one_owner_issue_per_historical_batch',
+    policy_doc: policy?.policy_doc ?? null,
+    reason: verification?.verification_status ?? null
+  };
+}
+
+function doesVerificationConfirmLiveOwner(verification) {
+  return (
+    normalizeOptionalString(verification?.verification_status) === 'succeeded' &&
+    normalizeOptionalBoolean(verification?.usable) === true
+  );
+}
+
+function buildUnresolvedCanonicalOwnerAction(ownerConfig, verification) {
+  const verificationStatus = normalizeOptionalString(verification?.verification_status);
+  return {
+    mode: 'create_required',
+    issue: null,
+    existing_issue: normalizeOptionalString(ownerConfig?.owner_issue),
+    duplicate_policy: 'one_owner_issue_per_canonical_owner_key',
+    canonical_owner_key: ownerConfig?.canonical_owner_key ?? null,
+    policy_doc: ownerConfig?.policy_doc ?? null,
+    reason:
+      verificationStatus === 'failed'
+        ? 'owner_verification_failed'
+        : 'owner_verification_unavailable',
+    verification_status: verificationStatus,
+    verification_error: verification?.error ?? null
+  };
+}
+
+function normalizeCanonicalOwnerIssues(policy) {
+  if (!Array.isArray(policy?.canonical_owner_issues)) {
+    return [];
+  }
+  return policy.canonical_owner_issues
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') {
+        return null;
+      }
+      const canonicalOwnerKey = normalizeOptionalString(entry.canonical_owner_key);
+      const ownerIssue = normalizeOptionalString(entry.owner_issue);
+      if (!canonicalOwnerKey || !ownerIssue) {
+        return null;
+      }
+      return {
+        canonical_owner_key: canonicalOwnerKey,
+        owner_issue: ownerIssue,
+        owner_issue_state: normalizeOptionalString(entry.owner_issue_state),
+        owner_issue_state_type: normalizeOptionalString(entry.owner_issue_state_type),
+        owner_issue_is_terminal: normalizeOptionalBoolean(entry.owner_issue_is_terminal),
+        policy_doc: policy?.policy_doc ?? null
+      };
+    })
+    .filter(Boolean);
+}
+
+function canonicalOwnerVerificationLookup(verifications) {
+  const lookup = new Map();
+  for (const verification of Array.isArray(verifications) ? verifications : []) {
+    const issue = normalizeOptionalString(verification?.issue);
+    if (issue && !lookup.has(issue)) {
+      lookup.set(issue, verification);
+    }
+  }
+  return lookup;
+}
+
+function buildCanonicalOwnerIssueAction(ownerConfig, ownerIssueVerification = null) {
+  const resolvedVerification = deriveOwnerIssueVerification(ownerConfig, ownerIssueVerification);
+  const baseAction = buildOwnerIssueAction(ownerConfig, resolvedVerification);
+  const policyVerification = deriveOwnerIssueVerificationFromPolicy(ownerConfig);
+  const verifiedLiveOwner = doesVerificationConfirmLiveOwner(ownerIssueVerification);
+  const metadataConfirmsLiveOwner = policyVerification?.usable === true;
+  if (baseAction.mode === 'update_existing' && !verifiedLiveOwner && !metadataConfirmsLiveOwner) {
+    return buildUnresolvedCanonicalOwnerAction(ownerConfig, resolvedVerification);
+  }
+  return {
+    ...baseAction,
+    duplicate_policy: 'one_owner_issue_per_canonical_owner_key',
+    canonical_owner_key: ownerConfig?.canonical_owner_key ?? null,
+    reason:
+      baseAction.mode === 'update_existing'
+        ? verifiedLiveOwner
+          ? ownerIssueVerification.verification_status
+          : policyVerification?.verification_status ?? 'canonical_owner_key_match'
+        : baseAction.reason
+  };
+}
+
+function resolveCandidateOwner(policy, cohortKey, globalOwnerIssueAction, canonicalOwnerVerifications = []) {
+  if (policy?.is_valid !== true) {
+    return {
+      owner_issue: policy?.owner_issue ?? null,
+      configured_owner_issue: policy?.owner_issue ?? null,
+      owner_issue_action: globalOwnerIssueAction,
+      owner_issue_resolution: {
+        mode: 'rolling_freshness_policy_owner',
+        source: 'rolling_freshness_policy.owner_issue',
+        canonical_owner_key: cohortKey,
+        configured_owner_issue: policy?.owner_issue ?? null
+      }
+    };
+  }
+
+  const canonicalOwners = normalizeCanonicalOwnerIssues(policy);
+  const matchedOwner = canonicalOwners.find((entry) => entry.canonical_owner_key === cohortKey) ?? null;
+  if (matchedOwner) {
+    const verification = canonicalOwnerVerificationLookup(canonicalOwnerVerifications).get(matchedOwner.owner_issue) ?? null;
+    const action = buildCanonicalOwnerIssueAction(matchedOwner, verification);
+    return {
+      owner_issue: action.issue ?? action.existing_issue ?? matchedOwner.owner_issue,
+      configured_owner_issue: policy?.owner_issue ?? null,
+      owner_issue_action: action,
+      owner_issue_resolution: {
+        mode: 'canonical_owner_key_match',
+        source: 'rolling_freshness_policy.canonical_owner_issues',
+        canonical_owner_key: cohortKey,
+        configured_owner_issue: policy?.owner_issue ?? null
+      }
+    };
+  }
+
+  return {
+    owner_issue: policy?.owner_issue ?? null,
+    configured_owner_issue: policy?.owner_issue ?? null,
+    owner_issue_action: globalOwnerIssueAction,
+    owner_issue_resolution: {
+      mode: 'rolling_freshness_policy_owner',
+      source: 'rolling_freshness_policy.owner_issue',
+      canonical_owner_key: cohortKey,
+      configured_owner_issue: policy?.owner_issue ?? null
+    }
+  };
+}
+
+function describeOwnerIssuePath(ownerIssueAction) {
+  if (
+    ownerIssueAction?.mode === 'update_existing_multiple' &&
+    Array.isArray(ownerIssueAction.issues) &&
+    ownerIssueAction.issues.length > 0
+  ) {
+    return `owner issues ${formatHumanList(ownerIssueAction.issues)}`;
+  }
+  if (ownerIssueAction?.mode === 'update_existing' && ownerIssueAction.issue) {
+    return `owner issue ${ownerIssueAction.issue}`;
+  }
+  if (ownerIssueAction?.reason === 'configured_owner_terminal' && ownerIssueAction.existing_issue) {
+    return `a new live same-project owner issue; configured owner ${ownerIssueAction.existing_issue} is terminal`;
+  }
+  if (ownerIssueAction?.reason === 'owner_verification_failed' && ownerIssueAction.existing_issue) {
+    return `a verified live same-project owner issue; current owner ${ownerIssueAction.existing_issue} could not be verified`;
+  }
+  return 'a live same-project owner issue';
 }
 
 function isTaskNumberInRange(taskNumber, range) {
@@ -120,10 +395,6 @@ function findMatchingBaselineCohort(entry, policy) {
   );
 }
 
-function isPolicyUsable(policy) {
-  return Boolean(policy?.enabled && policy?.is_valid && policy?.owner_issue);
-}
-
 function isEligibleHistoricalEntry(entry, policy) {
   const eligibleClasses = new Set(Array.isArray(policy?.eligible_doc_classes) ? policy.eligible_doc_classes : []);
   return Boolean(
@@ -132,6 +403,19 @@ function isEligibleHistoricalEntry(entry, policy) {
       Number.isInteger(entry.overdue_days) &&
       entry.overdue_days > 0
   );
+}
+
+function shouldVerifyCanonicalOwnerIssues(report) {
+  const policy = report?.rolling_freshness_policy ?? {};
+  if (policy?.is_valid !== true) {
+    return false;
+  }
+
+  const ownerCandidateEntries = [
+    ...(Array.isArray(report?.stale_entries) ? report.stale_entries : []),
+    ...(Array.isArray(report?.rolling_cohort_entries) ? report.rolling_cohort_entries : [])
+  ];
+  return ownerCandidateEntries.some((entry) => isEligibleHistoricalEntry(entry, policy));
 }
 
 function normalizeCandidateEntry(entry, policy, source) {
@@ -195,7 +479,7 @@ function canonicalOwnerMarkerForKey(key) {
   return `${CANONICAL_OWNER_MARKER_PREFIX}${key}`;
 }
 
-function summarizeCandidateCohorts(entries, policy) {
+function summarizeCandidateCohorts(entries, policy, ownerIssueAction, canonicalOwnerIssueVerifications = []) {
   const byKey = new Map();
   for (const entry of entries) {
     const key = candidateCohortKey(entry);
@@ -219,6 +503,12 @@ function summarizeCandidateCohorts(entries, policy) {
       const baselineIds = uniqueSorted(cohortEntries.map((entry) => entry.baseline_cohort_id).filter(Boolean));
       const expiresAfter = addDaysToIsoDate(first.last_review, first.cadence_days + policy.window_days);
       const cohortKey = candidateCohortKey(first);
+      const ownerResolution = resolveCandidateOwner(
+        policy,
+        cohortKey,
+        ownerIssueAction,
+        canonicalOwnerIssueVerifications
+      );
       return {
         id:
           baselineIds.length === 1 && cohortEntries.every((entry) => entry.baseline_cohort_id === baselineIds[0])
@@ -226,7 +516,10 @@ function summarizeCandidateCohorts(entries, policy) {
             : `candidate-${first.last_review}-cadence-${first.cadence_days}-age-${first.age_days}`,
         canonical_owner_key: cohortKey,
         canonical_owner_marker: canonicalOwnerMarkerForKey(cohortKey),
-        owner_issue: policy.owner_issue ?? null,
+        owner_issue: ownerResolution.owner_issue,
+        configured_owner_issue: ownerResolution.configured_owner_issue,
+        owner_issue_action: ownerResolution.owner_issue_action,
+        owner_issue_resolution: ownerResolution.owner_issue_resolution,
         status: cohortEntries.some((entry) => entry.overdue_days > policy.window_days)
           ? 'expired_candidate'
           : 'eligible_historical_candidate',
@@ -262,7 +555,19 @@ function collectReportFailurePaths(report) {
   ]);
 }
 
-function summarizePolicyCapacity(candidateEntries, policy) {
+function hasUsableCohortOwner(candidateCohorts) {
+  return (Array.isArray(candidateCohorts) ? candidateCohorts : []).some(isCohortOwnerResolved);
+}
+
+function isCohortOwnerResolved(cohort) {
+  return Boolean(
+    cohort?.owner_issue_action?.mode === 'update_existing' &&
+      (cohort?.owner_issue_resolution?.mode === 'canonical_owner_key_match' ||
+        (Array.isArray(cohort?.declared_baseline_ids) && cohort.declared_baseline_ids.length > 0))
+  );
+}
+
+function summarizePolicyCapacity(candidateEntries, policy, { hasUsableOwnerPath = false, hasPolicyOwnerUsable = false } = {}) {
   if (!policy?.enabled) {
     return {
       status: 'policy_missing',
@@ -272,7 +577,11 @@ function summarizePolicyCapacity(candidateEntries, policy) {
       max_cohorts: policy?.max_cohorts ?? 0
     };
   }
-  if (!policy.is_valid || !policy.owner_issue) {
+  if (
+    !policy.is_valid ||
+    !policy.owner_issue ||
+    (candidateEntries.length > 0 && !hasUsableOwnerPath && !hasPolicyOwnerUsable)
+  ) {
     return {
       status: 'invalid_policy',
       current_entries: candidateEntries.length,
@@ -313,12 +622,12 @@ function hasProvenDiffStatus(diffStatus) {
   return diffStatus === 'ok' || diffStatus === 'provided';
 }
 
-function buildRecommendedAction(decision, { policy, expiresAfter, diffStatus }) {
+function buildRecommendedAction(decision, { policy, expiresAfter, diffStatus, ownerIssueAction }) {
   if (decision === 'clean') {
     return 'No docs freshness maintenance action is required.';
   }
   if (decision === 'pass_with_owned_rolling_debt') {
-    return `Proceed only for unrelated clean diffs; cite owner issue ${policy.owner_issue} and refresh/archive/reclassify the cohort before ${expiresAfter ?? 'the rolling window expires'}.`;
+    return `Proceed only for unrelated clean diffs; cite ${describeOwnerIssuePath(ownerIssueAction)} and refresh/archive/reclassify the cohort before ${expiresAfter ?? 'the rolling window expires'}.`;
   }
   if (decision === 'block_diff_local') {
     if (!hasProvenDiffStatus(diffStatus)) {
@@ -330,12 +639,145 @@ function buildRecommendedAction(decision, { policy, expiresAfter, diffStatus }) 
     return 'Fix missing registry rows, missing-on-disk registry references, invalid registry metadata, or uncatalogued docs before any deferral.';
   }
   if (decision === 'block_policy_expired') {
-    return `Refresh, archive, or reclassify the expired historical cohort through owner issue ${policy.owner_issue ?? '<missing owner>'}; do not defer it further.`;
+    return `Refresh, archive, or reclassify the expired historical cohort through ${describeOwnerIssuePath(ownerIssueAction)}; do not defer it further.`;
   }
   if (decision === 'block_policy_over_budget') {
-    return `Open or update the single owner path ${policy.owner_issue ?? '<missing owner>'} with refresh/archive action evidence; do not expand rolling caps to pass an unrelated lane.`;
+    if (ownerIssueAction?.mode === 'update_existing_multiple') {
+      return `Open or update the resolved owner paths through ${describeOwnerIssuePath(ownerIssueAction)} with refresh/archive action evidence; do not expand rolling caps to pass an unrelated lane.`;
+    }
+    return `Open or update the single owner path through ${describeOwnerIssuePath(ownerIssueAction)} with refresh/archive action evidence; do not expand rolling caps to pass an unrelated lane.`;
+  }
+  if (ownerIssueAction?.reason === 'configured_owner_terminal' && ownerIssueAction.existing_issue) {
+    return `Open a new live same-project owner issue for the historical batch; configured owner ${ownerIssueAction.existing_issue} is terminal, so do not reuse it as the live owner path.`;
+  }
+  if (ownerIssueAction?.reason === 'owner_verification_failed' && ownerIssueAction.existing_issue) {
+    return `Verify or replace the owner issue for the historical batch; current owner ${ownerIssueAction.existing_issue} could not be verified, so do not reuse it blindly.`;
   }
   return `Open or update one baseline owner issue for the historical batch, or fix stale public/active guidance directly before gates pass.`;
+}
+
+function selectRecommendedOwnerIssueAction(ownerIssueAction, candidateCohorts) {
+  const cohorts = Array.isArray(candidateCohorts) ? candidateCohorts : [];
+  if (cohorts.length === 0 || !cohorts.every(isCohortOwnerResolved)) {
+    return ownerIssueAction;
+  }
+  const ownedIssues = uniqueSorted(
+    cohorts
+      .filter(isCohortOwnerResolved)
+      .map((cohort) => cohort.owner_issue_action.issue)
+      .filter(Boolean)
+  );
+  if (ownedIssues.length === 1) {
+    return {
+      mode: 'update_existing',
+      issue: ownedIssues[0],
+      existing_issue: null,
+      duplicate_policy: 'one_owner_issue_per_canonical_owner_key',
+      policy_doc: ownerIssueAction?.policy_doc ?? null,
+      reason: 'canonical_owner_key_match'
+    };
+  }
+  return {
+    mode: 'update_existing_multiple',
+    issue: null,
+    issues: ownedIssues,
+    existing_issue: null,
+    duplicate_policy: 'one_owner_issue_per_canonical_owner_key',
+    policy_doc: ownerIssueAction?.policy_doc ?? null,
+    reason: 'canonical_owner_key_match_multiple',
+    canonical_owner_keys: uniqueSorted(
+      cohorts
+        .filter(isCohortOwnerResolved)
+        .map((cohort) => cohort.owner_issue_action.canonical_owner_key)
+        .filter(Boolean)
+    )
+  };
+}
+
+async function verifyOwnerIssueContext(repoRoot, ownerIssue) {
+  const issue = normalizeOptionalString(ownerIssue);
+  if (!issue) {
+    return null;
+  }
+
+  const helperPath = path.join(repoRoot, 'bin', 'codex-orchestrator.js');
+  try {
+    await access(helperPath);
+  } catch {
+    return {
+      issue,
+      issue_id: null,
+      state: null,
+      state_type: null,
+      is_terminal: null,
+      usable: null,
+      verification_status: 'unavailable',
+      checked_at: new Date().toISOString(),
+      source: 'linear issue-context',
+      error: 'helper_missing'
+    };
+  }
+
+  try {
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      [helperPath, 'linear', 'issue-context', '--issue-id', issue, '--format', 'json'],
+      {
+        cwd: repoRoot,
+        maxBuffer: 64 * 1024 * 1024,
+        timeout: LINEAR_ISSUE_CONTEXT_TIMEOUT_MS
+      }
+    );
+    const parsed = JSON.parse(stdout);
+    const issueContext = parsed?.issue ?? {};
+    const workflowState = issueContext?.state && typeof issueContext.state === 'object' ? issueContext.state : null;
+    const state = normalizeOptionalString(workflowState?.name ?? issueContext?.state);
+    const stateType = normalizeOptionalString(workflowState?.type ?? issueContext?.state_type ?? issueContext?.stateType);
+    const isTerminal = isTerminalWorkflowState({
+      state,
+      stateType,
+      isTerminal: normalizeOptionalBoolean(
+        workflowState?.is_terminal ?? workflowState?.isTerminal ?? issueContext?.is_terminal ?? issueContext?.isTerminal
+      )
+    });
+    return {
+      issue,
+      issue_id: normalizeOptionalString(issueContext?.id),
+      state,
+      state_type: stateType,
+      is_terminal: isTerminal,
+      usable: !isTerminal,
+      verification_status: 'succeeded',
+      checked_at: new Date().toISOString(),
+      source: 'linear issue-context',
+      error: null
+    };
+  } catch (error) {
+    const detail =
+      sampleLines(
+        [error?.stdout, error?.stderr, error instanceof Error ? error.message : String(error)].filter(Boolean).join('\n')
+      )[0] ?? (error instanceof Error ? error.message : String(error));
+    return {
+      issue,
+      issue_id: null,
+      state: null,
+      state_type: null,
+      is_terminal: null,
+      usable: null,
+      verification_status: 'failed',
+      checked_at: new Date().toISOString(),
+      source: 'linear issue-context',
+      error: detail
+    };
+  }
+}
+
+async function verifyCanonicalOwnerIssues(repoRoot, policy) {
+  const ownerIssues = uniqueSorted(normalizeCanonicalOwnerIssues(policy).map((entry) => entry.owner_issue));
+  if (ownerIssues.length === 0) {
+    return [];
+  }
+  return Promise.all(ownerIssues.map((ownerIssue) => verifyOwnerIssueContext(repoRoot, ownerIssue)));
 }
 
 export function buildDocsFreshnessMaintenanceDecision(
@@ -346,10 +788,14 @@ export function buildDocsFreshnessMaintenanceDecision(
     specGuard = { status: 'skipped' },
     diffStatus = 'ok',
     diffBaseRef = null,
-    generatedAt = new Date().toISOString()
+    generatedAt = new Date().toISOString(),
+    ownerIssueVerification = null,
+    canonicalOwnerIssueVerifications = []
   } = {}
 ) {
   const policy = report.rolling_freshness_policy ?? {};
+  const resolvedOwnerIssueVerification = deriveOwnerIssueVerification(policy, ownerIssueVerification);
+  const ownerIssueAction = buildOwnerIssueAction(policy, resolvedOwnerIssueVerification);
   const staleEntries = Array.isArray(report.stale_entries) ? report.stale_entries : [];
   const rollingEntries = Array.isArray(report.rolling_cohort_entries) ? report.rolling_cohort_entries : [];
   const blockingCandidateEntries = staleEntries
@@ -359,14 +805,27 @@ export function buildDocsFreshnessMaintenanceDecision(
     .filter((entry) => isEligibleHistoricalEntry(entry, policy))
     .map((entry) => normalizeCandidateEntry(entry, policy, 'rolling_window'));
   const candidateEntries = [...blockingCandidateEntries, ...ownedRollingEntries];
-  const passableOwnedRollingEntries = ownedRollingEntries.filter((entry) => entry.baseline_cohort_id);
   const blockingCandidatePaths = new Set(blockingCandidateEntries.map((entry) => entry.path));
   const candidatePaths = new Set(candidateEntries.map((entry) => entry.path));
   const nonCandidateStaleEntries = staleEntries
     .filter((entry) => !blockingCandidatePaths.has(normalizeDocPath(entry.path)))
     .map((entry) => normalizeCandidateEntry(entry, policy, 'hard_stale'));
-  const candidateCohorts = summarizeCandidateCohorts(candidateEntries, policy);
-  const policyCapacityStatus = summarizePolicyCapacity(candidateEntries, policy);
+  const candidateCohorts = summarizeCandidateCohorts(
+    candidateEntries,
+    policy,
+    ownerIssueAction,
+    canonicalOwnerIssueVerifications
+  );
+  const unownedCandidateCohorts = candidateCohorts.filter(
+    (cohort) => !isCohortOwnerResolved(cohort)
+  );
+  const ownedCandidateEntries = candidateCohorts
+    .filter(isCohortOwnerResolved)
+    .reduce((total, cohort) => total + Number(cohort?.stale_entries ?? 0), 0);
+  const policyCapacityStatus = summarizePolicyCapacity(candidateEntries, policy, {
+    hasUsableOwnerPath: hasUsableCohortOwner(candidateCohorts),
+    hasPolicyOwnerUsable: ownerIssueAction.mode === 'update_existing'
+  });
   const expiresAfterCandidates = uniqueSorted(candidateCohorts.map((cohort) => cohort.expires_after).filter(Boolean));
   const expiresAfter = expiresAfterCandidates[0] ?? null;
 
@@ -383,21 +842,25 @@ export function buildDocsFreshnessMaintenanceDecision(
     Number(report.totals?.missing_on_disk ?? 0) +
     Number(report.totals?.invalid_entries ?? 0) +
     Number(report.totals?.uncatalogued_docs ?? 0);
+  const hasOwnerRelevantDebt = candidateEntries.length > 0 || staleEntries.length > 0;
 
   let freshnessDecision = 'clean';
   if (registryBlockerCount > 0) {
     freshnessDecision = 'block_missing_or_invalid_registry';
   } else if (!hasProvenDiffStatus(diffStatus) || blockingChangedPaths.length > 0 || specGuard.status === 'failed') {
     freshnessDecision = 'block_diff_local';
-  } else if ((candidateEntries.length > 0 || staleEntries.length > 0) && !isPolicyUsable(policy)) {
+  } else if (
+    hasOwnerRelevantDebt &&
+    (policyCapacityStatus.status === 'invalid_policy' || policyCapacityStatus.status === 'policy_missing')
+  ) {
     freshnessDecision = 'block_unowned_repo_debt';
   } else if (policyCapacityStatus.status === 'expired') {
     freshnessDecision = 'block_policy_expired';
   } else if (policyCapacityStatus.status === 'over_budget') {
     freshnessDecision = 'block_policy_over_budget';
-  } else if (blockingCandidateEntries.length > 0 || nonCandidateStaleEntries.length > 0) {
+  } else if (unownedCandidateCohorts.length > 0 || nonCandidateStaleEntries.length > 0) {
     freshnessDecision = 'block_unowned_repo_debt';
-  } else if (passableOwnedRollingEntries.length > 0) {
+  } else if (candidateEntries.length > 0 && ownedCandidateEntries > 0) {
     freshnessDecision = 'pass_with_owned_rolling_debt';
   }
 
@@ -407,19 +870,21 @@ export function buildDocsFreshnessMaintenanceDecision(
     task_id: taskId,
     freshness_decision: freshnessDecision,
     owner_issue: policy.owner_issue ?? null,
-    owner_issue_action: {
-      mode: policy.owner_issue ? 'update_existing' : 'create_required',
-      issue: policy.owner_issue ?? null,
-      duplicate_policy: 'one_owner_issue_per_historical_batch',
-      policy_doc: policy.policy_doc ?? null
-    },
+    owner_issue_action: ownerIssueAction,
+    owner_issue_verification: resolvedOwnerIssueVerification,
+    canonical_owner_issue_verifications: canonicalOwnerIssueVerifications,
     candidate_cohorts: candidateCohorts,
     blocking_changed_paths: blockingChangedPaths,
     diff_status: diffStatus,
     diff_base_ref: diffBaseRef,
     policy_capacity_status: policyCapacityStatus,
     expires_after: expiresAfter,
-    recommended_action: buildRecommendedAction(freshnessDecision, { policy, expiresAfter, diffStatus }),
+    recommended_action: buildRecommendedAction(freshnessDecision, {
+      policy,
+      expiresAfter,
+      diffStatus,
+      ownerIssueAction: selectRecommendedOwnerIssueAction(ownerIssueAction, candidateCohorts)
+    }),
     sample_paths: {
       changed_paths: normalizedChangedPaths.slice(0, 10),
       blocking_changed_paths: blockingChangedPaths.slice(0, 10),
@@ -437,6 +902,8 @@ export function buildDocsFreshnessMaintenanceDecision(
       candidate_entries: candidateEntries.length,
       blocking_candidate_entries: blockingCandidateEntries.length,
       owned_rolling_entries: ownedRollingEntries.length,
+      owned_candidate_entries: ownedCandidateEntries,
+      unowned_candidate_cohorts: unownedCandidateCohorts.length,
       hard_stale_entries: nonCandidateStaleEntries.length,
       missing_in_registry: report.totals?.missing_in_registry ?? 0,
       missing_on_disk: report.totals?.missing_on_disk ?? 0,
@@ -580,18 +1047,31 @@ export async function runDocsFreshnessMaintain(
     outRoot,
     taskId
   });
-  const [diffResult, specGuard] = await Promise.all([
+  const hasOwnerRelevantDebt =
+    (Array.isArray(freshnessResult.report?.stale_entries) && freshnessResult.report.stale_entries.length > 0) ||
+    (Array.isArray(freshnessResult.report?.rolling_cohort_entries) &&
+      freshnessResult.report.rolling_cohort_entries.length > 0);
+  const shouldVerifyCanonicalOwners = shouldVerifyCanonicalOwnerIssues(freshnessResult.report);
+  const [diffResult, specGuard, ownerIssueVerification, canonicalOwnerIssueVerifications] = await Promise.all([
     Array.isArray(changedPaths)
       ? Promise.resolve({ base_ref: baseRef, status: 'provided', paths: changedPaths })
       : collectChangedPaths(repoRoot, { baseRef }),
-    runSpecGuard(repoRoot, { skip: skipSpecGuard })
+    runSpecGuard(repoRoot, { skip: skipSpecGuard }),
+    hasOwnerRelevantDebt
+      ? verifyOwnerIssueContext(repoRoot, freshnessResult.report?.rolling_freshness_policy?.owner_issue ?? null)
+      : Promise.resolve(null),
+    shouldVerifyCanonicalOwners
+      ? verifyCanonicalOwnerIssues(repoRoot, freshnessResult.report?.rolling_freshness_policy ?? {})
+      : Promise.resolve([])
   ]);
   const decision = buildDocsFreshnessMaintenanceDecision(freshnessResult.report, {
     changedPaths: diffResult.paths,
     taskId,
     specGuard,
     diffStatus: diffResult.status,
-    diffBaseRef: diffResult.base_ref
+    diffBaseRef: diffResult.base_ref,
+    ownerIssueVerification,
+    canonicalOwnerIssueVerifications
   });
   decision.diff = diffResult;
 

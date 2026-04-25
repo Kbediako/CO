@@ -389,6 +389,219 @@ describe('implementation-docs-archive script', () => {
     expect(after).toEqual(before);
   });
 
+  it('does not auto-archive preserved historical stubs for completed task packets', async () => {
+    const repo = await initRepository({
+      policyOverrides: {
+        doc_patterns: ['tasks/tasks-*.md'],
+        retain_days: 0,
+        max_lines: 1
+      },
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'tasks/tasks-9999-archive-test.md',
+            status: 'preserved_historical_stub',
+            last_review: '2025-01-01',
+            cadence_days: 30
+          }
+        ]
+      },
+      taskOverrides: {
+        paths: {
+          task: 'tasks/tasks-9999-archive-test.md'
+        }
+      }
+    });
+
+    const taskPath = join(repo, 'tasks', 'tasks-9999-archive-test.md');
+    const taskContent = '# Historical stub\n\nCanonical key continuity only.\n';
+    await writeFile(taskPath, taskContent);
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const registry = JSON.parse(await readFile(join(repo, 'docs', 'docs-freshness-registry.json'), 'utf8'));
+    const preservedEntry = registry.entries.find(
+      (entry: { path?: string }) => entry.path === 'tasks/tasks-9999-archive-test.md'
+    );
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+
+    expect(report.totals.archived).toBe(0);
+    expect(report.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-9999-archive-test.md',
+          reason: 'preserved_historical_stub'
+        })
+      ])
+    );
+    expect(preservedEntry).toMatchObject({
+      path: 'tasks/tasks-9999-archive-test.md',
+      status: 'preserved_historical_stub',
+      last_review: '2025-01-01'
+    });
+    expect(await readFile(taskPath, 'utf8')).toBe(taskContent);
+    await expect(
+      readFile(
+        join(
+          repo,
+          'out',
+          'implementation-docs-archive-automation',
+          'docs-archive',
+          'tasks',
+          'tasks-9999-archive-test.md'
+        ),
+        'utf8'
+      )
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('does not auto-archive preserved historical stub stray files', async () => {
+    const repo = await initRepository({
+      taskOverrides: {
+        status: 'in_progress'
+      },
+      policyOverrides: {
+        doc_patterns: ['tasks/tasks-*.md'],
+        stray_retain_days: 0,
+        max_lines: 1
+      },
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'tasks/tasks-linear-stub.md',
+            status: 'preserved_historical_stub',
+            last_review: '2025-01-01',
+            cadence_days: 30
+          }
+        ]
+      }
+    });
+
+    const strayPath = join(repo, 'tasks', 'tasks-linear-stub.md');
+    const strayContent = '# Historical stub\n\nStill authoritative.\n';
+    await writeFile(strayPath, strayContent);
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+
+    expect(report.totals.archived).toBe(0);
+    expect(report.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-linear-stub.md',
+          reason: 'preserved_historical_stub'
+        })
+      ])
+    );
+    expect(await readFile(strayPath, 'utf8')).toBe(strayContent);
+    await expect(
+      readFile(
+        join(
+          repo,
+          'out',
+          'implementation-docs-archive-automation',
+          'docs-archive',
+          'tasks',
+          'tasks-linear-stub.md'
+        ),
+        'utf8'
+      )
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('does not let ordinary task packets bypass archiving via preserved historical stub status', async () => {
+    const repo = await initRepository({
+      policyOverrides: {
+        doc_patterns: ['tasks/tasks-*.md'],
+        retain_days: 0,
+        max_lines: 1
+      },
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'tasks/tasks-9999-archive-test.md',
+            status: 'preserved_historical_stub',
+            last_review: '2025-01-01',
+            cadence_days: 30
+          }
+        ]
+      },
+      taskOverrides: {
+        paths: {
+          task: 'tasks/tasks-9999-archive-test.md'
+        }
+      }
+    });
+
+    const taskPath = join(repo, 'tasks', 'tasks-9999-archive-test.md');
+    await writeFile(taskPath, '# Task Checklist\n\nOrdinary packet content.\n\n# Historical stub\n');
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+
+    expect(report.archived).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-9999-archive-test.md'
+        })
+      ])
+    );
+    expect(report.skipped).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-9999-archive-test.md',
+          reason: 'preserved_historical_stub'
+        })
+      ])
+    );
+    const stubContent = await readFile(taskPath, 'utf8');
+    expect(stubContent).toContain('<!-- docs-archive:stub -->');
+  });
+
   it('archives linked PRD, TECH_SPEC, and ACTION_PLAN docs for plain star patterns', async () => {
     const repo = await initRepository({
       policyOverrides: {

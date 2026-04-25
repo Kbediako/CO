@@ -73,11 +73,11 @@ If you want strict “small slice” behavior (for example, keeping subcalls aro
 
 ## Upstream Capability Watch (Codex CLI)
 
-As of 2026-02-25, these upstream details are relevant for CO planning:
+As of 2026-04-25, these upstream details are relevant for CO planning:
 
 - Built-in `explorer` no longer pins an older profile in `0.105.0`; it inherits top-level model/reasoning unless role `config_file` overrides it.
-- `agents.max_threads` default remains `6`; CO now recommends `12` with optional `max_depth = 4` for active multi-agent lanes, while treating `max_spawn_depth` as a legacy local override rather than current baseline guidance. Contingency-only fallback profiles remain `8/2` by default and legacy `6/1/1` only when an older parser/runtime still consumes spawn-depth caps.
-- `features.multi_agent` is canonical; `collab` is a legacy alias.
+- For normal `features.multi_agent=true` and older Codex behavior, `agents.max_threads` default remains `6`; CO recommends `12` with optional `max_depth = 4` for active multi-agent lanes, while treating `max_spawn_depth` as a legacy local override rather than current baseline guidance. For Codex CLI `0.125+` with `features.multi_agent_v2=true`, omit `agents.max_threads` entirely; upstream rejects the key, so doctor/default setup must not write or recommend it. Contingency-only fallback profiles remain `8/2` by default and legacy `6/1/1` only for v1/older configs that still consume spawn-depth caps.
+- `features.multi_agent` is canonical for v1/older collab tooling; `features.multi_agent_v2` is the Codex CLI `0.125+` path that rejects `agents.max_threads`; `collab` is a legacy alias.
 - `features.sqlite` and `features.memories` remain experimental/eval-only (legacy alias `features.memory_tool` remains compatibility-only).
 - `features.js_repl` is enabled by default globally. For deterministic cloud contracts, pin explicit feature lanes (`CODEX_CLOUD_ENABLE_FEATURES=js_repl` and separate `CODEX_CLOUD_DISABLE_FEATURES=js_repl` runs). Use `CODEX_CLOUD_DISABLE_FEATURES=js_repl` for task-scoped cloud break-glass; reserve `codex features disable js_repl` for global emergency toggles and re-enable with `codex features enable js_repl`.
 - Upstream app-server now emits `model/rerouted` notifications; CO should keep this on the watchlist for future run-summary/diagnostic enrichment.

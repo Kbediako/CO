@@ -35,6 +35,7 @@ export type DocsCheckRule =
   | 'spark-policy-overbroad'
   | 'bundled-skill-roster-drift'
   | 'front-door-budget-exceeded'
+  | 'release-runbook-stale'
   | 'tracked-runtime-artifact'
   | 'public-doc-absolute-path'
   | 'top-level-doc-sprawl';
@@ -71,6 +72,222 @@ const SPARK_POLICY_DOC_CLASSES = new Set([
   'shipped_companion',
   'seeded_template'
 ]);
+
+const RELEASE_WORKFLOW_PATH = '.github/workflows/release.yml';
+const RELEASE_ADDENDUM_PATH = 'docs/release-notes-template-addendum.md';
+
+const RELEASE_VALIDATION_COMMANDS = [
+  'node scripts/delegation-guard.mjs',
+  'node scripts/spec-guard.mjs --dry-run',
+  'npm run build',
+  'npm run lint',
+  'npm run test',
+  'npm run docs:check',
+  'npm run docs:freshness',
+  'npm run repo:stewardship',
+  'node scripts/diff-budget.mjs',
+  'npm run review',
+  'npm run pack:audit',
+  'npm run pack:smoke'
+] as const;
+
+const RELEASE_FULL_MATRIX_COMMANDS = [
+  'npm run build:all',
+  'npm run test:adapters',
+  'npm run test:evaluation',
+  'npm run eval:test'
+] as const;
+
+const RELEASE_LOCAL_SIGNING_REQUIREMENTS = [
+  {
+    label: 'local signing gate',
+    patterns: [/release is blocked unless .*signing.*release machine/i, /if signing is not configured.*release machine/i]
+  },
+  {
+    label: 'local commit signing config',
+    patterns: [/git config commit\.gpgsign/i]
+  },
+  {
+    label: 'local tag signing config',
+    patterns: [/git config tag\.gpgSign/i]
+  },
+  {
+    label: 'signed tag requirement',
+    patterns: [/signed annotated tag/i, /git tag -s\b/i]
+  }
+] as const;
+
+interface ReleaseWorkflowTruth {
+  hasManualDispatchTagInput: boolean;
+  hasSigningPublicKeys: boolean;
+  hasSigningAllowedSigners: boolean;
+  hasAnnotatedTagBodyOverviewOverride: boolean;
+  hasOidcPublish: boolean;
+  hasNpmTokenFallback: boolean;
+  hasStableLatestPublish: boolean;
+  hasPrereleaseDistTagPublish: boolean;
+  hasCleanDistBuild: boolean;
+}
+
+function buildReleaseRunbookError(file: string, label: string, missing: string[]): DocsCheckError[] {
+  if (missing.length === 0) {
+    return [];
+  }
+
+  return [
+    {
+      file,
+      rule: 'release-runbook-stale',
+      reference: `${label}: ${missing.join(', ')}`
+    }
+  ];
+}
+
+function contentMentionsAny(content: string, patterns: RegExp[]): boolean {
+  return patterns.some((pattern) => pattern.test(content));
+}
+
+function contentMentionsReleaseCommand(content: string, command: string): boolean {
+  const escaped = escapeRegExp(command);
+  return new RegExp(`(^|[^A-Za-z0-9:_-])${escaped}(?![A-Za-z0-9:_-])`).test(content);
+}
+
+function releaseValidationFloorContent(content: string): string {
+  const artifactSectionMatch = /(?:^|\n).*(?:validate the package artifact|package artifact validation).*/i.exec(content);
+  return artifactSectionMatch?.index === undefined ? content : content.slice(0, artifactSectionMatch.index);
+}
+
+async function readReleaseWorkflowTruth(repoRoot: string): Promise<ReleaseWorkflowTruth | null> {
+  const workflowPath = path.join(repoRoot, RELEASE_WORKFLOW_PATH);
+  if (!(await pathExists(workflowPath))) {
+    return null;
+  }
+
+  const workflow = await readFile(workflowPath, 'utf8');
+
+  return {
+    hasManualDispatchTagInput: /workflow_dispatch:[\s\S]*inputs:[\s\S]*\btag:/.test(workflow),
+    hasSigningPublicKeys: workflow.includes('RELEASE_SIGNING_PUBLIC_KEYS'),
+    hasSigningAllowedSigners: workflow.includes('RELEASE_SIGNING_ALLOWED_SIGNERS'),
+    hasAnnotatedTagBodyOverviewOverride:
+      workflow.includes('%(contents:body)') && workflow.includes('readAnnotatedTagBody'),
+    hasOidcPublish: workflow.includes('--provenance') && workflow.includes('OIDC publish failed'),
+    hasNpmTokenFallback: workflow.includes('NPM_TOKEN') && workflow.includes('falling back to NPM_TOKEN'),
+    hasStableLatestPublish: workflow.includes('dist_tag=latest'),
+    hasPrereleaseDistTagPublish: workflow.includes('prerelease=true') && workflow.includes('--tag "$DIST_TAG"'),
+    hasCleanDistBuild: workflow.includes('npm run clean:dist') && workflow.includes('npm run build')
+  };
+}
+
+function checkReleaseRunbookTruth(input: {
+  file: string;
+  content: string;
+  workflowTruth: ReleaseWorkflowTruth | null;
+}): DocsCheckError[] {
+  const { file, content, workflowTruth } = input;
+  if (!workflowTruth) {
+    return [
+      {
+        file,
+        rule: 'release-runbook-stale',
+        reference: `missing source-of-truth workflow ${RELEASE_WORKFLOW_PATH}`
+      }
+    ];
+  }
+
+  const missing: string[] = [];
+
+  if (file === RELEASE_ADDENDUM_PATH) {
+    if (!contentMentionsAny(content, [/\*\*Overview\*\*/i])) {
+      missing.push('release notes placement under Overview');
+    }
+    if (
+      workflowTruth.hasAnnotatedTagBodyOverviewOverride &&
+      !contentMentionsAny(content, [/signed annotated tag body/i, /tag body/i])
+    ) {
+      missing.push('signed annotated tag body overview override note');
+    }
+    if (!content.includes('codex-orchestrator skills install --force')) {
+      missing.push('codex-orchestrator skills install --force');
+    }
+    if (!content.includes('docs/skills-release.md')) {
+      missing.push('docs/skills-release.md link');
+    }
+    return buildReleaseRunbookError(file, 'missing addendum coverage', missing);
+  }
+
+  const validationFloorContent = releaseValidationFloorContent(content);
+  for (const command of RELEASE_VALIDATION_COMMANDS) {
+    if (!contentMentionsReleaseCommand(validationFloorContent, command)) {
+      missing.push(`validation command ${command}`);
+    }
+  }
+
+  for (const command of RELEASE_FULL_MATRIX_COMMANDS) {
+    if (!contentMentionsReleaseCommand(content, command)) {
+      missing.push(`full-matrix command ${command}`);
+    }
+  }
+
+  if (workflowTruth.hasCleanDistBuild && !contentMentionsReleaseCommand(content, 'npm run clean:dist')) {
+    missing.push('package artifact clean-dist validation');
+  }
+
+  if (workflowTruth.hasSigningPublicKeys && !content.includes('RELEASE_SIGNING_PUBLIC_KEYS')) {
+    missing.push('RELEASE_SIGNING_PUBLIC_KEYS signer secret');
+  }
+  if (workflowTruth.hasSigningAllowedSigners && !content.includes('RELEASE_SIGNING_ALLOWED_SIGNERS')) {
+    missing.push('RELEASE_SIGNING_ALLOWED_SIGNERS signer secret');
+  }
+  if (
+    workflowTruth.hasSigningPublicKeys &&
+    workflowTruth.hasSigningAllowedSigners &&
+    !contentMentionsAny(content, [/exactly one/i, /only one/i, /one signer secret/i])
+  ) {
+    missing.push('exactly-one signer secret posture');
+  }
+  if (workflowTruth.hasManualDispatchTagInput && !content.includes('inputs.tag')) {
+    missing.push('manual-dispatch inputs.tag semantics');
+  }
+  if (
+    workflowTruth.hasAnnotatedTagBodyOverviewOverride &&
+    !contentMentionsAny(content, [/signed annotated tag body/i, /tag body/i])
+  ) {
+    missing.push('signed annotated tag body overview override');
+  }
+  if (
+    workflowTruth.hasOidcPublish &&
+    !contentMentionsAny(content, [/\bOIDC\b/i, /trusted publishing/i])
+  ) {
+    missing.push('OIDC or trusted publishing posture');
+  }
+  if (workflowTruth.hasOidcPublish && !contentMentionsAny(content, [/--provenance/, /\bprovenance\b/i])) {
+    missing.push('provenance publish note');
+  }
+  if (workflowTruth.hasNpmTokenFallback && !content.includes('NPM_TOKEN')) {
+    missing.push('NPM_TOKEN fallback');
+  }
+  if (workflowTruth.hasNpmTokenFallback && !/automation token/i.test(content)) {
+    missing.push('npm automation token note');
+  }
+  if (workflowTruth.hasStableLatestPublish && !contentMentionsAny(content, [/\blatest\b/i])) {
+    missing.push('stable latest dist-tag note');
+  }
+  if (workflowTruth.hasPrereleaseDistTagPublish && !/\bprerelease\b/i.test(content)) {
+    missing.push('prerelease publish note');
+  }
+  if (workflowTruth.hasPrereleaseDistTagPublish && !/dist[- ]tag/i.test(content)) {
+    missing.push('dist-tag semantics');
+  }
+
+  for (const requirement of RELEASE_LOCAL_SIGNING_REQUIREMENTS) {
+    if (!contentMentionsAny(content, [...requirement.patterns])) {
+      missing.push(requirement.label);
+    }
+  }
+
+  return buildReleaseRunbookError(file, 'missing release runbook coverage', missing);
+}
 
 
 
@@ -166,6 +383,7 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
   const bundledSkillNames = docsCatalog ? await listBundledSkillNames(repoRoot) : [];
   const readmeBudget = docsCatalog?.policies?.readme_front_door ?? {};
   const rosterPolicy = docsCatalog?.policies?.bundled_skills_roster ?? {};
+  const releaseWorkflowTruth = docsCatalog ? await readReleaseWorkflowTruth(repoRoot) : null;
   if (docsCatalog) {
     errors.push(...checkTrackedRuntimeArtifacts(repoRoot, docsCatalog.policies?.release_surface_paths));
     errors.push(...(await checkTopLevelDocsSprawl(repoRoot, docsCatalog.policies?.top_level_docs)));
@@ -246,16 +464,23 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
         });
       } else {
         const versionMentions = extractCodexCliVersionMentions(content);
+        const allowedVersionMentions = new Set([
+          codexPosture.cli_version,
+          ...(codexPosture.cli_compatibility_versions ?? [])
+        ]);
         const hasCurrentMention = versionMentions.includes(codexPosture.cli_version);
-        const staleMentions = versionMentions.filter((version: string) => version !== codexPosture.cli_version);
+        const staleMentions = versionMentions.filter((version: string) => !allowedVersionMentions.has(version));
         if (!hasCurrentMention || staleMentions.length > 0) {
+          const reference =
+            versionMentions.length === 0
+              ? `missing Codex CLI version ${codexPosture.cli_version}`
+              : staleMentions.length === 0
+                ? `missing current Codex CLI version ${codexPosture.cli_version}; mentioned compatibility version(s) ${versionMentions.join(', ')}`
+                : `Codex CLI version(s) ${staleMentions.join(', ')} != current policy ${codexPosture.cli_version}`;
           errors.push({
             file,
             rule: 'doc-posture-stale',
-            reference:
-              versionMentions.length === 0
-                ? `missing Codex CLI version ${codexPosture.cli_version}`
-                : `Codex CLI version(s) ${staleMentions.join(', ')} != current policy ${codexPosture.cli_version}`
+            reference
           });
         }
       }
@@ -345,6 +570,16 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
           reference: `lines=${lineCount}/${maxLines ?? 'none'} h2=${h2Count}/${maxH2Sections ?? 'none'}`
         });
       }
+    }
+
+    if (truthChecks.has('release-runbook')) {
+      errors.push(
+        ...checkReleaseRunbookTruth({
+          file,
+          content,
+          workflowTruth: releaseWorkflowTruth
+        })
+      );
     }
   }
 

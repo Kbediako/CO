@@ -63,6 +63,7 @@ interface ControlRuntimeContext {
   paths: Pick<RunPaths, 'manifestPath' | 'runDir' | 'logPath'>;
   linearAdvisoryState: {
     tracked_issue: LiveLinearTrackedIssue | null;
+    stale_source?: unknown;
   };
   providerIntakeState?: ProviderIntakeState;
   providerWorkflowConfigStore?: ProviderWorkflowConfigStore;
@@ -181,7 +182,7 @@ function createControlRuntimeSnapshot(
       );
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
-      const tracked = resolveRuntimeTrackedPayload(selected, context.linearAdvisoryState.tracked_issue);
+      const tracked = resolveRuntimeTrackedPayload(selected, context.linearAdvisoryState);
       const providerIntake = buildProviderIntakeSummary(context.providerIntakeState);
       const providerWorkflow = context.providerWorkflowConfigStore
         ? await refreshProviderWorkflowStatusPayload(context.providerWorkflowConfigStore)
@@ -221,7 +222,7 @@ function createControlRuntimeSnapshot(
         .filter((source): source is ControlCompatibilitySourceContext => source !== null);
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
-      const tracked = resolveRuntimeTrackedPayload(selected, context.linearAdvisoryState.tracked_issue);
+      const tracked = resolveRuntimeTrackedPayload(selected, context.linearAdvisoryState);
       const providerIntake = buildProviderIntakeSummary(context.providerIntakeState);
       const polling = readProviderPollingSnapshot(context);
       const providerWorkflow = context.providerWorkflowConfigStore
@@ -254,8 +255,12 @@ function createControlRuntimeSnapshot(
         selected,
         running,
         retrying,
-        maxConcurrentAgents: resolveProviderPollDispatchLimits(context.controlStore.snapshot().feature_toggles)
-          .maxConcurrentAgents,
+        maxConcurrentAgents: resolveProviderPollDispatchLimits(
+          context.controlStore.snapshot().feature_toggles,
+          {
+            localWorkerOnly: (providerWorkflow?.worker_hosts?.length ?? 0) === 0
+          }
+        ).maxConcurrentAgents,
         codexTotals,
         rateLimits,
         dispatchPilot: dispatchPilotSummary.configured ? dispatchPilotSummary : null,
@@ -975,7 +980,7 @@ function isFallbackCompatibilityIdentityAlias(
 
 function resolveRuntimeTrackedPayload(
   selected: SelectedRunContext | ControlCompatibilitySourceContext | null,
-  advisoryTrackedIssue: LiveLinearTrackedIssue | null
+  advisoryState: { tracked_issue: LiveLinearTrackedIssue | null; stale_source?: unknown }
 ) {
   if (selected?.tracked) {
     if (linearTrackedIssueConflictsWithAuthoritativeIdentity(selected, selected.tracked.linear)) {
@@ -983,6 +988,10 @@ function resolveRuntimeTrackedPayload(
     }
     return selected.tracked;
   }
+  if (advisoryState.stale_source) {
+    return null;
+  }
+  const advisoryTrackedIssue = advisoryState.tracked_issue;
   if (!advisoryTrackedIssue) {
     return null;
   }
@@ -1362,6 +1371,8 @@ function buildCompatibilityTelemetrySnapshot(
   let hasOutputTokens = false;
   let totalTokens = 0;
   let hasTotalTokens = false;
+  let reasoningOutputTokens = 0;
+  let hasReasoningOutputTokens = false;
   let secondsRunning = 0;
   let latestAuthoritativeRateLimits: Record<string, unknown> | null = polling?.linear_budget
     ? { ...polling.linear_budget }
@@ -1388,6 +1399,13 @@ function buildCompatibilityTelemetrySnapshot(
       totalTokens += Math.max(0, tokenUsage.total_tokens);
       hasTotalTokens = true;
     }
+    if (
+      typeof tokenUsage?.reasoning_output_tokens === 'number' &&
+      Number.isFinite(tokenUsage.reasoning_output_tokens)
+    ) {
+      reasoningOutputTokens += Math.max(0, tokenUsage.reasoning_output_tokens);
+      hasReasoningOutputTokens = true;
+    }
     secondsRunning += computeCompatibilityRuntimeSeconds(source, now);
 
     const linearBudget = proof?.linear_budget ? { ...proof.linear_budget } : null;
@@ -1411,13 +1429,18 @@ function buildCompatibilityTelemetrySnapshot(
     }
   }
 
+  const codexTotals: ControlCodexTotalsPayload = {
+    input_tokens: hasInputTokens ? inputTokens : null,
+    output_tokens: hasOutputTokens ? outputTokens : null,
+    total_tokens: hasTotalTokens ? totalTokens : null,
+    seconds_running: Number(secondsRunning.toFixed(3))
+  };
+  if (hasReasoningOutputTokens) {
+    codexTotals.reasoning_output_tokens = reasoningOutputTokens;
+  }
+
   return {
-    codexTotals: {
-      input_tokens: hasInputTokens ? inputTokens : null,
-      output_tokens: hasOutputTokens ? outputTokens : null,
-      total_tokens: hasTotalTokens ? totalTokens : null,
-      seconds_running: Number(secondsRunning.toFixed(3))
-    },
+    codexTotals,
     rateLimits: combineCompatibilityRateLimits({
       codex: latestCodexRateLimits,
       linearBudget: latestAuthoritativeRateLimits

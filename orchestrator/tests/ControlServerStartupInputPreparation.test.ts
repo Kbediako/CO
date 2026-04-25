@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -27,7 +27,7 @@ async function createRunRoot(taskId: string) {
 }
 
 describe('prepareControlServerStartupInputs', () => {
-  it('returns the ready-instance inputs with seeded runtime state preserved', async () => {
+  it('returns the ready-instance inputs with seeded runtime state preserved and stale advisory marked', async () => {
     const { root, env, paths } = await createRunRoot('task-1121');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
     const controlSeed: ControlState = {
@@ -217,7 +217,28 @@ describe('prepareControlServerStartupInputs', () => {
       expect(context.confirmationStore.snapshot()).toEqual(confirmationsSeed);
       expect(context.questionQueue.list()).toEqual(questions);
       expect(context.delegationTokens.list()).toEqual(tokens);
-      expect(context.linearAdvisoryState).toEqual(linearAdvisorySeed);
+      expect(context.linearAdvisoryState).toMatchObject({
+        ...linearAdvisorySeed,
+        stale_source: {
+          source: 'provider-intake',
+          reason: 'provider_intake_newer_than_linear_advisory',
+          provider_intake_updated_at: '2026-03-12T00:04:30.000Z',
+          advisory_updated_at: '2026-03-12T00:04:00.000Z'
+        }
+      });
+      expect(context.linearAdvisoryState.stale_source?.marked_at).toEqual(expect.any(String));
+      const persistedAdvisoryState = JSON.parse(
+        await readFile(join(paths.runDir, LINEAR_ADVISORY_STATE_FILE), 'utf8')
+      ) as LinearAdvisoryState;
+      expect(persistedAdvisoryState).toMatchObject({
+        ...linearAdvisorySeed,
+        stale_source: {
+          source: 'provider-intake',
+          reason: 'provider_intake_newer_than_linear_advisory',
+          provider_intake_updated_at: '2026-03-12T00:04:30.000Z',
+          advisory_updated_at: '2026-03-12T00:04:00.000Z'
+        }
+      });
       expect(context.providerIntakeState).toMatchObject({
         ...providerIntakeSeed,
         polling: null

@@ -20,8 +20,10 @@ jobs:
   archive:
     uses: ./.github/workflows/archive-automation-base.yml
     permissions:
+      actions: write
       contents: write
       pull-requests: write
+      statuses: write
     with:
       run_command: node scripts/tasks-archive.mjs
       task_id: tasks-archive-automation

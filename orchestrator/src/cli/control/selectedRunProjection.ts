@@ -3,6 +3,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import type { RunPaths } from '../run/runPaths.js';
 import type { CliManifest } from '../types.js';
+import { stripNonApplicableGuardrailSummaryLines } from '../run/manifest.js';
 import type { ControlAction, ControlState } from './controlState.js';
 import { LINEAR_ADVISORY_STATE_FILE } from './controlPersistenceFiles.js';
 import {
@@ -88,6 +89,7 @@ export interface SelectedRunProjectionContext {
   paths: Pick<RunPaths, 'manifestPath' | 'runDir'>;
   linearAdvisoryState: {
     tracked_issue: LiveLinearTrackedIssue | null;
+    stale_source?: unknown;
   };
   providerIntakeState?: ProviderIntakeState;
 }
@@ -166,6 +168,19 @@ interface ResolvedCompatibilityState {
 
 interface LinearAdvisoryStateSnapshot {
   tracked_issue?: LiveLinearTrackedIssue | null;
+  stale_source?: unknown;
+}
+
+function selectFreshLinearAdvisoryTrackedIssue(
+  advisoryState:
+    | { tracked_issue?: LiveLinearTrackedIssue | null; stale_source?: unknown }
+    | null
+    | undefined
+): LiveLinearTrackedIssue | null {
+  if (!advisoryState || advisoryState.stale_source) {
+    return null;
+  }
+  return advisoryState.tracked_issue ?? null;
 }
 
 export function createSelectedRunProjectionReader(
@@ -434,7 +449,10 @@ function buildProjectionContextFromParts(
       : manifestUpdatedAt;
   const manifestCompletedAt = readStringValue(manifestRecord, 'completed_at', 'completedAt');
   const completedAt = manifestCompletedAt ?? (isTerminalRunStatus(rawStatus) ? proofUpdatedAt ?? updatedAt : null);
-  const manifestSummary = readStringValue(manifestRecord, 'summary') ?? null;
+  const manifestSummary = stripNonApplicableGuardrailSummaryLines(
+    manifestRecord,
+    readStringValue(manifestRecord, 'summary')
+  );
   const proofAttemptStartedAt = useScopedTerminalProof
     ? resolveProviderLinearWorkerAttemptStartedAt(providerProofRecord)
     : null;
@@ -450,7 +468,8 @@ function buildProjectionContextFromParts(
                   deriveDeterministicProviderMutationSuppressions(
                     parts.providerLinearWorkerProof?.linear_audit ?? null,
                     {
-                      recordedAtNotBefore: proofAttemptStartedAt
+                      recordedAtNotBefore: proofAttemptStartedAt,
+                      issueId: parts.providerLinearWorkerProof?.issue_id ?? null
                     }
                   )
                 )
@@ -1254,7 +1273,7 @@ async function resolveProjectionContextParts(
       control: context.controlStore.snapshot(),
       questions: context.questionQueue.list(),
       runDir: context.paths.runDir,
-      trackedIssue: context.linearAdvisoryState.tracked_issue,
+      trackedIssue: selectFreshLinearAdvisoryTrackedIssue(context.linearAdvisoryState),
       providerLinearWorkerProof: await readProviderLinearWorkerProofForProjection(context.paths.runDir)
     };
   }
@@ -1273,7 +1292,7 @@ async function resolveProjectionContextParts(
     control,
     questions: Array.isArray(questionSnapshot?.questions) ? questionSnapshot.questions : [],
     runDir: snapshot.runDir,
-    trackedIssue: advisoryState?.tracked_issue ?? null,
+    trackedIssue: selectFreshLinearAdvisoryTrackedIssue(advisoryState),
     providerLinearWorkerProof: await readProviderLinearWorkerProofForProjection(snapshot.runDir)
   };
 }
@@ -1373,7 +1392,7 @@ async function readTaskCompatibilityContexts(
         control,
         questions: Array.isArray(questionSnapshot?.questions) ? questionSnapshot.questions : [],
         runDir,
-        trackedIssue: advisoryState?.tracked_issue ?? null,
+        trackedIssue: selectFreshLinearAdvisoryTrackedIssue(advisoryState),
         providerLinearWorkerProof
       },
       resolveRunsRootFromRunDir(runDir),
@@ -2126,12 +2145,73 @@ function hasProviderLinearWorkerProjectionTelemetryGap(
 ): boolean {
   const tokens = proof.tokens ?? null;
   const hasTokens =
-    tokens?.input_tokens != null || tokens?.output_tokens != null || tokens?.total_tokens != null;
+    tokens?.input_tokens != null ||
+    tokens?.output_tokens != null ||
+    tokens?.total_tokens != null ||
+    tokens?.reasoning_output_tokens != null;
   return (
     !proof.latest_turn_id ||
     !proof.latest_session_id ||
     !hasTokens ||
-    proof.rate_limits == null
+    proof.rate_limits == null ||
+    hasProviderLinearWorkerProjectionSessionLogHydrationGap(proof) ||
+    hasProviderLinearWorkerProjectionAppServerSupervisionGap(proof)
+  );
+}
+
+function hasProviderLinearWorkerProjectionAppServerSupervisionGap(
+  proof: ProviderLinearWorkerProof
+): boolean {
+  const selectedRuntimeMode =
+    proof.runtime?.selected_mode ?? proof.auth_provenance?.runtime_mode ?? null;
+  const requestedRuntimeMode = proof.runtime?.requested_mode ?? null;
+  const fallback = proof.runtime?.fallback ?? null;
+  if (
+    selectedRuntimeMode !== 'appserver' &&
+    requestedRuntimeMode !== 'appserver' &&
+    fallback?.from_mode !== 'appserver' &&
+    fallback?.to_mode !== 'appserver'
+  ) {
+    return false;
+  }
+  const supervision = proof.appserver_supervision ?? null;
+  if (!supervision) {
+    return true;
+  }
+  const expectedSessionLogTruthRetained = selectedRuntimeMode === 'appserver';
+  return (
+    supervision.selected_runtime?.selected_mode !== selectedRuntimeMode ||
+    supervision.selected_runtime?.requested_mode !== requestedRuntimeMode ||
+    supervision.thread_id !== proof.thread_id ||
+    supervision.latest_turn_id !== proof.latest_turn_id ||
+    supervision.latest_session_id !== proof.latest_session_id ||
+    supervision.session_log_thread_id !== (proof.session_log_thread_id ?? null) ||
+    supervision.session_log_turn_id !== (proof.session_log_turn_id ?? null) ||
+    supervision.session_log_session_id !== (proof.session_log_session_id ?? null) ||
+    supervision.turn_persistence_status == null ||
+    supervision.pagination_status == null ||
+    supervision.resume_status == null ||
+    supervision.fork_status == null ||
+    supervision.jsonl_truth_retained !== true ||
+    supervision.session_log_truth_retained !== expectedSessionLogTruthRetained
+  );
+}
+
+function hasProviderLinearWorkerProjectionSessionLogHydrationGap(
+  proof: ProviderLinearWorkerProof
+): boolean {
+  const runtimeMode =
+    proof.runtime?.selected_mode ?? proof.auth_provenance?.runtime_mode ?? null;
+  if (runtimeMode !== 'appserver') {
+    return false;
+  }
+  if (!proof.thread_id || !proof.latest_turn_id || !proof.latest_session_id) {
+    return false;
+  }
+  return (
+    proof.session_log_thread_id !== proof.thread_id ||
+    proof.session_log_turn_id !== proof.latest_turn_id ||
+    proof.session_log_session_id !== proof.latest_session_id
   );
 }
 

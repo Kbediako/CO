@@ -433,6 +433,7 @@ export interface ControlTokenUsagePayload {
   input_tokens: number | null;
   output_tokens: number | null;
   total_tokens: number | null;
+  reasoning_output_tokens?: number | null;
 }
 
 export interface ControlCodexTotalsPayload extends ControlTokenUsagePayload {

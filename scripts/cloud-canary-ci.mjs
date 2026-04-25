@@ -53,11 +53,35 @@ function envConfigDiagnosis() {
   };
 }
 
+function configuredEnvIssueDiagnosis(diagnosticCategory, guidance) {
+  return {
+    category: 'configuration',
+    diagnostic_category: diagnosticCategory,
+    guidance
+  };
+}
+
 function authMismatchDiagnosis() {
   return {
     category: 'credentials',
     diagnostic_category: 'auth_mismatch',
     guidance: 'Provide Codex Cloud credentials in CI with access to the configured environment.'
+  };
+}
+
+function cloudDenialDiagnosis() {
+  return {
+    category: 'credentials',
+    diagnostic_category: 'cloud_denial',
+    guidance: 'Codex Cloud rejected this run; verify the configured cloud environment, branch, and account permission for cloud execution.'
+  };
+}
+
+function quotaRateLimitDiagnosis() {
+  return {
+    category: 'execution',
+    diagnostic_category: 'quota_rate_limit',
+    guidance: 'Codex account quota or rate-limit state is implicated; inspect account plan/rate-limit evidence and retry after limits reset.'
   };
 }
 
@@ -99,11 +123,36 @@ function hasCloudConnectorAuthDriftSignal(normalizedSignal) {
   );
 }
 
+function hasEnvironmentNotFoundSignal(normalizedSignal) {
+  if (normalizedSignal.includes('environment_not_found')) {
+    return true;
+  }
+  if (!/\benvironment\s+(?:['"][^'"]+['"]|[^\s'"]+)\s+not\s+found\b/u.test(normalizedSignal)) {
+    return false;
+  }
+  return (
+    normalizedSignal.includes('codex_cloud_env_id') ||
+    normalizedSignal.includes('codex cloud env id') ||
+    normalizedSignal.includes('is not visible to codex cloud') ||
+    normalizedSignal.includes('could not be verified by codex cloud')
+  );
+}
+
 function hasEnvConfigSignal(normalizedSignal) {
   return (
     normalizedSignal.includes('cloud-env-missing') ||
     normalizedSignal.includes('codex_cloud_env_id') ||
-    normalizedSignal.includes('no environment id is configured')
+    normalizedSignal.includes('no environment id is configured') ||
+    hasEnvironmentNotFoundSignal(normalizedSignal) ||
+    hasEnvironmentUnavailableSignal(normalizedSignal)
+  );
+}
+
+function hasEnvironmentUnavailableSignal(normalizedSignal) {
+  return (
+    normalizedSignal.includes('environment_unavailable') ||
+    normalizedSignal.includes('is not visible to codex cloud') ||
+    normalizedSignal.includes('could not be verified by codex cloud')
   );
 }
 
@@ -123,6 +172,32 @@ function hasAuthMismatchSignal(normalizedSignal) {
   );
 }
 
+function hasCloudDenialSignal(normalizedSignal) {
+  return (
+    normalizedSignal.includes('cloud denial') ||
+    normalizedSignal.includes('cloud-denial') ||
+    normalizedSignal.includes('cloud_denial') ||
+    normalizedSignal.includes('cloud denied') ||
+    normalizedSignal.includes('not allowed in cloud') ||
+    normalizedSignal.includes('cloud access denied') ||
+    normalizedSignal.includes('cloud execution denied')
+  );
+}
+
+function hasQuotaRateLimitSignal(normalizedSignal) {
+  return (
+    normalizedSignal.includes('quota_rate_limit') ||
+    normalizedSignal.includes('rate limit') ||
+    normalizedSignal.includes('rate-limit') ||
+    normalizedSignal.includes('rate_limited') ||
+    normalizedSignal.includes('rate_limit_exceeded') ||
+    normalizedSignal.includes('quota') ||
+    normalizedSignal.includes('too many requests') ||
+    normalizedSignal.includes('usage limit') ||
+    normalizedSignal.includes('usage_limit_reached')
+  );
+}
+
 function hasOnlyExpectedFallbackIssues(issues) {
   return (
     Array.isArray(issues) &&
@@ -138,7 +213,32 @@ function hasConnectivityStatusCodeContext(normalizedSignal) {
   );
 }
 
+function maskEnvConfigIdentifierValues(normalizedSignal) {
+  return normalizedSignal
+    .replace(/\bcodex_cloud_env_id\s+(?:['"][^'"]+['"]|[^\s'"]+)/gu, 'codex_cloud_env_id <env-id>')
+    .replace(/\bcodex cloud env id\s+(?:['"][^'"]+['"]|[^\s'"]+)/gu, 'codex cloud env id <env-id>')
+    .replace(/\benvironment\s+(?:['"][^'"]+['"]|[^\s'"]+)\s+not\s+found\b/gu, 'environment <env-id> not found');
+}
+
+function hasStrongConnectivityContext(normalizedSignal) {
+  const connectivitySignal = maskEnvConfigIdentifierValues(normalizedSignal);
+  return (
+    connectivitySignal.includes('enotfound') ||
+    connectivitySignal.includes('econn') ||
+    connectivitySignal.includes('bad gateway') ||
+    connectivitySignal.includes('service unavailable') ||
+    connectivitySignal.includes('gateway timeout') ||
+    /\bnetwork\W{0,24}(?:error|failure|unreachable|unavailable|timeout|timed out|connection|connectivity)\b/u.test(connectivitySignal) ||
+    /\b(?:request|connection|endpoint|gateway|upstream|service)\W{0,24}(?:timed out|timeout)\b/u.test(connectivitySignal) ||
+    /\b(?:timed out|timeout)\W{0,24}(?:(?:while\s+)?(?:contacting|connecting|reaching|calling|waiting)|request|connection|endpoint|gateway|upstream|service|after)\b/u.test(connectivitySignal) ||
+    hasConnectivityStatusCodeContext(connectivitySignal)
+  );
+}
+
 function hasConnectivitySignal(normalizedSignal, { includeStatusCodes = true, requireStatusContext = false } = {}) {
+  if (requireStatusContext) {
+    return hasStrongConnectivityContext(normalizedSignal);
+  }
   return (
     normalizedSignal.includes('enotfound') ||
     normalizedSignal.includes('econn') ||
@@ -165,17 +265,38 @@ function hasConnectivitySignal(normalizedSignal, { includeStatusCodes = true, re
 
 export function classifyFailure(signal) {
   const normalized = normalizeFailureSignal(signal);
-  if (hasCloudConnectorAuthDriftSignal(normalized)) {
+  const masked = maskEnvConfigIdentifierValues(normalized);
+  const hasEnvironmentNotFound = hasEnvironmentNotFoundSignal(normalized);
+  if (hasCloudConnectorAuthDriftSignal(masked)) {
     return cloudConnectorAuthDriftDiagnosis();
   }
-  if (hasEnvConfigSignal(normalized)) {
-    return envConfigDiagnosis();
+  if (hasCloudDenialSignal(masked)) {
+    return cloudDenialDiagnosis();
   }
-  if (hasAuthMismatchSignal(normalized)) {
+  if (hasAuthMismatchSignal(masked)) {
     return authMismatchDiagnosis();
   }
-  if (hasConnectivitySignal(normalized)) {
+  if (hasQuotaRateLimitSignal(masked)) {
+    return quotaRateLimitDiagnosis();
+  }
+  const hasEnvConfig = hasEnvConfigSignal(normalized);
+  if (hasConnectivitySignal(normalized, { requireStatusContext: hasEnvConfig })) {
     return networkConnectivityDiagnosis();
+  }
+  if (hasEnvironmentNotFound) {
+    return configuredEnvIssueDiagnosis(
+      'environment_not_found',
+      'CODEX_CLOUD_ENV_ID is configured, but Codex Cloud could not resolve it. Fix the env id or choose an environment visible to this account.'
+    );
+  }
+  if (hasEnvironmentUnavailableSignal(normalized)) {
+    return configuredEnvIssueDiagnosis(
+      'environment_unavailable',
+      'CODEX_CLOUD_ENV_ID is configured, but this account cannot use that environment right now. Verify visibility/permissions and retry.'
+    );
+  }
+  if (hasEnvConfig) {
+    return envConfigDiagnosis();
   }
   if (normalized.includes('failed') || normalized.includes('error') || normalized.includes('cancelled')) {
     return providerRuntimeDiagnosis();
@@ -185,10 +306,11 @@ export function classifyFailure(signal) {
 
 function classifyCredentialFatalSignal(signal) {
   const normalized = normalizeFailureSignal(signal);
-  if (hasCloudConnectorAuthDriftSignal(normalized)) {
+  const masked = maskEnvConfigIdentifierValues(normalized);
+  if (hasCloudConnectorAuthDriftSignal(masked)) {
     return cloudConnectorAuthDriftDiagnosis();
   }
-  if (hasAuthMismatchSignal(normalized)) {
+  if (hasAuthMismatchSignal(masked)) {
     return authMismatchDiagnosis();
   }
   return null;
@@ -196,7 +318,11 @@ function classifyCredentialFatalSignal(signal) {
 
 function classifyConnectivityFatalSignal(signal, options) {
   const normalized = normalizeFailureSignal(signal);
-  if (hasConnectivitySignal(normalized, options)) {
+  const hasEnvConfig = hasEnvConfigSignal(normalized);
+  const effectiveOptions = hasEnvConfig
+    ? { ...options, requireStatusContext: true }
+    : options;
+  if (hasConnectivitySignal(normalized, effectiveOptions)) {
     return networkConnectivityDiagnosis();
   }
   return null;

@@ -7,6 +7,8 @@ import { resolveCodexCliBin } from './codexCli.js';
 export interface CloudPreflightIssue {
   code:
     | 'missing_environment'
+    | 'environment_not_found'
+    | 'environment_unavailable'
     | 'codex_unavailable'
     | 'branch_missing'
     | 'git_unavailable'
@@ -41,6 +43,18 @@ interface CommandResult {
   stderr: string;
 }
 
+function formatCommandSpawnError(error: unknown): string {
+  if (error instanceof Error) {
+    const errno = error as NodeJS.ErrnoException;
+    const code = typeof errno.code === 'string' ? errno.code : null;
+    if (code && !error.message.includes(code)) {
+      return `${code}: ${error.message}`;
+    }
+    return error.message;
+  }
+  return String(error);
+}
+
 export interface CloudPreflightRequest {
   repoRoot: string;
   codexBin: string;
@@ -56,11 +70,17 @@ function runCommand(
 ): Promise<CommandResult> {
   const timeoutMs = options.timeoutMs ?? 10_000;
   return new Promise((resolve) => {
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      env: options.env,
-      stdio: ['ignore', 'pipe', 'pipe']
-    });
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn(command, args, {
+        cwd: options.cwd,
+        env: options.env,
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
+    } catch (error) {
+      resolve({ exitCode: 1, stdout: '', stderr: formatCommandSpawnError(error) });
+      return;
+    }
     let stdout = '';
     let stderr = '';
     let settled = false;
@@ -92,7 +112,7 @@ function runCommand(
       }
       settled = true;
       clearTimeout(timer);
-      resolve({ exitCode: 1, stdout, stderr: `${stderr}\n${error.message}`.trim() });
+      resolve({ exitCode: 1, stdout, stderr: `${stderr}\n${formatCommandSpawnError(error)}`.trim() });
     });
     child.once('close', (code) => {
       if (settled) {
@@ -116,6 +136,221 @@ function normalizeBranch(raw: string | null | undefined): string | null {
 function normalizeCloudPreflightRequestValue(raw: string | null | undefined): string | null {
   const trimmed = String(raw ?? '').trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function readCloudPreflightCommandOutput(result: CommandResult): string {
+  const output = [result.stderr, result.stdout]
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0)
+    .join(' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
+  return output || 'no output';
+}
+
+function readCloudPreflightErrorOutput(result: CommandResult): string {
+  const output = result.stderr.trim().replace(/\s+/gu, ' ');
+  return output || 'no output';
+}
+
+function compactCloudPreflightOutput(output: string): string {
+  return output.length > 500 ? `${output.slice(0, 497)}...` : output;
+}
+
+function redactCloudPreflightOutput(output: string): string {
+  return output
+    .replace(/\b(?:authorization|bearer)\s*[:=]\s*bearer\s+[^\s,;]+/giu, 'authorization: Bearer <redacted>')
+    .replace(/\bbearer\s+[A-Za-z0-9._~+/-]{10,}/giu, 'Bearer <redacted>')
+    .replace(/\b(?:sk|sess|eyJ)[A-Za-z0-9._~+/-]{12,}/gu, '<redacted-token>')
+    .replace(
+      /\b(?:CODEX|OPENAI|CHATGPT|GITHUB|GH)_[A-Z0-9_]*(?:API_KEY|AUTH_TOKEN|ACCESS_TOKEN|REFRESH_TOKEN|TOKEN|SECRET|PASSWORD)\s*=\s*[^\s,;]+/gu,
+      (match) => `${match.split('=')[0] ?? 'secret'}=<redacted>`
+    )
+    .replace(
+      /\b(?:api[_ -]?key|auth[_ -]?token|access[_ -]?token|refresh[_ -]?token|bearer[_ -]?token|password|secret|credential)\s*[:=]\s*[^\s,;]+/giu,
+      (match) => `${match.split(/[:=]/u)[0]?.trim() ?? 'secret'}=<redacted>`
+    )
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/giu, '<redacted-email>');
+}
+
+function compactCloudPreflightCommandOutput(result: CommandResult): string {
+  return compactCloudPreflightOutput(redactCloudPreflightOutput(readCloudPreflightCommandOutput(result)));
+}
+
+function escapeRegExpLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+}
+
+function isEnvironmentNotFoundSignal(signal: string, environmentId: string): boolean {
+  const normalized = signal.toLowerCase();
+  const normalizedEnvironmentId = environmentId.toLowerCase();
+  if (normalized.includes('environment_not_found')) {
+    return true;
+  }
+  const escapedEnvironmentId = escapeRegExpLiteral(normalizedEnvironmentId);
+  return new RegExp(
+    `\\benvironment\\s+(?:(["'])${escapedEnvironmentId}\\1|${escapedEnvironmentId})\\s+not\\s+found\\b`,
+    'u'
+  ).test(normalized);
+}
+
+function maskCloudPreflightEnvironmentIdentifierValues(signal: string): string {
+  return signal
+    .toLowerCase()
+    .replace(/\benvironment\s+(?:['"][^'"]+['"]|[^\s'"]+)\s+not\s+found\b/gu, 'environment <env-id> not found')
+    .replace(/\bcodex_cloud_env_id\s+(?:['"][^'"]+['"]|[^\s'"]+)/gu, 'codex_cloud_env_id <env-id>')
+    .replace(/\bcodex cloud env id\s+(?:['"][^'"]+['"]|[^\s'"]+)/gu, 'codex cloud env id <env-id>');
+}
+
+function hasWrappedEnvironmentProbeUnavailableSignal(signal: string): boolean {
+  const normalized = maskCloudPreflightEnvironmentIdentifierValues(signal);
+  return (
+    /\b(?:missing[_ -]github[_ -]connector[_ -]link|github connection not found|github connector not found)\b/u.test(normalized) ||
+    /\b(?:cloud denial|cloud-denial|cloud_denial|cloud denied|not allowed in cloud|cloud access denied|cloud execution denied)\b/u.test(normalized) ||
+    /\b(?:forbidden|unauthorized|not logged in|login required|active account|active profile|account mismatch|profile mismatch|invalid token|expired token|token expired|missing token|token missing|api key|auth token|access token|refresh token|bearer token)\b/u.test(normalized) ||
+    /\b(?:rate limit|rate-limit|rate_limited|rate_limit_exceeded|quota|too many requests|usage limit|usage_limit_reached)\b/u.test(normalized) ||
+    /\b(?:enotfound|econn|network|timed out|timeout|502|503|504|bad gateway|service unavailable|gateway timeout)\b/u.test(normalized)
+  );
+}
+
+function buildEnvironmentProbeIssue(environmentId: string, result: CommandResult): CloudPreflightIssue {
+  const fullDetail = readCloudPreflightCommandOutput(result);
+  const detail = compactCloudPreflightCommandOutput(result);
+  if (
+    isEnvironmentNotFoundSignal(fullDetail, environmentId) &&
+    !hasWrappedEnvironmentProbeUnavailableSignal(fullDetail)
+  ) {
+    return {
+      code: 'environment_not_found',
+      message:
+        `Configured CODEX_CLOUD_ENV_ID '${environmentId}' is not visible to codex cloud before codex cloud exec: ${detail}`
+    };
+  }
+  return {
+    code: 'environment_unavailable',
+    message:
+      `Configured CODEX_CLOUD_ENV_ID '${environmentId}' could not be verified by codex cloud before codex cloud exec: ${detail}`
+  };
+}
+
+function tryParseCloudListJson(stdout: string): unknown {
+  const trimmed = stdout.trim();
+  if (!trimmed) {
+    return null;
+  }
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function readCloudListTasks(payload: unknown): unknown[] | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null;
+  }
+  const record = payload as Record<string, unknown>;
+  return Array.isArray(record.tasks) ? record.tasks : null;
+}
+
+function readCloudListTaskEnvironmentIdentities(task: unknown): string[] {
+  if (!task || typeof task !== 'object') {
+    return [];
+  }
+  const record = task as Record<string, unknown>;
+  const identities: string[] = [];
+  for (const key of ['environment_id', 'environmentId', 'cloud_environment_id', 'cloudEnvId']) {
+    const value = normalizeCloudPreflightRequestValue(record[key] as string | null | undefined);
+    if (value) {
+      identities.push(value);
+    }
+  }
+  for (const key of ['environment_label', 'environmentLabel']) {
+    const value = normalizeCloudPreflightRequestValue(record[key] as string | null | undefined);
+    if (value) {
+      identities.push(value);
+    }
+  }
+  const environment = record.environment;
+  if (environment && typeof environment === 'object') {
+    const environmentRecord = environment as Record<string, unknown>;
+    for (const key of ['id', 'environment_id', 'environmentId', 'cloud_environment_id', 'cloudEnvId']) {
+      const value = normalizeCloudPreflightRequestValue(environmentRecord[key] as string | null | undefined);
+      if (value) {
+        identities.push(value);
+      }
+    }
+    for (const key of ['label', 'environment_label', 'environmentLabel']) {
+      const value = normalizeCloudPreflightRequestValue(environmentRecord[key] as string | null | undefined);
+      if (value) {
+        identities.push(value);
+      }
+    }
+  }
+  return [...new Set(identities)];
+}
+
+function normalizeCloudEnvironmentIdentity(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function buildEnvironmentProbePayloadIssue(
+  environmentId: string,
+  detail: string
+): CloudPreflightIssue {
+  const safeDetail = compactCloudPreflightOutput(redactCloudPreflightOutput(detail));
+  return {
+    code: 'environment_unavailable',
+    message:
+      `Configured CODEX_CLOUD_ENV_ID '${environmentId}' could not be verified by codex cloud before codex cloud exec: ${safeDetail}`
+  };
+}
+
+function inspectSuccessfulEnvironmentProbe(
+  environmentId: string,
+  result: CommandResult
+): CloudPreflightIssue | null {
+  const stderrDetail = readCloudPreflightErrorOutput(result);
+  if (isEnvironmentNotFoundSignal(stderrDetail, environmentId)) {
+    return buildEnvironmentProbeIssue(environmentId, {
+      ...result,
+      stdout: ''
+    });
+  }
+
+  const payload = tryParseCloudListJson(result.stdout);
+  const tasks = readCloudListTasks(payload);
+  if (!tasks) {
+    return buildEnvironmentProbePayloadIssue(
+      environmentId,
+      `unexpected codex cloud list JSON payload: ${compactCloudPreflightOutput(result.stdout.trim() || 'no output')}`
+    );
+  }
+
+  const taskEnvironmentIdentities = tasks.map((task) => readCloudListTaskEnvironmentIdentities(task));
+  const normalizedEnvironmentId = normalizeCloudEnvironmentIdentity(environmentId);
+  if (taskEnvironmentIdentities.some((identities) => identities.length === 0)) {
+    return buildEnvironmentProbePayloadIssue(
+      environmentId,
+      'codex cloud list returned task rows without an environment identity'
+    );
+  }
+
+  const mismatchedEnvironmentIds = taskEnvironmentIdentities
+    .filter((identities) =>
+      !identities.some((identity) => normalizeCloudEnvironmentIdentity(identity) === normalizedEnvironmentId)
+    )
+    .flat();
+  if (mismatchedEnvironmentIds.length > 0) {
+    return buildEnvironmentProbePayloadIssue(
+      environmentId,
+      `codex cloud list returned task rows for a different environment identity: ${[
+        ...new Set(mismatchedEnvironmentIds)
+      ].join(', ')}`
+    );
+  }
+
+  return null;
 }
 
 function readFirstCloudPreflightEnvValue(
@@ -226,6 +461,25 @@ export async function runCloudPreflight(params: CloudPreflightRequest): Promise<
       code: 'codex_unavailable',
       message: `Codex CLI is unavailable (${params.codexBin} --version failed).`
     });
+  }
+
+  if (params.environmentId && codexCheck.exitCode === 0) {
+    const environmentCheck = await runCommand(
+      params.codexBin,
+      ['cloud', 'list', '--env', params.environmentId, '--limit', '1', '--json'],
+      {
+        cwd: params.repoRoot,
+        env: params.env
+      }
+    );
+    if (environmentCheck.exitCode !== 0) {
+      issues.push(buildEnvironmentProbeIssue(params.environmentId, environmentCheck));
+    } else {
+      const environmentProbeIssue = inspectSuccessfulEnvironmentProbe(params.environmentId, environmentCheck);
+      if (environmentProbeIssue) {
+        issues.push(environmentProbeIssue);
+      }
+    }
   }
 
   if (branch) {
