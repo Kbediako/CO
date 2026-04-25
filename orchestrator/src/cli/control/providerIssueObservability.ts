@@ -10,8 +10,10 @@ import {
   normalizeProviderLinearWorkflowState
 } from './providerLinearWorkflowStates.js';
 import { normalizeProviderWorkerHostName } from './providerWorkerHosts.js';
+import { stripNonApplicableGuardrailSummaryLines } from '../run/manifest.js';
 
 const PROVIDER_SEMANTIC_STALL_THRESHOLD_MS = 15 * 60 * 1000;
+const PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID = 'provider-linear-child-lane';
 
 export type ProviderIntakeClaimFreshness =
   | 'fresh'
@@ -228,12 +230,16 @@ interface ProviderIssueChildStreamLike {
 
 interface ProviderIssueChildLaneLike {
   stream?: string | null;
+  pipeline_id?: string | null;
   task_id?: string | null;
   run_id?: string | null;
   status?: string | null;
   launched_at?: string | null;
   summary_recorded_at?: string | null;
   summary?: string | null;
+  guardrails_required?: boolean | null;
+  guardrails_required_source?: string | null;
+  guardrail_command_count?: number | null;
   decision?: string | null;
   in_flight_action?: string | null;
   decision_at?: string | null;
@@ -829,7 +835,7 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
 
   if (activeChildLane) {
     const childLaneSummary =
-      normalizeOptionalString(activeChildLane.summary) ??
+      normalizeProviderChildLaneProgressSummary(activeChildLane) ??
       `Waiting on child lane ${activeChildLane.stream ?? activeChildLane.task_id ?? activeChildLane.run_id ?? 'unknown'}.`;
     return {
       phase: 'child_lane',
@@ -1202,7 +1208,7 @@ function collectCurrentTurnChildProgressSummaryCandidates(
     ...selectCurrentTurnChildLanes(proof?.child_lanes ?? null, currentTurnStartedAt)
       .filter(isCurrentProgressChildLaneSummaryEligible)
       .flatMap((childLane) => {
-        const summary = normalizeOptionalString(childLane.summary);
+        const summary = normalizeProviderChildLaneProgressSummary(childLane);
         const summaryRecordedAt = childLaneSummaryRecordedAt(childLane);
         return summary
           ? [
@@ -1885,7 +1891,7 @@ function selectLatestChildProgressSummaryCandidate(
     ...selectCurrentTurnChildLanes(proof?.child_lanes ?? null, currentTurnStartedAt)
       .filter(isCurrentProgressChildLaneSummaryEligible)
       .flatMap((childLane) => {
-        const summary = normalizeOptionalString(childLane.summary);
+        const summary = normalizeProviderChildLaneProgressSummary(childLane);
         return summary
           ? [
               {
@@ -1985,6 +1991,40 @@ function isCurrentProgressChildLaneSummaryEligible(childLane: ProviderIssueChild
 
 function childLaneSummaryRecordedAt(childLane: ProviderIssueChildLaneLike): string | null {
   return normalizeOptionalString(childLane.summary_recorded_at) ?? normalizeOptionalString(childLane.launched_at);
+}
+
+function normalizeProviderChildLaneProgressSummary(childLane: ProviderIssueChildLaneLike): string | null {
+  const summary = normalizeOptionalString(childLane.summary);
+  if (!summary) {
+    return null;
+  }
+  const pipelineId = normalizeOptionalString(childLane.pipeline_id);
+  if (pipelineId !== null && pipelineId !== PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID) {
+    return summary;
+  }
+  const guardrailCommandCount = normalizeOptionalInteger(childLane.guardrail_command_count);
+  if (guardrailCommandCount !== null && guardrailCommandCount > 0) {
+    return summary;
+  }
+  const guardrailsRequiredSource = normalizeGuardrailsRequiredSource(
+    childLane.guardrails_required_source
+  );
+  if (
+    typeof childLane.guardrails_required !== 'boolean' &&
+    guardrailsRequiredSource === null &&
+    guardrailCommandCount === null
+  ) {
+    return summary;
+  }
+  return stripNonApplicableGuardrailSummaryLines(
+    {
+      pipeline_id: pipelineId ?? PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID,
+      guardrails_required: childLane.guardrails_required === true,
+      guardrails_required_source: guardrailsRequiredSource,
+      commands: []
+    },
+    summary
+  );
 }
 
 function childLaneProgressRecordedAt(childLane: ProviderIssueChildLaneLike): string | null {
@@ -2121,6 +2161,10 @@ function normalizeOptionalInteger(value: unknown): number | null {
     return Math.trunc(value);
   }
   return null;
+}
+
+function normalizeGuardrailsRequiredSource(value: unknown): string | null {
+  return value === 'explicit' || value === 'stage_detection' ? value : null;
 }
 
 function normalizeStringArray(value: unknown): string[] {

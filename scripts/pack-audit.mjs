@@ -15,6 +15,10 @@ const REQUIRED_FILES = [
   'dist/scripts/run-review.js',
   'schemas/manifest.json',
   'skills/long-poll-wait/SKILL.md',
+  'docs/README.md',
+  'docs/book/README.md',
+  'docs/book/setup.md',
+  'docs/guides/codex-version-policy.md',
   'docs/public/downstream-setup.md',
   'docs/public/provider-onboarding.md',
   'templates/codex/.codex/providers/README.md',
@@ -25,7 +29,8 @@ const REQUIRED_FILES = [
 ];
 
 const ALLOWED_PREFIXES = ['dist/', 'plugins/', 'schemas/', 'templates/', 'skills/'];
-const EXPLICIT_ALLOWED_PREFIXES = ['docs/public/'];
+const EXPLICIT_ALLOWED_PREFIXES = ['docs/book/', 'docs/public/'];
+const EXPLICIT_ALLOWED_FILES = new Set(['docs/README.md', 'docs/guides/codex-version-policy.md']);
 const ALLOWED_ROOT_FILES = new Set([
   '.agents/plugins/marketplace.json',
   'bin/codex-orchestrator.js',
@@ -77,6 +82,9 @@ function collectFilePaths(record) {
 
 function isAllowedPath(filePath) {
   if (ALLOWED_ROOT_FILES.has(filePath)) {
+    return true;
+  }
+  if (EXPLICIT_ALLOWED_FILES.has(filePath)) {
     return true;
   }
   if (EXPLICIT_ALLOWED_PREFIXES.some((prefix) => filePath.startsWith(prefix))) {

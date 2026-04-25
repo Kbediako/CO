@@ -12,7 +12,7 @@
   },
   "policy": {
     "truth_check": "model-posture",
-    "current_model": "gpt-5.4",
+    "current_model": "gpt-5.5",
     "spark_exception_role": "explorer_fast",
     "spark_exception_model": "gpt-5.3-codex-spark",
     "required_scope": "file/codebase search only"
@@ -31,7 +31,7 @@
       "content_lines": [
         "# Codex Orchestrator",
         "",
-        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.",
         "- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.",
         "- `explorer_fast` is limited to file/codebase search only.",
         ""
@@ -55,7 +55,7 @@
       "content_lines": [
         "# Codex Orchestrator",
         "",
-        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.",
         "- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception for fast search/synthesis.",
         "- The spark policy permits planning.",
         ""
@@ -99,7 +99,7 @@
       "content_lines": [
         "# Codex Orchestrator",
         "",
-        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.",
         "- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only; do not use it for planning or review.",
         "- For planning or review, do not use spark roles.",
         "- For planning or review, do not use `explorer_fast`.",
@@ -107,10 +107,10 @@
         "- Planning or review should not use spark roles.",
         "- For planning, do not route to spark roles.",
         "- For review, do not choose the spark role.",
-        "- Do not use spark for planning, only use gpt-5.4.",
-        "- Do not use spark for planning and only use gpt-5.4.",
+        "- Do not use spark for planning, only use gpt-5.5.",
+        "- Do not use spark for planning and only use gpt-5.5.",
         "- For planning, do not use spark because non-spark roles are limited.",
-        "- Do not use spark, limit planning to gpt-5.4.",
+        "- Do not use spark, limit planning to gpt-5.5.",
         "- The spark policy must not permit planning.",
         "- For planning or review, do not use",
         "  `explorer_fast`.",
@@ -146,7 +146,7 @@
         "- Keep spark roles disabled until file/codebase search lanes need them.",
         "- `gpt-5.3-codex-spark` remains inactive by default.",
         "- Spark roles are off by default.",
-        "- Spark roles are off by default, and docs should use gpt-5.4 terminology.",
+        "- Spark roles are off by default, and docs should use gpt-5.5 terminology.",
         "- Spark roles are off by default and not available for search lanes.",
         "- Spark roles are off by default and are not available for search lanes.",
         "- Spark roles are off by default and not intended for search lanes.",
@@ -182,7 +182,7 @@
       "content_lines": [
         "# Codex Orchestrator",
         "",
-        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.",
         "- `explorer_fast` can help with debugging.",
         "- Spark roles can assist with diagnostics.",
         "- `gpt-5.3-codex-spark` is helpful for incident triage.",
@@ -256,7 +256,7 @@
       "content_lines": [
         "# Codex Orchestrator",
         "",
-        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.",
         "- Spark roles are off by default and may be used for search.",
         "- Keep spark roles disabled by default and use them for search lanes.",
         "- `explorer_fast` remains inactive by default and can be used for search.",
@@ -550,7 +550,7 @@
       "content_lines": [
         "# Codex Orchestrator",
         "",
-        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.",
         "- The spark policy must be search-only.",
         "- The spark policy permits image inputs.",
         "- The spark policy remains text-only.",
@@ -705,7 +705,7 @@
       "content_lines": [
         "# Codex Orchestrator",
         "",
-        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.",
         "- Spark roles are file/codebase search only; use non-spark roles for planning or review.",
         "- Spark roles are file/codebase search only, but use non-spark roles for implementation.",
         "- For planning or review, use non-spark roles.",
@@ -733,7 +733,7 @@
       "content_lines": [
         "# Codex Orchestrator",
         "",
-        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.",
         "- Reference note: `gpt-5.3-codex-spark` compatibility can change.",
         "- Do not use spark for planning or review.",
         ""
@@ -757,7 +757,7 @@
       "content_lines": [
         "# Codex Orchestrator",
         "",
-        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.",
         "- `explorer_fast` is not limited to file/codebase search and can help with planning.",
         "- Spark roles can help with planning, but do not use spark for images.",
         "- Spark roles can help with review, do not use spark for images.",
@@ -841,7 +841,7 @@
       "content_lines": [
         "# Codex Orchestrator",
         "",
-        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.",
         "- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only,",
         "  but can help with planning.",
         "- For planning or review, use",
@@ -887,7 +887,7 @@
       "content_lines": [
         "# Codex Orchestrator",
         "",
-        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.",
         "- `explorer_fast` is not limited to file/codebase search.",
         ""
       ],
@@ -921,7 +921,7 @@
       "content_lines": [
         "# Codex Orchestrator",
         "",
-        "- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.",
+        "- Current model posture is `gpt-5.5` for top-level, delegated subagent, and review surfaces.",
         "- `explorer_fast` remains the only explicit `gpt-5.3-codex-spark` exception.",
         "- Keep `explorer_fast` on `gpt-5.3-codex-spark` without changing defaults.",
         "- `explorer_fast` is limited to search.",

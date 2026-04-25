@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { chmod, mkdir, mkdtemp, readFile, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -19,6 +19,7 @@ import { runEntrypointLikeExec } from './helpers/inProcessEntrypoint.js';
 const execFileAsync = promisify(execFile);
 const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
 const CLI_ENTRY_DIST = join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js');
+const PACKAGE_JSON_PATH = fileURLToPath(new URL('../package.json', import.meta.url));
 const CLI_BOOT_TIMEOUT = 30000;
 const CLI_SOURCE_ENTRY_TIMEOUT = 60000;
 const TEST_TIMEOUT = CLI_BOOT_TIMEOUT;
@@ -614,6 +615,7 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
     expect(stdout).toContain('review [options]');
     expect(stdout).toContain('codex defaults');
+    expect(stdout).toContain('--auth-scope <portable|chatgpt>');
     expect(stdout).toContain('Quickstart (agent-first):');
     expect(stdout).toContain('codex-orchestrator flow --task <task-id>');
     expect(stdout).toContain('NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>');
@@ -861,11 +863,12 @@ describe('codex-orchestrator command surface', () => {
     const { stdout } = await runCli(['codex', 'defaults', '--format', 'json'], env, CLI_BOOT_TIMEOUT);
     const payload = JSON.parse(stdout) as {
       status?: string;
-      plan?: { configPath?: string };
+      plan?: { configPath?: string; authScope?: string };
       changes?: Array<{ target?: string; status?: string }>;
     };
     expect(payload.status).toBe('planned');
     expect(payload.plan?.configPath).toBe(join(tempDir, 'config.toml'));
+    expect(payload.plan?.authScope).toBe('portable');
     expect(payload.changes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ target: 'config', status: 'pending' })
@@ -1487,15 +1490,21 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_SOURCE_ENTRY_TIMEOUT);
 
   it('prints self-check text output through the binary shell', async () => {
+    const packageVersion = JSON.parse(await readFile(PACKAGE_JSON_PATH, 'utf8')) as {
+      version: string;
+    };
     const { stdout } = await runCliSubprocess(['self-check'], undefined, CLI_BINARY_SHELL_TIMEOUT);
     expect(stdout).toContain('Status: ok');
     expect(stdout).toContain('Name: @kbediako/codex-orchestrator');
-    expect(stdout).toContain('Version: 0.1.38');
+    expect(stdout).toContain(`Version: ${packageVersion.version}`);
     expect(stdout).toContain(`Node: ${process.version}`);
     expect(stdout).toContain('Timestamp: ');
   }, CLI_BINARY_SHELL_TIMEOUT);
 
   it('prints self-check json output through the binary shell', async () => {
+    const packageVersion = JSON.parse(await readFile(PACKAGE_JSON_PATH, 'utf8')) as {
+      version: string;
+    };
     const { stdout } = await runCliSubprocess(
       ['self-check', '--format', 'json'],
       undefined,
@@ -1511,7 +1520,7 @@ describe('codex-orchestrator command surface', () => {
 
     expect(payload.status).toBe('ok');
     expect(payload.name).toBe('@kbediako/codex-orchestrator');
-    expect(payload.version).toBe('0.1.38');
+    expect(payload.version).toBe(packageVersion.version);
     expect(payload.node).toBe(process.version);
     expect(new Date(String(payload.timestamp)).toISOString()).toBe(payload.timestamp);
   }, CLI_BINARY_SHELL_TIMEOUT);

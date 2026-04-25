@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-20
+last_review: 2026-04-21
 canonical_owner_marker: codex-orchestrator:canonical-owner-key=docs:freshness:maintain
 related_action_plan: docs/ACTION_PLAN-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md
 task_checklists:
@@ -92,6 +92,7 @@ task_checklists:
   - 2026-04-20: live issue context confirms CO-267 is `Ready` with no attached PR and no existing workpad; it was moved to `In Progress` before coding.
   - 2026-04-20: parent reproduction confirms the current exact baseline shape: `66` blocking stale docs, `221` CO-175 rolling rows, and stale active spec frontmatter rows.
   - 2026-04-20: the micro-task path is ineligible because correctness depends on protected wording, canonical owner reuse, policy visibility, and path-level review evidence.
+  - 2026-04-21: Rework reset confirmed prior PR #566 was already merged. Current `origin/main` reproduced 37 stale Task Packet / Task Mirror rows, no rolling cohort rows, `docs:freshness:maintain=block_policy_over_budget`, and `blocking_changed_paths=0`; the rework patch owns only the reviewed Apr 21 packet/mirror metadata and evidence updates.
 - Safeguard ownership split:
   - parent lane owns Linear state/workpad, docs packet, registry refresh, validation, PR lifecycle, and merge
   - same-issue child lane `freshness-baseline` successfully reproduced the baseline, but its patch was invalidated by live issue timestamp drift before accept; parent reran baseline reproduction and does not rely on an unaccepted child patch
@@ -151,5 +152,5 @@ task_checklists:
 - None currently.
 
 ## Approvals
-- Reviewer: pending standalone review
-- Date: 2026-04-20
+- Reviewer: rework standalone review completed with `bounded-success`; evidence `.runs/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4/cli/2026-04-21T05-34-25-740Z-9cf43116/review/telemetry.json`.
+- Date: 2026-04-21

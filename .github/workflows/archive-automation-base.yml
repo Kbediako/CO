@@ -58,8 +58,10 @@ jobs:
   archive:
     runs-on: ubuntu-latest
     permissions:
+      actions: write
       contents: write
       pull-requests: write
+      statuses: write
     steps:
       - name: Checkout (full history for diffs)
         uses: actions/checkout@v4
@@ -168,6 +170,211 @@ jobs:
           labels: ${{ inputs.pr_labels }}
           branch: ${{ inputs.pr_branch }}
           delete-branch: true
+
+      - name: Dispatch Core Lane for archive PR
+        if: steps.changes.outputs.changed == 'true' && steps.cpr.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_BRANCH: ${{ inputs.pr_branch }}
+          PR_HEAD_SHA: ${{ steps.cpr.outputs.pull-request-head-sha }}
+          PR_NUMBER: ${{ steps.cpr.outputs.pull-request-number }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${PR_BRANCH}" ] || [ -z "${PR_HEAD_SHA}" ]; then
+            echo "::error::Archive PR branch input or create-pull-request head SHA is missing."
+            exit 1
+          fi
+
+          set_core_lane_status() {
+            local state="$1"
+            local description="$2"
+            local target_url="$3"
+            local status_write_exit=0
+
+            for attempt in $(seq 1 3); do
+              set +e
+              gh api "repos/${GH_REPO}/statuses/${PR_HEAD_SHA}" \
+                -f "state=${state}" \
+                -f "context=Core Lane" \
+                -f "description=${description}" \
+                -f "target_url=${target_url}" >/dev/null
+              status_write_exit=$?
+              set -e
+
+              if [ "${status_write_exit}" -eq 0 ]; then
+                return 0
+              fi
+
+              if [ "${attempt}" -lt 3 ]; then
+                echo "::warning::Failed to write Core Lane ${state} status for ${PR_HEAD_SHA} (attempt ${attempt}/3); retrying."
+                sleep 5
+              fi
+            done
+
+            echo "::error::Failed to write Core Lane ${state} status for ${PR_HEAD_SHA} after 3 attempts."
+            return "${status_write_exit}"
+          }
+
+          list_matching_run_ids() {
+            gh run list \
+              --repo "${GH_REPO}" \
+              --workflow core-lane.yml \
+              --branch "${PR_BRANCH}" \
+              --commit "${PR_HEAD_SHA}" \
+              --event workflow_dispatch \
+              --limit 20 \
+              --json databaseId \
+              --jq '.[].databaseId'
+          }
+
+          find_dispatched_run_id() {
+            local run_ids=""
+            local list_status=0
+            local run_id=""
+            local candidates=()
+
+            run_ids="$(list_matching_run_ids)"
+            list_status=$?
+            if [ "${list_status}" -ne 0 ]; then
+              return "${list_status}"
+            fi
+
+            while IFS= read -r run_id; do
+              if [ -z "${run_id}" ]; then
+                continue
+              fi
+              if ! grep -Fxq "${run_id}" <<< "${BASELINE_RUN_IDS}"; then
+                candidates+=("${run_id}")
+              fi
+            done <<< "${run_ids}"
+
+            if [ "${#candidates[@]}" -gt 1 ]; then
+              echo "::error::Multiple new Core Lane workflow_dispatch runs matched ${PR_BRANCH} @ ${PR_HEAD_SHA}; refusing to mirror an ambiguous run." >&2
+              return 2
+            fi
+
+            if [ "${#candidates[@]}" -eq 1 ]; then
+              printf '%s\n' "${candidates[0]}"
+            fi
+          }
+
+          ACTIONS_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/core-lane.yml"
+          set_core_lane_status "pending" "Archive automation dispatched Core Lane." "${ACTIONS_URL}"
+
+          # gh workflow run does not return a run id; baseline visible matches so polling watches only a new id.
+          set +e
+          BASELINE_RUN_IDS="$(list_matching_run_ids)"
+          RUN_DISCOVERY_STATUS=$?
+          set -e
+
+          if [ "${RUN_DISCOVERY_STATUS}" -ne 0 ]; then
+            set_core_lane_status "error" "Core Lane run discovery failed for archive PR #${PR_NUMBER}." "${ACTIONS_URL}"
+            echo "::error::Failed to capture existing Core Lane runs for archive PR #${PR_NUMBER}; gh run list exited ${RUN_DISCOVERY_STATUS}."
+            exit "${RUN_DISCOVERY_STATUS}"
+          fi
+
+          set +e
+          gh workflow run core-lane.yml \
+            --repo "${GH_REPO}" \
+            --ref "${PR_BRANCH}" \
+            -f "archive_pr_number=${PR_NUMBER}" \
+            -f "archive_pr_branch=${PR_BRANCH}" \
+            -f "archive_pr_head_sha=${PR_HEAD_SHA}"
+          DISPATCH_STATUS=$?
+          set -e
+
+          if [ "${DISPATCH_STATUS}" -ne 0 ]; then
+            set_core_lane_status "error" "Core Lane dispatch failed for archive PR #${PR_NUMBER}." "${ACTIONS_URL}"
+            echo "::error::Core Lane dispatch failed for archive PR #${PR_NUMBER} (${PR_BRANCH} @ ${PR_HEAD_SHA})."
+            exit "${DISPATCH_STATUS}"
+          fi
+
+          RUN_ID=""
+          for attempt in $(seq 1 40); do
+            set +e
+            CANDIDATE_RUN_ID="$(find_dispatched_run_id)"
+            RUN_DISCOVERY_STATUS=$?
+            set -e
+
+            if [ "${RUN_DISCOVERY_STATUS}" -ne 0 ]; then
+              set_core_lane_status "error" "Core Lane run discovery failed for archive PR #${PR_NUMBER}." "${ACTIONS_URL}"
+              echo "::error::Failed to discover an unambiguous dispatched Core Lane run for archive PR #${PR_NUMBER}; discovery exited ${RUN_DISCOVERY_STATUS}."
+              exit "${RUN_DISCOVERY_STATUS}"
+            fi
+
+            if [ -n "${CANDIDATE_RUN_ID}" ]; then
+              RUN_ID="${CANDIDATE_RUN_ID}"
+            fi
+
+            if [ "${attempt}" -lt 40 ]; then
+              sleep 15
+            fi
+          done
+
+          if [ -z "${RUN_ID}" ]; then
+            set_core_lane_status "error" "Dispatched Core Lane run was not found." "${ACTIONS_URL}"
+            echo "::error::Dispatched Core Lane run was not found for ${PR_BRANCH} @ ${PR_HEAD_SHA}."
+            exit 1
+          fi
+
+          echo "Dispatched Core Lane run ${RUN_ID} for archive PR #${PR_NUMBER} (${PR_BRANCH} @ ${PR_HEAD_SHA})." >> "$GITHUB_STEP_SUMMARY"
+
+          set +e
+          gh run watch "${RUN_ID}" --repo "${GH_REPO}" --exit-status --interval 30
+          WATCH_STATUS=$?
+          set -e
+
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}"
+          RUN_CONCLUSION=""
+          for attempt in $(seq 1 20); do
+            set +e
+            RUN_FIELDS="$(gh run view "${RUN_ID}" --repo "${GH_REPO}" --json conclusion,url --jq '(.conclusion // "") + "|" + (.url // "")')"
+            RUN_VIEW_STATUS=$?
+            set -e
+
+            if [ "${RUN_VIEW_STATUS}" -ne 0 ]; then
+              set_core_lane_status "error" "Core Lane run details unavailable for archive PR #${PR_NUMBER}." "${RUN_URL}"
+              echo "::error::Failed to fetch Core Lane run details for archive PR #${PR_NUMBER}; run=${RUN_ID}."
+              exit "${RUN_VIEW_STATUS}"
+            fi
+
+            RUN_CONCLUSION="${RUN_FIELDS%%|*}"
+            VIEW_RUN_URL="${RUN_FIELDS#*|}"
+            RUN_URL="${VIEW_RUN_URL:-${RUN_URL}}"
+
+            if [ -n "${RUN_CONCLUSION}" ]; then
+              break
+            fi
+
+            if [ "${attempt}" -lt 20 ]; then
+              echo "::warning::Core Lane run ${RUN_ID} has no conclusion yet after gh run watch; waiting for terminal conclusion (attempt ${attempt}/20)."
+              sleep 30
+            fi
+          done
+
+          if [ -z "${RUN_CONCLUSION}" ]; then
+            set_core_lane_status "error" "Core Lane conclusion unavailable for archive PR #${PR_NUMBER}." "${RUN_URL:-${ACTIONS_URL}}"
+            echo "::error::Core Lane run is not terminal after bounded wait for archive PR #${PR_NUMBER}; run=${RUN_URL:-${RUN_ID}}."
+            if [ "${WATCH_STATUS}" -ne 0 ]; then
+              exit "${WATCH_STATUS}"
+            fi
+            exit 1
+          fi
+
+          if [ "${RUN_CONCLUSION}" = "success" ]; then
+            set_core_lane_status "success" "Core Lane passed for archive PR #${PR_NUMBER}." "${RUN_URL}"
+            echo "Core Lane passed for archive PR #${PR_NUMBER}: ${RUN_URL}" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          set_core_lane_status "failure" "Core Lane ${RUN_CONCLUSION:-failed} for archive PR #${PR_NUMBER}." "${RUN_URL:-${ACTIONS_URL}}"
+          echo "::error::Core Lane did not pass for archive PR #${PR_NUMBER}; conclusion=${RUN_CONCLUSION:-unknown}; run=${RUN_URL:-${RUN_ID}}."
+          if [ "${WATCH_STATUS}" -ne 0 ]; then
+            exit "${WATCH_STATUS}"
+          fi
+          exit 1
 
       - name: Check auto-merge token
         if: steps.changes.outputs.changed == 'true' && inputs.enable_auto_merge

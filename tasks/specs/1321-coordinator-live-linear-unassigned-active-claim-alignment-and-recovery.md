@@ -4,7 +4,7 @@ title: Coordinator Live Linear Unassigned Active-Claim Alignment and Recovery
 status: in_progress
 owner: Codex
 created: 2026-03-23
-last_review: 2026-03-23
+last_review: 2026-04-23
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md
@@ -16,6 +16,7 @@ review_notes:
   - 2026-03-23: Opened after live `CO-3` remained `Merging` and recommended by `/api/v1/dispatch`, but persisted intake still recorded the claim as `released:assignee_changed`.
   - 2026-03-23: The current mismatch is internal to CO: fresh dispatch already accepts viewer-owned or unassigned issues, while existing-claim eligibility still treats `assignee_id: null` as a reassignment away from Codex.
   - 2026-03-23: The already-stuck live claim also needs a small refresh recovery seam because released claims currently reopen only on newer `updated_at`.
+  - 2026-04-23: CO-321 freshness review retained this as an active historical remediation spec rather than archive/reclassification. The checklist records implementation, focused regressions, validation floor, and live `CO-3` recovery proof as complete; separate delivery closeout checkboxes remain in the task mirror and stay outside this tasks/specs-only refresh.
 ---
 
 # Technical Specification
@@ -35,11 +36,10 @@ review_notes:
 
 ## Current Truth
 
-- Live `CO-3` is still `Merging` / `started` with `assignee_id: null`.
-- `/api/v1/dispatch` recommends `CO-3`.
-- Persisted intake still says `released` with reason `provider_issue_released:assignee_changed`.
-- `linearDispatchSource.ts` already treats unassigned issues as eligible for fresh dispatch.
-- `providerIssueHandoff.ts` existing-claim eligibility and released-claim refresh recovery are the blocking seams.
+- The original live `CO-3` mismatch is no longer the current blocker. The related checklist records the patched control-host retest reclaiming `CO-3` from `Merging`, running the provider worker to terminal success, updating the workpad, attaching merged PR `#288`, and leaving `/api/v1/dispatch` without stale issue leakage.
+- `providerIssueHandoff.ts` active-claim eligibility now treats unassigned active issues consistently with fresh dispatch instead of releasing them as `provider_issue_released:assignee_changed`.
+- The equal-timestamp released-claim recovery seam is implemented and covered by focused regressions while preserving explicit release behavior for non-null foreign assignees.
+- Separate delivery closeout checkboxes remain in `tasks/tasks-1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md`; this CO-321 refresh does not broaden into the already refreshed `tasks/tasks-*` cohort.
 
 ## Validation Plan
 

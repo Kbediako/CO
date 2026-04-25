@@ -25,13 +25,39 @@ describe('initCodexTemplates', () => {
 
     const templatePath = path.join(tempDir, 'mcp-client.json');
     const contents = await readFile(templatePath, 'utf8');
-    expect(contents).toContain('"templateVersion"');
+    const mcpClientConfig = JSON.parse(contents);
+    expect(mcpClientConfig.templateVersion).toBe(1);
+    expect(mcpClientConfig.mcpServers['codex-orchestrator']).toEqual({
+      command: 'codex-orchestrator',
+      args: ['mcp', 'serve'],
+    });
     const pipelineConfig = await readFile(path.join(tempDir, 'codex.orchestrator.json'), 'utf8');
     expect(pipelineConfig).toContain('"pipelines"');
     const codexConfig = await readFile(path.join(tempDir, '.codex', 'config.toml'), 'utf8');
     expect(codexConfig).toContain('max_threads = 12');
     expect(codexConfig).not.toContain('max_depth = 4');
     expect(codexConfig).not.toContain('max_spawn_depth = 4');
+    const workerRole = await readFile(
+      path.join(tempDir, '.codex', 'agents', 'worker-complex.toml'),
+      'utf8'
+    );
+    expect(workerRole).toContain('model = "gpt-5.4"');
+    expect(workerRole).toContain('model_reasoning_effort = "xhigh"');
+    expect(workerRole).not.toContain('gpt-5.5');
+    const awaiterRole = await readFile(
+      path.join(tempDir, '.codex', 'agents', 'awaiter-high.toml'),
+      'utf8'
+    );
+    expect(awaiterRole).toContain('# with CO override to use gpt-5.4 at high reasoning.');
+    expect(awaiterRole).toContain('model = "gpt-5.4"');
+    expect(awaiterRole).toContain('model_reasoning_effort = "high"');
+    expect(awaiterRole).not.toContain('gpt-5.5');
+    const explorerFastRole = await readFile(
+      path.join(tempDir, '.codex', 'agents', 'explorer-fast.toml'),
+      'utf8'
+    );
+    expect(explorerFastRole).toContain('model = "gpt-5.3-codex-spark"');
+    expect(explorerFastRole).not.toContain('gpt-5.5');
 
     const second = await initCodexTemplates({ template: 'codex', cwd: tempDir, force: false });
     expect(second.written).toHaveLength(0);

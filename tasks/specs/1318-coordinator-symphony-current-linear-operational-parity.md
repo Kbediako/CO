@@ -4,7 +4,7 @@ title: Coordinator Symphony Current Linear Operational Parity
 status: in_progress
 owner: Codex
 created: 2026-03-22
-last_review: 2026-03-22
+last_review: 2026-04-22
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-symphony-current-linear-operational-parity.md
@@ -20,6 +20,7 @@ review_notes:
   - 2026-03-22: Live `CO-1` issue-context proof showed the current team exposes `In Review` instead of `Human Review`, so the implementation and proof path must treat `In Review` as the immediate review-handoff alias while keeping Symphony's canonical workflow naming intact.
   - 2026-03-22: The crash recovery restart initially came back on `--pipeline diagnostics`; final live parity proof for this lane must run through the control-host's `provider-linear-worker` pipeline instead so the worker mutation path is actually exercised.
   - 2026-03-22: The current branch now includes the worker-visible Linear CLI/facade, remote-first workpad path, prompt/workflow contract, provider handoff classifier, and helper-operation attempt/outcome proof trail; remaining work is clean validation plus live worker-path proof and merge closeout.
+  - 2026-04-22: CO-300 docs-freshness review rechecked the `1318` packet against current parity follow-on lineage in `tasks/index.json` and `docs/TASKS.md`. The packet remains a truthful active historical planning/implementation reference, so the packet/spec registry metadata was refreshed without reopening the original parity scope.
 ---
 
 # Technical Specification
