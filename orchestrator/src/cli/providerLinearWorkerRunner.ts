@@ -169,6 +169,8 @@ const PROVIDER_WORKER_SESSION_LOG_POLL_INTERVAL_MS = 250;
 const PROVIDER_WORKER_SESSION_LOG_DISCOVERY_WINDOW_MS = 15 * 60 * 1000;
 const PROVIDER_WORKER_SESSION_LOG_HEADER_BYTES = 256 * 1024;
 const PROVIDER_LINEAR_CHILD_LANE_POST_STARTUP_NO_OUTPUT_MIN_STALE_MS = 60 * 1000;
+const PROVIDER_LINEAR_CHILD_LANE_RUNNER_IDENTITY_START_BEFORE_TOLERANCE_MS = 5 * 60 * 1000;
+const PROVIDER_LINEAR_CHILD_LANE_RUNNER_PROCESS_LOOKUP_TIMEOUT_MS = 2000;
 
 export interface ProviderLinearWorkerContext {
   manifest: Record<string, unknown>;
@@ -265,6 +267,13 @@ export type ProviderLinearWorkerChildLaneInFlightAction =
   | 'reject'
   | 'invalidate';
 
+export type ProviderLinearWorkerChildLaneRunnerIdentityStatus =
+  | 'not_recorded'
+  | 'not_live'
+  | 'matched'
+  | 'ambiguous'
+  | 'pid_reuse_suspected';
+
 export interface ProviderLinearWorkerChildLaneRecord {
   stream: string;
   pipeline_id: string;
@@ -283,7 +292,12 @@ export interface ProviderLinearWorkerChildLaneRecord {
   heartbeat_at?: string | null;
   heartbeat_stale_after_seconds?: number | null;
   runner_pid?: number | null;
+  runner_started_at?: string | null;
   runner_alive?: boolean | null;
+  runner_identity_status?: ProviderLinearWorkerChildLaneRunnerIdentityStatus | null;
+  runner_identity_reason?: string | null;
+  runner_observed_started_at?: string | null;
+  runner_command_line_matches?: boolean | null;
   runtime_event?: string | null;
   runtime_event_at?: string | null;
   appserver_startup_observed?: boolean | null;
@@ -5882,7 +5896,12 @@ interface ProviderLinearWorkerChildLaneManifestHydrationCandidate {
   heartbeatAt: string | null;
   heartbeatStaleAfterSeconds: number | null;
   runnerPid: number | null;
+  runnerStartedAt: string | null;
   runnerAlive: boolean | null;
+  runnerIdentityStatus: ProviderLinearWorkerChildLaneRunnerIdentityStatus | null;
+  runnerIdentityReason: string | null;
+  runnerObservedStartedAt: string | null;
+  runnerCommandLineMatches: boolean | null;
   runtimeEvent: string | null;
   runtimeEventAt: string | null;
   appserverStartupObserved: boolean | null;
@@ -5891,9 +5910,27 @@ interface ProviderLinearWorkerChildLaneManifestHydrationCandidate {
   staleInvalidationReason: string | null;
 }
 
+interface ProviderLinearWorkerProcessInspection {
+  alive: boolean | null;
+  startedAt: string | null;
+  commandLine: string | null;
+  error: string | null;
+}
+
+interface ProviderLinearWorkerChildLaneRunnerIdentity {
+  alive: boolean | null;
+  status: ProviderLinearWorkerChildLaneRunnerIdentityStatus | null;
+  reason: string | null;
+  observedStartedAt: string | null;
+  commandLineMatches: boolean | null;
+}
+
 interface ProviderLinearWorkerChildLaneHydrationOptions {
   now: () => string;
-  isProcessAlive: (pid: number) => boolean;
+  isProcessAlive?: (pid: number) => boolean;
+  inspectProcess?: (
+    pid: number
+  ) => ProviderLinearWorkerProcessInspection | Promise<ProviderLinearWorkerProcessInspection>;
 }
 
 async function hydrateProviderLinearWorkerChildLanesFromActiveManifests(
@@ -5902,7 +5939,7 @@ async function hydrateProviderLinearWorkerChildLanesFromActiveManifests(
   priorProofChildLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined = null,
   options: ProviderLinearWorkerChildLaneHydrationOptions = {
     now: () => new Date().toISOString(),
-    isProcessAlive: isLocalProcessAlive
+    inspectProcess: inspectLocalProviderLinearChildLaneRunnerProcess
   }
 ): Promise<ProviderLinearWorkerChildLaneRecord[]> {
   if (childLanes.length === 0) {
@@ -5929,7 +5966,7 @@ async function readHydratedProviderLinearWorkerChildLanesAndRepairLedger(
   priorProofChildLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined = null,
   options: ProviderLinearWorkerChildLaneHydrationOptions = {
     now: () => new Date().toISOString(),
-    isProcessAlive: isLocalProcessAlive
+    inspectProcess: inspectLocalProviderLinearChildLaneRunnerProcess
   }
 ): Promise<ProviderLinearWorkerChildLaneRecord[]> {
   return await withProviderLinearWorkerChildLanesLock(runDir, async () => {
@@ -6039,7 +6076,7 @@ async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
   priorHydratedChildLane: ProviderLinearWorkerChildLaneRecord | null = null,
   options: ProviderLinearWorkerChildLaneHydrationOptions = {
     now: () => new Date().toISOString(),
-    isProcessAlive: isLocalProcessAlive
+    inspectProcess: inspectLocalProviderLinearChildLaneRunnerProcess
   }
 ): Promise<ProviderLinearWorkerChildLaneRecord> {
   if (isProviderLinearWorkerRetiredChildLanePlaceholder(childLane)) {
@@ -6113,7 +6150,12 @@ async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
     heartbeat_at: candidate.heartbeatAt,
     heartbeat_stale_after_seconds: candidate.heartbeatStaleAfterSeconds,
     runner_pid: candidate.runnerPid,
+    runner_started_at: candidate.runnerStartedAt,
     runner_alive: candidate.runnerAlive,
+    runner_identity_status: candidate.runnerIdentityStatus,
+    runner_identity_reason: candidate.runnerIdentityReason,
+    runner_observed_started_at: candidate.runnerObservedStartedAt,
+    runner_command_line_matches: candidate.runnerCommandLineMatches,
     runtime_event: candidate.runtimeEvent,
     runtime_event_at: candidate.runtimeEventAt,
     appserver_startup_observed: candidate.appserverStartupObserved,
@@ -6443,7 +6485,16 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
     runtimeDiagnostics?.provider_linear_child_lane_runner_pid ?? parsed.provider_linear_child_lane_runner_pid
   );
   const runnerPid = rawRunnerPid !== null && rawRunnerPid > 0 ? rawRunnerPid : null;
-  const runnerAlive = runnerPid !== null ? options.isProcessAlive(runnerPid) : null;
+  const runnerStartedAt = normalizeOptionalString(
+    runtimeDiagnostics?.provider_linear_child_lane_runner_started_at ??
+      parsed.provider_linear_child_lane_runner_started_at
+  );
+  const runnerIdentity = await inspectProviderLinearWorkerChildLaneRunnerIdentity({
+    runnerPid,
+    runnerStartedAt,
+    options
+  });
+  const runnerAlive = runnerIdentity.alive;
   const runtimeEvent = normalizeOptionalString(
     runtimeDiagnostics?.provider_linear_child_lane_runtime_event ?? parsed.provider_linear_child_lane_runtime_event
   );
@@ -6472,7 +6523,10 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
     heartbeatAt,
     heartbeatStaleAfterSeconds,
     runnerPid,
+    runnerStartedAt,
     runnerAlive,
+    runnerIdentityStatus: runnerIdentity.status,
+    runnerIdentityReason: runnerIdentity.reason,
     runtimeEvent,
     runtimeEventAt,
     appserverStartupObserved,
@@ -6535,7 +6589,12 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
     heartbeatAt,
     heartbeatStaleAfterSeconds,
     runnerPid,
+    runnerStartedAt,
     runnerAlive,
+    runnerIdentityStatus: runnerIdentity.status,
+    runnerIdentityReason: runnerIdentity.reason,
+    runnerObservedStartedAt: runnerIdentity.observedStartedAt,
+    runnerCommandLineMatches: runnerIdentity.commandLineMatches,
     runtimeEvent,
     runtimeEventAt,
     appserverStartupObserved,
@@ -6591,6 +6650,332 @@ async function readProviderLinearWorkerChildLaneRuntimeDiagnostics(
   return parsed;
 }
 
+async function inspectProviderLinearWorkerChildLaneRunnerIdentity(input: {
+  runnerPid: number | null;
+  runnerStartedAt: string | null;
+  options: ProviderLinearWorkerChildLaneHydrationOptions;
+}): Promise<ProviderLinearWorkerChildLaneRunnerIdentity> {
+  if (input.runnerPid === null) {
+    return {
+      alive: null,
+      status: 'not_recorded',
+      reason: 'runner_pid_not_recorded',
+      observedStartedAt: null,
+      commandLineMatches: null
+    };
+  }
+  const inspection = await readProviderLinearWorkerChildLaneRunnerProcessInspection(
+    input.runnerPid,
+    input.options
+  );
+  return resolveProviderLinearWorkerChildLaneRunnerIdentity({
+    runnerStartedAt: input.runnerStartedAt,
+    inspection
+  });
+}
+
+async function readProviderLinearWorkerChildLaneRunnerProcessInspection(
+  pid: number,
+  options: ProviderLinearWorkerChildLaneHydrationOptions
+): Promise<ProviderLinearWorkerProcessInspection> {
+  if (options.inspectProcess) {
+    try {
+      return normalizeProviderLinearWorkerProcessInspection(await options.inspectProcess(pid));
+    } catch (error) {
+      return {
+        alive: null,
+        startedAt: null,
+        commandLine: null,
+        error: providerLinearWorkerErrorMessage(error)
+      };
+    }
+  }
+  if (options.isProcessAlive) {
+    return {
+      alive: options.isProcessAlive(pid),
+      startedAt: null,
+      commandLine: null,
+      error: null
+    };
+  }
+  return await inspectLocalProviderLinearChildLaneRunnerProcess(pid);
+}
+
+function normalizeProviderLinearWorkerProcessInspection(
+  value: ProviderLinearWorkerProcessInspection | unknown
+): ProviderLinearWorkerProcessInspection {
+  if (!isRecord(value)) {
+    return {
+      alive: null,
+      startedAt: null,
+      commandLine: null,
+      error: 'process_identity_inspection_invalid'
+    };
+  }
+  return {
+    alive: typeof value.alive === 'boolean' ? value.alive : null,
+    startedAt: normalizeOptionalString(value.startedAt),
+    commandLine: normalizeOptionalString(value.commandLine),
+    error: normalizeOptionalString(value.error)
+  };
+}
+
+function resolveProviderLinearWorkerChildLaneRunnerIdentity(input: {
+  runnerStartedAt: string | null;
+  inspection: ProviderLinearWorkerProcessInspection;
+}): ProviderLinearWorkerChildLaneRunnerIdentity {
+  const commandLineMatches = resolveProviderLinearChildLaneRunnerCommandLineMatch(input.inspection.commandLine);
+  const recordedStartedMs = input.runnerStartedAt ? Date.parse(input.runnerStartedAt) : Number.NaN;
+  const recordedStartIdentityError =
+    !input.runnerStartedAt
+      ? 'runner_started_at_missing'
+      : Number.isFinite(recordedStartedMs)
+        ? null
+        : 'runner_started_at_unparseable';
+  if (input.inspection.alive === false) {
+    return {
+      alive: false,
+      status: 'not_live',
+      reason: 'runner_pid_not_live',
+      observedStartedAt: input.inspection.startedAt,
+      commandLineMatches
+    };
+  }
+  if (input.inspection.alive !== true) {
+    const lookupFailureReason = input.inspection.error
+      ? `process_identity_lookup_failed:${truncateProviderLinearWorkerDiagnosticReason(input.inspection.error)}`
+      : 'process_identity_lookup_unknown';
+    return {
+      alive: null,
+      status: 'ambiguous',
+      reason: recordedStartIdentityError ?? lookupFailureReason,
+      observedStartedAt: input.inspection.startedAt,
+      commandLineMatches
+    };
+  }
+  if (commandLineMatches !== true) {
+    const reason =
+      commandLineMatches === false
+        ? 'process_command_line_mismatch'
+        : input.inspection.error
+          ? `process_identity_lookup_failed:${truncateProviderLinearWorkerDiagnosticReason(input.inspection.error)}`
+          : 'process_command_line_unavailable';
+    return {
+      alive: null,
+      status: commandLineMatches === false ? 'pid_reuse_suspected' : 'ambiguous',
+      reason,
+      observedStartedAt: input.inspection.startedAt,
+      commandLineMatches
+    };
+  }
+  if (recordedStartIdentityError) {
+    return {
+      alive: null,
+      status: 'ambiguous',
+      reason: recordedStartIdentityError,
+      observedStartedAt: input.inspection.startedAt,
+      commandLineMatches
+    };
+  }
+  if (!input.inspection.startedAt) {
+    return {
+      alive: null,
+      status: 'ambiguous',
+      reason: input.inspection.error
+        ? `process_start_time_unavailable:${truncateProviderLinearWorkerDiagnosticReason(input.inspection.error)}`
+        : 'process_start_time_unavailable',
+      observedStartedAt: null,
+      commandLineMatches
+    };
+  }
+  const observedStartedMs = Date.parse(input.inspection.startedAt);
+  if (!Number.isFinite(observedStartedMs)) {
+    return {
+      alive: null,
+      status: 'ambiguous',
+      reason: 'process_start_time_unparseable',
+      observedStartedAt: input.inspection.startedAt,
+      commandLineMatches
+    };
+  }
+  if (observedStartedMs > recordedStartedMs) {
+    return {
+      alive: null,
+      status: 'pid_reuse_suspected',
+      reason: 'process_started_after_recorded_runner_start',
+      observedStartedAt: input.inspection.startedAt,
+      commandLineMatches
+    };
+  }
+  if (observedStartedMs < recordedStartedMs - PROVIDER_LINEAR_CHILD_LANE_RUNNER_IDENTITY_START_BEFORE_TOLERANCE_MS) {
+    return {
+      alive: null,
+      status: 'pid_reuse_suspected',
+      reason: 'process_start_time_mismatch',
+      observedStartedAt: input.inspection.startedAt,
+      commandLineMatches
+    };
+  }
+  return {
+    alive: true,
+    status: 'matched',
+    reason: 'process_identity_matched',
+    observedStartedAt: input.inspection.startedAt,
+    commandLineMatches
+  };
+}
+
+async function inspectLocalProviderLinearChildLaneRunnerProcess(
+  pid: number
+): Promise<ProviderLinearWorkerProcessInspection> {
+  if (!isLocalProcessAlive(pid)) {
+    return {
+      alive: false,
+      startedAt: null,
+      commandLine: null,
+      error: null
+    };
+  }
+  const [startedAtResult, commandLineResult] = await Promise.all([
+    readLocalProcessPsOutput(pid, 'lstart='),
+    readLocalProcessCommandLine(pid)
+  ]);
+  if (startedAtResult.output === null && commandLineResult.output === null && !isLocalProcessAlive(pid)) {
+    return {
+      alive: false,
+      startedAt: null,
+      commandLine: null,
+      error: 'process_exited_before_identity_lookup'
+    };
+  }
+  const startedAt = startedAtResult.output ? parseLocalProcessStartedAt(startedAtResult.output) : null;
+  const startError = startedAtResult.output && !startedAt
+    ? `process_start_time_unparseable:${startedAtResult.output}`
+    : startedAtResult.error;
+  const error = [startError, commandLineResult.error]
+    .map((value) => normalizeOptionalString(value))
+    .filter((value): value is string => Boolean(value))
+    .join('; ');
+  return {
+    alive: true,
+    startedAt,
+    commandLine: commandLineResult.output,
+    error: error || null
+  };
+}
+
+async function readLocalProcessCommandLine(
+  pid: number
+): Promise<{ output: string | null; error: string | null }> {
+  const commandResult = await readLocalProcessPsOutput(pid, 'command=');
+  if (commandResult.output !== null) {
+    return commandResult;
+  }
+  const argsResult = await readLocalProcessPsOutput(pid, 'args=');
+  if (argsResult.output !== null) {
+    return argsResult;
+  }
+  return {
+    output: null,
+    error: [commandResult.error, argsResult.error]
+      .map((value) => normalizeOptionalString(value))
+      .filter((value): value is string => Boolean(value))
+      .join('; ') || null
+  };
+}
+
+async function readLocalProcessPsOutput(
+  pid: number,
+  outputColumn: string
+): Promise<{ output: string | null; error: string | null }> {
+  return await new Promise((resolvePromise) => {
+    let stdout = '';
+    let stderr = '';
+    let completed = false;
+    let timedOut = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const child = spawn('ps', ['-ww', '-p', String(pid), '-o', outputColumn], {
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    const finish = (result: { output: string | null; error: string | null }) => {
+      if (completed) {
+        return;
+      }
+      completed = true;
+      if (timer) {
+        clearTimeout(timer);
+      }
+      resolvePromise(result);
+    };
+    timer = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGKILL');
+    }, PROVIDER_LINEAR_CHILD_LANE_RUNNER_PROCESS_LOOKUP_TIMEOUT_MS);
+    child.stdout?.on('data', (chunk) => {
+      stdout += String(chunk);
+    });
+    child.stderr?.on('data', (chunk) => {
+      stderr += String(chunk);
+    });
+    child.on('error', (error) => {
+      finish({
+        output: null,
+        error: providerLinearWorkerErrorMessage(error)
+      });
+    });
+    child.on('close', (code) => {
+      if (timedOut) {
+        finish({
+          output: null,
+          error: 'process_identity_lookup_timeout'
+        });
+        return;
+      }
+      const output = normalizeOptionalString(stdout);
+      if (code === 0 && output) {
+        finish({
+          output,
+          error: null
+        });
+        return;
+      }
+      finish({
+        output: null,
+        error: normalizeOptionalString(stderr) ?? `ps exited with code ${code ?? 'unknown'}`
+      });
+    });
+  });
+}
+
+function parseLocalProcessStartedAt(value: string): string | null {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return null;
+  }
+  const parsed = Date.parse(normalized);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
+}
+
+function resolveProviderLinearChildLaneRunnerCommandLineMatch(commandLine: string | null): boolean | null {
+  const normalized = normalizeOptionalString(commandLine);
+  if (!normalized) {
+    return null;
+  }
+  return normalized.includes('providerLinearChildLaneRunner');
+}
+
+function truncateProviderLinearWorkerDiagnosticReason(value: string): string {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return 'unknown';
+  }
+  return normalized.length > 160 ? `${normalized.slice(0, 157)}...` : normalized;
+}
+
+function providerLinearWorkerErrorMessage(error: unknown): string {
+  return normalizeOptionalString((error as Error)?.message) ?? String(error);
+}
+
 function resolveProviderLinearWorkerChildLanePostStartupNoOutputDiagnostic(input: {
   childLane: ProviderLinearWorkerChildLaneRecord;
   status: string;
@@ -6598,7 +6983,10 @@ function resolveProviderLinearWorkerChildLanePostStartupNoOutputDiagnostic(input
   heartbeatAt: string | null;
   heartbeatStaleAfterSeconds: number | null;
   runnerPid: number | null;
+  runnerStartedAt: string | null;
   runnerAlive: boolean | null;
+  runnerIdentityStatus: ProviderLinearWorkerChildLaneRunnerIdentityStatus | null;
+  runnerIdentityReason: string | null;
   runtimeEvent: string | null;
   runtimeEventAt: string | null;
   appserverStartupObserved: boolean | null;
@@ -6627,14 +7015,18 @@ function resolveProviderLinearWorkerChildLanePostStartupNoOutputDiagnostic(input
   if (nowMs - heartbeatMs <= staleAfterMs) {
     return null;
   }
-  if (input.runnerAlive !== false) {
+  if (input.runnerAlive !== false || input.runnerIdentityStatus !== 'not_live') {
     return null;
   }
   const stream = input.childLane.stream || input.childLane.task_id || input.childLane.run_id;
   const runnerState =
     input.runnerPid !== null
-      ? `providerLinearChildLaneRunner pid ${input.runnerPid} is not live`
+      ? `providerLinearChildLaneRunner pid ${input.runnerPid} is not live` +
+        (input.runnerStartedAt ? ` for recorded start ${input.runnerStartedAt}` : '')
       : 'providerLinearChildLaneRunner pid was not recorded';
+  const identityState = input.runnerIdentityReason
+    ? ` Runner identity proof: ${input.runnerIdentityReason}.`
+    : '';
   const startupAt = input.appserverStartupObservedAt ?? input.runtimeEventAt ?? 'unknown time';
   const reason = 'post_startup_no_output_heartbeat_stale_runner_dead';
   return {
@@ -6643,6 +7035,7 @@ function resolveProviderLinearWorkerChildLanePostStartupNoOutputDiagnostic(input
     summary:
       `Child lane ${stream} is a stale invalidation candidate: appserver startup was observed at ${startupAt}, ` +
       `manifest heartbeat stopped at ${input.heartbeatAt}, ${runnerState}, and no proof/patch output is present. ` +
+      identityState +
       'Invalidate the lane and rerun parent-owned validation, or relaunch under CLI for scoped diagnosis.'
   };
 }
@@ -7031,7 +7424,15 @@ function normalizeProviderLinearWorkerChildLaneRecord(
     heartbeat_at: normalizeOptionalString(value.heartbeat_at),
     heartbeat_stale_after_seconds: normalizeOptionalInteger(value.heartbeat_stale_after_seconds),
     runner_pid: normalizeOptionalInteger(value.runner_pid),
+    runner_started_at: normalizeOptionalString(value.runner_started_at),
     runner_alive: typeof value.runner_alive === 'boolean' ? value.runner_alive : null,
+    runner_identity_status: normalizeProviderLinearWorkerChildLaneRunnerIdentityStatus(
+      value.runner_identity_status
+    ),
+    runner_identity_reason: normalizeOptionalString(value.runner_identity_reason),
+    runner_observed_started_at: normalizeOptionalString(value.runner_observed_started_at),
+    runner_command_line_matches:
+      typeof value.runner_command_line_matches === 'boolean' ? value.runner_command_line_matches : null,
     runtime_event: normalizeOptionalString(value.runtime_event),
     runtime_event_at: normalizeOptionalString(value.runtime_event_at),
     appserver_startup_observed:
@@ -7100,6 +7501,18 @@ function normalizeChildLaneInFlightAction(
   value: unknown
 ): ProviderLinearWorkerChildLaneInFlightAction | null {
   return value === 'accept' || value === 'reject' || value === 'invalidate'
+    ? value
+    : null;
+}
+
+function normalizeProviderLinearWorkerChildLaneRunnerIdentityStatus(
+  value: unknown
+): ProviderLinearWorkerChildLaneRunnerIdentityStatus | null {
+  return value === 'not_recorded' ||
+    value === 'not_live' ||
+    value === 'matched' ||
+    value === 'ambiguous' ||
+    value === 'pid_reuse_suspected'
     ? value
     : null;
 }
@@ -7719,6 +8132,9 @@ export async function refreshProviderLinearWorkerProofSnapshot(
     skipSessionLogHydration?: boolean;
     emitProgressEvent?: (message: string) => void;
     isProcessAlive?: (pid: number) => boolean;
+    inspectProcess?: (
+      pid: number
+    ) => ProviderLinearWorkerProcessInspection | Promise<ProviderLinearWorkerProcessInspection>;
   } = {}
 ): Promise<ProviderLinearWorkerProof | null> {
   return await withProviderLinearWorkerProofLock(runDir, async () => {
@@ -7742,7 +8158,8 @@ export async function refreshProviderLinearWorkerProofSnapshot(
       parsed.child_lanes,
       {
         now,
-        isProcessAlive: options.isProcessAlive ?? isLocalProcessAlive
+        isProcessAlive: options.isProcessAlive,
+        inspectProcess: options.inspectProcess
       }
     );
     const proofWithHydratedSources: ProviderLinearWorkerProof = {
