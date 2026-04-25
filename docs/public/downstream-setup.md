@@ -9,7 +9,7 @@ This guide is the downstream-safe setup path shipped in the npm package.
 - CO-local ChatGPT-auth/appserver posture now uses `gpt-5.5` / `xhigh` on Codex CLI `0.125.0` when live access smoke passes; release-facing cloud/downstream pins remain evidence-gated in the version policy.
 - Portable generated downstream defaults keep `gpt-5.4` / `xhigh` as a fallback when `gpt-5.5`, API/cloud portability, or downstream/no-network access is not proven.
 - Local ChatGPT-auth `gpt-5.5` / `xhigh` is the preferred CO posture after `codex debug models` verifies current model access.
-- `codex-orchestrator doctor` accepts the marker-backed local `gpt-5.5` opt-in as non-drift only when `codex debug models` verifies current model access, and additive defaults preserve matching prior `gpt-5.5` role files when the top-level config is explicitly opted in.
+- `codex-orchestrator doctor` treats `gpt-5.5` as non-drift when `codex debug models` verifies current model access, and additive defaults preserve compatible prior `gpt-5.5` role files without requiring extra marker metadata.
 - CO-196 posture lineage remains unchanged: npm is the supported baseline because it is the simplest supported CLI install path, and marketplace packaging is an additive registration path for newer Codex releases. `0.121.0` accepts both `codex marketplace add` and `codex plugin marketplace add`; `0.122.0+` require `codex plugin marketplace add`.
 
 ## Once per machine

@@ -35,12 +35,12 @@ The parent source anchor for this docs packet is `ctx:sha256:3cf28c7e9319e4f963d
 
 ## Issue-Shaping Contract
 - User-request translation carried forward: validate `0.125` model-catalog posture before changing defaults; debug catalog visibility alone is not adoption proof.
-- Protected terms / exact artifact and surface names: `CO-352`, Codex CLI `0.125`, `@openai/codex`, `codex debug models`, `codex debug models --bundled`, `codex login status`, `codex exec`, `codex exec resume`, `codex review`, `review_model`, `app-server model/list`, `provider-linear-worker`, `cloud-canary`, `CODEX_CLOUD_ENV_ID`, `missing_environment`, `gpt-5.5`, `gpt-5.4`, `model_reasoning_effort = "xhigh"`, `local_model_opt_in = "gpt-5.5"`, `explorer_fast`, `gpt-5.3-codex-spark`, `pack:smoke`, no-network downstream smoke.
+- Protected terms / exact artifact and surface names: `CO-352`, Codex CLI `0.125`, `@openai/codex`, `codex debug models`, `codex debug models --bundled`, `codex login status`, `codex exec`, `codex exec resume`, `codex review`, `review_model`, `app-server model/list`, `provider-linear-worker`, `cloud-canary`, `CODEX_CLOUD_ENV_ID`, `missing_environment`, `gpt-5.5`, `gpt-5.4`, `model_reasoning_effort = "xhigh"`, legacy compatibility marker `local_model_opt_in = "gpt-5.5"`, `explorer_fast`, `gpt-5.3-codex-spark`, `pack:smoke`, no-network downstream smoke.
 - Nearby wrong interpretations to reject: blind default promotion from `codex debug models`, conflating top-level ChatGPT-auth access with provider/review/cloud/downstream portability, treating live and bundled catalogs as identical without comparison, weakening `explorer_fast`, or mutating user-level config.
 - Explicit non-goals carried forward: no implementation in the docs child lane, no Linear mutation, no PR lifecycle work, no broad marketplace/cloud/provider redesign, and no unrelated stale-doc cleanup.
 
 ## Parity / Alignment Matrix
-- Current truth: CO-341 promoted `0.124.0` command/workflow surfaces with evidence, kept packaged/generated defaults on `gpt-5.4` / `xhigh`, allowed marker-backed local ChatGPT-auth `gpt-5.5` opt-ins, and held Cloud/API direct model choice.
+- Pre-CO-352 baseline: CO-341 promoted `0.124.0` command/workflow surfaces with evidence, kept packaged/generated defaults on `gpt-5.4` / `xhigh`, allowed legacy-marker local ChatGPT-auth `gpt-5.5` use, and held Cloud/API direct model choice.
 - Reference truth: parent CO-352 canaries must establish exact `0.125` source, live catalog, bundled catalog, app-server, provider, review, cloud/fallback, and downstream/no-network facts.
 - Target truth: classify every model-catalog surface as adopt, fallback, blocker, or no-op with dated artifact evidence; adopt `gpt-5.5` / `xhigh` for validated CO-local surfaces and keep blockers scoped to the surfaces they actually affect.
 - Explicitly out-of-scope differences: release publication, broad plugin marketplace redesign, user-level Codex config mutation, unrelated active issue cleanup, and role-policy changes beyond `explorer_fast` validation.
@@ -89,7 +89,7 @@ The parent source anchor for this docs packet is `ctx:sha256:3cf28c7e9319e4f963d
   - Parent records adopt/fallback/no-op buckets with manifest paths before PR handoff.
   - If a required gate fails, hold only that surface and record the blocker instead of downgrading validated local posture.
 - Monitoring / alerts:
-  - Follow-up issue required for live-vs-bundled catalog disagreement, stale local opt-in marker behavior, or no-network downstream regressions not fixed in CO-352.
+  - Follow-up issue required for live-vs-bundled catalog disagreement, stale legacy-marker cleanup, or no-network downstream regressions not fixed in CO-352.
 
 ## Open Questions
 - What exact `0.125` package/version/source snapshot is the parent lane validating?

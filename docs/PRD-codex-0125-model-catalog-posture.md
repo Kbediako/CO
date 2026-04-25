@@ -34,7 +34,7 @@ Codex CLI `0.125` exposes updated model-catalog behavior, and CO-352 validates i
   - `gpt-5.5`
   - `gpt-5.4`
   - `model_reasoning_effort = "xhigh"`
-  - `local_model_opt_in = "gpt-5.5"`
+  - legacy compatibility marker `local_model_opt_in = "gpt-5.5"`
   - `explorer_fast`
   - `gpt-5.3-codex-spark`
   - `pack:smoke`
@@ -50,7 +50,7 @@ Codex CLI `0.125` exposes updated model-catalog behavior, and CO-352 validates i
 
 | Surface | Current truth | Reference truth to capture | Target truth / intended delta | Explicitly out of scope |
 | --- | --- | --- | --- | --- |
-| CO-local model posture | CO-341 allowed marker-backed local ChatGPT-auth `gpt-5.5` opt-ins while many docs still presented `gpt-5.4` as the conservative posture. | `0.125` `which codex`, `codex --version`, auth state, `codex debug models`, `codex debug models --bundled`, top-level `codex exec`, delegated `codex exec`, appserver/runtime canary, and review-wrapper fallback evidence. | Adopt `gpt-5.5` / `xhigh` as the current CO-local ChatGPT-auth/appserver posture; keep `gpt-5.4` as fallback only when access or provider evidence is missing. | Blind default bumps from catalog listing alone or user-level config mutation in this lane. |
+| CO-local model posture | Pre-CO-352 baseline: CO-341 allowed legacy-marker local ChatGPT-auth `gpt-5.5` use while many docs still presented `gpt-5.4` as the conservative posture. | `0.125` `which codex`, `codex --version`, auth state, `codex debug models`, `codex debug models --bundled`, top-level `codex exec`, delegated `codex exec`, appserver/runtime canary, and review-wrapper fallback evidence. | Adopt `gpt-5.5` / `xhigh` as the current CO-local ChatGPT-auth/appserver posture; keep `gpt-5.4` as fallback only when access or provider evidence is missing. | Blind default bumps from catalog listing alone or user-level config mutation in this lane. |
 | Cloud and release-facing pins | Required cloud canary is a separate promotion gate. | Required cloud canary plus exact fallback contract. | Keep cloud execution and release-facing pin promotion blocked on the exact `environment ... not found` failure, tracked by `CO-358`. | Treating the cloud blocker as proof that local appserver posture must remain `gpt-5.4`. |
 | Provider and review posture | Provider/review surfaces need their own proof before using a newer model. | Provider-worker `codex exec` / `codex exec resume`, standalone review model behavior, `app-server model/list`, and fallback review evidence. | Use `gpt-5.5` on validated ChatGPT-auth local/delegated/review surfaces; fallback to `gpt-5.4` only on concrete access failure. | Claiming Cloud/API portability from local ChatGPT-auth evidence. |
 | Downstream/no-network `explorer_fast` | `explorer_fast` is the `gpt-5.3-codex-spark` file/codebase-search-only exception. | Packaged downstream install behavior without live network catalog assumptions. | Preserve `explorer_fast` behavior unless focused downstream/no-network smoke proves a safe alternative. | Broad role redesign or using spark for synthesis, planning, implementation, or review. |

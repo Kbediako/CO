@@ -868,7 +868,7 @@ describe('codex-orchestrator command surface', () => {
     };
     expect(payload.status).toBe('planned');
     expect(payload.plan?.configPath).toBe(join(tempDir, 'config.toml'));
-    expect(payload.plan?.authScope).toBe('portable');
+    expect(payload.plan?.authScope).toBe('chatgpt');
     expect(payload.changes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ target: 'config', status: 'pending' })

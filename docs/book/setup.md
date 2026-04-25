@@ -51,7 +51,7 @@ The plugin launcher reads the `codex-orchestrator` marketplace entry in `${CODEX
 
 Re-run the version-appropriate marketplace add command after moving a local-directory source, replacing it, or removing Codex's installed marketplace checkout.
 
-CO currently targets Codex CLI `0.124.0` with portable packaged/generated defaults on `gpt-5.4` / `xhigh`. Local ChatGPT-auth `gpt-5.5` / `xhigh` remains marker-backed opt-in only after live model access is verified.
+CO currently targets Codex CLI `0.125.0` for local ChatGPT-auth/appserver posture. Use `gpt-5.5` / `xhigh` after live model access is verified; keep `gpt-5.4` / `xhigh` only as the portable fallback when access, API/cloud portability, or downstream/no-network evidence is missing.
 
 ## Rollback / Removal
 
