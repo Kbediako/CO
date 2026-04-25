@@ -41,6 +41,18 @@ interface CommandResult {
   stderr: string;
 }
 
+function formatCommandSpawnError(error: unknown): string {
+  if (error instanceof Error) {
+    const errno = error as NodeJS.ErrnoException;
+    const code = typeof errno.code === 'string' ? errno.code : null;
+    if (code && !error.message.includes(code)) {
+      return `${code}: ${error.message}`;
+    }
+    return error.message;
+  }
+  return String(error);
+}
+
 export interface CloudPreflightRequest {
   repoRoot: string;
   codexBin: string;
@@ -56,11 +68,17 @@ function runCommand(
 ): Promise<CommandResult> {
   const timeoutMs = options.timeoutMs ?? 10_000;
   return new Promise((resolve) => {
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      env: options.env,
-      stdio: ['ignore', 'pipe', 'pipe']
-    });
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn(command, args, {
+        cwd: options.cwd,
+        env: options.env,
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
+    } catch (error) {
+      resolve({ exitCode: 1, stdout: '', stderr: formatCommandSpawnError(error) });
+      return;
+    }
     let stdout = '';
     let stderr = '';
     let settled = false;
@@ -92,7 +110,7 @@ function runCommand(
       }
       settled = true;
       clearTimeout(timer);
-      resolve({ exitCode: 1, stdout, stderr: `${stderr}\n${error.message}`.trim() });
+      resolve({ exitCode: 1, stdout, stderr: `${stderr}\n${formatCommandSpawnError(error)}`.trim() });
     });
     child.once('close', (code) => {
       if (settled) {
