@@ -14,6 +14,7 @@ import {
   buildEmptyProviderLinearWorkerTokenUsage,
   defaultExecRunner,
   parseProviderLinearWorkerJsonl,
+  PROVIDER_LINEAR_CHILD_LANE_DIAGNOSTICS_FILENAME,
   type ProviderLinearWorkerChildLaneParentSnapshot,
   type ProviderLinearWorkerChildLaneScope,
   type ProviderLinearWorkerTokenUsage
@@ -40,6 +41,7 @@ const PROVIDER_LINEAR_CHILD_LANE_SCOPE_DRIFT_POLL_INTERVAL_MS = 250;
 const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_DISCOVERY_WINDOW_MS = 10 * 60 * 1000;
 const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_HEADER_BYTES = 256 * 1024;
 const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_MTIME_SKEW_MS = 1000;
+const PROVIDER_LINEAR_CHILD_LANE_RUNNER_ENTRYPOINT = 'providerLinearChildLaneRunner';
 let tomlParser: { parse: (source: string) => unknown } | null | undefined;
 const PROVIDER_LINEAR_CHILD_LANE_TRUSTED_PROJECT_CONFIG_LOCK_RETRY: LockRetryOptions = {
   maxAttempts: 50,
@@ -1915,6 +1917,42 @@ async function writeChildLaneProof(
   await writeFile(join(runDir, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME), `${JSON.stringify(proof, null, 2)}\n`, 'utf8');
 }
 
+async function writeProviderLinearChildLaneDiagnostics(
+  context: ProviderLinearChildLaneContext,
+  patch: Record<string, unknown>
+): Promise<void> {
+  const diagnosticsPath = join(context.runDir, PROVIDER_LINEAR_CHILD_LANE_DIAGNOSTICS_FILENAME);
+  try {
+    let existing: Record<string, unknown> = {};
+    try {
+      const parsed = JSON.parse(await readFile(diagnosticsPath, 'utf8')) as unknown;
+      existing = isRecord(parsed) ? parsed : {};
+    } catch {
+      existing = {};
+    }
+    await writeAtomicFile(
+      diagnosticsPath,
+      `${JSON.stringify({
+        ...existing,
+        issue_id: context.issueId,
+        issue_identifier: context.issueIdentifier,
+        task_id: context.taskId,
+        run_id: context.runId,
+        parent_run_id: context.parentRunId,
+        stream: context.stream,
+        ...patch
+      }, null, 2)}\n`,
+      { ensureDir: true, encoding: 'utf8' }
+    );
+  } catch (error) {
+    logger.warn(
+      `[provider-linear-child-lane-diagnostics] failed to persist ${basename(diagnosticsPath)} at ${diagnosticsPath}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+}
+
 function buildFailedChildLaneProof(input: {
   context: ProviderLinearChildLaneContext;
   laneWorkspacePath: string;
@@ -1972,6 +2010,14 @@ export async function runProviderLinearChildLane(
     ...dependencyOverrides
   };
   const context = await loadProviderLinearChildLaneContext(env);
+  const runnerStartedAt = deps.now();
+  await writeProviderLinearChildLaneDiagnostics(context, {
+    provider_linear_child_lane_runner_entrypoint: PROVIDER_LINEAR_CHILD_LANE_RUNNER_ENTRYPOINT,
+    provider_linear_child_lane_runner_pid: process.pid,
+    provider_linear_child_lane_runner_started_at: runnerStartedAt,
+    provider_linear_child_lane_runtime_event: 'runner_started',
+    provider_linear_child_lane_runtime_event_at: runnerStartedAt
+  });
   const { laneWorkspacePath, laneBranch } = await prepareLaneWorkspace(context);
   const startingHeadSha = await readProviderLinearChildLaneHeadSha(laneWorkspacePath).catch(() => null);
   const startingReflogEntryCount = await countProviderLinearChildLaneReflogEntries(laneWorkspacePath).catch(
@@ -1980,6 +2026,21 @@ export async function runProviderLinearChildLane(
   try {
     const runtimeContext = await resolveChildLaneRuntimeContext(env, laneWorkspacePath, context.runId);
     logger.info(`[provider-linear-child-lane-runtime] ${formatRuntimeSelectionSummary(runtimeContext.runtime)}`);
+    await writeProviderLinearChildLaneDiagnostics(context, {
+      provider_linear_child_lane_runtime_requested_mode: runtimeContext.runtime.requested_mode,
+      provider_linear_child_lane_runtime_selected_mode: runtimeContext.runtime.selected_mode,
+      provider_linear_child_lane_runtime_source: runtimeContext.runtime.source,
+      provider_linear_child_lane_runtime_provider: runtimeContext.runtime.provider,
+      provider_linear_child_lane_runtime_session_id: runtimeContext.runtime.runtime_session_id,
+      provider_linear_child_lane_runtime_fallback_occurred: runtimeContext.runtime.fallback.occurred,
+      provider_linear_child_lane_runtime_fallback_code: runtimeContext.runtime.fallback.code,
+      provider_linear_child_lane_runtime_fallback_reason: runtimeContext.runtime.fallback.reason,
+      provider_linear_child_lane_runtime_fallback_from_mode: runtimeContext.runtime.fallback.from_mode,
+      provider_linear_child_lane_runtime_fallback_to_mode: runtimeContext.runtime.fallback.to_mode,
+      provider_linear_child_lane_runtime_fallback_checked_at: runtimeContext.runtime.fallback.checked_at,
+      provider_linear_child_lane_runtime_event: 'runtime_selected',
+      provider_linear_child_lane_runtime_event_at: deps.now()
+    });
     const childEnv: NodeJS.ProcessEnv = { ...process.env, ...env, ...runtimeContext.env };
     childEnv.CODEX_NON_INTERACTIVE = '1';
     childEnv.CODEX_NO_INTERACTIVE = '1';
@@ -2030,6 +2091,14 @@ export async function runProviderLinearChildLane(
             logger.info(
               `[provider-linear-child-lane-runtime] appserver startup observed via session log ${basename(startupRace.sessionLogPath)}`
             );
+            const startupObservedAt = deps.now();
+            await writeProviderLinearChildLaneDiagnostics(context, {
+              provider_linear_child_lane_runtime_event: 'appserver_startup_observed',
+              provider_linear_child_lane_runtime_event_at: startupObservedAt,
+              provider_linear_child_lane_appserver_startup_observed: true,
+              provider_linear_child_lane_appserver_startup_observed_at: startupObservedAt,
+              provider_linear_child_lane_appserver_session_log: basename(startupRace.sessionLogPath)
+            });
           }
           const execOrDriftRace = startupRace.sessionLogPath
             ? await Promise.race([
@@ -2091,6 +2160,11 @@ export async function runProviderLinearChildLane(
     if (!execResult) {
       throw new Error('provider-linear-child-lane completed without an exec result');
     }
+    await writeProviderLinearChildLaneDiagnostics(context, {
+      provider_linear_child_lane_runtime_event: 'codex_exec_completed',
+      provider_linear_child_lane_runtime_event_at: deps.now(),
+      provider_linear_child_lane_exec_exit_code: execResult.exitCode
+    });
     const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
     const session = deriveLatestTurnSessionId({
       threadId: parsed.threadId,
