@@ -1624,6 +1624,12 @@ function buildCloudPreflightGuidance(issues: CloudPreflightIssue[]): string[] {
       case 'missing_environment':
         guidance.push('Set CODEX_CLOUD_ENV_ID or provide target metadata.cloudEnvId.');
         break;
+      case 'environment_not_found':
+        guidance.push('Set CODEX_CLOUD_ENV_ID to a Codex Cloud environment visible to the active account; run `codex cloud` to list available environments.');
+        break;
+      case 'environment_unavailable':
+        guidance.push('Verify the active Codex account/profile can read CODEX_CLOUD_ENV_ID before running required cloud canaries.');
+        break;
       case 'branch_missing':
         guidance.push('Push the branch to origin or set CODEX_CLOUD_BRANCH to an existing remote branch.');
         break;

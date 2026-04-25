@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260425-linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7",
+      "title": "CO-360 task registry docs pointer TECH_SPEC mirror alignment",
+      "relates_to": "tasks/tasks-linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-25",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-25",
+          "status": "parent_applied_artifact_after_stale_accept",
+          "manifest": ".runs/linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7-co369-docs-packet/cli/2026-04-25T09-39-15-489Z-53166d03/manifest.json",
+          "source_anchor": "ctx:sha256:17c72b629ea51d97e5065c3e76d6f4316f93091ecea9e4b15ea7310a08b13aab#chunk:c000001",
+          "summary": "Docs-first packet created for CO-369. The child lane completed successfully and produced a six-file patch; the parent had moved from the stale provider snapshot to current origin/main, so the helper rejected accept as stale and the parent applied the reviewed patch artifact manually. Parent owns the CO-360 mirror/repoint implementation, validation, Linear workpad, PR lifecycle, and closeout."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7.md",
+        "task": "tasks/tasks-linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7.md",
+        "agent_task": ".agent/task/linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7.md",
+        "docs": "docs/TECH_SPEC-linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7.md"
+      }
+    },
+    {
       "id": "20260425-linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1",
       "title": "CO-353 Codex CLI 0.125.0 reasoning-token telemetry",
       "relates_to": "tasks/tasks-linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md",
@@ -74,7 +100,7 @@
       "paths": {
         "spec": "tasks/specs/linear-17451947-1b72-4d01-9e3d-86dcaab46c39-provider-worker-codex-0125-appserver-supervision-gate.md",
         "task": "tasks/tasks-linear-17451947-1b72-4d01-9e3d-86dcaab46c39.md",
-        "docs": "tasks/specs/linear-17451947-1b72-4d01-9e3d-86dcaab46c39-provider-worker-codex-0125-appserver-supervision-gate.md"
+        "docs": "docs/TECH_SPEC-linear-17451947-1b72-4d01-9e3d-86dcaab46c39.md"
       }
     },
     {
@@ -142,6 +168,31 @@
         "task": "tasks/tasks-linear-7f6b0776-51b8-4f54-b330-b4e359afe829.md",
         "agent_task": ".agent/task/linear-7f6b0776-51b8-4f54-b330-b4e359afe829.md",
         "docs": "docs/TECH_SPEC-linear-7f6b0776-51b8-4f54-b330-b4e359afe829.md"
+      }
+    },
+    {
+      "id": "20260425-linear-17cc0dd8-5a82-45a6-b0c0-cf0062797491",
+      "title": "Tighten cloud preflight for unusable configured environment ids",
+      "relates_to": "tasks/tasks-linear-17cc0dd8-5a82-45a6-b0c0-cf0062797491.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-25",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-25",
+          "status": "produced_then_invalidated_by_linear_updated_at",
+          "manifest": ".runs/linear-17cc0dd8-5a82-45a6-b0c0-cf0062797491-docs-packet/cli/2026-04-25T02-58-41-550Z-a1fc12a9/manifest.json",
+          "summary": "The same-issue docs child lane produced the six-file docs-first packet, then the accept helper invalidated it after Linear updated_at changed during parent progress updates; parent verified the patch and reapplied the same docs-only packet under parent ownership before implementation."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-17cc0dd8-5a82-45a6-b0c0-cf0062797491.md",
+        "task": "tasks/tasks-linear-17cc0dd8-5a82-45a6-b0c0-cf0062797491.md",
+        "agent_task": ".agent/task/linear-17cc0dd8-5a82-45a6-b0c0-cf0062797491.md",
+        "docs": "docs/TECH_SPEC-linear-17cc0dd8-5a82-45a6-b0c0-cf0062797491.md"
       }
     },
     {
