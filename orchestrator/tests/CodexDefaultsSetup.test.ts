@@ -355,6 +355,46 @@ describe('runCodexDefaultsSetup', () => {
     }
   });
 
+  it('ignores stale legacy markers during implicit portable defaults runs', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-stale-marker-'));
+    const configPath = join(tempHome, 'config.toml');
+    const workerPath = join(tempHome, 'agents', 'worker-complex.toml');
+    try {
+      await writeFile(
+        configPath,
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '[codex_orchestrator]',
+          'local_model_opt_in = "gpt-5.5"',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = await runCodexDefaultsSetup({
+        apply: true,
+        env: { CODEX_HOME: tempHome } as NodeJS.ProcessEnv
+      });
+
+      expect(result.status).toBe('applied');
+      expect(result.plan.authScope).toBe('portable');
+
+      const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        model?: string;
+        review_model?: string;
+        codex_orchestrator?: Record<string, unknown>;
+      };
+      expect(parsed.model).toBe('gpt-5.4');
+      expect(parsed.review_model).toBe('gpt-5.4');
+      expect(parsed.codex_orchestrator).toBeUndefined();
+      expect(await readFile(workerPath, 'utf8')).toContain('model = "gpt-5.4"');
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
   it('does not seed agent depth caps when the source config omits them', async () => {
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-no-depth-'));
     const configPath = join(tempHome, 'config.toml');

@@ -397,10 +397,6 @@ function resolveRequestedLocalModelOptIn(
   if (requestedAuthScope === 'chatgpt') {
     return CURRENT_CHATGPT_MODEL;
   }
-  const existingLocalModelOptIn = resolveLocalModelOptIn(existing);
-  if (existingLocalModelOptIn) {
-    return existingLocalModelOptIn;
-  }
   const model = readOptionalString(existing.model);
   const reviewModel = readOptionalString(existing.review_model);
   if (isLocalModelOptIn(model)) {
