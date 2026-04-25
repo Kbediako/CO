@@ -686,9 +686,22 @@ describe('providerWorkflowConfigStore', () => {
     });
 
     await store.bootstrap();
-    store.recordOperatorAutopilotResult(
-      buildLargeOperatorAutopilotResult(OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT + 25)
+    const largeResult = buildLargeOperatorAutopilotResult(
+      OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT + 25
     );
+    largeResult.actions = largeResult.actions.map((action, index) => ({
+      ...action,
+      transition: {
+        ...action.transition,
+        attempted_at: new Date(Date.UTC(2026, 3, 25, 18, index, 0, 0)).toISOString(),
+        issue_updated_at: new Date(Date.UTC(2026, 3, 25, 18, index, 0, 1)).toISOString()
+      }
+    }));
+    largeResult.actions = [
+      ...largeResult.actions.slice(OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT),
+      ...largeResult.actions.slice(0, OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT)
+    ];
+    store.recordOperatorAutopilotResult(largeResult);
 
     const operationalLastResult = store.snapshot().operator_autopilot?.last_result;
     expect(operationalLastResult?.actions).toHaveLength(
@@ -721,6 +734,7 @@ describe('providerWorkflowConfigStore', () => {
       OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT
     );
     expect(lastResult?.actions[0]?.issue_identifier).toBe('CO-25');
+    expect(lastResult?.actions[lastResult.actions.length - 1]?.issue_identifier).toBe('CO-74');
     expect(lastResult?.status_dataset_bounds).toEqual({
       limit: OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT,
       truncated: true,

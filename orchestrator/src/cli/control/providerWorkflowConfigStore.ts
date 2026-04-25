@@ -840,6 +840,25 @@ function cloneLocalRolloutExecutionConfig(
 type StatusDatasetArrayKey =
   keyof ControlProviderOperatorAutopilotStatusDatasetBoundsPayload['omitted_counts'];
 
+const STATUS_DATASET_TOP_LEVEL_RECENCY_KEYS = [
+  'recorded_at',
+  'attempted_at',
+  'evaluated_at',
+  'started_at',
+  'ended_at',
+  'issue_updated_at',
+  'issue_observed_updated_at',
+  'promotion_attempted_at',
+  'promotion_issue_updated_at',
+  'merge_closeout_recorded_at',
+  'lifecycle_recorded_at'
+] as const;
+
+const STATUS_DATASET_NESTED_RECENCY_KEYS = {
+  transition: ['attempted_at', 'issue_updated_at'],
+  preflight: ['checked_at']
+} as const;
+
 function cloneBoundedStatusDatasetItems<TInput, TOutput>(
   items: readonly TInput[],
   key: StatusDatasetArrayKey,
@@ -851,12 +870,78 @@ function cloneBoundedStatusDatasetItems<TInput, TOutput>(
     ? Math.max(0, items.length - OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT)
     : 0;
   const priorOmitted = boundStatusDataset ? Math.max(0, priorBounds?.omitted_counts[key] ?? 0) : 0;
+  const boundedItems = boundStatusDataset
+    ? takeMostRecentStatusDatasetItems(items)
+    : items;
   return {
-    items: (boundStatusDataset ? items.slice(-OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT) : items).map(
-      cloneItem
-    ),
+    items: boundedItems.map(cloneItem),
     omitted: priorOmitted + omittedFromCurrent
   };
+}
+
+function takeMostRecentStatusDatasetItems<TInput>(items: readonly TInput[]): TInput[] {
+  if (items.length <= OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT) {
+    return [...items];
+  }
+  const ranked = items.map((item, index) => ({
+    item,
+    index,
+    recencyMs: getStatusDatasetItemRecencyMs(item)
+  }));
+  if (!ranked.some((entry) => entry.recencyMs !== null)) {
+    return items.slice(-OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT);
+  }
+  return ranked
+    .sort((left, right) => {
+      const leftRecency = left.recencyMs ?? Number.NEGATIVE_INFINITY;
+      const rightRecency = right.recencyMs ?? Number.NEGATIVE_INFINITY;
+      if (leftRecency !== rightRecency) {
+        return leftRecency - rightRecency;
+      }
+      return left.index - right.index;
+    })
+    .slice(-OPERATOR_AUTOPILOT_STATUS_DATASET_ITEM_LIMIT)
+    .map((entry) => entry.item);
+}
+
+function getStatusDatasetItemRecencyMs(item: unknown): number | null {
+  if (!isObjectRecord(item)) {
+    return null;
+  }
+  let maxTimestampMs = getMaxTimestampMs(item, STATUS_DATASET_TOP_LEVEL_RECENCY_KEYS);
+  for (const [nestedKey, timestampKeys] of Object.entries(STATUS_DATASET_NESTED_RECENCY_KEYS)) {
+    const nested = item[nestedKey];
+    if (!isObjectRecord(nested)) {
+      continue;
+    }
+    const nestedTimestampMs = getMaxTimestampMs(nested, timestampKeys);
+    if (nestedTimestampMs !== null && (maxTimestampMs === null || nestedTimestampMs > maxTimestampMs)) {
+      maxTimestampMs = nestedTimestampMs;
+    }
+  }
+  return maxTimestampMs;
+}
+
+function getMaxTimestampMs(record: Record<string, unknown>, keys: readonly string[]): number | null {
+  let maxTimestampMs: number | null = null;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value !== 'string') {
+      continue;
+    }
+    const timestampMs = Date.parse(value);
+    if (!Number.isFinite(timestampMs)) {
+      continue;
+    }
+    if (maxTimestampMs === null || timestampMs > maxTimestampMs) {
+      maxTimestampMs = timestampMs;
+    }
+  }
+  return maxTimestampMs;
+}
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function cloneStatusTextField(value: string | null, boundStatusDataset: boolean): string | null {
