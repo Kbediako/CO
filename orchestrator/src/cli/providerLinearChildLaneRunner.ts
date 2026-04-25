@@ -34,6 +34,7 @@ const PROVIDER_LINEAR_CHILD_LANE_APPSERVER_STARTUP_POLL_INTERVAL_MS = 250;
 const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_DISCOVERY_WINDOW_MS = 10 * 60 * 1000;
 const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_HEADER_BYTES = 256 * 1024;
 const PROVIDER_LINEAR_CHILD_LANE_SESSION_LOG_MTIME_SKEW_MS = 1000;
+const PROVIDER_LINEAR_CHILD_LANE_RUNNER_ENTRYPOINT = 'providerLinearChildLaneRunner';
 
 export const PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME = 'provider-linear-child-lane-proof.json';
 export const PROVIDER_LINEAR_CHILD_LANE_STREAM_ENV = 'CODEX_PROVIDER_LINEAR_CHILD_LANE_STREAM';
@@ -647,6 +648,26 @@ async function writeChildLaneProof(
   await writeFile(join(runDir, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME), `${JSON.stringify(proof, null, 2)}\n`, 'utf8');
 }
 
+async function updateProviderLinearChildLaneManifestDiagnostics(
+  context: ProviderLinearChildLaneContext,
+  patch: Record<string, unknown>
+): Promise<void> {
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(await readFile(context.manifestPath, 'utf8')) as Record<string, unknown>;
+  } catch {
+    return;
+  }
+  await writeFile(
+    context.manifestPath,
+    `${JSON.stringify({
+      ...parsed,
+      ...patch
+    }, null, 2)}\n`,
+    'utf8'
+  );
+}
+
 export async function runProviderLinearChildLane(
   env: NodeJS.ProcessEnv = process.env,
   dependencyOverrides: Partial<ProviderLinearChildLaneRunnerDependencies> = {}
@@ -663,9 +684,20 @@ export async function runProviderLinearChildLane(
     ...dependencyOverrides
   };
   const context = await loadProviderLinearChildLaneContext(env);
+  await updateProviderLinearChildLaneManifestDiagnostics(context, {
+    provider_linear_child_lane_runner_entrypoint: PROVIDER_LINEAR_CHILD_LANE_RUNNER_ENTRYPOINT,
+    provider_linear_child_lane_runner_pid: process.pid,
+    provider_linear_child_lane_runner_started_at: deps.now(),
+    provider_linear_child_lane_runtime_event: 'runner_started',
+    provider_linear_child_lane_runtime_event_at: deps.now()
+  });
   const { laneWorkspacePath, laneBranch } = await prepareLaneWorkspace(context);
   const runtimeContext = await resolveChildLaneRuntimeContext(env, laneWorkspacePath, context.runId);
   logger.info(`[provider-linear-child-lane-runtime] ${formatRuntimeSelectionSummary(runtimeContext.runtime)}`);
+  await updateProviderLinearChildLaneManifestDiagnostics(context, {
+    provider_linear_child_lane_runtime_event: 'runtime_selected',
+    provider_linear_child_lane_runtime_event_at: deps.now()
+  });
   const childEnv: NodeJS.ProcessEnv = { ...process.env, ...env, ...runtimeContext.env };
   childEnv.CODEX_NON_INTERACTIVE = '1';
   childEnv.CODEX_NO_INTERACTIVE = '1';
@@ -715,6 +747,11 @@ export async function runProviderLinearChildLane(
           logger.info(
             `[provider-linear-child-lane-runtime] appserver startup observed via session log ${basename(startupRace.sessionLogPath)}`
           );
+          await updateProviderLinearChildLaneManifestDiagnostics(context, {
+            provider_linear_child_lane_runtime_event: 'appserver_startup_observed',
+            provider_linear_child_lane_runtime_event_at: deps.now(),
+            provider_linear_child_lane_appserver_session_log: basename(startupRace.sessionLogPath)
+          });
         }
         execResult = await execPromise;
       }
@@ -767,6 +804,11 @@ export async function runProviderLinearChildLane(
   if (!execResult) {
     throw new Error('provider-linear-child-lane completed without an exec result');
   }
+  await updateProviderLinearChildLaneManifestDiagnostics(context, {
+    provider_linear_child_lane_runtime_event: 'codex_exec_completed',
+    provider_linear_child_lane_runtime_event_at: deps.now(),
+    provider_linear_child_lane_exec_exit_code: execResult.exitCode
+  });
   const parsed = parseProviderLinearWorkerJsonl(execResult.stdout);
   const session = deriveLatestTurnSessionId({
     threadId: parsed.threadId,

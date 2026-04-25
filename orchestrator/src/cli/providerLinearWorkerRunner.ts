@@ -154,6 +154,7 @@ export const PROVIDER_SEMANTIC_STALL_RECHECK_DELAY_MS = 15 * 60 * 1000 + 1_000;
 const PROVIDER_WORKER_SESSION_LOG_POLL_INTERVAL_MS = 250;
 const PROVIDER_WORKER_SESSION_LOG_DISCOVERY_WINDOW_MS = 15 * 60 * 1000;
 const PROVIDER_WORKER_SESSION_LOG_HEADER_BYTES = 256 * 1024;
+const PROVIDER_LINEAR_CHILD_LANE_POST_STARTUP_NO_OUTPUT_MIN_STALE_MS = 60 * 1000;
 
 export interface ProviderLinearWorkerContext {
   manifest: Record<string, unknown>;
@@ -272,6 +273,16 @@ export interface ProviderLinearWorkerChildLaneRecord {
   lane_workspace_path: string | null;
   patch_artifact_path: string | null;
   patch_bytes: number | null;
+  runtime_mode?: string | null;
+  runtime_provider?: string | null;
+  heartbeat_at?: string | null;
+  heartbeat_stale_after_seconds?: number | null;
+  runner_pid?: number | null;
+  runner_alive?: boolean | null;
+  runtime_event?: string | null;
+  runtime_event_at?: string | null;
+  stale_invalidation_candidate?: boolean | null;
+  stale_invalidation_reason?: string | null;
   decision: ProviderLinearWorkerChildLaneDecision;
   in_flight_action?: ProviderLinearWorkerChildLaneInFlightAction | null;
   in_flight_started_at?: string | null;
@@ -5103,12 +5114,31 @@ interface ProviderLinearWorkerChildLaneManifestHydrationCandidate {
   patchArtifactPath: string | null;
   patchBytes: number | null;
   summaryRecordedAt: string | null;
+  runtimeMode: string | null;
+  runtimeProvider: string | null;
+  heartbeatAt: string | null;
+  heartbeatStaleAfterSeconds: number | null;
+  runnerPid: number | null;
+  runnerAlive: boolean | null;
+  runtimeEvent: string | null;
+  runtimeEventAt: string | null;
+  staleInvalidationCandidate: boolean | null;
+  staleInvalidationReason: string | null;
+}
+
+interface ProviderLinearWorkerChildLaneHydrationOptions {
+  now: () => string;
+  isProcessAlive: (pid: number) => boolean;
 }
 
 async function hydrateProviderLinearWorkerChildLanesFromActiveManifests(
   runDir: string,
   childLanes: ProviderLinearWorkerChildLaneRecord[],
-  priorProofChildLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined = null
+  priorProofChildLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined = null,
+  options: ProviderLinearWorkerChildLaneHydrationOptions = {
+    now: () => new Date().toISOString(),
+    isProcessAlive: isLocalProcessAlive
+  }
 ): Promise<ProviderLinearWorkerChildLaneRecord[]> {
   if (childLanes.length === 0) {
     return childLanes;
@@ -5122,7 +5152,8 @@ async function hydrateProviderLinearWorkerChildLanesFromActiveManifests(
       await hydrateProviderLinearWorkerChildLaneFromActiveManifest(
         parent,
         childLane,
-        findMatchingPriorHydratedProviderLinearWorkerChildLane(childLane, priorProofChildLanes)
+        findMatchingPriorHydratedProviderLinearWorkerChildLane(childLane, priorProofChildLanes),
+        options
       )
     )
   );
@@ -5130,7 +5161,11 @@ async function hydrateProviderLinearWorkerChildLanesFromActiveManifests(
 
 async function readHydratedProviderLinearWorkerChildLanesAndRepairLedger(
   runDir: string,
-  priorProofChildLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined = null
+  priorProofChildLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined = null,
+  options: ProviderLinearWorkerChildLaneHydrationOptions = {
+    now: () => new Date().toISOString(),
+    isProcessAlive: isLocalProcessAlive
+  }
 ): Promise<ProviderLinearWorkerChildLaneRecord[]> {
   return await withProviderLinearWorkerChildLanesLock(runDir, async () => {
     const { records: existing, ledgerExists } = await readProviderLinearWorkerChildLanesWithPresence(runDir);
@@ -5146,7 +5181,8 @@ async function readHydratedProviderLinearWorkerChildLanesAndRepairLedger(
     const hydrated = await hydrateProviderLinearWorkerChildLanesFromActiveManifests(
       runDir,
       existing,
-      priorProofChildLanes
+      priorProofChildLanes,
+      options
     );
     const ledgerRecords = hydrated.map((childLane, index) =>
       preserveProviderLinearWorkerLaunchReservationLedgerIdentity(existing[index] ?? null, childLane)
@@ -5232,7 +5268,11 @@ async function readProviderLinearWorkerParentManifestHydrationMetadata(
 async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
   parent: ProviderLinearWorkerParentManifestHydrationMetadata,
   childLane: ProviderLinearWorkerChildLaneRecord,
-  priorHydratedChildLane: ProviderLinearWorkerChildLaneRecord | null = null
+  priorHydratedChildLane: ProviderLinearWorkerChildLaneRecord | null = null,
+  options: ProviderLinearWorkerChildLaneHydrationOptions = {
+    now: () => new Date().toISOString(),
+    isProcessAlive: isLocalProcessAlive
+  }
 ): Promise<ProviderLinearWorkerChildLaneRecord> {
   if (isProviderLinearWorkerRetiredChildLanePlaceholder(childLane)) {
     return retireProviderLinearWorkerChildLanePlaceholder(childLane);
@@ -5246,7 +5286,7 @@ async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
   }
   const reservationPlaceholder = isProviderLinearWorkerChildLaneReservationPlaceholder(childLane);
   const candidate = reservationPlaceholder
-    ? await findMatchingProviderLinearWorkerChildLaneManifest(parent, childLane, childCliDir)
+    ? await findMatchingProviderLinearWorkerChildLaneManifest(parent, childLane, childCliDir, options)
     : await readProviderLinearWorkerChildLaneManifestCandidate(
       parent,
       childLane,
@@ -5254,7 +5294,8 @@ async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
       resolveProviderLinearWorkerChildLanePath(
         childLane.manifest_path,
         childLane.workspace_path ?? parent.workspacePath
-      ) ?? join(childCliDir, childLane.run_id, 'manifest.json')
+      ) ?? join(childCliDir, childLane.run_id, 'manifest.json'),
+      options
     );
   if (!candidate) {
     return childLane;
@@ -5288,7 +5329,17 @@ async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
     summary_recorded_at: summaryRecordedAt,
     lane_workspace_path: candidate.laneWorkspacePath ?? childLane.lane_workspace_path,
     patch_artifact_path: candidate.patchArtifactPath ?? childLane.patch_artifact_path,
-    patch_bytes: candidate.patchBytes ?? childLane.patch_bytes
+    patch_bytes: candidate.patchBytes ?? childLane.patch_bytes,
+    runtime_mode: candidate.runtimeMode,
+    runtime_provider: candidate.runtimeProvider,
+    heartbeat_at: candidate.heartbeatAt,
+    heartbeat_stale_after_seconds: candidate.heartbeatStaleAfterSeconds,
+    runner_pid: candidate.runnerPid,
+    runner_alive: candidate.runnerAlive,
+    runtime_event: candidate.runtimeEvent,
+    runtime_event_at: candidate.runtimeEventAt,
+    stale_invalidation_candidate: candidate.staleInvalidationCandidate,
+    stale_invalidation_reason: candidate.staleInvalidationReason
   };
 }
 
@@ -5469,7 +5520,8 @@ function resolveProviderLinearWorkerChildLanePath(
 async function findMatchingProviderLinearWorkerChildLaneManifest(
   parent: ProviderLinearWorkerParentManifestHydrationMetadata,
   childLane: ProviderLinearWorkerChildLaneRecord,
-  childCliDir: string
+  childCliDir: string,
+  options: ProviderLinearWorkerChildLaneHydrationOptions
 ): Promise<ProviderLinearWorkerChildLaneManifestHydrationCandidate | null> {
   let entries: Array<{ isDirectory(): boolean; name: string }>;
   try {
@@ -5485,7 +5537,8 @@ async function findMatchingProviderLinearWorkerChildLaneManifest(
           parent,
           childLane,
           childCliDir,
-          join(childCliDir, entry.name, 'manifest.json')
+          join(childCliDir, entry.name, 'manifest.json'),
+          options
         )
       )
   );
@@ -5501,7 +5554,8 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
   parent: ProviderLinearWorkerParentManifestHydrationMetadata,
   childLane: ProviderLinearWorkerChildLaneRecord,
   childCliDir: string,
-  manifestPath: string
+  manifestPath: string,
+  options: ProviderLinearWorkerChildLaneHydrationOptions
 ): Promise<ProviderLinearWorkerChildLaneManifestHydrationCandidate | null> {
   let parsed: unknown;
   try {
@@ -5584,33 +5638,73 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
     manifestArtifactRoot,
     workspacePath
   );
+  const runtimeMode = normalizeOptionalString(parsed.runtime_mode);
+  const runtimeProvider = normalizeOptionalString(parsed.runtime_provider);
+  const heartbeatAt = normalizeOptionalString(parsed.heartbeat_at);
+  const heartbeatStaleAfterSeconds = normalizeOptionalInteger(parsed.heartbeat_stale_after_seconds);
+  const rawRunnerPid = normalizeOptionalInteger(parsed.provider_linear_child_lane_runner_pid);
+  const runnerPid = rawRunnerPid !== null && rawRunnerPid > 0 ? rawRunnerPid : null;
+  const runnerAlive = runnerPid !== null ? options.isProcessAlive(runnerPid) : null;
+  const runtimeEvent = normalizeOptionalString(parsed.provider_linear_child_lane_runtime_event);
+  const runtimeEventAt = normalizeOptionalString(parsed.provider_linear_child_lane_runtime_event_at);
   const successfulStatus = isSuccessfulProviderLinearWorkerChildLaneStatus(status);
   const patchBytes = proofMetadata?.patchBytes ?? null;
   const patchReady = Boolean(proofMetadata?.patchArtifactPath && patchBytes !== null && patchBytes > 0);
-  const hydratedStatus = successfulStatus && !patchReady ? 'in_progress' : status;
+  const staleDiagnostic = resolveProviderLinearWorkerChildLanePostStartupNoOutputDiagnostic({
+    childLane,
+    status,
+    runtimeMode,
+    heartbeatAt,
+    heartbeatStaleAfterSeconds,
+    runnerPid,
+    runnerAlive,
+    runtimeEvent,
+    runtimeEventAt,
+    patchReady,
+    now: options.now
+  });
+  const hydratedStatus = staleDiagnostic
+    ? 'stale_invalidation_candidate'
+    : successfulStatus && !patchReady
+      ? 'in_progress'
+      : status;
   const manifestTimestamp = latestProviderLinearWorkerChildLaneManifestTimestamp(parsed);
   const summaryRecordedAt = providerLinearWorkerChildLaneSummaryRecordedAt(
     parsed,
     proofMetadata?.updatedAt ?? null,
     startedAt
   );
+  const summary = staleDiagnostic?.summary ??
+    (
+      successfulStatus && !patchReady
+        ? patchBytes === 0
+          ? 'Child lane completed without patch output; waiting for parent ledger decision.'
+          : 'Child lane completed; waiting for patch proof metadata.'
+        : normalizeOptionalString(parsed.summary) ?? normalizeOptionalString(parsed.status_detail)
+    );
   return {
     runId,
     status: hydratedStatus,
     manifestPath,
     artifactRoot: manifestArtifactRoot,
     logPath,
-    summary: successfulStatus && !patchReady
-      ? patchBytes === 0
-        ? 'Child lane completed without patch output; waiting for parent ledger decision.'
-        : 'Child lane completed; waiting for patch proof metadata.'
-      : normalizeOptionalString(parsed.summary) ?? normalizeOptionalString(parsed.status_detail),
+    summary,
     startedAt,
     updatedAt: manifestTimestamp,
     laneWorkspacePath: proofMetadata?.laneWorkspacePath ?? null,
     patchArtifactPath: proofMetadata?.patchArtifactPath ?? null,
     patchBytes: proofMetadata?.patchBytes ?? null,
-    summaryRecordedAt
+    summaryRecordedAt: staleDiagnostic?.observedAt ?? summaryRecordedAt,
+    runtimeMode,
+    runtimeProvider,
+    heartbeatAt,
+    heartbeatStaleAfterSeconds,
+    runnerPid,
+    runnerAlive,
+    runtimeEvent,
+    runtimeEventAt,
+    staleInvalidationCandidate: staleDiagnostic ? true : null,
+    staleInvalidationReason: staleDiagnostic?.reason ?? null
   };
 }
 
@@ -5619,6 +5713,62 @@ interface ProviderLinearWorkerChildLaneProofHydrationMetadata {
   patchArtifactPath: string | null;
   patchBytes: number | null;
   updatedAt: string | null;
+}
+
+function resolveProviderLinearWorkerChildLanePostStartupNoOutputDiagnostic(input: {
+  childLane: ProviderLinearWorkerChildLaneRecord;
+  status: string;
+  runtimeMode: string | null;
+  heartbeatAt: string | null;
+  heartbeatStaleAfterSeconds: number | null;
+  runnerPid: number | null;
+  runnerAlive: boolean | null;
+  runtimeEvent: string | null;
+  runtimeEventAt: string | null;
+  patchReady: boolean;
+  now: () => string;
+}): { observedAt: string; reason: string; summary: string } | null {
+  if (
+    !isActiveLookingProviderLinearWorkerChildLaneStatus(input.status) ||
+    input.runtimeMode !== 'appserver' ||
+    input.runtimeEvent !== 'appserver_startup_observed' ||
+    input.patchReady
+  ) {
+    return null;
+  }
+  const heartbeatMs = input.heartbeatAt ? Date.parse(input.heartbeatAt) : Number.NaN;
+  const now = input.now();
+  const nowMs = Date.parse(now);
+  if (!Number.isFinite(heartbeatMs) || !Number.isFinite(nowMs)) {
+    return null;
+  }
+  const staleAfterMs = Math.max(
+    PROVIDER_LINEAR_CHILD_LANE_POST_STARTUP_NO_OUTPUT_MIN_STALE_MS,
+    (input.heartbeatStaleAfterSeconds ?? 0) * 1000
+  );
+  if (nowMs - heartbeatMs <= staleAfterMs) {
+    return null;
+  }
+  if (input.runnerAlive === true) {
+    return null;
+  }
+  const stream = input.childLane.stream || input.childLane.task_id || input.childLane.run_id;
+  const runnerState =
+    input.runnerPid !== null
+      ? `providerLinearChildLaneRunner pid ${input.runnerPid} is not live`
+      : 'providerLinearChildLaneRunner pid was not recorded';
+  const startupAt = input.runtimeEventAt ?? 'unknown time';
+  const reason = input.runnerPid !== null
+    ? 'post_startup_no_output_heartbeat_stale_runner_dead'
+    : 'post_startup_no_output_heartbeat_stale_runner_unknown';
+  return {
+    observedAt: now,
+    reason,
+    summary:
+      `Child lane ${stream} is a stale invalidation candidate: appserver startup was observed at ${startupAt}, ` +
+      `manifest heartbeat stopped at ${input.heartbeatAt}, ${runnerState}, and no proof/patch output is present. ` +
+      'Invalidate the lane and rerun parent-owned validation, or relaunch under CLI for scoped diagnosis.'
+  };
 }
 
 async function readProviderLinearWorkerChildLaneProofHydrationMetadata(
@@ -5994,6 +6144,19 @@ function normalizeProviderLinearWorkerChildLaneRecord(
     lane_workspace_path: normalizeOptionalString(value.lane_workspace_path),
     patch_artifact_path: normalizeOptionalString(value.patch_artifact_path),
     patch_bytes: normalizeOptionalInteger(value.patch_bytes),
+    runtime_mode: normalizeOptionalString(value.runtime_mode),
+    runtime_provider: normalizeOptionalString(value.runtime_provider),
+    heartbeat_at: normalizeOptionalString(value.heartbeat_at),
+    heartbeat_stale_after_seconds: normalizeOptionalInteger(value.heartbeat_stale_after_seconds),
+    runner_pid: normalizeOptionalInteger(value.runner_pid),
+    runner_alive: typeof value.runner_alive === 'boolean' ? value.runner_alive : null,
+    runtime_event: normalizeOptionalString(value.runtime_event),
+    runtime_event_at: normalizeOptionalString(value.runtime_event_at),
+    stale_invalidation_candidate:
+      typeof value.stale_invalidation_candidate === 'boolean'
+        ? value.stale_invalidation_candidate
+        : null,
+    stale_invalidation_reason: normalizeOptionalString(value.stale_invalidation_reason),
     decision,
     in_flight_action: inFlightAction,
     in_flight_started_at: normalizeOptionalString(value.in_flight_started_at),
@@ -6054,6 +6217,15 @@ function normalizeChildLaneInFlightAction(
   return value === 'accept' || value === 'reject' || value === 'invalidate'
     ? value
     : null;
+}
+
+function isLocalProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException)?.code === 'EPERM';
+  }
 }
 async function resolveProviderWorkerRunLocation(
   currentManifestPath: string,
@@ -6457,7 +6629,11 @@ async function writeProofSnapshot(
     const childStreams = await readProviderLinearWorkerChildStreams(runDir);
     const childLanes = await readHydratedProviderLinearWorkerChildLanesAndRepairLedger(
       runDir,
-      proof.child_lanes
+      proof.child_lanes,
+      {
+        now: deps.now,
+        isProcessAlive: isLocalProcessAlive
+      }
     );
     const proofWithHydratedSources = {
       ...proof,
@@ -6496,6 +6672,7 @@ export async function refreshProviderLinearWorkerProofSnapshot(
     updatedAtComparisonScope?: 'full' | 'telemetry';
     skipSessionLogHydration?: boolean;
     emitProgressEvent?: (message: string) => void;
+    isProcessAlive?: (pid: number) => boolean;
   } = {}
 ): Promise<ProviderLinearWorkerProof | null> {
   return await withProviderLinearWorkerProofLock(runDir, async () => {
@@ -6516,7 +6693,11 @@ export async function refreshProviderLinearWorkerProofSnapshot(
     const childStreams = await readProviderLinearWorkerChildStreams(runDir);
     const childLanes = await readHydratedProviderLinearWorkerChildLanesAndRepairLedger(
       runDir,
-      parsed.child_lanes
+      parsed.child_lanes,
+      {
+        now,
+        isProcessAlive: options.isProcessAlive ?? isLocalProcessAlive
+      }
     );
     const proofWithHydratedSources: ProviderLinearWorkerProof = {
       ...parsed,
