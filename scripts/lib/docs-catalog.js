@@ -329,8 +329,8 @@ function extractAllowedCliCompatibilityVersions(content, currentCliVersion) {
   const scanContent = extractCurrentPostureContent(content);
   for (const line of scanContent.split(/\r?\n/)) {
     if (
-      !/(compatibility|app-server|control-host|proof use)/i.test(line) ||
-      !/(separately\s+rebaselined|downstream-smoke|release-facing|app-server|control-host|proof use)/i.test(line)
+      !/compatibility/i.test(line) ||
+      !/(separately\s+rebaselined|downstream-smoke|release-facing)/i.test(line)
     ) {
       continue;
     }
