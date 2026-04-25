@@ -20,6 +20,7 @@ jobs:
   archive:
     uses: ./.github/workflows/archive-automation-base.yml
     permissions:
+      actions: write
       contents: write
       pull-requests: write
     with:
