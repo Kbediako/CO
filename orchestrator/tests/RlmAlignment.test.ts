@@ -14,7 +14,7 @@ import {
   shouldRunDeepAudit
 } from '../src/cli/rlm/alignment.js';
 
-const { incrementIntentVersion } = alignmentTest;
+const { incrementIntentVersion, resolvePolicy } = alignmentTest;
 
 let tempDir: string | null = null;
 
@@ -101,9 +101,28 @@ describe('alignment scoring', () => {
 
   it('keeps route models aligned with the current CO model posture', () => {
     expect(DEFAULT_ALIGNMENT_POLICY.route).toMatchObject({
+      sentinel_model: 'gpt-5.5',
+      high_reasoning_model: 'gpt-5.5',
+      arbitration_model: 'gpt-5.5',
+      high_reasoning_available: true
+    });
+  });
+
+  it('preserves explicit route model overrides', () => {
+    const policy = resolvePolicy({
+      route: {
+        sentinel_model: 'gpt-5.4',
+        high_reasoning_model: 'gpt-5.4',
+        arbitration_model: 'gpt-5.4',
+        high_reasoning_available: false
+      }
+    });
+
+    expect(policy.route).toMatchObject({
       sentinel_model: 'gpt-5.4',
       high_reasoning_model: 'gpt-5.4',
-      arbitration_model: 'gpt-5.4'
+      arbitration_model: 'gpt-5.4',
+      high_reasoning_available: false
     });
   });
 });
