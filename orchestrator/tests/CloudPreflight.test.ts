@@ -1,6 +1,7 @@
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import process from 'node:process';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -17,13 +18,13 @@ afterEach(async () => {
   }
 });
 
-async function createFakeCodex(script: string): Promise<{ dir: string; bin: string; log: string }> {
+async function createNodeBackedFakeCodex(script: string): Promise<{ dir: string; bin: string; log: string }> {
   const dir = await mkdtemp(join(tmpdir(), 'cloud-preflight-'));
   createdDirs.push(dir);
-  const bin = join(dir, 'codex');
+  // Keep the version probe on a stable executable; the cwd-local script handles `cloud ...`.
+  const bin = process.execPath;
   const log = join(dir, 'codex.log');
-  await writeFile(bin, script, 'utf8');
-  await chmod(bin, 0o755);
+  await writeFile(join(dir, 'cloud'), script, 'utf8');
   return { dir, bin, log };
 }
 
@@ -34,30 +35,27 @@ async function runCloudPreflightWithCloudList(options: {
   exitCode?: number;
   logCommands?: boolean;
 }): Promise<{ result: Awaited<ReturnType<typeof runCloudPreflight>>; log: string }> {
-  const { dir, bin, log } = await createFakeCodex(
+  const { dir, bin, log } = await createNodeBackedFakeCodex(
     [
-      '#!/bin/sh',
-      'if [ -n "$CODEX_TEST_LOG" ]; then',
-      '  printf "%s\\n" "$*" >> "$CODEX_TEST_LOG"',
-      'fi',
-      'if [ "$1" = "--version" ]; then',
-      '  echo "codex 0.0.0-test"',
-      '  exit 0',
-      'fi',
-      'if [ "$1" = "cloud" ] && [ "$2" = "list" ]; then',
-      '  if [ -n "$CODEX_TEST_CLOUD_LIST_STDERR" ]; then',
-      '    printf "%s\\n" "$CODEX_TEST_CLOUD_LIST_STDERR" 1>&2',
-      '  fi',
-      '  if [ -n "$CODEX_TEST_CLOUD_LIST_STDOUT" ]; then',
-      '    printf "%s\\n" "$CODEX_TEST_CLOUD_LIST_STDOUT"',
-      '  fi',
-      '  exit "${CODEX_TEST_CLOUD_LIST_EXIT_CODE:-0}"',
-      'fi',
-      'if [ "$1" = "cloud" ] && [ "$2" = "exec" ]; then',
-      '  echo "cloud exec should not run during preflight" 1>&2',
-      '  exit 2',
-      'fi',
-      'exit 1'
+      "const { appendFileSync } = require('node:fs');",
+      'const args = process.argv.slice(2);',
+      'if (process.env.CODEX_TEST_LOG) {',
+      "  appendFileSync(process.env.CODEX_TEST_LOG, ['cloud', ...args].join(' ') + '\\n');",
+      '}',
+      "if (args[0] === 'list') {",
+      '  if (process.env.CODEX_TEST_CLOUD_LIST_STDERR) {',
+      "    process.stderr.write(process.env.CODEX_TEST_CLOUD_LIST_STDERR + '\\n');",
+      '  }',
+      '  if (process.env.CODEX_TEST_CLOUD_LIST_STDOUT) {',
+      "    process.stdout.write(process.env.CODEX_TEST_CLOUD_LIST_STDOUT + '\\n');",
+      '  }',
+      "  process.exit(Number(process.env.CODEX_TEST_CLOUD_LIST_EXIT_CODE ?? '0'));",
+      '}',
+      "if (args[0] === 'exec') {",
+      "  process.stderr.write('cloud exec should not run during preflight\\n');",
+      '  process.exit(2);',
+      '}',
+      'process.exit(1);'
     ].join('\n')
   );
   const result = await runCloudPreflight({
