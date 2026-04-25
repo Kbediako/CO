@@ -19,7 +19,7 @@
 
 ## Source / Assumptions
 - [x] Source-0 anchor recorded. Evidence: `ctx:sha256:17c72b629ea51d97e5065c3e76d6f4316f93091ecea9e4b15ea7310a08b13aab#chunk:c000001`.
-- [x] Source payload availability caveat recorded. Evidence: child drafting could not see the parent source path, and parent reconciled to `../../.runs/linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7/cli/2026-04-25T09-36-04-589Z-45349664/memory/source-0/source.txt`.
+- [x] Source payload availability caveat recorded. Evidence: child drafting could not see the parent source path, and parent reconciled to `.runs/linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7/cli/2026-04-25T09-36-04-589Z-45349664/memory/source-0/source.txt`.
 - [x] Parent/child ownership split recorded. Evidence: PRD, TECH_SPEC, ACTION_PLAN, and this checklist.
 
 ## Parent Implementation
@@ -34,7 +34,7 @@
 - [x] Child protected-term check. Evidence: `rg -n "CO-360|CO-369|paths\\.docs|TECH_SPEC mirror|CO-360 docs TECH_SPEC mirror|legacy fallback rationale|tasks/index\\.json|docs/docs-freshness-registry\\.json|provider runtime files|Not Done If|Parity / Alignment Matrix" <six owned files>` found required terms.
 - [x] Parent focused docs/registry validation. Evidence: JSON parse passed for `tasks/index.json` and `docs/docs-freshness-registry.json`; focused pointer search confirmed CO-360 `paths.docs` points to `docs/TECH_SPEC-linear-17451947-1b72-4d01-9e3d-86dcaab46c39.md`; `git diff --check`, `npm run docs:check`, and `npm run docs:freshness` passed.
 - [x] Parent `node scripts/spec-guard.mjs --dry-run`. Evidence: command passed on 2026-04-25.
-- [x] Parent review/elegance pass if non-trivial implementation occurs. Evidence: final wrapper review telemetry `../../.runs/linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7/cli/2026-04-25T09-36-04-589Z-45349664/review/telemetry.json` reports `status: succeeded` and `review_outcome: bounded-success`; explicit elegance pass kept the narrow mirror/repoint shape and found no safe simplification.
+- [x] Parent review/elegance pass if non-trivial implementation occurs. Evidence: final wrapper review telemetry `.runs/linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7/cli/2026-04-25T09-36-04-589Z-45349664/review/telemetry.json` reports `status: succeeded` and `review_outcome: bounded-success`; explicit elegance pass kept the narrow mirror/repoint shape and found no safe simplification.
 
 ## Handoff Status
 - [x] Child lane leaves docs packet changes in place for patch export. Evidence: dirty working tree in this child workspace.

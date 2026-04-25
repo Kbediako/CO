@@ -59,6 +59,7 @@
   - mutating Linear from the child lane
 
 ## Parity / Alignment Matrix
+
 | Dimension | Current Truth | Reference Truth | Target Truth / Intended Delta | Explicitly Out Of Scope |
 | --- | --- | --- | --- | --- |
 | `CO-360` registry docs pointer | Parent is verifying whether `tasks/index.json` `paths.docs` points at the correct docs-side `TECH_SPEC` mirror, a canonical task spec, or a missing/stale path. | Docs-first packets should have a canonical task spec under `tasks/specs/` and, when registry docs linkage is expected, a docs-side `docs/TECH_SPEC-*` mirror. | Parent records the verified current state and makes `paths.docs` point to the `CO-360` docs `TECH_SPEC` mirror, or records why this row must stay on a specific legacy fallback. | Broad `tasks/index.json` cleanup or normalization of unrelated task rows. |

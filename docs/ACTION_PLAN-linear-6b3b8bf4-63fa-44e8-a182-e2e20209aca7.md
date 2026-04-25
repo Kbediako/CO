@@ -31,7 +31,7 @@
 1. Completed in this child lane: create the PRD, docs `TECH_SPEC` mirror, canonical task spec, ACTION_PLAN, task checklist, and `.agent` mirror for `CO-369`.
 2. Parent applies the child patch and verifies the exact `CO-360` task UUID, canonical task spec, docs-side `TECH_SPEC` mirror state, and `tasks/index.json` `paths.docs` value.
 3. Parent chooses one implementation path based on evidence:
-   - add the missing `CO-360` docs `TECH_SPEC` mirror and repoint `paths.docs`; or
+   - add the missing `CO-360` docs `TECH_SPEC` mirror and repoint `paths.docs`, or
    - record a specific legacy fallback rationale explaining why `paths.docs` must not point to a docs mirror.
 4. Parent runs focused validation for the touched registry/docs surfaces and records evidence in the task checklist/workpad.
 5. Parent handles Linear state, PR lifecycle, review, and closeout.

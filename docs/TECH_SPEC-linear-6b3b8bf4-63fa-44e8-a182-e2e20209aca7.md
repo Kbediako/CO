@@ -29,6 +29,7 @@ last_review: 2026-04-25
 - Explicit non-goals carried forward: no Linear mutation, no full repo validation, no child edit outside the six packet files, and no pre-decision before parent verifies current `CO-360` state.
 
 ## Parity / Alignment Matrix
+
 | Dimension | Current Truth | Reference Truth | Target Truth / Intended Delta | Explicitly Out Of Scope |
 | --- | --- | --- | --- | --- |
 | `paths.docs` | Parent is verifying the current `CO-360` `tasks/index.json` entry. | Registry docs pointers should land on the intended docs-facing spec surface or document a specific exception. | Parent repoints `paths.docs` to the `CO-360` docs `TECH_SPEC` mirror, or records a specific fallback rationale. | Changing unrelated `tasks/index.json` entries. |
