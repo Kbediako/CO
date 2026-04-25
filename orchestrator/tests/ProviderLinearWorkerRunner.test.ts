@@ -4986,7 +4986,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(refreshed?.progress?.summary).toContain('stale invalidation candidate');
     const rehydrated = await refreshProviderLinearWorkerProofSnapshot(
       runDir,
-      refreshed,
+      null,
       () => '2026-04-17T00:36:05.000Z',
       async (path, proof) => await writeFile(path, JSON.stringify(proof, null, 2), 'utf8'),
       { CODEX_HOME: tempRoot! },
