@@ -44,8 +44,10 @@ const LOCAL_DEGRADED_FALLBACK_ALLOWED_VERDICTS = new Set<ProviderControlHostFres
 ]);
 const LOCAL_DEGRADED_FALLBACK_ALLOWED_FINDING_CODES = new Set(['active_worker_proof_missing']);
 
+type CoStatusDegradedReadReason = 'ui_request_timeout' | 'current_host_unhealthy';
+
 export interface CoStatusDegradedReadPayload {
-  reason: 'ui_request_timeout';
+  reason: CoStatusDegradedReadReason;
   source: 'local_seeded_runtime';
   freshness_verdict: ProviderControlHostFreshnessVerdict;
   artifact_root: string;
@@ -129,7 +131,8 @@ async function tryReadLocalDegradedUiDataset(input: {
   error: unknown;
   target: CoStatusAttachTarget;
 }): Promise<CoStatusJsonDataset | null> {
-  if (!isUiRequestTimeoutError(input.error)) {
+  const degradedReason = resolveLocalDegradedReadReason(input.error);
+  if (!degradedReason) {
     return null;
   }
 
@@ -157,13 +160,30 @@ async function tryReadLocalDegradedUiDataset(input: {
 
   return {
     ...dataset,
-    degraded_read: buildDegradedReadPayload(input.target, freshnessReport)
+    degraded_read: buildDegradedReadPayload(input.target, freshnessReport, degradedReason)
   };
 }
 
-function isUiRequestTimeoutError(error: unknown): boolean {
+function resolveLocalDegradedReadReason(error: unknown): CoStatusDegradedReadReason | null {
   const message = (error as Error)?.message ?? String(error);
-  return message.includes('control-host ui request timeout after');
+  if (message.includes('Re-resolving control_endpoint.json failed')) {
+    return null;
+  }
+  if (isCurrentHostUnhealthyErrorMessage(message)) {
+    return 'current_host_unhealthy';
+  }
+  if (message.includes('control-host ui request timeout after')) {
+    return 'ui_request_timeout';
+  }
+  return null;
+}
+
+function isCurrentHostUnhealthyErrorMessage(message: string): boolean {
+  return (
+    message.includes('current-host-unhealthy') ||
+    message.includes('control-host unavailable; control_endpoint.json has not rotated to a reachable host') ||
+    message.includes('refreshed control-host endpoint is still unreachable')
+  );
 }
 
 function isEligibleLocalDegradedFallbackFreshnessReport(
@@ -183,10 +203,11 @@ function isEligibleLocalDegradedFallbackFreshnessReport(
 
 function buildDegradedReadPayload(
   target: CoStatusAttachTarget,
-  report: ProviderControlHostFreshnessGaugeReport
+  report: ProviderControlHostFreshnessGaugeReport,
+  reason: CoStatusDegradedReadReason
 ): CoStatusDegradedReadPayload {
   return {
-    reason: 'ui_request_timeout',
+    reason,
     source: 'local_seeded_runtime',
     freshness_verdict: report.verdict,
     artifact_root: target.runDir,
