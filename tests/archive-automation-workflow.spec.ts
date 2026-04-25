@@ -196,9 +196,10 @@ describe('archive automation workflow required checks', () => {
 
     const pendingStatus = run.indexOf('set_core_lane_status "pending"');
     const runDiscovery = run.indexOf('RUN_ID="$(find_dispatched_run_id)"');
-    const discoveryStatusCapture = run.indexOf('RUN_DISCOVERY_STATUS=$?');
+    const discoveryStatusCapture = run.indexOf('RUN_DISCOVERY_STATUS=$?', runDiscovery);
     const terminalErrorStatus = run.indexOf(
-      'set_core_lane_status "error" "Core Lane run discovery failed for archive PR #${PR_NUMBER}."'
+      'set_core_lane_status "error" "Core Lane run discovery failed for archive PR #${PR_NUMBER}."',
+      runDiscovery
     );
     const notFoundStatus = run.indexOf(
       'set_core_lane_status "error" "Dispatched Core Lane run was not found."'
@@ -223,6 +224,26 @@ describe('archive automation workflow required checks', () => {
       'Failed to discover dispatched Core Lane run for archive PR #${PR_NUMBER}; gh run list exited ${RUN_DISCOVERY_STATUS}.'
     );
     expect(run).toContain('exit "${RUN_DISCOVERY_STATUS}"');
+  });
+
+  it('matches the dispatched Core Lane run from the post-dispatch run id delta', async () => {
+    const workflow = await readWorkflow('.github/workflows/archive-automation-base.yml');
+    const dispatchStep = getStep(workflow, 'archive', 'Dispatch Core Lane for archive PR');
+    const run = dispatchStep.run ?? '';
+
+    const baselineCapture = run.indexOf('BASELINE_RUN_IDS="$(list_matching_run_ids)"');
+    const dispatch = run.indexOf('gh workflow run core-lane.yml');
+    const runDiscovery = run.indexOf('RUN_ID="$(find_dispatched_run_id)"');
+
+    expect(run).toContain('list_matching_run_ids()');
+    expect(run).toContain('find_dispatched_run_id()');
+    expect(baselineCapture).toBeGreaterThan(run.indexOf('set_core_lane_status "pending"'));
+    expect(baselineCapture).toBeLessThan(dispatch);
+    expect(runDiscovery).toBeGreaterThan(dispatch);
+    expect(run).toContain('grep -Fxq "${run_id}" <<< "${BASELINE_RUN_IDS}"');
+    expect(run).toContain('candidates+=("${run_id}")');
+    expect(run).toContain('Multiple new Core Lane workflow_dispatch runs matched');
+    expect(run).not.toContain('| head -n 1');
   });
 
   it('grants reusable archive callers permission to dispatch Core Lane', async () => {

@@ -199,7 +199,7 @@ jobs:
               -f "target_url=${target_url}" >/dev/null
           }
 
-          find_dispatched_run_id() {
+          list_matching_run_ids() {
             gh run list \
               --repo "${GH_REPO}" \
               --workflow core-lane.yml \
@@ -209,12 +209,54 @@ jobs:
               --limit 20 \
               --json databaseId,createdAt \
               --jq ".[] | select(.createdAt >= \"${DISPATCH_STARTED_AT}\") | .databaseId" \
-              | head -n 1
+          }
+
+          find_dispatched_run_id() {
+            local run_ids=""
+            local list_status=0
+            local run_id=""
+            local candidates=()
+
+            run_ids="$(list_matching_run_ids)"
+            list_status=$?
+            if [ "${list_status}" -ne 0 ]; then
+              return "${list_status}"
+            fi
+
+            while IFS= read -r run_id; do
+              if [ -z "${run_id}" ]; then
+                continue
+              fi
+              if ! grep -Fxq "${run_id}" <<< "${BASELINE_RUN_IDS}"; then
+                candidates+=("${run_id}")
+              fi
+            done <<< "${run_ids}"
+
+            if [ "${#candidates[@]}" -gt 1 ]; then
+              echo "::error::Multiple new Core Lane workflow_dispatch runs matched ${PR_BRANCH} @ ${PR_HEAD_SHA}; refusing to mirror an ambiguous run." >&2
+              return 2
+            fi
+
+            if [ "${#candidates[@]}" -eq 1 ]; then
+              printf '%s\n' "${candidates[0]}"
+            fi
           }
 
           ACTIONS_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/core-lane.yml"
           DISPATCH_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           set_core_lane_status "pending" "Archive automation dispatched Core Lane." "${ACTIONS_URL}"
+
+          # gh workflow run does not return a run id; baseline visible matches so polling watches only a new id.
+          set +e
+          BASELINE_RUN_IDS="$(list_matching_run_ids)"
+          RUN_DISCOVERY_STATUS=$?
+          set -e
+
+          if [ "${RUN_DISCOVERY_STATUS}" -ne 0 ]; then
+            set_core_lane_status "error" "Core Lane run discovery failed for archive PR #${PR_NUMBER}." "${ACTIONS_URL}"
+            echo "::error::Failed to capture existing Core Lane runs for archive PR #${PR_NUMBER}; gh run list exited ${RUN_DISCOVERY_STATUS}."
+            exit "${RUN_DISCOVERY_STATUS}"
+          fi
 
           set +e
           gh workflow run core-lane.yml \
