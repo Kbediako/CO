@@ -32,6 +32,7 @@ export interface CodexOrchestratorCLIManifest {
   provider_launch_source?: string | null;
   provider_control_host_task_id?: string | null;
   provider_control_host_run_id?: string | null;
+  provider_linear_worker_tokens?: null | ProviderLinearWorkerTokenUsage;
   summary: string | null;
   metrics_recorded: boolean;
   resume_token: string;
@@ -497,6 +498,12 @@ export interface CodexOrchestratorCLIManifest {
   design_history?: null | DesignHistory;
   design_style_profile?: null | DesignStyleProfile;
   design_metrics?: null | DesignMetrics;
+}
+export interface ProviderLinearWorkerTokenUsage {
+  input_tokens: number | null;
+  output_tokens: number | null;
+  total_tokens: number | null;
+  reasoning_output_tokens?: number | null;
 }
 export interface CollabToolCall {
   observed_at: string;
