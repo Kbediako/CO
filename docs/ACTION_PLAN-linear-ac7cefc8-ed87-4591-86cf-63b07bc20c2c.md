@@ -19,6 +19,7 @@
   - `fetch failed`
   - `control-host-stale-owner.json`
   - `provider-control-host-refresh-failure.json`
+  - `active_worker_probe_timeout_quarantine`
   - `owner pid/host/task/run`
   - `attempted pid/host`
   - `co-status freshness`
@@ -67,7 +68,7 @@
 
 ## Validation
 - Checks / tests:
-  - `rg -n "stale_control_host_owner|stale_reclaimed|provider-control-host-refresh-failure.json|control-host-stale-owner.json|owner pid/host/task/run|attempted pid/host|co-status freshness|CO-351|CO-352|CO-355" <packet files>`
+  - `rg -n "stale_control_host_owner|stale_reclaimed|provider-control-host-refresh-failure.json|control-host-stale-owner.json|active_worker_probe_timeout_quarantine|owner pid/host/task/run|attempted pid/host|co-status freshness|CO-351|CO-352|CO-355" <packet files>`
   - `npm test -- --run orchestrator/tests/ControlHostSupervision.test.ts`
   - `git diff --name-only`
   - `git status --short`

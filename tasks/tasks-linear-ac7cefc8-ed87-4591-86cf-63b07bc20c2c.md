@@ -18,7 +18,7 @@
 - [x] `tasks/index.json` and docs-freshness registry refreshed by the parent lane after child-lane handoff. Evidence: `tasks/index.json`, `docs/docs-freshness-registry.json`.
 
 ## Protected Scope
-- [x] Protected terms preserved. Evidence: PRD and canonical TECH_SPEC include `stale_control_host_owner`, `stale_reclaimed`, `control-host`, `provider-linear-worker could not request control-host refresh`, `refresh request timeout`, `fetch failed`, `control-host-stale-owner.json`, `provider-control-host-refresh-failure.json`, `owner pid/host/task/run`, `attempted pid/host`, `co-status freshness`, `owner reclaim`, `provider refresh`, and `retry/resumable queue behavior`.
+- [x] Protected terms preserved. Evidence: PRD and canonical TECH_SPEC include `stale_control_host_owner`, `stale_reclaimed`, `control-host`, `provider-linear-worker could not request control-host refresh`, `refresh request timeout`, `fetch failed`, `control-host-stale-owner.json`, `provider-control-host-refresh-failure.json`, `active_worker_probe_timeout_quarantine`, `owner pid/host/task/run`, `attempted pid/host`, `co-status freshness`, `owner reclaim`, `provider refresh`, and `retry/resumable queue behavior`.
 - [x] Wrong interpretations rejected. Evidence: PRD and canonical TECH_SPEC reject CO-41 ownership, CO-317-only admission/backfill, generic host restart workaround, and stdin bootstrap regression.
 - [x] Related context bounded. Evidence: packet references CO-152 stale-owner ownership, CO-119 refresh-timeout recovery, and PR #624 only as prior context.
 
@@ -35,7 +35,7 @@
 - [x] Cover `CO-351`, `CO-352`, and `CO-355` recurrence shapes in focused parent-owned tests. Evidence: `orchestrator/tests/ControlHostSupervision.test.ts`.
 
 ## Validation
-- [x] Protected-term text check across the six packet files. Evidence: `rg -n "stale_control_host_owner|stale_reclaimed|provider-control-host-refresh-failure.json|control-host-stale-owner.json|owner pid/host/task/run|attempted pid/host|co-status freshness|CO-351|CO-352|CO-355" ...` returned matches in the packet.
+- [x] Protected-term text check across the six packet files. Evidence: `rg -n "stale_control_host_owner|stale_reclaimed|provider-control-host-refresh-failure.json|control-host-stale-owner.json|active_worker_probe_timeout_quarantine|owner pid/host/task/run|attempted pid/host|co-status freshness|CO-351|CO-352|CO-355" ...` returned matches in the packet.
 - [x] Scoped child-lane diff review confirmed no edits outside declared file scope before parent application. Evidence: child-lane manifest `.runs/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c-co330-recurrence-docs/cli/2026-04-25T12-07-04-429Z-22659fae/manifest.json`.
 - [x] Delegation evidence passed. Evidence: `node scripts/delegation-guard.mjs`.
 - [x] Spec guard passed. Evidence: `node scripts/spec-guard.mjs --dry-run`.

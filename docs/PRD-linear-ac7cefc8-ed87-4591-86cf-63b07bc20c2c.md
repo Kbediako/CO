@@ -43,6 +43,7 @@
   - `fetch failed`
   - `control-host-stale-owner.json`
   - `provider-control-host-refresh-failure.json`
+  - `active_worker_probe_timeout_quarantine`
   - `stale_reclaimed`
   - `owner pid/host/task/run`
   - `attempted pid/host`

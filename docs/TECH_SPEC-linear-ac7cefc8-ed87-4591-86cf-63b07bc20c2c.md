@@ -20,7 +20,7 @@ This mirror points to the canonical task spec at `tasks/specs/linear-ac7cefc8-ed
 - CO-152 stale-owner ownership, CO-119 refresh-timeout recovery, and PR #624 are prior related context only; they do not make the reopened recurrence complete.
 
 ## Issue-Shaping Contract
-- Protected terms / exact artifact and surface names: `stale_control_host_owner`, `stale_reclaimed`, `control-host`, `provider-linear-worker could not request control-host refresh`, `refresh request timeout`, `fetch failed`, `control-host-stale-owner.json`, `provider-control-host-refresh-failure.json`, `owner pid/host/task/run`, `attempted pid/host`, `co-status freshness`, `owner reclaim`, `provider refresh`, `retry/resumable queue behavior`.
+- Protected terms / exact artifact and surface names: `stale_control_host_owner`, `stale_reclaimed`, `control-host`, `provider-linear-worker could not request control-host refresh`, `refresh request timeout`, `fetch failed`, `control-host-stale-owner.json`, `provider-control-host-refresh-failure.json`, `active_worker_probe_timeout_quarantine`, `owner pid/host/task/run`, `attempted pid/host`, `co-status freshness`, `owner reclaim`, `provider refresh`, `retry/resumable queue behavior`.
 - Nearby wrong interpretations to reject: already owned by `CO-41`, only `CO-317` admission/backfill, generic host restart workaround, stdin bootstrap regression.
 - Explicit non-goals: Linear mutation outside the workpad/state workflow, `tasks/index.json` edits, docs-freshness registry edits, broad control-host restart redesign, provider queue deletion during reclaim.
 

@@ -40,6 +40,7 @@ task_checklists:
   - `fetch failed`
   - `control-host-stale-owner.json`
   - `provider-control-host-refresh-failure.json`
+  - `active_worker_probe_timeout_quarantine`
   - `owner pid/host/task/run`
   - `attempted pid/host`
   - `co-status freshness`
@@ -118,7 +119,7 @@ task_checklists:
 - `control-host-stale-owner.json` records `owner pid/host/task/run`, `attempted pid/host`, stale reason, reclaim outcome, and freshness follow-up.
 - Unrecovered `fetch failed` or `refresh request timeout` after reclaim writes `provider-control-host-refresh-failure.json`.
 - Provider refresh queue state is preserved without duplicate launch, dropped work, or false terminal state.
-- Control-host supervision stops repeated same-worker restart churn during active provider refresh before `restart_required`, preserving the active provider workers instead of rotating the owner again, including retries with a retained historical `last_error`.
+- Control-host supervision returns `active_worker_probe_timeout_quarantine` to stop repeated same-worker restart churn during active provider refresh before `restart_required`, preserving the active provider workers instead of rotating the owner again, including retries with a retained historical `last_error`.
 - Focused validation covers the reopened recurrence from `CO-351`, `CO-352`, and `CO-355`.
 
 ## Validation Plan
