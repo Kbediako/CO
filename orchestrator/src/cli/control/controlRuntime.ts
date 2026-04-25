@@ -2,7 +2,10 @@ import type { RunPaths } from '../run/runPaths.js';
 import type { ControlState } from './controlState.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
-import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
+import {
+  cloneProviderWorkflowStatusPayload,
+  type ProviderWorkflowConfigStore
+} from './providerWorkflowConfigStore.js';
 import type { LinearBudgetStatus } from './linearBudgetState.js';
 import {
   readProviderPollingHealth,
@@ -20,6 +23,7 @@ import {
   type ControlCompatibilityProjectionSnapshot,
   type ControlCompatibilitySourceContext,
   type ControlCodexTotalsPayload,
+  type ControlProviderWorkflowPayload,
   type ControlProviderRetryState,
   type ControlPollingHealthPayload,
   type ControlTrackedLinearPayload,
@@ -181,7 +185,7 @@ function createControlRuntimeSnapshot(
       const tracked = resolveRuntimeTrackedPayload(selected, context.linearAdvisoryState);
       const providerIntake = buildProviderIntakeSummary(context.providerIntakeState);
       const providerWorkflow = context.providerWorkflowConfigStore
-        ? await context.providerWorkflowConfigStore.refresh()
+        ? await refreshProviderWorkflowStatusPayload(context.providerWorkflowConfigStore)
         : null;
       return {
         selected,
@@ -222,7 +226,7 @@ function createControlRuntimeSnapshot(
       const providerIntake = buildProviderIntakeSummary(context.providerIntakeState);
       const polling = readProviderPollingSnapshot(context);
       const providerWorkflow = context.providerWorkflowConfigStore
-        ? await context.providerWorkflowConfigStore.refresh()
+        ? await refreshProviderWorkflowStatusPayload(context.providerWorkflowConfigStore)
         : null;
       const running = [
         ...(isAuthoritativeSelectedCurrentRunningSource(selected, context.providerIntakeState)
@@ -328,6 +332,15 @@ function createControlRuntimeSnapshot(
       await readSelectedRunSnapshot();
     }
   };
+}
+
+async function refreshProviderWorkflowStatusPayload(
+  store: ProviderWorkflowConfigStore
+): Promise<ControlProviderWorkflowPayload> {
+  if (store.refreshStatus) {
+    return await store.refreshStatus();
+  }
+  return cloneProviderWorkflowStatusPayload(await store.refresh());
 }
 
 function readProviderPollingSnapshot(

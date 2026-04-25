@@ -16,6 +16,7 @@ import { createControlRuntime } from '../src/cli/control/controlRuntime.js';
 import { buildUiDataset } from '../src/cli/control/operatorDashboardPresenter.js';
 import { readCompatibilityState } from '../src/cli/control/observabilitySurface.js';
 import * as liveLinearAdvisoryRuntimeModule from '../src/cli/control/liveLinearAdvisoryRuntime.js';
+import type { ControlProviderWorkflowPayload } from '../src/cli/control/observabilityReadModel.js';
 import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
 import type { ProviderIntakeState } from '../src/cli/control/providerIntakeState.js';
 import type { QuestionRecord } from '../src/cli/control/questions.js';
@@ -315,6 +316,48 @@ function buildLiveLinearGraphqlResponse(): Response {
 }
 
 describe('ControlRuntime', () => {
+  it('uses the bounded provider workflow status refresh for runtime snapshots', async () => {
+    const fixture = await createFixture();
+    const statusPayload: ControlProviderWorkflowPayload = {
+      status: 'ready',
+      pipeline_id: 'provider-linear-worker',
+      source_path: join(fixture.root, 'codex.orchestrator.json'),
+      snapshot_path: join(fixture.paths.runDir, 'provider-workflow.last-known-good.json'),
+      last_reload_attempt_at: '2026-04-25T18:00:00.000Z',
+      last_success_at: '2026-04-25T18:00:00.000Z',
+      last_error_at: null,
+      last_error: null,
+      terminal_cleanup: null,
+      worker_hosts: [],
+      operator_autopilot: null
+    };
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(async () => statusPayload),
+      refresh: vi.fn(async () => {
+        throw new Error('full provider workflow refresh should not run for status reads');
+      }),
+      refreshStatus: vi.fn(async () => statusPayload),
+      snapshot: vi.fn(() => statusPayload),
+      getLaunchConfigPath: vi.fn(async () => statusPayload.snapshot_path ?? ''),
+      recordTerminalCleanupResult: vi.fn(),
+      recordOperatorAutopilotResult: vi.fn()
+    };
+
+    const runtime = createControlRuntime({
+      controlStore: fixture.controlStore,
+      questionQueue: { list: () => [] },
+      paths: fixture.paths,
+      linearAdvisoryState: { tracked_issue: null },
+      providerWorkflowConfigStore
+    });
+
+    const selectedSnapshot = await runtime.snapshot().readSelectedRunSnapshot();
+
+    expect(selectedSnapshot.providerWorkflow?.pipeline_id).toBe('provider-linear-worker');
+    expect(providerWorkflowConfigStore.refreshStatus).toHaveBeenCalledTimes(1);
+    expect(providerWorkflowConfigStore.refresh).not.toHaveBeenCalled();
+  });
+
   it('reads max concurrent agents from control feature toggles into the compatibility projection', async () => {
     const fixture = await createFixture({
       featureToggles: {

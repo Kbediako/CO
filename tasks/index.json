@@ -15147,6 +15147,31 @@
         "agent_task": ".agent/task/linear-co-373-cloudpreflight-flake.md",
         "docs": "docs/TECH_SPEC-linear-co-373-cloudpreflight-flake.md"
       }
+    },
+    {
+      "id": "20260426-linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe",
+      "title": "CO-376 co-status authenticated dataset bounds",
+      "relates_to": "tasks/tasks-linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-26",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-26",
+          "status": "produced",
+          "manifest": ".runs/linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe-docs-packet/cli/2026-04-25T17-57-28-787Z-d2c4e692/manifest.json",
+          "source_anchor": "ctx:sha256:2ad2a0ba5ecbafe9bb0b7cb2875952678949f28fbb367b10bee33ce33466e560#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-376 as an authenticated `co-status --format json` / `/ui/data.json` dataset-bound issue: the hot path must stop processing unbounded audit/operator history while provider workers are active, without timeout-only fixes or disabling provider workers/operator autopilot. Parent owns implementation, focused tests, before/after timing and response-size evidence, supervisor status/restart-count evidence, LaunchAgent posture or migration-path evidence, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe-co-status-authenticated-dataset-bounds.md",
+        "task": "tasks/tasks-linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe.md",
+        "agent_task": ".agent/task/linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe.md"
+      }
     }
   ]
 }
