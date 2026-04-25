@@ -787,14 +787,14 @@
       }
     },
     {
-      "id": "20260423-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c",
-      "title": "CO-330 stale control-host owner reclaim and provider refresh retry recovery",
+      "id": "20260425-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c",
+      "title": "CO-330 reopened stale-owner/provider-refresh recurrence after PR #624",
       "relates_to": "tasks/tasks-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
       "risk": "high",
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-23",
+      "last_review": "2026-04-25",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -803,6 +803,14 @@
           "manifest": ".runs/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c-co330-docs/cli/2026-04-23T13-50-23-422Z-4c9061c1/manifest.json",
           "source_anchor": "ctx:sha256:dd72505af8602844d9a722f7d0cac31d98fe08f25d84adb745ed3f979b6c8cf8#chunk:c000001",
           "summary": "Docs-first packet created for CO-330 stale control-host owner reclaim and provider refresh retry recovery. The parent source-0 payload is present and records provider-worker run metadata/provenance; the packet preserves the Linear issue contract: protect stale_control_host_owner, control-host, provider-linear-worker could not request control-host refresh, refresh request timeout, fetch failed, control-host-stale-owner.json, owner reclaim, provider refresh, and retry/resumable queue behavior; reject CO-41 ownership, CO-317-only admission/backfill, generic host restart workaround, stdin bootstrap regression; reference CO-152 stale-owner ownership and CO-119 refresh-timeout recovery only as prior related context."
+        },
+        "reopened_recurrence_docs_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-25",
+          "status": "produced_parent_applied_after_stale_accept",
+          "manifest": ".runs/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c-co330-recurrence-docs/cli/2026-04-25T12-07-04-429Z-22659fae/manifest.json",
+          "source_anchor": "ctx:sha256:d14a6cd66c90db64bf91248f6f68d329bf0b540a68b4243aec21a6770b4dce3b#chunk:c000001",
+          "summary": "Docs packet refreshed for the reopened CO-330 recurrence after PR #624. The packet preserves stale_control_host_owner, stale_reclaimed, control-host, fetch failed, refresh request timeout, owner pid/host/task/run, attempted pid/host, co-status freshness, CO-351, CO-352, and CO-355; parent reviewed and applied the child patch after helper acceptance invalidated on Linear updated_at staleness."
         }
       },
       "paths": {

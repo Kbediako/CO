@@ -582,14 +582,12 @@ export function evaluateControlHostSupervisionProbeTimeoutDiagnostic(
   if (!diagnostic || diagnostic.running_workers.length === 0) {
     return null;
   }
-  if (!isProviderRefreshLifecycleRestartRequiredDiagnostic(diagnostic.polling)) {
-    return null;
-  }
   if (!isCurrentControlHostSupervisionPollingDiagnostic(diagnostic.polling, options.minPollingUpdatedAt)) {
     return null;
   }
-  const pollingReason = diagnostic.polling?.reason ?? diagnostic.polling?.last_error ?? null;
-  if (!pollingReason) {
+  const restartRequired = isProviderRefreshLifecycleRestartRequiredDiagnostic(diagnostic.polling);
+  const activeRefresh = isActiveProviderRefreshProbeTimeoutDiagnostic(diagnostic.polling);
+  if (!restartRequired && !activeRefresh) {
     return null;
   }
   if (hasAvailableProviderWorkerCapacity(diagnostic)) {
@@ -645,6 +643,21 @@ function isProviderRefreshLifecycleRestartRequiredDiagnostic(
     polling.reason === 'provider_refresh_lifecycle_stuck' ||
     polling.last_error === 'provider_refresh_lifecycle_stuck'
   );
+}
+
+function isActiveProviderRefreshProbeTimeoutDiagnostic(
+  polling: ControlHostSupervisionPollingDiagnostic | null
+): boolean {
+  if (!polling || polling.checking !== true) {
+    return false;
+  }
+  if (polling.restart_required === true || polling.stuck === true) {
+    return false;
+  }
+  if (polling.reason !== null) {
+    return false;
+  }
+  return polling.refresh_phase?.startsWith('refresh:') === true;
 }
 
 function isCurrentControlHostSupervisionPollingDiagnostic(
@@ -764,9 +777,24 @@ function buildControlHostSupervisionRestartSignature(
   // Quarantine repeated restart churn on the stable active-worker series, not on transient
   // refresh checkpoints that can legitimately drift within one stuck refresh cycle.
   return JSON.stringify({
-    reason: diagnostic.polling.reason ?? diagnostic.polling.last_error ?? null,
+    reason: buildControlHostSupervisionRestartReasonKey(diagnostic.polling),
     worker_series: workerSeries
   });
+}
+
+function buildControlHostSupervisionRestartReasonKey(
+  polling: ControlHostSupervisionPollingDiagnostic
+): string | null {
+  if (polling.reason) {
+    return polling.reason;
+  }
+  if (isActiveProviderRefreshProbeTimeoutDiagnostic(polling)) {
+    return 'active_provider_refresh_probe_timeout';
+  }
+  if (isProviderRefreshLifecycleRestartRequiredDiagnostic(polling)) {
+    return 'provider_refresh_lifecycle_stuck';
+  }
+  return polling.last_error ?? null;
 }
 
 function buildControlHostSupervisionWorkerSeriesKey(
