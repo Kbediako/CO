@@ -310,7 +310,8 @@ export async function readCurrentCodexPosture(repoRoot, policy = {}) {
     /delegated subagent and review surfaces on [^;\n]*; `([^`]+)` is currently unsupported there/i.exec(content)?.[1] ??
     /delegated(?: subagent)?(?: and|\/) review surfaces on [^\n]* validates `([^`]+)`/i.exec(content)?.[1] ??
     null;
-  const cliVersion = /Codex CLI\s+\(?`?([0-9]+\.[0-9]+\.[0-9]+)`?\)?/.exec(content)?.[1] ?? null;
+  const cliVersion =
+    /Codex CLI\s+\(?`?([0-9]+\.[0-9]+\.[0-9]+)`?\)?/.exec(content)?.[1] ?? null;
   return {
     source_path: sourcePath,
     cli_version: cliVersion,
@@ -328,8 +329,8 @@ function extractAllowedCliCompatibilityVersions(content, currentCliVersion) {
   const scanContent = extractCurrentPostureContent(content);
   for (const line of scanContent.split(/\r?\n/)) {
     if (
-      !/compatibility/i.test(line) ||
-      !/(separately\s+rebaselined|downstream-smoke|release-facing)/i.test(line)
+      !/(compatibility|app-server|control-host|proof use)/i.test(line) ||
+      !/(separately\s+rebaselined|downstream-smoke|release-facing|app-server|control-host|proof use)/i.test(line)
     ) {
       continue;
     }

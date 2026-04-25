@@ -3,7 +3,7 @@
 ## Summary
 - Goal: complete CO-355 by aligning public marketplace docs, pack-smoke behavior/tests, and version-policy release-smoke pin posture with Codex CLI `0.125.0`.
 - Scope: docs-first packet, current CLI/npm evidence, same-issue child lane for pack-smoke behavior/tests, parent docs/version-policy/workflow integration, validation, review, and PR handoff.
-- Assumptions: local `/opt/homebrew/bin/codex` is the current canary binary for command-surface evidence, npm latest is verified during the lane, and release-facing pins move only if `npm run pack:smoke` canary evidence passes on the final candidate.
+- Assumptions: captured Codex CLI `0.125.0` command-help evidence is the canary input for command-surface decisions, npm latest is verified during the lane, and release-facing pins move only if `npm run pack:smoke` canary evidence passes on the final candidate.
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward: `CO-355`, Codex CLI `0.125.0`, `codex plugin marketplace add`, `upgrade`, `remove`, `pack:smoke`, `README.md`, `docs/public/downstream-setup.md`, `docs/guides/codex-version-policy.md`, `scripts/pack-smoke.mjs`, `tests/pack-smoke.spec.ts`, `tests/marketplace-launcher.spec.ts`, `@openai/codex@0.125.0`.
@@ -30,6 +30,9 @@
   - `codex plugin marketplace remove --help`
   - `codex marketplace add --help` expected failure on `0.125.0`
   - focused pack-smoke / marketplace tests
+  - `node scripts/runtime-mode-canary.mjs` before any broader runtime posture promotion, or an exact blocker/hold note if CO-355 remains marketplace-only
+  - `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary` before any broader cloud/active-target promotion, or an exact blocker/hold note if CO-355 remains marketplace-only
+  - `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary` before any broader cloud fallback promotion, or an exact blocker/hold note if CO-355 remains marketplace-only
   - `node scripts/delegation-guard.mjs`
   - `node scripts/spec-guard.mjs --dry-run`
   - `npm run build`

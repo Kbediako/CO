@@ -403,7 +403,6 @@ function formatHelpCommand(command, args) {
 }
 
 export async function resolveMarketplaceCommandSupport(command, options = {}, probe = commandSucceeds) {
-  let incompletePluginSupport = null;
   for (const candidate of MARKETPLACE_COMMAND_CANDIDATES) {
     if (!(await probe(command, candidate.helpArgs, options))) {
       continue;
@@ -421,14 +420,14 @@ export async function resolveMarketplaceCommandSupport(command, options = {}, pr
       helpArgs: [...candidate.helpArgs],
       missingHelpCommands
     };
+    if (candidate.surface === 'plugin-marketplace') {
+      return support;
+    }
     if (missingHelpCommands.length === 0) {
       return support;
     }
-    if (candidate.surface === 'plugin-marketplace') {
-      incompletePluginSupport = support;
-    }
   }
-  return incompletePluginSupport;
+  return null;
 }
 
 export function resolveMarketplaceSmokePrerequisite({

@@ -553,6 +553,61 @@ describe('docs hygiene tooling', () => {
     ).toBeUndefined();
   });
 
+  it('allows a task-scoped app-server compatibility version when the current posture is still present', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-posture-appserver-version-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['codex-cli-version']
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'docs', 'guides', 'codex-version-policy.md'),
+      [
+        '# Codex Version Policy (CO)',
+        '',
+        '## Current Posture',
+        '- Current CO compatibility/adoption target remains stable Codex CLI `0.117.0` for the current upstream-aligned main baseline.',
+        '- App-server/control-host proof use is task-scoped to Codex CLI `0.125.0` after CO-351 evidence; provider runtime remains gated.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current CO compatibility/adoption target is stable Codex CLI `0.117.0`.',
+        '- Codex CLI `0.125.0` app-server control-host proof use remains task-scoped.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(
+      errors.find((error) => error.file === 'README.md' && error.rule === 'doc-posture-stale')
+    ).toBeUndefined();
+  });
+
   it('reports a clear error when only compatibility Codex CLI versions are mentioned', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-posture-compatibility-only-'));
     createdDirs.push(repoRoot);

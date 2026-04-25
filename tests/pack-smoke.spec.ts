@@ -1089,26 +1089,31 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     ]);
 
     const partialPluginProbeCalls: string[] = [];
-    const partialPluginLegacySupport = await resolveMarketplaceCommandSupport(
+    const partialPluginSupport = await resolveMarketplaceCommandSupport(
       'codex-0.121',
       {},
       async (_command: string, args: string[]) => {
         partialPluginProbeCalls.push(args.join(' '));
-        return args.join(' ') === 'plugin marketplace add --help' || args.join(' ') === 'marketplace add --help';
+        return (
+          args.join(' ') === 'plugin marketplace add --help' ||
+          args.join(' ') === 'marketplace add --help'
+        );
       }
     );
 
-    expect(partialPluginLegacySupport).toMatchObject({
-      surface: 'legacy-marketplace',
-      displayName: 'codex marketplace add',
-      addArgs: ['marketplace', 'add'],
-      missingHelpCommands: []
+    expect(partialPluginSupport).toMatchObject({
+      surface: 'plugin-marketplace',
+      displayName: 'codex plugin marketplace add',
+      addArgs: ['plugin', 'marketplace', 'add'],
+      missingHelpCommands: [
+        'codex-0.121 plugin marketplace upgrade --help',
+        'codex-0.121 plugin marketplace remove --help'
+      ]
     });
     expect(partialPluginProbeCalls).toEqual([
       'plugin marketplace add --help',
       'plugin marketplace upgrade --help',
-      'plugin marketplace remove --help',
-      'marketplace add --help'
+      'plugin marketplace remove --help'
     ]);
   });
 

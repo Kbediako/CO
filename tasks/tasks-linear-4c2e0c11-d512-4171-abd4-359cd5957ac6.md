@@ -16,7 +16,7 @@
 
 ## Source / Assumptions
 - [x] Authoritative CO-355 issue body and live workflow states were read via `linear issue-context`. Evidence: packaged `linear issue-context --issue-id 4c2e0c11-d512-4171-abd4-359cd5957ac6`.
-- [x] Current CLI/npm evidence was started before implementation. Evidence: local `/opt/homebrew/bin/codex` help output and `npm view @openai/codex dist-tags.latest version --json`.
+- [x] Current CLI/npm evidence was started before implementation. Evidence: captured `codex plugin marketplace add|upgrade|remove --help`, expected `codex marketplace add --help` failure, and `npm view @openai/codex dist-tags.latest version --json` in `out/linear-4c2e0c11-d512-4171-abd4-359cd5957ac6/manual/workpad.md`.
 - [x] Required parallelization decision was recorded and same-issue child lane launched. Evidence: Linear parallelization event and child lane `pack-smoke-marketplace-0125`.
 
 ## Implementation
@@ -29,6 +29,8 @@
 - [x] `codex plugin marketplace add --help`, `upgrade --help`, and `remove --help` captured.
 - [x] `codex marketplace add --help` captured as expected failure on `0.125.0`.
 - [x] npm latest check captured (`@openai/codex` `0.125.0`).
+- [x] Runtime-mode / cloud-contract boundary recorded. Evidence: `docs/guides/codex-version-policy.md` holds any broader `0.125.0` active-posture or `cloud-canary` promotion until `node scripts/runtime-mode-canary.mjs`, the required cloud contract, and the fallback cloud contract pass in the owning lane; CO-355 only moves release-facing downstream-smoke pins after pack-smoke evidence.
+- [ ] Final-head PR canary gate pass required before review handoff. Evidence: pending after review-feedback fixes; any earlier GitHub `Cloud Canary` pass is prior-head evidence only and must not be treated as final-head completion.
 - [x] Focused pack-smoke / marketplace tests. Evidence: `npx vitest run tests/pack-smoke.spec.ts tests/docs-hygiene.spec.ts` passed 50 tests after CodeRabbit feedback fixes.
 - [x] `node scripts/delegation-guard.mjs`. Evidence: OK with 4 subagent manifests.
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `Spec guard: OK`.
