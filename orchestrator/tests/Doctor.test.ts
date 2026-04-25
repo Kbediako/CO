@@ -27,8 +27,14 @@ function testFingerprint(value: string): string {
     .slice(0, 16)}`;
 }
 
-async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<string> {
+async function writeFakeCodexBinary(
+  dir: string,
+  featureLine: string,
+  options: { exitCode?: number; stderr?: string } = {}
+): Promise<string> {
   const binPath = join(dir, 'codex');
+  const featureOutput = featureLine.length > 0 ? `  printf '%s\n' ${JSON.stringify(featureLine)}` : '';
+  const stderrOutput = options.stderr ? `  printf '%s\n' ${JSON.stringify(options.stderr)} >&2` : '';
   await writeFile(
     binPath,
     [
@@ -38,8 +44,9 @@ async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<s
       '  exit 0',
       'fi',
       'if [ "$1" = "features" ] && [ "$2" = "list" ]; then',
-      `  echo "${featureLine}"`,
-      '  exit 0',
+      featureOutput,
+      stderrOutput,
+      `  exit ${options.exitCode ?? 0}`,
       'fi',
       'if [ "$1" = "cloud" ] && [ "$2" = "--help" ]; then',
       '  exit 0',
@@ -49,7 +56,7 @@ async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<s
       '  exit 0',
       'fi',
       'exit 0'
-    ].join('\n'),
+    ].filter(Boolean).join('\n'),
     'utf8'
   );
   await chmod(binPath, 0o755);
@@ -159,6 +166,39 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
         delete process.env.CODEX_HOME;
       } else {
         process.env.CODEX_HOME = originalCodexHome;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('skips missing-config max_threads recommendation when Codex feature output enables multi_agent_v2', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-missing-config-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempHome, 'multi_agent_v2 experimental true');
+    try {
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('advisory');
+      expect(result.codex_defaults.config.status).toBe('missing');
+      expect(result.codex_defaults.checks.max_threads.status).toBe('skipped');
+      expect(result.codex_defaults.checks.max_threads.actual).toBeNull();
+      expect(result.codex_defaults.checks.max_threads.detail).toContain('omit agents.max_threads');
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('agents.max_threads: skipped');
+      expect(summary).toContain('features.multi_agent_v2=true; omit agents.max_threads');
+      expect(summary).not.toContain('agents.max_threads: advisory');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
       }
       await rm(tempHome, { recursive: true, force: true });
     }
@@ -408,6 +448,259 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
         delete process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
       } else {
         process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON = originalDebugModelsJson;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('skips max_threads recommendation when multi_agent_v2 is enabled and the key is absent', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[features]',
+          'multi_agent_v2 = true',
+          '',
+          '[agents]'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('ok');
+      expect(result.codex_defaults.checks.max_threads.status).toBe('skipped');
+      expect(result.codex_defaults.checks.max_threads.actual).toBeNull();
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('agents.max_threads: skipped');
+      expect(summary).toContain('features.multi_agent_v2=true; omit agents.max_threads');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('flags max_threads as invalid when multi_agent_v2 is enabled and the key is present', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-invalid-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[features]',
+          'multi_agent_v2 = true',
+          '',
+          '[agents]',
+          'max_threads = 12'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('advisory');
+      expect(result.codex_defaults.checks.max_threads.status).toBe('advisory');
+      expect(result.codex_defaults.checks.max_threads.actual).toBe(12);
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('features.multi_agent_v2=true; remove agents.max_threads');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('flags max_threads as invalid under multi_agent_v2 even when the value is nonnumeric', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-string-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[features]',
+          'multi_agent_v2 = true',
+          '',
+          '[agents]',
+          'max_threads = "12"'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('advisory');
+      expect(result.codex_defaults.checks.max_threads.status).toBe('advisory');
+      expect(result.codex_defaults.checks.max_threads.actual).toBeNull();
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('features.multi_agent_v2=true; remove agents.max_threads');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('uses Codex feature output to apply multi_agent_v2 max_threads rules', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-feature-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempHome, 'multi_agent_v2 experimental true');
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[agents]'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('ok');
+      expect(result.codex_defaults.checks.max_threads.status).toBe('skipped');
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('features.multi_agent_v2=true; omit agents.max_threads');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('keeps max_threads baseline when the live feature probe explicitly disables multi_agent_v2', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-false-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempHome, 'multi_agent_v2 experimental false', {
+      stderr: 'invalid config: agents.max_threads is rejected when features.multi_agent_v2=true'
+    });
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[features]',
+          'multi_agent_v2 = true',
+          '',
+          '[agents]',
+          'max_threads = 12'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('ok');
+      expect(result.codex_defaults.checks.max_threads.status).toBe('ok');
+      expect(result.codex_defaults.checks.max_threads.actual).toBe(12);
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('agents.max_threads: ok (actual: 12, expected >= 12)');
+      expect(summary).not.toContain('features.multi_agent_v2=true; omit agents.max_threads');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('flags max_threads when Codex rejects the current config before feature flags can be listed', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-reject-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempHome, '', {
+      exitCode: 1,
+      stderr: 'invalid config: agents.max_threads is rejected when features.multi_agent_v2=true'
+    });
+    try {
+      await writeFile(join(tempHome, 'config.toml'), ['[agents]', 'max_threads = 12'].join('\n'), 'utf8');
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('advisory');
+      expect(result.codex_defaults.checks.max_threads.status).toBe('advisory');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
       }
       await rm(tempHome, { recursive: true, force: true });
     }

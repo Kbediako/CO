@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260425-linear-bf27af4a-01b6-4006-a39b-a9c668be8548",
+      "title": "CO-354 multi_agent_v2 thread-limit safe defaults",
+      "relates_to": "tasks/tasks-linear-bf27af4a-01b6-4006-a39b-a9c668be8548.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-25",
+      "paths": {
+        "spec": "tasks/specs/linear-bf27af4a-01b6-4006-a39b-a9c668be8548.md",
+        "task": "tasks/tasks-linear-bf27af4a-01b6-4006-a39b-a9c668be8548.md",
+        "agent_task": ".agent/task/linear-bf27af4a-01b6-4006-a39b-a9c668be8548.md",
+        "docs": "docs/TECH_SPEC-linear-bf27af4a-01b6-4006-a39b-a9c668be8548.md"
+      }
+    },
+    {
       "id": "20260425-linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7",
       "title": "CO-360 task registry docs pointer TECH_SPEC mirror alignment",
       "relates_to": "tasks/tasks-linear-6b3b8bf4-63fa-44e8-a182-e2e20209aca7.md",
