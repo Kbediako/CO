@@ -14932,6 +14932,31 @@
           "ACTION_PLAN": "docs/ACTION_PLAN-linear-b2712a15-b04f-4a4e-aac8-35f614abb01b.md"
         }
       }
+    },
+    {
+      "id": "20260425-linear-dc23c6fa-5080-4665-89c2-f657983901bd",
+      "title": "CO-359 appserver child-lane runtime classification after pack smoke validation stall",
+      "relates_to": "tasks/tasks-linear-dc23c6fa-5080-4665-89c2-f657983901bd.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-25",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-25",
+          "status": "produced",
+          "manifest": ".runs/linear-dc23c6fa-5080-4665-89c2-f657983901bd-docs-packet/cli/2026-04-25T03-44-14-263Z-48fc482a/manifest.json",
+          "source_anchor": "ctx:sha256:ec738e2d6838b7a07389e50b49cb93adb3d410ead5a7d9e087dd8760c790b635#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-359 as a focused runtime regression/classification lane for providerLinearChildLaneRunner under runtime_mode=appserver. pack-smoke-current-validation-r2 is evidence only: the observed chain is child manifest in_progress after appserver startup, no assistant follow-up, no scoped Vitest, child-lane invalidation, and codex_exit_1. Parent owns runtime classification, implementation, tests, Linear/workpad reconciliation, PR, and merge; non-goals preserve no marketplace command changes, no model posture changes, no broad control-host rewrite, no bypass of same-issue child-lane proof/patch validation, and no weakening of parent-dirty fail-closed behavior."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-dc23c6fa-5080-4665-89c2-f657983901bd.md",
+        "task": "tasks/tasks-linear-dc23c6fa-5080-4665-89c2-f657983901bd.md",
+        "docs": "docs/TECH_SPEC-linear-dc23c6fa-5080-4665-89c2-f657983901bd.md"
+      }
     }
   ]
 }

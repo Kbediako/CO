@@ -10,6 +10,7 @@ import {
   __test__ as childLaneRunnerTest,
   runProviderLinearChildLane
 } from '../src/cli/providerLinearChildLaneRunner.js';
+import { PROVIDER_LINEAR_CHILD_LANE_DIAGNOSTICS_FILENAME } from '../src/cli/providerLinearWorkerRunner.js';
 
 let tempRoot: string | null = null;
 
@@ -314,7 +315,27 @@ describe('provider linear child lane runner', () => {
     );
 
     const finalConfig = await readFile(configPath, 'utf8');
+    const diagnostics = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_CHILD_LANE_DIAGNOSTICS_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    const finalManifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>;
     expect(proof.lane_workspace_path).toBe(join(parentWorkspacePath, '.child-lanes', 'docs-child-run-1'));
+    expect(diagnostics).toMatchObject({
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-307',
+      task_id: 'linear-lin-issue-1-docs',
+      run_id: 'child-run-1',
+      parent_run_id: 'provider-run-1',
+      stream: 'docs',
+      provider_linear_child_lane_runtime_requested_mode: 'cli',
+      provider_linear_child_lane_runtime_selected_mode: 'cli',
+      provider_linear_child_lane_runtime_source: 'flag',
+      provider_linear_child_lane_runtime_provider: 'CliRuntimeProvider',
+      provider_linear_child_lane_runtime_fallback_occurred: false,
+      provider_linear_child_lane_runtime_event: 'codex_exec_completed',
+      provider_linear_child_lane_exec_exit_code: 0
+    });
+    expect(finalManifest.provider_linear_child_lane_runtime_event).toBeUndefined();
     expect(finalConfig).toContain(`[projects."${parentWorkspacePath}"]`);
     expect(finalConfig).not.toContain(`[projects."${proof.lane_workspace_path}"]`);
     expect(finalConfig).toContain(`[projects."${join(parentWorkspacePath, '.child-lanes', 'tests-sibling')}"]`);
