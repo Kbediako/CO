@@ -4513,7 +4513,7 @@ function providerWorkerSessionJsonlLineTimestamp(line: string): string | null {
   if (!parsed) {
     return null;
   }
-  return normalizeOptionalString(parsed.timestamp);
+  return extractProviderWorkerEventSummary(parsed).at;
 }
 
 function isProviderWorkerSessionBootstrapLineAtOrAfter(
@@ -6683,7 +6683,10 @@ function buildProviderLinearWorkerHydratedChildLaneSummary(
   childLane: ProviderLinearWorkerChildLaneRecord,
   candidate: ProviderLinearWorkerChildLaneManifestHydrationCandidate
 ): string {
-  if (candidate.summary?.startsWith('Child lane completed')) {
+  if (
+    candidate.summary &&
+    (candidate.status === 'stale_invalidation_candidate' || candidate.summary.startsWith('Child lane completed'))
+  ) {
     return candidate.summary;
   }
   const label = childLane.stream || childLane.task_id || candidate.runId;

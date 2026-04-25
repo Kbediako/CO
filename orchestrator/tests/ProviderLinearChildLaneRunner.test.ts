@@ -327,6 +327,11 @@ describe('provider linear child lane runner', () => {
       run_id: 'child-run-1',
       parent_run_id: 'provider-run-1',
       stream: 'docs',
+      provider_linear_child_lane_runtime_requested_mode: 'cli',
+      provider_linear_child_lane_runtime_selected_mode: 'cli',
+      provider_linear_child_lane_runtime_source: 'flag',
+      provider_linear_child_lane_runtime_provider: 'CliRuntimeProvider',
+      provider_linear_child_lane_runtime_fallback_occurred: false,
       provider_linear_child_lane_runtime_event: 'codex_exec_completed',
       provider_linear_child_lane_exec_exit_code: 0
     });

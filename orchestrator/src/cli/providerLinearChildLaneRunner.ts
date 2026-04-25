@@ -2027,6 +2027,17 @@ export async function runProviderLinearChildLane(
     const runtimeContext = await resolveChildLaneRuntimeContext(env, laneWorkspacePath, context.runId);
     logger.info(`[provider-linear-child-lane-runtime] ${formatRuntimeSelectionSummary(runtimeContext.runtime)}`);
     await writeProviderLinearChildLaneDiagnostics(context, {
+      provider_linear_child_lane_runtime_requested_mode: runtimeContext.runtime.requested_mode,
+      provider_linear_child_lane_runtime_selected_mode: runtimeContext.runtime.selected_mode,
+      provider_linear_child_lane_runtime_source: runtimeContext.runtime.source,
+      provider_linear_child_lane_runtime_provider: runtimeContext.runtime.provider,
+      provider_linear_child_lane_runtime_session_id: runtimeContext.runtime.runtime_session_id,
+      provider_linear_child_lane_runtime_fallback_occurred: runtimeContext.runtime.fallback.occurred,
+      provider_linear_child_lane_runtime_fallback_code: runtimeContext.runtime.fallback.code,
+      provider_linear_child_lane_runtime_fallback_reason: runtimeContext.runtime.fallback.reason,
+      provider_linear_child_lane_runtime_fallback_from_mode: runtimeContext.runtime.fallback.from_mode,
+      provider_linear_child_lane_runtime_fallback_to_mode: runtimeContext.runtime.fallback.to_mode,
+      provider_linear_child_lane_runtime_fallback_checked_at: runtimeContext.runtime.fallback.checked_at,
       provider_linear_child_lane_runtime_event: 'runtime_selected',
       provider_linear_child_lane_runtime_event_at: deps.now()
     });
