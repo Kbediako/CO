@@ -120,6 +120,31 @@
       }
     },
     {
+      "id": "20260425-linear-17cc0dd8-5a82-45a6-b0c0-cf0062797491",
+      "title": "Tighten cloud preflight for unusable configured environment ids",
+      "relates_to": "tasks/tasks-linear-17cc0dd8-5a82-45a6-b0c0-cf0062797491.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-25",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-25",
+          "status": "produced_then_invalidated_by_linear_updated_at",
+          "manifest": ".runs/linear-17cc0dd8-5a82-45a6-b0c0-cf0062797491-docs-packet/cli/2026-04-25T02-58-41-550Z-a1fc12a9/manifest.json",
+          "summary": "The same-issue docs child lane produced the six-file docs-first packet, then the accept helper invalidated it after Linear updated_at changed during parent progress updates; parent verified the patch and reapplied the same docs-only packet under parent ownership before implementation."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-17cc0dd8-5a82-45a6-b0c0-cf0062797491.md",
+        "task": "tasks/tasks-linear-17cc0dd8-5a82-45a6-b0c0-cf0062797491.md",
+        "agent_task": ".agent/task/linear-17cc0dd8-5a82-45a6-b0c0-cf0062797491.md",
+        "docs": "docs/TECH_SPEC-linear-17cc0dd8-5a82-45a6-b0c0-cf0062797491.md"
+      }
+    },
+    {
       "id": "20260424-linear-56c2656d-853f-43f9-91af-455970800060",
       "title": "CO-356 archive automation Core Lane checks",
       "relates_to": "tasks/tasks-linear-56c2656d-853f-43f9-91af-455970800060.md",

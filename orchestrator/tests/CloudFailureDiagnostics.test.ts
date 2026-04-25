@@ -22,10 +22,82 @@ describe('diagnoseCloudFailure', () => {
     expect(diagnosis.diagnostic_category).toBe('env_config');
   });
 
+  it('classifies configured environment probe wrapper signals with precedence', () => {
+    const cases = [
+      [
+        "Error: environment 'env-missing' not found; run `codex cloud` to list available environments",
+        'configuration',
+        'environment_not_found'
+      ],
+      ['Error: environment env-missing not found', 'configuration', 'environment_not_found'],
+      [
+        "Configured CODEX_CLOUD_ENV_ID 'env-missing' could not be verified by codex cloud before codex cloud exec: HTTP 503 service unavailable",
+        'connectivity',
+        'network_connectivity'
+      ],
+      [
+        "Configured CODEX_CLOUD_ENV_ID 'env-503' could not be verified by codex cloud before codex cloud exec: no output",
+        'configuration',
+        'environment_unavailable'
+      ],
+      ...['env-network', 'env-timeout', 'env-enotfound', 'env-econnreset'].map((environmentId) => [
+        `Configured CODEX_CLOUD_ENV_ID '${environmentId}' could not be verified by codex cloud before codex cloud exec: no output`,
+        'configuration',
+        'environment_unavailable'
+      ]),
+      [
+        "Configured CODEX_CLOUD_ENV_ID 'env-prod' could not be verified by codex cloud before codex cloud exec: network timeout while contacting the endpoint",
+        'connectivity',
+        'network_connectivity'
+      ],
+      [
+        "Configured CODEX_CLOUD_ENV_ID 'env-prod' could not be verified by codex cloud before codex cloud exec: Timed out after 10s.",
+        'connectivity',
+        'network_connectivity'
+      ],
+      [
+        "Configured CODEX_CLOUD_ENV_ID 'env-prod' could not be verified by codex cloud before codex cloud exec: forbidden for active account",
+        'credentials',
+        'auth_mismatch'
+      ],
+      [
+        "Configured CODEX_CLOUD_ENV_ID 'env-prod' could not be verified by codex cloud before codex cloud exec: rate limit exceeded",
+        'execution',
+        'quota_rate_limit'
+      ]
+    ] as const;
+
+    for (const [error, category, diagnosticCategory] of cases) {
+      const diagnosis = diagnoseCloudFailure({
+        status: 'failed',
+        error,
+        statusDetail: null
+      });
+
+      expect(diagnosis.category).toBe(category);
+      expect(diagnosis.diagnostic_category).toBe(diagnosticCategory);
+    }
+
+    const connectivityError = cases.find(([, , diagnosticCategory]) => diagnosticCategory === 'network_connectivity')?.[0];
+    expect(connectivityError).toBeTruthy();
+    for (const [error, category, diagnosticCategory] of [
+      [connectivityError ?? '', 'connectivity', 'network_connectivity'],
+      ['forbidden for active account', 'credentials', 'auth_mismatch'],
+      ['HTTP 400 missing_github_connector_link: GitHub connection not found for user', 'credentials', 'cloud_connector_auth_drift'],
+      ['rate limit exceeded', 'execution', 'quota_rate_limit']
+    ] as const) {
+      const diagnosis = diagnoseCloudFailure({ status: 'failed', error, statusDetail: 'environment_unavailable' });
+      expect(diagnosis.category).toBe(category);
+      expect(diagnosis.diagnostic_category).toBe(diagnosticCategory);
+    }
+  });
+
   it('matches machine-readable cloud diagnostic categories', () => {
     const cases = new Map([
       ['env_config', 'env_config'],
       ['no_environment_id', 'env_config'],
+      ['environment_not_found', 'environment_not_found'],
+      ['environment_unavailable', 'environment_unavailable'],
       ['auth_mismatch', 'auth_mismatch'],
       ['cloud_connector_auth_drift', 'cloud_connector_auth_drift'],
       ['missing_github_connector_link', 'cloud_connector_auth_drift'],
