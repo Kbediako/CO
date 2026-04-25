@@ -224,6 +224,7 @@ type PersistedSessionLogHydrationState = {
   trailing_text: string;
   bootstrap_pending: boolean;
   proof_signature: string;
+  id_rewind_signature?: string | null;
 };
 
 function createTrackedIssue(overrides: Partial<LiveLinearTrackedIssue> = {}): LiveLinearTrackedIssue {
@@ -3715,6 +3716,1227 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     ).toBe(true);
   }, providerLinearWorkerRunnerTestTimeoutMs);
 
+  it('records appserver supervision proof with sticky environment and retained JSONL truth', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Merging',
+          state_type: 'started',
+          assignee_id: null,
+          assignee_name: null
+        })
+      )
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed',
+          assignee_id: null,
+          assignee_name: null
+        })
+      );
+
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+        turnIndex: 1
+      });
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-app"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-app-1"}}',
+          '{"type":"event_msg","payload":{"type":"agent_message","message":"appserver canary complete"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-app-1","timestamp":"2026-03-21T09:00:01.500Z"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_CLOUD_ENV_ID: 'env-appserver-proof'
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () =>
+          createAppServerRuntimeContext({
+            runtime_session_id: 'appserver-run-child'
+          })
+        ),
+        execRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof).toMatchObject({
+      thread_id: 'thread-app',
+      latest_turn_id: 'turn-app-1',
+      latest_session_id: 'thread-app-turn-app-1',
+      runtime: {
+        requested_mode: 'appserver',
+        selected_mode: 'appserver',
+        provider: 'AppServerRuntimeProvider',
+        runtime_session_id: 'appserver-run-child',
+        fallback: {
+          occurred: false
+        }
+      },
+      appserver_supervision: {
+        selected_runtime: {
+          requested_mode: 'appserver',
+          selected_mode: 'appserver',
+          provider: 'AppServerRuntimeProvider',
+          runtime_session_id: 'appserver-run-child'
+        },
+        supervision_command: 'codex_exec',
+        appserver_session_id: 'appserver-run-child',
+        thread_id: 'thread-app',
+        latest_turn_id: 'turn-app-1',
+        latest_session_id: 'thread-app-turn-app-1',
+        sticky_environment_id: 'env-appserver-proof',
+        sticky_environment_status: 'proven',
+        sticky_environment_blocker: null,
+        turn_persistence_status: 'blocked',
+        turn_persistence_blocker: 'session_log_hydration_missing',
+        resume_status: 'not_requested',
+        fork_status: 'blocked',
+        fork_blocker: 'appserver_fork_probe_not_implemented',
+        jsonl_truth_retained: true,
+        session_log_truth_retained: true
+      }
+    });
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      appserver_supervision: {
+        sticky_environment_status: 'proven',
+        turn_persistence_status: 'blocked',
+        turn_persistence_blocker: 'session_log_hydration_missing',
+        fork_blocker: 'appserver_fork_probe_not_implemented'
+      }
+    });
+  });
+
+  it('preserves live session-log ids when final stdout parse supplies the turn', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-app.jsonl');
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Merging',
+          state_type: 'started',
+          assignee_id: null,
+          assignee_name: null
+        })
+      )
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed',
+          assignee_id: null,
+          assignee_name: null
+        })
+      );
+
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+        turnIndex: 1
+      });
+      await mkdir(sessionDir, { recursive: true });
+      await writeFile(
+        sessionLogPath,
+        [
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:00.000Z',
+            type: 'session_meta',
+            payload: {
+              id: 'thread-app',
+              cwd: tempRoot,
+              initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+            }
+          }),
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:00.050Z',
+            type: 'turn_context',
+            payload: { turn_id: 'turn-app-1' }
+          }),
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:01.000Z',
+            type: 'event_msg',
+            payload: { type: 'task_complete', turn_id: 'turn-app-1' }
+          })
+        ].join('\n'),
+        'utf8'
+      );
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-app"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-app-1"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-app-1"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_CLOUD_ENV_ID: 'env-appserver-proof',
+        CODEX_HOME: tempRoot ?? undefined
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () =>
+          createAppServerRuntimeContext({
+            runtime_session_id: 'appserver-run-child'
+          })
+        ),
+        execRunner,
+        sleep: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+        },
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof).toMatchObject({
+      thread_id: 'thread-app',
+      latest_turn_id: 'turn-app-1',
+      session_log_thread_id: 'thread-app',
+      session_log_turn_id: 'turn-app-1',
+      session_log_session_id: 'thread-app-turn-app-1',
+      appserver_supervision: {
+        turn_persistence_status: 'proven',
+        turn_persistence_source: 'session_log_hydration',
+        turn_persistence_blocker: null
+      }
+    });
+  });
+
+  it('does not observe a discarded bootstrap tail line as live session-log proof', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-app.jsonl');
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Merging',
+          state_type: 'started',
+          assignee_id: null,
+          assignee_name: null
+        })
+      )
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed',
+          assignee_id: null,
+          assignee_name: null
+        })
+      );
+
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+        turnIndex: 1
+      });
+      await mkdir(sessionDir, { recursive: true });
+      await writeFile(
+        sessionLogPath,
+        [
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:00.000Z',
+            type: 'session_meta',
+            payload: {
+              id: 'thread-app',
+              cwd: tempRoot,
+              initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+            }
+          }),
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:01.000Z',
+            type: 'event_msg',
+            payload: { type: 'task_complete', turn_id: 'turn-app-stale' }
+          })
+        ].join('\n'),
+        'utf8'
+      );
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return {
+        exitCode: 0,
+        stdout: '{"type":"thread.started","thread_id":"thread-app"}',
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_CLOUD_ENV_ID: 'env-appserver-proof',
+        CODEX_HOME: tempRoot ?? undefined
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () =>
+          createAppServerRuntimeContext({
+            runtime_session_id: 'appserver-run-child'
+          })
+        ),
+        execRunner,
+        sleep: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+        },
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof).toMatchObject({
+      thread_id: 'thread-app',
+      latest_turn_id: null,
+      session_log_thread_id: 'thread-app',
+      session_log_turn_id: null,
+      session_log_session_id: null,
+      appserver_supervision: {
+        turn_persistence_status: 'blocked',
+        turn_persistence_blocker: 'session_log_hydration_missing'
+      }
+    });
+  });
+
+  it('preserves prior-turn session-log proof when an appserver resume launch fails before new turn data', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-app.jsonl');
+    let execCallCount = 0;
+    const execRunner = vi.fn(async (request) => {
+      execCallCount += 1;
+      if (execCallCount === 1) {
+        await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+          turnIndex: 1
+        });
+        await mkdir(sessionDir, { recursive: true });
+        await writeFile(
+          sessionLogPath,
+          [
+            JSON.stringify({
+              timestamp: '2026-03-21T09:00:00.000Z',
+              type: 'session_meta',
+              payload: {
+                id: 'thread-app',
+                cwd: tempRoot,
+                initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+              }
+            }),
+            JSON.stringify({
+              timestamp: '2026-03-21T09:00:00.050Z',
+              type: 'turn_context',
+              payload: { turn_id: 'turn-app-1' }
+            }),
+            JSON.stringify({
+              timestamp: '2026-03-21T09:00:01.000Z',
+              type: 'event_msg',
+              payload: { type: 'task_complete', turn_id: 'turn-app-1' }
+            })
+          ].join('\n'),
+          'utf8'
+        );
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return {
+          exitCode: 0,
+          stdout: [
+            '{"type":"thread.started","thread_id":"thread-app"}',
+            '{"type":"turn_context","payload":{"turn_id":"turn-app-1"}}',
+            '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-app-1"}}'
+          ].join('\n'),
+          stderr: ''
+        };
+      }
+      throw new Error('spawn failed');
+    });
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '2',
+          CODEX_CLOUD_ENV_ID: 'env-appserver-proof',
+          CODEX_HOME: tempRoot ?? undefined
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+          resolveRuntimeContext: vi.fn(async () =>
+            createAppServerRuntimeContext({
+              runtime_session_id: 'appserver-run-child'
+            })
+          ),
+          execRunner,
+          sleep: async () => {
+            await new Promise((resolve) => setTimeout(resolve, 1));
+          },
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:01.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      )
+    ).rejects.toThrow('spawn failed');
+
+    expect(execRunner).toHaveBeenCalledTimes(2);
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      thread_id: 'thread-app',
+      latest_turn_id: 'turn-app-1',
+      latest_session_id: 'thread-app-turn-app-1',
+      latest_session_id_source: 'derived_from_thread_and_turn',
+      session_log_thread_id: 'thread-app',
+      session_log_turn_id: 'turn-app-1',
+      session_log_session_id: 'thread-app-turn-app-1',
+      owner_phase: 'ended',
+      owner_status: 'failed',
+      end_reason: 'exec_runner_failed',
+      appserver_supervision: {
+        turn_persistence_status: 'proven',
+        turn_persistence_source: 'session_log_hydration',
+        turn_persistence_blocker: null
+      }
+    });
+  }, 20_000);
+
+  it('blocks appserver resident resume proof until a persisted turn is observed', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-1.jsonl');
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Merging',
+          state_type: 'started',
+          assignee_id: null,
+          assignee_name: null
+        })
+      )
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed',
+          assignee_id: null,
+          assignee_name: null
+        })
+      );
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_CLOUD_ENV_ID: 'env-appserver-resume',
+        CODEX_HOME: tempRoot ?? undefined,
+        [PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV]: JSON.stringify({
+          source_run_id: 'run-prev',
+          source_updated_at: '2026-03-21T08:59:59.000Z',
+          source_end_reason: 'max_turns_reached_issue_still_active',
+          source_thread_id: 'thread-1',
+          logical_turn_count: 20,
+          restart_count: 1
+        })
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () =>
+          createAppServerRuntimeContext({
+            runtime_session_id: 'appserver-run-child'
+          })
+        ),
+        execRunner: vi.fn(async (request) => {
+          await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+            turnIndex: 1
+          });
+          await mkdir(sessionDir, { recursive: true });
+          await writeFile(
+            sessionLogPath,
+            [
+              JSON.stringify({
+                timestamp: '2026-03-21T09:00:00.000Z',
+                type: 'session_meta',
+                payload: {
+                  id: 'thread-1',
+                  cwd: tempRoot,
+                  initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+                }
+              }),
+              JSON.stringify({
+                timestamp: '2026-03-21T09:00:00.050Z',
+                type: 'turn_context',
+                payload: { turn_id: 'turn-prior' }
+              }),
+              JSON.stringify({
+                timestamp: '2026-03-21T09:00:00.100Z',
+                type: 'event_msg',
+                payload: { type: 'task_complete', turn_id: 'turn-prior' }
+              })
+            ].join('\n'),
+            'utf8'
+          );
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          return {
+            exitCode: 0,
+            stdout: '{"type":"thread.started","thread_id":"thread-1"}',
+            stderr: ''
+          };
+        }),
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof).toMatchObject({
+      thread_id: 'thread-1',
+      latest_turn_id: null,
+      latest_session_id: null,
+      appserver_supervision: {
+        supervision_command: 'codex_exec_resume',
+        sticky_environment_status: 'proven',
+        turn_persistence_status: 'blocked',
+        turn_persistence_blocker: 'session_log_hydration_missing',
+        resume_status: 'blocked',
+        resume_source_thread_id: 'thread-1',
+        resume_observed_thread_id: 'thread-1',
+        resume_blocker: 'resume_session_log_hydration_missing'
+      }
+    });
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:02.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+
+    expect(refreshed).toMatchObject({
+      thread_id: 'thread-1',
+      latest_turn_id: null,
+      latest_session_id: null,
+      session_log_thread_id: 'thread-1',
+      session_log_turn_id: null,
+      session_log_session_id: null,
+      appserver_supervision: {
+        supervision_command: 'codex_exec_resume',
+        turn_persistence_status: 'blocked',
+        turn_persistence_blocker: 'session_log_hydration_missing',
+        resume_status: 'blocked',
+        resume_source_thread_id: 'thread-1',
+        resume_observed_thread_id: 'thread-1',
+        resume_blocker: 'resume_session_log_hydration_missing'
+      }
+    });
+  });
+
+  it('proves appserver persistence when session-log records match existing stdout proof', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-app.jsonl');
+    const appserverRuntime = {
+      requested_mode: 'appserver',
+      selected_mode: 'appserver',
+      provider: 'AppServerRuntimeProvider',
+      runtime_session_id: 'appserver-run-child',
+      fallback: {
+        occurred: false,
+        code: null,
+        reason: null,
+        from_mode: null,
+        to_mode: null,
+        checked_at: '2026-03-21T09:00:00.000Z'
+      }
+    } as const;
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(
+      sessionLogPath,
+      [
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.000Z',
+          type: 'session_meta',
+          payload: {
+            id: 'thread-app',
+            cwd: tempRoot,
+            initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.050Z',
+          type: 'turn_context',
+          payload: { turn_id: 'turn-app-1' }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:01.000Z',
+          type: 'event_msg',
+          payload: { type: 'task_complete', turn_id: 'turn-app-1' }
+        })
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          thread_id: 'thread-app',
+          latest_turn_id: 'turn-app-1',
+          latest_session_id: 'thread-app-turn-app-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 1,
+          last_event: 'task_complete',
+          last_event_at: '2026-03-21T09:00:01.000Z',
+          current_turn_activity: {
+            event: 'task_complete',
+            message_or_payload: null,
+            recorded_at: '2026-03-21T09:00:01.000Z',
+            source: 'stdout_jsonl',
+            turn_id: 'turn-app-1',
+            session_id: 'thread-app-turn-app-1'
+          },
+          runtime: appserverRuntime,
+          auth_provenance: {
+            provider_kind: 'codex',
+            runtime_mode: 'appserver',
+            runtime_provider: 'AppServerRuntimeProvider',
+            active_profile_fingerprint: null,
+            active_account_fingerprint: null,
+            cloud_env_id: 'env-appserver-proof',
+            cloud_branch: null,
+            credential_source: null,
+            auth_freshness: 'credential_source_unknown',
+            observed_at: '2026-03-21T09:00:00.000Z',
+            source: 'runtime_env:linear'
+          },
+          workspace_path: tempRoot
+        })
+      ),
+      'utf8'
+    );
+
+    const hydrated = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:03.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+
+    expect(hydrated).toMatchObject({
+      session_log_thread_id: 'thread-app',
+      session_log_turn_id: 'turn-app-1',
+      session_log_session_id: 'thread-app-turn-app-1',
+      appserver_supervision: {
+        supervision_command: 'codex_exec',
+        turn_persistence_status: 'proven',
+        turn_persistence_source: 'session_log_hydration',
+        turn_persistence_blocker: null,
+        resume_status: 'not_requested'
+      }
+    });
+  });
+
+  it('ignores discarded bootstrap turn ids when session-log proof lags the stdout turn', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-app.jsonl');
+    const appserverRuntime = {
+      requested_mode: 'appserver',
+      selected_mode: 'appserver',
+      provider: 'AppServerRuntimeProvider',
+      runtime_session_id: 'appserver-run-child',
+      fallback: {
+        occurred: false,
+        code: null,
+        reason: null,
+        from_mode: null,
+        to_mode: null,
+        checked_at: '2026-03-21T09:00:00.000Z'
+      }
+    } as const;
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(
+      sessionLogPath,
+      [
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.000Z',
+          type: 'session_meta',
+          payload: {
+            id: 'thread-app',
+            cwd: tempRoot,
+            initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.050Z',
+          type: 'turn_context',
+          payload: { turn_id: 'turn-app-1' }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:01.000Z',
+          type: 'event_msg',
+          payload: { type: 'task_complete', turn_id: 'turn-app-1' }
+        })
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          thread_id: 'thread-app',
+          latest_turn_id: 'turn-app-2',
+          latest_session_id: 'thread-app-turn-app-2',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          turn_count: 2,
+          last_event: 'turn_started',
+          last_event_at: '2026-03-21T09:00:02.000Z',
+          current_turn_activity: {
+            event: 'turn_started',
+            message_or_payload: null,
+            recorded_at: '2026-03-21T09:00:02.000Z',
+            source: 'stdout_jsonl',
+            turn_id: 'turn-app-2',
+            session_id: 'thread-app-turn-app-2'
+          },
+          runtime: appserverRuntime,
+          auth_provenance: {
+            provider_kind: 'codex',
+            runtime_mode: 'appserver',
+            runtime_provider: 'AppServerRuntimeProvider',
+            active_profile_fingerprint: null,
+            active_account_fingerprint: null,
+            cloud_env_id: 'env-appserver-proof',
+            cloud_branch: null,
+            credential_source: null,
+            auth_freshness: 'credential_source_unknown',
+            observed_at: '2026-03-21T09:00:00.000Z',
+            source: 'runtime_env:linear'
+          },
+          workspace_path: tempRoot
+        })
+      ),
+      'utf8'
+    );
+
+    const hydrated = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:03.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+
+    expect(hydrated).toMatchObject({
+      latest_turn_id: 'turn-app-2',
+      session_log_thread_id: 'thread-app',
+      session_log_turn_id: null,
+      session_log_session_id: null,
+      appserver_supervision: {
+        turn_persistence_status: 'blocked',
+        turn_persistence_blocker: 'session_log_hydration_missing'
+      }
+    });
+  });
+
+  it('rewinds consumed appserver session logs to backfill missing session-log proof ids', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-app.jsonl');
+    const sessionLog = [
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.000Z',
+        type: 'session_meta',
+        payload: {
+          id: 'thread-app',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        }
+      }),
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.050Z',
+        type: 'turn_context',
+        payload: { turn_id: 'turn-app-1' }
+      }),
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:01.000Z',
+        type: 'event_msg',
+        payload: { type: 'task_complete', turn_id: 'turn-app-1' }
+      })
+    ].join('\n');
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(sessionLogPath, sessionLog, 'utf8');
+    await writeFile(
+      hydrationPath,
+      JSON.stringify({
+        path: sessionLogPath,
+        offset_bytes: Buffer.byteLength(sessionLog, 'utf8'),
+        trailing_text: '',
+        bootstrap_pending: false,
+        proof_signature: 'already-consumed-before-session-log-proof-fields'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          thread_id: 'thread-app',
+          latest_turn_id: 'turn-app-1',
+          latest_session_id: 'thread-app-turn-app-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          session_log_thread_id: null,
+          session_log_turn_id: null,
+          session_log_session_id: null,
+          turn_count: 1,
+          last_event: 'task_complete',
+          last_event_at: '2026-03-21T09:00:01.000Z',
+          current_turn_activity: {
+            event: 'task_complete',
+            message_or_payload: null,
+            recorded_at: '2026-03-21T09:00:01.000Z',
+            source: 'stdout_jsonl',
+            turn_id: 'turn-app-1',
+            session_id: 'thread-app-turn-app-1'
+          },
+          runtime: {
+            requested_mode: 'appserver',
+            selected_mode: 'appserver',
+            provider: 'AppServerRuntimeProvider',
+            runtime_session_id: 'appserver-run-child',
+            fallback: {
+              occurred: false,
+              code: null,
+              reason: null,
+              from_mode: null,
+              to_mode: null,
+              checked_at: '2026-03-21T09:00:00.000Z'
+            }
+          },
+          auth_provenance: {
+            provider_kind: 'codex',
+            runtime_mode: 'appserver',
+            runtime_provider: 'AppServerRuntimeProvider',
+            active_profile_fingerprint: null,
+            active_account_fingerprint: null,
+            cloud_env_id: 'env-appserver-proof',
+            cloud_branch: null,
+            credential_source: null,
+            auth_freshness: 'credential_source_unknown',
+            observed_at: '2026-03-21T09:00:00.000Z',
+            source: 'runtime_env:linear'
+          },
+          workspace_path: tempRoot
+        })
+      ),
+      'utf8'
+    );
+
+    const hydrated = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:03.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+
+    expect(hydrated).toMatchObject({
+      session_log_thread_id: 'thread-app',
+      session_log_turn_id: 'turn-app-1',
+      session_log_session_id: 'thread-app-turn-app-1',
+      appserver_supervision: {
+        turn_persistence_status: 'proven',
+        turn_persistence_source: 'session_log_hydration',
+        turn_persistence_blocker: null
+      }
+    });
+  });
+
+  it('does not rewind consumed appserver session logs repeatedly for the same unmatched turn', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-app.jsonl');
+    const sessionLog = [
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.000Z',
+        type: 'session_meta',
+        payload: {
+          id: 'thread-app',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        }
+      }),
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.050Z',
+        type: 'turn_context',
+        payload: { turn_id: 'turn-app-1' }
+      }),
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:01.000Z',
+        type: 'event_msg',
+        payload: { type: 'task_complete', turn_id: 'turn-app-1' }
+      })
+    ].join('\n');
+    const idRewindSignature = JSON.stringify({
+      thread_id: 'thread-app',
+      latest_turn_id: 'turn-app-2',
+      latest_session_id: 'thread-app-turn-app-2',
+      session_log_thread_id: 'thread-app',
+      session_log_turn_id: null,
+      session_log_session_id: null
+    });
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(sessionLogPath, sessionLog, 'utf8');
+    await writeFile(
+      hydrationPath,
+      JSON.stringify({
+        path: sessionLogPath,
+        offset_bytes: Buffer.byteLength(sessionLog, 'utf8'),
+        trailing_text: 'pending-fragment',
+        bootstrap_pending: false,
+        proof_signature: 'stale-after-first-unmatched-turn-rewind',
+        id_rewind_signature: idRewindSignature
+      }),
+      'utf8'
+    );
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          thread_id: 'thread-app',
+          latest_turn_id: 'turn-app-2',
+          latest_session_id: 'thread-app-turn-app-2',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          session_log_thread_id: 'thread-app',
+          session_log_turn_id: null,
+          session_log_session_id: null,
+          turn_count: 2,
+          last_event: 'agent_message',
+          last_message: 'turn 2 active',
+          last_event_at: '2026-03-21T09:00:02.000Z',
+          current_turn_activity: {
+            event: 'agent_message',
+            message_or_payload: 'turn 2 active',
+            recorded_at: '2026-03-21T09:00:02.000Z',
+            source: 'stdout_jsonl',
+            turn_id: 'turn-app-2',
+            session_id: 'thread-app-turn-app-2'
+          },
+          runtime: {
+            requested_mode: 'appserver',
+            selected_mode: 'appserver',
+            provider: 'AppServerRuntimeProvider',
+            runtime_session_id: 'appserver-run-child',
+            fallback: {
+              occurred: false,
+              code: null,
+              reason: null,
+              from_mode: null,
+              to_mode: null,
+              checked_at: '2026-03-21T09:00:00.000Z'
+            }
+          },
+          auth_provenance: {
+            provider_kind: 'codex',
+            runtime_mode: 'appserver',
+            runtime_provider: 'AppServerRuntimeProvider',
+            active_profile_fingerprint: null,
+            active_account_fingerprint: null,
+            cloud_env_id: 'env-appserver-proof',
+            cloud_branch: null,
+            credential_source: null,
+            auth_freshness: 'credential_source_unknown',
+            observed_at: '2026-03-21T09:00:00.000Z',
+            source: 'runtime_env:linear'
+          },
+          workspace_path: tempRoot
+        })
+      ),
+      'utf8'
+    );
+
+    const hydrated = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:03.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+    const hydration = await readPersistedSessionLogHydrationState(hydrationPath);
+
+    expect(hydrated).toMatchObject({
+      latest_turn_id: 'turn-app-2',
+      session_log_thread_id: 'thread-app',
+      session_log_turn_id: null,
+      session_log_session_id: null,
+      appserver_supervision: {
+        turn_persistence_status: 'blocked',
+        turn_persistence_blocker: 'session_log_hydration_missing'
+      }
+    });
+    expect(hydration).toMatchObject({
+      path: sessionLogPath,
+      offset_bytes: Buffer.byteLength(sessionLog, 'utf8'),
+      trailing_text: 'pending-fragment',
+      bootstrap_pending: true,
+      id_rewind_signature: idRewindSignature,
+      proof_signature: expect.any(String)
+    });
+  });
+
+  it('proves appserver in-run resume only from session-log hydrated turns', async () => {
+    const { runDir } = await createManifestRoot();
+    const proof: ProviderLinearWorkerProof = {
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      attempt_started_at: '2026-03-21T09:00:00.000Z',
+      current_turn_started_at: '2026-03-21T09:00:01.000Z',
+      pid: '123',
+      thread_id: 'thread-app',
+      latest_turn_id: 'turn-app-2',
+      latest_session_id: 'thread-app-turn-app-2',
+      latest_session_id_source: 'derived_from_thread_and_turn',
+      session_log_thread_id: 'thread-app',
+      session_log_turn_id: 'turn-app-2',
+      session_log_session_id: 'thread-app-turn-app-2',
+      resume_source_thread_id: 'thread-app',
+      turn_count: 2,
+      last_event: 'task_complete',
+      last_message: null,
+      last_event_at: '2026-03-21T09:00:02.000Z',
+      current_turn_activity: {
+        event: 'task_complete',
+        message_or_payload: null,
+        recorded_at: '2026-03-21T09:00:02.000Z',
+        source: 'session_log_hydration',
+        turn_id: 'turn-app-2',
+        session_id: 'thread-app-turn-app-2'
+      },
+      tokens: {
+        input_tokens: null,
+        output_tokens: null,
+        total_tokens: null
+      },
+      rate_limits: null,
+      runtime: {
+        requested_mode: 'appserver',
+        selected_mode: 'appserver',
+        provider: 'AppServerRuntimeProvider',
+        runtime_session_id: 'appserver-run-child',
+        fallback: {
+          occurred: false,
+          code: null,
+          reason: null,
+          from_mode: null,
+          to_mode: null,
+          checked_at: '2026-03-21T09:00:00.000Z'
+        }
+      },
+      auth_provenance: {
+        provider_kind: 'codex',
+        runtime_mode: 'appserver',
+        runtime_provider: 'AppServerRuntimeProvider',
+        active_profile_fingerprint: null,
+        active_account_fingerprint: null,
+        cloud_env_id: 'env-appserver-proof',
+        cloud_branch: null,
+        credential_source: null,
+        auth_freshness: 'credential_source_unknown',
+        observed_at: '2026-03-21T09:00:00.000Z',
+        source: 'runtime_env:linear'
+      },
+      failure_diagnosis: null,
+      owner_phase: 'turn_running',
+      owner_status: 'in_progress',
+      workspace_path: tempRoot,
+      worker_host: null,
+      source_setup: null,
+      linear_audit: null,
+      child_streams: [],
+      child_lanes: [],
+      parallelization: null,
+      progress: null,
+      linear_budget: null,
+      tracked_issue_error: null,
+      resident_session: null,
+      end_reason: null,
+      updated_at: '2026-03-21T09:00:02.000Z'
+    };
+    await writeFile(
+      join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(proof),
+      'utf8'
+    );
+
+    const hydrated = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:03.000Z',
+      undefined,
+      process.env,
+      { skipSessionLogHydration: true }
+    );
+
+    expect(hydrated).toMatchObject({
+      appserver_supervision: {
+        turn_persistence_status: 'proven',
+        turn_persistence_source: 'session_log_hydration',
+        turn_persistence_blocker: null,
+        pagination_status: 'blocked',
+        pagination_blocker: 'appserver_pagination_probe_not_implemented',
+        resume_status: 'proven',
+        resume_source_thread_id: 'thread-app',
+        resume_observed_thread_id: 'thread-app',
+        resume_blocker: null
+      }
+    });
+  });
+
+  it('preserves machine-readable appserver fallback reasons when provider supervision falls back to exec', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const fallback = {
+      occurred: true,
+      code: 'appserver-command-unavailable',
+      reason: 'Appserver preflight failed (appserver-command-unavailable). Failed probing `codex app-server --help`.',
+      from_mode: 'appserver',
+      to_mode: 'cli',
+      checked_at: '2026-03-21T09:00:00.000Z'
+    } as const;
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_CLOUD_ENV_ID: 'env-appserver-fallback'
+      },
+      {
+        readTrackedIssue: vi
+          .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+          .mockResolvedValueOnce(
+            createTrackedIssue({
+              state: 'Merging',
+              state_type: 'started',
+              assignee_id: null,
+              assignee_name: null
+            })
+          )
+          .mockResolvedValueOnce(
+            createTrackedIssue({
+              state: 'Done',
+              state_type: 'completed',
+              assignee_id: null,
+              assignee_name: null
+            })
+          ),
+        resolveRuntimeContext: vi.fn(async () =>
+          createRuntimeContext({
+            requested_mode: 'appserver',
+            selected_mode: 'cli',
+            provider: 'CliRuntimeProvider',
+            runtime_session_id: null,
+            fallback
+          })
+        ),
+        execRunner: vi.fn(async (request) => {
+          await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+            turnIndex: 1
+          });
+          return {
+            exitCode: 0,
+            stdout: [
+              '{"type":"thread.started","thread_id":"thread-1"}',
+              '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+              '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1"}}'
+            ].join('\n'),
+            stderr: ''
+          };
+        }),
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof).toMatchObject({
+      runtime: {
+        requested_mode: 'appserver',
+        selected_mode: 'cli',
+        provider: 'CliRuntimeProvider',
+        fallback
+      },
+      appserver_supervision: {
+        selected_runtime: {
+          requested_mode: 'appserver',
+          selected_mode: 'cli',
+          provider: 'CliRuntimeProvider',
+          fallback
+        },
+        sticky_environment_id: 'env-appserver-fallback',
+        sticky_environment_status: 'proven',
+        sticky_environment_blocker: null,
+        turn_persistence_status: 'blocked',
+        turn_persistence_blocker: 'session_log_hydration_missing',
+        pagination_status: 'blocked',
+        pagination_blocker: 'appserver_pagination_probe_not_implemented',
+        resume_status: 'not_requested',
+        fork_status: 'blocked',
+        fork_blocker: 'appserver_fork_probe_not_implemented',
+        jsonl_truth_retained: true,
+        session_log_truth_retained: false
+      }
+    });
+  });
+
   it('uses guarded resident-session seeds to resume the prior thread on worker turn one', async () => {
     const { manifestPath } = await createManifestRoot();
     const execRunner = vi.fn(async (request) => {
@@ -3738,6 +4960,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
         CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
         CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_CLOUD_ENV_ID: 'env-appserver-resume',
         [PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV]: JSON.stringify({
           source_run_id: 'run-prev',
           source_updated_at: '2026-03-21T08:59:59.000Z',
@@ -3754,7 +4977,11 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           assignee_id: null,
           assignee_name: null
         })),
-        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        resolveRuntimeContext: vi.fn(async () =>
+          createAppServerRuntimeContext({
+            runtime_session_id: 'appserver-run-child'
+          })
+        ),
         execRunner,
         now: vi
           .fn()
@@ -3790,6 +5017,16 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         source_run_id: 'run-prev',
         source_end_reason: 'max_turns_reached_issue_still_active',
         source_thread_id: 'thread-1'
+      },
+      appserver_supervision: {
+        sticky_environment_id: 'env-appserver-resume',
+        sticky_environment_status: 'proven',
+        turn_persistence_status: 'blocked',
+        turn_persistence_blocker: 'session_log_hydration_missing',
+        resume_status: 'blocked',
+        resume_source_thread_id: 'thread-1',
+        resume_observed_thread_id: 'thread-1',
+        resume_blocker: 'resume_session_log_hydration_missing'
       }
     });
   });
@@ -6053,6 +7290,117 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(typeof hydration?.proof_signature).toBe('string');
     expect(hydration?.proof_signature).not.toBe('');
     expect(hydration?.proof_signature).not.toBe('stale-proof-signature');
+  });
+
+  it('does not retain discarded newer session-log ids after proof-floor restoration', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    await mkdir(sessionDir, { recursive: true });
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-2.jsonl');
+    const sessionLog = [
+      JSON.stringify({
+        type: 'session_meta',
+        payload: {
+          id: 'thread-2',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        }
+      }),
+      JSON.stringify({ type: 'turn_context', payload: { turn_id: 'turn-2' } }),
+      JSON.stringify({
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          info: {
+            total_token_usage: {
+              input_tokens: 4,
+              output_tokens: 3,
+              total_tokens: 7
+            }
+          }
+        }
+      })
+    ].join('\n');
+    await writeFile(sessionLogPath, sessionLog, 'utf8');
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-1',
+          latest_session_id: 'thread-1-turn-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          session_log_thread_id: 'thread-1',
+          session_log_turn_id: 'turn-1',
+          session_log_session_id: 'thread-1-turn-1',
+          tokens: {
+            input_tokens: 12,
+            output_tokens: 8,
+            total_tokens: 20
+          },
+          current_turn_activity: {
+            event: 'task_complete',
+            message_or_payload: null,
+            recorded_at: '2026-03-21T09:00:01.000Z',
+            source: 'session_log_hydration',
+            turn_id: 'turn-1',
+            session_id: 'thread-1-turn-1'
+          },
+          runtime: {
+            requested_mode: 'appserver',
+            selected_mode: 'appserver',
+            provider: 'AppServerRuntimeProvider',
+            runtime_session_id: 'appserver-run-child',
+            fallback: {
+              occurred: false,
+              code: null,
+              reason: null,
+              from_mode: null,
+              to_mode: null,
+              checked_at: '2026-03-21T09:00:00.000Z'
+            }
+          },
+          workspace_path: tempRoot
+        })
+      ),
+      'utf8'
+    );
+    await writeFile(
+      hydrationPath,
+      JSON.stringify({
+        path: sessionLogPath,
+        offset_bytes: 0,
+        trailing_text: '',
+        bootstrap_pending: false,
+        proof_signature: 'stale-proof-signature'
+      }),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:40.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+
+    expect(refreshed).toMatchObject({
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      session_log_thread_id: 'thread-1',
+      session_log_turn_id: 'turn-1',
+      session_log_session_id: 'thread-1-turn-1',
+      tokens: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20
+      }
+    });
+    expect(refreshed?.session_log_thread_id).not.toBe('thread-2');
+    expect(refreshed?.session_log_turn_id).not.toBe('turn-2');
   });
 
   it('rebootstraps stale cursor parsing at the next turn boundary for bootstrap proofs', async () => {
@@ -14081,15 +15429,17 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       await vi.waitFor(() => {
         expect(refreshBodies.filter((body) => body.owner_status === 'in_progress')).toHaveLength(2);
       });
-      const queuedRefreshProof = JSON.parse(
-        await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
-      ) as Record<string, unknown>;
-      expect(queuedRefreshProof).toMatchObject({
-        latest_turn_id: 'turn-1',
-        latest_session_id: 'thread-1-turn-1',
-        turn_count: 1,
-        last_message: 'Worker turn updated',
-        owner_status: 'in_progress'
+      await vi.waitFor(async () => {
+        const queuedRefreshProof = JSON.parse(
+          await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+        ) as Record<string, unknown>;
+        expect(queuedRefreshProof).toMatchObject({
+          latest_turn_id: 'turn-1',
+          latest_session_id: 'thread-1-turn-1',
+          turn_count: 1,
+          last_message: 'Worker turn updated',
+          owner_status: 'in_progress'
+        });
       });
 
       allowRunnerToFinishResolve?.();

@@ -343,6 +343,43 @@ export interface ProviderLinearWorkerFailureDiagnosis {
   observed_at: string | null;
 }
 
+export interface ProviderLinearWorkerRuntimeProof {
+  requested_mode: string | null;
+  selected_mode: string | null;
+  provider: string | null;
+  runtime_session_id: string | null;
+  fallback: RuntimeSelection['fallback'] | null;
+}
+
+export interface ProviderLinearWorkerAppServerSupervisionProof {
+  selected_runtime: ProviderLinearWorkerRuntimeProof;
+  supervision_command: 'codex_exec' | 'codex_exec_resume';
+  appserver_session_id: string | null;
+  thread_id: string | null;
+  latest_turn_id: string | null;
+  latest_session_id: string | null;
+  session_log_thread_id: string | null;
+  session_log_turn_id: string | null;
+  session_log_session_id: string | null;
+  sticky_environment_id: string | null;
+  sticky_environment_status: 'proven' | 'blocked' | 'not_applicable';
+  sticky_environment_blocker: string | null;
+  turn_persistence_status: 'proven' | 'blocked' | 'not_applicable';
+  turn_persistence_source: 'session_log_hydration' | null;
+  turn_persistence_blocker: string | null;
+  pagination_status: 'blocked' | 'not_applicable';
+  pagination_blocker: string | null;
+  resume_status: 'proven' | 'blocked' | 'not_requested' | 'not_applicable';
+  resume_source_thread_id: string | null;
+  resume_observed_thread_id: string | null;
+  resume_blocker: string | null;
+  fork_status: 'blocked' | 'not_requested' | 'not_applicable';
+  fork_blocker: string | null;
+  jsonl_truth_retained: boolean;
+  session_log_truth_retained: boolean;
+  updated_at: string | null;
+}
+
 export interface ProviderLinearWorkerProof {
   issue_id: string;
   issue_identifier: string;
@@ -353,6 +390,10 @@ export interface ProviderLinearWorkerProof {
   latest_turn_id: string | null;
   latest_session_id: string | null;
   latest_session_id_source: 'derived_from_thread_and_turn' | null;
+  session_log_thread_id?: string | null;
+  session_log_turn_id?: string | null;
+  session_log_session_id?: string | null;
+  resume_source_thread_id?: string | null;
   turn_count: number;
   last_event: string | null;
   last_message: string | null;
@@ -360,6 +401,8 @@ export interface ProviderLinearWorkerProof {
   current_turn_activity?: ProviderLinearWorkerCurrentTurnActivity | null;
   tokens: ProviderLinearWorkerTokenUsage;
   rate_limits: Record<string, unknown> | null;
+  runtime?: ProviderLinearWorkerRuntimeProof | null;
+  appserver_supervision?: ProviderLinearWorkerAppServerSupervisionProof | null;
   auth_provenance?: ProviderLinearWorkerAuthProvenance | null;
   failure_diagnosis?: ProviderLinearWorkerFailureDiagnosis | null;
   owner_phase: string;
@@ -467,7 +510,8 @@ interface ProviderWorkerSessionLogTailState {
   offsetBytes: number;
   trailingText: string;
   bootstrapPending: boolean;
-  currentTurnStartedAt?: string | null;
+  currentTurnStartedAt: string | null;
+  idRewindSignature: string | null;
 }
 
 interface ProviderWorkerSessionLogHydrationState {
@@ -476,6 +520,7 @@ interface ProviderWorkerSessionLogHydrationState {
   trailing_text: string;
   bootstrap_pending: boolean;
   proof_signature: string;
+  id_rewind_signature?: string | null;
 }
 
 interface ProviderControlHostManifestTarget {
@@ -2150,18 +2195,6 @@ function applyProviderLinearWorkerJsonlRecord(
     changed = true;
   }
   return changed;
-}
-
-function applyProviderLinearWorkerSessionJsonlLine(
-  state: ProviderLinearWorkerJsonlParseResult,
-  line: string,
-  env: NodeJS.ProcessEnv = process.env
-): boolean {
-  const parsed = parseProviderWorkerSessionJsonlLine(line);
-  if (!parsed) {
-    return false;
-  }
-  return applyProviderLinearWorkerSessionJsonlRecord(state, parsed, env);
 }
 
 function applyProviderLinearWorkerSessionJsonlRecord(
@@ -4122,6 +4155,7 @@ function resetProviderWorkerSessionLogTailState(state: ProviderWorkerSessionLogT
   state.offsetBytes = 0;
   state.trailingText = '';
   state.bootstrapPending = true;
+  state.idRewindSignature = null;
 }
 
 function normalizeProviderWorkerSessionLogHydrationState(
@@ -4143,7 +4177,8 @@ function normalizeProviderWorkerSessionLogHydrationState(
     offset_bytes: offsetBytes,
     trailing_text: typeof value.trailing_text === 'string' ? value.trailing_text : '',
     bootstrap_pending: typeof value.bootstrap_pending === 'boolean' ? value.bootstrap_pending : true,
-    proof_signature: typeof value.proof_signature === 'string' ? value.proof_signature : ''
+    proof_signature: typeof value.proof_signature === 'string' ? value.proof_signature : '',
+    id_rewind_signature: typeof value.id_rewind_signature === 'string' ? value.id_rewind_signature : null
   };
 }
 
@@ -4159,7 +4194,8 @@ function buildProviderWorkerSessionLogTailState(
       offsetBytes: 0,
       trailingText: '',
       bootstrapPending: true,
-      currentTurnStartedAt: normalizedCurrentTurnStartedAt
+      currentTurnStartedAt: normalizedCurrentTurnStartedAt,
+      idRewindSignature: null
     };
   }
   return {
@@ -4167,7 +4203,8 @@ function buildProviderWorkerSessionLogTailState(
     offsetBytes: hydrationState.offset_bytes,
     trailingText: hydrationState.trailing_text,
     bootstrapPending: hydrationState.bootstrap_pending,
-    currentTurnStartedAt: normalizedCurrentTurnStartedAt
+    currentTurnStartedAt: normalizedCurrentTurnStartedAt,
+    idRewindSignature: hydrationState.id_rewind_signature ?? null
   };
 }
 
@@ -4177,13 +4214,17 @@ function snapshotProviderWorkerSessionLogTailState(
   if (!state.path) {
     return null;
   }
-  return {
+  const snapshot: ProviderWorkerSessionLogHydrationState = {
     path: state.path,
     offset_bytes: state.offsetBytes,
     trailing_text: state.trailingText,
     bootstrap_pending: state.bootstrapPending,
     proof_signature: ''
   };
+  if (state.idRewindSignature) {
+    snapshot.id_rewind_signature = state.idRewindSignature;
+  }
+  return snapshot;
 }
 
 function selectProviderLinearWorkerCurrentTurnActivity(
@@ -4244,6 +4285,40 @@ function buildProviderWorkerSessionLogHydrationProofSignature(
   });
 }
 
+function providerLinearWorkerProofNeedsSessionLogIdHydration(
+  proof: ProviderLinearWorkerProof
+): boolean {
+  const selectedMode =
+    proof.runtime?.selected_mode ?? proof.auth_provenance?.runtime_mode ?? null;
+  if (selectedMode !== 'appserver') {
+    return false;
+  }
+  if (!proof.thread_id || !proof.latest_turn_id || !proof.latest_session_id) {
+    return false;
+  }
+  return (
+    proof.session_log_thread_id !== proof.thread_id ||
+    proof.session_log_turn_id !== proof.latest_turn_id ||
+    proof.session_log_session_id !== proof.latest_session_id
+  );
+}
+
+function buildProviderWorkerSessionLogIdHydrationRewindSignature(
+  proof: ProviderLinearWorkerProof
+): string | null {
+  if (!providerLinearWorkerProofNeedsSessionLogIdHydration(proof)) {
+    return null;
+  }
+  return JSON.stringify({
+    thread_id: proof.thread_id ?? null,
+    latest_turn_id: proof.latest_turn_id ?? null,
+    latest_session_id: proof.latest_session_id ?? null,
+    session_log_thread_id: proof.session_log_thread_id ?? null,
+    session_log_turn_id: proof.session_log_turn_id ?? null,
+    session_log_session_id: proof.session_log_session_id ?? null
+  });
+}
+
 async function readProviderWorkerSessionLogDelta(
   state: ProviderWorkerSessionLogTailState
 ): Promise<string> {
@@ -4258,6 +4333,7 @@ async function readProviderWorkerSessionLogDelta(
     state.offsetBytes = 0;
     state.trailingText = '';
     state.bootstrapPending = true;
+    state.idRewindSignature = null;
   }
   const bytesToRead = fileStat.size - state.offsetBytes;
   if (bytesToRead <= 0) {
@@ -4287,17 +4363,84 @@ function parseProviderWorkerSessionJsonlLine(line: string): Record<string, unkno
   }
 }
 
+interface ProviderWorkerSessionLogApplyResult {
+  changed: boolean;
+  observed: boolean;
+  observedThreadId: string | null;
+  observedTurnId: string | null;
+}
+
+function extractProviderWorkerSessionLogObservedThreadId(
+  parsed: Record<string, unknown>
+): string | null {
+  const payload = isRecord(parsed.payload) ? parsed.payload : null;
+  if (parsed.type === 'session_meta' && payload) {
+    return normalizeOptionalString(payload.id);
+  }
+  if (parsed.type === 'thread.started') {
+    return normalizeOptionalString(parsed.thread_id);
+  }
+  return null;
+}
+
+function extractProviderWorkerSessionLogObservedTurnId(
+  parsed: Record<string, unknown>
+): string | null {
+  const payload = isRecord(parsed.payload) ? parsed.payload : null;
+  if (parsed.type === 'turn_context' && payload) {
+    return normalizeOptionalString(payload.turn_id);
+  }
+  return extractProviderWorkerActivityTurnId(parsed);
+}
+
+function observeProviderWorkerSessionLogLines(
+  lines: readonly string[]
+): Pick<ProviderWorkerSessionLogApplyResult, 'observed' | 'observedThreadId' | 'observedTurnId'> {
+  let observed = false;
+  let observedThreadId: string | null = null;
+  let observedTurnId: string | null = null;
+  for (const line of lines) {
+    const parsed = parseProviderWorkerSessionJsonlLine(line);
+    if (!parsed) {
+      continue;
+    }
+    observed = true;
+    observedThreadId = extractProviderWorkerSessionLogObservedThreadId(parsed) ?? observedThreadId;
+    observedTurnId = extractProviderWorkerSessionLogObservedTurnId(parsed) ?? observedTurnId;
+  }
+  return {
+    observed,
+    observedThreadId,
+    observedTurnId
+  };
+}
+
+function observeProviderWorkerSessionLogAppliedLines(input: {
+  lines: readonly string[];
+  linesToApply: readonly string[];
+  bootstrapPending: boolean;
+}): Pick<ProviderWorkerSessionLogApplyResult, 'observed' | 'observedThreadId' | 'observedTurnId'> {
+  const observationLines =
+    !input.bootstrapPending || input.linesToApply.length === input.lines.length
+      ? input.lines
+      : input.linesToApply;
+  return observeProviderWorkerSessionLogLines(observationLines);
+}
+
 function selectProviderWorkerSessionBootstrapLines(
   lines: string[],
   options: {
     requireTurnContext: boolean;
     currentTurnStartedAt?: string | null;
+    currentTurnId?: string | null;
+    allowCompletedBootstrapTurn?: boolean;
   } = { requireTurnContext: false }
 ): string[] {
   let latestSessionMetaIndex = -1;
   let latestTurnContextIndex = -1;
   let latestTurnId: string | null = null;
   let latestTurnCompleted = false;
+  let latestTurnCompletedIndex = -1;
   for (let index = 0; index < lines.length; index += 1) {
     const parsed = parseProviderWorkerSessionJsonlLine(lines[index] ?? '');
     if (!parsed) {
@@ -4310,6 +4453,7 @@ function selectProviderWorkerSessionBootstrapLines(
       latestTurnContextIndex = index;
       latestTurnId = normalizeOptionalString(parsed.payload.turn_id);
       latestTurnCompleted = false;
+      latestTurnCompletedIndex = -1;
     }
     if (parsed.type === 'event_msg' && isRecord(parsed.payload) && parsed.payload.type === 'task_complete') {
       const completedTurnId = normalizeOptionalString(parsed.payload.turn_id);
@@ -4318,6 +4462,7 @@ function selectProviderWorkerSessionBootstrapLines(
         (!latestTurnId || !completedTurnId || completedTurnId === latestTurnId)
       ) {
         latestTurnCompleted = true;
+        latestTurnCompletedIndex = index;
       }
     }
   }
@@ -4328,19 +4473,33 @@ function selectProviderWorkerSessionBootstrapLines(
     return lines;
   }
   if (latestTurnCompleted) {
+    const currentTurnId = normalizeOptionalString(options.currentTurnId);
+    const allowCompletedBootstrapTurn = options.allowCompletedBootstrapTurn ?? true;
+    if (!allowCompletedBootstrapTurn && currentTurnId === null) {
+      return latestSessionMetaIndex >= 0 ? [lines[latestSessionMetaIndex] ?? ''] : [];
+    }
+    if (currentTurnId !== null && latestTurnId !== null && latestTurnId !== currentTurnId) {
+      return latestSessionMetaIndex >= 0 ? [lines[latestSessionMetaIndex] ?? ''] : [];
+    }
+    const currentTurnMatchesCompletedLog = currentTurnId !== null && latestTurnId === currentTurnId;
+    const completedFloorLine =
+      latestTurnCompletedIndex >= 0
+        ? lines[latestTurnCompletedIndex] ?? ''
+        : lines[latestTurnContextIndex] ?? '';
     if (
-      isProviderWorkerSessionBootstrapLineAtOrAfter(
-        lines[latestTurnContextIndex] ?? '',
+      !currentTurnMatchesCompletedLog &&
+      !isProviderWorkerSessionBootstrapLineAtOrAfter(
+        completedFloorLine,
         options.currentTurnStartedAt ?? null
       )
     ) {
-      const bootstrapLines =
-        latestSessionMetaIndex >= 0 && latestSessionMetaIndex < latestTurnContextIndex
-          ? [lines[latestSessionMetaIndex] ?? '']
-          : [];
-      return [...bootstrapLines, ...lines.slice(latestTurnContextIndex)];
+      return latestSessionMetaIndex >= 0 ? [lines[latestSessionMetaIndex] ?? ''] : [];
     }
-    return latestSessionMetaIndex >= 0 ? [lines[latestSessionMetaIndex] ?? ''] : [];
+    const bootstrapLines =
+      latestSessionMetaIndex >= 0 && latestSessionMetaIndex < latestTurnContextIndex
+        ? [lines[latestSessionMetaIndex] ?? '']
+        : [];
+    return [...bootstrapLines, ...lines.slice(latestTurnContextIndex)];
   }
   const bootstrapLines =
     latestSessionMetaIndex >= 0 && latestSessionMetaIndex < latestTurnContextIndex
@@ -4369,12 +4528,25 @@ function isProviderWorkerSessionBootstrapLineAtOrAfter(
   return lineTimestamp !== null && compareIsoTimestamp(lineTimestamp, normalizedFloor) >= 0;
 }
 
+function shouldAllowCompletedProviderWorkerSessionBootstrapTurn(
+  proof: ProviderLinearWorkerProof
+): boolean {
+  if (proof.latest_turn_id !== null) {
+    return true;
+  }
+  const continuityState = proof.resident_session?.continuity_state ?? null;
+  return continuityState !== 'guarded_resume_pending' && continuityState !== 'guarded_resume_active';
+}
+
 function applyProviderWorkerSessionLogDelta(
   parseState: ProviderLinearWorkerJsonlParseResult,
   tailState: ProviderWorkerSessionLogTailState,
   chunk: string,
-  env: NodeJS.ProcessEnv = process.env
-): boolean {
+  env: NodeJS.ProcessEnv = process.env,
+  options: {
+    allowCompletedBootstrapTurn?: boolean;
+  } = {}
+): ProviderWorkerSessionLogApplyResult {
   const combined = `${tailState.trailingText}${chunk}`;
   const lines = combined.split(/\r?\n/u);
   tailState.trailingText = lines.pop() ?? '';
@@ -4387,31 +4559,45 @@ function applyProviderWorkerSessionLogDelta(
     tailState.bootstrapPending && lines.length > 0
       ? selectProviderWorkerSessionBootstrapLines(lines, {
           requireTurnContext,
-          currentTurnStartedAt: tailState.currentTurnStartedAt ?? null
+          currentTurnStartedAt: tailState.currentTurnStartedAt,
+          currentTurnId: parseState.turnId,
+          allowCompletedBootstrapTurn: options.allowCompletedBootstrapTurn
         })
       : lines;
+  const observation = observeProviderWorkerSessionLogAppliedLines({
+    lines,
+    linesToApply,
+    bootstrapPending: tailState.bootstrapPending
+  });
   let changed = false;
   for (const line of linesToApply) {
-    changed = applyProviderLinearWorkerSessionJsonlLine(parseState, line, env) || changed;
+    const parsed = parseProviderWorkerSessionJsonlLine(line);
+    if (!parsed) {
+      continue;
+    }
+    changed = applyProviderLinearWorkerSessionJsonlRecord(parseState, parsed, env) || changed;
   }
   if (tailState.bootstrapPending && lines.length > 0) {
     tailState.bootstrapPending = requireTurnContext && parseState.turnId === null;
   }
-  return changed;
+  return { changed, ...observation };
 }
 
 function flushProviderWorkerSessionLogTail(
   parseState: ProviderLinearWorkerJsonlParseResult,
   tailState: ProviderWorkerSessionLogTailState,
-  env: NodeJS.ProcessEnv = process.env
-): boolean {
+  env: NodeJS.ProcessEnv = process.env,
+  options: {
+    allowCompletedBootstrapTurn?: boolean;
+  } = {}
+): ProviderWorkerSessionLogApplyResult {
   const trailingLine = tailState.trailingText.trim();
   if (!trailingLine) {
     tailState.trailingText = '';
-    return false;
+    return { changed: false, observed: false, observedThreadId: null, observedTurnId: null };
   }
   if (!parseProviderWorkerSessionJsonlLine(trailingLine)) {
-    return false;
+    return { changed: false, observed: false, observedThreadId: null, observedTurnId: null };
   }
   tailState.trailingText = '';
   const shouldBootstrap = tailState.bootstrapPending;
@@ -4419,17 +4605,28 @@ function flushProviderWorkerSessionLogTail(
   const trailingLines = shouldBootstrap
     ? selectProviderWorkerSessionBootstrapLines([trailingLine], {
         requireTurnContext,
-        currentTurnStartedAt: tailState.currentTurnStartedAt ?? null
+        currentTurnStartedAt: tailState.currentTurnStartedAt,
+        currentTurnId: parseState.turnId,
+        allowCompletedBootstrapTurn: options.allowCompletedBootstrapTurn
       })
     : [trailingLine];
+  const observation = observeProviderWorkerSessionLogAppliedLines({
+    lines: [trailingLine],
+    linesToApply: trailingLines,
+    bootstrapPending: shouldBootstrap
+  });
   let changed = false;
   for (const line of trailingLines) {
-    changed = applyProviderLinearWorkerSessionJsonlLine(parseState, line, env) || changed;
+    const parsed = parseProviderWorkerSessionJsonlLine(line);
+    if (!parsed) {
+      continue;
+    }
+    changed = applyProviderLinearWorkerSessionJsonlRecord(parseState, parsed, env) || changed;
   }
   if (shouldBootstrap) {
     tailState.bootstrapPending = requireTurnContext && parseState.turnId === null;
   }
-  return changed;
+  return { changed, ...observation };
 }
 
 function normalizeProviderLinearWorkerProofForUpdatedAtComparison(
@@ -4437,10 +4634,48 @@ function normalizeProviderLinearWorkerProofForUpdatedAtComparison(
 ): Record<string, unknown> {
   return {
     ...proof,
+    current_turn_started_at: proof.current_turn_started_at ?? null,
+    session_log_thread_id: proof.session_log_thread_id ?? null,
+    session_log_turn_id: proof.session_log_turn_id ?? null,
+    session_log_session_id: proof.session_log_session_id ?? null,
+    resume_source_thread_id: proof.resume_source_thread_id ?? null,
+    current_turn_activity: proof.current_turn_activity ?? null,
+    runtime: proof.runtime ?? null,
+    appserver_supervision: proof.appserver_supervision
+      ? {
+          ...proof.appserver_supervision,
+          updated_at: null
+        }
+      : proof.appserver_supervision ?? null,
+    auth_provenance: proof.auth_provenance ?? null,
+    failure_diagnosis: proof.failure_diagnosis ?? null,
+    worker_host: proof.worker_host ?? null,
+    source_setup: proof.source_setup ?? null,
+    linear_budget: proof.linear_budget ?? null,
+    tracked_issue_error: proof.tracked_issue_error ?? null,
+    resident_session: proof.resident_session ?? null,
     parallelization: proof.parallelization ?? null,
     progress: null,
     updated_at: null
   };
+}
+
+function stableProviderLinearWorkerProofComparisonString(value: unknown): string {
+  return JSON.stringify(sortProviderLinearWorkerProofComparisonValue(value));
+}
+
+function sortProviderLinearWorkerProofComparisonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sortProviderLinearWorkerProofComparisonValue(entry));
+  }
+  if (!isRecord(value)) {
+    return value;
+  }
+  return Object.fromEntries(
+    Object.keys(value)
+      .sort()
+      .map((key) => [key, sortProviderLinearWorkerProofComparisonValue(value[key])])
+  );
 }
 
 function selectProviderLinearWorkerProofTelemetryFields(
@@ -4452,6 +4687,10 @@ function selectProviderLinearWorkerProofTelemetryFields(
     latest_turn_id: proof.latest_turn_id ?? null,
     latest_session_id: proof.latest_session_id ?? null,
     latest_session_id_source: proof.latest_session_id_source ?? null,
+    session_log_thread_id: proof.session_log_thread_id ?? null,
+    session_log_turn_id: proof.session_log_turn_id ?? null,
+    session_log_session_id: proof.session_log_session_id ?? null,
+    resume_source_thread_id: proof.resume_source_thread_id ?? null,
     turn_count: proof.turn_count,
     last_event: proof.last_event ?? null,
     last_message: proof.last_message ?? null,
@@ -4495,7 +4734,8 @@ function deriveProviderLinearWorkerParallelizationRecord(input: {
 function buildProviderLinearWorkerTurnBootstrapProof(
   proof: ProviderLinearWorkerProof,
   turnCount: number,
-  updatedAt: string
+  updatedAt: string,
+  resumeSourceThreadId: string | null = null
 ): ProviderLinearWorkerProof {
   return {
     ...proof,
@@ -4503,6 +4743,10 @@ function buildProviderLinearWorkerTurnBootstrapProof(
     latest_turn_id: null,
     latest_session_id: null,
     latest_session_id_source: null,
+    session_log_thread_id: null,
+    session_log_turn_id: null,
+    session_log_session_id: null,
+    resume_source_thread_id: resumeSourceThreadId,
     last_event: null,
     last_message: null,
     last_event_at: null,
@@ -4666,9 +4910,80 @@ function shouldAdvanceProviderLinearWorkerProofUpdatedAt(
     );
   }
   return (
-    JSON.stringify(normalizeProviderLinearWorkerProofForUpdatedAtComparison(currentProof)) !==
-    JSON.stringify(normalizeProviderLinearWorkerProofForUpdatedAtComparison(nextProof))
+    stableProviderLinearWorkerProofComparisonString(
+      normalizeProviderLinearWorkerProofForUpdatedAtComparison(currentProof)
+    ) !==
+    stableProviderLinearWorkerProofComparisonString(
+      normalizeProviderLinearWorkerProofForUpdatedAtComparison(nextProof)
+    )
   );
+}
+
+function selectProviderWorkerScopedSessionLogIds(input: {
+  sessionLogObserved: boolean;
+  observedThreadId: string | null;
+  observedTurnId: string | null;
+  proof: ProviderLinearWorkerProof;
+  liveThreadId: string | null;
+  liveTurnId: string | null;
+}): {
+  sessionLogThreadId: string | null;
+  sessionLogTurnId: string | null;
+  sessionLogSessionId: string | null;
+} {
+  const proofThreadId = input.proof.session_log_thread_id ?? null;
+  const proofTurnId = input.proof.session_log_turn_id ?? null;
+  const proofThreadMatchesLive =
+    proofThreadId !== null &&
+    input.liveThreadId !== null &&
+    proofThreadId === input.liveThreadId;
+  const proofTurnMatchesLive =
+    proofTurnId !== null && input.liveTurnId !== null && proofTurnId === input.liveTurnId;
+  const observedThreadMatchesLive =
+    input.observedThreadId !== null &&
+    input.liveThreadId !== null &&
+    input.observedThreadId === input.liveThreadId;
+  const observedTurnMatchesLive =
+    input.observedTurnId !== null &&
+    input.liveTurnId !== null &&
+    input.observedTurnId === input.liveTurnId;
+
+  let sessionLogThreadId: string | null;
+  let sessionLogTurnId: string | null;
+  if (input.sessionLogObserved) {
+    if (observedThreadMatchesLive) {
+      sessionLogThreadId = input.observedThreadId;
+      sessionLogTurnId = observedTurnMatchesLive ? input.observedTurnId : null;
+    } else if (
+      input.observedThreadId === null &&
+      observedTurnMatchesLive &&
+      input.liveThreadId !== null
+    ) {
+      sessionLogThreadId = input.liveThreadId;
+      sessionLogTurnId = input.observedTurnId;
+    } else if (proofThreadMatchesLive) {
+      sessionLogThreadId = proofThreadId;
+      sessionLogTurnId = proofTurnMatchesLive ? proofTurnId : null;
+    } else {
+      sessionLogThreadId = null;
+      sessionLogTurnId = null;
+    }
+  } else if (proofThreadMatchesLive) {
+    sessionLogThreadId = proofThreadId;
+    sessionLogTurnId = proofTurnMatchesLive ? proofTurnId : null;
+  } else {
+    sessionLogThreadId = input.proof.session_log_thread_id ?? null;
+    sessionLogTurnId = input.proof.session_log_turn_id ?? null;
+  }
+
+  return {
+    sessionLogThreadId,
+    sessionLogTurnId,
+    sessionLogSessionId: deriveLatestTurnSessionId({
+      threadId: sessionLogThreadId,
+      turnId: sessionLogTurnId
+    }).sessionId
+  };
 }
 
 async function hydrateProviderLinearWorkerProofFromSessionLog(
@@ -4752,7 +5067,8 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
           offsetBytes: fileStat.size,
           trailingText: tailState.trailingText,
           bootstrapPending: true,
-          currentTurnStartedAt: tailState.currentTurnStartedAt ?? null
+          currentTurnStartedAt: tailState.currentTurnStartedAt,
+          idRewindSignature: tailState.idRewindSignature
         };
       } else if (fileStat.size < tailState.offsetBytes) {
         tailState = {
@@ -4760,7 +5076,8 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
           offsetBytes: 0,
           trailingText: '',
           bootstrapPending: true,
-          currentTurnStartedAt: tailState.currentTurnStartedAt ?? null
+          currentTurnStartedAt: tailState.currentTurnStartedAt,
+          idRewindSignature: null
         };
       } else {
         preserveProofTelemetryFloor = true;
@@ -4771,12 +5088,47 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
       }
     }
   }
+  const idHydrationRewindSignature =
+    buildProviderWorkerSessionLogIdHydrationRewindSignature(proof);
+  if (idHydrationRewindSignature === null) {
+    tailState = {
+      ...tailState,
+      idRewindSignature: null
+    };
+  } else if (
+    tailState.offsetBytes > 0 &&
+    tailState.idRewindSignature !== idHydrationRewindSignature
+  ) {
+    tailState = {
+      path: sessionLogPath,
+      offsetBytes: 0,
+      trailingText: '',
+      bootstrapPending: true,
+      currentTurnStartedAt: tailState.currentTurnStartedAt,
+      idRewindSignature: idHydrationRewindSignature
+    };
+  }
+  let sessionLogObserved = false;
+  let observedSessionLogThreadId = proof.session_log_thread_id ?? null;
+  let observedSessionLogTurnId = proof.session_log_turn_id ?? null;
+  const allowCompletedBootstrapTurn =
+    shouldAllowCompletedProviderWorkerSessionBootstrapTurn(proof);
   try {
     const delta = await readProviderWorkerSessionLogDelta(tailState);
     if (delta) {
-      applyProviderWorkerSessionLogDelta(parseState, tailState, delta, env);
+      const deltaApply = applyProviderWorkerSessionLogDelta(parseState, tailState, delta, env, {
+        allowCompletedBootstrapTurn
+      });
+      sessionLogObserved = deltaApply.observed || sessionLogObserved;
+      observedSessionLogThreadId = deltaApply.observedThreadId ?? observedSessionLogThreadId;
+      observedSessionLogTurnId = deltaApply.observedTurnId ?? observedSessionLogTurnId;
     }
-    flushProviderWorkerSessionLogTail(parseState, tailState, env);
+    const tailApply = flushProviderWorkerSessionLogTail(parseState, tailState, env, {
+      allowCompletedBootstrapTurn
+    });
+    sessionLogObserved = tailApply.observed || sessionLogObserved;
+    observedSessionLogThreadId = tailApply.observedThreadId ?? observedSessionLogThreadId;
+    observedSessionLogTurnId = tailApply.observedTurnId ?? observedSessionLogTurnId;
   } catch {
     return {
       proof,
@@ -4818,12 +5170,23 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     parseState.rateLimits !== null &&
     providerWorkerTokenUsageFallsBehindFloor(proofTokenFloor, parseState.tokens);
   const persistedTailState = snapshotProviderWorkerSessionLogTailState(tailState);
+  const scopedSessionLogIds = selectProviderWorkerScopedSessionLogIds({
+    sessionLogObserved,
+    observedThreadId: observedSessionLogThreadId,
+    observedTurnId: observedSessionLogTurnId,
+    proof,
+    liveThreadId,
+    liveTurnId
+  });
   const hydratedProof: ProviderLinearWorkerProof = {
     ...proof,
     thread_id: liveThreadId,
     latest_turn_id: liveTurnId,
     latest_session_id: session.sessionId,
     latest_session_id_source: session.source,
+    session_log_thread_id: scopedSessionLogIds.sessionLogThreadId,
+    session_log_turn_id: scopedSessionLogIds.sessionLogTurnId,
+    session_log_session_id: scopedSessionLogIds.sessionLogSessionId,
     last_event: parseState.lastEvent ?? null,
     last_message: parseState.finalMessage ?? null,
     last_event_at: parseState.lastEventAt ?? null,
@@ -4902,6 +5265,206 @@ export function deriveLatestTurnSessionId(input: {
   return {
     sessionId: `${input.threadId}-${input.turnId}`,
     source: 'derived_from_thread_and_turn'
+  };
+}
+
+function selectProviderLinearWorkerSessionLogProofForScope(input: {
+  proof: ProviderLinearWorkerProof;
+  threadId: string | null;
+  turnId: string | null;
+  sessionId: string | null;
+  scopeChanged: boolean;
+}): {
+  sessionLogThreadId: string | null;
+  sessionLogTurnId: string | null;
+  sessionLogSessionId: string | null;
+} {
+  const sessionLogThreadId = input.proof.session_log_thread_id ?? null;
+  const sessionLogTurnId = input.proof.session_log_turn_id ?? null;
+  const sessionLogSessionId = input.proof.session_log_session_id ?? null;
+  if (!input.scopeChanged) {
+    return { sessionLogThreadId, sessionLogTurnId, sessionLogSessionId };
+  }
+  if (
+    sessionLogThreadId &&
+    sessionLogTurnId &&
+    sessionLogSessionId &&
+    sessionLogThreadId === input.threadId &&
+    sessionLogTurnId === input.turnId &&
+    sessionLogSessionId === input.sessionId
+  ) {
+    return { sessionLogThreadId, sessionLogTurnId, sessionLogSessionId };
+  }
+  return { sessionLogThreadId: null, sessionLogTurnId: null, sessionLogSessionId: null };
+}
+
+function buildProviderLinearWorkerRuntimeProof(
+  selection: RuntimeSelection
+): ProviderLinearWorkerRuntimeProof {
+  return {
+    requested_mode: selection.requested_mode,
+    selected_mode: selection.selected_mode,
+    provider: selection.provider,
+    runtime_session_id: selection.runtime_session_id,
+    fallback: selection.fallback
+  };
+}
+
+function normalizeProviderLinearWorkerRuntimeProof(
+  proof: ProviderLinearWorkerProof
+): ProviderLinearWorkerRuntimeProof {
+  const existing = proof.runtime ?? null;
+  const authProvenance = proof.auth_provenance ?? null;
+  return {
+    requested_mode: existing?.requested_mode ?? authProvenance?.runtime_mode ?? null,
+    selected_mode: existing?.selected_mode ?? authProvenance?.runtime_mode ?? null,
+    provider: existing?.provider ?? authProvenance?.runtime_provider ?? null,
+    runtime_session_id: existing?.runtime_session_id ?? null,
+    fallback: existing?.fallback ?? null
+  };
+}
+
+function normalizeProviderLinearWorkerRuntimeProofIfRelevant(
+  proof: ProviderLinearWorkerProof
+): ProviderLinearWorkerRuntimeProof | null {
+  const runtime = normalizeProviderLinearWorkerRuntimeProof(proof);
+  if (
+    runtime.requested_mode ||
+    runtime.selected_mode ||
+    runtime.provider ||
+    runtime.runtime_session_id ||
+    runtime.fallback ||
+    proof.auth_provenance?.runtime_mode ||
+    proof.auth_provenance?.runtime_provider
+  ) {
+    return runtime;
+  }
+  return null;
+}
+
+function shouldEmitProviderLinearWorkerAppServerSupervisionProof(
+  proof: ProviderLinearWorkerProof
+): boolean {
+  const runtime = normalizeProviderLinearWorkerRuntimeProofIfRelevant(proof);
+  return (
+    runtime?.requested_mode === 'appserver' ||
+    runtime?.selected_mode === 'appserver' ||
+    runtime?.fallback?.from_mode === 'appserver' ||
+    runtime?.fallback?.to_mode === 'appserver' ||
+    proof.auth_provenance?.runtime_mode === 'appserver'
+  );
+}
+
+function buildProviderLinearWorkerAppServerSupervisionProofIfRelevant(
+  proof: ProviderLinearWorkerProof
+): ProviderLinearWorkerAppServerSupervisionProof | null {
+  return shouldEmitProviderLinearWorkerAppServerSupervisionProof(proof)
+    ? buildProviderLinearWorkerAppServerSupervisionProof(proof)
+    : null;
+}
+
+function buildProviderLinearWorkerAppServerSupervisionProof(
+  proof: ProviderLinearWorkerProof
+): ProviderLinearWorkerAppServerSupervisionProof {
+  const selectedRuntime = normalizeProviderLinearWorkerRuntimeProof(proof);
+  const selectedMode = selectedRuntime.selected_mode ?? proof.auth_provenance?.runtime_mode ?? null;
+  const appserverSelected = selectedMode === 'appserver';
+  const appserverIntended =
+    appserverSelected ||
+    selectedRuntime.requested_mode === 'appserver' ||
+    selectedRuntime.fallback?.from_mode === 'appserver' ||
+    proof.auth_provenance?.runtime_mode === 'appserver';
+  const stickyEnvironmentId =
+    normalizeOptionalString(proof.auth_provenance?.cloud_env_id) ?? null;
+  const sessionLogThreadId = normalizeOptionalString(proof.session_log_thread_id) ?? null;
+  const sessionLogTurnId = normalizeOptionalString(proof.session_log_turn_id) ?? null;
+  const sessionLogSessionId = normalizeOptionalString(proof.session_log_session_id) ?? null;
+  const hasTurnPersistence = Boolean(
+    proof.thread_id &&
+      proof.latest_turn_id &&
+      proof.latest_session_id &&
+      sessionLogThreadId === proof.thread_id &&
+      sessionLogTurnId === proof.latest_turn_id &&
+      sessionLogSessionId === proof.latest_session_id
+  );
+  const residentResumeSourceThreadId =
+    normalizeOptionalString(proof.resident_session?.source_thread_id) ?? null;
+  const recordedResumeSourceThreadId =
+    normalizeOptionalString(proof.resume_source_thread_id) ?? null;
+  const inRunResumeRequested = appserverIntended && proof.turn_count > 1;
+  const supervisionCommand =
+    residentResumeSourceThreadId || recordedResumeSourceThreadId || proof.turn_count > 1
+      ? 'codex_exec_resume'
+      : 'codex_exec';
+  const resumeSourceThreadId =
+    residentResumeSourceThreadId ?? recordedResumeSourceThreadId;
+  const resumeRequested = Boolean(residentResumeSourceThreadId) || inRunResumeRequested;
+  const resumeThreadMatches =
+    resumeRequested &&
+    proof.thread_id !== null &&
+    resumeSourceThreadId !== null &&
+    proof.thread_id === resumeSourceThreadId;
+  const resumeThreadMismatch =
+    Boolean(resumeSourceThreadId) &&
+    proof.thread_id !== null &&
+    proof.thread_id !== resumeSourceThreadId;
+  const resumePersistedTurnObserved = resumeThreadMatches && hasTurnPersistence;
+  return {
+    selected_runtime: selectedRuntime,
+    supervision_command: supervisionCommand,
+    appserver_session_id: appserverSelected ? selectedRuntime.runtime_session_id : null,
+    thread_id: proof.thread_id,
+    latest_turn_id: proof.latest_turn_id,
+    latest_session_id: proof.latest_session_id,
+    session_log_thread_id: sessionLogThreadId,
+    session_log_turn_id: sessionLogTurnId,
+    session_log_session_id: sessionLogSessionId,
+    sticky_environment_id: stickyEnvironmentId,
+    sticky_environment_status: appserverIntended
+      ? stickyEnvironmentId
+        ? 'proven'
+        : 'blocked'
+      : 'not_applicable',
+    sticky_environment_blocker:
+      appserverIntended && !stickyEnvironmentId
+        ? 'configured_environment_id_missing'
+        : null,
+    turn_persistence_status: appserverIntended
+      ? hasTurnPersistence
+        ? 'proven'
+        : 'blocked'
+      : 'not_applicable',
+    turn_persistence_source: appserverIntended && hasTurnPersistence ? 'session_log_hydration' : null,
+    turn_persistence_blocker:
+      appserverIntended && !hasTurnPersistence
+        ? 'session_log_hydration_missing'
+        : null,
+    pagination_status: appserverIntended ? 'blocked' : 'not_applicable',
+    pagination_blocker: appserverIntended ? 'appserver_pagination_probe_not_implemented' : null,
+    resume_status: appserverIntended
+      ? resumeRequested
+        ? resumePersistedTurnObserved
+          ? 'proven'
+          : 'blocked'
+        : 'not_requested'
+      : 'not_applicable',
+    resume_source_thread_id: resumeSourceThreadId,
+    resume_observed_thread_id: resumeRequested ? proof.thread_id : null,
+    resume_blocker:
+      appserverIntended && resumeRequested && resumeThreadMismatch
+        ? 'guarded_resume_thread_mismatch'
+        : appserverIntended && resumeRequested && !resumeSourceThreadId
+          ? 'resume_source_thread_id_missing'
+        : appserverIntended && resumeRequested && !proof.thread_id
+          ? 'resume_thread_id_missing'
+          : appserverIntended && resumeRequested && !resumePersistedTurnObserved
+            ? 'resume_session_log_hydration_missing'
+          : null,
+    fork_status: appserverIntended ? 'blocked' : 'not_applicable',
+    fork_blocker: appserverIntended ? 'appserver_fork_probe_not_implemented' : null,
+    jsonl_truth_retained: true,
+    session_log_truth_retained: appserverSelected,
+    updated_at: proof.updated_at ?? null
   };
 }
 
@@ -7045,6 +7608,7 @@ async function writeProofSnapshot(
     );
     const proofWithHydratedSources = {
       ...proof,
+      runtime: normalizeProviderLinearWorkerRuntimeProofIfRelevant(proof),
       linear_audit: linearAudit,
       child_streams: childStreams,
       child_lanes: childLanes,
@@ -7059,6 +7623,8 @@ async function writeProofSnapshot(
     };
     const hydratedProof = {
       ...proofWithHydratedSources,
+      appserver_supervision:
+        buildProviderLinearWorkerAppServerSupervisionProofIfRelevant(proofWithHydratedSources),
       progress: deriveProviderLinearWorkerProgressSnapshot({
         proof: proofWithHydratedSources,
         now: deps.now
@@ -7109,6 +7675,7 @@ export async function refreshProviderLinearWorkerProofSnapshot(
     );
     const proofWithHydratedSources: ProviderLinearWorkerProof = {
       ...parsed,
+      runtime: normalizeProviderLinearWorkerRuntimeProofIfRelevant(parsed),
       linear_audit: linearAudit,
       child_streams: childStreams,
       child_lanes: childLanes,
@@ -7135,20 +7702,27 @@ export async function refreshProviderLinearWorkerProofSnapshot(
     const proofWithSessionTelemetry = proofWithSessionTelemetryResult.proof;
     const hydratedWithoutUpdatedAt: ProviderLinearWorkerProof = {
       ...proofWithSessionTelemetry,
+      appserver_supervision:
+        buildProviderLinearWorkerAppServerSupervisionProofIfRelevant(proofWithSessionTelemetry),
       progress: deriveProviderLinearWorkerProgressSnapshot({
         proof: proofWithSessionTelemetry,
         now
       })
     };
-    const hydrated: ProviderLinearWorkerProof = {
+    const nextUpdatedAt = shouldAdvanceProviderLinearWorkerProofUpdatedAt(
+      parsed,
+      hydratedWithoutUpdatedAt,
+      options.updatedAtComparisonScope ?? 'full'
+    )
+      ? now()
+      : parsed.updated_at ?? null;
+    const hydratedBase: ProviderLinearWorkerProof = {
       ...hydratedWithoutUpdatedAt,
-      updated_at: shouldAdvanceProviderLinearWorkerProofUpdatedAt(
-        parsed,
-        hydratedWithoutUpdatedAt,
-        options.updatedAtComparisonScope ?? 'full'
-      )
-        ? now()
-        : parsed.updated_at ?? null
+      updated_at: nextUpdatedAt
+    };
+    const hydrated: ProviderLinearWorkerProof = {
+      ...hydratedBase,
+      appserver_supervision: buildProviderLinearWorkerAppServerSupervisionProofIfRelevant(hydratedBase)
     };
     await writeProof(proofPath, hydrated);
     await writeProviderWorkerSessionLogHydrationState(runDir, proofWithSessionTelemetryResult.hydrationState);
@@ -7251,6 +7825,10 @@ export async function runProviderLinearWorker(
     latest_turn_id: null,
     latest_session_id: null,
     latest_session_id_source: null,
+    session_log_thread_id: null,
+    session_log_turn_id: null,
+    session_log_session_id: null,
+    resume_source_thread_id: residentSessionSeed?.source_thread_id ?? null,
     turn_count: 0,
     last_event: null,
     last_message: null,
@@ -7258,6 +7836,8 @@ export async function runProviderLinearWorker(
     current_turn_activity: null,
     tokens: buildEmptyProviderLinearWorkerTokenUsage(),
     rate_limits: null,
+    runtime: buildProviderLinearWorkerRuntimeProof(runtimeContext.runtime),
+    appserver_supervision: null,
     auth_provenance: buildProviderWorkerRuntimeAuthProvenance({
       env: childEnv,
       runtime: runtimeContext.runtime,
@@ -7414,6 +7994,9 @@ export async function runProviderLinearWorker(
       let liveStdoutBuffer = '';
       let liveProofSignature: string | null = null;
       const liveParseState = buildEmptyProviderLinearWorkerJsonlParseResult();
+      let liveSessionLogThreadId: string | null = null;
+      let liveSessionLogTurnId: string | null = null;
+      let liveSessionLogSessionId: string | null = null;
       const scheduleTrailingLiveRefresh = (): void => {
         if (liveRefreshClosed || !liveRefreshPending || liveRefreshRequest !== null || liveRefreshTimer !== null) {
           return;
@@ -7539,6 +8122,13 @@ export async function runProviderLinearWorker(
           latest_turn_id: liveTurnId,
           latest_session_id: session.sessionId,
           latest_session_id_source: session.source,
+          session_log_thread_id:
+            liveSessionLogThreadId ?? (liveScopeChanged ? null : finalProof.session_log_thread_id ?? null),
+          session_log_turn_id:
+            liveSessionLogTurnId ?? (liveScopeChanged ? null : finalProof.session_log_turn_id ?? null),
+          session_log_session_id:
+            liveSessionLogSessionId ?? (liveScopeChanged ? null : finalProof.session_log_session_id ?? null),
+          resume_source_thread_id: finalProof.resume_source_thread_id ?? null,
           turn_count: turnNumber,
           last_event: liveParseState.lastEvent ?? (liveScopeChanged ? null : finalProof.last_event),
           last_message:
@@ -7574,6 +8164,10 @@ export async function runProviderLinearWorker(
           latest_turn_id: nextProof.latest_turn_id,
           latest_session_id: nextProof.latest_session_id,
           latest_session_id_source: nextProof.latest_session_id_source,
+          session_log_thread_id: nextProof.session_log_thread_id ?? null,
+          session_log_turn_id: nextProof.session_log_turn_id ?? null,
+          session_log_session_id: nextProof.session_log_session_id ?? null,
+          resume_source_thread_id: nextProof.resume_source_thread_id ?? null,
           turn_count: nextProof.turn_count,
           last_event: nextProof.last_event,
           last_message: nextProof.last_message,
@@ -7640,6 +8234,12 @@ export async function runProviderLinearWorker(
         })) ??
         deriveSharedRepoCheckoutPathFallback(context.repoRoot, context.taskId);
       const continueResidentSessionOnBoot = turnNumber === 1 && residentSessionSeed !== null;
+      const resumeSourceThreadIdForTurn =
+        continueResidentSessionOnBoot
+          ? residentSessionSeed?.source_thread_id ?? null
+          : turnNumber > 1
+            ? threadId ?? finalProof.thread_id ?? null
+            : null;
       const prompt = buildProviderWorkerPrompt(
         issue,
         turnNumber,
@@ -7656,10 +8256,10 @@ export async function runProviderLinearWorker(
       );
       const args =
         continueResidentSessionOnBoot
-          ? ['exec', 'resume', '--json', residentSessionSeed?.source_thread_id ?? '', prompt]
+          ? ['exec', 'resume', '--json', resumeSourceThreadIdForTurn ?? '', prompt]
           : turnNumber === 1
           ? ['exec', '--json', prompt]
-          : ['exec', 'resume', '--json', threadId ?? '', prompt];
+          : ['exec', 'resume', '--json', resumeSourceThreadIdForTurn ?? '', prompt];
       const resolved = resolveRuntimeCodexCommand(args, runtimeContext);
       let stopLiveSessionTailResolve: (() => void) | null = null;
       let liveSessionTailStopped = false;
@@ -7679,7 +8279,12 @@ export async function runProviderLinearWorker(
         deps,
         context.runDir,
         auditPath,
-        buildProviderLinearWorkerTurnBootstrapProof(finalProof, turnNumber, turnStartedAt),
+        buildProviderLinearWorkerTurnBootstrapProof(
+          finalProof,
+          turnNumber,
+          turnStartedAt,
+          resumeSourceThreadIdForTurn
+        ),
         childEnv
       );
       const parallelizationDecisionCountBeforeTurn = readProviderLinearParallelizationSnapshots(
@@ -7696,9 +8301,14 @@ export async function runProviderLinearWorker(
               offsetBytes: 0,
               trailingText: '',
               bootstrapPending: true,
-              currentTurnStartedAt: turnStartedAt
+              currentTurnStartedAt: turnStartedAt,
+              idRewindSignature: null
             }
           : null;
+      const allowCompletedSessionBootstrapTurn =
+        turnNumber === 1 &&
+        previousTurnProof.latest_turn_id === null &&
+        !continueResidentSessionOnBoot;
       const liveSessionTailPromise =
         liveSessionTailState === null
           ? Promise.resolve()
@@ -7732,7 +8342,29 @@ export async function runProviderLinearWorker(
                 }
                 if (liveSessionTailState.path !== null) {
                   const delta = await readProviderWorkerSessionLogDelta(liveSessionTailState);
-                  if (delta && applyProviderWorkerSessionLogDelta(liveParseState, liveSessionTailState, delta, childEnv)) {
+                  const deltaApply =
+                    delta
+                      ? applyProviderWorkerSessionLogDelta(
+                          liveParseState,
+                          liveSessionTailState,
+                          delta,
+                          childEnv,
+                          { allowCompletedBootstrapTurn: allowCompletedSessionBootstrapTurn }
+                        )
+                      : {
+                          changed: false,
+                          observed: false,
+                          observedThreadId: null,
+                          observedTurnId: null
+                        };
+                  if (deltaApply.observed) {
+                    liveSessionLogThreadId =
+                      deltaApply.observedThreadId ?? liveSessionLogThreadId;
+                    liveSessionLogTurnId = deltaApply.observedTurnId ?? liveSessionLogTurnId;
+                    liveSessionLogSessionId = deriveLatestTurnSessionId({
+                      threadId: liveSessionLogThreadId,
+                      turnId: liveSessionLogTurnId
+                    }).sessionId;
                     queueLiveProofWrite();
                   }
                 }
@@ -7744,7 +8376,27 @@ export async function runProviderLinearWorker(
                   stopLiveSessionTailPromise
                 ]);
               }
-              if (liveSessionTailState.path !== null && flushProviderWorkerSessionLogTail(liveParseState, liveSessionTailState, childEnv)) {
+              const tailApply =
+                liveSessionTailState.path !== null
+                  ? flushProviderWorkerSessionLogTail(
+                      liveParseState,
+                      liveSessionTailState,
+                      childEnv,
+                      { allowCompletedBootstrapTurn: allowCompletedSessionBootstrapTurn }
+                    )
+                  : {
+                      changed: false,
+                      observed: false,
+                      observedThreadId: null,
+                      observedTurnId: null
+                    };
+              if (tailApply.observed) {
+                liveSessionLogThreadId = tailApply.observedThreadId ?? liveSessionLogThreadId;
+                liveSessionLogTurnId = tailApply.observedTurnId ?? liveSessionLogTurnId;
+                liveSessionLogSessionId = deriveLatestTurnSessionId({
+                  threadId: liveSessionLogThreadId,
+                  turnId: liveSessionLogTurnId
+                }).sessionId;
                 queueLiveProofWrite();
               }
             })().catch((error) => {
@@ -7780,6 +8432,9 @@ export async function runProviderLinearWorker(
               latest_turn_id: previousTurnProof.latest_turn_id,
               latest_session_id: previousTurnProof.latest_session_id,
               latest_session_id_source: previousTurnProof.latest_session_id_source,
+              session_log_thread_id: previousTurnProof.session_log_thread_id,
+              session_log_turn_id: previousTurnProof.session_log_turn_id,
+              session_log_session_id: previousTurnProof.session_log_session_id,
               last_event: previousTurnProof.last_event,
               last_message: previousTurnProof.last_message,
               last_event_at: previousTurnProof.last_event_at,
@@ -7845,6 +8500,13 @@ export async function runProviderLinearWorker(
       const parsedTurnChanged = Boolean(turnId && turnId !== finalProof.latest_turn_id);
       const parsedScopeChanged = parsedThreadChanged || parsedTurnChanged;
       const session = deriveLatestTurnSessionId({ threadId, turnId });
+      const sessionLogProof = selectProviderLinearWorkerSessionLogProofForScope({
+        proof: finalProof,
+        threadId,
+        turnId,
+        sessionId: session.sessionId,
+        scopeChanged: parsedScopeChanged
+      });
 
       finalProof = {
         issue_id: context.issueId,
@@ -7856,6 +8518,10 @@ export async function runProviderLinearWorker(
         latest_turn_id: turnId,
         latest_session_id: session.sessionId,
         latest_session_id_source: session.source,
+        session_log_thread_id: sessionLogProof.sessionLogThreadId,
+        session_log_turn_id: sessionLogProof.sessionLogTurnId,
+        session_log_session_id: sessionLogProof.sessionLogSessionId,
+        resume_source_thread_id: finalProof.resume_source_thread_id ?? null,
         turn_count: turnNumber,
         last_event: parsed.lastEvent ?? (parsedScopeChanged ? null : finalProof.last_event),
         last_message: parsed.finalMessage ?? (parsedScopeChanged ? null : finalProof.last_message),
@@ -7869,6 +8535,8 @@ export async function runProviderLinearWorker(
           ) ?? (parsedScopeChanged ? null : selectProviderLinearWorkerCurrentTurnActivity(finalProof)),
         tokens: hasProviderWorkerTokenUsage(parsed.tokens) ? parsed.tokens : finalProof.tokens,
         rate_limits: parsed.rateLimits ?? finalProof.rate_limits,
+        runtime: finalProof.runtime ?? buildProviderLinearWorkerRuntimeProof(runtimeContext.runtime),
+        appserver_supervision: finalProof.appserver_supervision ?? null,
         auth_provenance: mergeProviderWorkerAuthProvenance(
           finalProof.auth_provenance ?? null,
           parsed.authProvenance

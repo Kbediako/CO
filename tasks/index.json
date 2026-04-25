@@ -14809,6 +14809,57 @@
           "ACTION_PLAN": "docs/ACTION_PLAN-linear-b2712a15-b04f-4a4e-aac8-35f614abb01b.md"
         }
       }
+    },
+    {
+      "id": "20260425-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83",
+      "title": "CO: repair archive automation auto-merge token",
+      "relates_to": "tasks/tasks-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-25",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-25",
+          "status": "produced",
+          "manifest": ".runs/linear-fd4bf705-11a9-4717-948c-addfb4fa3f83-docs-packet-cli/cli/2026-04-25T06-07-45-642Z-4500fa92/manifest.json",
+          "source_anchor": "ctx:sha256:becfd8cba79308cf736ffb09357d004b9d8b428a1389367239b753c92a9107d6#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-362 as the archive auto-merge credential repair lane for `ARCHIVE_AUTOMERGE_TOKEN`, `tasks-archive-automation`, `implementation-docs-archive-automation`, archive auto-merge, and `401 Bad credentials`; parent owns GitHub secret or permission repair, required `Core Lane` archive PR evidence, auto-merge verification, Linear state, workpad, PR, and merge."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
+        "task": "tasks/tasks-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
+        "agent_task": ".agent/task/linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",
+        "docs": "docs/TECH_SPEC-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md"
+      }
+    },
+    {
+      "id": "20260425-linear-17451947-1b72-4d01-9e3d-86dcaab46c39",
+      "title": "CO-360 provider-worker Codex 0.125 app-server supervision gate",
+      "relates_to": "tasks/tasks-linear-17451947-1b72-4d01-9e3d-86dcaab46c39.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-25",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-25",
+          "status": "parent_applied_artifact",
+          "manifest": ".runs/linear-17451947-1b72-4d01-9e3d-86dcaab46c39-docs-packet/cli/2026-04-25T00-45-42-850Z-ac87a210/manifest.json",
+          "source_anchor": "ctx:sha256:07c7c2fa5d9442a961e0bb4be17721c4884e178304d5767a51417c30e21de227#chunk:c000001",
+          "summary": "Docs-first packet created for CO-360. The packet preserves the provider-worker Codex 0.125 app-server supervision proof gate: configured provider-linear-worker canary under runtime_mode=appserver, sticky environment proof with real environment id or exact fallback blocker, persisted-turn pagination/resume/fork proof or exact fallback blocker, fail-closed codex exec/codex exec resume fallback with machine-readable reasons, manifest/status truth for selected runtime and app-server identifiers, regression coverage, and JSONL/session-log truth retention until parity is proven. The source payload is present in the parent artifact tree; parent reviewed and manually applied the patch artifact after child-lane accept invalidated on a Linear updated_at change."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-17451947-1b72-4d01-9e3d-86dcaab46c39-provider-worker-codex-0125-appserver-supervision-gate.md",
+        "task": "tasks/tasks-linear-17451947-1b72-4d01-9e3d-86dcaab46c39.md",
+        "docs": "tasks/specs/linear-17451947-1b72-4d01-9e3d-86dcaab46c39-provider-worker-codex-0125-appserver-supervision-gate.md"
+      }
     }
   ]
 }
