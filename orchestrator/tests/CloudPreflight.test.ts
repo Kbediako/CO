@@ -2,7 +2,7 @@ import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { buildCloudPreflightRequest, runCloudPreflight } from '../src/cli/utils/cloudPreflight.js';
 
@@ -304,5 +304,55 @@ describe('buildCloudPreflightRequest', () => {
     expect(message).not.toContain('sk-testsecret1234567890');
     expect(message).not.toContain('sess-secret1234567890');
     expect(message).not.toContain('standalonesecret1234567890');
+  });
+
+  it('reports codex unavailable when spawning the Codex version check throws ETXTBSY synchronously', async () => {
+    const spawnError = new Error('text file busy') as NodeJS.ErrnoException;
+    spawnError.code = 'ETXTBSY';
+    const spawnMock = vi.fn(() => {
+      throw spawnError;
+    });
+
+    vi.resetModules();
+    vi.doMock('node:child_process', () => ({
+      spawn: spawnMock
+    }));
+
+    try {
+      const { runCloudPreflight: runCloudPreflightWithMockedSpawn } = await import(
+        '../src/cli/utils/cloudPreflight.js'
+      );
+
+      const result = await runCloudPreflightWithMockedSpawn({
+        repoRoot: '/tmp/repo',
+        codexBin: '/tmp/busy-codex',
+        environmentId: 'env-123',
+        branch: null,
+        env: {}
+      });
+
+      expect(result).toMatchObject({
+        ok: false,
+        issues: [
+          {
+            code: 'codex_unavailable',
+            message: 'Codex CLI is unavailable (/tmp/busy-codex --version failed).'
+          }
+        ],
+        details: {
+          codexBin: '/tmp/busy-codex',
+          environmentId: 'env-123',
+          branch: null
+        }
+      });
+      expect(spawnMock).toHaveBeenCalledWith('/tmp/busy-codex', ['--version'], {
+        cwd: '/tmp/repo',
+        env: {},
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
+    } finally {
+      vi.doUnmock('node:child_process');
+      vi.resetModules();
+    }
   });
 });
