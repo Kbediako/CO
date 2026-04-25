@@ -380,9 +380,9 @@ function formatAttachRequestFailure(
   if (error instanceof CoStatusAttachRequestError) {
     if (error.kind === 'network') {
       if (options.endpointAlreadyRotated) {
-        return `${error.message}. The refreshed control-host endpoint is still unreachable; wait for the new host to come up or rerun co-status attach.`;
+        return `current-host-unhealthy: ${error.message}. The refreshed control-host endpoint is still unreachable; wait for the new host to come up or rerun co-status attach.`;
       }
-      return `stale endpoint after control-host restart; control-host unavailable; control_endpoint.json has not rotated to a reachable host. ${error.message}. Waiting for ${resolve(target.runDir, 'control_endpoint.json')} to rotate or rerun co-status attach.`;
+      return `current-host-unhealthy: control_endpoint.json; control-host unavailable; stale endpoint after control-host restart. control_endpoint.json has not rotated to a reachable host. ${error.message}. Waiting for ${resolve(target.runDir, 'control_endpoint.json')} to rotate or rerun co-status attach.`;
     }
     if (error.kind === 'timeout') {
       return `${error.message}. The control-host did not answer before the attach timeout; if restart is in progress, wait for endpoint rotation or rerun co-status attach.`;
