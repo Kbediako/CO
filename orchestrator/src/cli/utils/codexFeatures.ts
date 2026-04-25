@@ -43,6 +43,10 @@ export function codexFeatureProbeRejectsAgentMaxThreads(probe: CodexFeatureProbe
   return mentionsMaxThreads && /\bmulti_agent_v2\b/u.test(text);
 }
 
+export function codexFeatureProbeDisablesMultiAgentV2(probe: CodexFeatureProbeResult): boolean {
+  return probe.flags?.multi_agent_v2 === false;
+}
+
 function parseFeatureFlagsFromText(stdout: string): Record<string, boolean> {
   const flags: Record<string, boolean> = {};
   for (const line of stdout.split(/\r?\n/u)) {

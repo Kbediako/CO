@@ -18,6 +18,7 @@ import {
   type CodexCliReadiness
 } from './utils/codexCli.js';
 import {
+  codexFeatureProbeDisablesMultiAgentV2,
   codexFeatureProbeRejectsAgentMaxThreads,
   readCodexFeatureProbe,
   type CodexFeatureProbeResult
@@ -1098,9 +1099,12 @@ function inspectCodexDefaultsAdvisory(
     'Current CO baseline no longer seeds or expects `agents.max_spawn_depth`; keep it only as a legacy local override when an older parser/runtime still honors it.',
     'Leaving `agents.max_depth` unset remains accepted when local parser/runtime constraints require it.'
   ];
+  const featureProbeDisablesMultiAgentV2 =
+    featureProbe ? codexFeatureProbeDisablesMultiAgentV2(featureProbe) : false;
   const featureProbeIndicatesMultiAgentV2 =
-    featureProbe?.flags?.multi_agent_v2 === true
-    || (featureProbe ? codexFeatureProbeRejectsAgentMaxThreads(featureProbe) : false);
+    !featureProbeDisablesMultiAgentV2
+    && (featureProbe?.flags?.multi_agent_v2 === true
+      || (featureProbe ? codexFeatureProbeRejectsAgentMaxThreads(featureProbe) : false));
   if (featureProbeIndicatesMultiAgentV2) {
     checks.max_threads.status = 'skipped';
     checks.max_threads.actual = null;
@@ -1189,7 +1193,8 @@ function inspectCodexDefaultsAdvisory(
   const agents = isRecord(parsed.agents) ? parsed.agents : {};
   const multiAgentV2Enabled =
     featureProbeIndicatesMultiAgentV2
-    || readBooleanValue(readRecordValue(parsed, 'features')?.multi_agent_v2) === true;
+    || (!featureProbeDisablesMultiAgentV2
+      && readBooleanValue(readRecordValue(parsed, 'features')?.multi_agent_v2) === true);
   const maxThreads = readNumberValue(agents.max_threads);
   const maxDepth = readNumberValue(agents.max_depth);
   const maxSpawnDepth = readNumberValue(agents.max_spawn_depth);

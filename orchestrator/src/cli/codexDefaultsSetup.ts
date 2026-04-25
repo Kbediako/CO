@@ -7,6 +7,7 @@ import process from 'node:process';
 import { resolveCodexHome } from './utils/codexPaths.js';
 import { resolveCodexCliBin } from './utils/codexCli.js';
 import {
+  codexFeatureProbeDisablesMultiAgentV2,
   codexFeatureProbeRejectsAgentMaxThreads,
   readCodexFeatureProbe,
   type CodexFeatureProbeResult
@@ -695,6 +696,9 @@ function isMultiAgentV2Enabled(
 ): boolean {
   if (featureProbe.flags?.multi_agent_v2 === true) {
     return true;
+  }
+  if (codexFeatureProbeDisablesMultiAgentV2(featureProbe)) {
+    return false;
   }
   if (codexFeatureProbeRejectsAgentMaxThreads(featureProbe)) {
     return true;

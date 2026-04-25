@@ -6,7 +6,11 @@ import process from 'node:process';
 
 import { resolveCodexHome } from './utils/codexPaths.js';
 import { resolveCodexCliBin } from './utils/codexCli.js';
-import { codexFeatureProbeRejectsAgentMaxThreads, readCodexFeatureProbe } from './utils/codexFeatures.js';
+import {
+  codexFeatureProbeDisablesMultiAgentV2,
+  codexFeatureProbeRejectsAgentMaxThreads,
+  readCodexFeatureProbe
+} from './utils/codexFeatures.js';
 import { findPackageRoot } from './utils/packageInfo.js';
 
 export interface InitOptions {
@@ -64,7 +68,13 @@ export async function initCodexTemplates(options: InitOptions): Promise<InitResu
 
 async function isMultiAgentV2Enabled(env: NodeJS.ProcessEnv): Promise<boolean> {
   const featureProbe = readCodexFeatureProbe(resolveCodexCliBin(env), env);
-  if (featureProbe.flags?.multi_agent_v2 === true || codexFeatureProbeRejectsAgentMaxThreads(featureProbe)) {
+  if (featureProbe.flags?.multi_agent_v2 === true) {
+    return true;
+  }
+  if (codexFeatureProbeDisablesMultiAgentV2(featureProbe)) {
+    return false;
+  }
+  if (codexFeatureProbeRejectsAgentMaxThreads(featureProbe)) {
     return true;
   }
   const configPath = join(resolveCodexHome(env), 'config.toml');

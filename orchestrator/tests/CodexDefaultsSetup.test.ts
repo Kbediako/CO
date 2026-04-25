@@ -1044,6 +1044,79 @@ describe('runCodexDefaultsSetup', () => {
     }
   });
 
+  it('keeps max_threads when the live feature probe explicitly disables multi_agent_v2', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-multi-agent-v2-false-'));
+    const configPath = join(tempHome, 'config.toml');
+    try {
+      await writeFile(
+        configPath,
+        [
+          'model = "legacy-model"',
+          '',
+          '[features]',
+          'multi_agent_v2 = true',
+          '',
+          '[agents]',
+          'max_threads = 2',
+          'extra_agent_key = "keep"',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
+      const codexBin = await writeFakeCodexBinary(tempHome, 'multi_agent_v2 experimental false');
+
+      await runCodexDefaultsSetup({
+        apply: true,
+        env: buildDefaultsEnv(tempHome, codexBin)
+      });
+
+      const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        agents?: Record<string, unknown>;
+      };
+
+      expect(parsed.agents?.max_threads).toBe(12);
+      expect(parsed.agents?.extra_agent_key).toBe('keep');
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps max_threads when the Codex feature surface explicitly disables multi_agent_v2', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-multi-agent-v2-false-'));
+    const configPath = join(tempHome, 'config.toml');
+    try {
+      await writeFile(
+        configPath,
+        [
+          'model = "legacy-model"',
+          '',
+          '[agents]',
+          'max_threads = 2',
+          'extra_agent_key = "keep"',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
+      const codexBin = await writeFakeCodexBinary(tempHome, 'multi_agent_v2 experimental false', {
+        stderr: 'invalid config: agents.max_threads is rejected when features.multi_agent_v2=true'
+      });
+
+      await runCodexDefaultsSetup({
+        apply: true,
+        env: buildDefaultsEnv(tempHome, codexBin)
+      });
+
+      const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        agents?: Record<string, unknown>;
+      };
+
+      expect(parsed.agents?.max_threads).toBe(12);
+      expect(parsed.agents?.extra_agent_key).toBe('keep');
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
   it('uses the target env when probing Codex features during defaults setup', async () => {
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-multi-agent-v2-env-'));
     const ambientHome = await mkdtemp(join(tmpdir(), 'codex-defaults-multi-agent-v2-ambient-'));

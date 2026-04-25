@@ -628,6 +628,54 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     }
   }, 15000);
 
+  it('keeps max_threads baseline when the live feature probe explicitly disables multi_agent_v2', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-false-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempHome, 'multi_agent_v2 experimental false', {
+      stderr: 'invalid config: agents.max_threads is rejected when features.multi_agent_v2=true'
+    });
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[features]',
+          'multi_agent_v2 = true',
+          '',
+          '[agents]',
+          'max_threads = 12'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('ok');
+      expect(result.codex_defaults.checks.max_threads.status).toBe('ok');
+      expect(result.codex_defaults.checks.max_threads.actual).toBe(12);
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('agents.max_threads: ok (actual: 12, expected >= 12)');
+      expect(summary).not.toContain('features.multi_agent_v2=true; omit agents.max_threads');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
   it('flags max_threads when Codex rejects the current config before feature flags can be listed', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const originalCodexCliBin = process.env.CODEX_CLI_BIN;
