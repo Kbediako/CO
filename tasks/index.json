@@ -28,11 +28,7 @@
         "spec": "tasks/specs/linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md",
         "task": "tasks/tasks-linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md",
         "agent_task": ".agent/task/linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md"
       }
     },
     {

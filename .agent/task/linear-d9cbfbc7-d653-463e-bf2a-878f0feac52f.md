@@ -16,7 +16,7 @@
 - [x] Focused validation harness proves no fixed delay remains and ambiguity still fails. Evidence: `tests/archive-automation-core-lane-dispatch.spec.ts`.
 - [x] Focused Vitest passed: `npx vitest run --config vitest.config.core.ts tests/archive-automation-workflow.spec.ts tests/archive-automation-core-lane-dispatch.spec.ts`.
 - [x] Required local validation floor passed through diff budget. Evidence: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `CODEX_NON_INTERACTIVE=1 npm run test`, `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, `node scripts/diff-budget.mjs`, and `git diff --check`.
-- [x] Standalone review and explicit elegance pass complete before review handoff. Evidence: `../../.runs/linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f/cli/2026-04-25T17-47-06-075Z-eae318bc/review/telemetry.json` (`status=succeeded`, `review_outcome=bounded-success`, `termination_boundary.kind=command-intent` / `provenance=validation-runner`), `out/linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f/manual/elegance-review.md`.
+- [x] Standalone review and explicit elegance pass complete before review handoff. Evidence: `.runs/linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f/cli/2026-04-25T17-47-06-075Z-eae318bc/review/telemetry.json` (`status=succeeded`, `review_outcome=bounded-success`, `termination_boundary.kind=command-intent` / `provenance=validation-runner`), `out/linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f/manual/elegance-review.md`.
 - [ ] PR attached, automated feedback drain clean, and Linear moved to `In Review` only after required checks are green.
 
 ## Progress Log

@@ -31,7 +31,7 @@
 - Completed evidence:
   - focused Vitest passed for `tests/archive-automation-workflow.spec.ts` and `tests/archive-automation-core-lane-dispatch.spec.ts`
   - local validation floor passed through diff budget and `git diff --check`
-  - standalone review telemetry `../../.runs/linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f/cli/2026-04-25T17-47-06-075Z-eae318bc/review/telemetry.json` reports `status=succeeded` / `review_outcome=bounded-success`
+  - standalone review telemetry `.runs/linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f/cli/2026-04-25T17-47-06-075Z-eae318bc/review/telemetry.json` reports `status=succeeded` / `review_outcome=bounded-success`
   - elegance review at `out/linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f/manual/elegance-review.md` found no simplification edits
 - Rollback plan: revert the workflow/test/docs packet; archive automation returns to the previous bounded polling behavior and remains visibly slow rather than silently changing status semantics.
 
