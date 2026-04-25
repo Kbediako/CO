@@ -34,6 +34,7 @@
 - [ ] Archive PR #668 or replacement archive path is unblocked.
 
 ## Delivery
-- [ ] Open PR, attach evidence to Linear, and monitor all required checks to terminal status.
+- [x] Open PR and attach evidence to Linear. Evidence: PR `#669` (`https://github.com/Kbediako/CO/pull/669`).
+- [ ] Monitor all required checks to terminal status.
 - [ ] Merge after green checks and no actionable review feedback.
 - [ ] Mark CO-373 Done and resume CO-361 tag/release only after blocker evidence is green.
