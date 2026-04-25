@@ -6733,15 +6733,6 @@ function resolveProviderLinearWorkerChildLaneRunnerIdentity(input: {
         ? null
         : 'runner_started_at_unparseable';
   if (input.inspection.alive === false) {
-    if (recordedStartIdentityError) {
-      return {
-        alive: null,
-        status: 'ambiguous',
-        reason: recordedStartIdentityError,
-        observedStartedAt: input.inspection.startedAt,
-        commandLineMatches
-      };
-    }
     return {
       alive: false,
       status: 'not_live',
