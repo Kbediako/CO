@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260425-linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1",
+      "title": "CO-353 Codex CLI 0.125.0 reasoning-token telemetry",
+      "relates_to": "tasks/tasks-linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-25",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-25",
+          "status": "prepared-for-parent-reconciliation",
+          "manifest": ".runs/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1-docs-packet/cli/2026-04-25T07-37-29-958Z-656ef03f/manifest.json",
+          "source_anchor": "ctx:sha256:4a1b90d4079209b44b35ed390dfc9ddc4b647dbdb70c4633a2907d47cd8aabc3#chunk:c000001",
+          "summary": "Docs-first packet created for CO-353 Codex CLI 0.125.0 reasoning-token telemetry. It preserves turn.completed.usage.reasoning_output_tokens, reasoning-token usage, provider proof, manifests, control/read-model metrics, and status/dashboard output; parent owns source-payload reconciliation, docs-review, implementation, validation, Linear/workpad state, PR lifecycle, and closeout."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md",
+        "task": "tasks/tasks-linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md",
+        "agent_task": ".agent/task/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md",
+        "docs": "tasks/specs/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md"
+      }
+    },
+    {
       "id": "20260425-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83",
       "title": "CO: repair archive automation auto-merge token",
       "relates_to": "tasks/tasks-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md",

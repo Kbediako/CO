@@ -5631,7 +5631,8 @@ describe('ControlRuntime', () => {
         tokens: {
           input_tokens: 21,
           output_tokens: 13,
-          total_tokens: 34
+          total_tokens: 34,
+          reasoning_output_tokens: 9
         },
         updated_at: '2026-03-07T00:20:00.000Z'
       });
@@ -5654,7 +5655,8 @@ describe('ControlRuntime', () => {
         tokens: {
           input_tokens: 12,
           output_tokens: 8,
-          total_tokens: 20
+          total_tokens: 20,
+          reasoning_output_tokens: 99
         },
         updated_at: '2026-03-07T00:15:00.000Z'
       });
@@ -5676,7 +5678,8 @@ describe('ControlRuntime', () => {
         tokens: {
           input_tokens: 5,
           output_tokens: 3,
-          total_tokens: 8
+          total_tokens: 8,
+          reasoning_output_tokens: 2
         },
         rate_limits: {
           limit_id: 'coding',
@@ -5698,7 +5701,8 @@ describe('ControlRuntime', () => {
             tokens: {
               input_tokens: 21,
               output_tokens: 13,
-              total_tokens: 34
+              total_tokens: 34,
+              reasoning_output_tokens: 9
             }
           }),
           expect.objectContaining({
@@ -5712,6 +5716,7 @@ describe('ControlRuntime', () => {
         input_tokens: 26,
         output_tokens: 16,
         total_tokens: 42,
+        reasoning_output_tokens: 11,
         seconds_running: 1500
       });
       expect(compatibilityProjection.rateLimits).toEqual({

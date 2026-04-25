@@ -461,6 +461,42 @@ describe('OperatorDashboardPresenter', () => {
     ]);
   });
 
+  it('carries reasoning output token usage through the operator dashboard dataset', () => {
+    const projection = buildProjection();
+    projection.codexTotals = {
+      ...projection.codexTotals,
+      reasoning_output_tokens: 31
+    };
+    projection.running = projection.running.map((entry) => ({
+      ...entry,
+      tokens: {
+        ...entry.tokens,
+        reasoning_output_tokens: 17
+      }
+    }));
+    const runningIssue = projection.issues.find((issue) => issue.issueIdentifier === 'CO-7');
+    expect(runningIssue?.payload.provider_linear_worker_proof).toBeTruthy();
+    if (!runningIssue?.payload.provider_linear_worker_proof) {
+      return;
+    }
+    runningIssue.payload.provider_linear_worker_proof = {
+      ...runningIssue.payload.provider_linear_worker_proof,
+      tokens: {
+        ...runningIssue.payload.provider_linear_worker_proof.tokens,
+        reasoning_output_tokens: 17
+      }
+    };
+
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-03-27T04:06:02.000Z'
+    });
+
+    expect(dataset.totals.reasoning_output_tokens).toBe(31);
+    expect(dataset.running[0]?.tokens.reasoning_output_tokens).toBe(17);
+    expect(dataset.issues.find((issue) => issue.issue_identifier === 'CO-7')?.tokens?.reasoning_output_tokens).toBe(17);
+  });
+
   it('falls back to provider proof activity when manifest-backed latest-event data is absent', () => {
     const projection = buildProjection();
     const retryIssue = projection.issues.find((issue) => issue.issueIdentifier === 'CO-8');

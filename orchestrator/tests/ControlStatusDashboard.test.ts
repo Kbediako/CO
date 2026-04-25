@@ -627,7 +627,7 @@ describe('control status dashboard', () => {
       '│ Agents: 1/4 max allowed',
       '│ Throughput: 1,842 tps',
       '│ Runtime: 15m 12s',
-      '│ Tokens: in 100 | out 117 | total 217',
+      '│ Tokens: in 100 | out 117 | total 217 | reasoning n/a',
       '│ Rate Limits: Codex primary 63.3% | secondary 60% | credits 1234.50',
       '│ Project: CO Control and Advisory',
       '│ Next refresh: 15s | source 9s old',
@@ -635,7 +635,7 @@ describe('control status dashboard', () => {
     ]);
     expect(plainFrame).toContain('│ Agents: 1/4 max allowed');
     expect(plainFrame).toContain('│ Throughput: 1,842 tps');
-    expect(plainFrame).toContain('│ Tokens: in 100 | out 117 | total 217');
+    expect(plainFrame).toContain('│ Tokens: in 100 | out 117 | total 217 | reasoning n/a');
     expect(plainFrame).toContain('│ Rate Limits: Codex primary 63.3% | secondary 60% | credits 1234.50');
     expect(plainFrame).toContain('│   ID         STAGE        PID');
     expect(plainFrame).toContain('│ ● CO-26      running      4242');
@@ -643,6 +643,26 @@ describe('control status dashboard', () => {
     expect(plainFrame).toContain('│  ↻ CO-27 retry scheduled in 1m | attempt 2 | rate limit exceeded');
     expect(plainFrame).toContain('├─ Status controls');
     expect(plainFrame).toContain('│ Inspect: live | alternate screen | full frame');
+  });
+
+  it('renders reasoning output tokens when Codex usage reports them', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        totals: {
+          ...buildDataset().totals,
+          reasoning_output_tokens: 31
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 1842.7
+    });
+
+    expect(stripAnsi(frame)).toContain('│ Tokens: in 100 | out 117 | total 217 | reasoning 31');
   });
 
   it('renders remote worker_host ownership in the live running and retry frame text', () => {
@@ -1027,7 +1047,7 @@ describe('control status dashboard', () => {
     expect(plainFrame).toBe([
       '╭─ CO STATUS',
       '│ Status: 1/4 max allowed | 15m 12s | next 15s | source 9s old',
-      '│ Tokens: in 100 | out 117 | total 217',
+      '│ Tokens: in 100 | out 117 | total 217 | reasoning n/a',
       '│ Rate Limits: Codex primary 63.3% | secondary 60% | credits 1234.50',
       '│ Running: CO-26 | running | Terminal dashboard renderer in progress',
       '│ Retry: CO-27 | retry scheduled in 1m | rate limit exceeded',
@@ -1736,7 +1756,7 @@ describe('control status dashboard', () => {
     });
 
     const plainFrame = stripAnsi(frame);
-    expect(plainFrame).toContain('│ Tokens: in n/a | out n/a | total n/a');
+    expect(plainFrame).toContain('│ Tokens: in n/a | out n/a | total n/a | reasoning n/a');
     expect(plainFrame).toContain('│ ● CO-26      running      4242');
     expect(plainFrame).toContain('15m / 4             n/a session-26');
   });
@@ -2027,7 +2047,7 @@ describe('control status dashboard', () => {
     expect(stripAnsi(writes[1] ?? '')).not.toContain('│ Dashboard: ');
     expect(stripAnsi(writes[1] ?? '')).toContain('│ Runtime: 15m 13s');
     expect(stripAnsi(writes[1] ?? '')).toContain('15m 1s / 4');
-    expect(stripAnsi(writes[1] ?? '')).toContain('│ Tokens: in 100 | out 117 | total 218');
+    expect(stripAnsi(writes[1] ?? '')).toContain('│ Tokens: in 100 | out 117 | total 218 | reasoning n/a');
 
     handle.stop();
     expect(writes[writes.length - 1]).toBe('\n');

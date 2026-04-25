@@ -1959,6 +1959,74 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(parsed.lastEvent).toBe('turn.completed');
   });
 
+  it('parses Codex 0.125 reasoning output tokens from turn.completed usage', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-1"}',
+        '{"type":"turn.completed","usage":{"input_tokens":32795,"cached_input_tokens":3456,"output_tokens":52,"reasoning_output_tokens":17}}'
+      ].join('\n')
+    );
+
+    expect(parsed.tokens).toEqual({
+      input_tokens: 32795,
+      output_tokens: 52,
+      total_tokens: 32847,
+      reasoning_output_tokens: 17
+    });
+    expect(parsed.lastEvent).toBe('turn.completed');
+  });
+
+  it('preserves reasoning output tokens when later legacy token samples omit them', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-1"}',
+        '{"type":"turn.completed","usage":{"input_tokens":32795,"cached_input_tokens":3456,"output_tokens":52,"reasoning_output_tokens":17}}',
+        '{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":32800,"output_tokens":60,"total_tokens":32860}}}}'
+      ].join('\n')
+    );
+
+    expect(parsed.tokens).toEqual({
+      input_tokens: 32800,
+      output_tokens: 60,
+      total_tokens: 32860,
+      reasoning_output_tokens: 17
+    });
+  });
+
+  it('preserves core token counts on reasoning-only updates', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-1"}',
+        '{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"output_tokens":20,"total_tokens":120}}}}',
+        '{"type":"turn.completed","usage":{"reasoning_output_tokens":9}}'
+      ].join('\n')
+    );
+
+    expect(parsed.tokens).toEqual({
+      input_tokens: 100,
+      output_tokens: 20,
+      total_tokens: 120,
+      reasoning_output_tokens: 9
+    });
+  });
+
+  it('uses a fresh observed reasoning output token value when the sample includes one', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-1"}',
+        '{"type":"turn.completed","usage":{"input_tokens":100,"output_tokens":20,"reasoning_output_tokens":9}}',
+        '{"type":"notification","payload":{"method":"thread/tokenUsage/updated","params":{"tokenUsage":{"inputTokens":10,"outputTokens":5,"totalTokens":15,"reasoningOutputTokens":3}}},"timestamp":"2026-03-21T09:00:00.100Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.tokens).toEqual({
+      input_tokens: 10,
+      output_tokens: 5,
+      total_tokens: 15,
+      reasoning_output_tokens: 3
+    });
+  });
+
   it('parses appserver method telemetry into proof event/message semantics', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [
@@ -1999,16 +2067,17 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
   it('keeps token-update humanization aligned with parser-supported tokenUsage shapes', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [
-        '{"type":"notification","payload":{"method":"thread/tokenUsage/updated","params":{"tokenUsage":{"inputTokens":7,"outputTokens":5,"totalTokens":12}}},"timestamp":"2026-03-21T09:00:00.100Z"}'
+        '{"type":"notification","payload":{"method":"thread/tokenUsage/updated","params":{"tokenUsage":{"inputTokens":7,"outputTokens":5,"totalTokens":12,"reasoningOutputTokens":3}}},"timestamp":"2026-03-21T09:00:00.100Z"}'
       ].join('\n')
     );
 
     expect(parsed.tokens).toEqual({
       input_tokens: 7,
       output_tokens: 5,
-      total_tokens: 12
+      total_tokens: 12,
+      reasoning_output_tokens: 3
     });
-    expect(parsed.finalMessage).toBe('thread token usage updated (in 7 / out 5 / total 12)');
+    expect(parsed.finalMessage).toBe('thread token usage updated (in 7 / out 5 / total 12 / reasoning 3)');
   });
 
   it('parses Codex usage-window rate limits without a legacy limit id', () => {

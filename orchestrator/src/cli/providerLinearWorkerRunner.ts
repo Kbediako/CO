@@ -196,6 +196,7 @@ export interface ProviderLinearWorkerTokenUsage {
   input_tokens: number | null;
   output_tokens: number | null;
   total_tokens: number | null;
+  reasoning_output_tokens?: number | null;
 }
 
 export interface ProviderLinearResidentSessionSeed {
@@ -2147,7 +2148,7 @@ function applyProviderLinearWorkerJsonlRecord(
   }
   const observedTokens = extractProviderWorkerTokenUsage(parsed);
   if (observedTokens && hasProviderWorkerTokenUsage(observedTokens)) {
-    state.tokens = observedTokens;
+    state.tokens = mergeProviderWorkerObservedTokenUsage(state.tokens, observedTokens);
     changed = true;
   }
   const observedRateLimits = extractProviderWorkerRateLimits(parsed);
@@ -2209,7 +2210,12 @@ function isProviderLinearWorkerBookkeepingRecord(parsed: Record<string, unknown>
 }
 
 function hasProviderWorkerTokenUsage(value: ProviderLinearWorkerTokenUsage): boolean {
-  return value.input_tokens !== null || value.output_tokens !== null || value.total_tokens !== null;
+  return (
+    value.input_tokens !== null ||
+    value.output_tokens !== null ||
+    value.total_tokens !== null ||
+    value.reasoning_output_tokens != null
+  );
 }
 
 function maxProviderWorkerNullableNumber(left: number | null, right: number | null): number | null {
@@ -2226,11 +2232,36 @@ function mergeProviderWorkerTokenUsageFloor(
   current: ProviderLinearWorkerTokenUsage,
   observed: ProviderLinearWorkerTokenUsage
 ): ProviderLinearWorkerTokenUsage {
-  return {
+  const merged: ProviderLinearWorkerTokenUsage = {
     input_tokens: maxProviderWorkerNullableNumber(current.input_tokens, observed.input_tokens),
     output_tokens: maxProviderWorkerNullableNumber(current.output_tokens, observed.output_tokens),
     total_tokens: maxProviderWorkerNullableNumber(current.total_tokens, observed.total_tokens)
   };
+  const reasoningOutputTokens = maxProviderWorkerNullableNumber(
+    current.reasoning_output_tokens ?? null,
+    observed.reasoning_output_tokens ?? null
+  );
+  if (reasoningOutputTokens !== null) {
+    merged.reasoning_output_tokens = reasoningOutputTokens;
+  }
+  return merged;
+}
+
+function mergeProviderWorkerObservedTokenUsage(
+  current: ProviderLinearWorkerTokenUsage,
+  observed: ProviderLinearWorkerTokenUsage
+): ProviderLinearWorkerTokenUsage {
+  const merged: ProviderLinearWorkerTokenUsage = {
+    input_tokens: observed.input_tokens ?? current.input_tokens,
+    output_tokens: observed.output_tokens ?? current.output_tokens,
+    total_tokens: observed.total_tokens ?? current.total_tokens
+  };
+  const reasoningOutputTokens =
+    observed.reasoning_output_tokens ?? current.reasoning_output_tokens ?? null;
+  if (reasoningOutputTokens !== null) {
+    merged.reasoning_output_tokens = reasoningOutputTokens;
+  }
+  return merged;
 }
 
 function providerWorkerTokenUsageFallsBehindFloor(
@@ -2495,16 +2526,33 @@ function normalizeProviderWorkerTokenUsage(
     'totalTokens',
     'total'
   ]);
+  const reasoningOutputTokens = readTokenCount(input, [
+    'reasoning_output_tokens',
+    'reasoningOutputTokens',
+    'total_reasoning_output_tokens',
+    'totalReasoningOutputTokens',
+    'reasoning_tokens',
+    'reasoningTokens'
+  ]);
   const normalizedTotalTokens =
     totalTokens ?? (inputTokens !== null && outputTokens !== null ? inputTokens + outputTokens : null);
-  if (inputTokens === null && outputTokens === null && normalizedTotalTokens === null) {
+  if (
+    inputTokens === null &&
+    outputTokens === null &&
+    normalizedTotalTokens === null &&
+    reasoningOutputTokens === null
+  ) {
     return null;
   }
-  return {
+  const usage: ProviderLinearWorkerTokenUsage = {
     input_tokens: inputTokens,
     output_tokens: outputTokens,
     total_tokens: normalizedTotalTokens
   };
+  if (reasoningOutputTokens !== null) {
+    usage.reasoning_output_tokens = reasoningOutputTokens;
+  }
+  return usage;
 }
 
 function readTokenCount(input: Record<string, unknown>, keys: string[]): number | null {
@@ -3824,6 +3872,9 @@ function formatProviderWorkerTokenUsageSummary(
   }
   if (typeof usage.total_tokens === 'number' && Number.isFinite(usage.total_tokens)) {
     parts.push(`total ${Math.max(0, Math.trunc(usage.total_tokens))}`);
+  }
+  if (typeof usage.reasoning_output_tokens === 'number' && Number.isFinite(usage.reasoning_output_tokens)) {
+    parts.push(`reasoning ${Math.max(0, Math.trunc(usage.reasoning_output_tokens))}`);
   }
   return parts.length > 0 ? parts.join(' / ') : null;
 }
