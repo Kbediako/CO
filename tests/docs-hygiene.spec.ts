@@ -57,12 +57,14 @@ async function writeDocsCatalogFixture(
     entries = [],
     patterns = [],
     readmeBudget = { max_lines: 240, max_h2_sections: 9 },
-    extraPolicies = {}
+    extraPolicies = {},
+    codexPostureSourcePath = 'docs/guides/codex-version-policy.md'
   }: {
     entries?: Array<Record<string, unknown>>;
     patterns?: Array<Record<string, unknown>>;
     readmeBudget?: { max_lines: number; max_h2_sections: number };
     extraPolicies?: Record<string, unknown>;
+    codexPostureSourcePath?: string;
   } = {}
 ) {
   await mkdir(join(repoRoot, 'docs', 'guides'), { recursive: true });
@@ -87,12 +89,14 @@ async function writeDocsCatalogFixture(
         version: 1,
         classes: {
           front_door: { label: 'Front Door', report_order: 10 },
+          public_guide: { label: 'Public Guide', report_order: 15 },
           repo_guide: { label: 'Repository Guide', report_order: 20 },
+          active_guide: { label: 'Active Guide', report_order: 40 },
           task_packet: { label: 'Task Packet', report_order: 200 }
         },
         policies: {
           codex_posture: {
-            source_path: 'docs/guides/codex-version-policy.md'
+            source_path: codexPostureSourcePath
           },
           readme_front_door: readmeBudget,
           bundled_skills_roster: {
@@ -104,6 +108,45 @@ async function writeDocsCatalogFixture(
         },
         entries,
         patterns
+      },
+      null,
+      2
+    ),
+    'utf8'
+  );
+}
+
+async function writeCodexPostureMatrixFixture(
+  repoRoot: string,
+  {
+    current = {},
+    surfaces = [],
+    historicalReleaseEvidence = []
+  }: {
+    current?: Record<string, unknown>;
+    surfaces?: Array<Record<string, unknown>>;
+    historicalReleaseEvidence?: Array<Record<string, unknown>>;
+  } = {}
+) {
+  await mkdir(join(repoRoot, 'docs'), { recursive: true });
+  await writeFile(
+    join(repoRoot, 'docs', 'codex-posture-matrix.json'),
+    JSON.stringify(
+      {
+        version: 1,
+        current: {
+          codex_cli_version: '0.117.0',
+          latest_audited_candidate_cli_version: '0.122.0',
+          marketplace_smoke_cli_version: '0.121.0',
+          cloud_canary_cli_version: '0.122.0',
+          model: 'gpt-5.4',
+          default_runtime: 'appserver',
+          explorer_fast_model: 'gpt-5.3-codex-spark',
+          unsupported_review_model: 'gpt-5.4-codex',
+          ...current
+        },
+        surfaces,
+        historical_release_evidence: historicalReleaseEvidence
       },
       null,
       2
@@ -1542,6 +1585,748 @@ describe('docs hygiene tooling', () => {
         reference: 'expected default runtime appserver from docs/guides/codex-version-policy.md'
       })
     );
+  });
+
+  it('loads current posture from a machine-readable matrix and validates matrix surfaces', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-matrix-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json',
+      entries: [
+        {
+          path: 'README.md',
+          doc_class: 'front_door',
+          truth_checks: ['codex-cli-version', 'model-posture', 'default-runtime']
+        }
+      ]
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      current: {
+        codex_cli_version: '0.125.0',
+        marketplace_smoke_cli_version: '0.124.0',
+        cloud_canary_cli_version: '0.124.0'
+      },
+      surfaces: [
+        {
+          path: 'README.md',
+          kind: 'front_door',
+          status: 'current',
+          requirements: [
+            {
+              label: 'current CLI target',
+              contains: 'Codex CLI `{{current_cli_version}}`'
+            },
+            {
+              label: 'workflow pin',
+              contains: '@openai/codex@{{marketplace_smoke_cli_version}}'
+            },
+            {
+              label: 'cloud canary posture',
+              contains: 'Cloud canary remains Codex CLI `{{cloud_canary_cli_version}}`'
+            }
+          ]
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'README.md'),
+      [
+        '# Codex Orchestrator',
+        '',
+        '- Current CO compatibility/adoption target is stable Codex CLI `0.125.0`.',
+        '- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces.',
+        '- Local appserver remains the expected default runtime path.',
+        '- Release smoke stays on @openai/codex@0.124.0.',
+        '- Cloud canary remains Codex CLI `0.124.0`.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors.find((error) => error.rule === 'codex-posture-matrix-drift')).toBeUndefined();
+    expect(errors.find((error) => error.rule === 'doc-posture-stale')).toBeUndefined();
+  });
+
+  it('flags drift when matrix-governed workflow or pack-smoke pin expectations disagree', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-matrix-drift-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, '.github', 'workflows'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json'
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      surfaces: [
+        {
+          path: '.github/workflows/core-lane.yml',
+          kind: 'workflow_pin',
+          status: 'current',
+          requirements: [
+            {
+              label: 'marketplace smoke workflow pin',
+              contains: 'npm install --global @openai/codex@{{marketplace_smoke_cli_version}}'
+            }
+          ]
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, '.github', 'workflows', 'core-lane.yml'),
+      ['name: core', 'jobs:', '  smoke:', '    steps:', '      - run: npm install --global @openai/codex@0.120.0', ''].join(
+        '\n'
+      ),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: '.github/workflows/core-lane.yml',
+        rule: 'codex-posture-matrix-drift',
+        reference: 'marketplace smoke workflow pin: expected "npm install --global @openai/codex@0.121.0"'
+      })
+    );
+  });
+
+  it('flags stale duplicate Codex package pins in matrix-managed pin surfaces', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-matrix-stale-pins-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, '.github', 'workflows'), { recursive: true });
+    await mkdir(join(repoRoot, 'tests'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json'
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      current: {
+        marketplace_smoke_cli_version: '0.121.0',
+        cloud_canary_cli_version: '0.122.0'
+      },
+      surfaces: [
+        {
+          path: '.github/workflows/core-lane.yml',
+          kind: 'workflow_pin',
+          status: 'current',
+          requirements: [
+            {
+              label: 'marketplace smoke workflow pin',
+              contains: 'npm install --global @openai/codex@{{marketplace_smoke_cli_version}}'
+            }
+          ]
+        },
+        {
+          path: 'tests/pack-smoke.spec.ts',
+          kind: 'pack_smoke_expectation',
+          status: 'current',
+          requirements: [
+            {
+              label: 'marketplace install expectation',
+              contains: 'npm install --global @openai/codex@{{marketplace_smoke_cli_version}}'
+            },
+            {
+              label: 'cloud install expectation',
+              contains: 'npm install --global @openai/codex@{{cloud_canary_cli_version}}'
+            }
+          ]
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, '.github', 'workflows', 'core-lane.yml'),
+      [
+        'name: core',
+        'jobs:',
+        '  smoke:',
+        '    steps:',
+        '      - run: npm install --global @openai/codex@0.121.0',
+        '      - run: npm install --global @openai/codex@0.120.0',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'tests', 'pack-smoke.spec.ts'),
+      [
+        "const marketplace = 'npm install --global @openai/codex@0.121.0';",
+        "const cloud = 'npm install --global @openai/codex@0.122.0';",
+        "const stale = 'npm install --global @openai/codex@0.120.0';",
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: '.github/workflows/core-lane.yml',
+        rule: 'codex-posture-matrix-drift',
+        reference: 'unexpected Codex package pin(s) 0.120.0; expected 0.121.0'
+      })
+    );
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'tests/pack-smoke.spec.ts',
+        rule: 'codex-posture-matrix-drift',
+        reference: 'unexpected Codex package pin(s) 0.120.0; expected 0.121.0, 0.122.0'
+      })
+    );
+  });
+
+  it('reports malformed matrix surfaces instead of silently dropping them', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-matrix-malformed-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json'
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      surfaces: [
+        {
+          kind: 'workflow_pin',
+          status: 'current',
+          requirements: [
+            {
+              label: 'marketplace smoke workflow pin',
+              contains: 'npm install --global @openai/codex@{{marketplace_smoke_cli_version}}'
+            }
+          ]
+        }
+      ]
+    });
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'docs/codex-posture-matrix.json',
+        rule: 'codex-posture-matrix-unresolved',
+        reference: 'matrix surface missing path'
+      })
+    );
+  });
+
+  it('reports malformed matrix requirements instead of silently dropping them', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-matrix-requirement-malformed-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json'
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      surfaces: [
+        {
+          path: 'README.md',
+          kind: 'front_door',
+          status: 'current',
+          requirements: [
+            {
+              label: 'current CLI target'
+            }
+          ]
+        }
+      ]
+    });
+    await writeFile(join(repoRoot, 'README.md'), '# Fixture\n', 'utf8');
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'docs/codex-posture-matrix.json',
+        rule: 'codex-posture-matrix-unresolved',
+        reference: 'README.md:current CLI target missing contains'
+      })
+    );
+  });
+
+  it('reports matrix surfaces with no requirements instead of silently skipping them', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-matrix-empty-requirements-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json'
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      surfaces: [
+        {
+          path: 'README.md',
+          kind: 'front_door',
+          status: 'current'
+        }
+      ]
+    });
+    await writeFile(join(repoRoot, 'README.md'), '# Fixture\n', 'utf8');
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'docs/codex-posture-matrix.json',
+        rule: 'codex-posture-matrix-unresolved',
+        reference: 'README.md:matrix surface missing requirements'
+      })
+    );
+  });
+
+  it('does not validate demoted historical matrix surfaces as current requirements', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-matrix-historical-surface-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json'
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      surfaces: [
+        {
+          path: 'docs/archive/codex-0.124-adoption.md',
+          kind: 'historical_evidence',
+          status: 'historical',
+          requirements: [
+            {
+              label: 'old active target',
+              contains: 'Codex CLI `{{current_cli_version}}`'
+            }
+          ]
+        }
+      ],
+      historicalReleaseEvidence: [
+        {
+          path: 'docs/archive/codex-0.124-adoption.md',
+          status: 'historical',
+          version: '0.124.0'
+        }
+      ]
+    });
+    await mkdir(join(repoRoot, 'docs', 'archive'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'docs', 'archive', 'codex-0.124-adoption.md'),
+      '# Codex 0.124 adoption evidence\n\nArchived evidence for Codex CLI `0.124.0`.\n',
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors.find((error) => error.rule === 'codex-posture-matrix-drift')).toBeUndefined();
+  });
+
+  it('fails stale active Codex release evidence pages without historical status', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-active-history-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs', 'book'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json',
+      entries: [
+        {
+          path: 'docs/book/codex-0.124-adoption.md',
+          status: 'active',
+          doc_class: 'public_guide',
+          truth_checks: []
+        }
+      ]
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      current: {
+        codex_cli_version: '0.125.0',
+        cloud_canary_cli_version: '0.124.0'
+      }
+    });
+    await writeFile(
+      join(repoRoot, 'docs', 'book', 'codex-0.124-adoption.md'),
+      [
+        '# Codex 0.124 adoption evidence',
+        '',
+        'This page is still linked as current guidance for Codex CLI `0.124.0`.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'docs/book/codex-0.124-adoption.md',
+        rule: 'codex-posture-history-active',
+        reference:
+          'active current-facing release evidence mentions Codex CLI version(s) 0.124.0 without current/historical/archive matrix status'
+      })
+    );
+  });
+
+  it('fails stale Codex release evidence links in current-facing navigation without historical status', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-active-history-nav-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs', 'book'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json',
+      entries: [
+        {
+          path: 'docs/book/index.md',
+          status: 'active',
+          doc_class: 'public_guide',
+          truth_checks: []
+        }
+      ]
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      current: {
+        codex_cli_version: '0.125.0',
+        cloud_canary_cli_version: '0.124.0'
+      }
+    });
+    await writeFile(
+      join(repoRoot, 'docs', 'book', 'index.md'),
+      ['# Book', '', '- [Codex 0.124 adoption evidence](codex-0.124-adoption.md)', ''].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'docs/book/index.md',
+        rule: 'codex-posture-history-active',
+        reference:
+          'active current-facing release evidence mentions Codex CLI version(s) 0.124.0 without current/historical/archive matrix status'
+      })
+    );
+  });
+
+  it('still scans release evidence links in current matrix-managed navigation docs', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-active-history-matrix-nav-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs', 'book'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json',
+      entries: [
+        {
+          path: 'docs/book/README.md',
+          status: 'active',
+          doc_class: 'public_guide',
+          truth_checks: []
+        }
+      ]
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      current: {
+        codex_cli_version: '0.125.0',
+        cloud_canary_cli_version: '0.124.0'
+      },
+      surfaces: [
+        {
+          path: 'docs/book/README.md',
+          kind: 'book_index',
+          status: 'current',
+          requirements: [
+            {
+              label: 'historical evidence demotion',
+              contains: '[Codex CLI 0.124.0 Adoption Evidence](codex-cli-0124-adoption.md): historical'
+            }
+          ]
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'docs', 'book', 'README.md'),
+      [
+        '# Book',
+        '',
+        '- [Codex CLI 0.124.0 Adoption Evidence](codex-cli-0124-adoption.md): historical',
+        '- [Codex CLI 0.124.0 Adoption Evidence](codex-cli-0124-stray.md)',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'docs/book/README.md',
+        rule: 'codex-posture-history-active',
+        reference:
+          'active current-facing release evidence mentions Codex CLI version(s) 0.124.0 without current/historical/archive matrix status'
+      })
+    );
+  });
+
+  it('allows current-facing navigation links to active matrix-managed candidate evidence', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-active-candidate-nav-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs', 'book'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json',
+      entries: [
+        {
+          path: 'docs/book/index.md',
+          status: 'active',
+          doc_class: 'public_guide',
+          truth_checks: []
+        }
+      ]
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      current: {
+        codex_cli_version: '0.118.0',
+        latest_audited_candidate_cli_version: '0.122.0'
+      },
+      surfaces: [
+        {
+          path: 'docs/book/codex-0.122-candidate-evidence.md',
+          kind: 'candidate_evidence',
+          status: 'candidate',
+          requirements: [
+            {
+              label: 'candidate evidence title',
+              contains: 'Codex 0.122 candidate evidence'
+            }
+          ]
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'docs', 'book', 'codex-0.122-candidate-evidence.md'),
+      '# Codex 0.122 candidate evidence\n\nCurrent candidate evidence for Codex CLI `0.122.0`.\n',
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'docs', 'book', 'index.md'),
+      ['# Book', '', '- [Codex 0.122 candidate evidence](codex-0.122-candidate-evidence.md)', ''].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors.find((error) => error.rule === 'codex-posture-history-active')).toBeUndefined();
+  });
+
+  it('allows stale Codex release evidence pages with explicit historical matrix status', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-historical-history-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs', 'book'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json',
+      entries: [
+        {
+          path: 'docs/book/codex-0.124-adoption.md',
+          status: 'active',
+          doc_class: 'public_guide',
+          truth_checks: []
+        }
+      ]
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      current: {
+        codex_cli_version: '0.125.0'
+      },
+      historicalReleaseEvidence: [
+        {
+          path: 'docs/book/codex-0.124-adoption.md',
+          status: 'historical',
+          version: '0.124.0',
+          title: 'Codex 0.124 adoption evidence'
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'docs', 'book', 'codex-0.124-adoption.md'),
+      [
+        '# Codex 0.124 adoption evidence',
+        '',
+        'This archived page preserves evidence for Codex CLI `0.124.0`.',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors.find((error) => error.rule === 'codex-posture-history-active')).toBeUndefined();
+  });
+
+  it('allows current-facing navigation links to explicit historical release evidence', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-historical-history-nav-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs', 'book'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json',
+      entries: [
+        {
+          path: 'docs/book/index.md',
+          status: 'active',
+          doc_class: 'public_guide',
+          truth_checks: []
+        }
+      ]
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      current: {
+        codex_cli_version: '0.125.0'
+      },
+      historicalReleaseEvidence: [
+        {
+          path: 'docs/book/codex-0.124-adoption.md',
+          status: 'historical',
+          version: '0.124.0',
+          title: 'Codex 0.124 adoption evidence'
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'docs', 'book', 'index.md'),
+      ['# Book', '', '- [Codex 0.124 adoption evidence](codex-0.124-adoption.md)', ''].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors.find((error) => error.rule === 'codex-posture-history-active')).toBeUndefined();
   });
 
   it('flags bundled skill roster drift for the README roster source', async () => {
