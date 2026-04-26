@@ -84,8 +84,8 @@ For cloud-focused lanes, avoid relying on fallback and fail fast on preflight is
 export CODEX_ORCHESTRATOR_CLOUD_FALLBACK=strict
 ```
 
-Accepted strict aliases: `strict`, `deny`, `false`, `0`, `off`, `disabled`, `never`.
-Accepted auto aliases: `auto`, `allow`, `true`, `1`, `on`, `enabled`.
+Accepted strict aliases: `strict`, `deny`, `denied`, `false`, `0`, `off`, `disabled`, `never`.
+Accepted auto aliases: `auto`, `allow`, `allowed`, `true`, `yes`, `1`, `on`, `enabled`.
 When strict is selected, cloud preflight failures stop the run with `status_detail=cloud-preflight-failed` and include the policy, original target, fallback target, and blocking reason in the failure detail.
 
 ## Observability + Issue Logging

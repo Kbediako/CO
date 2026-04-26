@@ -17,6 +17,7 @@ This mirror points to the canonical task spec at `tasks/specs/linear-9473c8b2-3f
 - `strict`: fallback routing is denied when the original runtime target is blocked. The run must fail before launching the fallback target, with an actionable blocking reason.
 - Required fields across runtime fallback surfaces:
   - selected policy
+  - policy source
   - original target
   - fallback target
   - blocking reason

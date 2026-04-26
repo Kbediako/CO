@@ -67,7 +67,7 @@ export async function executeOrchestratorLocalRouteShell(
           state.runtimeSelection.fallback.reason ??
           'runtime fallback occurred';
         const fallbackSummary =
-          `Runtime fallback: policy=${fallback.policy} code=${fallbackCode} ` +
+          `Runtime fallback: policy=${fallback.policy} policy_source=${fallback.policy_source} code=${fallbackCode} ` +
           `original_target=${describeFallbackTarget(fallback.original_target)} ` +
           `fallback_target=${describeFallbackTarget(fallback.fallback_target)} ` +
           `blocking_reason=${fallbackReason}`;

@@ -953,15 +953,15 @@ function emitRunOutput(
       `Runtime: ${payload.runtime_mode}${payload.runtime_mode_requested ? ` (requested ${payload.runtime_mode_requested})` : ''}` +
         (payload.runtime_provider ? ` via ${payload.runtime_provider}` : '')
     );
-    if (payload.runtime_fallback?.occurred || payload.runtime_fallback?.blocking_reason) {
-      console.log(
-        `Runtime fallback: policy=${payload.runtime_fallback.policy ?? 'auto'} ` +
-          `code=${payload.runtime_fallback.code ?? 'runtime-fallback'} ` +
-          `original_target=${payload.runtime_fallback.original_target ?? '<none>'} ` +
-          `fallback_target=${payload.runtime_fallback.fallback_target ?? '<none>'} ` +
-          `blocking_reason=${payload.runtime_fallback.blocking_reason ?? payload.runtime_fallback.reason ?? 'n/a'}`
-      );
-    }
+  }
+  if (payload.runtime_fallback?.occurred || payload.runtime_fallback?.blocking_reason) {
+    console.log(
+      `Runtime fallback: policy=${payload.runtime_fallback.policy ?? 'auto'} ` +
+        `code=${payload.runtime_fallback.code ?? 'runtime-fallback'} ` +
+        `original_target=${payload.runtime_fallback.original_target ?? '<none>'} ` +
+        `fallback_target=${payload.runtime_fallback.fallback_target ?? '<none>'} ` +
+        `blocking_reason=${payload.runtime_fallback.blocking_reason ?? payload.runtime_fallback.reason ?? 'n/a'}`
+    );
   }
   if (payload.cloud_fallback) {
     console.log(

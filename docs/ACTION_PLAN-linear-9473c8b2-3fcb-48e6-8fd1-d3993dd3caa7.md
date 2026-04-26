@@ -14,6 +14,7 @@
   - `auto`
   - `strict`
   - `selected policy`
+  - `policy source`
   - `original target`
   - `fallback target`
   - `blocking reason`
@@ -21,7 +22,8 @@
 - Not done if:
   - the packet treats `auto` as silent fallback
   - the packet treats `strict` as a global runtime default change
-  - selected policy, original target, fallback target, or blocking reason is omitted
+  - selected policy, policy source, original target, fallback target, or blocking reason is omitted
+  - focused validation evidence does not assert policy source alongside fallback target and blocking reason
   - source/test implementation is attempted in this child lane
 - Pre-implementation issue-quality review:
   - 2026-04-26: current runtime files show fallback behavior centered in `orchestrator/src/cli/runtime/provider.ts`, manifest mutation in `orchestrator/src/cli/services/orchestratorRuntimeManifestMutation.ts`, route propagation in `orchestrator/src/cli/services/orchestratorExecutionRouteState.ts`, and local summary handling in `orchestrator/src/cli/services/orchestratorLocalRouteShell.ts`.
@@ -56,6 +58,7 @@
 - Parent implementation checks:
   - docs-review
   - focused runtime/provider/router tests
+  - focused validation evidence for `policy_source` / `fallback_policy_source` on fallback and non-fallback runtime summaries
   - focused provider-worker/control-host projection tests
   - validation floor
   - standalone review

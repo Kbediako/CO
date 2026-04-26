@@ -156,10 +156,10 @@ describe('executeOrchestratorLocalRouteShell', () => {
 
     expect(result.success).toBe(true);
     expect(result.notes).toEqual([
-      'Runtime fallback: policy=auto code=appserver-command-unavailable original_target=runtime:appserver fallback_target=runtime:cli blocking_reason=Appserver preflight failed.'
+      'Runtime fallback: policy=auto policy_source=env code=appserver-command-unavailable original_target=runtime:appserver fallback_target=runtime:cli blocking_reason=Appserver preflight failed.'
     ]);
     expect(options.manifest.summary).toBe(
-      'Runtime fallback: policy=auto code=appserver-command-unavailable original_target=runtime:appserver fallback_target=runtime:cli blocking_reason=Appserver preflight failed.'
+      'Runtime fallback: policy=auto policy_source=env code=appserver-command-unavailable original_target=runtime:appserver fallback_target=runtime:cli blocking_reason=Appserver preflight failed.'
     );
   });
 

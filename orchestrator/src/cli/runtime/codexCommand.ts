@@ -58,7 +58,7 @@ export function resolveRuntimeCodexCommand(
 export function formatRuntimeSelectionSummary(selection: RuntimeSelection): string {
   const base =
     `runtime requested=${selection.requested_mode} selected=${selection.selected_mode} provider=${selection.provider}` +
-    ` fallback_policy=${selection.fallback.policy}`;
+    ` fallback_policy=${selection.fallback.policy} fallback_policy_source=${selection.fallback.policy_source}`;
   if (!selection.fallback.occurred) {
     return base;
   }

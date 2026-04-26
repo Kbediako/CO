@@ -447,7 +447,9 @@ Options:
           CODEX_REVIEW_NON_INTERACTIVE: '1',
           CODEX_ORCHESTRATOR_ROOT: repoDir,
           CODEX_ORCHESTRATOR_RUNS_DIR: join(repoDir, '.runs'),
-          CODEX_ORCHESTRATOR_OUT_DIR: join(repoDir, 'out')
+          CODEX_ORCHESTRATOR_OUT_DIR: join(repoDir, 'out'),
+          CODEX_ORCHESTRATOR_CLOUD_FALLBACK: 'auto',
+          CODEX_ORCHESTRATOR_RUNTIME_FALLBACK: 'auto'
         };
 
         const defaultModeLabel = `canary-default-mode-${runSuffix}`;
