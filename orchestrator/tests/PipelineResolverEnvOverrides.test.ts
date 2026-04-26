@@ -346,6 +346,7 @@ describe('PipelineResolver env overrides', () => {
     expect(testEnv.CODEX_VITEST_PROGRESS).toBe('1');
     expect(testEnv.FORCE_CODEX_REVIEW).toBe('');
     expect(testEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('');
+    expect(testEnv.CODEX_REVIEW_AUTHORITATIVE_GATE).toBe('');
     expect(testEnv.CODEX_NON_INTERACTIVE).toBe('');
     expect(testEnv.CODEX_NO_INTERACTIVE).toBe('');
     expect(testEnv.CODEX_NONINTERACTIVE).toBe('');
@@ -386,21 +387,25 @@ describe('PipelineResolver env overrides', () => {
 
     expect(implementationReviewEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
     expect(implementationReviewEnv.FORCE_CODEX_REVIEW).toBe('1');
+    expect(implementationReviewEnv.CODEX_REVIEW_AUTHORITATIVE_GATE).toBe('1');
     expect(implementationReviewEnv.CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON).toBe(
       'Pipeline-owned implementation gate review accepts large uncommitted scope; use --base/--commit for narrower operator-driven review runs.'
     );
     expect(docsReviewEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
     expect(docsReviewEnv.FORCE_CODEX_REVIEW).toBe('1');
+    expect(docsReviewEnv.CODEX_REVIEW_AUTHORITATIVE_GATE).toBe('1');
     expect(docsReviewEnv.CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON).toBe(
       'Pipeline-owned docs review accepts large uncommitted scope; use --base/--commit for narrower operator-driven review runs.'
     );
     expect(docsRelevanceEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
     expect(docsRelevanceEnv.FORCE_CODEX_REVIEW).toBe('');
+    expect(docsRelevanceEnv.CODEX_REVIEW_AUTHORITATIVE_GATE).toBe('');
     expect(providerWorkerStage?.command).toBe(
       'node "$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/providerLinearWorkerRunner.js"'
     );
     expect(providerWorkerEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
     expect(providerWorkerEnv.FORCE_CODEX_REVIEW).toBe('1');
+    expect(providerWorkerEnv.CODEX_REVIEW_AUTHORITATIVE_GATE).toBe('1');
   });
 });
 

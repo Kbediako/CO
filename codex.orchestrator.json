@@ -22,6 +22,7 @@
           "CODEX_VITEST_PROGRESS": "1",
           "FORCE_CODEX_REVIEW": "",
           "CODEX_REVIEW_NON_INTERACTIVE": "",
+          "CODEX_REVIEW_AUTHORITATIVE_GATE": "",
           "CODEX_NON_INTERACTIVE": "",
           "CODEX_NO_INTERACTIVE": "",
           "CODEX_NONINTERACTIVE": "",
@@ -91,6 +92,7 @@
         "env": {
           "SKIP_DIFF_BUDGET": "1",
           "CODEX_REVIEW_NON_INTERACTIVE": "1",
+          "CODEX_REVIEW_AUTHORITATIVE_GATE": "",
           "FORCE_CODEX_REVIEW": "",
           "CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON": "Pipeline-owned docs relevance advisory review accepts large uncommitted scope; use --base/--commit for narrower operator-driven review runs.",
           "NOTES": "Goal: docs relevance advisory | Summary: semantic docs relevance review lane with manifest context | Risks: advisory-only lane; false positives/negatives possible"
@@ -202,6 +204,7 @@
             "DIFF_BUDGET_STAGE": "1",
             "CODEX_REVIEW_NON_INTERACTIVE": "1",
             "FORCE_CODEX_REVIEW": "1",
+            "CODEX_REVIEW_AUTHORITATIVE_GATE": "1",
             "CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON": "Pipeline-owned implementation gate review accepts large uncommitted scope; use --base/--commit for narrower operator-driven review runs.",
             "CODEX_REVIEW_ENFORCE_EVIDENCE_CONSISTENCY": "1",
             "NOTES": "Goal: implementation gate forced standalone review | Summary: automated forced review execution with manifest evidence + scope hints | Risks: review output depends on local Codex CLI capabilities"
@@ -238,6 +241,7 @@
             "SKIP_DIFF_BUDGET": "1",
             "CODEX_REVIEW_NON_INTERACTIVE": "1",
             "FORCE_CODEX_REVIEW": "1",
+            "CODEX_REVIEW_AUTHORITATIVE_GATE": "1",
             "CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON": "Pipeline-owned docs review accepts large uncommitted scope; use --base/--commit for narrower operator-driven review runs.",
             "CODEX_REVIEW_ENFORCE_EVIDENCE_CONSISTENCY": "1",
             "NOTES": "Goal: docs review forced standalone review | Summary: automated forced review execution with manifest evidence + scope hints | Risks: review output depends on local Codex CLI capabilities"
@@ -335,7 +339,8 @@
           "command": "node \"$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/providerLinearWorkerRunner.js\"",
           "env": {
             "CODEX_REVIEW_NON_INTERACTIVE": "1",
-            "FORCE_CODEX_REVIEW": "1"
+            "FORCE_CODEX_REVIEW": "1",
+            "CODEX_REVIEW_AUTHORITATIVE_GATE": "1"
           },
           "summaryHint": "Provider linear worker completed with forced standalone review enabled for handoff"
         }

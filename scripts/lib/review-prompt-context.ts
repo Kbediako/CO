@@ -42,6 +42,8 @@ export interface BuildReviewPromptContextOptions {
   runnerLogExists: boolean;
   relativeRunnerLog: string;
   notes?: string;
+  authoritativeGate?: boolean;
+  missingNotesWaiver?: MissingReviewNotesWaiver | null;
   scopeMode: ReviewScopeMode;
   includeBoundedReviewConstraints?: boolean;
 }
@@ -52,6 +54,14 @@ export interface BuildReviewPromptContextResult {
   activeCloseoutBundleRoots: string[];
   resolvedNotes: string;
   scopedReviewerVisibleTitle: string;
+}
+
+export interface MissingReviewNotesWaiver {
+  reason?: string | null;
+  approvedBy?: string | null;
+  owner?: string | null;
+  expiresAt?: string | null;
+  evidence?: string | null;
 }
 
 async function readTaskIndexEntries(repoRoot: string): Promise<TaskIndexEntry[]> {
@@ -323,19 +333,77 @@ export function resolveReviewNotes(options: {
   notes: string | undefined;
   taskLabel: string;
   surface: ReviewSurface;
+  authoritativeGate?: boolean;
+  missingNotesWaiver?: MissingReviewNotesWaiver | null;
 }): string {
-  if (options.notes) {
-    return options.notes;
+  const notes = options.notes?.trim();
+  if (notes) {
+    return notes;
   }
-  const fallback =
-    `Goal: standalone review handoff | ` +
-    `Summary: auto-generated NOTES fallback (task=${options.taskLabel}, surface=${options.surface}) | ` +
-    'Risks: missing custom intent details may reduce review precision';
-  console.warn(
-    '[run-review] NOTES was not provided; using a generated fallback. ' +
-      'Set NOTES="Goal: ... | Summary: ... | Risks: ... | Questions (optional): ..." for higher-signal review context.'
+  if (options.missingNotesWaiver) {
+    return formatMissingReviewNotesWaiver({
+      taskLabel: options.taskLabel,
+      surface: options.surface,
+      waiver: options.missingNotesWaiver
+    });
+  }
+  if (!options.authoritativeGate) {
+    const fallback =
+      `Goal: standalone review handoff | ` +
+      `Summary: auto-generated NOTES fallback (task=${options.taskLabel}, surface=${options.surface}) | ` +
+      'Risks: missing custom intent details may reduce review precision';
+    console.warn(
+      '[run-review] NOTES was not provided; using a generated fallback for a non-authoritative review. ' +
+        'Set NOTES="Goal: ... | Summary: ... | Risks: ... | Questions (optional): ..." for higher-signal review context.'
+    );
+    return fallback;
+  }
+  throw new Error(
+    'NOTES is required for the authoritative review gate; set NOTES="Goal: ... | Summary: ... | Risks: ... | Questions (optional): ..." or provide a break-glass waiver.'
   );
-  return fallback;
+}
+
+function requireWaiverField(value: string | null | undefined, label: string): string {
+  const normalized = value?.trim();
+  if (!normalized) {
+    throw new Error(`NOTES is required for the authoritative review gate; missing break-glass waiver ${label}.`);
+  }
+  return normalized;
+}
+
+function requireFutureWaiverExpiry(value: string | null | undefined): string {
+  const normalized = requireWaiverField(value, 'expires_at');
+  const expiresAtMs = Date.parse(normalized);
+  if (!Number.isFinite(expiresAtMs)) {
+    throw new Error(
+      `NOTES is required for the authoritative review gate; break-glass waiver expires_at is invalid: ${normalized}.`
+    );
+  }
+  if (expiresAtMs <= Date.now()) {
+    throw new Error(
+      `NOTES is required for the authoritative review gate; break-glass waiver expired at ${normalized}.`
+    );
+  }
+  return normalized;
+}
+
+function formatMissingReviewNotesWaiver(options: {
+  taskLabel: string;
+  surface: ReviewSurface;
+  waiver: MissingReviewNotesWaiver;
+}): string {
+  const approvedBy = requireWaiverField(
+    options.waiver.approvedBy?.trim() || options.waiver.owner,
+    'approved_by'
+  );
+  const reason = requireWaiverField(options.waiver.reason, 'reason');
+  const expiresAt = requireFutureWaiverExpiry(options.waiver.expiresAt);
+  const evidence = requireWaiverField(options.waiver.evidence, 'evidence');
+  return [
+    'Goal: standalone review break-glass',
+    `Summary: Break-glass missing NOTES waiver (task=${options.taskLabel}, surface=${options.surface}, approved_by=${approvedBy}, expires_at=${expiresAt}, evidence=${evidence})`,
+    `Risks: missing authored NOTES allowed only by explicit waiver; reason=${reason}`
+  ].join(' | ');
 }
 
 function normalizeScopedReviewTitleSegment(value: string): string {
@@ -413,9 +481,11 @@ export async function buildReviewPromptContext(
   options: BuildReviewPromptContextOptions
 ): Promise<BuildReviewPromptContextResult> {
   const notes = resolveReviewNotes({
-    notes: options.notes?.trim(),
+    notes: options.notes,
     taskLabel: options.taskLabel,
-    surface: options.reviewSurface
+    surface: options.reviewSurface,
+    authoritativeGate: options.authoritativeGate,
+    missingNotesWaiver: options.missingNotesWaiver
   });
   const scopedReviewerVisibleTitle = buildScopedReviewTitle({
     notes,

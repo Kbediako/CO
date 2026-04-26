@@ -1,6 +1,31 @@
 {
   "items": [
     {
+      "id": "20260426-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25",
+      "title": "CO-380 authoritative review gate",
+      "relates_to": "tasks/tasks-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-26",
+      "approvals": {
+        "tests_child_lane": {
+          "reviewer": "bounded same-issue tests child lane plus parent provider worker",
+          "date": "2026-04-26",
+          "status": "accepted",
+          "manifest": ".runs/linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25-notes-contract-tests/cli/2026-04-26T00-23-19-232Z-fb205e4e/manifest.json",
+          "summary": "Child lane added focused review-prompt context tests so missing NOTES is exceptional under the authoritative review gate and break-glass waiver context is review-visible."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md",
+        "task": "tasks/tasks-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md",
+        "agent_task": ".agent/task/linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md",
+        "docs": "docs/TECH_SPEC-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md"
+      }
+    },
+    {
       "id": "20260426-linear-67e2ffd2-a653-4d69-9241-5f32c459a682",
       "title": "CO-386 Codex CLI release-intake supersession workflow",
       "relates_to": "tasks/tasks-linear-67e2ffd2-a653-4d69-9241-5f32c459a682.md",

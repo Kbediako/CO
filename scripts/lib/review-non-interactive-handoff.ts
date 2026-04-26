@@ -40,6 +40,9 @@ export function shouldPrintNonInteractiveHandoff(params: {
   nonInteractive: boolean;
   stdinIsTTY: boolean;
 }): boolean {
+  if (envFlagEnabled(params.env.CODEX_REVIEW_AUTHORITATIVE_GATE)) {
+    return false;
+  }
   return (
     params.nonInteractive &&
     !envFlagEnabled(params.env.FORCE_CODEX_REVIEW) &&

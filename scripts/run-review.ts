@@ -43,6 +43,7 @@ import {
   addBoundedReviewConstraintsToScopedTitle,
   buildActiveCloseoutProvenanceLines,
   buildReviewPromptContext,
+  type MissingReviewNotesWaiver,
   type ReviewSurface
 } from './lib/review-prompt-context.js';
 import {
@@ -77,6 +78,12 @@ const REVIEW_ENABLE_DELEGATION_MCP_ENV_KEY = 'CODEX_REVIEW_ENABLE_DELEGATION_MCP
 const REVIEW_DISABLE_DELEGATION_MCP_ENV_KEY = 'CODEX_REVIEW_DISABLE_DELEGATION_MCP';
 const REVIEW_TELEMETRY_DEBUG_ENV_KEY = 'CODEX_REVIEW_DEBUG_TELEMETRY';
 const REVIEW_SURFACE_ENV_KEY = 'CODEX_REVIEW_SURFACE';
+const REVIEW_AUTHORITATIVE_GATE_ENV_KEY = 'CODEX_REVIEW_AUTHORITATIVE_GATE';
+const REVIEW_BREAK_GLASS_NOTES_FALLBACK_ENV_KEY = 'CODEX_REVIEW_BREAK_GLASS_NOTES_FALLBACK';
+const REVIEW_BREAK_GLASS_OWNER_ENV_KEY = 'CODEX_REVIEW_BREAK_GLASS_OWNER';
+const REVIEW_BREAK_GLASS_EXPIRES_AT_ENV_KEY = 'CODEX_REVIEW_BREAK_GLASS_EXPIRES_AT';
+const REVIEW_BREAK_GLASS_REASON_ENV_KEY = 'CODEX_REVIEW_BREAK_GLASS_REASON';
+const REVIEW_BREAK_GLASS_EVIDENCE_ENV_KEY = 'CODEX_REVIEW_BREAK_GLASS_EVIDENCE';
 const PROVIDER_LINEAR_WORKER_PIPELINE_ID = 'provider-linear-worker';
 const PROVIDER_WORKSPACE_ROOT_DIRNAME = '.workspaces';
 const PRESERVE_PROVIDER_ARTIFACT_ROOTS_ENV =
@@ -125,6 +132,32 @@ function buildExplicitScopeSurfaceGateError(
     return null;
   }
   return `explicit scoped review cannot honor --surface ${reviewSurface} because current Codex CLI rejects inline prompt transport under --base/--commit/--uncommitted; the wrapper only has bounded --title transport there when supported and otherwise falls back to artifact-only scoped context, so rerun with the default diff surface or drop the explicit scope if you need ${reviewSurface} prompt context.`;
+}
+
+function resolveMissingReviewNotesWaiverFromEnv(env: NodeJS.ProcessEnv): MissingReviewNotesWaiver | null {
+  if (!envFlagEnabled(env[REVIEW_BREAK_GLASS_NOTES_FALLBACK_ENV_KEY])) {
+    return null;
+  }
+  return {
+    owner: env[REVIEW_BREAK_GLASS_OWNER_ENV_KEY],
+    expiresAt: env[REVIEW_BREAK_GLASS_EXPIRES_AT_ENV_KEY],
+    reason: env[REVIEW_BREAK_GLASS_REASON_ENV_KEY],
+    evidence: env[REVIEW_BREAK_GLASS_EVIDENCE_ENV_KEY]
+  };
+}
+
+function buildAuthoritativeNonInteractiveGateError(params: {
+  env: NodeJS.ProcessEnv;
+  nonInteractive: boolean;
+}): string | null {
+  if (
+    !envFlagEnabled(params.env[REVIEW_AUTHORITATIVE_GATE_ENV_KEY]) ||
+    !params.nonInteractive ||
+    envFlagEnabled(params.env.FORCE_CODEX_REVIEW)
+  ) {
+    return null;
+  }
+  return `${REVIEW_AUTHORITATIVE_GATE_ENV_KEY}=1 disallows prompt-only non-interactive review handoff; set FORCE_CODEX_REVIEW=1 so the authoritative review gate executes and writes terminal telemetry.`;
 }
 
 function installStdioErrorGuards(): void {
@@ -640,6 +673,8 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
       runnerLogExists,
       relativeRunnerLog,
       notes: process.env.NOTES,
+      authoritativeGate: envFlagEnabled(process.env[REVIEW_AUTHORITATIVE_GATE_ENV_KEY]),
+      missingNotesWaiver: resolveMissingReviewNotesWaiverFromEnv(process.env),
       scopeMode,
       includeBoundedReviewConstraints: !allowHeavyCommands
     });
@@ -690,10 +725,18 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
     const scopeMetrics = formatScopeMetrics(scopeAssessment);
     const largeScopeOverrideReason = resolveLargeScopeOverrideReason(process.env);
     const stdinIsTTY = process.stdin?.isTTY === true;
+    const requestedNonInteractive =
+      options.nonInteractive ?? shouldForceNonInteractive(process.env, stdinIsTTY);
+    const authoritativeNonInteractiveGateError = buildAuthoritativeNonInteractiveGateError({
+      env: process.env,
+      nonInteractive: requestedNonInteractive
+    });
+    if (authoritativeNonInteractiveGateError) {
+      throw new Error(authoritativeNonInteractiveGateError);
+    }
     const promptOnlyHandoff = shouldPrintNonInteractiveHandoff({
       env: process.env,
-      nonInteractive:
-        options.nonInteractive ?? shouldForceNonInteractive(process.env, stdinIsTTY),
+      nonInteractive: requestedNonInteractive,
       stdinIsTTY
     });
     logReviewScopeAssessment(scopeAssessment, scopeMetrics, console, largeScopeOverrideReason);
@@ -984,7 +1027,9 @@ Options:
   -h, --help                     Show this help.
 
 Environment:
-  NOTES (recommended)            Goal/summary/risks context. If omitted, wrapper generates fallback notes.
+  NOTES (required)               Goal/summary/risks context for review gate runs.
+  ${REVIEW_AUTHORITATIVE_GATE_ENV_KEY}=1  Disallow prompt-only non-interactive handoff as a successful review gate.
+  ${REVIEW_BREAK_GLASS_NOTES_FALLBACK_ENV_KEY}=1  Allow missing NOTES only with owner, expiry, reason, and evidence env fields.
   MANIFEST                       Alternative manifest path source.
   MCP_RUNNER_TASK_ID / TASK      Task id fallback when --task is omitted.
   ${REVIEW_SURFACE_ENV_KEY}      Review surface fallback when --surface is omitted.
