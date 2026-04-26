@@ -42,17 +42,20 @@
           "manifest": ".runs/linear-013cb593-b45d-4623-a75d-bc0945510518-docs-packet/cli/2026-04-26T06-13-35-946Z-9546675e/manifest.json",
           "source_anchor": "ctx:sha256:2c96739ac67ce61d68c8e3c99a086702858252d3bcfd7a74b724a3da3aa6aaa8#chunk:c000001",
           "summary": "Docs-first packet created for CO-388 stale checkout posture advisory. The packet requires a non-destructive doctor/co-status or equivalent advisory that reports ahead/behind counts against local origin/main, distinguishes dirty local work from stale branch/worktree drift, names the latest known posture commit/issue and current-main Codex CLI/model posture belief, and covers stale/current/ahead-only/no-remote focused tests. Parent owns implementation, focused tests, validation, Linear state, workpad, PR, and merge."
+        },
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-26",
+          "status": "succeeded",
+          "manifest": ".runs/linear-013cb593-b45d-4623-a75d-bc0945510518-docs-review-r2/cli/2026-04-26T06-28-17-926Z-ab57b22e/manifest.json",
+          "summary": "Docs-review passed after removing generated child-lane scratch artifacts; this is the canonical docs-review evidence for CO-388."
         }
       },
       "paths": {
         "spec": "tasks/specs/linear-013cb593-b45d-4623-a75d-bc0945510518.md",
         "task": "tasks/tasks-linear-013cb593-b45d-4623-a75d-bc0945510518.md",
         "agent_task": ".agent/task/linear-013cb593-b45d-4623-a75d-bc0945510518.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-013cb593-b45d-4623-a75d-bc0945510518.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-013cb593-b45d-4623-a75d-bc0945510518.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-013cb593-b45d-4623-a75d-bc0945510518.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-013cb593-b45d-4623-a75d-bc0945510518.md"
       }
     },
     {
