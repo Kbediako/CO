@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { runDocsCheck, runDocsSync } from '../scripts/docs-hygiene.js';
@@ -2001,6 +2001,54 @@ describe('docs hygiene tooling', () => {
         file: 'docs/codex-posture-matrix.json',
         rule: 'codex-posture-matrix-unresolved',
         reference: '../outside-codex-posture.md:matrix surface path escapes repository'
+      })
+    );
+  });
+
+  it('reports matrix surface symlinks that resolve outside the repository root', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-matrix-surface-symlink-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    const outsidePath = join(dirname(repoRoot), 'outside-codex-posture-symlink.md');
+    await writeFile(outsidePath, 'Codex CLI `0.117.0`\n', 'utf8');
+    await symlink(outsidePath, join(repoRoot, 'docs', 'symlinked-codex-posture.md'));
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json'
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      surfaces: [
+        {
+          path: 'docs/symlinked-codex-posture.md',
+          kind: 'front_door',
+          status: 'current',
+          requirements: [
+            {
+              label: 'current CLI target',
+              contains: 'Codex CLI `{{current_cli_version}}`'
+            }
+          ]
+        }
+      ]
+    });
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'docs/codex-posture-matrix.json',
+        rule: 'codex-posture-matrix-unresolved',
+        reference: 'docs/symlinked-codex-posture.md:matrix surface path resolves outside repository'
       })
     );
   });

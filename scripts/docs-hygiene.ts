@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { readFile, readdir, writeFile } from 'node:fs/promises';
+import { readFile, readdir, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
@@ -743,7 +743,7 @@ async function checkCodexPostureMatrixSurface(
       }
     ];
   }
-  const { absolutePath } = resolvedSurface;
+  const { absolutePath, repoRootAbs } = resolvedSurface;
   if (!(await pathExists(absolutePath))) {
     return [
       {
@@ -754,7 +754,19 @@ async function checkCodexPostureMatrixSurface(
     ];
   }
 
-  const content = await readFile(absolutePath, 'utf8');
+  const repoRootReal = await realpath(repoRootAbs);
+  const realAbsolutePath = await realpath(absolutePath);
+  if (!isPathInsideRepo(repoRootReal, realAbsolutePath)) {
+    return [
+      {
+        file: matrix.source_path,
+        rule: 'codex-posture-matrix-unresolved',
+        reference: `${surfacePath}:matrix surface path resolves outside repository`
+      }
+    ];
+  }
+
+  const content = await readFile(realAbsolutePath, 'utf8');
   if (surface.requirements.length === 0) {
     errors.push({
       file: matrix.source_path,
@@ -793,15 +805,19 @@ async function checkCodexPostureMatrixSurface(
   return errors;
 }
 
-function resolveMatrixSurfacePath(repoRoot: string, surfacePath: string): { absolutePath: string; relativePath: string } | null {
+function resolveMatrixSurfacePath(repoRoot: string, surfacePath: string): { absolutePath: string; repoRootAbs: string } | null {
   const repoRootAbs = path.resolve(repoRoot);
   const absolutePath = path.resolve(repoRootAbs, surfacePath);
-  const relativeToRepoNative = path.relative(repoRootAbs, absolutePath);
-  const relativePath = toPosixPath(relativeToRepoNative);
-  if (relativePath === '..' || relativePath.startsWith('../') || path.isAbsolute(relativeToRepoNative)) {
+  if (!isPathInsideRepo(repoRootAbs, absolutePath)) {
     return null;
   }
-  return { absolutePath, relativePath };
+  return { absolutePath, repoRootAbs };
+}
+
+function isPathInsideRepo(repoRootAbs: string, absolutePath: string): boolean {
+  const relativeToRepoNative = path.relative(repoRootAbs, absolutePath);
+  const relativePath = toPosixPath(relativeToRepoNative);
+  return relativePath !== '..' && !relativePath.startsWith('../') && !path.isAbsolute(relativeToRepoNative);
 }
 
 function resolveCodexPostureMatrixTemplate(
