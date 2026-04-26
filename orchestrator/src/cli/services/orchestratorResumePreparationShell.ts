@@ -125,6 +125,7 @@ export async function runOrchestratorResumePreparationShell(
     planTargetFallback: manifest.plan_target_id ?? null,
     envOverrides
   });
+  manifest.config_resolution = preparation.configResolution ?? null;
   if (preparation.configNotice && !(manifest.summary ?? '').includes(preparation.configNotice)) {
     appendSummaryImpl(manifest, preparation.configNotice);
   }
