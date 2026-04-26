@@ -184,9 +184,8 @@ async function fetchGithubReleases(fetchImpl, githubRepo, headers) {
   const releases = [];
   const rateLimits = [];
   const perPage = 100;
-  const maxPages = 10;
 
-  for (let page = 1; page <= maxPages; page += 1) {
+  for (let page = 1; ; page += 1) {
     const url = `https://api.github.com/repos/${githubRepo}/releases?per_page=${perPage}&page=${page}`;
     const result = await fetchJson(fetchImpl, url, headers);
     rateLimits.push(result.rate_limit);
@@ -262,10 +261,11 @@ function matchPolicyVersion(content, pattern) {
 
 function extractAuditedVersions(content) {
   const versions = new Set();
+  // Only release-truth audit markers count here. Control-seam-only entries can say
+  // "audited Codex CLI <version>" without completing release intake.
   const patterns = [
     /\baudited(?: official)? `rust-v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)`/gi,
-    /\baudited[^.\n]*npm `@openai\/codex@(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)`/gi,
-    /\baudited[^.\n]*Codex CLI `(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)`/gi
+    /\baudited[^.\n]*npm `@openai\/codex@(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)`/gi
   ];
   for (const pattern of patterns) {
     for (const match of content.matchAll(pattern)) {

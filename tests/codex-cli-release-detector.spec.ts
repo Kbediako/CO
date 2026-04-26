@@ -27,12 +27,14 @@ async function writeFixtureRepo({
   releasePin = '0.125.0',
   cloudPin = '0.124.0',
   policyStable = '0.125.0',
-  auditedStable = policyStable
+  auditedStable = policyStable,
+  extraPolicyLines = []
 }: {
   releasePin?: string;
   cloudPin?: string;
   policyStable?: string;
   auditedStable?: string;
+  extraPolicyLines?: string[];
 } = {}): Promise<string> {
   const repo = await mkdtemp(join(tmpdir(), 'codex-cli-release-detector-'));
   createdDirs.push(repo);
@@ -48,7 +50,8 @@ async function writeFixtureRepo({
       `- Current CO-local ChatGPT-auth/appserver model posture is \`gpt-5.5\` / \`xhigh\` on Codex CLI \`${policyStable}\` when live access smoke passes.`,
       `- Current release-facing package/downstream-smoke compatibility target is Codex CLI \`${releasePin}\`.`,
       `- Current cloud execution candidate remains Codex CLI \`${cloudPin}\`.`,
-      `- 2026-04-24: CO-355 audited \`rust-v${auditedStable}\` and npm \`@openai/codex@${auditedStable}\`.`
+      `- 2026-04-24: CO-355 audited \`rust-v${auditedStable}\` and npm \`@openai/codex@${auditedStable}\`.`,
+      ...extraPolicyLines
     ].join('\n'),
     'utf8'
   );
@@ -348,6 +351,64 @@ function laterPageHigherStableFetch() {
   return { fetchImpl, calls };
 }
 
+function stableAfterTenGithubPagesFetch() {
+  const calls: string[] = [];
+  const stable = '0.126.0';
+  const prerelease = '0.127.0-alpha.1100';
+  const npmMetadata = {
+    name: '@openai/codex',
+    'dist-tags': {
+      latest: stable,
+      alpha: prerelease
+    },
+    time: {
+      [stable]: '2026-04-26T00:01:00.000Z',
+      [prerelease]: '2026-04-26T01:01:00.000Z',
+      modified: '2026-04-26T01:01:00.000Z'
+    }
+  };
+  const fetchImpl = async (url: string) => {
+    calls.push(url);
+    return {
+      ok: true,
+      status: 200,
+      headers: {
+        get(name: string) {
+          const normalized = name.toLowerCase();
+          if (normalized === 'x-ratelimit-remaining') return '4999';
+          if (normalized === 'x-ratelimit-limit') return '5000';
+          if (normalized === 'x-ratelimit-reset') return '1770000000';
+          return null;
+        }
+      },
+      async json() {
+        if (!url.includes('api.github.com')) {
+          return npmMetadata;
+        }
+        const pageMatch = /[?&]page=(\d+)/.exec(url);
+        const page = pageMatch ? Number(pageMatch[1]) : 1;
+        if (page <= 10) {
+          return Array.from({ length: 100 }, (_, index) => ({
+            tag_name: `rust-v0.127.0-alpha.${1100 - ((page - 1) * 100 + index)}`,
+            prerelease: true,
+            published_at: `2026-04-26T01:${String(index).padStart(2, '0')}:00Z`,
+            html_url: `https://github.com/openai/codex/releases/tag/rust-v0.127.0-alpha.${1100 - ((page - 1) * 100 + index)}`
+          }));
+        }
+        return [
+          {
+            tag_name: `rust-v${stable}`,
+            prerelease: false,
+            published_at: '2026-04-26T00:00:00Z',
+            html_url: `https://github.com/openai/codex/releases/tag/rust-v${stable}`
+          }
+        ];
+      }
+    };
+  };
+  return { fetchImpl, calls };
+}
+
 function createLinearRunner(action = 'created') {
   const calls: string[][] = [];
   const descriptions: string[] = [];
@@ -542,6 +603,31 @@ describe('codex CLI release detector', () => {
     expect(artifact.mutation_result.action).toBe('dry_run');
   });
 
+  it('ignores control-seam-only Codex CLI audits when deriving release-intake coverage', async () => {
+    const repo = await writeFixtureRepo({
+      releasePin: '0.126.0',
+      cloudPin: '0.126.0',
+      policyStable: '0.126.0',
+      auditedStable: '0.125.0',
+      extraPolicyLines: [
+        '- 2026-04-24: CO-351 audited Codex CLI `0.126.0` app-server control-seam surfaces without release-intake closeout.'
+      ]
+    });
+
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: repo,
+      artifactPath: 'out/detection.json',
+      fetchImpl: mockFetch({ stable: '0.126.0' }),
+      dryRun: true,
+      env: {}
+    });
+
+    expect(exitCode).toBe(0);
+    expect(artifact.decision_state).toBe('new_audit_required');
+    expect(artifact.last_audited_version).toBe('0.125.0');
+    expect(artifact.mutation_result.action).toBe('dry_run');
+  });
+
   it('paginates GitHub releases until the latest stable release is found', async () => {
     const repo = await writeFixtureRepo();
     const { fetchImpl, calls } = paginatedGithubFetch();
@@ -576,6 +662,24 @@ describe('codex CLI release detector', () => {
     expect(artifact.decision_state).toBe('new_audit_required');
     expect(artifact.upstream_truth.github.stable.version).toBe('0.126.0');
     expect(calls.some((url) => url.includes('page=2'))).toBe(true);
+  });
+
+  it('continues GitHub pagination beyond ten full prerelease pages', async () => {
+    const repo = await writeFixtureRepo();
+    const { fetchImpl, calls } = stableAfterTenGithubPagesFetch();
+
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: repo,
+      artifactPath: 'out/detection.json',
+      fetchImpl,
+      dryRun: true,
+      env: {}
+    });
+
+    expect(exitCode).toBe(0);
+    expect(artifact.decision_state).toBe('new_audit_required');
+    expect(artifact.upstream_truth.github.stable.version).toBe('0.126.0');
+    expect(calls.some((url) => url.includes('page=11'))).toBe(true);
   });
 
   it('fails closed when Linear auth is missing for a required mutation', async () => {
