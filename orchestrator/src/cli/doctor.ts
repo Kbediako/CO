@@ -23,6 +23,7 @@ import {
   readCodexFeatureProbe,
   type CodexFeatureProbeResult
 } from './utils/codexFeatures.js';
+import { formatCheckoutPostureSummary, inspectCheckoutPosture, type CheckoutPostureInspection } from './utils/checkoutPosture.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
 import { resolveOptionalDependency, type OptionalResolutionSource } from './utils/optionalDeps.js';
 import {
@@ -168,6 +169,7 @@ export interface DoctorResult {
     managed: CodexCliReadiness;
   };
   codex_defaults: DoctorCodexDefaultsAdvisory;
+  checkout_posture: CheckoutPostureInspection;
   collab: {
     status: 'ok' | 'disabled' | 'unavailable';
     enabled: boolean | null;
@@ -418,6 +420,7 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
           ? 'ok'
           : 'not_configured';
   const repoRoot = resolveDoctorRepoRoot(cwd);
+  const checkoutPosture = inspectCheckoutPosture(repoRoot);
 
   const delegationSnapshot = inspectDelegationMcpConfig(process.env);
   const delegationTransport = classifyDelegationTransport(delegationSnapshot.entry);
@@ -442,6 +445,7 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
       missing.length === 0 &&
       codexDefaults.status === 'ok' &&
       providers.status === 'ok' &&
+      !checkoutPosture.stale_docs_may_be &&
       cloudStatus !== 'invalid_policy' &&
       !delegationBlocksOverallStatus
         ? 'ok'
@@ -454,6 +458,7 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
       managed: managedCodex
     },
     codex_defaults: codexDefaults,
+    checkout_posture: checkoutPosture,
     collab: {
       status: collabStatus,
       enabled: collabEnabled,
@@ -865,6 +870,8 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
   for (const line of result.codex_defaults.guidance) {
     lines.push(`  - ${line}`);
   }
+
+  lines.push(...formatCheckoutPostureSummary(result.checkout_posture));
 
   lines.push(`Collab: ${result.collab.status}`);
   if (result.collab.enabled !== null) {
