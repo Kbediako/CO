@@ -14,7 +14,7 @@ The governed high-churn surfaces are:
 
 ## Required Decision
 
-Every fallback-facing task must choose exactly one decision before implementation:
+Every touched fallback or seam in a fallback-facing task must carry exactly one decision before implementation:
 
 | Decision | Use when | Required evidence |
 | --- | --- | --- |

@@ -7,7 +7,7 @@ Use this path to reduce friction for very small changes while keeping traceabili
 - No schema/data migration, no auth/secret boundary change, no release workflow/publish change.
 - No user-visible behavior change beyond typo/wording/clarity or narrowly scoped guardrail text.
 - Change is not a parity/alignment lane and does not depend on preserving exact artifact names, exact surfaces, or other protected wording.
-- Change does not add, retain, or touch fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior on high-churn control surfaces.
+- Change does not add, retain, or touch fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior anywhere in the repo.
 - Rollback is trivial (single commit revert) and blast radius is low.
 
 ## Required artifacts
