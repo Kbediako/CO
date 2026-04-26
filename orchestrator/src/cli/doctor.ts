@@ -439,13 +439,15 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
           : 'ok';
   const delegationBlocksOverallStatus = delegationStatus === 'missing-config';
   const providers = inspectProviderReadiness(repoRoot, process.env);
+  const checkoutPostureBlocksOverallStatus =
+    checkoutPosture.stale_docs_may_be || (checkoutPosture.status === 'unavailable' && checkoutPosture.head !== null);
 
   return {
     status:
       missing.length === 0 &&
       codexDefaults.status === 'ok' &&
       providers.status === 'ok' &&
-      !checkoutPosture.stale_docs_may_be &&
+      !checkoutPostureBlocksOverallStatus &&
       cloudStatus !== 'invalid_policy' &&
       !delegationBlocksOverallStatus
         ? 'ok'
