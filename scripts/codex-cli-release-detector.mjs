@@ -336,12 +336,17 @@ export async function collectCurrentCoPins({ repoRoot = process.cwd(), readFileI
     split_pin_versions: distinctPins.length > 1,
     missing_surfaces: missing,
     release_intake_template_path: RELEASE_INTAKE_TEMPLATE_PATH,
-    release_intake_template_present: Boolean(releaseTemplate)
+    release_intake_template_present: Boolean(releaseTemplate),
+    release_intake_template_content: releaseTemplate
   };
 }
 
 function versionsMatch(left, right) {
   return Boolean(left && right && compareSemver(left, right) === 0);
+}
+
+function isPrereleaseNewerThanStable(prerelease, stable) {
+  return Boolean(prerelease && stable && compareSemver(prerelease, stable) > 0);
 }
 
 function findTruthBlocker(upstreamTruth) {
@@ -367,7 +372,9 @@ function findTruthBlocker(upstreamTruth) {
   }
   const githubPrerelease = upstreamTruth.github.prerelease?.version ?? null;
   const npmPrerelease = upstreamTruth.npm.prerelease?.version ?? null;
-  if ((githubPrerelease || npmPrerelease) && !versionsMatch(githubPrerelease, npmPrerelease)) {
+  const githubPrereleaseRelevant = isPrereleaseNewerThanStable(githubPrerelease, githubStable);
+  const npmPrereleaseRelevant = isPrereleaseNewerThanStable(npmPrerelease, npmStable);
+  if ((githubPrereleaseRelevant || npmPrereleaseRelevant) && !versionsMatch(githubPrerelease, npmPrerelease)) {
     return {
       state: 'blocked_upstream_mismatch',
       reason: `GitHub prerelease ${githubPrerelease ?? 'missing'} does not match npm prerelease ${npmPrerelease ?? 'missing'}.`
@@ -446,10 +453,44 @@ function hasEnvValue(value) {
   return typeof value === 'string' ? value.trim().length > 0 : Boolean(value);
 }
 
+function releaseTemplateContent(currentCo) {
+  return (
+    currentCo.release_intake_template_content?.trim() ??
+    [
+      '# Codex CLI Release-Intake Issue Template',
+      '',
+      '## Release Evidence Axes',
+      '- [ ] local CLI evidence',
+      '- [ ] package/downstream smoke evidence',
+      '- [ ] cloud-canary evidence',
+      '- [ ] workflow pins evidence',
+      '- [ ] model posture evidence',
+      '- [ ] docs surfaces evidence',
+      '- [ ] release notes evidence',
+      '',
+      '## Supersedes / Holds Matrix',
+      '| Surface | Prior release evidence page or posture surface | Classification | Reason | Evidence | Follow-up |',
+      '| --- | --- | --- | --- | --- | --- |',
+      '',
+      '## Closure Gate',
+      '- [ ] No stale current-facing docs remain unclassified.',
+      '- [ ] No workflow pins remain unclassified.'
+    ].join('\n')
+  );
+}
+
+function quoteTemplateForWorkpad(templateContent) {
+  return templateContent
+    .split(/\r?\n/u)
+    .map((line) => `> ${line}`)
+    .join('\n');
+}
+
 function buildCreateFollowUpPacket({ candidate, sourceIssueId, currentCo, upstreamTruth }) {
   const version = candidate.version;
   const canonicalOwnerKey = `${RELEASE_INTAKE_OWNER_PREFIX}${version}`;
   const marker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
+  const templateContent = releaseTemplateContent(currentCo);
   const description = [
     `## Context`,
     ``,
@@ -470,9 +511,11 @@ function buildCreateFollowUpPacket({ candidate, sourceIssueId, currentCo, upstre
     `- Cloud candidate: \`${currentCo.policy.cloud_execution_candidate ?? 'unknown'}\`.`,
     `- Workflow/test install pins: \`${currentCo.distinct_install_pins.join(', ') || 'none'}\`.`,
     ``,
-    `## Release-Intake Template`,
+    `## CO-386 Release-Intake Checklist`,
     ``,
-    `Use \`${RELEASE_INTAKE_TEMPLATE_PATH}\` as the canonical checklist. The release-intake issue must preserve release evidence axes, supersedes/holds matrix, closeout classification, and closure gate before completion.`
+    `Source template: \`${RELEASE_INTAKE_TEMPLATE_PATH}\`.`,
+    ``,
+    templateContent
   ].join('\n');
   const intentChecksum = [
     `Protected terms: upstream Codex CLI release detection, canonical release-intake triggering, GitHub release truth, npm @openai/codex dist-tags/time, CO version-policy target, workflow pins, one canonical Linear intake issue, CO-386 release-intake template, candidate ${version}.`,
@@ -514,7 +557,11 @@ function buildCreateFollowUpPacket({ candidate, sourceIssueId, currentCo, upstre
     `- [ ] CO-386 closure gate satisfied before Done.`,
     ``,
     `### Notes`,
-    `Canonical owner key: \`${canonicalOwnerKey}\`. Detector mutation path must reuse this workpad/issue instead of creating duplicates.`
+    `Canonical owner key: \`${canonicalOwnerKey}\`. Detector mutation path must reuse this workpad/issue instead of creating duplicates.`,
+    ``,
+    `CO-386 template content copied from \`${RELEASE_INTAKE_TEMPLATE_PATH}\`:`,
+    ``,
+    quoteTemplateForWorkpad(templateContent)
   ].join('\n');
   return {
     title: `CO: Codex CLI ${version} release-intake and posture audit`,

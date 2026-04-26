@@ -70,7 +70,22 @@ async function writeFixtureRepo({
   );
   await writeFile(
     join(repo, '.agent', 'task', 'templates', 'codex-cli-release-intake-template.md'),
-    '# Codex CLI Release-Intake Issue Template\n\n## Release Evidence Axes\n- [ ] local CLI evidence\n',
+    [
+      '# Codex CLI Release-Intake Issue Template',
+      '',
+      '## Release Evidence Axes',
+      '- [ ] local CLI evidence',
+      '- [ ] package/downstream smoke evidence',
+      '',
+      '## Supersedes / Holds Matrix',
+      '| Surface | Prior release evidence page or posture surface | Classification | Reason | Evidence | Follow-up |',
+      '| --- | --- | --- | --- | --- | --- |',
+      '',
+      '## Closure Gate',
+      '- [ ] No stale current-facing docs remain unclassified.',
+      '- [ ] No workflow pins remain unclassified.',
+      ''
+    ].join('\n'),
     'utf8'
   );
   return repo;
@@ -151,6 +166,48 @@ function mismatchFetch() {
   };
 }
 
+function stalePrereleaseMismatchFetch() {
+  const stable = '0.126.0';
+  const githubReleases = [
+    {
+      tag_name: `rust-v${stable}`,
+      prerelease: false,
+      published_at: '2026-04-26T00:00:00Z',
+      html_url: `https://github.com/openai/codex/releases/tag/rust-v${stable}`
+    },
+    {
+      tag_name: 'rust-v0.125.0-alpha.1',
+      prerelease: true,
+      published_at: '2026-04-25T00:00:00Z',
+      html_url: 'https://github.com/openai/codex/releases/tag/rust-v0.125.0-alpha.1'
+    }
+  ];
+  const npmMetadata = {
+    name: '@openai/codex',
+    'dist-tags': { latest: stable },
+    time: {
+      [stable]: '2026-04-26T00:01:00.000Z',
+      modified: '2026-04-26T00:01:00.000Z'
+    }
+  };
+  return async (url: string) => ({
+    ok: true,
+    status: 200,
+    headers: {
+      get(name: string) {
+        const normalized = name.toLowerCase();
+        if (normalized === 'x-ratelimit-remaining') return '4999';
+        if (normalized === 'x-ratelimit-limit') return '5000';
+        if (normalized === 'x-ratelimit-reset') return '1770000000';
+        return null;
+      }
+    },
+    async json() {
+      return url.includes('api.github.com') ? githubReleases : npmMetadata;
+    }
+  });
+}
+
 function paginatedGithubFetch() {
   const calls: string[] = [];
   const stable = '0.126.0';
@@ -209,6 +266,7 @@ function paginatedGithubFetch() {
 function createLinearRunner(action = 'created') {
   const calls: string[][] = [];
   const descriptions: string[] = [];
+  const workpads: string[] = [];
   const runner = async (args: string[]) => {
     calls.push(args);
     if (args[0] === 'create-follow-up') {
@@ -235,11 +293,13 @@ function createLinearRunner(action = 'created') {
       };
     }
     if (args[0] === 'upsert-workpad') {
+      const bodyPath = args[args.indexOf('--body-file') + 1];
+      workpads.push(await readFile(bodyPath, 'utf8'));
       return { stdout: JSON.stringify({ ok: true, action: 'updated' }), stderr: '' };
     }
     throw new Error(`unexpected linear command: ${args.join(' ')}`);
   };
-  return { runner, calls, descriptions };
+  return { runner, calls, descriptions, workpads };
 }
 
 describe('codex CLI release detector', () => {
@@ -261,7 +321,7 @@ describe('codex CLI release detector', () => {
 
   it('creates one canonical intake for a new stable release', async () => {
     const repo = await writeFixtureRepo();
-    const { runner, calls } = createLinearRunner('created');
+    const { runner, calls, descriptions, workpads } = createLinearRunner('created');
 
     const { artifact, exitCode } = await runCodexCliReleaseDetector({
       repoRoot: repo,
@@ -278,6 +338,12 @@ describe('codex CLI release detector', () => {
     expect(calls.filter((args) => args[0] === 'create-follow-up')).toHaveLength(1);
     expect(calls.filter((args) => args[0] === 'upsert-workpad')).toHaveLength(1);
     expect(calls.some((args) => args[0] === 'upsert-workpad' && args.includes('created-linear-id'))).toBe(true);
+    expect(descriptions[0]).toContain('## CO-386 Release-Intake Checklist');
+    expect(descriptions[0]).toContain('## Supersedes / Holds Matrix');
+    expect(descriptions[0]).toContain('## Closure Gate');
+    expect(workpads[0]).toContain('CO-386 template content copied from');
+    expect(workpads[0]).toContain('> ## Supersedes / Holds Matrix');
+    expect(workpads[0]).toContain('> ## Closure Gate');
   });
 
   it('records prerelease-only movement without Linear mutation', async () => {
@@ -294,6 +360,27 @@ describe('codex CLI release detector', () => {
     expect(artifact.decision_state).toBe('prerelease_observed');
     expect(artifact.candidate.version).toBe('0.126.0-alpha.2');
     expect(artifact.mutation_result.action).toBe('skipped');
+  });
+
+  it('ignores stale historical prerelease mismatches when stable truth agrees', async () => {
+    const repo = await writeFixtureRepo({
+      releasePin: '0.126.0',
+      cloudPin: '0.126.0',
+      policyStable: '0.126.0',
+      auditedStable: '0.126.0'
+    });
+
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: repo,
+      artifactPath: 'out/detection.json',
+      fetchImpl: stalePrereleaseMismatchFetch(),
+      env: {}
+    });
+
+    expect(exitCode).toBe(0);
+    expect(artifact.decision_state).toBe('no_new_audit_required');
+    expect(artifact.upstream_truth.github.prerelease.version).toBe('0.125.0-alpha.1');
+    expect(artifact.upstream_truth.npm.prerelease).toBeNull();
   });
 
   it('refreshes an existing canonical owner instead of creating duplicate issue truth', async () => {
