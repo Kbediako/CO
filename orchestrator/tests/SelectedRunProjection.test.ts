@@ -6394,6 +6394,8 @@ describe('SelectedRunProjection', () => {
       taskId: 'linear-released'
     };
     const releasedPaths = resolveRunPaths(releasedEnv, 'run-released-active-looking');
+    const releasedLocalRunId = '2026-03-20T03-20-00-000Z-released-local-active';
+    const releasedLocalPaths = resolveRunPaths(releasedEnv, releasedLocalRunId);
     const releasedNoisePaths = Array.from({ length: 70 }, (_, index) => {
       const taskId = `linear-zreleased-${index}`;
       return {
@@ -6417,7 +6419,7 @@ describe('SelectedRunProjection', () => {
       ...activeEnv,
       taskId: 'linear-active-zzzz-docs-review'
     };
-    const syntheticLocalRunId = '2026-03-20T00-30-00-000Z-linear-derived-local-active';
+    const syntheticLocalRunId = '2026-03-20T03-18-00-000Z-linear-derived-local-active';
     const syntheticLocalPaths = resolveRunPaths(
       syntheticLocalEnv,
       syntheticLocalRunId
@@ -6426,7 +6428,7 @@ describe('SelectedRunProjection', () => {
       ...activeEnv,
       taskId: 'linear-unclaimed-local-tool'
     };
-    const syntheticUnrelatedLocalRunId = '2026-03-20T00-31-00-000Z-linear-unclaimed-local-active';
+    const syntheticUnrelatedLocalRunId = '2026-03-20T03-19-00-000Z-linear-unclaimed-local-active';
     const syntheticUnrelatedLocalPaths = resolveRunPaths(
       syntheticUnrelatedLocalEnv,
       syntheticUnrelatedLocalRunId
@@ -6449,6 +6451,7 @@ describe('SelectedRunProjection', () => {
     await Promise.all([
       mkdir(activePaths.runDir, { recursive: true }),
       mkdir(releasedPaths.runDir, { recursive: true }),
+      mkdir(releasedLocalPaths.runDir, { recursive: true }),
       mkdir(localPaths.runDir, { recursive: true }),
       mkdir(syntheticLocalPaths.runDir, { recursive: true }),
       mkdir(syntheticUnrelatedLocalPaths.runDir, { recursive: true }),
@@ -6500,6 +6503,19 @@ describe('SelectedRunProjection', () => {
       }),
       'utf8'
     );
+    await writeFile(
+      releasedLocalPaths.manifestPath,
+      JSON.stringify({
+        run_id: releasedLocalRunId,
+        task_id: 'linear-released',
+        status: 'in_progress',
+        issue_identifier: 'LOCAL-RELEASED-TASK',
+        updated_at: '2026-03-20T03:20:00.000Z',
+        summary: 'non-provider local run under an inactive provider-claim task remains visible',
+        commands: []
+      }),
+      'utf8'
+    );
     await Promise.all(
       releasedNoisePaths.map((entry) =>
         writeFile(
@@ -6528,7 +6544,7 @@ describe('SelectedRunProjection', () => {
         status: 'in_progress',
         issue_identifier: 'LOCAL-LINEAR-DERIVED',
         updated_at: '2026-03-20T03:18:00.000Z',
-        summary: 'older-started non-intake local run under a Linear-derived task id remains visible by manifest freshness',
+        summary: 'non-intake local run under a Linear-derived task id remains visible by bounded cheap recency',
         commands: []
       }),
       'utf8'
@@ -6541,7 +6557,7 @@ describe('SelectedRunProjection', () => {
         status: 'in_progress',
         issue_identifier: 'LOCAL-LINEAR-UNCLAIMED',
         updated_at: '2026-03-20T03:19:00.000Z',
-        summary: 'older-started non-intake local run under an unclaimed Linear-looking task id remains visible by manifest freshness',
+        summary: 'non-intake local run under an unclaimed Linear-looking task id remains visible by bounded cheap recency',
         commands: []
       }),
       'utf8'
@@ -6643,6 +6659,7 @@ describe('SelectedRunProjection', () => {
       expect.arrayContaining([
         syntheticLocalRunId,
         syntheticUnrelatedLocalRunId,
+        releasedLocalRunId,
         'run-local-active',
         'run-active'
       ])

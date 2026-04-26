@@ -396,7 +396,11 @@ async function readSyntheticTaskLocalCompatibilityContexts(
   }
   const discovered: DiscoveredTaskCompatibilityContext[] = [];
   let manifestReads = 0;
-  const providerIntakeTaskEntries = collectProviderIntakeClaimTaskEntries(
+  const activeProviderIntakeTaskEntries = collectProviderIntakeTaskEntries(
+    selectCompatibilityDiscoveryClaims(options.providerIntakeState),
+    runsRoot
+  );
+  const providerIntakeRunEntries = collectProviderIntakeClaimRunEntries(
     options.providerIntakeState,
     runsRoot
   );
@@ -406,12 +410,14 @@ async function readSyntheticTaskLocalCompatibilityContexts(
       (taskEntry) =>
         isProviderIntakeScopedTaskEntry(taskEntry) &&
         !includedTaskEntries.has(taskEntry) &&
-        !providerIntakeTaskEntries.has(taskEntry)
-    )
+        !activeProviderIntakeTaskEntries.has(taskEntry)
+    ),
+    providerIntakeRunEntries
   );
   const manifestCandidates = await readSyntheticTaskLocalManifestCandidates(
     runsRoot,
-    syntheticTaskEntries
+    syntheticTaskEntries,
+    providerIntakeRunEntries
   );
 
   for (const candidate of manifestCandidates) {
@@ -442,12 +448,17 @@ async function readSyntheticTaskLocalCompatibilityContexts(
 
 async function selectRecentSyntheticTaskEntries(
   runsRoot: string,
-  taskEntries: string[]
+  taskEntries: string[],
+  providerIntakeRunEntries: Map<string, Set<string>>
 ): Promise<string[]> {
   const withRecency = await Promise.all(
     taskEntries.map(async (taskEntry) => ({
       taskEntry,
-      recencyAt: await readSyntheticTaskEntryLatestRunRecencyIso(runsRoot, taskEntry)
+      recencyAt: await readSyntheticTaskEntryLatestCheapRecencyIso(
+        runsRoot,
+        taskEntry,
+        providerIntakeRunEntries.get(taskEntry)
+      )
     }))
   );
   return withRecency
@@ -463,35 +474,46 @@ async function selectRecentSyntheticTaskEntries(
 
 async function readSyntheticTaskLocalManifestCandidates(
   runsRoot: string,
-  syntheticTaskEntries: string[]
+  syntheticTaskEntries: string[],
+  providerIntakeRunEntries: Map<string, Set<string>>
 ): Promise<SyntheticTaskLocalManifestCandidate[]> {
   const candidates: SyntheticTaskLocalManifestCandidate[] = [];
   for (const taskEntry of syntheticTaskEntries) {
     const cliRoot = join(runsRoot, taskEntry, 'cli');
-    const runEntries = (await readSyntheticTaskRunEntryRecencies(cliRoot))
+    const runEntries = (await readSyntheticTaskRunEntryCheapRecencies(cliRoot))
+      .filter(({ runEntry }) => !providerIntakeRunEntries.get(taskEntry)?.has(runEntry))
       .sort(compareSyntheticRunEntryRecencyDesc)
       .slice(0, PROVIDER_COMPATIBILITY_SYNTHETIC_LOCAL_SCAN_RUNS_PER_TASK);
-    for (const { runEntry, recencyAt } of runEntries) {
+    for (const { runEntry, recencyAt: cheapRecencyAt } of runEntries) {
       const runDir = join(cliRoot, runEntry);
       candidates.push({
         taskEntry,
         runEntry,
         manifestPath: join(runDir, 'manifest.json'),
-        recencyAt
+        recencyAt:
+          await readManifestRecencyIso(join(runDir, 'manifest.json')) ??
+          cheapRecencyAt
       });
     }
   }
   return candidates.sort(compareSyntheticTaskLocalManifestCandidateRecencyDesc);
 }
 
-async function readSyntheticTaskEntryLatestRunRecencyIso(
+async function readSyntheticTaskEntryLatestCheapRecencyIso(
   runsRoot: string,
-  taskEntry: string
+  taskEntry: string,
+  skippedRunEntries?: Set<string>
 ): Promise<string | null> {
   const cliRoot = join(runsRoot, taskEntry, 'cli');
-  const runEntries = await readSyntheticTaskRunEntryRecencies(cliRoot);
-  if (runEntries.length === 0) {
+  const allRunEntries = await readSyntheticTaskRunEntryCheapRecencies(cliRoot);
+  if (allRunEntries.length === 0) {
     return await readDirectoryMtimeIso(cliRoot);
+  }
+  const runEntries = skippedRunEntries?.size
+    ? allRunEntries.filter(({ runEntry }) => !skippedRunEntries.has(runEntry))
+    : allRunEntries;
+  if (runEntries.length === 0) {
+    return null;
   }
   return runEntries.reduce<string | null>(
     (latest, entry) => selectLatestIsoTimestamp(latest, entry.recencyAt),
@@ -499,14 +521,13 @@ async function readSyntheticTaskEntryLatestRunRecencyIso(
   );
 }
 
-async function readSyntheticTaskRunEntryRecencies(
+async function readSyntheticTaskRunEntryCheapRecencies(
   cliRoot: string
 ): Promise<Array<{ runEntry: string; recencyAt: string | null }>> {
   return await Promise.all(
     (await readDirectoryNames(cliRoot)).map(async (runEntry) => ({
       runEntry,
       recencyAt:
-        await readManifestRecencyIso(join(cliRoot, runEntry, 'manifest.json')) ??
         parseProviderLinearWorkerRunIdTimestamp(runEntry) ??
         await readDirectoryMtimeIso(join(cliRoot, runEntry))
     }))
@@ -565,13 +586,6 @@ function isSyntheticTaskLocalCompatibilityManifest(manifest: CliManifest): boole
   return issueProvider !== 'linear';
 }
 
-function collectProviderIntakeClaimTaskEntries(
-  providerIntakeState: ProviderIntakeState,
-  runsRoot: string
-): Set<string> {
-  return collectProviderIntakeTaskEntries(providerIntakeState.claims, runsRoot);
-}
-
 function collectProviderIntakeTaskEntries(
   claims: ProviderIntakeClaimRecord[],
   runsRoot: string
@@ -592,6 +606,54 @@ function collectProviderIntakeTaskEntries(
     }
   }
   return taskEntries;
+}
+
+function collectProviderIntakeClaimRunEntries(
+  providerIntakeState: ProviderIntakeState,
+  runsRoot: string
+): Map<string, Set<string>> {
+  const runEntries = new Map<string, Set<string>>();
+  for (const claim of providerIntakeState.claims) {
+    const taskIds = new Set<string>();
+    if (claim.task_id && claim.task_id !== 'local-mcp') {
+      taskIds.add(claim.task_id);
+    }
+    if (
+      claim.run_manifest_path &&
+      isCliRunManifestPathWithinRunsRoot(claim.run_manifest_path, runsRoot)
+    ) {
+      const taskId = resolveTaskIdFromManifestPath(claim.run_manifest_path);
+      if (taskId && taskId !== 'local-mcp') {
+        taskIds.add(taskId);
+      }
+    }
+
+    const claimRunEntries = new Set<string>();
+    if (claim.run_id) {
+      claimRunEntries.add(claim.run_id);
+    }
+    if (
+      claim.run_manifest_path &&
+      isCliRunManifestPathWithinRunsRoot(claim.run_manifest_path, runsRoot)
+    ) {
+      const runId = resolveRunIdFromManifestPath(claim.run_manifest_path);
+      if (runId) {
+        claimRunEntries.add(runId);
+      }
+    }
+
+    if (taskIds.size === 0 || claimRunEntries.size === 0) {
+      continue;
+    }
+    for (const taskId of taskIds) {
+      const taskRunEntries = runEntries.get(taskId) ?? new Set<string>();
+      for (const runId of claimRunEntries) {
+        taskRunEntries.add(runId);
+      }
+      runEntries.set(taskId, taskRunEntries);
+    }
+  }
+  return runEntries;
 }
 
 export async function discoverAuthoritativeRetryCollectionContexts(
