@@ -28,7 +28,7 @@
         "policy_implementation": {
           "reviewer": "parent provider worker",
           "date": "2026-04-26",
-          "status": "implemented-pending-validation",
+          "status": "validated-review-finding-addressed",
           "docs": "docs/guides/fallback-expiry-and-refactor-policy.md",
           "follow_ups": [
             "CO-394",
@@ -37,7 +37,7 @@
             "CO-397",
             "CO-398"
           ],
-          "summary": "Added fallback-expiry and large-refactor policy, docs-first prompts, micro-task guardrail, and follow-up ownership for five fallback-heavy areas."
+          "summary": "Added fallback-expiry and large-refactor policy, docs-first prompts, micro-task guardrail, and follow-up ownership for five fallback-heavy areas; validation gates passed and the standalone-review P2 expiry-date finding was addressed with concrete 2026-05-10 review / 2026-05-26 expiry dates."
         }
       },
       "paths": {
