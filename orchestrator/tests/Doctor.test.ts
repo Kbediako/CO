@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildDelegationEnablementGuidance,
   buildDelegationDirectTransportGuidance,
+  checkoutPostureBlocksDoctorStatus,
   formatDoctorCloudPreflightSummary,
   formatDoctorSummary,
   inspectCodexSandboxSecurityAdvisories,
@@ -149,6 +150,30 @@ function buildDoctorCloudEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessE
 }
 
 describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
+  it('blocks an overall ok status for unavailable posture inside git worktrees only', () => {
+    expect(
+      checkoutPostureBlocksDoctorStatus({
+        status: 'unavailable',
+        inside_git_worktree: true,
+        stale_docs_may_be: false
+      })
+    ).toBe(true);
+    expect(
+      checkoutPostureBlocksDoctorStatus({
+        status: 'unavailable',
+        inside_git_worktree: false,
+        stale_docs_may_be: false
+      })
+    ).toBe(false);
+    expect(
+      checkoutPostureBlocksDoctorStatus({
+        status: 'stale',
+        inside_git_worktree: true,
+        stale_docs_may_be: true
+      })
+    ).toBe(true);
+  });
+
   it('reports missing devtools config and skill when absent', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
