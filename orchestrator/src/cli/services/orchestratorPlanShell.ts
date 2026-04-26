@@ -9,7 +9,7 @@ export interface RunOrchestratorPlanShellParams {
   prepareRunImpl?: typeof prepareRun;
 }
 
-type PreviewPreparation = Pick<RunPreparationResult, 'pipeline' | 'pipelineSource'>;
+type PreviewPreparation = Pick<RunPreparationResult, 'pipeline' | 'pipelineSource' | 'configResolution'>;
 
 export function buildOrchestratorPlanPreview(
   preparation: PreviewPreparation,
@@ -51,7 +51,8 @@ export function buildOrchestratorPlanPreview(
       id: preparation.pipeline.id,
       title: preparation.pipeline.title,
       description: preparation.pipeline.description ?? null,
-      source: pipelineSource
+      source: pipelineSource,
+      config_resolution: preparation.configResolution ?? null
     },
     stages,
     plan,

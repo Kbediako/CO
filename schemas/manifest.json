@@ -70,6 +70,22 @@
     "provider_launch_source": { "type": ["string", "null"] },
     "provider_control_host_task_id": { "type": ["string", "null"] },
     "provider_control_host_run_id": { "type": ["string", "null"] },
+    "config_resolution": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["mode", "reason", "config_source"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["repo-authoritative", "downstream-compatibility"]
+        },
+        "reason": { "type": "string", "minLength": 1 },
+        "config_source": {
+          "type": ["string", "null"],
+          "enum": ["repo", "package", null]
+        }
+      }
+    },
     "summary": { "type": ["string", "null"] },
     "metrics_recorded": { "type": "boolean" },
     "resume_token": { "type": "string", "minLength": 1 },

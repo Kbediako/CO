@@ -1,6 +1,34 @@
 {
   "items": [
     {
+      "id": "20260426-linear-902025f4-f954-41e5-9dcb-9c3d2d12741f",
+      "title": "CO: split repo-authoritative mode from downstream compatibility mode",
+      "relates_to": "tasks/tasks-linear-902025f4-f954-41e5-9dcb-9c3d2d12741f.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-26",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-26",
+          "status": "produced",
+          "manifest": ".runs/linear-902025f4-f954-41e5-9dcb-9c3d2d12741f-docs-packet-v2/cli/2026-04-26T01-37-33-415Z-a122aed5/manifest.json",
+          "source_anchor": "ctx:sha256:2d8ef5d9cc274d0e7e06cb774c3f7e24b0efecd258411a566b314e62c089bd63#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-385 as a mode-split lane: repo-authoritative execution requires repo-local config and canonical CO pipelines by default; packaged fallback config/pipelines remain available only through explicit downstream compatibility mode or adapter; operator output, manifests, status, and CI must distinguish the active mode and reason. The referenced source payload is not present in this child checkout, so the packet is anchored on parent-provided protected wording only."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-902025f4-f954-41e5-9dcb-9c3d2d12741f.md",
+        "task": "tasks/tasks-linear-902025f4-f954-41e5-9dcb-9c3d2d12741f.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-902025f4-f954-41e5-9dcb-9c3d2d12741f.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-902025f4-f954-41e5-9dcb-9c3d2d12741f.md"
+        }
+      }
+    },
+    {
       "id": "20260421-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb",
       "title": "CO: replace remaining dead-code-pruning archive README pointers with durable guidance",
       "relates_to": "tasks/tasks-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",

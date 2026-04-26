@@ -5,6 +5,7 @@ import type {
   RunStatus
 } from '../../../packages/shared/manifest/types.js';
 import type { RuntimeMode } from './runtime/types.js';
+import type { ConfigResolutionSummary } from './services/pipelineResolver.js';
 
 export type PipelineStage = CommandStage | SubPipelineStage;
 
@@ -73,6 +74,7 @@ export interface PlanPreviewResult {
     title: string;
     description: string | null;
     source: 'default' | 'user' | null;
+    config_resolution: ConfigResolutionSummary | null;
   };
   stages: PlanPreviewStage[];
   plan: PlanResult;

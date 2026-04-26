@@ -12,10 +12,12 @@ describe('sanitizeProviderOverrideEnv', () => {
       CODEX_ORCHESTRATOR_REPO_CONFIG_PATH:
         '/tmp/provider-package-root/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
       CODEX_ORCHESTRATOR_PACKAGE_ROOT: '/tmp/child-package-root',
+      CODEX_ORCHESTRATOR_CONFIG_MODE: 'repo-authoritative',
       CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1'
     });
 
     expect(sanitized.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBeUndefined();
+    expect(sanitized.CODEX_ORCHESTRATOR_CONFIG_MODE).toBeUndefined();
     expect(sanitized.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED).toBeUndefined();
     expect(sanitized.CODEX_ORCHESTRATOR_PACKAGE_ROOT).toBe('/tmp/child-package-root');
   });

@@ -37,6 +37,7 @@ export function buildOrchestratorStatusPayload(
     runtime_mode_requested: manifest.runtime_mode_requested,
     runtime_mode: manifest.runtime_mode,
     runtime_provider: manifest.runtime_provider,
+    config_resolution: manifest.config_resolution ?? null,
     runtime_fallback: manifest.runtime_fallback ?? null,
     cloud_execution: manifest.cloud_execution ?? null,
     cloud_fallback: manifest.cloud_fallback ?? null
@@ -62,6 +63,11 @@ export function renderOrchestratorStatus(
   if (manifest.runtime_fallback?.occurred) {
     const fallbackCode = manifest.runtime_fallback.code ?? 'runtime-fallback';
     logger.info(`Runtime fallback: ${fallbackCode} — ${manifest.runtime_fallback.reason ?? 'n/a'}`);
+  }
+  if (manifest.config_resolution) {
+    logger.info(
+      `Configuration mode: ${manifest.config_resolution.mode} (${manifest.config_resolution.reason}; source=${manifest.config_resolution.config_source ?? 'none'})`
+    );
   }
   if (activity.observed_at) {
     const staleSuffix = activity.stale === null ? '' : activity.stale ? ' [stale]' : ' [active]';

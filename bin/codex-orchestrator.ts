@@ -57,7 +57,11 @@ import { runControlHostSupervisionCliShell } from '../orchestrator/src/cli/contr
 import { runCoStatusAttachCliShell } from '../orchestrator/src/cli/coStatusAttachCliShell.js';
 import { runCoStatusCliShell } from '../orchestrator/src/cli/coStatusCliShell.js';
 import { runCoStatusOperatorAutopilotCliShell } from '../orchestrator/src/cli/coStatusOperatorAutopilotCliShell.js';
-import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../orchestrator/src/cli/config/repoConfigPolicy.js';
+import {
+  CONFIG_AUTHORITY_MODE_ENV_KEY,
+  REPO_CONFIG_REQUIRED_ENV_KEY,
+  type ConfigAuthorityMode
+} from '../orchestrator/src/cli/config/repoConfigPolicy.js';
 
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
@@ -75,6 +79,11 @@ interface RunOutputPayload {
   runtime_mode_requested: string | null;
   runtime_mode: string | null;
   runtime_provider: string | null;
+  config_resolution: {
+    mode: string;
+    reason: string;
+    config_source: string | null;
+  } | null;
   runtime_fallback: {
     occurred: boolean;
     code: string | null;
@@ -339,9 +348,67 @@ function resolveBooleanOption(flags: ArgMap, key: string, envKey?: string): bool
 }
 
 function applyRepoConfigRequiredPolicy(flags: ArgMap): boolean {
-  const required = resolveBooleanOption(flags, 'repo-config-required', REPO_CONFIG_REQUIRED_ENV_KEY);
-  process.env[REPO_CONFIG_REQUIRED_ENV_KEY] = required ? '1' : '0';
-  return required;
+  const explicitConfigMode = readStringFlag(flags, 'config-mode');
+  if (flags['config-mode'] === true || (flags['config-mode'] !== undefined && !explicitConfigMode)) {
+    throw new Error(
+      '--config-mode requires a value. Expected one of: repo-authoritative, downstream-compatibility.'
+    );
+  }
+  if (explicitConfigMode) {
+    const mode = normalizeConfigModeFlag(explicitConfigMode);
+    applyConfigModeEnv(mode);
+    return mode === 'repo-authoritative';
+  }
+
+  if (flags['repo-config-required'] !== undefined) {
+    const required = parseBooleanSetting(flags['repo-config-required'], '--repo-config-required');
+    applyConfigModeEnv(required ? 'repo-authoritative' : 'downstream-compatibility');
+    return required;
+  }
+
+  const configModeEnv = process.env[CONFIG_AUTHORITY_MODE_ENV_KEY];
+  if (typeof configModeEnv === 'string' && configModeEnv.trim().length > 0) {
+    const mode = normalizeConfigModeFlag(configModeEnv);
+    applyConfigModeEnv(mode);
+    return mode === 'repo-authoritative';
+  }
+
+  const legacyEnv = process.env[REPO_CONFIG_REQUIRED_ENV_KEY];
+  if (typeof legacyEnv === 'string' && legacyEnv.trim().length > 0) {
+    const required = parseBooleanSetting(legacyEnv, REPO_CONFIG_REQUIRED_ENV_KEY);
+    applyConfigModeEnv(required ? 'repo-authoritative' : 'downstream-compatibility');
+    return required;
+  }
+
+  delete process.env[REPO_CONFIG_REQUIRED_ENV_KEY];
+  delete process.env[CONFIG_AUTHORITY_MODE_ENV_KEY];
+  return true;
+}
+
+function normalizeConfigModeFlag(raw: string): ConfigAuthorityMode {
+  const normalized = raw.trim().toLowerCase();
+  if (
+    normalized === 'repo-authoritative' ||
+    normalized === 'repo_authoritative' ||
+    normalized === 'repo' ||
+    normalized === 'authoritative'
+  ) {
+    return 'repo-authoritative';
+  }
+  if (
+    normalized === 'downstream-compatibility' ||
+    normalized === 'downstream_compatibility' ||
+    normalized === 'compatibility' ||
+    normalized === 'compat'
+  ) {
+    return 'downstream-compatibility';
+  }
+  throw new Error('Invalid --config-mode value. Expected one of: repo-authoritative, downstream-compatibility.');
+}
+
+function applyConfigModeEnv(mode: ConfigAuthorityMode): void {
+  process.env[CONFIG_AUTHORITY_MODE_ENV_KEY] = mode;
+  process.env[REPO_CONFIG_REQUIRED_ENV_KEY] = mode === 'repo-authoritative' ? '1' : '0';
 }
 
 function resolveAutoIssueLogEnabled(flags: ArgMap): boolean {
@@ -899,6 +966,11 @@ function emitRunOutput(
       runtime_mode_requested?: string | null;
       runtime_mode?: string | null;
       runtime_provider?: string | null;
+      config_resolution?: {
+        mode: string;
+        reason: string;
+        config_source: string | null;
+      } | null;
       runtime_fallback?: {
         occurred: boolean;
         code: string | null;
@@ -934,6 +1006,11 @@ function emitRunOutput(
       );
     }
   }
+  if (payload.config_resolution) {
+    console.log(
+      `Configuration mode: ${payload.config_resolution.mode} (${payload.config_resolution.reason}; source=${payload.config_resolution.config_source ?? 'none'})`
+    );
+  }
   if (payload.cloud_fallback_reason) {
     console.log(`Cloud fallback: ${payload.cloud_fallback_reason}`);
   }
@@ -964,6 +1041,11 @@ function toRunOutputPayload(
       runtime_mode_requested?: string | null;
       runtime_mode?: string | null;
       runtime_provider?: string | null;
+      config_resolution?: {
+        mode: string;
+        reason: string;
+        config_source: string | null;
+      } | null;
       runtime_fallback?: {
         occurred: boolean;
         code: string | null;
@@ -987,6 +1069,7 @@ function toRunOutputPayload(
     runtime_mode_requested: result.manifest.runtime_mode_requested ?? null,
     runtime_mode: result.manifest.runtime_mode ?? null,
     runtime_provider: result.manifest.runtime_provider ?? null,
+    config_resolution: result.manifest.config_resolution ?? null,
     runtime_fallback: result.manifest.runtime_fallback ?? null,
     cloud_fallback_reason: result.manifest.cloud_fallback?.reason ?? null,
     issue_log: issueLogCapture.issueLog,
@@ -1373,7 +1456,8 @@ Commands:
     --runtime-mode <cli|appserver>  Force runtime mode for this run and child subpipelines.
     --target <stage-id>     Focus plan/build metadata on a specific stage (alias: --target-stage).
     --auto-issue-log [true|false]  On failure, auto-write doctor issue bundle/log entry.
-    --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+    --config-mode <repo-authoritative|downstream-compatibility>  Select repo config authority mode.
+    --repo-config-required [true|false]  Legacy alias: true=repo-authoritative, false=downstream-compatibility.
     --goal "<goal>"         When pipeline is rlm, set the RLM goal.
     --multi-agent [auto|true|false]  Preferred alias for multi-agent collab subagents (implies symbolic mode).
     --collab [auto|true|false]  Legacy alias for --multi-agent.
@@ -1387,7 +1471,8 @@ Commands:
   rlm "<goal>"              Run RLM loop until validator passes.
     --task <id>             Override task identifier.
     --runtime-mode <cli|appserver>  Force runtime mode for this run.
-    --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+    --config-mode <repo-authoritative|downstream-compatibility>  Select repo config authority mode.
+    --repo-config-required [true|false]  Legacy alias: true=repo-authoritative, false=downstream-compatibility.
     --multi-agent [auto|true|false]  Preferred alias for multi-agent collab subagents (implies symbolic mode).
     --collab [auto|true|false]  Legacy alias for --multi-agent.
     --validator <cmd|none>  Set validator command or disable validation.
@@ -1403,7 +1488,8 @@ Commands:
     --devtools             Enable Chrome DevTools MCP for this run.
     --task <id>             Override task identifier (defaults to MCP_RUNNER_TASK_ID).
     --runtime-mode <cli|appserver>  Force runtime mode for this run.
-    --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+    --config-mode <repo-authoritative|downstream-compatibility>  Select repo config authority mode.
+    --repo-config-required [true|false]  Legacy alias: true=repo-authoritative, false=downstream-compatibility.
     --parent-run <id>       Link run to parent run id.
     --approval-policy <p>   Record approval policy metadata.
     --format json           Emit machine-readable output.
@@ -1421,7 +1507,8 @@ Commands:
     --runtime-mode <cli|appserver>  Force runtime mode for both runs.
     --target <stage-id>     Focus plan/build metadata on a specific stage (alias: --target-stage).
     --auto-issue-log [true|false]  On failure, auto-write doctor issue bundle/log entry.
-    --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+    --config-mode <repo-authoritative|downstream-compatibility>  Select repo config authority mode.
+    --repo-config-required [true|false]  Legacy alias: true=repo-authoritative, false=downstream-compatibility.
     --interactive | --ui    Enable read-only HUD when running in a TTY.
     --no-interactive        Force disable HUD (default is off unless requested).
 
@@ -1442,7 +1529,8 @@ Commands:
     --task <id>             Override task identifier.
     --format json           Emit machine-readable output.
     --target <stage-id>     Highlight the stage chosen for orchestration (alias: --target-stage).
-    --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+    --config-mode <repo-authoritative|downstream-compatibility>  Select repo config authority mode.
+    --repo-config-required [true|false]  Legacy alias: true=repo-authoritative, false=downstream-compatibility.
 
   exec [command]            Run a one-off command with unified exec runtime.
     --json [compact]        Emit final JSON summary (optional compact mode).
@@ -1458,7 +1546,8 @@ Commands:
     --reason <text>         Record why the run was resumed.
     --target <stage-id>     Override stage selection before resuming (alias: --target-stage).
     --runtime-mode <cli|appserver>  Force runtime mode before resuming.
-    --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+    --config-mode <repo-authoritative|downstream-compatibility>  Select repo config authority mode.
+    --repo-config-required [true|false]  Legacy alias: true=repo-authoritative, false=downstream-compatibility.
     --format json           Emit machine-readable output.
     --interactive | --ui    Enable read-only HUD when running in a TTY.
     --no-interactive        Force disable HUD (default is off unless requested).
@@ -1934,7 +2023,8 @@ Options:
   --reason <text>       Record why the run was resumed.
   --target <stage-id>   Override stage selection before resuming.
   --runtime-mode <cli|appserver>  Force runtime mode before resuming.
-  --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+  --config-mode <repo-authoritative|downstream-compatibility>  Select repo config authority mode.
+  --repo-config-required [true|false]  Legacy alias: true=repo-authoritative, false=downstream-compatibility.
   --format json         Emit machine-readable output.
   --interactive | --ui  Enable read-only HUD when running in a TTY.
   --no-interactive      Force disable HUD.
@@ -2160,7 +2250,8 @@ Options:
   --goal "<goal>"         Alternate way to set the goal (positional is preferred).
   --task <id>             Override task identifier (defaults to MCP_RUNNER_TASK_ID).
   --runtime-mode <cli|appserver>  Force runtime mode for this run.
-  --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+  --config-mode <repo-authoritative|downstream-compatibility>  Select repo config authority mode.
+  --repo-config-required [true|false]  Legacy alias: true=repo-authoritative, false=downstream-compatibility.
   --multi-agent [auto|true|false]  Preferred alias for multi-agent collab subagents (implies symbolic mode).
   --collab [auto|true|false]  Legacy alias for --multi-agent.
   --validator <cmd|none>  Set validator command or disable validation.
@@ -2192,7 +2283,8 @@ Options:
   --devtools              Enable Chrome DevTools MCP for this run.
   --task <id>             Override task identifier (defaults to MCP_RUNNER_TASK_ID).
   --runtime-mode <cli|appserver>  Force runtime mode for this run.
-  --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+  --config-mode <repo-authoritative|downstream-compatibility>  Select repo config authority mode.
+  --repo-config-required [true|false]  Legacy alias: true=repo-authoritative, false=downstream-compatibility.
   --parent-run <id>       Link run to parent run id.
   --approval-policy <p>   Record approval policy metadata.
   --format json           Emit machine-readable output.
@@ -2222,7 +2314,8 @@ Options:
   --runtime-mode <cli|appserver>  Force runtime mode for both runs.
   --target <stage-id>       Focus plan/build metadata (applies where the stage exists).
   --auto-issue-log [true|false]  On failure, auto-write doctor issue bundle/log entry.
-  --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+  --config-mode <repo-authoritative|downstream-compatibility>  Select repo config authority mode.
+  --repo-config-required [true|false]  Legacy alias: true=repo-authoritative, false=downstream-compatibility.
   --interactive | --ui      Enable read-only HUD when running in a TTY.
   --no-interactive          Force disable HUD.
 
@@ -2289,7 +2382,8 @@ Options:
   --runtime-mode <cli|appserver>  Force runtime mode for this run.
   --target <stage-id>       Focus plan/build metadata on a specific stage.
   --auto-issue-log [true|false]  On failure, auto-write doctor issue bundle/log entry.
-  --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+  --config-mode <repo-authoritative|downstream-compatibility>  Select repo config authority mode.
+  --repo-config-required [true|false]  Legacy alias: true=repo-authoritative, false=downstream-compatibility.
   --goal "<goal>"           When pipeline is rlm, set the RLM goal.
   --multi-agent [auto|true|false]  Preferred alias for multi-agent collab subagents.
   --collab [auto|true|false]  Legacy alias for --multi-agent.
@@ -2318,7 +2412,8 @@ Options:
   --task <id>               Override task identifier.
   --format json             Emit machine-readable output.
   --target <stage-id>       Highlight the stage chosen for orchestration.
-  --repo-config-required [true|false]  Require repo-local codex.orchestrator.json (no package fallback).
+  --config-mode <repo-authoritative|downstream-compatibility>  Select repo config authority mode.
+  --repo-config-required [true|false]  Legacy alias: true=repo-authoritative, false=downstream-compatibility.
 `);
 }
 

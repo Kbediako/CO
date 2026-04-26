@@ -32,6 +32,11 @@ export interface CodexOrchestratorCLIManifest {
   provider_launch_source?: string | null;
   provider_control_host_task_id?: string | null;
   provider_control_host_run_id?: string | null;
+  config_resolution?: {
+    mode: "repo-authoritative" | "downstream-compatibility";
+    reason: string;
+    config_source: "repo" | "package" | null;
+  } | null;
   summary: string | null;
   metrics_recorded: boolean;
   resume_token: string;
