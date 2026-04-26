@@ -3096,9 +3096,13 @@ export function createProviderIssueHandoffService(
     claim: ProviderIntakeClaimRecord;
     trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at' | 'blocked_by'>;
   }): boolean => {
+    const claimReason = input.claim.reason ?? null;
     if (
       input.claim.state !== 'released' ||
-      input.claim.reason !== 'provider_issue_released:not_active'
+      (
+        claimReason !== 'provider_issue_released:not_active' &&
+        !isProviderIssueReleasedPendingReopen(claimReason)
+      )
     ) {
       return false;
     }
@@ -4745,6 +4749,7 @@ export function createProviderIssueHandoffService(
             : Math.max(1, refreshCounts.occupied_slots)
           : Number.POSITIVE_INFINITY;
         let preDiscoveryNonActiveIssueByIdReads = 0;
+        let noRunPendingReopenLiveStartedProbeReads = 0;
 
         for (const claim of [...options.state.claims]) {
           assertRefreshCycleNotStuck();
@@ -4804,6 +4809,21 @@ export function createProviderIssueHandoffService(
             ) &&
             !canFreshDiscoverReleasedMissingRetainedRun &&
             !canFreshDiscoverReleasedLiveWorker;
+          const shouldProbeNoRunPendingReopenLiveStartedTruth =
+            pollInput?.deferFreshDiscovery === true &&
+            shouldProbeNoRunReleasedPendingReopenClaimForLiveStartedTruth({
+              claim,
+              releaseRun,
+              activeRun,
+              latestRun,
+              hasPendingReleaseCancel
+            });
+          const hasOccupiedPollDispatchProviderKey =
+            occupiedPollDispatchProviderKeys.has(claimProviderKey);
+          const canUseNoRunPendingReopenLiveStartedProbe =
+            shouldProbeNoRunPendingReopenLiveStartedTruth &&
+            !hasOccupiedPollDispatchProviderKey &&
+            noRunPendingReopenLiveStartedProbeReads < 1;
           const retainedReleasedBlockerSnapshot =
             trackedIssueBlockersByKey?.get(claimProviderKey) ?? null;
           const shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot =
@@ -4819,7 +4839,7 @@ export function createProviderIssueHandoffService(
           ) {
             deferredRetainedReleasedBlockerRefreshProviderKeys.add(claimProviderKey);
           }
-          const allowDirectIssueById =
+          const normallyAllowDirectIssueById =
             (
               !boundPreDiscoveryIssueByIdReads ||
               activeRun !== null ||
@@ -4830,6 +4850,11 @@ export function createProviderIssueHandoffService(
               shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot
             ) &&
             !shouldBlockPendingReopenFreshDiscovery;
+          const allowDirectIssueById =
+            normallyAllowDirectIssueById || canUseNoRunPendingReopenLiveStartedProbe;
+          const shouldCountNoRunPendingReopenLiveStartedProbe =
+            !normallyAllowDirectIssueById && canUseNoRunPendingReopenLiveStartedProbe;
+          let usedNoRunPendingReopenLiveStartedProbe = false;
           const resolution = await resolveRefreshTrackedIssueResolution({
             claim,
             trackedIssuesByKey,
@@ -4844,6 +4869,10 @@ export function createProviderIssueHandoffService(
               refreshCounts.issue_by_id_reads += 1;
               if (boundPreDiscoveryIssueByIdReads && activeRun === null) {
                 preDiscoveryNonActiveIssueByIdReads += 1;
+              }
+              if (shouldCountNoRunPendingReopenLiveStartedProbe) {
+                usedNoRunPendingReopenLiveStartedProbe = true;
+                noRunPendingReopenLiveStartedProbeReads += 1;
               }
               recordRefreshProgress('refresh:claim_issue_by_id_reconcile', {
                 requestClass: `claim_issue_by_id:${claim.state ?? 'unknown'}`,
@@ -5128,6 +5157,19 @@ export function createProviderIssueHandoffService(
               continue;
             }
             if (
+              shouldProbeNoRunPendingReopenLiveStartedTruth &&
+              hasOccupiedPollDispatchProviderKey
+            ) {
+              deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
+              continue;
+            }
+            if (
+              usedNoRunPendingReopenLiveStartedProbe &&
+              !isProviderStartedWorkerTrackedIssue(resolution.trackedIssue)
+            ) {
+              continue;
+            }
+            if (
               shouldBlockPlainReleasedWithoutConcreteRetainedRunFreshDiscovery ||
               (
                 (
@@ -5160,15 +5202,42 @@ export function createProviderIssueHandoffService(
               deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
               continue;
             }
+            const shouldPreserveFreshDiscoverySlotForReleasedStart =
+              shouldReserveFreshDiscoverySlot && !usedNoRunPendingReopenLiveStartedProbe;
+            const canDispatchReleasedStart = pollDispatchBudget.canDispatch(resolution.trackedIssue);
+            const canDispatchReleasedStartWhilePreservingFreshDiscoverySlot =
+              !shouldPreserveFreshDiscoverySlotForReleasedStart ||
+              pollDispatchBudget.canDispatchWhilePreservingFreshDiscoverySlot(
+                resolution.trackedIssue
+              );
             if (
-              !pollDispatchBudget.canDispatch(resolution.trackedIssue) ||
-              (
-                shouldReserveFreshDiscoverySlot &&
-                !pollDispatchBudget.canDispatchWhilePreservingFreshDiscoverySlot(
-                  resolution.trackedIssue
-                )
-              )
+              !canDispatchReleasedStart ||
+              !canDispatchReleasedStartWhilePreservingFreshDiscoverySlot
             ) {
+              if (
+                shouldProbeNoRunPendingReopenLiveStartedTruth &&
+                !hasOccupiedPollDispatchProviderKey &&
+                isProviderStartedWorkerTrackedIssue(resolution.trackedIssue) &&
+                (
+                  !canDispatchReleasedStart ||
+                  usedNoRunPendingReopenLiveStartedProbe
+                )
+              ) {
+                const handoffResult = await launchStartForTrackedIssue({
+                  claim,
+                  trackedIssue: resolution.trackedIssue,
+                  reason: 'provider_issue_refresh_start_launched',
+                  previousRun: latestRun
+                });
+                if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
+                  noteOccupiedPollDispatchSlot(
+                    resolveClaimPollDispatchSlotKey(claimProviderKey, handoffResult.claim),
+                    claimProviderKey,
+                    resolution.trackedIssue
+                  );
+                }
+                continue;
+              }
               await refreshRetainedReleasedNotActiveClaimMetadata({
                 claim,
                 releaseRun,
@@ -9446,6 +9515,34 @@ function canFreshDiscoverReleasedPendingReopenClaim(
     return !claim.run_id && !claim.run_manifest_path;
   }
   return !shouldAttemptReleaseCancel(run) || isInactiveReleasedPendingReopenRun(claim, run);
+}
+
+function shouldProbeNoRunReleasedPendingReopenClaimForLiveStartedTruth(input: {
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'run_id' | 'run_manifest_path' | 'issue_state' | 'issue_state_type'
+  >;
+  releaseRun: ProviderIssueRunRecord | null;
+  activeRun: ProviderIssueRunRecord | null;
+  latestRun: ProviderIssueRunRecord | null;
+  hasPendingReleaseCancel: (manifestPath: string | null | undefined) => boolean;
+}): boolean {
+  if (
+    input.claim.state !== 'released' ||
+    !isProviderIssueReleasedPendingReopen(input.claim.reason ?? null)
+  ) {
+    return false;
+  }
+  if (input.claim.run_id || input.claim.run_manifest_path) {
+    return false;
+  }
+  if (input.releaseRun || input.activeRun || input.latestRun) {
+    return false;
+  }
+  if (input.hasPendingReleaseCancel(input.claim.run_manifest_path)) {
+    return false;
+  }
+  return !isProviderStartedWorkerClaim(input.claim);
 }
 
 function canFreshDiscoverPlainReleasedMissingRetainedRunClaim(input: {

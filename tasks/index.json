@@ -15555,6 +15555,42 @@
         "task": "tasks/tasks-linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe.md",
         "agent_task": ".agent/task/linear-612a3dc3-f66f-4ba3-aea9-1282b54d93fe.md"
       }
+    },
+    {
+      "id": "20260426-linear-b131706d-e40f-42db-8f29-9f1ddd636187",
+      "title": "CO-392 live-started released-pending-reopen refresh",
+      "relates_to": "tasks/tasks-linear-b131706d-e40f-42db-8f29-9f1ddd636187.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-26",
+      "approvals": {
+        "tests_child_lane": {
+          "reviewer": "bounded same-issue tests child lane plus parent provider worker",
+          "date": "2026-04-26",
+          "status": "rejected_after_successful_completion",
+          "manifest": ".runs/linear-b131706d-e40f-42db-8f29-9f1ddd636187-co379-live-started-regression/cli/2026-04-26T10-12-26-338Z-f86a07cd/manifest.json",
+          "summary": "Child lane completed with a patch in the delegated test file, but parent rejected it because it depended on fresh discovery returning the live started issue and rejected the direct issue-by-id recovery path required by CO-392."
+        },
+        "docs_review_child_stream": {
+          "reviewer": "bounded same-issue docs-review child stream",
+          "date": "2026-04-26",
+          "status": "succeeded_with_p1_resolved_by_parent",
+          "manifest": ".runs/linear-b131706d-e40f-42db-8f29-9f1ddd636187-docs-review/cli/2026-04-26T10-49-31-623Z-16f26867/manifest.json",
+          "summary": "Docs-review completed and surfaced a high-signal P1 on same-issue occupancy for the new live-start probe; parent fixed the probe to skip occupied provider keys and added an unreadable same-issue occupancy regression."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-b131706d-e40f-42db-8f29-9f1ddd636187.md",
+        "task": "tasks/tasks-linear-b131706d-e40f-42db-8f29-9f1ddd636187.md",
+        "agent_task": ".agent/task/linear-b131706d-e40f-42db-8f29-9f1ddd636187.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-b131706d-e40f-42db-8f29-9f1ddd636187.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-b131706d-e40f-42db-8f29-9f1ddd636187.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-b131706d-e40f-42db-8f29-9f1ddd636187.md"
+        }
+      }
     }
   ]
 }
