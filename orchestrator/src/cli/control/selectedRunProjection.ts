@@ -1,4 +1,4 @@
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import type { RunPaths } from '../run/runPaths.js';
@@ -33,6 +33,7 @@ import {
   buildProviderFallbackTaskId,
   buildProviderIssueKey,
   hasQueuedProviderIntakeRetry,
+  isActiveProviderIntakeClaim,
   readProviderIntakeClaim,
   selectProviderIntakeClaim
 } from './providerIntakeState.js';
@@ -66,6 +67,18 @@ const PROVIDER_LINEAR_CHILD_PIPELINE_IDS = new Set([
   'docs-relevance-advisory',
   'provider-linear-child-lane'
 ]);
+const PROVIDER_COMPATIBILITY_FULL_RECONCILIATION_CLAIM_LIMIT = 16;
+const PROVIDER_COMPATIBILITY_SYNTHETIC_LOCAL_SCAN_MANIFEST_LIMIT = 64;
+const PROVIDER_COMPATIBILITY_SYNTHETIC_LOCAL_SCAN_TASK_LIMIT = 64;
+const PROVIDER_COMPATIBILITY_SYNTHETIC_LOCAL_SCAN_TASK_RECENCY_SAMPLE_LIMIT = 128;
+const PROVIDER_COMPATIBILITY_SYNTHETIC_LOCAL_SCAN_RUNS_PER_TASK = 2;
+
+interface SyntheticTaskLocalManifestCandidate {
+  taskEntry: string;
+  runEntry: string;
+  manifestPath: string;
+  recencyAt: string | null;
+}
 
 export interface SelectedRunManifestSnapshot {
   manifestRecord: Record<string, unknown>;
@@ -282,7 +295,10 @@ async function readDiscoveredTaskCompatibilityContexts(
   controlWorkspacePath: string | null
 ): Promise<DiscoveredTaskCompatibilityContext[]> {
   const discovered: DiscoveredTaskCompatibilityContext[] = [];
-  const taskEntries = await readDirectoryNames(runsRoot);
+  const taskEntries = await resolveCompatibilityDiscoveryTaskEntries(
+    runsRoot,
+    context.providerIntakeState
+  );
 
   for (const taskEntry of taskEntries.sort((left, right) => left.localeCompare(right)).reverse()) {
     if (taskEntry === 'local-mcp') {
@@ -297,7 +313,403 @@ async function readDiscoveredTaskCompatibilityContexts(
     discovered.push(...discoveredContexts);
   }
 
+  discovered.push(
+    ...(await readSyntheticTaskLocalCompatibilityContexts(runsRoot, new Set(taskEntries), {
+      currentTaskId,
+      currentRunId,
+      providerIntakeState: context.providerIntakeState,
+      controlWorkspacePath
+    }))
+  );
+
   return discovered;
+}
+
+async function resolveCompatibilityDiscoveryTaskEntries(
+  runsRoot: string,
+  providerIntakeState: ProviderIntakeState | undefined
+): Promise<string[]> {
+  const directoryEntries = await readDirectoryNames(runsRoot);
+  if (!providerIntakeState || providerIntakeState.claims.length === 0) {
+    return directoryEntries;
+  }
+  if (shouldUseFullCompatibilityDiscovery(providerIntakeState)) {
+    return directoryEntries;
+  }
+
+  const taskEntries = new Set<string>();
+  for (const taskEntry of directoryEntries) {
+    if (!isProviderIntakeScopedTaskEntry(taskEntry)) {
+      taskEntries.add(taskEntry);
+    }
+  }
+  for (const claim of selectCompatibilityDiscoveryClaims(providerIntakeState)) {
+    if (claim.task_id && claim.task_id !== 'local-mcp') {
+      taskEntries.add(claim.task_id);
+    }
+    if (
+      claim.run_manifest_path &&
+      isCliRunManifestPathWithinRunsRoot(claim.run_manifest_path, runsRoot)
+    ) {
+      const taskId = resolveTaskIdFromManifestPath(claim.run_manifest_path);
+      if (taskId && taskId !== 'local-mcp') {
+        taskEntries.add(taskId);
+      }
+    }
+  }
+
+  return [...taskEntries];
+}
+
+function isProviderIntakeScopedTaskEntry(taskEntry: string): boolean {
+  return SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(taskEntry);
+}
+
+function shouldUseFullCompatibilityDiscovery(providerIntakeState: ProviderIntakeState): boolean {
+  return (
+    providerIntakeState.claims.length <=
+    PROVIDER_COMPATIBILITY_FULL_RECONCILIATION_CLAIM_LIMIT
+  );
+}
+
+function selectCompatibilityDiscoveryClaims(
+  providerIntakeState: ProviderIntakeState
+): ProviderIntakeClaimRecord[] {
+  return providerIntakeState.claims.filter((claim) =>
+    isActiveProviderIntakeClaim(claim) ||
+    hasQueuedProviderIntakeRetry(claim) ||
+    isLiveRehydrateProviderLinearWorkerReleasedClaim(claim)
+  );
+}
+
+async function readSyntheticTaskLocalCompatibilityContexts(
+  runsRoot: string,
+  includedTaskEntries: Set<string>,
+  options: {
+    currentTaskId?: string | null;
+    currentRunId?: string | null;
+    providerIntakeState?: ProviderIntakeState;
+    controlWorkspacePath?: string | null;
+  }
+): Promise<DiscoveredTaskCompatibilityContext[]> {
+  if (!options.providerIntakeState || shouldUseFullCompatibilityDiscovery(options.providerIntakeState)) {
+    return [];
+  }
+  const discovered: DiscoveredTaskCompatibilityContext[] = [];
+  let manifestReads = 0;
+  const activeProviderIntakeTaskEntries = collectProviderIntakeTaskEntries(
+    selectCompatibilityDiscoveryClaims(options.providerIntakeState),
+    runsRoot
+  );
+  const providerIntakeRunEntries = collectProviderIntakeClaimRunEntries(
+    options.providerIntakeState,
+    runsRoot
+  );
+  const syntheticTaskEntries = await selectRecentSyntheticTaskEntries(
+    runsRoot,
+    (await readDirectoryNames(runsRoot)).filter(
+      (taskEntry) =>
+        isProviderIntakeScopedTaskEntry(taskEntry) &&
+        !includedTaskEntries.has(taskEntry) &&
+        !activeProviderIntakeTaskEntries.has(taskEntry)
+    ),
+    providerIntakeRunEntries
+  );
+  const manifestCandidates = await readSyntheticTaskLocalManifestCandidates(
+    runsRoot,
+    syntheticTaskEntries,
+    providerIntakeRunEntries
+  );
+
+  for (const candidate of manifestCandidates) {
+    if (manifestReads >= PROVIDER_COMPATIBILITY_SYNTHETIC_LOCAL_SCAN_MANIFEST_LIMIT) {
+      break;
+    }
+    if (options.currentTaskId === candidate.taskEntry && options.currentRunId === candidate.runEntry) {
+      continue;
+    }
+    manifestReads += 1;
+    const manifest = await readJsonFile<CliManifest>(candidate.manifestPath);
+    if (!manifest || !isSyntheticTaskLocalCompatibilityManifest(manifest)) {
+      continue;
+    }
+    const context = await readTaskCompatibilityContextFromManifest(
+      candidate.manifestPath,
+      candidate.runEntry,
+      manifest,
+      options
+    );
+    if (context) {
+      discovered.push(context);
+    }
+  }
+
+  return discovered;
+}
+
+async function selectRecentSyntheticTaskEntries(
+  runsRoot: string,
+  taskEntries: string[],
+  providerIntakeRunEntries: Map<string, Set<string>>
+): Promise<string[]> {
+  const withCheapRecency = await Promise.all(
+    taskEntries.map(async (taskEntry) => ({
+      taskEntry,
+      recencyAt: await readSyntheticTaskEntryLatestCheapRecencyIso(
+        runsRoot,
+        taskEntry,
+        providerIntakeRunEntries.get(taskEntry)
+      )
+    }))
+  );
+  const manifestRankCandidates = withCheapRecency
+    .sort(compareSyntheticTaskEntryRecencyDesc)
+    .slice(0, PROVIDER_COMPATIBILITY_SYNTHETIC_LOCAL_SCAN_TASK_RECENCY_SAMPLE_LIMIT);
+  const withManifestRecency = await Promise.all(
+    manifestRankCandidates.map(async (entry) => ({
+      taskEntry: entry.taskEntry,
+      recencyAt: selectLatestIsoTimestamp(
+        entry.recencyAt,
+        await readSyntheticTaskEntryLatestManifestRecencyIso(
+          runsRoot,
+          entry.taskEntry,
+          providerIntakeRunEntries.get(entry.taskEntry)
+        )
+      )
+    }))
+  );
+  return withManifestRecency
+    .sort(compareSyntheticTaskEntryRecencyDesc)
+    .slice(0, PROVIDER_COMPATIBILITY_SYNTHETIC_LOCAL_SCAN_TASK_LIMIT)
+    .map((entry) => entry.taskEntry);
+}
+
+async function readSyntheticTaskEntryLatestManifestRecencyIso(
+  runsRoot: string,
+  taskEntry: string,
+  skippedRunEntries?: Set<string>
+): Promise<string | null> {
+  const cliRoot = join(runsRoot, taskEntry, 'cli');
+  const runEntries = (await readSyntheticTaskRunEntryCheapRecencies(cliRoot))
+    .filter(({ runEntry }) => !skippedRunEntries?.has(runEntry))
+    .sort(compareSyntheticRunEntryRecencyDesc)
+    .slice(0, PROVIDER_COMPATIBILITY_SYNTHETIC_LOCAL_SCAN_RUNS_PER_TASK);
+  const manifestRecencies = await Promise.all(
+    runEntries.map(({ runEntry }) =>
+      readManifestRecencyIso(join(cliRoot, runEntry, 'manifest.json'))
+    )
+  );
+  return manifestRecencies.reduce<string | null>(
+    (latest, recencyAt) => selectLatestIsoTimestamp(latest, recencyAt),
+    null
+  );
+}
+
+async function readSyntheticTaskLocalManifestCandidates(
+  runsRoot: string,
+  syntheticTaskEntries: string[],
+  providerIntakeRunEntries: Map<string, Set<string>>
+): Promise<SyntheticTaskLocalManifestCandidate[]> {
+  const candidates: SyntheticTaskLocalManifestCandidate[] = [];
+  for (const taskEntry of syntheticTaskEntries) {
+    const cliRoot = join(runsRoot, taskEntry, 'cli');
+    const runEntries = (await readSyntheticTaskRunEntryCheapRecencies(cliRoot))
+      .filter(({ runEntry }) => !providerIntakeRunEntries.get(taskEntry)?.has(runEntry))
+      .sort(compareSyntheticRunEntryRecencyDesc)
+      .slice(0, PROVIDER_COMPATIBILITY_SYNTHETIC_LOCAL_SCAN_RUNS_PER_TASK);
+    for (const { runEntry, recencyAt: cheapRecencyAt } of runEntries) {
+      const runDir = join(cliRoot, runEntry);
+      candidates.push({
+        taskEntry,
+        runEntry,
+        manifestPath: join(runDir, 'manifest.json'),
+        recencyAt:
+          await readManifestRecencyIso(join(runDir, 'manifest.json')) ??
+          cheapRecencyAt
+      });
+    }
+  }
+  return candidates.sort(compareSyntheticTaskLocalManifestCandidateRecencyDesc);
+}
+
+async function readSyntheticTaskEntryLatestCheapRecencyIso(
+  runsRoot: string,
+  taskEntry: string,
+  skippedRunEntries?: Set<string>
+): Promise<string | null> {
+  const cliRoot = join(runsRoot, taskEntry, 'cli');
+  const allRunEntries = await readSyntheticTaskRunEntryCheapRecencies(cliRoot);
+  if (allRunEntries.length === 0) {
+    return await readDirectoryMtimeIso(cliRoot);
+  }
+  const runEntries = skippedRunEntries?.size
+    ? allRunEntries.filter(({ runEntry }) => !skippedRunEntries.has(runEntry))
+    : allRunEntries;
+  if (runEntries.length === 0) {
+    return null;
+  }
+  return runEntries.reduce<string | null>(
+    (latest, entry) => selectLatestIsoTimestamp(latest, entry.recencyAt),
+    null
+  );
+}
+
+async function readSyntheticTaskRunEntryCheapRecencies(
+  cliRoot: string
+): Promise<Array<{ runEntry: string; recencyAt: string | null }>> {
+  return await Promise.all(
+    (await readDirectoryNames(cliRoot)).map(async (runEntry) => {
+      const runDir = join(cliRoot, runEntry);
+      return {
+        runEntry,
+        recencyAt: selectLatestIsoTimestamp(
+          parseProviderLinearWorkerRunIdTimestamp(runEntry),
+          await readDirectoryMtimeIso(runDir)
+        )
+      };
+    })
+  );
+}
+
+async function readManifestRecencyIso(manifestPath: string): Promise<string | null> {
+  const manifest = await readJsonFile<Record<string, unknown>>(manifestPath);
+  if (!manifest) {
+    return null;
+  }
+  return selectLatestIsoTimestamp(
+    readStringValue(manifest, 'updated_at', 'updatedAt') ?? null,
+    readStringValue(manifest, 'completed_at', 'completedAt') ?? null,
+    readStringValue(manifest, 'started_at', 'startedAt') ?? null
+  );
+}
+
+function compareSyntheticRunEntryRecencyDesc(
+  left: { runEntry: string; recencyAt: string | null },
+  right: { runEntry: string; recencyAt: string | null }
+): number {
+  const recencyComparison = compareIsoTimestamp(right.recencyAt, left.recencyAt);
+  return recencyComparison !== 0 ? recencyComparison : right.runEntry.localeCompare(left.runEntry);
+}
+
+function compareSyntheticTaskEntryRecencyDesc(
+  left: { taskEntry: string; recencyAt: string | null },
+  right: { taskEntry: string; recencyAt: string | null }
+): number {
+  const recencyComparison = compareIsoTimestamp(right.recencyAt, left.recencyAt);
+  return recencyComparison !== 0 ? recencyComparison : right.taskEntry.localeCompare(left.taskEntry);
+}
+
+function compareSyntheticTaskLocalManifestCandidateRecencyDesc(
+  left: SyntheticTaskLocalManifestCandidate,
+  right: SyntheticTaskLocalManifestCandidate
+): number {
+  const recencyComparison = compareIsoTimestamp(right.recencyAt, left.recencyAt);
+  if (recencyComparison !== 0) {
+    return recencyComparison;
+  }
+  const taskComparison = right.taskEntry.localeCompare(left.taskEntry);
+  return taskComparison !== 0 ? taskComparison : right.runEntry.localeCompare(left.runEntry);
+}
+
+async function readDirectoryMtimeIso(path: string): Promise<string | null> {
+  try {
+    return (await stat(path)).mtime.toISOString();
+  } catch {
+    return null;
+  }
+}
+
+function isSyntheticTaskLocalCompatibilityManifest(manifest: CliManifest): boolean {
+  const manifestRecord = manifest as unknown as Record<string, unknown>;
+  const status = readStringValue(manifestRecord, 'status');
+  if (status !== 'in_progress') {
+    return false;
+  }
+  if (isProviderLinearWorkerCompatibilityManifest(manifestRecord)) {
+    return false;
+  }
+  return true;
+}
+
+function isProviderLinearWorkerCompatibilityManifest(manifestRecord: Record<string, unknown>): boolean {
+  const pipelineId = readStringValue(manifestRecord, 'pipeline_id', 'pipelineId');
+  if (pipelineId === PROVIDER_LINEAR_WORKER_PIPELINE_ID) {
+    return true;
+  }
+  return (
+    isRecord(manifestRecord.provider_linear_worker_proof) ||
+    isRecord(manifestRecord.providerLinearWorkerProof)
+  );
+}
+
+function collectProviderIntakeTaskEntries(
+  claims: ProviderIntakeClaimRecord[],
+  runsRoot: string
+): Set<string> {
+  const taskEntries = new Set<string>();
+  for (const claim of claims) {
+    if (claim.task_id && claim.task_id !== 'local-mcp') {
+      taskEntries.add(claim.task_id);
+    }
+    if (
+      claim.run_manifest_path &&
+      isCliRunManifestPathWithinRunsRoot(claim.run_manifest_path, runsRoot)
+    ) {
+      const taskId = resolveTaskIdFromManifestPath(claim.run_manifest_path);
+      if (taskId && taskId !== 'local-mcp') {
+        taskEntries.add(taskId);
+      }
+    }
+  }
+  return taskEntries;
+}
+
+function collectProviderIntakeClaimRunEntries(
+  providerIntakeState: ProviderIntakeState,
+  runsRoot: string
+): Map<string, Set<string>> {
+  const runEntries = new Map<string, Set<string>>();
+  for (const claim of providerIntakeState.claims) {
+    const taskIds = new Set<string>();
+    if (claim.task_id && claim.task_id !== 'local-mcp') {
+      taskIds.add(claim.task_id);
+    }
+    if (
+      claim.run_manifest_path &&
+      isCliRunManifestPathWithinRunsRoot(claim.run_manifest_path, runsRoot)
+    ) {
+      const taskId = resolveTaskIdFromManifestPath(claim.run_manifest_path);
+      if (taskId && taskId !== 'local-mcp') {
+        taskIds.add(taskId);
+      }
+    }
+
+    const claimRunEntries = new Set<string>();
+    if (claim.run_id) {
+      claimRunEntries.add(claim.run_id);
+    }
+    if (
+      claim.run_manifest_path &&
+      isCliRunManifestPathWithinRunsRoot(claim.run_manifest_path, runsRoot)
+    ) {
+      const runId = resolveRunIdFromManifestPath(claim.run_manifest_path);
+      if (runId) {
+        claimRunEntries.add(runId);
+      }
+    }
+
+    if (taskIds.size === 0 || claimRunEntries.size === 0) {
+      continue;
+    }
+    for (const taskId of taskIds) {
+      const taskRunEntries = runEntries.get(taskId) ?? new Set<string>();
+      for (const runId of claimRunEntries) {
+        taskRunEntries.add(runId);
+      }
+      runEntries.set(taskId, taskRunEntries);
+    }
+  }
+  return runEntries;
 }
 
 export async function discoverAuthoritativeRetryCollectionContexts(
@@ -1364,53 +1776,66 @@ async function readTaskCompatibilityContexts(
       continue;
     }
 
-    const snapshot = buildSelectedRunManifestSnapshot(
-      manifest as unknown as Record<string, unknown>,
+    const context = await readTaskCompatibilityContextFromManifest(
       manifestPath,
-      runEntry
-    );
-    if (!snapshot) {
-      continue;
-    }
-    if (isAuxiliaryProviderProofHarnessManifest(manifest as unknown as Record<string, unknown>)) {
-      continue;
-    }
-
-    const control = normalizeControlState(
-      await readJsonFile<ControlState>(join(runDir, 'control.json')),
-      snapshot.runId
-    );
-    const questionSnapshot = await readJsonFile<{ questions?: QuestionRecord[] }>(join(runDir, 'questions.json'));
-    const advisoryState = await readJsonFile<LinearAdvisoryStateSnapshot>(
-      join(runDir, LINEAR_ADVISORY_STATE_FILE)
-    );
-    const providerLinearWorkerProof = await readProviderLinearWorkerProofForProjection(runDir);
-
-    const context = buildProjectionContextFromParts(
-      snapshot,
-      {
-        control,
-        questions: Array.isArray(questionSnapshot?.questions) ? questionSnapshot.questions : [],
-        runDir,
-        trackedIssue: selectFreshLinearAdvisoryTrackedIssue(advisoryState),
-        providerLinearWorkerProof
-      },
-      resolveRunsRootFromRunDir(runDir),
-      options.controlWorkspacePath ?? resolveSafeLegacyWorkspacePathFromRunDir(runDir),
-      findMatchingProviderIntakeClaim(options.providerIntakeState, snapshot, providerLinearWorkerProof),
-      options.providerIntakeState ?? null
+      runEntry,
+      manifest,
+      options
     );
     if (context) {
-      discovered.push({
-        context,
-        retryFallbackEligible: isManifestRetryFallbackCandidate(
-          manifest as unknown as Record<string, unknown>
-        )
-      });
+      discovered.push(context);
     }
   }
 
   return discovered;
+}
+
+async function readTaskCompatibilityContextFromManifest(
+  manifestPath: string,
+  fallbackRunId: string,
+  manifest: CliManifest,
+  options: {
+    providerIntakeState?: ProviderIntakeState;
+    controlWorkspacePath?: string | null;
+  } = {}
+): Promise<DiscoveredTaskCompatibilityContext | null> {
+  const manifestRecord = manifest as unknown as Record<string, unknown>;
+  const snapshot = buildSelectedRunManifestSnapshot(manifestRecord, manifestPath, fallbackRunId);
+  if (!snapshot || isAuxiliaryProviderProofHarnessManifest(manifestRecord)) {
+    return null;
+  }
+
+  const runDir = dirname(manifestPath);
+  const control = normalizeControlState(
+    await readJsonFile<ControlState>(join(runDir, 'control.json')),
+    snapshot.runId
+  );
+  const questionSnapshot = await readJsonFile<{ questions?: QuestionRecord[] }>(join(runDir, 'questions.json'));
+  const advisoryState = await readJsonFile<LinearAdvisoryStateSnapshot>(
+    join(runDir, LINEAR_ADVISORY_STATE_FILE)
+  );
+  const providerLinearWorkerProof = await readProviderLinearWorkerProofForProjection(runDir);
+
+  const context = buildProjectionContextFromParts(
+    snapshot,
+    {
+      control,
+      questions: Array.isArray(questionSnapshot?.questions) ? questionSnapshot.questions : [],
+      runDir,
+      trackedIssue: selectFreshLinearAdvisoryTrackedIssue(advisoryState),
+      providerLinearWorkerProof
+    },
+    resolveRunsRootFromRunDir(runDir),
+    options.controlWorkspacePath ?? resolveSafeLegacyWorkspacePathFromRunDir(runDir),
+    findMatchingProviderIntakeClaim(options.providerIntakeState, snapshot, providerLinearWorkerProof),
+    options.providerIntakeState ?? null
+  );
+  return context
+    ? {
+        context,
+        retryFallbackEligible: isManifestRetryFallbackCandidate(manifestRecord)
+      }
+    : null;
 }
 
 async function reconcileProviderLinearWorkerDiscoveredContexts(
@@ -1460,7 +1885,7 @@ function resolveProviderLinearWorkerRunArtifactReconciliation(
     return null;
   }
   const claim = findProviderLinearWorkerClaimForContext(providerIntakeState, context);
-  if (claim && isActiveProviderLinearWorkerClaimState(claim.state)) {
+  if (claim && isActiveProviderLinearWorkerReconciliationClaim(claim)) {
     return null;
   }
   const replacementRun = findNewerTerminalProviderLinearWorkerContext(allContexts, context);
@@ -1503,7 +1928,7 @@ function resolveProviderLinearWorkerRunArtifactReconciliation(
     (claim?.state === 'completed' ? 'succeeded' : 'cancelled');
   const recordedAt = evidenceUpdatedAt ?? context.updatedAt ?? context.startedAt ?? new Date(0).toISOString();
   const supersedingRunBoundClaimSummaryPrefix =
-    supersedingRunBoundClaim && isActiveProviderLinearWorkerClaimState(supersedingRunBoundClaim.state)
+    supersedingRunBoundClaim && isActiveProviderIntakeClaim(supersedingRunBoundClaim)
       ? 'newer active claim run'
       : 'newer run-bound claim run';
   const summary =
@@ -1549,6 +1974,31 @@ function resolveProviderLinearWorkerRunArtifactReconciliation(
         }
       : null
   };
+}
+
+function isActiveProviderLinearWorkerReconciliationClaim(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'reason' | 'issue_state' | 'issue_state_type'>
+): boolean {
+  switch (claim.state) {
+    case 'accepted':
+    case 'starting':
+    case 'running':
+    case 'resuming':
+    case 'resumable':
+      return true;
+    case 'handoff_failed':
+      if (claim.reason === 'provider_issue_merge_closeout_action_required') {
+        return false;
+      }
+      return !isTerminalProviderLinearIssueState(claim.issue_state, claim.issue_state_type);
+    case 'released':
+    case 'completed':
+    case 'stale':
+    case 'duplicate':
+    case 'ignored':
+    default:
+      return false;
+  }
 }
 
 function applyProviderLinearWorkerRunArtifactReconciliation(
@@ -1656,22 +2106,18 @@ function providerLinearWorkerClaimMatchesContext(
   return providerLinearWorkerClaimIssueIdentityMatchesContext(claim, context);
 }
 
-function isActiveProviderLinearWorkerClaimState(state: string): boolean {
-  return (
-    state === 'accepted' ||
-    state === 'starting' ||
-    state === 'running' ||
-    state === 'resuming' ||
-    state === 'resumable' ||
-    state === 'handoff_failed'
-  );
-}
-
 function resolveProviderLinearWorkerClaimReconciliationReason(
   claim: ProviderIntakeClaimRecord
 ): string | null {
   if (claim.state === 'completed') {
     return 'provider_claim_completed';
+  }
+  if (
+    claim.state === 'handoff_failed' &&
+    (claim.reason === 'provider_issue_merge_closeout_action_required' ||
+      isTerminalProviderLinearIssueState(claim.issue_state, claim.issue_state_type))
+  ) {
+    return 'provider_claim_handoff_failed';
   }
   if (claim.state === 'released') {
     const reason = claim.reason ?? '';
@@ -1958,10 +2404,13 @@ function selectProviderLinearWorkerClaimRunEvidenceTimestamp(
 }
 
 function isProviderLinearWorkerRunBoundClaimAuthoritative(
-  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'reason' | 'issue_state' | 'issue_state_type'>
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'retry_queued' | 'issue_state' | 'issue_state_type'
+  >
 ): boolean {
   return (
-    isActiveProviderLinearWorkerClaimState(claim.state) ||
+    isActiveProviderIntakeClaim(claim) ||
     (claim.state === 'released' && isLiveRehydrateProviderLinearWorkerReleasedClaim(claim))
   );
 }
