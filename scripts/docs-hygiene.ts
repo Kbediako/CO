@@ -692,6 +692,13 @@ async function checkCodexPostureMatrix(input: {
   matrix: CodexPostureMatrix;
 }): Promise<DocsCheckError[]> {
   const errors: DocsCheckError[] = [];
+  if (input.matrix.surfaces.length === 0) {
+    errors.push({
+      file: input.matrix.source_path,
+      rule: 'codex-posture-matrix-unresolved',
+      reference: 'matrix surfaces missing'
+    });
+  }
   for (const surface of input.matrix.surfaces) {
     if (CODEX_POSTURE_HISTORICAL_STATUSES.has(surface.status.toLowerCase())) {
       continue;
@@ -726,7 +733,17 @@ async function checkCodexPostureMatrixSurface(
       }
     ];
   }
-  const absolutePath = path.resolve(repoRoot, surfacePath);
+  const resolvedSurface = resolveMatrixSurfacePath(repoRoot, surfacePath);
+  if (!resolvedSurface) {
+    return [
+      {
+        file: matrix.source_path,
+        rule: 'codex-posture-matrix-unresolved',
+        reference: `${surfacePath}:matrix surface path escapes repository`
+      }
+    ];
+  }
+  const { absolutePath } = resolvedSurface;
   if (!(await pathExists(absolutePath))) {
     return [
       {
@@ -774,6 +791,17 @@ async function checkCodexPostureMatrixSurface(
   }
   errors.push(...checkCodexPostureMatrixPackagePins(content, surfacePath, surface, codexPosture));
   return errors;
+}
+
+function resolveMatrixSurfacePath(repoRoot: string, surfacePath: string): { absolutePath: string; relativePath: string } | null {
+  const repoRootAbs = path.resolve(repoRoot);
+  const absolutePath = path.resolve(repoRootAbs, surfacePath);
+  const relativeToRepoNative = path.relative(repoRootAbs, absolutePath);
+  const relativePath = toPosixPath(relativeToRepoNative);
+  if (relativePath === '..' || relativePath.startsWith('../') || path.isAbsolute(relativeToRepoNative)) {
+    return null;
+  }
+  return { absolutePath, relativePath };
 }
 
 function resolveCodexPostureMatrixTemplate(
@@ -867,11 +895,7 @@ async function checkActiveHistoricalReleaseEvidence(input: {
         .filter((entry) => CODEX_POSTURE_HISTORICAL_STATUSES.has(entry.status.toLowerCase()))
         .map((entry) => normalizePolicyPath(entry.path)),
       ...input.matrix.surfaces
-        .filter(
-          (surface) =>
-            CODEX_POSTURE_HISTORICAL_STATUSES.has(surface.status.toLowerCase()) &&
-            isCodexReleaseEvidenceMatrixSurface(surface)
-        )
+        .filter((surface) => CODEX_POSTURE_HISTORICAL_STATUSES.has(surface.status.toLowerCase()))
         .map((surface) => normalizePolicyPath(surface.path))
     ].filter((entry) => entry.length > 0)
   );
@@ -931,8 +955,14 @@ async function checkActiveHistoricalReleaseEvidence(input: {
 }
 
 function isCodexReleaseEvidenceMatrixSurface(surface: CodexPostureMatrix['surfaces'][number]): boolean {
-  const haystack = [surface.kind, surface.path].join('\n');
-  return looksLikeCodexReleaseEvidenceText(haystack);
+  const status = surface.status.toLowerCase();
+  if (CODEX_POSTURE_HISTORICAL_STATUSES.has(status)) {
+    return true;
+  }
+  if (CODEX_POSTURE_CURRENT_EVIDENCE_STATUSES.has(status) && !CODEX_POSTURE_CURRENT_STATUSES.has(status)) {
+    return true;
+  }
+  return /(adoption|audit|canary|candidate|evidence|release)/u.test(surface.kind.toLowerCase());
 }
 
 function isCurrentFacingCodexPostureDoc(
