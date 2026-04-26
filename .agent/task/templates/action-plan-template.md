@@ -11,7 +11,7 @@
 - Intent checksum / protected terms carried forward:
 - Not done if:
 - Pre-implementation issue-quality review:
-- Fallback / refactor decision: choose `remove fallback`, `expire fallback`, `justify retaining fallback`, or `Not applicable`; retained fallbacks must name owner, trigger, review date, maximum lifetime, removal condition, and validation.
+- Fallback / refactor decision: choose `remove fallback`, `expire fallback`, `justify retaining fallback`, or `Not applicable`; retained fallbacks must name owner, trigger, introduced date, review date, maximum lifetime, removal condition, and validation.
 - Large-refactor check: record whether another minor seam is acceptable under `docs/guides/fallback-expiry-and-refactor-policy.md`.
 
 ## Milestones & Sequencing

@@ -37,7 +37,7 @@
             "CO-397",
             "CO-398"
           ],
-          "summary": "Added fallback-expiry and large-refactor policy, docs-first prompts, micro-task guardrail, and follow-up ownership for five fallback-heavy areas; validation gates passed and the standalone-review P2 expiry-date finding was addressed with concrete 2026-05-10 review / 2026-05-26 expiry dates."
+          "summary": "Added fallback-expiry and large-refactor policy, docs-first prompts, micro-task guardrail, and follow-up ownership for five fallback-heavy areas; validation gates passed, the standalone-review P2 expiry-date finding was addressed with concrete 2026-05-10 review / 2026-05-26 expiry dates, and the re-review P2 template finding was addressed by mirroring the full retained-fallback metadata set."
         }
       },
       "paths": {
