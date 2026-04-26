@@ -6443,6 +6443,15 @@ describe('SelectedRunProjection', () => {
       syntheticProviderWorkerEnv,
       syntheticProviderWorkerRunId
     );
+    const syntheticRecentActivityEnv = {
+      ...activeEnv,
+      taskId: 'linear-old-run-recent-activity'
+    };
+    const syntheticRecentActivityRunId = '2026-03-20T00-05-00-000Z-old-run-recent-activity';
+    const syntheticRecentActivityPaths = resolveRunPaths(
+      syntheticRecentActivityEnv,
+      syntheticRecentActivityRunId
+    );
     const syntheticNoisePaths = Array.from({ length: 70 }, (_, index) => {
       const taskId = `linear-active-zlocal-noise-${index}`;
       return {
@@ -6466,6 +6475,7 @@ describe('SelectedRunProjection', () => {
       mkdir(syntheticLocalPaths.runDir, { recursive: true }),
       mkdir(syntheticUnrelatedLocalPaths.runDir, { recursive: true }),
       mkdir(syntheticProviderWorkerPaths.runDir, { recursive: true }),
+      mkdir(syntheticRecentActivityPaths.runDir, { recursive: true }),
       ...releasedNoisePaths.map((entry) => mkdir(entry.paths.runDir, { recursive: true })),
       ...syntheticNoisePaths.map((entry) => mkdir(entry.paths.runDir, { recursive: true }))
     ]);
@@ -6588,6 +6598,19 @@ describe('SelectedRunProjection', () => {
       }),
       'utf8'
     );
+    await writeFile(
+      syntheticRecentActivityPaths.manifestPath,
+      JSON.stringify({
+        run_id: syntheticRecentActivityRunId,
+        task_id: 'linear-old-run-recent-activity',
+        status: 'in_progress',
+        issue_identifier: 'LOCAL-RECENT-ACTIVITY',
+        updated_at: '2026-03-20T03:22:00.000Z',
+        summary: 'older-started local run with recent activity should stay visible',
+        commands: []
+      }),
+      'utf8'
+    );
     await Promise.all(
       syntheticNoisePaths.map((entry) =>
         writeFile(
@@ -6607,6 +6630,29 @@ describe('SelectedRunProjection', () => {
     );
     const olderSyntheticTaskTime = new Date('2026-03-19T00:00:00.000Z');
     const newerSyntheticTaskTime = new Date('2026-03-20T02:00:00.000Z');
+    const syntheticLocalActivityTime = new Date('2026-03-20T03:18:00.000Z');
+    const syntheticUnrelatedActivityTime = new Date('2026-03-20T03:19:00.000Z');
+    const releasedLocalActivityTime = new Date('2026-03-20T03:20:00.000Z');
+    const syntheticProviderWorkerActivityTime = new Date('2026-03-20T03:21:00.000Z');
+    const recentActivityTime = new Date('2026-03-20T03:22:00.000Z');
+    await Promise.all([
+      utimes(syntheticLocalPaths.runDir, syntheticLocalActivityTime, syntheticLocalActivityTime),
+      utimes(syntheticUnrelatedLocalPaths.runDir, syntheticUnrelatedActivityTime, syntheticUnrelatedActivityTime),
+      utimes(releasedLocalPaths.runDir, releasedLocalActivityTime, releasedLocalActivityTime),
+      utimes(
+        syntheticProviderWorkerPaths.runDir,
+        syntheticProviderWorkerActivityTime,
+        syntheticProviderWorkerActivityTime
+      ),
+      utimes(syntheticRecentActivityPaths.runDir, recentActivityTime, recentActivityTime),
+      ...syntheticNoisePaths.map((entry) =>
+        utimes(
+          entry.paths.runDir,
+          new Date(`2026-03-20T01:${String(entry.index % 20).padStart(2, '0')}:00.000Z`),
+          new Date(`2026-03-20T01:${String(entry.index % 20).padStart(2, '0')}:00.000Z`)
+        )
+      )
+    ]);
     await Promise.all(
       syntheticNoisePaths.map((entry) =>
         utimes(join(activeEnv.runsRoot, entry.taskId), newerSyntheticTaskTime, newerSyntheticTaskTime)
@@ -6685,6 +6731,7 @@ describe('SelectedRunProjection', () => {
       expect.arrayContaining([
         syntheticLocalRunId,
         syntheticUnrelatedLocalRunId,
+        syntheticRecentActivityRunId,
         releasedLocalRunId,
         'run-local-active',
         'run-active'

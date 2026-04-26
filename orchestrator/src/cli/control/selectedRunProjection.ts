@@ -525,12 +525,16 @@ async function readSyntheticTaskRunEntryCheapRecencies(
   cliRoot: string
 ): Promise<Array<{ runEntry: string; recencyAt: string | null }>> {
   return await Promise.all(
-    (await readDirectoryNames(cliRoot)).map(async (runEntry) => ({
-      runEntry,
-      recencyAt:
-        parseProviderLinearWorkerRunIdTimestamp(runEntry) ??
-        await readDirectoryMtimeIso(join(cliRoot, runEntry))
-    }))
+    (await readDirectoryNames(cliRoot)).map(async (runEntry) => {
+      const runDir = join(cliRoot, runEntry);
+      return {
+        runEntry,
+        recencyAt: selectLatestIsoTimestamp(
+          parseProviderLinearWorkerRunIdTimestamp(runEntry),
+          await readDirectoryMtimeIso(runDir)
+        )
+      };
+    })
   );
 }
 
