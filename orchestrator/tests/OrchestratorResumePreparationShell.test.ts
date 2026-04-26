@@ -149,6 +149,13 @@ describe('runOrchestratorResumePreparationShell', () => {
       taskIdOverride: 'task-1',
       targetStageId: 'stage-1',
       planTargetFallback: 'manifest-target',
+      configResolution: {
+        mode: 'downstream-compatibility',
+        reason: 'resume policy allowed packaged compatibility fallback',
+        config_source: 'repo'
+      },
+      configNotice:
+        'Configuration mode: downstream-compatibility (resume policy allowed packaged compatibility fallback); using repo-local codex.orchestrator.json with packaged fallback enabled.',
       envOverrides: { DESIGN_PIPELINE: '1' }
     });
     expect(resolveRuntimeModeImpl).toHaveBeenCalledWith(
@@ -386,6 +393,11 @@ describe('runOrchestratorResumePreparationShell', () => {
     expect(result.runtimeModeResolution).toEqual({ mode: 'cli', source: 'manifest' });
     expect(applyRequestedRuntimeMode).toHaveBeenCalledWith(manifest, 'cli');
     expect(appendSummaryImpl).not.toHaveBeenCalled();
+    expect(manifest.config_resolution).toEqual({
+      mode: 'downstream-compatibility',
+      reason: 'resume policy allowed packaged compatibility fallback',
+      config_source: 'repo'
+    });
     expect(manifest.plan_target_id).toBe('planner-target');
     expect(createPersister).toHaveBeenCalledWith(
       expect.objectContaining({

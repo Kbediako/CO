@@ -23,12 +23,18 @@ import {
 } from './runPreparation.js';
 import type { CliManifest, ResumeOptions } from '../types.js';
 import type { EnvironmentPaths } from '../run/environment.js';
-import { PipelineResolver } from './pipelineResolver.js';
+import {
+  PipelineResolver,
+  formatConfigNotice,
+  type ConfigResolutionSummary
+} from './pipelineResolver.js';
 import {
   formatRepoConfigRequiredError,
-  isRepoConfigRequired
+  isRepoConfigRequired,
+  resolveConfigAuthorityMode
 } from '../config/repoConfigPolicy.js';
 import {
+  findPipeline,
   loadPackageConfig,
   loadUserConfig,
   resolveRepoConfigPath
@@ -94,15 +100,35 @@ export async function runOrchestratorResumePreparationShell(
   const designConfig = await resolver.loadDesignConfig(actualEnv.repoRoot);
 
   const repoConfigRequired = isRepoConfigRequiredImpl(process.env);
+  const configMode = resolveResumeConfigMode(repoConfigRequired, process.env);
   const userConfig = await loadUserConfigImpl(actualEnv, { allowPackageFallback: !repoConfigRequired });
   if (repoConfigRequired && userConfig?.source !== 'repo') {
     throw new Error(formatRepoConfigRequiredErrorImpl(resolveRepoConfigPathImpl(actualEnv, process.env)));
   }
+  const repoPipeline = findPipeline(userConfig ?? null, manifest.pipeline_id);
   const fallbackConfig =
-    !repoConfigRequired && manifest.pipeline_id === 'rlm' && userConfig?.source === 'repo'
+    !repoConfigRequired && manifest.pipeline_id === 'rlm' && userConfig?.source === 'repo' && !repoPipeline
       ? await loadPackageConfigImpl(actualEnv)
       : null;
   const pipeline = resolvePipelineForResumeImpl(actualEnv, manifest, userConfig, fallbackConfig);
+  const fallbackPipeline = fallbackConfig ? findPipeline(fallbackConfig, manifest.pipeline_id) : null;
+  const fallbackNotice =
+    'Configuration mode: downstream-compatibility; repo config is missing the rlm pipeline, so the packaged compatibility pipeline is active. ' +
+    'Add rlm to your repo-local codex.orchestrator.json to avoid compatibility fallback.';
+  const resumeConfigResolution: ConfigResolutionSummary =
+    !repoPipeline && fallbackPipeline
+      ? {
+          mode: 'downstream-compatibility',
+          reason: fallbackNotice,
+          config_source: 'package'
+        }
+      : {
+          mode: configMode.mode,
+          reason: configMode.reason,
+          config_source: userConfig?.source ?? null
+        };
+  const resumeConfigNotice =
+    !repoPipeline && fallbackPipeline ? fallbackNotice : formatConfigNotice(resumeConfigResolution);
   const envOverrides = resolver.resolveDesignEnvOverrides(designConfig, pipeline.id);
 
   await params.validateResumeToken(paths, manifest, params.options.resumeToken ?? null);
@@ -123,11 +149,15 @@ export async function runOrchestratorResumePreparationShell(
     taskIdOverride: manifest.task_id,
     targetStageId: params.options.targetStageId,
     planTargetFallback: manifest.plan_target_id ?? null,
+    configResolution: resumeConfigResolution,
+    configNotice: resumeConfigNotice,
     envOverrides
   });
-  manifest.config_resolution = preparation.configResolution ?? null;
-  if (preparation.configNotice && !(manifest.summary ?? '').includes(preparation.configNotice)) {
-    appendSummaryImpl(manifest, preparation.configNotice);
+  const activeConfigResolution = preparation.configResolution ?? resumeConfigResolution;
+  const activeConfigNotice = preparation.configNotice ?? resumeConfigNotice;
+  manifest.config_resolution = activeConfigResolution;
+  if (activeConfigNotice && !(manifest.summary ?? '').includes(activeConfigNotice)) {
+    appendSummaryImpl(manifest, activeConfigNotice);
   }
   const runtimeModeResolution = resolveRuntimeModeImpl({
     flag: params.options.runtimeMode,
@@ -152,4 +182,17 @@ export async function runOrchestratorResumePreparationShell(
     paths,
     persister
   };
+}
+
+function resolveResumeConfigMode(
+  repoConfigRequired: boolean,
+  runtimeEnv: NodeJS.ProcessEnv
+): ReturnType<typeof resolveConfigAuthorityMode> {
+  const resolved = resolveConfigAuthorityMode(runtimeEnv);
+  if ((resolved.mode === 'repo-authoritative') === repoConfigRequired) {
+    return resolved;
+  }
+  return repoConfigRequired
+    ? { mode: 'repo-authoritative', reason: 'resume policy required repo-local config' }
+    : { mode: 'downstream-compatibility', reason: 'resume policy allowed packaged compatibility fallback' };
 }

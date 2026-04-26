@@ -202,7 +202,7 @@ export class PipelineResolver {
   }
 }
 
-function formatConfigNotice(resolution: ConfigResolutionSummary): string {
+export function formatConfigNotice(resolution: ConfigResolutionSummary): string {
   if (resolution.mode === 'repo-authoritative') {
     if (resolution.config_source === 'repo') {
       return `Configuration mode: repo-authoritative (${resolution.reason}); using repo-local codex.orchestrator.json.`;
