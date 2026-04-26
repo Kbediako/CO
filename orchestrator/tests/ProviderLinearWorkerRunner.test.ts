@@ -2598,6 +2598,94 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     }
   });
 
+  it('redacts app-server terminal turn error details before diagnostics are persisted', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-provider-appserver-terminal-redaction-'));
+    extraTempRoots.push(root);
+    const scriptPath = join(root, 'fake-app-server-terminal-redaction.mjs');
+    await writeFile(
+      scriptPath,
+      `
+import readline from 'node:readline';
+
+const rl = readline.createInterface({ input: process.stdin });
+const send = (payload) => process.stdout.write(JSON.stringify(payload) + '\\n');
+
+for await (const line of rl) {
+  const message = JSON.parse(line);
+  if (message.method === 'initialize') {
+    send({ id: message.id, result: {} });
+    continue;
+  }
+  if (message.method === 'thread/start') {
+    send({ id: message.id, result: { thread: { id: 'thread-secret' } } });
+    continue;
+  }
+  if (message.method === 'turn/start') {
+    send({ id: message.id, result: { turn: { id: 'turn-secret', status: 'inProgress' } } });
+    send({
+      method: 'turn/completed',
+      params: {
+        threadId: 'thread-secret',
+        turn: {
+          id: 'turn-secret',
+          status: 'failed',
+          error: {
+            message:
+              'model stream failed OPENAI_API_KEY=secret-openai-key refresh_token secret-refresh-token operator@example.com'
+          }
+        }
+      }
+    });
+    setTimeout(() => process.exit(0), 50);
+    continue;
+  }
+}
+`
+    );
+
+    const result = await defaultAppServerTurnRunner({
+      command: process.execPath,
+      args: [scriptPath],
+      cwd: root,
+      env: process.env,
+      prompt: 'exercise terminal redaction',
+      resumeThreadId: null
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('app-server turn turn-secret failed');
+    expect(result.stderr).toContain('OPENAI_API_KEY=<redacted>');
+    expect(result.stderr).toContain('refresh_token <redacted>');
+    expect(result.stderr).toContain('<email-redacted>');
+    expect(result.stderr).not.toContain('secret-openai-key');
+    expect(result.stderr).not.toContain('secret-refresh-token');
+    expect(result.stderr).not.toContain('operator@example.com');
+
+    const parsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'notification',
+        method: 'turn/completed',
+        params: {
+          turn: {
+            id: 'turn-secret',
+            status: 'failed',
+            error: {
+              message:
+                'model stream failed OPENAI_API_KEY=secret-openai-key refresh_token secret-refresh-token operator@example.com'
+            }
+          }
+        }
+      })
+    );
+    expect(parsed.finalMessage).toContain('app-server turn turn-secret failed');
+    expect(parsed.finalMessage).toContain('OPENAI_API_KEY=<redacted>');
+    expect(parsed.finalMessage).toContain('refresh_token <redacted>');
+    expect(parsed.finalMessage).toContain('<email-redacted>');
+    expect(parsed.finalMessage).not.toContain('secret-openai-key');
+    expect(parsed.finalMessage).not.toContain('secret-refresh-token');
+    expect(parsed.finalMessage).not.toContain('operator@example.com');
+  });
+
   it('redacts whitespace-separated credential labels from provider diagnostics', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       JSON.stringify({
@@ -9708,6 +9796,18 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
     expect(
       buildProviderLinearWorkerAppServerCallbackResponse('item/commandExecution/requestApproval', {
+        availableDecisions: ['acceptForSession']
+      })
+    ).toEqual({
+      kind: 'error',
+      error: {
+        code: -32000,
+        message:
+          'Provider worker app-server control has no safe offered decision for item/commandExecution/requestApproval.'
+      }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/commandExecution/requestApproval', {
         availableDecisions: ['decline', 'accept'],
         additionalPermissions: {
           network: { enabled: true }
@@ -9762,6 +9862,18 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     ).toEqual({
       kind: 'result',
       result: { decision: 'decline' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/fileChange/requestApproval', {
+        availableDecisions: ['acceptForSession']
+      })
+    ).toEqual({
+      kind: 'error',
+      error: {
+        code: -32000,
+        message:
+          'Provider worker app-server control has no safe offered decision for item/fileChange/requestApproval.'
+      }
     });
     expect(
       buildProviderLinearWorkerAppServerCallbackResponse('item/fileChange/requestApproval', {

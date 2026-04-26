@@ -767,13 +767,33 @@ export function defaultExecRunner(
   });
 }
 
-function pickProviderLinearWorkerCommandApprovalDecision(params: Record<string, unknown> | null): string {
+function pickProviderLinearWorkerOfferedDenialDecision(decisions: unknown[]): string | null {
+  if (decisions.length === 0) {
+    return 'decline';
+  }
+  if (decisions.includes('decline')) {
+    return 'decline';
+  }
+  return decisions.includes('cancel') ? 'cancel' : null;
+}
+
+function buildProviderLinearWorkerUnavailableDecisionError(
+  method: string
+): ProviderLinearWorkerAppServerCallbackResponse {
+  return {
+    kind: 'error',
+    error: {
+      code: -32000,
+      message: `Provider worker app-server control has no safe offered decision for ${method}.`
+    }
+  };
+}
+
+function pickProviderLinearWorkerCommandApprovalDecision(
+  params: Record<string, unknown> | null
+): string | null {
   const decisions = Array.isArray(params?.availableDecisions) ? params.availableDecisions : [];
-  const fallbackDenialDecision = decisions.includes('decline')
-    ? 'decline'
-    : decisions.includes('cancel')
-      ? 'cancel'
-      : 'cancel';
+  const fallbackDenialDecision = pickProviderLinearWorkerOfferedDenialDecision(decisions);
   if (hasProviderLinearWorkerCommandApprovalEscalation(params)) {
     return fallbackDenialDecision;
   }
@@ -790,18 +810,15 @@ function hasProviderLinearWorkerGrantRoot(params: Record<string, unknown> | null
   );
 }
 
-function pickProviderLinearWorkerFileChangeApprovalDecision(params: Record<string, unknown> | null): string {
+function pickProviderLinearWorkerFileChangeApprovalDecision(params: Record<string, unknown> | null): string | null {
   const decisions = Array.isArray(params?.availableDecisions) ? params.availableDecisions : [];
   if (hasProviderLinearWorkerGrantRoot(params)) {
-    return decisions.includes('cancel') && !decisions.includes('decline') ? 'cancel' : 'decline';
+    return pickProviderLinearWorkerOfferedDenialDecision(decisions);
   }
   if (decisions.length === 0 || decisions.includes('accept')) {
     return 'accept';
   }
-  if (decisions.includes('decline')) {
-    return 'decline';
-  }
-  return decisions.includes('cancel') ? 'cancel' : 'decline';
+  return pickProviderLinearWorkerOfferedDenialDecision(decisions);
 }
 
 function pickProviderLinearWorkerLegacyPatchApprovalDecision(
@@ -857,20 +874,30 @@ export function buildProviderLinearWorkerAppServerCallbackResponse(
   params: Record<string, unknown> | null = null
 ): ProviderLinearWorkerAppServerCallbackResponse {
   switch (method) {
-    case 'item/commandExecution/requestApproval':
+    case 'item/commandExecution/requestApproval': {
+      const decision = pickProviderLinearWorkerCommandApprovalDecision(params);
+      if (!decision) {
+        return buildProviderLinearWorkerUnavailableDecisionError(method);
+      }
       return {
         kind: 'result',
         result: {
-          decision: pickProviderLinearWorkerCommandApprovalDecision(params)
+          decision
         }
       };
-    case 'item/fileChange/requestApproval':
+    }
+    case 'item/fileChange/requestApproval': {
+      const decision = pickProviderLinearWorkerFileChangeApprovalDecision(params);
+      if (!decision) {
+        return buildProviderLinearWorkerUnavailableDecisionError(method);
+      }
       return {
         kind: 'result',
         result: {
-          decision: pickProviderLinearWorkerFileChangeApprovalDecision(params)
+          decision
         }
       };
+    }
     case 'item/permissions/requestApproval':
       return {
         kind: 'result',
@@ -1445,7 +1472,7 @@ function buildProviderLinearWorkerAppServerTerminalFailureMessage(
   const errorDetail = stringifyProviderLinearWorkerAppServerTurnError(
     turn?.error ?? turn?.failure ?? turn?.status_detail ?? turn?.statusDetail
   );
-  return errorDetail ? `${base}: ${errorDetail}` : base;
+  return errorDetail ? `${base}: ${redactProviderWorkerDiagnosticText(errorDetail)}` : base;
 }
 
 function normalizeGuardrailsRequiredSource(value: unknown): string | null {
