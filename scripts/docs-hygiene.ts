@@ -675,8 +675,11 @@ async function checkCodexReleaseIntakeTemplate(
   repoRoot: string,
   policy: { enabled?: unknown; template_path?: unknown; required_markers?: unknown } | undefined
 ): Promise<DocsCheckError[]> {
+  const activePolicy = policy?.enabled === false ? undefined : policy;
   const configuredPath =
-    typeof policy?.template_path === 'string' ? policy.template_path : DEFAULT_CODEX_RELEASE_INTAKE_TEMPLATE_PATH;
+    typeof activePolicy?.template_path === 'string'
+      ? activePolicy.template_path
+      : DEFAULT_CODEX_RELEASE_INTAKE_TEMPLATE_PATH;
   const templatePath = normalizePolicyPath(configuredPath);
   if (!templatePath) {
     return [
@@ -688,7 +691,19 @@ async function checkCodexReleaseIntakeTemplate(
     ];
   }
 
-  const absolutePath = path.join(repoRoot, templatePath);
+  const repoRootAbs = path.resolve(repoRoot);
+  const absolutePath = path.resolve(repoRootAbs, templatePath);
+  const relativePath = path.relative(repoRootAbs, absolutePath);
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    return [
+      {
+        file: templatePath,
+        rule: 'codex-release-intake-template-stale',
+        reference: 'invalid template_path'
+      }
+    ];
+  }
+
   if (!(await pathExists(absolutePath))) {
     return [
       {
@@ -700,7 +715,7 @@ async function checkCodexReleaseIntakeTemplate(
   }
 
   const content = await readFile(absolutePath, 'utf8');
-  const configuredMarkers = normalizeStringArrayPolicy(policy?.required_markers);
+  const configuredMarkers = normalizeStringArrayPolicy(activePolicy?.required_markers);
   const requiredMarkers =
     configuredMarkers.length > 0 ? configuredMarkers : [...DEFAULT_CODEX_RELEASE_INTAKE_MARKERS];
 

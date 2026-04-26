@@ -1856,10 +1856,53 @@ describe('docs hygiene tooling', () => {
     );
   });
 
+  it('flags Codex CLI release-intake template paths outside the repository', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-release-intake-outside-path-'));
+    createdDirs.push(repoRoot);
+
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      extraPolicies: {
+        codex_release_intake: {
+          template_path: '../outside-template.md',
+          required_markers: ['Release Evidence Axes']
+        }
+      }
+    });
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: '../outside-template.md',
+        rule: 'codex-release-intake-template-stale',
+        reference: 'invalid template_path'
+      })
+    );
+  });
+
   it('validates the default Codex CLI release-intake template when the policy is absent or disabled', async () => {
     for (const [policyCase, extraPolicies] of [
       ['absent', {}],
-      ['disabled', { codex_release_intake: { enabled: false } }]
+      [
+        'disabled',
+        {
+          codex_release_intake: {
+            enabled: false,
+            template_path: 'docs/custom-release-intake-template.md',
+            required_markers: ['Custom Disabled Marker']
+          }
+        }
+      ]
     ] as const) {
       const repoRoot = await mkdtemp(join(tmpdir(), `docs-hygiene-release-intake-default-${policyCase}-`));
       createdDirs.push(repoRoot);
