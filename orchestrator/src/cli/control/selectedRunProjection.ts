@@ -628,10 +628,7 @@ function isSyntheticTaskLocalCompatibilityManifest(manifest: CliManifest): boole
   if (isProviderLinearWorkerCompatibilityManifest(manifestRecord)) {
     return false;
   }
-  const issueProvider =
-    readStringValue(manifestRecord, 'issue_provider') ??
-    readStringValue(manifestRecord, 'issueProvider');
-  return issueProvider !== 'linear';
+  return true;
 }
 
 function isProviderLinearWorkerCompatibilityManifest(manifestRecord: Record<string, unknown>): boolean {

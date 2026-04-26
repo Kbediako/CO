@@ -6443,6 +6443,15 @@ describe('SelectedRunProjection', () => {
       syntheticProviderWorkerEnv,
       syntheticProviderWorkerRunId
     );
+    const syntheticLinearDocsEnv = {
+      ...activeEnv,
+      taskId: 'linear-unclaimed-docs-review'
+    };
+    const syntheticLinearDocsRunId = '2026-03-20T03-23-00-000Z-linear-docs-review-active';
+    const syntheticLinearDocsPaths = resolveRunPaths(
+      syntheticLinearDocsEnv,
+      syntheticLinearDocsRunId
+    );
     const syntheticRecentActivityEnv = {
       ...activeEnv,
       taskId: 'linear-old-run-recent-activity'
@@ -6475,6 +6484,7 @@ describe('SelectedRunProjection', () => {
       mkdir(syntheticLocalPaths.runDir, { recursive: true }),
       mkdir(syntheticUnrelatedLocalPaths.runDir, { recursive: true }),
       mkdir(syntheticProviderWorkerPaths.runDir, { recursive: true }),
+      mkdir(syntheticLinearDocsPaths.runDir, { recursive: true }),
       mkdir(syntheticRecentActivityPaths.runDir, { recursive: true }),
       ...releasedNoisePaths.map((entry) => mkdir(entry.paths.runDir, { recursive: true })),
       ...syntheticNoisePaths.map((entry) => mkdir(entry.paths.runDir, { recursive: true }))
@@ -6599,6 +6609,22 @@ describe('SelectedRunProjection', () => {
       'utf8'
     );
     await writeFile(
+      syntheticLinearDocsPaths.manifestPath,
+      JSON.stringify({
+        run_id: syntheticLinearDocsRunId,
+        task_id: 'linear-unclaimed-docs-review',
+        pipeline_id: 'docs-review',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-docs',
+        issue_identifier: 'CO-DOCS',
+        updated_at: '2026-03-20T03:23:00.000Z',
+        summary: 'linear-tagged non-provider-worker docs run remains visible',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
       syntheticRecentActivityPaths.manifestPath,
       JSON.stringify({
         run_id: syntheticRecentActivityRunId,
@@ -6635,6 +6661,7 @@ describe('SelectedRunProjection', () => {
     const releasedLocalActivityTime = new Date('2026-03-20T03:20:00.000Z');
     const syntheticProviderWorkerActivityTime = new Date('2026-03-20T03:21:00.000Z');
     const syntheticRecentActivityRunTime = new Date('2026-03-20T00:05:00.000Z');
+    const syntheticLinearDocsActivityTime = new Date('2026-03-20T03:23:00.000Z');
     await Promise.all([
       utimes(syntheticLocalPaths.runDir, syntheticLocalActivityTime, syntheticLocalActivityTime),
       utimes(syntheticUnrelatedLocalPaths.runDir, syntheticUnrelatedActivityTime, syntheticUnrelatedActivityTime),
@@ -6643,6 +6670,11 @@ describe('SelectedRunProjection', () => {
         syntheticProviderWorkerPaths.runDir,
         syntheticProviderWorkerActivityTime,
         syntheticProviderWorkerActivityTime
+      ),
+      utimes(
+        syntheticLinearDocsPaths.runDir,
+        syntheticLinearDocsActivityTime,
+        syntheticLinearDocsActivityTime
       ),
       utimes(
         syntheticRecentActivityPaths.runDir,
@@ -6735,6 +6767,7 @@ describe('SelectedRunProjection', () => {
       expect.arrayContaining([
         syntheticLocalRunId,
         syntheticUnrelatedLocalRunId,
+        syntheticLinearDocsRunId,
         syntheticRecentActivityRunId,
         releasedLocalRunId,
         'run-local-active',
