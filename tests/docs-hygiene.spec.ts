@@ -1737,6 +1737,45 @@ describe('docs hygiene tooling', () => {
     await expect(runDocsCheck(repoRoot)).rejects.toThrow('Invalid Codex posture matrix path outside repository');
   });
 
+  it('fails closed when the configured posture matrix file resolves outside the repository', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-matrix-file-symlink-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    const outsidePath = join(dirname(repoRoot), 'outside-codex-posture-matrix.json');
+    await writeFile(
+      outsidePath,
+      JSON.stringify(
+        {
+          version: 1,
+          current: { codex_cli_version: '0.125.0', model: 'gpt-5.5', default_runtime: 'appserver' },
+          surfaces: []
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await symlink(outsidePath, join(repoRoot, 'docs', 'codex-posture-matrix.json'));
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json'
+    });
+
+    await expect(runDocsCheck(repoRoot)).rejects.toThrow(
+      'Invalid Codex posture matrix path resolves outside repository'
+    );
+  });
+
   it('flags drift when matrix-governed workflow or pack-smoke pin expectations disagree', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-matrix-drift-'));
     createdDirs.push(repoRoot);

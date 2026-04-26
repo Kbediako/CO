@@ -1,4 +1,4 @@
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { pathExists, toPosixPath } from './docs-helpers.js';
 
@@ -368,7 +368,14 @@ export async function loadCodexPostureMatrix(repoRoot, relativePath) {
   if (relativeToRepo === '..' || relativeToRepo.startsWith('../') || path.isAbsolute(relativeToRepoNative)) {
     throw new Error(`Invalid Codex posture matrix path outside repository: ${matrixPath}`);
   }
-  const raw = JSON.parse(await readFile(absolutePath, 'utf8'));
+  const resolvedRepoRootReal = await realpath(resolvedRepoRoot);
+  const absolutePathReal = await realpath(absolutePath);
+  const realRelativeToRepoNative = path.relative(resolvedRepoRootReal, absolutePathReal);
+  const realRelativeToRepo = toPosixPath(realRelativeToRepoNative);
+  if (realRelativeToRepo === '..' || realRelativeToRepo.startsWith('../') || path.isAbsolute(realRelativeToRepoNative)) {
+    throw new Error(`Invalid Codex posture matrix path resolves outside repository: ${matrixPath}`);
+  }
+  const raw = JSON.parse(await readFile(absolutePathReal, 'utf8'));
 
   return {
     version: Number.isFinite(raw?.version) ? Number(raw.version) : 1,
