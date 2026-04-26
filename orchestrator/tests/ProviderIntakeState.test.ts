@@ -19,6 +19,42 @@ function createProviderIntakeState(): ProviderIntakeState {
   };
 }
 
+function createClaim(
+  overrides: Partial<ProviderIntakeState['claims'][number]> & {
+    issue_identifier: string;
+  }
+): ProviderIntakeState['claims'][number] {
+  const suffix = overrides.issue_identifier.replace(/^CO-/, '').toLowerCase();
+  return {
+    provider: 'linear',
+    provider_key: `linear:lin-issue-${suffix}`,
+    issue_id: `lin-issue-${suffix}`,
+    issue_title: `Issue ${overrides.issue_identifier}`,
+    issue_state: 'In Progress',
+    issue_state_type: 'started',
+    issue_updated_at: '2026-04-26T07:00:00.000Z',
+    task_id: `linear-lin-issue-${suffix}`,
+    mapping_source: 'provider_id_fallback',
+    state: 'handoff_failed',
+    reason: 'provider_issue_handoff_failed',
+    accepted_at: '2026-04-26T07:00:00.000Z',
+    updated_at: '2026-04-26T07:01:00.000Z',
+    last_delivery_id: null,
+    last_event: 'poll_tick',
+    last_action: 'reconcile',
+    last_webhook_timestamp: null,
+    run_id: `run-${suffix}`,
+    run_manifest_path: `/tmp/run-${suffix}/manifest.json`,
+    retry_queued: null,
+    retry_attempt: null,
+    retry_due_at: null,
+    retry_error: null,
+    launch_source: 'control-host',
+    launch_token: `launch-${suffix}`,
+    ...overrides
+  };
+}
+
 describe('upsertProviderIntakeClaim', () => {
   it('preserves persisted viewer identity when a later update omits it', () => {
     const state = createProviderIntakeState();
@@ -827,6 +863,67 @@ describe('buildProviderIntakeSummary', () => {
           attempt: 2,
           due_at: '2026-04-23T08:14:25.936Z'
         }
+      }
+    });
+  });
+
+  it('excludes terminal handoff failures and merge-closeout non-retry failures from active issue identifiers', () => {
+    const summary = buildProviderIntakeSummary({
+      schema_version: 1,
+      updated_at: '2026-04-26T07:34:09.880Z',
+      rehydrated_at: '2026-04-26T07:34:09.880Z',
+      latest_provider_key: 'linear:lin-issue-381',
+      latest_reason: 'provider_issue_handoff_failed',
+      claims: [
+        createClaim({
+          issue_identifier: 'CO-381',
+          issue_title: 'Completed stale merge closeout',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          issue_updated_at: '2026-04-26T05:00:00.000Z',
+          accepted_at: '2026-04-26T00:18:10.000Z',
+          updated_at: '2026-04-26T07:34:09.880Z'
+        }),
+        createClaim({
+          issue_identifier: 'CO-382',
+          issue_title: 'Stale started merge closeout',
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-26T05:30:00.000Z',
+          reason: 'provider_issue_merge_closeout_action_required',
+          accepted_at: '2026-04-26T00:18:10.000Z',
+          updated_at: '2026-04-26T07:35:09.880Z'
+        }),
+        createClaim({
+          issue_identifier: 'CO-392',
+          issue_title: 'Active failed handoff'
+        }),
+        createClaim({
+          issue_identifier: 'CO-393',
+          issue_title: 'Terminal retry stays active',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          issue_updated_at: '2026-04-26T06:00:00.000Z',
+          state: 'completed',
+          reason: 'provider_issue_retry_queued',
+          accepted_at: '2026-04-26T06:00:00.000Z',
+          updated_at: '2026-04-26T06:01:00.000Z',
+          retry_queued: true,
+          retry_attempt: 2,
+          retry_due_at: '2026-04-26T06:10:00.000Z',
+          retry_error: 'queued retry still occupies capacity'
+        })
+      ]
+    });
+
+    expect(summary).toMatchObject({
+      active_claim_count: 2,
+      running_claim_count: 0,
+      active_issue_identifiers: ['CO-392', 'CO-393'],
+      running_issue_identifiers: [],
+      selected_claim: {
+        issue_identifier: 'CO-392',
+        state: 'handoff_failed'
       }
     });
   });

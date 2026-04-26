@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260426-linear-1383a1c1-3937-4eb9-b205-050d299e85d5",
+      "title": "CO-391 installed control-host timeout and stale terminal suppression",
+      "relates_to": "tasks/tasks-linear-1383a1c1-3937-4eb9-b205-050d299e85d5.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-26",
+      "paths": {
+        "spec": "tasks/specs/linear-1383a1c1-3937-4eb9-b205-050d299e85d5.md",
+        "task": "tasks/tasks-linear-1383a1c1-3937-4eb9-b205-050d299e85d5.md",
+        "agent_task": ".agent/task/linear-1383a1c1-3937-4eb9-b205-050d299e85d5.md",
+        "docs": "docs/TECH_SPEC-linear-1383a1c1-3937-4eb9-b205-050d299e85d5.md"
+      }
+    },
+    {
       "id": "20260426-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25",
       "title": "CO-380 authoritative review gate",
       "relates_to": "tasks/tasks-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md",

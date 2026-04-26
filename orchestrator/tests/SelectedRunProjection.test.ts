@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -6307,6 +6307,319 @@ describe('SelectedRunProjection', () => {
       displayStatus: 'failed',
       summary: 'retryable failure pending rerun'
     });
+  });
+
+  it('keeps full compatibility discovery for small provider-intake sets', async () => {
+    const { root, paths } = await createHostPaths();
+    const providerEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const providerPaths = resolveRunPaths(providerEnv, 'run-provider-active');
+    const unrelatedEnv = {
+      ...providerEnv,
+      taskId: 'linear-unrelated'
+    };
+    const unrelatedPaths = resolveRunPaths(unrelatedEnv, 'run-unrelated-active');
+    await Promise.all([
+      mkdir(providerPaths.runDir, { recursive: true }),
+      mkdir(unrelatedPaths.runDir, { recursive: true })
+    ]);
+    await writeFile(
+      providerPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-provider-active',
+        task_id: 'linear-lin-issue-1',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:16:00.000Z',
+        summary: 'provider-intake-backed active run',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      unrelatedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-unrelated-active',
+        task_id: 'linear-unrelated',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-unrelated',
+        issue_identifier: 'CO-999',
+        updated_at: '2026-03-20T01:17:00.000Z',
+        summary: 'unrelated active run should not be scanned',
+        commands: []
+      }),
+      'utf8'
+    );
+    const providerIntakeState = createProviderIntakeState(providerPaths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      task_id: 'linear-lin-issue-1',
+      run_id: 'run-provider-active',
+      run_manifest_path: providerPaths.manifestPath
+    };
+
+    const discovery = await discoverCompatibilityCollectionContexts(
+      createProjectionContext(paths, providerIntakeState)
+    );
+
+    expect(discovery.running.map((entry) => entry.runId)).toEqual([
+      'run-unrelated-active',
+      'run-provider-active'
+    ]);
+    expect(discovery.all.map((entry) => entry.runId)).toContain('run-unrelated-active');
+  });
+
+  it('bounds high-volume provider-intake discovery to active claim directories', async () => {
+    const { root, paths } = await createHostPaths();
+    const activeEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-active'
+    };
+    const activePaths = resolveRunPaths(activeEnv, 'run-active');
+    const releasedEnv = {
+      ...activeEnv,
+      taskId: 'linear-released'
+    };
+    const releasedPaths = resolveRunPaths(releasedEnv, 'run-released-active-looking');
+    const releasedNoisePaths = Array.from({ length: 70 }, (_, index) => {
+      const taskId = `linear-zreleased-${index}`;
+      return {
+        index,
+        taskId,
+        paths: resolveRunPaths(
+          {
+            ...activeEnv,
+            taskId
+          },
+          `run-zreleased-${index}`
+        )
+      };
+    });
+    const localEnv = {
+      ...activeEnv,
+      taskId: 'local-active-tool'
+    };
+    const localPaths = resolveRunPaths(localEnv, 'run-local-active');
+    const syntheticLocalEnv = {
+      ...activeEnv,
+      taskId: 'linear-active-zzzz-docs-review'
+    };
+    const syntheticLocalRunId = '2026-03-20T01-30-00-000Z-linear-derived-local-active';
+    const syntheticLocalPaths = resolveRunPaths(
+      syntheticLocalEnv,
+      syntheticLocalRunId
+    );
+    const syntheticNoisePaths = Array.from({ length: 70 }, (_, index) => {
+      const taskId = `linear-active-zlocal-noise-${index}`;
+      return {
+        index,
+        taskId,
+        runId: `2026-03-20T01-${String(index % 20).padStart(2, '0')}-00-000Z-zlocal-noise-${index}`,
+        paths: resolveRunPaths(
+          {
+            ...activeEnv,
+            taskId
+          },
+          `2026-03-20T01-${String(index % 20).padStart(2, '0')}-00-000Z-zlocal-noise-${index}`
+        )
+      };
+    });
+    await Promise.all([
+      mkdir(activePaths.runDir, { recursive: true }),
+      mkdir(releasedPaths.runDir, { recursive: true }),
+      mkdir(localPaths.runDir, { recursive: true }),
+      mkdir(syntheticLocalPaths.runDir, { recursive: true }),
+      ...releasedNoisePaths.map((entry) => mkdir(entry.paths.runDir, { recursive: true })),
+      ...syntheticNoisePaths.map((entry) => mkdir(entry.paths.runDir, { recursive: true }))
+    ]);
+    await writeFile(
+      activePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-active',
+        task_id: 'linear-active',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-active',
+        issue_identifier: 'CO-ACTIVE',
+        updated_at: '2026-03-20T01:16:00.000Z',
+        summary: 'active provider run',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      releasedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-released-active-looking',
+        task_id: 'linear-released',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-released',
+        issue_identifier: 'CO-RELEASED',
+        updated_at: '2026-03-20T01:15:00.000Z',
+        summary: 'released historical run should not be scanned on high-volume status',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      localPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-local-active',
+        task_id: 'local-active-tool',
+        status: 'in_progress',
+        issue_identifier: 'LOCAL-ACTIVE',
+        updated_at: '2026-03-20T01:17:00.000Z',
+        summary: 'non-intake local run remains visible in high-volume mode',
+        commands: []
+      }),
+      'utf8'
+    );
+    await Promise.all(
+      releasedNoisePaths.map((entry) =>
+        writeFile(
+          entry.paths.manifestPath,
+          JSON.stringify({
+            run_id: `run-zreleased-${entry.index}`,
+            task_id: entry.taskId,
+            pipeline_id: 'provider-linear-worker',
+            status: 'in_progress',
+            issue_provider: 'linear',
+            issue_id: `lin-zreleased-${entry.index}`,
+            issue_identifier: `CO-ZREL-${entry.index}`,
+            updated_at: '2026-03-20T01:14:00.000Z',
+            summary: 'inactive retained provider history should not spend synthetic local scan budget',
+            commands: []
+          }),
+          'utf8'
+        )
+      )
+    );
+    await writeFile(
+      syntheticLocalPaths.manifestPath,
+      JSON.stringify({
+        run_id: syntheticLocalRunId,
+        task_id: 'linear-active-zzzz-docs-review',
+        status: 'in_progress',
+        issue_identifier: 'LOCAL-LINEAR-DERIVED',
+        updated_at: '2026-03-20T01:18:00.000Z',
+        summary: 'non-intake local run under a Linear-derived task id remains visible',
+        commands: []
+      }),
+      'utf8'
+    );
+    await Promise.all(
+      syntheticNoisePaths.map((entry) =>
+        writeFile(
+          entry.paths.manifestPath,
+          JSON.stringify({
+            run_id: entry.runId,
+            task_id: entry.taskId,
+            status: 'in_progress',
+            issue_identifier: `LOCAL-ZNOISE-${entry.index}`,
+            updated_at: `2026-03-20T01:${String(entry.index % 20).padStart(2, '0')}:00.000Z`,
+            summary: 'older non-intake synthetic local run should not hide newer local work',
+            commands: []
+          }),
+          'utf8'
+        )
+      )
+    );
+    const olderSyntheticTaskTime = new Date('2026-03-19T00:00:00.000Z');
+    const newerSyntheticTaskTime = new Date('2026-03-20T02:00:00.000Z');
+    await Promise.all(
+      syntheticNoisePaths.map((entry) =>
+        utimes(join(activeEnv.runsRoot, entry.taskId), olderSyntheticTaskTime, olderSyntheticTaskTime)
+      )
+    );
+    await utimes(
+      join(activeEnv.runsRoot, syntheticLocalEnv.taskId),
+      newerSyntheticTaskTime,
+      newerSyntheticTaskTime
+    );
+    const baseClaim = createProviderIntakeState(activePaths.manifestPath).claims[0]!;
+    const providerIntakeState: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-03-20T01:20:00.000Z',
+      rehydrated_at: '2026-03-20T01:20:00.000Z',
+      latest_provider_key: 'linear:lin-active',
+      latest_reason: 'provider_issue_rehydrated_active_run',
+      claims: [
+        {
+          ...baseClaim,
+          provider_key: 'linear:lin-active',
+          issue_id: 'lin-active',
+          issue_identifier: 'CO-ACTIVE',
+          issue_title: 'Active issue',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          task_id: 'linear-active',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          updated_at: '2026-03-20T01:20:00.000Z',
+          run_id: 'run-active',
+          run_manifest_path: activePaths.manifestPath
+        },
+        {
+          ...baseClaim,
+          provider_key: 'linear:lin-released',
+          issue_id: 'lin-released',
+          issue_identifier: 'CO-RELEASED',
+          issue_title: 'Released issue',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          task_id: 'linear-released',
+          state: 'released' as const,
+          reason: 'provider_issue_released:not_active',
+          updated_at: '2026-03-20T01:10:00.000Z',
+          run_id: 'run-released-active-looking',
+          run_manifest_path: releasedPaths.manifestPath
+        },
+        ...releasedNoisePaths.map((entry) => ({
+          ...baseClaim,
+          provider_key: `linear:lin-zreleased-${entry.index}`,
+          issue_id: `lin-zreleased-${entry.index}`,
+          issue_identifier: `CO-ZREL-${entry.index}`,
+          issue_title: `Released noise issue ${entry.index}`,
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          task_id: entry.taskId,
+          state: 'released' as const,
+          reason: 'provider_issue_released:not_active',
+          updated_at: '2026-03-20T01:10:00.000Z',
+          run_id: `run-zreleased-${entry.index}`,
+          run_manifest_path: entry.paths.manifestPath
+        }))
+      ]
+    };
+
+    const discovery = await discoverCompatibilityCollectionContexts(
+      createProjectionContext(paths, providerIntakeState)
+    );
+
+    expect(discovery.running.map((entry) => entry.runId)).toEqual(
+      expect.arrayContaining([
+        syntheticLocalRunId,
+        'run-local-active',
+        'run-active'
+      ])
+    );
+    expect(discovery.all.map((entry) => entry.runId)).not.toContain('run-released-active-looking');
   });
 
   it('reconciles orphaned active provider manifests with released claim and newer terminal run truth', async () => {

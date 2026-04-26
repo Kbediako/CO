@@ -156,7 +156,8 @@ function shouldPruneTerminalSelectedCompatibilityIssue(
   }
   return (
     isTerminalReleasedCompletedProviderSource(issue.selectedSource) ||
-    isStaleInProgressTerminalReleasedProviderSource(issue.selectedSource)
+    isStaleInProgressTerminalReleasedProviderSource(issue.selectedSource) ||
+    isTerminalHandoffFailedProviderSource(issue.selectedSource)
   );
 }
 
@@ -174,7 +175,20 @@ function isTerminalReleasedCompletedProviderSource(
 }
 
 function shouldSuppressInactiveSelectedPayload(source: ControlCompatibilitySourceContext): boolean {
-  return isStaleInProgressTerminalReleasedProviderSource(source);
+  return (
+    isStaleInProgressTerminalReleasedProviderSource(source) ||
+    isTerminalHandoffFailedProviderSource(source)
+  );
+}
+
+function isTerminalHandoffFailedProviderSource(
+  source: ControlCompatibilitySourceContext
+): boolean {
+  const claim = source.providerDebugSnapshot?.claim ?? null;
+  if (normalizeProviderLinearWorkflowState(claim?.state) !== 'handoff_failed') {
+    return false;
+  }
+  return isTerminalProviderIssueState(source);
 }
 
 function isStaleInProgressTerminalReleasedProviderSource(
