@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing release tag to publish (vX.Y.Z or vX.Y.Z-prerelease.N)'
+        description: 'Existing release tag to publish (vX.Y.Z or vX.Y.Z-<prerelease>)'
         required: false
         type: string
 
@@ -26,11 +26,11 @@ jobs:
       dist_tag: ${{ steps.meta.outputs.dist_tag }}
       prerelease: ${{ steps.meta.outputs.prerelease }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org/
@@ -56,7 +56,7 @@ jobs:
 
           TAG="${TAG#refs/tags/}"
           if [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
-            echo "::error::Invalid release tag '${TAG}'. Expected vX.Y.Z or vX.Y.Z-prerelease." >&2
+            echo "::error::Invalid release tag '${TAG}'. Expected vX.Y.Z or vX.Y.Z-<prerelease>." >&2
             exit 1
           fi
 
@@ -158,7 +158,7 @@ jobs:
       - run: npm run clean:dist
       - run: npm run build
       - run: npm run pack:audit
-      - run: npm install --global @openai/codex@0.121.0
+      - run: npm install --global @openai/codex@0.125.0
       - run: npm run pack:smoke
 
       - name: Create tarball
@@ -172,6 +172,7 @@ jobs:
       - name: Generate release notes
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
         run: |
           TAG="${{ steps.meta.outputs.tag }}"
           gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
@@ -179,6 +180,7 @@ jobs:
             -f target_commitish="${{ steps.meta.outputs.tag_sha }}" > release-notes.json
           node - <<'NODE'
           const fs = require('fs');
+          const { execFileSync } = require('node:child_process');
           const data = JSON.parse(fs.readFileSync('release-notes.json', 'utf8'));
           const body = (data.body || '').trim();
 
@@ -226,21 +228,38 @@ jobs:
             return [...lines.slice(0, start), ...lines.slice(end)].join('\n').trim();
           }
 
-          let overview = extractSection(body, 'Overview') ?? '- No labeled overview items.';
-          const overridePath = '.github/release-overview.md';
-          if (fs.existsSync(overridePath)) {
-            const override = fs.readFileSync(overridePath, 'utf8').trim();
-            if (override.length > 0) {
-              overview = override;
+          function readAnnotatedTagBody(tag) {
+            if (!tag) return null;
+            try {
+              const tagBody = execFileSync(
+                'git',
+                ['for-each-ref', `refs/tags/${tag}`, '--format=%(contents:body)'],
+                { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+              ).trim();
+              return tagBody.length > 0 ? tagBody : null;
+            } catch {
+              return null;
             }
+          }
+
+          let overview = extractSection(body, 'Overview') ?? '- No labeled overview items.';
+          // A signed annotated tag body is release-specific, unlike a committed
+          // overview file that can accidentally persist into later releases.
+          const overviewOverride = readAnnotatedTagBody(process.env.RELEASE_TAG);
+          if (overviewOverride) {
+            overview = overviewOverride;
           }
           const bugFixes = extractSection(body, 'Bug Fixes') ?? '- No labeled bug fixes.';
           const compareLine = extractCompareLine(body);
-          let bodyWithoutOverview = stripSection(body, 'Overview');
-          if (compareLine && !bodyWithoutOverview.includes(compareLine)) {
-            bodyWithoutOverview = `${bodyWithoutOverview}\n\n${compareLine}`.trim();
+          const promotedHeadings = ['Overview', 'Bug Fixes'];
+          let fullBody = promotedHeadings.reduce(
+            (remaining, heading) => stripSection(remaining, heading),
+            body
+          ).trim();
+          if (compareLine && !fullBody.includes(compareLine)) {
+            fullBody = `${fullBody}\n\n${compareLine}`.trim();
           }
-          const full = bodyWithoutOverview.length > 0 ? `## Full Changelog\n\n${bodyWithoutOverview}` : '## Full Changelog\n\nNo changes.';
+          const full = fullBody.length > 0 ? `## Full Changelog\n\n${fullBody}` : '## Full Changelog\n\nNo changes.';
 
           const output = [
             '## Release Overview',
@@ -255,23 +274,49 @@ jobs:
           fs.writeFileSync('release-notes.md', output);
           NODE
 
-      - name: Create GitHub Release
+      - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           TAG="${{ steps.meta.outputs.tag }}"
-          FLAGS=""
+          TARBALL="${{ steps.pack.outputs.tarball }}"
+          CREATE_RELEASE_FLAGS=()
+          EDIT_RELEASE_FLAGS=(--draft=false)
           if [[ "${{ steps.meta.outputs.prerelease }}" == "true" ]]; then
-            FLAGS="--prerelease"
+            CREATE_RELEASE_FLAGS+=(--prerelease)
+            EDIT_RELEASE_FLAGS+=(--prerelease)
+          else
+            EDIT_RELEASE_FLAGS+=(--prerelease=false)
           fi
-          gh release create "$TAG" "${{ steps.pack.outputs.tarball }}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --title "$TAG" \
-            --notes-file release-notes.md \
-            $FLAGS
+
+          if gh release view "$TAG" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "Release ${TAG} already exists; repairing release notes and tarball asset in place."
+            gh release edit "$TAG" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "$TAG" \
+              --notes-file release-notes.md \
+              "${EDIT_RELEASE_FLAGS[@]}"
+            if gh release view "$TAG" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --json assets \
+              --jq '.assets[].name' | grep -Fx -- "$TARBALL" >/dev/null; then
+              echo "Release asset ${TARBALL} already exists; preserving existing release tarball."
+            else
+              echo "Release asset ${TARBALL} is missing; uploading tarball built from ${TAG}."
+              gh release upload "$TAG" "$TARBALL" \
+                --repo "${GITHUB_REPOSITORY}"
+            fi
+          else
+            gh release create "$TAG" "$TARBALL" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "$TAG" \
+              --notes-file release-notes.md \
+              "${CREATE_RELEASE_FLAGS[@]}"
+          fi
 
       - name: Upload tarball artifact (fallback)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-tarball
           path: ${{ steps.pack.outputs.tarball }}
@@ -288,16 +333,50 @@ jobs:
       DIST_TAG: ${{ needs.build-release.outputs.dist_tag }}
       TARBALL_NAME: ${{ needs.build-release.outputs.tarball }}
     steps:
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: '24.5.0'
           registry-url: https://registry.npmjs.org/
 
-      - name: Ensure npm trusted publishing prerequisites
+      - name: Verify npm trusted publishing runtime
         run: |
-          npm install --global npm@^11.5.1
-          node --version
-          npm --version
+          set -euo pipefail
+          NODE_VERSION="$(node --version)"
+          NPM_VERSION="$(npm --version)"
+          echo "node ${NODE_VERSION}"
+          echo "npm ${NPM_VERSION}"
+          node - "${NODE_VERSION}" "${NPM_VERSION}" <<'NODE'
+          const [nodeVersionRaw, npmVersionRaw] = process.argv.slice(2);
+
+          function parseVersion(raw) {
+            const match = String(raw).trim().replace(/^v/u, '').match(/^(\d+)\.(\d+)\.(\d+)/u);
+            if (!match) {
+              throw new Error(`Could not parse version '${raw}'.`);
+            }
+            return match.slice(1).map((part) => Number(part));
+          }
+
+          function gte(actual, required) {
+            for (let index = 0; index < required.length; index += 1) {
+              if (actual[index] > required[index]) {
+                return true;
+              }
+              if (actual[index] < required[index]) {
+                return false;
+              }
+            }
+            return true;
+          }
+
+          const nodeVersion = parseVersion(nodeVersionRaw);
+          const npmVersion = parseVersion(npmVersionRaw);
+          if (!gte(nodeVersion, [22, 14, 0])) {
+            throw new Error(`npm trusted publishing requires Node.js 22.14.0 or newer; found ${nodeVersionRaw}.`);
+          }
+          if (!gte(npmVersion, [11, 5, 1])) {
+            throw new Error(`npm trusted publishing requires npm 11.5.1 or newer; found ${npmVersionRaw}.`);
+          }
+          NODE
 
       - name: Download release asset with gh (preferred)
         id: gh-download
@@ -307,7 +386,7 @@ jobs:
           set +e
           mkdir -p release-assets
           for attempt in 1 2 3; do
-            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "*.tgz" --dir release-assets
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$TARBALL_NAME" --dir release-assets
             status=$?
             if [[ $status -eq 0 ]]; then
               echo "downloaded=true" >> "$GITHUB_OUTPUT"
@@ -321,15 +400,22 @@ jobs:
       - name: Resolve asset id (fallback)
         if: steps.gh-download.outputs.downloaded != 'true'
         id: asset
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const { owner, repo } = context.repo;
             const tag = process.env.TAG;
+            const assetName = process.env.TARBALL_NAME;
+            if (!assetName) {
+              core.setFailed('TARBALL_NAME is not set.');
+              return;
+            }
             const release = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
-            const asset = release.data.assets.find(item => item.name.endsWith('.tgz'));
+            const asset = release.data.assets.find(item => item.name === assetName);
             if (!asset) {
-              core.setFailed('No .tgz release asset found.');
+              core.warning(`No release asset named ${assetName} found; falling back to the build artifact.`);
+              core.setOutput('asset_id', '');
+              core.setOutput('asset_name', '');
               return;
             }
             core.setOutput('asset_id', String(asset.id));
@@ -348,8 +434,8 @@ jobs:
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/assets/${{ steps.asset.outputs.asset_id }}"
 
       - name: Download artifact from build (last resort)
-        if: steps.gh-download.outputs.downloaded != 'true'
-        uses: actions/download-artifact@v4
+        if: steps.gh-download.outputs.downloaded != 'true' && steps.asset.outputs.asset_id == ''
+        uses: actions/download-artifact@v8
         with:
           name: release-tarball
           path: release-assets
@@ -357,8 +443,10 @@ jobs:
       - name: Verify release tarball availability
         run: |
           set -euo pipefail
-          if ! ls release-assets/*.tgz >/dev/null 2>&1; then
-            echo "::error::Release asset download did not produce a .tgz tarball for ${TAG}."
+          TARBALL_PATH="release-assets/${TARBALL_NAME}"
+          if [[ ! -f "${TARBALL_PATH}" ]]; then
+            echo "::error::Expected release asset ${TARBALL_NAME} was not downloaded for ${TAG}."
+            find release-assets -maxdepth 1 -type f -print
             echo "::error::Check release asset upload/download steps before publish."
             exit 1
           fi
@@ -368,9 +456,9 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
-          TARBALL_PATH=$(ls release-assets/*.tgz | head -n 1)
-          if [[ -z "$TARBALL_PATH" ]]; then
-            echo "No tarball found to publish." >&2
+          TARBALL_PATH="release-assets/${TARBALL_NAME}"
+          if [[ ! -f "$TARBALL_PATH" ]]; then
+            echo "Expected tarball ${TARBALL_NAME} was not found to publish." >&2
             exit 1
           fi
           if [[ "$TARBALL_PATH" != /* ]]; then
@@ -398,7 +486,7 @@ jobs:
 
           PUBLISH_LOG="$(mktemp)"
           set +e
-          NODE_AUTH_TOKEN="$NPM_TOKEN" npm publish "$TARBALL_PATH" --tag "$DIST_TAG" 2>&1 | tee "$PUBLISH_LOG"
+          NODE_AUTH_TOKEN="$NPM_TOKEN" npm publish "$TARBALL_PATH" --tag "$DIST_TAG" --provenance 2>&1 | tee "$PUBLISH_LOG"
           TOKEN_STATUS=${PIPESTATUS[0]}
           set -e
           if [[ $TOKEN_STATUS -ne 0 ]] && grep -q "npm error code EOTP" "$PUBLISH_LOG"; then

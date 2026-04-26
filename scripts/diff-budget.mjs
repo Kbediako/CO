@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFile } from 'node:child_process';
-import { readFile, stat } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
@@ -13,6 +13,9 @@ const DEFAULT_MAX_FILES = 25;
 const DEFAULT_MAX_LINES = 1200;
 const MAX_UNTRACKED_BYTES_FOR_LINE_COUNT = 1024 * 1024;
 const DEFAULT_STACKED_ADVISORY_REF = 'origin/main';
+const CHILD_LANES_PREFIX = '.child-lanes/';
+const PROVIDER_CHILD_LANE_PATCH = 'provider-linear-child-lane.patch';
+const PROVIDER_CHILD_LANE_LEDGER = 'provider-linear-worker-child-lanes.json';
 
 const IGNORED_EXACT_PATHS = new Set(['package-lock.json']);
 const IGNORED_PREFIXES = [
@@ -24,6 +27,7 @@ const IGNORED_PREFIXES = [
   'out/'
 ];
 const IGNORED_TASK_CHECKLIST_PREFIX = 'tasks/tasks-';
+let acceptedChildLaneWorkspacePrefixesCache = null;
 
 function showUsage() {
   console.log(`Usage: node scripts/diff-budget.mjs [--dry-run] [--commit <sha>] [--base <ref>] [--max-files <n>] [--max-lines <n>]
@@ -135,8 +139,225 @@ async function runGit(args, options = {}) {
   return String(stdout ?? '').trimEnd();
 }
 
-function isIgnoredPath(filePath) {
+function toRelativePosixPath(absPath) {
+  const relativePath = path.relative(process.cwd(), absPath);
+  if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    return null;
+  }
+  return relativePath.split(path.sep).join('/');
+}
+
+function normalizeWorkspacePrefix(workspacePath) {
+  if (typeof workspacePath !== 'string' || workspacePath.trim().length === 0) {
+    return null;
+  }
+  const absoluteWorkspacePath = path.isAbsolute(workspacePath)
+    ? workspacePath
+    : path.resolve(process.cwd(), workspacePath);
+  let relativeWorkspacePath = toRelativePosixPath(absoluteWorkspacePath);
+  if (!relativeWorkspacePath) {
+    const parts = absoluteWorkspacePath.split(path.sep);
+    const childLanesIndex = parts.lastIndexOf('.child-lanes');
+    if (childLanesIndex >= 0) {
+      relativeWorkspacePath = parts.slice(childLanesIndex).join('/');
+    }
+  }
+  if (!relativeWorkspacePath?.startsWith(CHILD_LANES_PREFIX)) {
+    return null;
+  }
+  return relativeWorkspacePath.endsWith('/') ? relativeWorkspacePath : `${relativeWorkspacePath}/`;
+}
+
+function normalizeDarwinVarPath(filePath) {
+  return filePath.replace(/^\/private\/var\//, '/var/');
+}
+
+function isCurrentWorkspacePath(workspacePath) {
+  if (typeof workspacePath !== 'string' || workspacePath.trim().length === 0) {
+    return false;
+  }
+  const absoluteWorkspacePath = path.isAbsolute(workspacePath)
+    ? workspacePath
+    : path.resolve(process.cwd(), workspacePath);
+  return normalizeDarwinVarPath(path.resolve(absoluteWorkspacePath)) === normalizeDarwinVarPath(process.cwd());
+}
+
+function currentTaskIdCandidates() {
+  const candidates = new Set();
+  for (const value of [
+    process.env.MCP_RUNNER_TASK_ID,
+    process.env.CODEX_ORCHESTRATOR_TASK_ID,
+    process.env.TASK
+  ]) {
+    if (typeof value === 'string' && value.trim()) {
+      candidates.add(value.trim());
+    }
+  }
+
+  const workspaceName = path.basename(process.cwd());
+  if (/^linear-[0-9a-f-]{36}$/i.test(workspaceName)) {
+    candidates.add(workspaceName);
+  }
+  return candidates;
+}
+
+function linearIssueIdFromTaskCandidate(taskId) {
+  const match = String(taskId ?? '').match(/(?:^|-)linear-([0-9a-f-]{36})(?:-|$)/i);
+  return match?.[1] ?? null;
+}
+
+function matchesCurrentIssueOrTask(entry) {
+  const taskIds = currentTaskIdCandidates();
+  if (taskIds.size === 0) {
+    return false;
+  }
+
+  const entryTaskId = typeof entry?.task_id === 'string' ? entry.task_id : '';
+  const entryIssueId = typeof entry?.issue_id === 'string' ? entry.issue_id : '';
+  for (const taskId of taskIds) {
+    if (entryTaskId === taskId || entryTaskId.startsWith(`${taskId}-`)) {
+      return true;
+    }
+    const issueId = linearIssueIdFromTaskCandidate(taskId);
+    if (issueId && entryIssueId === issueId) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function pathExists(filePath) {
+  try {
+    await stat(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function collectFilesByName(rootDir, fileName, maxDepth = 8) {
+  const matches = [];
+  const visited = new Set();
+
+  async function visit(currentDir, depth) {
+    const resolved = path.resolve(currentDir);
+    if (visited.has(resolved) || depth > maxDepth) {
+      return;
+    }
+    visited.add(resolved);
+
+    let entries;
+    try {
+      entries = await readdir(resolved, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      const entryPath = path.join(resolved, entry.name);
+      if (entry.isFile() && entry.name === fileName) {
+        matches.push(entryPath);
+      } else if (entry.isDirectory()) {
+        await visit(entryPath, depth + 1);
+      }
+    }
+  }
+
+  await visit(rootDir, 0);
+  return matches;
+}
+
+function candidateRunsRoots() {
+  const roots = new Set([path.resolve(process.cwd(), '.runs')]);
+  const configuredRunsDir = process.env.CODEX_ORCHESTRATOR_RUNS_DIR?.trim();
+  if (configuredRunsDir) {
+    roots.add(path.resolve(process.cwd(), configuredRunsDir));
+  }
+  roots.add(path.resolve(process.cwd(), '..', '..', '.runs'));
+  return [...roots];
+}
+
+async function loadAcceptedChildLaneWorkspacePrefixes() {
+  if (acceptedChildLaneWorkspacePrefixesCache) {
+    return acceptedChildLaneWorkspacePrefixesCache;
+  }
+
+  const acceptedPrefixes = new Set();
+  const ledgerFiles = [];
+  for (const root of candidateRunsRoots()) {
+    if (await pathExists(root)) {
+      ledgerFiles.push(...(await collectFilesByName(root, PROVIDER_CHILD_LANE_LEDGER)));
+    }
+  }
+
+  for (const ledgerFile of ledgerFiles) {
+    let parsed;
+    try {
+      parsed = JSON.parse(await readFile(ledgerFile, 'utf8'));
+    } catch {
+      continue;
+    }
+
+    const entries = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.child_lanes) ? parsed.child_lanes : [];
+    for (const entry of entries) {
+      if (entry?.pipeline_id !== 'provider-linear-child-lane') {
+        continue;
+      }
+      if (entry?.status !== 'succeeded' || entry?.decision !== 'accepted' || !entry?.decision_at) {
+        continue;
+      }
+
+      const patchArtifactPath =
+        typeof entry.patch_artifact_path === 'string'
+          ? entry.patch_artifact_path
+          : typeof entry.patchArtifactPath === 'string'
+            ? entry.patchArtifactPath
+            : '';
+      if (!patchArtifactPath || path.basename(patchArtifactPath) !== PROVIDER_CHILD_LANE_PATCH) {
+        continue;
+      }
+
+      const resolvedPatchArtifactPath = path.isAbsolute(patchArtifactPath)
+        ? patchArtifactPath
+        : path.resolve(path.dirname(ledgerFile), patchArtifactPath);
+      if (!(await pathExists(resolvedPatchArtifactPath))) {
+        continue;
+      }
+      if (!isCurrentWorkspacePath(entry.workspace_path)) {
+        continue;
+      }
+      if (!matchesCurrentIssueOrTask(entry)) {
+        continue;
+      }
+
+      const workspacePrefix = normalizeWorkspacePrefix(entry.lane_workspace_path);
+      if (workspacePrefix) {
+        acceptedPrefixes.add(workspacePrefix);
+      }
+    }
+  }
+
+  acceptedChildLaneWorkspacePrefixesCache = acceptedPrefixes;
+  return acceptedChildLaneWorkspacePrefixesCache;
+}
+
+function isAcceptedChildLaneWorkspaceArtifact(filePath, acceptedChildLaneWorkspacePrefixes) {
+  if (!filePath?.startsWith(CHILD_LANES_PREFIX)) {
+    return false;
+  }
+  for (const prefix of acceptedChildLaneWorkspacePrefixes) {
+    if (filePath === prefix.slice(0, -1) || filePath.startsWith(prefix)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isIgnoredPath(filePath, acceptedChildLaneWorkspacePrefixes = new Set()) {
   if (!filePath) {
+    return true;
+  }
+  if (isAcceptedChildLaneWorkspaceArtifact(filePath, acceptedChildLaneWorkspacePrefixes)) {
     return true;
   }
   if (IGNORED_EXACT_PATHS.has(filePath)) {
@@ -337,6 +558,7 @@ function summarizeDiff(diff, commitRef) {
 
 async function measureDiff(diff) {
   const { changedFiles, numstatByPath, untrackedRaw, commitRef } = diff;
+  let acceptedChildLaneWorkspacePrefixes;
 
   let consideredFiles = 0;
   let totalAdded = 0;
@@ -345,7 +567,13 @@ async function measureDiff(diff) {
   const untrackedIssues = [];
 
   for (const filePath of [...changedFiles].sort()) {
-    if (isIgnoredPath(filePath)) {
+    const isUntracked = !commitRef && untrackedRaw.includes(filePath);
+    if (isUntracked && filePath.startsWith(CHILD_LANES_PREFIX)) {
+      acceptedChildLaneWorkspacePrefixes ??= await loadAcceptedChildLaneWorkspacePrefixes();
+      if (isIgnoredPath(filePath, acceptedChildLaneWorkspacePrefixes)) {
+        continue;
+      }
+    } else if (isIgnoredPath(filePath)) {
       continue;
     }
 
@@ -359,7 +587,7 @@ async function measureDiff(diff) {
       continue;
     }
 
-    if (!commitRef && untrackedRaw.includes(filePath)) {
+    if (isUntracked) {
       const lines = await countUntrackedLines(filePath);
       if (lines?.kind === 'lines') {
         totalAdded += lines.lines;

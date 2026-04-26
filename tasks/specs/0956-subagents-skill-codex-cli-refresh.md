@@ -5,7 +5,7 @@ relates_to: tasks/tasks-0956-subagents-skill-codex-cli-refresh.md
 risk: low
 owners:
   - Codex
-last_review: 2026-03-26
+last_review: 2026-04-26
 ---
 
 ## Summary
@@ -52,3 +52,6 @@ last_review: 2026-03-26
 ## Approvals
 - Reviewer: Codex (self)
 - Date: 2026-03-26
+- Reviewer: CO-378 docs freshness baseline pass
+- Date: 2026-04-26
+- Notes: Current-main merge preserved the refreshed docs freshness registry review date; no scope or content changes were made in this baseline repair.

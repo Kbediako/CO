@@ -247,7 +247,7 @@ export class TaskManager {
     const build = await this.executeBuilder(task, plan, target, mode, runId);
     if (!build.success) {
       const skippedTest = this.createSkippedTestResult(build, runId);
-      const skippedReview = this.createSkippedReviewResult('build-failed');
+      const skippedReview = this.createSkippedReviewResult('build-failed', build);
       const summary = this.createRunSummary(task, mode, plan, build, skippedTest, skippedReview, runId);
       return { target, mode, build, test: skippedTest, review: skippedReview, summary };
     }
@@ -336,13 +336,27 @@ export class TaskManager {
     };
   }
 
-  private createSkippedReviewResult(reason: 'build-failed' | 'test-failed'): ReviewResult {
+  private createSkippedReviewResult(reason: 'build-failed' | 'test-failed', build?: BuildResult): ReviewResult {
     if (reason === 'build-failed') {
+      const prerequisiteStage = this.extractFailedPrerequisiteStage(build);
+      if (prerequisiteStage) {
+        const artifactPath = this.findFailedStageArtifactPath(build);
+        const artifactFeedback = artifactPath ? ` Error artifact: ${artifactPath}.` : '';
+        return {
+          summary: `Review skipped: prerequisite stage \`${prerequisiteStage}\` failed.`,
+          decision: {
+            approved: false,
+            feedback: `Prerequisite stage \`${prerequisiteStage}\` failed; review skipped.${artifactFeedback}`
+          }
+        };
+      }
+      const artifactPath = this.findFailedStageArtifactPath(build);
+      const artifactFeedback = artifactPath ? ` Error artifact: ${artifactPath}.` : '';
       return {
         summary: 'Review skipped: build stage failed.',
         decision: {
           approved: false,
-          feedback: 'Build stage failed; review skipped.'
+          feedback: `Build stage failed; review skipped.${artifactFeedback}`
         }
       };
     }
@@ -353,6 +367,72 @@ export class TaskManager {
         feedback: 'Tests failed; review skipped.'
       }
     };
+  }
+
+  private extractFailedPrerequisiteStage(build?: BuildResult): string | null {
+    const stage = build?.failureStage?.trim();
+    const canonicalStage = stage?.toLowerCase();
+    if (!stage || (canonicalStage != null && ['build', 'test', 'review'].includes(canonicalStage))) {
+      return null;
+    }
+    return stage;
+  }
+
+  private findFailedStageArtifactPath(build?: BuildResult): string | null {
+    if (build?.failureArtifactPath) {
+      return build.failureArtifactPath;
+    }
+    const failureStage = build?.failureStage?.trim().toLowerCase();
+    if (!failureStage) {
+      return null;
+    }
+    if (['build', 'test', 'review'].includes(failureStage)) {
+      return null;
+    }
+    const stagePathToken = failureStage.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const stageArtifact = build?.artifacts.find((candidate) => {
+      const normalizedPath = candidate.path.replace(/\\/g, '/').toLowerCase();
+      const isErrorArtifact =
+        normalizedPath.startsWith('errors/') ||
+        normalizedPath.includes('/errors/') ||
+        /\berror\b/i.test(candidate.description);
+      if (!isErrorArtifact) {
+        return false;
+      }
+      return this.artifactMatchesFailedStage(candidate, failureStage, stagePathToken);
+    });
+    return stageArtifact?.path ?? null;
+  }
+
+  private artifactMatchesFailedStage(
+    candidate: BuildResult['artifacts'][number],
+    failureStage: string,
+    stagePathToken: string
+  ): boolean {
+    const normalizedDescription = candidate.description.toLowerCase();
+    const parentheticalStages = [...normalizedDescription.matchAll(/\(([^)]+)\)/g)]
+      .map((match) => match[1]?.trim() ?? '')
+      .filter(Boolean);
+    if (parentheticalStages.some((stage) => this.stageTokenMatches(stage, failureStage, stagePathToken))) {
+      return true;
+    }
+
+    const normalizedPath = candidate.path.replace(/\\/g, '/').toLowerCase();
+    return normalizedPath
+      .split('/')
+      .map((segment) => segment.replace(/\.[^.]+$/, '').replace(/^\d+-/, ''))
+      .some((segment) => this.stageTokenMatches(segment, failureStage, stagePathToken));
+  }
+
+  private stageTokenMatches(candidate: string, failureStage: string, stagePathToken: string): boolean {
+    if (candidate === failureStage) {
+      return true;
+    }
+    if (!stagePathToken) {
+      return false;
+    }
+    const candidatePathToken = candidate.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    return candidatePathToken === stagePathToken;
   }
 
   private async executePlanner(
@@ -459,7 +539,7 @@ export class TaskManager {
     const cause = error ?? new Error('Planner stage failed without an error payload');
     const build = this.createBuilderErrorResult('planner-unavailable', mode, runId, cause);
     const skippedTest = this.createSkippedTestResult(build, runId);
-    const skippedReview = this.createSkippedReviewResult('build-failed');
+    const skippedReview = this.createSkippedReviewResult('build-failed', build);
     const summary = this.createRunSummary(task, mode, plan, build, skippedTest, skippedReview, runId);
     this.eventBus.emit({ type: 'run:completed', payload: summary });
     return summary;

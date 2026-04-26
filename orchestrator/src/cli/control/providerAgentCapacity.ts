@@ -1,23 +1,37 @@
 import { normalizeProviderLinearWorkflowState } from './providerLinearWorkflowStates.js';
 
 export const DEFAULT_PROVIDER_MAX_CONCURRENT_AGENTS = 10;
+export const DEFAULT_LOCAL_PROVIDER_MAX_CONCURRENT_AGENTS = 3;
 
 export function resolveProviderPollDispatchLimits(
-  featureToggles: Record<string, unknown> | null | undefined
+  featureToggles: Record<string, unknown> | null | undefined,
+  options: {
+    localWorkerOnly?: boolean;
+  } = {}
 ): {
   maxConcurrentAgents: number;
   maxConcurrentAgentsByState: Map<string, number>;
 } {
   const agentConfig = readProviderPollAgentConfig(featureToggles);
+  const explicitMaxConcurrentAgents = readPositiveIntegerValue(
+    agentConfig,
+    'max_concurrent_agents',
+    'maxConcurrentAgents'
+  );
+  const maxConcurrentAgentsByState = readPositiveIntegerMap(
+    agentConfig,
+    'max_concurrent_agents_by_state',
+    'maxConcurrentAgentsByState'
+  );
   return {
     maxConcurrentAgents:
-      readPositiveIntegerValue(agentConfig, 'max_concurrent_agents', 'maxConcurrentAgents') ??
-      DEFAULT_PROVIDER_MAX_CONCURRENT_AGENTS,
-    maxConcurrentAgentsByState: readPositiveIntegerMap(
-      agentConfig,
-      'max_concurrent_agents_by_state',
-      'maxConcurrentAgentsByState'
-    )
+      explicitMaxConcurrentAgents ??
+      (
+        options.localWorkerOnly === true
+          ? DEFAULT_LOCAL_PROVIDER_MAX_CONCURRENT_AGENTS
+          : DEFAULT_PROVIDER_MAX_CONCURRENT_AGENTS
+      ),
+    maxConcurrentAgentsByState
   };
 }
 

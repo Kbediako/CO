@@ -21,4 +21,59 @@ describe('sanitizeProviderOverrideEnv', () => {
     expect(sanitized.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED).toBeUndefined();
     expect(sanitized.CODEX_ORCHESTRATOR_PACKAGE_ROOT).toBe('/tmp/child-package-root');
   });
+
+  it('preserves workspace artifact layout env by default', () => {
+    const sanitized = sanitizeProviderOverrideEnv({
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
+      CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host',
+      CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
+      CODEX_ORCHESTRATOR_ROOT: '/tmp/workspace',
+      CODEX_ORCHESTRATOR_RUNS_DIR: '/tmp/workspace/.runs',
+      CODEX_ORCHESTRATOR_OUT_DIR: '/tmp/workspace/out'
+    });
+
+    expect(sanitized.CODEX_ORCHESTRATOR_ROOT).toBe('/tmp/workspace');
+    expect(sanitized.CODEX_ORCHESTRATOR_RUNS_DIR).toBe('/tmp/workspace/.runs');
+    expect(sanitized.CODEX_ORCHESTRATOR_OUT_DIR).toBe('/tmp/workspace/out');
+  });
+
+  it('strips workspace artifact layout env when explicitly requested', () => {
+    const sanitized = sanitizeProviderOverrideEnv(
+      {
+        CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID: 'local-mcp',
+        CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID: 'control-host',
+        CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE: 'control-host',
+        CODEX_ORCHESTRATOR_ROOT: '/tmp/workspace',
+        CODEX_ORCHESTRATOR_RUNS_DIR: '/tmp/workspace/.runs',
+        CODEX_ORCHESTRATOR_OUT_DIR: '/tmp/workspace/out'
+      },
+      {
+        stripWorkspaceArtifactEnv: true
+      }
+    );
+
+    expect(sanitized.CODEX_ORCHESTRATOR_ROOT).toBeUndefined();
+    expect(sanitized.CODEX_ORCHESTRATOR_RUNS_DIR).toBeUndefined();
+    expect(sanitized.CODEX_ORCHESTRATOR_OUT_DIR).toBeUndefined();
+    expect(sanitized.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_TASK_ID).toBe('local-mcp');
+    expect(sanitized.CODEX_ORCHESTRATOR_PROVIDER_CONTROL_HOST_RUN_ID).toBe('control-host');
+    expect(sanitized.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE).toBe('control-host');
+  });
+
+  it('strips workspace artifact layout env even without provider locator metadata', () => {
+    const sanitized = sanitizeProviderOverrideEnv(
+      {
+        CODEX_ORCHESTRATOR_ROOT: '/tmp/workspace',
+        CODEX_ORCHESTRATOR_RUNS_DIR: '/tmp/workspace/.runs',
+        CODEX_ORCHESTRATOR_OUT_DIR: '/tmp/workspace/out'
+      },
+      {
+        stripWorkspaceArtifactEnv: true
+      }
+    );
+
+    expect(sanitized.CODEX_ORCHESTRATOR_ROOT).toBeUndefined();
+    expect(sanitized.CODEX_ORCHESTRATOR_RUNS_DIR).toBeUndefined();
+    expect(sanitized.CODEX_ORCHESTRATOR_OUT_DIR).toBeUndefined();
+  });
 });

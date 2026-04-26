@@ -17,6 +17,11 @@ const PROVIDER_OVERRIDE_MARKER_ENV_KEYS = [
   PROVIDER_REPO_CONFIG_PATH_ENV_KEY,
   PROVIDER_PACKAGE_ROOT_ENV_KEY
 ] as const;
+const PROVIDER_WORKSPACE_ARTIFACT_ENV_KEYS = [
+  'CODEX_ORCHESTRATOR_ROOT',
+  'CODEX_ORCHESTRATOR_RUNS_DIR',
+  'CODEX_ORCHESTRATOR_OUT_DIR'
+] as const;
 
 export {
   PROVIDER_OVERRIDE_ENV_KEYS,
@@ -26,9 +31,17 @@ export {
 };
 
 export function sanitizeProviderOverrideEnv(
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  options: {
+    stripWorkspaceArtifactEnv?: boolean;
+  } = {}
 ): NodeJS.ProcessEnv {
   const sanitized: NodeJS.ProcessEnv = { ...env };
+  if (options.stripWorkspaceArtifactEnv) {
+    for (const key of PROVIDER_WORKSPACE_ARTIFACT_ENV_KEYS) {
+      delete sanitized[key];
+    }
+  }
   const controlHostLocator = readProviderControlHostLocatorFromEnv(sanitized);
   if (!controlHostLocator) {
     return sanitized;

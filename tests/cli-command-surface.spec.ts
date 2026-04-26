@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { chmod, mkdir, mkdtemp, readFile, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -19,6 +19,7 @@ import { runEntrypointLikeExec } from './helpers/inProcessEntrypoint.js';
 const execFileAsync = promisify(execFile);
 const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
 const CLI_ENTRY_DIST = join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js');
+const PACKAGE_JSON_PATH = fileURLToPath(new URL('../package.json', import.meta.url));
 const CLI_BOOT_TIMEOUT = 30000;
 const CLI_SOURCE_ENTRY_TIMEOUT = 60000;
 const TEST_TIMEOUT = CLI_BOOT_TIMEOUT;
@@ -584,6 +585,28 @@ async function writeFakeCodexBinary(dir: string): Promise<string> {
       'if [ "$1" = "cloud" ] && [ "$2" = "--help" ]; then',
       '  exit 0',
       'fi',
+      'if [ "$1" = "cloud" ] && [ "$2" = "list" ]; then',
+      '  if [ -n "$CODEX_TEST_CLOUD_LIST_LOG" ]; then',
+      '    printf "%s\\n" "$*" >> "$CODEX_TEST_CLOUD_LIST_LOG"',
+      '  fi',
+      '  if [ -n "$CODEX_TEST_CLOUD_LIST_FAIL_MESSAGE" ]; then',
+      '    echo "$CODEX_TEST_CLOUD_LIST_FAIL_MESSAGE" 1>&2',
+      '    exit "${CODEX_TEST_CLOUD_LIST_FAIL_CODE:-1}"',
+      '  fi',
+      '  echo "{\\"tasks\\":[{\\"id\\":\\"task-test\\",\\"environment_id\\":\\"${CODEX_CLOUD_ENV_ID:-env-test}\\"}]}"',
+      '  exit 0',
+      'fi',
+      'if [ "$1" = "cloud" ] && [ "$2" = "exec" ]; then',
+      '  if [ -n "$CODEX_TEST_CLOUD_EXEC_LOG" ]; then',
+      '    printf "%s\\n" "$*" >> "$CODEX_TEST_CLOUD_EXEC_LOG"',
+      '  fi',
+      '  if [ -n "$CODEX_TEST_CLOUD_EXEC_FAIL_MESSAGE" ]; then',
+      '    echo "$CODEX_TEST_CLOUD_EXEC_FAIL_MESSAGE" 1>&2',
+      '    exit "${CODEX_TEST_CLOUD_EXEC_FAIL_CODE:-1}"',
+      '  fi',
+      '  echo "cloud exec mock ok"',
+      '  exit 0',
+      'fi',
       'if [ "$1" = "mcp" ] && [ "$2" = "list" ] && [ "$3" = "--json" ]; then',
       '  if [ -n "$CODEX_TEST_MCP_LIST_JSON" ]; then',
       '    echo "$CODEX_TEST_MCP_LIST_JSON"',
@@ -616,6 +639,7 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
     expect(stdout).toContain('review [options]');
     expect(stdout).toContain('codex defaults');
+    expect(stdout).toContain('--auth-scope <portable|chatgpt>');
     expect(stdout).toContain('Quickstart (agent-first):');
     expect(stdout).toContain('codex-orchestrator flow --task <task-id>');
     expect(stdout).toContain('NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>');
@@ -863,11 +887,12 @@ describe('codex-orchestrator command surface', () => {
     const { stdout } = await runCli(['codex', 'defaults', '--format', 'json'], env, CLI_BOOT_TIMEOUT);
     const payload = JSON.parse(stdout) as {
       status?: string;
-      plan?: { configPath?: string };
+      plan?: { configPath?: string; authScope?: string };
       changes?: Array<{ target?: string; status?: string }>;
     };
     expect(payload.status).toBe('planned');
     expect(payload.plan?.configPath).toBe(join(tempDir, 'config.toml'));
+    expect(payload.plan?.authScope).toBe('portable');
     expect(payload.changes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ target: 'config', status: 'pending' })
@@ -1491,15 +1516,21 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_SOURCE_ENTRY_TIMEOUT);
 
   it('prints self-check text output through the binary shell', async () => {
+    const packageVersion = JSON.parse(await readFile(PACKAGE_JSON_PATH, 'utf8')) as {
+      version: string;
+    };
     const { stdout } = await runCliSubprocess(['self-check'], undefined, CLI_BINARY_SHELL_TIMEOUT);
     expect(stdout).toContain('Status: ok');
     expect(stdout).toContain('Name: @kbediako/codex-orchestrator');
-    expect(stdout).toContain('Version: 0.1.38');
+    expect(stdout).toContain(`Version: ${packageVersion.version}`);
     expect(stdout).toContain(`Node: ${process.version}`);
     expect(stdout).toContain('Timestamp: ');
   }, CLI_BINARY_SHELL_TIMEOUT);
 
   it('prints self-check json output through the binary shell', async () => {
+    const packageVersion = JSON.parse(await readFile(PACKAGE_JSON_PATH, 'utf8')) as {
+      version: string;
+    };
     const { stdout } = await runCliSubprocess(
       ['self-check', '--format', 'json'],
       undefined,
@@ -1515,7 +1546,7 @@ describe('codex-orchestrator command surface', () => {
 
     expect(payload.status).toBe('ok');
     expect(payload.name).toBe('@kbediako/codex-orchestrator');
-    expect(payload.version).toBe('0.1.38');
+    expect(payload.version).toBe(packageVersion.version);
     expect(payload.node).toBe(process.version);
     expect(new Date(String(payload.timestamp)).toISOString()).toBe(payload.timestamp);
   }, CLI_BINARY_SHELL_TIMEOUT);
@@ -1616,6 +1647,40 @@ describe('codex-orchestrator command surface', () => {
       expect.arrayContaining([expect.objectContaining({ code: 'missing_environment' })])
     );
     expect(payload.cloud_preflight?.guidance?.join('\n')).toContain('CODEX_CLOUD_ENV_ID');
+  }, TEST_TIMEOUT);
+
+  it('emits distinct doctor cloud preflight issue for configured but not-found env ids', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-doctor-cloud-preflight-not-found-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_CLOUD_ENV_ID: 'env-missing',
+      CODEX_CLOUD_BRANCH: '',
+      CODEX_TEST_CLOUD_LIST_FAIL_MESSAGE:
+        "Error: environment 'env-missing' not found; run `codex cloud` to list available environments"
+    };
+    const { stdout } = await runCli(['doctor', '--format', 'json', '--cloud-preflight'], env);
+    const payload = JSON.parse(stdout) as {
+      cloud_preflight?: {
+        ok?: boolean;
+        issues?: Array<{ code?: string; message?: string }>;
+        guidance?: string[];
+      };
+    };
+    const issueCodes = payload.cloud_preflight?.issues?.map((issue) => issue.code) ?? [];
+    expect(payload.cloud_preflight?.ok).toBe(false);
+    expect(issueCodes).toContain('environment_not_found');
+    expect(issueCodes).not.toContain('missing_environment');
+    expect(payload.cloud_preflight?.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'environment_not_found',
+          message: expect.stringContaining("environment 'env-missing' not found")
+        })
+      ])
+    );
+    expect(payload.cloud_preflight?.guidance?.join('\n')).toContain('codex cloud');
   }, TEST_TIMEOUT);
 
   it('writes doctor issue logs and bundles with downstream run context', async () => {
@@ -2196,6 +2261,81 @@ describe('codex-orchestrator command surface', () => {
     expect(manifest.status).toBe('failed');
     expect(manifest.status_detail).toBe('cloud-preflight-failed');
     expect(manifest.completed_at).toBeTruthy();
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('fails strict cloud preflight for configured but not-found env ids before cloud exec', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-cloud-preflight-env-not-found-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const cloudListLog = join(tempDir, 'cloud-list.log');
+    const cloudExecLog = join(tempDir, 'cloud-exec.log');
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      MCP_RUNNER_TASK_ID: 'cloud-preflight-env-not-found',
+      CODEX_ORCHESTRATOR_CLOUD_FALLBACK: 'deny',
+      CODEX_ORCHESTRATOR_RUNTIME_MODE: '',
+      CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: '',
+      CODEX_RUNTIME_MODE: '',
+      CODEX_CLOUD_ENV_ID: 'env-missing',
+      CODEX_CLOUD_BRANCH: '',
+      CODEX_TEST_CLOUD_LIST_LOG: cloudListLog,
+      CODEX_TEST_CLOUD_EXEC_LOG: cloudExecLog,
+      CODEX_TEST_CLOUD_LIST_FAIL_MESSAGE:
+        "Error: environment 'env-missing' not found; run `codex cloud` to list available environments"
+    };
+    let stdout = '';
+    let exitCode = 0;
+    try {
+      await runCli(
+        [
+          'start',
+          'docs-review',
+          '--execution-mode',
+          'cloud',
+          '--target',
+          'review',
+          '--format',
+          'json',
+          '--task',
+          'cloud-preflight-env-not-found'
+        ],
+        env,
+        FLOW_TARGET_TEST_TIMEOUT
+      );
+      throw new Error('expected cloud-preflight-env-not-found to exit non-zero');
+    } catch (error) {
+      ({ stdout, exitCode } = parseCliFailure(error));
+    }
+    expect(exitCode).not.toBe(0);
+    const jsonStart = stdout.indexOf('{');
+    const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
+      status?: string;
+      summary?: string | null;
+      manifest?: string;
+    };
+    expect(payload.status).toBe('failed');
+    expect(payload.summary).toContain("environment 'env-missing' not found");
+
+    const commandLog = await readFile(cloudListLog, 'utf8');
+    expect(commandLog).toContain('cloud list --env env-missing --limit 1 --json');
+    await expect(readFile(cloudExecLog, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+
+    const manifestPath = isAbsolute(payload.manifest ?? '')
+      ? (payload.manifest as string)
+      : join(tempDir, payload.manifest ?? '');
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as {
+      status?: string;
+      status_detail?: string | null;
+      cloud_execution?: unknown;
+      cloud_fallback?: { issues?: Array<{ code?: string }> } | null;
+    };
+    expect(manifest.status).toBe('failed');
+    expect(manifest.status_detail).toBe('cloud-preflight-failed');
+    expect(manifest.cloud_execution).toBeFalsy();
+    expect(manifest.cloud_fallback).toBeFalsy();
   }, FLOW_TARGET_TEST_TIMEOUT);
 
   it('emits MCP enable plan payload in JSON output', async () => {

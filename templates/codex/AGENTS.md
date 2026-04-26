@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 4690eb4deade8ef1073478ddb7662a24be5f6dce4a1666f6893f62f86b59a7ea -->
+<!-- codex:instruction-stamp 347a0465abbf61f5c79a8012b466e908cd49d9a33a210cfaa4be693de106b6e0 -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
@@ -54,19 +54,21 @@
 - Built-in roles are `default`, `explorer`, `worker`, and `awaiter`; `researcher` is user-defined.
 - `spawn_agent` defaults to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
 - For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
-- Current CO compatibility/adoption target is stable Codex CLI `0.118.0`.
-- Current `0.118.0` posture re-audit confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, and `codex review --help` exposing `[PROMPT]` alongside scoped review flags.
-- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
-- Keep top-level defaults on the current CO target by setting `model = "gpt-5.4"` in `~/.codex/config.toml`.
-- Under ChatGPT auth, keep delegated subagent and review surfaces on `gpt-5.4` unless a fresh provider lane explicitly validates `gpt-5.4-codex`.
+- CO-local ChatGPT-auth/appserver model posture is `gpt-5.5` / `xhigh` on Codex CLI `0.125.0` when live access smoke passes; release-facing cloud/downstream pins stay on the explicit promoted candidate recorded in `docs/guides/codex-version-policy.md`.
+- `0.124.0` CO posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, packaged `gpt-5.4` `xhigh` fallback defaults, and a post-build runtime-mode canary pass.
+- Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
+- Portable generated defaults still keep `model = "gpt-5.4"` and `model_reasoning_effort = "xhigh"` as fallback values in `~/.codex/config.toml`; operators should use `gpt-5.5` locally when access smoke passes.
+- Use `gpt-5.5` for delegated/review surfaces after access smoke validates current ChatGPT-auth/appserver availability.
+- Caveat: local model availability can vary by account; keep `gpt-5.4` only as the fallback generated default because it remains the app-server `isDefault`.
+- CO-352 catalog caveat: local `0.125.0` live catalog lists `gpt-5.3-codex-spark`, but bundled `0.125.0` catalog does not, so downstream/no-network `explorer_fast` file/codebase-search-only posture remains unchanged.
 - Set `model_reasoning_effort` to at least `high` (CO default: `xhigh`) so spawned agents inherit high reasoning unless role overrides change it.
 - Built-in `explorer` inherits top-level model defaults unless you attach a `config_file`; keep `explorer_fast` as the only explicit `gpt-5.3-codex-spark` exception for file/codebase search only.
 - Spark caveat: `gpt-5.3-codex-spark` is file/codebase search only.
 - Keep RLM/collab built-ins-first by default; add custom specialist roles only when there is measured value, clear ownership, and validation evidence.
-- Use `[agents] max_threads = 12` as the seeded baseline. Keep explicit `max_depth = 4` only when your local Codex parser accepts it, and treat `max_spawn_depth` as a legacy local override rather than current baseline guidance; preserve any intentional constrained caps instead of resetting them.
-- Keep fallback usage explicit and rare: `8/2` for constrained/high-risk lanes, legacy `6/1/1` only as break-glass when an older parser/runtime still consumes spawn-depth caps.
-- Add an explicit `worker_complex` role (`gpt-5.4`, `xhigh`) for high-risk implementation streams.
-- Use `codex-orchestrator doctor` as an advisory drift check for Codex defaults; remediate additively via `codex-orchestrator codex defaults --yes`.
+- For normal `features.multi_agent=true` and older Codex behavior, use `[agents] max_threads = 12` as the seeded baseline. For Codex CLI `0.125+` with `features.multi_agent_v2=true`, do not write or recommend `agents.max_threads`; upstream rejects the key, so doctor/default setup must omit it. Keep explicit `max_depth = 4` only when your local Codex parser accepts it, and treat `max_spawn_depth` as a legacy local override rather than current baseline guidance; preserve any intentional constrained caps instead of resetting them.
+- Keep fallback usage explicit and rare, and only for v1/older configs that still accept thread/depth caps: `8/2` for constrained/high-risk lanes, legacy `6/1/1` only as break-glass when an older parser/runtime still consumes spawn-depth caps.
+- Add an explicit `worker_complex` role (`gpt-5.5`, `xhigh` for current CO-local ChatGPT-auth/appserver work; `gpt-5.4`, `xhigh` only for portable fallback surfaces) for high-risk implementation streams.
+- Use `codex-orchestrator doctor` as an advisory drift check for Codex defaults; remediate additively via `codex-orchestrator codex defaults --yes` for portable fallback defaults or `codex-orchestrator codex defaults --auth-scope chatgpt --yes` after live access smoke, with exact prior CO-managed role baselines auto-migrated to the access-verified current ChatGPT-auth posture while preserving unrelated local customization and the `multi_agent_v2` rule that omits `agents.max_threads`.
 
 ## Completion discipline (patience-first)
 - Wait/poll for terminal state on long-running operations (CI checks, reviews, cloud jobs, orchestrator runs) before reporting completion.

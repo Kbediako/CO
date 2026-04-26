@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { writeAtomicFile } from '../src/utils/atomicWrite.js';
@@ -28,6 +28,19 @@ describe('atomic write helpers', () => {
   it('writeAtomicFile does not create directories', async () => {
     const targetPath = join(workspace, 'missing', 'file.txt');
     await expect(writeAtomicFile(targetPath, 'hello')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('writeAtomicFile preserves an existing file mode during replacement', async () => {
+    const targetPath = join(workspace, 'config.toml');
+    await writeFile(targetPath, 'original', 'utf8');
+    await chmod(targetPath, 0o600);
+
+    await writeAtomicFile(targetPath, 'updated');
+
+    const contents = await readFile(targetPath, 'utf8');
+    const mode = (await stat(targetPath)).mode & 0o777;
+    expect(contents).toBe('updated');
+    expect(mode).toBe(0o600);
   });
 
   it('writeJsonAtomic appends a trailing newline', async () => {
