@@ -14,7 +14,7 @@
 
 ### Evidence Gates
 - [ ] Issue-quality review captured (pre-implementation) - Evidence: spec/task notes confirming intent checksum, protected terms, `Not done if`, and parity-matrix status when applicable.
-- [ ] Fallback / refactor decision captured (pre-implementation) - Evidence: spec/task notes choosing `remove fallback`, `expire fallback`, `justify retaining fallback`, or `Not applicable`; retained fallbacks must record owner, trigger, introduced date, review date, maximum lifetime, removal condition, and validation.
+- [ ] Fallback / refactor decision captured (pre-implementation) - Evidence: spec/task notes first state whether fallback/seam behavior is touched. If yes, choose exactly `remove fallback`, `expire fallback`, or `justify retaining fallback`; use `Not applicable` only when no fallback/seam behavior is touched. Retained fallbacks must record owner, trigger, introduced date, review date, maximum lifetime, removal condition, and validation.
 - [ ] Durable fallback retention evidence captured when applicable - Evidence: for `justify retaining fallback`, record contract name, owning surface, steady-state proof, tests/docs, and why it is not governed as an expiring fallback.
 - [ ] Standalone review approval captured (pre-implementation) - Evidence: spec/task notes (no manifest).
 - [ ] Docs-review manifest captured (pre-implementation) - Evidence: `.runs/<task-id>/cli/<run-id>/manifest.json`.
