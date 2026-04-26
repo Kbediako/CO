@@ -129,12 +129,13 @@ export class PipelineResolver {
       this.logInfo(`PipelineResolver.resolve selected pipeline ${pipeline.id}`, quiet);
       return { pipeline, userConfig, designConfig, source, configResolution, configNotice, envOverrides };
     } catch (error) {
-      if (requestedPipelineId === 'rlm' && userConfig?.source === 'repo' && repoConfigRequired) {
+      const repoPipelineMissing = isMissingPipelineError(error, requestedPipelineId);
+      if (requestedPipelineId === 'rlm' && userConfig?.source === 'repo' && repoConfigRequired && repoPipelineMissing) {
         throw new Error(
           'Repo-local codex.orchestrator.json is missing the rlm pipeline while strict repo-config mode is enabled.'
         );
       }
-      if (requestedPipelineId === 'rlm' && userConfig?.source === 'repo' && !repoConfigRequired) {
+      if (requestedPipelineId === 'rlm' && userConfig?.source === 'repo' && !repoConfigRequired && repoPipelineMissing) {
         const packageConfig = await loadPackageConfig(env, { quiet });
         if (packageConfig) {
           const fallbackNotice =
@@ -215,4 +216,8 @@ function formatConfigNotice(resolution: ConfigResolutionSummary): string {
     return `Configuration mode: downstream-compatibility (${resolution.reason}); using repo-local codex.orchestrator.json with packaged fallback enabled.`;
   }
   return `Configuration mode: downstream-compatibility (${resolution.reason}); packaged compatibility fallback is enabled.`;
+}
+
+function isMissingPipelineError(error: unknown, pipelineId: string | undefined): boolean {
+  return error instanceof Error && pipelineId !== undefined && error.message === `Pipeline '${pipelineId}' not found.`;
 }

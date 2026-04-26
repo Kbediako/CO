@@ -222,6 +222,85 @@ describe('PipelineResolver env overrides', () => {
     );
   });
 
+  it('uses packaged rlm only for the explicit downstream missing-pipeline fallback', async () => {
+    enableDownstreamCompatibilityMode();
+    await writeFile(
+      join(workspaceRoot, 'codex.orchestrator.json'),
+      JSON.stringify(
+        {
+          defaultPipeline: 'docs-review',
+          pipelines: [
+            {
+              id: 'docs-review',
+              title: 'Docs Review',
+              guardrailsRequired: false,
+              stages: [
+                {
+                  kind: 'command',
+                  id: 'docs',
+                  title: 'Docs',
+                  command: 'echo docs'
+                }
+              ]
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const env: EnvironmentPaths = {
+      repoRoot: workspaceRoot,
+      runsRoot: join(workspaceRoot, '.runs'),
+      outRoot: join(workspaceRoot, 'out'),
+      taskId: 'task-compat-rlm'
+    };
+
+    const resolver = new PipelineResolver();
+    const result = await resolver.resolve(env, { pipelineId: 'rlm' });
+
+    expect(result.pipeline.id).toBe('rlm');
+    expect(result.configResolution).toEqual({
+      mode: 'downstream-compatibility',
+      reason:
+        'Configuration mode: downstream-compatibility; repo config is missing the rlm pipeline, so the packaged compatibility pipeline is active. ' +
+        'Add rlm to your repo-local codex.orchestrator.json to avoid compatibility fallback.',
+      config_source: 'package'
+    });
+  });
+
+  it('does not use packaged rlm when repo pipeline config is malformed', async () => {
+    enableDownstreamCompatibilityMode();
+    await writeFile(
+      join(workspaceRoot, 'codex.orchestrator.json'),
+      JSON.stringify(
+        {
+          defaultPipeline: 'rlm',
+          pipelines: {
+            id: 'rlm',
+            title: 'Malformed RLM',
+            stages: []
+          }
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const env: EnvironmentPaths = {
+      repoRoot: workspaceRoot,
+      runsRoot: join(workspaceRoot, '.runs'),
+      outRoot: join(workspaceRoot, 'out'),
+      taskId: 'task-malformed-rlm'
+    };
+
+    const resolver = new PipelineResolver();
+    await expect(resolver.resolve(env, { pipelineId: 'rlm' })).rejects.toThrow(
+      /codex\.orchestrator\.json pipelines must be an array/
+    );
+  });
+
   // Uses the real repo config to catch drift between shipped pipelines and docs.
   it('wires frontend testing pipeline with explicit devtools opt-in', async () => {
     const testDir = fileURLToPath(new URL('.', import.meta.url));
