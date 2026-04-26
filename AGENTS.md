@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 591e716841bfc16fe963d195d09b65d6eca02cf6d8880ebd6bf5d502e14b3704 -->
+<!-- codex:instruction-stamp 1f1decc1da30e130170a634fdf242198a5825f987e49f1e0e67f8f4fad16b0e8 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -55,7 +55,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Newer-version cloud/release adoption remains evidence-gated: no P0/P1 regressions, runtime-mode canary pass, and required cloud canary contract pass.
 - If any required lane fails (or provider/model compatibility regresses), hold/revert only the affected surface and record the decision in `docs/TASKS.md`, `tasks/index.json`, and task checklists.
 - For policy details and cadence, follow `docs/guides/codex-version-policy.md`.
-- App-server remains the normal local runtime path, but provider workers still stay on `codex exec` / `codex exec resume` supervision until a separate app-server control seam lands with explicit authority guardrails.
+- App-server remains the normal local runtime path and is the provider-worker control authority when selected by the runtime provider. `codex exec` / `codex exec resume` are preserved as explicitly labeled break-glass or legacy CLI fallback when app-server authority is unavailable or intentionally bypassed.
 
 ## Deliberation Default (Agent-First)
 - Deliberation is the default for high-ambiguity or high-impact work. Keep MCP as the top-level control plane and use collab/delegated subagents to explore options.

@@ -44,6 +44,7 @@ export interface OperatorDashboardSessionPayload {
   workspace_path: string | null;
   host: string;
   worker_host?: string | null;
+  worker_control?: NonNullable<ControlIssuePayload['provider_linear_worker_proof']>['worker_control'] | null;
   last_event: string | null;
   last_message: string | null;
   display_event?: string | null;
@@ -96,6 +97,7 @@ export interface OperatorDashboardIssuePayload {
     host: string;
   };
   worker_host?: string | null;
+  worker_control?: NonNullable<ControlIssuePayload['provider_linear_worker_proof']>['worker_control'] | null;
   session: {
     session_id: string | null;
     thread_id: string | null;
@@ -258,6 +260,7 @@ function buildIssuePayload(
       host: LOCAL_HOSTNAME
     },
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
+    worker_control: proof?.worker_control ?? null,
     session: {
       session_id: proof?.latest_session_id ?? running?.session_id ?? issue.retry?.session_id ?? null,
       thread_id: proof?.thread_id ?? null,
@@ -328,6 +331,7 @@ function buildRunningSessionPayload(
     workspace_path: issue?.workspace.path ?? proof?.workspace_path ?? null,
     host: LOCAL_HOSTNAME,
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
+    worker_control: proof?.worker_control ?? null,
     last_event: entry.last_event,
     last_message: entry.last_message,
     display_event: entry.display_event ?? null,
