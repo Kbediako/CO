@@ -131,7 +131,7 @@ export function inspectCheckoutPosture(repoRoot: string): CheckoutPostureInspect
   }
 
   const status = classifyComparison(ahead, behind);
-  const postureReference = readPostureReference(repoRoot, upstream);
+  const postureReference = readPostureReference(repoRoot);
   const staleDocsMayBe = status === 'stale' || status === 'diverged';
 
   return {
@@ -224,11 +224,8 @@ function inspectDirtyWork(repoRoot: string): CheckoutPostureInspection['dirty'] 
   };
 }
 
-function readPostureReference(
-  repoRoot: string,
-  upstream: CheckoutPostureCommit | null
-): CheckoutPostureInspection['posture_reference'] {
-  const commit = readLatestPostureCommit(repoRoot) ?? upstream;
+function readPostureReference(repoRoot: string): CheckoutPostureInspection['posture_reference'] {
+  const commit = readLatestPostureCommit(repoRoot);
   const policyLines = readOriginMainPostureLines(repoRoot);
   const issueIds = extractIssueIds([
     commit?.subject ?? '',

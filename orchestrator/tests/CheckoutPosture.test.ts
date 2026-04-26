@@ -118,6 +118,43 @@ describe('inspectCheckoutPosture', () => {
     }
   });
 
+  it('does not use an arbitrary origin/main commit as a posture reference', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'checkout-posture-no-reference-paths-'));
+    const origin = join(root, 'origin.git');
+    const repo = join(root, 'repo');
+    try {
+      runGit(root, ['init', '--bare', origin]);
+      runGit(root, ['clone', origin, repo]);
+      runGit(repo, ['switch', '-c', 'main']);
+      runGit(repo, ['config', 'user.name', 'Doctor Test']);
+      runGit(repo, ['config', 'user.email', 'doctor@example.invalid']);
+      await writeFile(join(repo, 'README.unrelated.md'), '# downstream repo\n', 'utf8');
+      runGit(repo, ['add', 'README.unrelated.md']);
+      runGit(repo, ['commit', '-m', 'Initial downstream repo']);
+      runGit(repo, ['push', '-u', 'origin', 'main']);
+      const initialCommit = runGit(repo, ['rev-parse', 'HEAD']);
+
+      await writeFile(join(repo, 'README.unrelated.md'), '# downstream repo\n\nnew unrelated work\n', 'utf8');
+      runGit(repo, ['add', 'README.unrelated.md']);
+      runGit(repo, ['commit', '-m', 'CO-321 unrelated downstream work']);
+      runGit(repo, ['push', 'origin', 'main']);
+      runGit(repo, ['fetch', 'origin', 'main:refs/remotes/origin/main']);
+      runGit(repo, ['reset', '--hard', initialCommit]);
+
+      const result = inspectCheckoutPosture(repo);
+
+      expect(result.status).toBe('stale');
+      expect(result.posture_reference.status).toBe('unavailable');
+      expect(result.posture_reference.commit).toBeNull();
+      expect(result.posture_reference.issue_ids).toEqual([]);
+      expect(formatCheckoutPostureSummary(result).join('\n')).toContain(
+        'No posture reference paths were readable from origin/main.'
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('keeps unborn-HEAD git worktrees distinguishable from non-git directories', async () => {
     const root = await mkdtemp(join(tmpdir(), 'checkout-posture-unborn-'));
     const repo = join(root, 'repo');
