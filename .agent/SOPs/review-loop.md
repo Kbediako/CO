@@ -3,7 +3,7 @@
 Use this playbook whenever handing off a review (`codex-orchestrator review` / `npm run review` alias, or an implementation gate) so feedback is captured and resolved until clean.
 
 ## Steps
-1. Draft `NOTES` with goal, summary, risks, and optional reviewer questions (one line each when possible). `NOTES` is expected for higher-signal review context; wrapper fallback notes are auto-generated when omitted.
+1. Draft `NOTES` with goal, summary, risks, and optional reviewer questions (one line each when possible). `NOTES` is required for authoritative review gates; missing notes require an explicit break-glass waiver with owner, expiry, reason, and evidence.
 2. Run the appropriate gate:
    - Default: `implementation-gate` for general reviews.
    - Enable DevTools by setting `CODEX_REVIEW_DEVTOOLS=1` only when Chrome DevTools capabilities are required.
