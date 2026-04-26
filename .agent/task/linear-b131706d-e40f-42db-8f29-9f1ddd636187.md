@@ -35,9 +35,9 @@
 - [x] `npm run lint` passed on 2026-04-26 after the occupied-provider veto fix with 3 pre-existing warnings in `orchestrator/tests/DelegationMcpHealth.test.ts`.
 - [x] `npm run test` passed on 2026-04-26 after the occupied-provider veto fix: 355 files, 4921 tests.
 - [x] `npm run docs:check` passed on 2026-04-26 after the occupied-provider veto fix.
-- [x] `npm run docs:freshness` passed on 2026-04-26 after the occupied-provider veto fix: 4815 docs, 4818 registry entries.
-- [x] `npm run repo:stewardship` passed on 2026-04-26 after the occupied-provider veto fix: 5938 tracked files, 0 action-required.
-- [x] `node scripts/diff-budget.mjs` passed on 2026-04-26 after the occupied-provider veto fix: working-tree files 3/25, lines 107/1200; advisory stacked aggregate files 9/25, lines 796/1200.
+- [x] `npm run docs:freshness` passed on 2026-04-26 after merging current `origin/main`: 4821 docs, 4824 registry entries.
+- [x] `npm run repo:stewardship` passed on 2026-04-26 after merging current `origin/main`: 5944 tracked files, 0 action-required.
+- [x] `node scripts/diff-budget.mjs` passed on 2026-04-26 after merging current `origin/main`: clean working-tree files 0/25, lines 0/1200; advisory stacked aggregate files 9/25, lines 796/1200.
 - [ ] Manifest-backed forced standalone review
 - [ ] Explicit elegance/minimality pass
 - [ ] PR attach and ready-review drain before review transition
@@ -52,6 +52,7 @@
 - 2026-04-26: Full validation reran after the capped-admission fix: focused refresh suite, adjacent CO-193/CO-189 tests, delegation/spec guards, build, lint, full test, docs gates, repo stewardship, and diff budget all passed.
 - 2026-04-26: Forced standalone review then surfaced a P1 normally budgeted direct-read occupancy gap: the capped live-start launch branch could ignore same-issue unreadable/foreign occupancy when the direct read did not use the special probe slot. Parent fixed that branch to carry the occupied-provider veto and added a normally budgeted same-issue unreadable-occupancy regression.
 - 2026-04-26: Full validation reran after the occupied-provider veto fix: focused refresh suite, adjacent CO-193/CO-189 tests, delegation/spec guards, build, lint, full test, docs gates, repo stewardship, and diff budget all passed.
+- 2026-04-26: Merged current `origin/main` and reran validation: focused refresh suite, adjacent CO-193/CO-189 tests, delegation/spec guards, build, lint, full test, docs gates, repo stewardship, and diff budget all passed.
 
 ## Notes
 - Do not hand-edit or delete `provider-intake-state.json` as the fix.
