@@ -2350,6 +2350,58 @@ describe('docs hygiene tooling', () => {
     );
   });
 
+  it('fails stale shortcut-reference Codex release evidence links in current-facing navigation', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-active-history-shortcut-ref-nav-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs', 'book'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json',
+      entries: [
+        {
+          path: 'docs/book/index.md',
+          status: 'active',
+          doc_class: 'public_guide',
+          truth_checks: []
+        }
+      ]
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      current: {
+        codex_cli_version: '0.125.0',
+        cloud_canary_cli_version: '0.124.0'
+      }
+    });
+    await writeFile(
+      join(repoRoot, 'docs', 'book', 'index.md'),
+      ['# Book', '', '- [codex-cli-0124-adoption]', '', '[codex-cli-0124-adoption]: codex-cli-0124-adoption.md', ''].join(
+        '\n'
+      ),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'docs/book/index.md',
+        rule: 'codex-posture-history-active',
+        reference:
+          'active current-facing release evidence mentions Codex CLI version(s) 0.124.0 without current/historical/archive matrix status'
+      })
+    );
+  });
+
   it('ignores external Codex release evidence links when checking current-facing navigation', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-active-history-external-nav-'));
     createdDirs.push(repoRoot);

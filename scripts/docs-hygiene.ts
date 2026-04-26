@@ -1019,6 +1019,22 @@ function extractCodexReleaseEvidenceLinks(file: string, content: string): Array<
     }
     pushCodexReleaseEvidenceLink(links, file, text, target);
   }
+  const shortcutReferencePattern = /\[([^\]]+)\]/g;
+  for (const match of content.matchAll(shortcutReferencePattern)) {
+    if (match.index && content[match.index - 1] === '!') {
+      continue;
+    }
+    const next = content[match.index + match[0].length] ?? '';
+    if (next === '(' || next === '[' || next === ':') {
+      continue;
+    }
+    const text = match[1] ?? '';
+    const target = referenceTargets.get(normalizeMarkdownReferenceLabel(text));
+    if (!target) {
+      continue;
+    }
+    pushCodexReleaseEvidenceLink(links, file, text, target);
+  }
   return links;
 }
 
