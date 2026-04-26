@@ -2103,6 +2103,22 @@ describe('codex-orchestrator command surface', () => {
     });
   }, TEST_TIMEOUT);
 
+  it('uses repo-authoritative default for malformed legacy repo config env', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-malformed-legacy-repo-config-'));
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: 'maybe'
+    };
+    await expect(
+      runCli(['plan', 'docs-review'], env, CLI_EXEC_TIMEOUT_MS, new Set(['CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED']))
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining('repo-authoritative config mode')
+    });
+  }, TEST_TIMEOUT);
+
   it('preserves explicit strict repo config env when it matches the ambient provider-worker value', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-strict-ambient-match-'));
     const originalStrictRepoConfig = process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
@@ -2154,6 +2170,7 @@ describe('codex-orchestrator command surface', () => {
       pipeline?: { id?: string; config_resolution?: { mode?: string } | null };
     };
     expect(payload.pipeline?.id).toBe('docs-review');
+    expect(payload.pipeline?.config_resolution?.mode).toBe('downstream-compatibility');
   }, TEST_TIMEOUT);
 
   it('plans docs-relevance-advisory pipeline from explicit downstream compatibility config', async () => {

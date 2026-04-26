@@ -60,6 +60,7 @@ import { runCoStatusOperatorAutopilotCliShell } from '../orchestrator/src/cli/co
 import {
   CONFIG_AUTHORITY_MODE_ENV_KEY,
   REPO_CONFIG_REQUIRED_ENV_KEY,
+  resolveConfigAuthorityMode,
   type ConfigAuthorityMode
 } from '../orchestrator/src/cli/config/repoConfigPolicy.js';
 
@@ -375,9 +376,9 @@ function applyRepoConfigRequiredPolicy(flags: ArgMap): boolean {
 
   const legacyEnv = process.env[REPO_CONFIG_REQUIRED_ENV_KEY];
   if (typeof legacyEnv === 'string' && legacyEnv.trim().length > 0) {
-    const required = parseBooleanSetting(legacyEnv, REPO_CONFIG_REQUIRED_ENV_KEY);
-    applyConfigModeEnv(required ? 'repo-authoritative' : 'downstream-compatibility');
-    return required;
+    const mode = resolveConfigAuthorityMode(process.env).mode;
+    applyConfigModeEnv(mode);
+    return mode === 'repo-authoritative';
   }
 
   delete process.env[REPO_CONFIG_REQUIRED_ENV_KEY];

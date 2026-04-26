@@ -22,10 +22,7 @@
       "paths": {
         "spec": "tasks/specs/linear-902025f4-f954-41e5-9dcb-9c3d2d12741f.md",
         "task": "tasks/tasks-linear-902025f4-f954-41e5-9dcb-9c3d2d12741f.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-902025f4-f954-41e5-9dcb-9c3d2d12741f.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-902025f4-f954-41e5-9dcb-9c3d2d12741f.md"
-        }
+        "docs": "tasks/specs/linear-902025f4-f954-41e5-9dcb-9c3d2d12741f.md"
       }
     },
     {
