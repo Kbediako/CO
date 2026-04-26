@@ -87,5 +87,5 @@
 ## Approvals
 - Docs-first packet: bounded same-issue child lane, 2026-04-27
 - Parent implementation: stale scope-dropping retry removed; synthesized scoped-title fallback retained with CO-395 expiry metadata; generated notes, command-intent retry, and telemetry classification justified as durable contracts.
-- Parent review: manifest-backed `npm run review -- --manifest ../../.runs/linear-86da539a-e106-44d9-87ea-759281a00a81/cli/2026-04-26T20-07-39-220Z-8ba45809/manifest.json --uncommitted` returned no actionable regressions with `review_outcome=bounded-success`.
+- Parent review: manifest-backed review returned no actionable regressions; latest repo-relative telemetry artifact `.runs/linear-86da539a-e106-44d9-87ea-759281a00a81/cli/2026-04-26T20-07-39-220Z-8ba45809/review/telemetry.json` records `review_outcome=clean-success` after the CodeRabbit feedback fix rerun.
 - Parent elegance pass: no simplification edits required before PR handoff.
