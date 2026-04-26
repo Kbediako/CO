@@ -6,6 +6,12 @@ export function formatPlanPreview(result: PlanPreviewResult): string {
   if (result.pipeline.description) {
     lines.push(`Description: ${result.pipeline.description}`);
   }
+  if (result.pipeline.config_resolution) {
+    const config = result.pipeline.config_resolution;
+    lines.push(
+      `Configuration mode: ${config.mode} (${config.reason}; source=${config.config_source ?? 'none'})`
+    );
+  }
   lines.push('Stages:');
   if (result.stages.length === 0) {
     lines.push('  (none)');

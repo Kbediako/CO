@@ -1,7 +1,10 @@
 import process from 'node:process';
 
 import type { RunEventEmitter } from './events/runEvents.js';
-import { REPO_CONFIG_REQUIRED_ENV_KEY } from './config/repoConfigPolicy.js';
+import {
+  CONFIG_AUTHORITY_MODE_ENV_KEY,
+  REPO_CONFIG_REQUIRED_ENV_KEY
+} from './config/repoConfigPolicy.js';
 import type { RunFrontendTestCliShellParams } from './frontendTestCliShell.js';
 import { runFrontendTestCliShell } from './frontendTestCliShell.js';
 import {
@@ -85,6 +88,7 @@ function applyProviderOverrideSanitizationToProcessEnv(
     trackedOverrides: Object.fromEntries(
       [...PROVIDER_OVERRIDE_ENV_KEYS, ...PROVIDER_OVERRIDE_MARKER_ENV_KEYS].map((key) => [key, env[key]])
     ) as Partial<NodeJS.ProcessEnv>,
+    configMode: env[CONFIG_AUTHORITY_MODE_ENV_KEY],
     repoConfigRequired: env[REPO_CONFIG_REQUIRED_ENV_KEY]
   };
   const sanitized = sanitizeProviderOverrideEnv(env);
@@ -101,6 +105,11 @@ function applyProviderOverrideSanitizationToProcessEnv(
   } else {
     env[REPO_CONFIG_REQUIRED_ENV_KEY] = sanitized[REPO_CONFIG_REQUIRED_ENV_KEY];
   }
+  if (sanitized[CONFIG_AUTHORITY_MODE_ENV_KEY] === undefined) {
+    delete env[CONFIG_AUTHORITY_MODE_ENV_KEY];
+  } else {
+    env[CONFIG_AUTHORITY_MODE_ENV_KEY] = sanitized[CONFIG_AUTHORITY_MODE_ENV_KEY];
+  }
   return () => {
     for (const key of [...PROVIDER_OVERRIDE_ENV_KEYS, ...PROVIDER_OVERRIDE_MARKER_ENV_KEYS]) {
       const value = previous.trackedOverrides[key];
@@ -114,6 +123,11 @@ function applyProviderOverrideSanitizationToProcessEnv(
       delete env[REPO_CONFIG_REQUIRED_ENV_KEY];
     } else {
       env[REPO_CONFIG_REQUIRED_ENV_KEY] = previous.repoConfigRequired;
+    }
+    if (previous.configMode === undefined) {
+      delete env[CONFIG_AUTHORITY_MODE_ENV_KEY];
+    } else {
+      env[CONFIG_AUTHORITY_MODE_ENV_KEY] = previous.configMode;
     }
   };
 }

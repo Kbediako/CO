@@ -38,6 +38,7 @@ export function buildOrchestratorStatusPayload(
     runtime_mode_requested: manifest.runtime_mode_requested,
     runtime_mode: manifest.runtime_mode,
     runtime_provider: manifest.runtime_provider,
+    config_resolution: manifest.config_resolution ?? null,
     runtime_fallback: manifest.runtime_fallback ?? null,
     cloud_execution: manifest.cloud_execution ?? null,
     cloud_fallback: manifest.cloud_fallback ?? null
@@ -67,6 +68,11 @@ export function renderOrchestratorStatus(
         `original_target=${describeFallbackTarget(fallback.original_target ?? null)} ` +
         `fallback_target=${describeFallbackTarget(fallback.fallback_target ?? null)} ` +
         `blocking_reason=${fallback.blocking_reason ?? fallback.reason ?? 'n/a'}`
+    );
+  }
+  if (manifest.config_resolution) {
+    logger.info(
+      `Configuration mode: ${manifest.config_resolution.mode} (${manifest.config_resolution.reason}; source=${manifest.config_resolution.config_source ?? 'none'})`
     );
   }
   if (activity.observed_at) {

@@ -27,6 +27,11 @@ describe('orchestrator status shell', () => {
       runtime_mode_requested: 'appserver',
       runtime_mode: 'appserver',
       runtime_provider: 'AppServerRuntimeProvider',
+      config_resolution: {
+        mode: 'repo-authoritative',
+        reason: 'default repo-authoritative mode',
+        config_source: 'repo'
+      },
       runtime_fallback: null,
       cloud_execution: null,
       cloud_fallback: null
@@ -95,6 +100,11 @@ describe('orchestrator status shell', () => {
       runtime_mode_requested: 'cli',
       runtime_mode: 'appserver',
       runtime_provider: 'AppServerRuntimeProvider',
+      config_resolution: {
+        mode: 'downstream-compatibility',
+        reason: 'CODEX_ORCHESTRATOR_CONFIG_MODE=downstream-compatibility',
+        config_source: 'package'
+      },
       runtime_fallback: {
         occurred: true,
         policy: 'auto',
@@ -169,6 +179,7 @@ describe('orchestrator status shell', () => {
       'Manifest: .runs/task-2/cli/run-2/manifest.json',
       'Runtime: appserver (requested cli) via AppServerRuntimeProvider',
       'Runtime fallback: policy=auto code=fallback-code original_target=runtime:appserver fallback_target=runtime:cli blocking_reason=appserver unavailable',
+      'Configuration mode: downstream-compatibility (CODEX_ORCHESTRATOR_CONFIG_MODE=downstream-compatibility; source=package)',
       'Activity: 2026-03-14T16:10:05.000Z via manifest age=42s [stale]',
       'Cloud: cloud-123 [running] https://example.invalid/status',
       'Cloud fallback: policy=auto original_target=execution:cloud fallback_target=execution:mcp blocking_reason=missing cloud environment',

@@ -42,6 +42,11 @@ describe('runOrchestratorStartPreparationShell', () => {
       pipeline: { id: 'pipeline-1', title: 'Pipeline 1', stages: [] },
       pipelineSource: null,
       runtimeModeDefault: 'appserver',
+      configResolution: {
+        mode: 'repo-authoritative',
+        reason: 'default repo-authoritative mode',
+        config_source: 'repo'
+      },
       configNotice: 'repo config active',
       envOverrides: { CODEX_ORCHESTRATOR_START_PREP_OVERRIDE: '1' },
       planner: { label: 'planner' },
@@ -121,7 +126,8 @@ describe('runOrchestratorStartPreparationShell', () => {
       issueProvider: 'linear',
       issueId: 'lin-issue-1',
       issueIdentifier: 'CO-2',
-      issueUpdatedAt: '2026-03-19T03:45:00.000Z'
+      issueUpdatedAt: '2026-03-19T03:45:00.000Z',
+      configResolution: preparation.configResolution
     });
     expect(applyRequestedRuntimeMode).toHaveBeenCalledWith(manifest, 'cli');
     expect(appendSummaryImpl).toHaveBeenCalledWith(manifest, 'repo config active');
@@ -151,6 +157,7 @@ describe('runOrchestratorStartPreparationShell', () => {
       pipeline: { id: 'pipeline-1', title: 'Pipeline 1', stages: [] },
       pipelineSource: null,
       runtimeModeDefault: null,
+      configResolution: null,
       configNotice: null,
       envOverrides: {},
       planner: { label: 'planner' },
@@ -215,6 +222,7 @@ describe('runOrchestratorStartPreparationShell', () => {
       pipeline: { id: 'pipeline-1', title: 'Pipeline 1', stages: [] },
       pipelineSource: null,
       runtimeModeDefault: null,
+      configResolution: null,
       configNotice: null,
       envOverrides: { CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli' },
       planner: { label: 'planner' },
