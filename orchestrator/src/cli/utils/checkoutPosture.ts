@@ -42,6 +42,15 @@ const PRIMARY_POSTURE_REFERENCE_PATHS = [
   'docs/codex-posture-matrix.json',
   'templates/codex/.codex/config.toml'
 ];
+const POSTURE_REFERENCE_LINE_LIMIT = 16;
+const PRIORITY_POSTURE_LINE_PATTERNS = [
+  /\b(Portable packaged\/generated defaults|fallback values)\b/u,
+  /\bCurrent model posture\b/u,
+  /\bCurrent CO-local\b/u,
+  /\bCurrent release-facing\b/u,
+  /\bCurrent cloud execution\b/u,
+  /\bLatest app-server\b/u
+];
 const POSTURE_REFERENCE_PATHS = [
   ...PRIMARY_POSTURE_REFERENCE_PATHS,
   'AGENTS.md',
@@ -261,16 +270,40 @@ function extractCurrentPostureLines(source: string): string[] {
     }
     if (isPostureSignalLine(trimmed)) {
       lines.push(trimmed);
-      if (lines.length >= 8) {
-        break;
-      }
     }
   }
-  return lines;
+  return prioritizePostureLines(lines);
 }
 
 function isPostureSignalLine(line: string): boolean {
   return /\b(Current|Latest|CO-\d+|Codex CLI|codex-cli|gpt-[\w.-]+|model posture)\b/u.test(line);
+}
+
+function prioritizePostureLines(lines: string[]): string[] {
+  if (lines.length <= POSTURE_REFERENCE_LINE_LIMIT) {
+    return lines;
+  }
+
+  const selectedIndexes = new Set<number>();
+  for (const pattern of PRIORITY_POSTURE_LINE_PATTERNS) {
+    for (const [index, line] of lines.entries()) {
+      if (selectedIndexes.size >= POSTURE_REFERENCE_LINE_LIMIT) {
+        break;
+      }
+      if (pattern.test(line)) {
+        selectedIndexes.add(index);
+      }
+    }
+  }
+
+  for (const index of lines.keys()) {
+    if (selectedIndexes.size >= POSTURE_REFERENCE_LINE_LIMIT) {
+      break;
+    }
+    selectedIndexes.add(index);
+  }
+
+  return lines.filter((_, index) => selectedIndexes.has(index));
 }
 
 function extractIssueIds(values: string[]): string[] {

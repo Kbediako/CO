@@ -31,6 +31,10 @@ describe('inspectCheckoutPosture', () => {
       expect(result.posture_reference.commit?.hash).toBe(fixture.latestCommit);
       expect(result.posture_reference.issue_ids).toContain('CO-999');
       expect(result.posture_reference.policy_lines.join('\n')).toContain('gpt-5.5');
+      expect(result.posture_reference.policy_lines.join('\n')).toContain(
+        'Portable packaged/generated defaults still keep `gpt-5.4` / `xhigh` as fallback values.'
+      );
+      expect(result.posture_reference.policy_lines.length).toBeLessThanOrEqual(16);
 
       const summary = formatCheckoutPostureSummary(result).join('\n');
       expect(summary).toContain('Checkout posture: stale');
@@ -38,6 +42,7 @@ describe('inspectCheckoutPosture', () => {
       expect(summary).toContain('dirty local work: dirty');
       expect(summary).toContain('local posture docs may be stale');
       expect(summary).toContain('CO-999');
+      expect(summary).toContain('Portable packaged/generated defaults still keep `gpt-5.4` / `xhigh`');
       expect(summary).toContain('Doctor only reports checkout posture; it does not fetch, rebase, checkout, or discard local work.');
     } finally {
       await rm(fixture.root, { recursive: true, force: true });
@@ -146,7 +151,19 @@ async function createPostureRepoFixture(): Promise<PostureRepoFixture> {
       '## Current Posture',
       '- Current CO-local ChatGPT-auth/appserver model posture is `gpt-5.5` / `xhigh` on Codex CLI `0.125.0`. CO-999 adopted that posture after live smoke evidence passed.',
       '- Current release-facing package/downstream-smoke compatibility target is Codex CLI `0.125.0`.',
+      '- Current cloud execution candidate remains Codex CLI `0.124.0`.',
+      '- Latest app-server control-seam candidate audited by CO-998 is Codex CLI `0.125.0`.',
+      '- Marketplace/downstream-smoke compatibility is separately rebaselined to Codex CLI `0.125.0` by CO-997.',
+      '- `cloud-canary` pins `@openai/codex@0.124.0` as the explicit cloud execution candidate.',
+      '- The current `0.125.0` local CLI/package posture keeps the previously recorded onboarding-sensitive help guarantees.',
+      '- Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions.',
+      ...Array.from(
+        { length: 12 },
+        (_, index) => `- Current optional posture note ${index + 1} for Codex CLI context.`
+      ),
       '- Portable packaged/generated defaults still keep `gpt-5.4` / `xhigh` as fallback values.',
+      '- CO-local `gpt-5.5` / `xhigh` configuration is the current ChatGPT-auth/appserver posture after live app-server/model smoke evidence.',
+      '- `codex-orchestrator doctor` treats `gpt-5.5` as non-drift when `codex debug models` verifies current model access.',
       '',
       '## Evidence'
     ].join('\n'),
