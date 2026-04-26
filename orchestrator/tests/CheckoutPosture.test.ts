@@ -199,6 +199,36 @@ describe('inspectCheckoutPosture', () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it('ignores inherited git repo-selection env while probing the requested root', async () => {
+    const fixture = await createPostureRepoFixture();
+    const plainRoot = await mkdtemp(join(tmpdir(), 'checkout-posture-env-plain-'));
+    const originalGitDir = process.env.GIT_DIR;
+    const originalGitWorkTree = process.env.GIT_WORK_TREE;
+    try {
+      process.env.GIT_DIR = join(fixture.repo, '.git');
+      process.env.GIT_WORK_TREE = fixture.repo;
+
+      const result = inspectCheckoutPosture(plainRoot);
+
+      expect(result.status).toBe('unavailable');
+      expect(result.inside_git_worktree).toBe(false);
+      expect(result.detail).toContain('not inside a git worktree');
+    } finally {
+      if (originalGitDir === undefined) {
+        delete process.env.GIT_DIR;
+      } else {
+        process.env.GIT_DIR = originalGitDir;
+      }
+      if (originalGitWorkTree === undefined) {
+        delete process.env.GIT_WORK_TREE;
+      } else {
+        process.env.GIT_WORK_TREE = originalGitWorkTree;
+      }
+      await rm(plainRoot, { recursive: true, force: true });
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  });
 });
 
 async function createPostureRepoFixture(): Promise<PostureRepoFixture> {

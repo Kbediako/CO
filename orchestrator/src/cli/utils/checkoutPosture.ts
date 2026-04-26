@@ -41,6 +41,14 @@ export interface CheckoutPostureInspection {
 const BASE_REF = 'origin/main';
 const GIT_TIMEOUT_MS = 5000;
 const EMPTY_GLOBAL_GIT_CONFIG = process.platform === 'win32' ? 'NUL' : '/dev/null';
+const GIT_REPO_SELECTION_ENV_KEYS = [
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_COMMON_DIR',
+  'GIT_DIR',
+  'GIT_INDEX_FILE',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_WORK_TREE'
+];
 const PRIMARY_POSTURE_REFERENCE_PATHS = [
   'docs/guides/codex-version-policy.md',
   'docs/codex-posture-matrix.json',
@@ -479,10 +487,14 @@ function runGit(
   repoRoot: string,
   args: string[]
 ): GitCommandResult {
+  const env = { ...process.env };
+  for (const key of GIT_REPO_SELECTION_ENV_KEYS) {
+    delete env[key];
+  }
   const result = spawnSync('git', ['-C', repoRoot, ...args], {
     encoding: 'utf8',
     env: {
-      ...process.env,
+      ...env,
       GIT_CONFIG_COUNT: '0',
       GIT_CONFIG_GLOBAL: EMPTY_GLOBAL_GIT_CONFIG,
       GIT_CONFIG_NOSYSTEM: '1',
