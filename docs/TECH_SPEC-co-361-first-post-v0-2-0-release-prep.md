@@ -15,7 +15,7 @@ last_review: 2026-04-26
 
 ## Issue-Shaping Contract
 - User-request translation carried forward: prepare a clean release PR that keeps current `gpt-5.5` / `0.125.0` / `appserver` posture visible, keeps portable fallback defaults intact, and avoids a lazy blanket hold on appserver/package posture.
-- Protected terms / exact artifact and surface names: `package.json`, `package-lock.json`, `README.md`, `docs/guides/codex-version-policy.md`, `docs/book/public-posture.md`, `docs/book/README.md`, `docs/book/codex-cli-0124-adoption.md`, `@openai/codex@0.125.0`, `gpt-5.5`, `appserver`, `npm run pack:smoke`.
+- Protected terms / exact artifact and surface names: `package.json`, `package-lock.json`, `README.md`, `docs/guides/codex-version-policy.md`, `docs/book/public-posture.md`, `docs/book/README.md`, `docs/book/archive/codex-cli-0124-adoption.md`, `@openai/codex@0.125.0`, `gpt-5.5`, `appserver`, `npm run pack:smoke`.
 - Nearby wrong interpretations to reject: publish the release, retarget cloud-canary without evidence, or reopen broader posture/default work.
 - Explicit non-goals carried forward: cloud execution promotion, provider-runtime promotion, and release publication.
 
