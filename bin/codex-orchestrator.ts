@@ -2411,7 +2411,9 @@ Common options:
   --enable-delegation-mcp [true|false]   Legacy delegation MCP toggle (disable via false).
 
 Environment controls (selected):
-  NOTES                            Recommended review notes ("Goal | Summary | Risks ..."); fallback notes are generated when omitted.
+  NOTES                            Required review notes for authoritative gates ("Goal | Summary | Risks ...").
+  CODEX_REVIEW_AUTHORITATIVE_GATE=1      Disallow prompt-only non-interactive handoff as gate success.
+  CODEX_REVIEW_BREAK_GLASS_NOTES_FALLBACK=1  Allow missing NOTES only with owner, expiry, reason, and evidence env fields.
   CODEX_REVIEW_ALLOW_HEAVY_COMMANDS=1      Allow unrestricted heavy commands.
   CODEX_REVIEW_ENFORCE_BOUNDED_MODE=1      Enforce bounded mode (hard-stop heavy commands).
   CODEX_REVIEW_TIMEOUT_SECONDS             Optional overall timeout (0 disables when set).

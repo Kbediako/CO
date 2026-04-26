@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -179,16 +179,103 @@ afterEach(async () => {
 });
 
 describe('review-prompt-context', () => {
-  it('returns generated fallback notes when NOTES is absent', () => {
-    const fallback = resolveReviewNotes({
-      notes: undefined,
+  it('keeps generated NOTES fallback available for non-authoritative review', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const notes = resolveReviewNotes({
+        notes: undefined,
+        taskLabel: 'sample-task',
+        surface: 'diff'
+      });
+
+      expect(notes).toContain('auto-generated NOTES fallback');
+      expect(notes).toContain('task=sample-task');
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('non-authoritative review')
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('rejects missing NOTES for authoritative gates unless a break-glass waiver is explicit', () => {
+    for (const notes of [undefined, '', '   ']) {
+      expect(() =>
+        resolveReviewNotes({
+          notes,
+          taskLabel: 'sample-task',
+          surface: 'diff',
+          authoritativeGate: true
+        })
+      ).toThrow(/NOTES.*required.*break-glass waiver/i);
+    }
+  });
+
+  it('accepts missing NOTES only with reviewer-visible break-glass waiver context', async () => {
+    const sandbox = await makeSandbox();
+    const result = await buildReviewPromptContext({
+      repoRoot: sandbox,
+      taskKey: 'sample-task',
       taskLabel: 'sample-task',
-      surface: 'diff'
+      reviewSurface: 'diff',
+      relativeManifest: '.runs/sample-task/cli/sample-run/manifest.json',
+      runnerLogExists: false,
+      relativeRunnerLog: '.runs/sample-task/cli/sample-run/runner.ndjson',
+      notes: undefined,
+      authoritativeGate: true,
+      scopeMode: 'uncommitted',
+      missingNotesWaiver: {
+        reason: 'parent lane authorized this bounded review before authored NOTES were available',
+        approvedBy: 'parent-lane',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        evidence: '.runs/sample-task/cli/sample-run/manifest.json'
+      }
     });
 
-    expect(fallback).toContain('Goal: standalone review handoff');
-    expect(fallback).toContain('task=sample-task');
-    expect(fallback).toContain('surface=diff');
+    expect(result.resolvedNotes).toContain('Break-glass missing NOTES waiver');
+    expect(result.resolvedNotes).toContain(
+      'parent lane authorized this bounded review before authored NOTES were available'
+    );
+    expect(result.resolvedNotes).toContain('approved_by=parent-lane');
+    expect(result.resolvedNotes).toContain('expires_at=2099-01-01T00:00:00.000Z');
+    expect(result.resolvedNotes).toContain('evidence=.runs/sample-task/cli/sample-run/manifest.json');
+    expect(result.resolvedNotes).not.toContain('auto-generated NOTES fallback');
+    expect(result.promptLines).toContain('Agent notes:');
+    expect(result.promptLines).toContain(result.resolvedNotes);
+  });
+
+  it('rejects prompt context construction when NOTES are absent without a waiver', async () => {
+    const sandbox = await makeSandbox();
+
+    await expect(
+      buildReviewPromptContext({
+        repoRoot: sandbox,
+        taskKey: 'sample-task',
+        taskLabel: 'sample-task',
+        reviewSurface: 'diff',
+        relativeManifest: '.runs/sample-task/cli/sample-run/manifest.json',
+        runnerLogExists: false,
+        relativeRunnerLog: '.runs/sample-task/cli/sample-run/runner.ndjson',
+        notes: undefined,
+        authoritativeGate: true,
+        scopeMode: 'uncommitted'
+      })
+    ).rejects.toThrow(/NOTES.*required.*break-glass waiver/i);
+  });
+
+  it('rejects incomplete break-glass waiver context for missing NOTES', () => {
+    expect(() =>
+      resolveReviewNotes({
+        notes: undefined,
+        taskLabel: 'sample-task',
+        surface: 'diff',
+        missingNotesWaiver: {
+          reason: 'temporary review waiver',
+          approvedBy: 'parent-lane',
+          evidence: '.runs/sample-task/cli/sample-run/manifest.json'
+        }
+      })
+    ).toThrow(/missing break-glass waiver expires_at/i);
   });
 
   it('keeps bounded no-validation guidance visible in scoped review titles', () => {
@@ -274,13 +361,13 @@ describe('review-prompt-context', () => {
       relativeManifest: '.runs/sample-task/cli/sample-run/manifest.json',
       runnerLogExists: false,
       relativeRunnerLog: '.runs/sample-task/cli/sample-run/runner.ndjson',
-      notes: undefined,
+      notes: 'Goal: helper test | Summary: closeout root selection | Risks: none',
       scopeMode: 'base'
     });
 
     expect(result.promptLines).toContain('Review surface: diff');
     expect(result.promptLines).toContain('Agent notes:');
-    expect(result.promptLines.join('\n')).toContain('auto-generated NOTES fallback');
+    expect(result.promptLines.join('\n')).not.toContain('auto-generated NOTES fallback');
     expect(result.promptLines.join('\n')).not.toContain('Active closeout provenance:');
     expect(result.activeCloseoutBundleRoots).toEqual([
       todoCloseout,

@@ -20,7 +20,7 @@
 - Package name is scoped to `@kbediako/codex-orchestrator`; the installed bin remains `codex-orchestrator`.
 - `npm run build` uses `tsconfig.build.json`; `clean:dist` + `prepack` exist, but ad-hoc builds can still leave stale `dist/` unless cleaned.
 - Pack audit restricts `dist/` to runtime subtrees; the `files` allowlist mirrors those subtrees so non-runtime `dist/**` output never ships.
-- `scripts/run-review.ts` enforces a non-interactive guard in CI or when stdin is not a TTY by printing the review handoff prompt (with manifest evidence + task context) and exiting successfully; set `FORCE_CODEX_REVIEW=1` to invoke `codex review` in that mode.
+- `scripts/run-review.ts` enforces a non-interactive guard in CI or when stdin is not a TTY by printing the review handoff prompt (with manifest evidence + task context) for direct/manual runs; set `FORCE_CODEX_REVIEW=1` to invoke `codex review` in that mode. Authoritative gate runs set `CODEX_REVIEW_AUTHORITATIVE_GATE=1`, require `NOTES`, and fail closed rather than treating prompt-only handoff as success.
 - Base logger uses `console.info` (stdout); MCP stdout-only guarantees are enforced by the `mcp serve` stdout guard.
 - Runtime schema resolution uses the `imports` alias with a fallback to `schemas/manifest.json`.
 - MCP usage still has legacy scripts in `scripts/`, but `mcp-client.json` now points at `codex-orchestrator mcp serve`.
