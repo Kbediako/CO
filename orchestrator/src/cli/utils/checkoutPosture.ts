@@ -434,6 +434,10 @@ function runGit(
 ): GitCommandResult {
   const result = spawnSync('git', ['-C', repoRoot, ...args], {
     encoding: 'utf8',
+    env: {
+      ...process.env,
+      GIT_OPTIONAL_LOCKS: '0'
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
     timeout: GIT_TIMEOUT_MS
   });
