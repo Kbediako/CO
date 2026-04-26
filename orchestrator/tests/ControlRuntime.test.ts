@@ -2460,6 +2460,217 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('prunes terminal handoff-failed provider rows from active dashboard issues', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-26T07:34:37.478Z'));
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        {
+          provider: 'linear',
+          provider_key: 'linear:issue-co-381',
+          issue_id: 'issue-co-381',
+          issue_identifier: 'CO-381',
+          issue_title: 'Completed stale merge closeout',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          issue_updated_at: '2026-04-26T05:00:00.000Z',
+          task_id: 'linear-issue-co-381',
+          mapping_source: 'provider_id_fallback',
+          state: 'handoff_failed',
+          reason: 'provider_issue_handoff_failed',
+          accepted_at: '2026-04-26T00:18:10.000Z',
+          updated_at: '2026-04-26T07:34:09.880Z',
+          last_delivery_id: null,
+          last_event: 'poll_tick',
+          last_action: 'reconcile',
+          last_webhook_timestamp: null,
+          run_id: 'run-381',
+          run_manifest_path: null,
+          retry_queued: null,
+          retry_attempt: null,
+          retry_due_at: null,
+          retry_error: null,
+          launch_source: 'control-host',
+          launch_token: 'launch-381',
+          merge_closeout: {
+            recorded_at: '2026-04-26T03:09:45.820Z',
+            issue_id: 'issue-co-381',
+            issue_identifier: 'CO-381',
+            issue_state: 'Merging',
+            issue_state_type: 'started',
+            issue_updated_at: '2026-04-26T02:59:13.159Z',
+            attached_pr_urls: ['https://github.com/Kbediako/CO/pull/677'],
+            ignored_historical_pr_urls: [],
+            conflicting_attached_pr_urls: [],
+            ignored_closed_unmerged_pr_urls: [],
+            ignored_cross_issue_pr_urls: [],
+            pr: {
+              url: 'https://github.com/Kbediako/CO/pull/677',
+              owner: 'Kbediako',
+              repo: 'CO',
+              number: 677
+            },
+            snapshot: {
+              state: 'OPEN',
+              review_decision: 'NONE',
+              merge_state_status: 'CLEAN',
+              ready_to_merge: false,
+              gate_reasons: ['unacknowledged_bot_feedback=5'],
+              action_required_reasons: ['unacknowledged_bot_feedback=5'],
+              unresolved_thread_count: 0,
+              checks_pending: 0,
+              checks_failed: 0,
+              required_checks_pending: 0,
+              required_checks_failed: 0,
+              updated_at: '2026-04-26T02:56:44Z',
+              merged_at: null,
+              head_oid: '4330b2a90508e64c750ac3ac77fc1ea65d638536',
+              github_rate_limit: null
+            },
+            branch_recovery: null,
+            merge_attempt: null,
+            shared_root: null,
+            linear_transition: null,
+            github_rate_limit: null,
+            status: 'action_required',
+            reason: 'unacknowledged_bot_feedback=5',
+            summary: 'Merge closeout is blocked by: unacknowledged_bot_feedback=5.'
+          }
+        }
+      ]);
+      const fixture = await createFixture({
+        taskId: 'linear-issue-co-381',
+        providerIntakeState,
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'issue-co-381',
+            identifier: 'CO-381',
+            title: 'Completed stale merge closeout',
+            state: 'Done',
+            state_type: 'completed',
+            updated_at: '2026-04-26T05:00:00.000Z'
+          })
+        }
+      });
+      await seedManifest(fixture.paths, {
+        task_id: 'linear-issue-co-381',
+        issue_provider: 'linear',
+        issue_id: 'issue-co-381',
+        issue_identifier: 'CO-381',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        status: 'in_progress',
+        started_at: '2026-04-26T00:18:11.308Z',
+        updated_at: '2026-04-26T02:04:41.878Z',
+        completed_at: null,
+        summary: 'Retained provider worker manifest still appears active after merge closeout failed.'
+      });
+
+      const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-04-26T07:34:37.478Z'
+      });
+
+      expect(compatibilityProjection.selected).toBeNull();
+      expect(compatibilityProjection.running).toEqual([]);
+      expect(compatibilityProjection.retrying).toEqual([]);
+      expect(compatibilityProjection.issues).toEqual([]);
+      expect(compatibilityProjection.providerIntake).toMatchObject({
+        active_claim_count: 0,
+        running_claim_count: 0,
+        active_issue_identifiers: [],
+        running_issue_identifiers: []
+      });
+      expect(uiDataset.counts.running).toBe(0);
+      expect(uiDataset.counts.issues).toBe(0);
+      expect(uiDataset.selected_issue_identifier).toBeNull();
+      expect(uiDataset.selected).toBeNull();
+      expect(uiDataset.running).toEqual([]);
+      expect(uiDataset.issues).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('prunes merge-closeout action-required handoff-failed provider rows from active dashboard issues', async () => {
+    const providerIntakeState = createProviderIntakeState([
+      {
+        provider: 'linear',
+        provider_key: 'linear:issue-co-381',
+        issue_id: 'issue-co-381',
+        issue_identifier: 'CO-381',
+        issue_title: 'Merging stale closeout',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-26T03:00:00.000Z',
+        task_id: 'linear-issue-co-381',
+        mapping_source: 'provider_id_fallback',
+        state: 'handoff_failed',
+        reason: 'provider_issue_merge_closeout_action_required',
+        accepted_at: '2026-04-26T00:18:10.000Z',
+        updated_at: '2026-04-26T07:34:09.880Z',
+        last_delivery_id: null,
+        last_event: 'poll_tick',
+        last_action: 'reconcile',
+        last_webhook_timestamp: null,
+        run_id: 'run-381',
+        run_manifest_path: null,
+        retry_queued: null,
+        retry_attempt: null,
+        retry_due_at: null,
+        retry_error: null,
+        launch_source: 'control-host',
+        launch_token: 'launch-381',
+        merge_closeout: null
+      }
+    ]);
+    const fixture = await createFixture({
+      taskId: 'linear-issue-co-381',
+      providerIntakeState,
+      linearAdvisoryState: {
+        tracked_issue: createTrackedIssue({
+          id: 'issue-co-381',
+          identifier: 'CO-381',
+          title: 'Merging stale closeout',
+          state: 'Merging',
+          state_type: 'started',
+          updated_at: '2026-04-26T03:00:00.000Z'
+        })
+      }
+    });
+    await seedManifest(fixture.paths, {
+      task_id: 'linear-issue-co-381',
+      issue_provider: 'linear',
+      issue_id: 'issue-co-381',
+      issue_identifier: 'CO-381',
+      pipeline_id: 'provider-linear-worker',
+      pipeline_title: 'Provider Linear Worker',
+      status: 'in_progress',
+      started_at: '2026-04-26T00:18:11.308Z',
+      updated_at: '2026-04-26T02:04:41.878Z',
+      completed_at: null,
+      summary: 'Retained provider worker manifest still appears active after merge closeout requires action.'
+    });
+
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const uiDataset = buildUiDataset({
+      projection: compatibilityProjection,
+      generatedAt: '2026-04-26T07:34:37.478Z'
+    });
+
+    expect(compatibilityProjection.selected).toBeNull();
+    expect(compatibilityProjection.running).toEqual([]);
+    expect(compatibilityProjection.issues).toEqual([]);
+    expect(compatibilityProjection.providerIntake).toMatchObject({
+      active_claim_count: 0,
+      active_issue_identifiers: []
+    });
+    expect(uiDataset.selected_issue_identifier).toBeNull();
+    expect(uiDataset.running).toEqual([]);
+    expect(uiDataset.issues).toEqual([]);
+  });
+
   it('prunes stale in-progress provider rows when terminal released claim has no live worker', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-15T15:13:39.658Z'));
