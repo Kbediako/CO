@@ -675,10 +675,6 @@ async function checkCodexReleaseIntakeTemplate(
   repoRoot: string,
   policy: { enabled?: unknown; template_path?: unknown; required_markers?: unknown } | undefined
 ): Promise<DocsCheckError[]> {
-  if (!policy || policy.enabled === false) {
-    return [];
-  }
-
   const configuredPath =
     typeof policy?.template_path === 'string' ? policy.template_path : DEFAULT_CODEX_RELEASE_INTAKE_TEMPLATE_PATH;
   const templatePath = normalizePolicyPath(configuredPath);

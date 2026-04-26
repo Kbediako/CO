@@ -1856,6 +1856,44 @@ describe('docs hygiene tooling', () => {
     );
   });
 
+  it('validates the default Codex CLI release-intake template when the policy is absent or disabled', async () => {
+    for (const [policyCase, extraPolicies] of [
+      ['absent', {}],
+      ['disabled', { codex_release_intake: { enabled: false } }]
+    ] as const) {
+      const repoRoot = await mkdtemp(join(tmpdir(), `docs-hygiene-release-intake-default-${policyCase}-`));
+      createdDirs.push(repoRoot);
+
+      await writeFile(
+        join(repoRoot, 'package.json'),
+        JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+        'utf8'
+      );
+      await writeFile(
+        join(repoRoot, 'codex.orchestrator.json'),
+        JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+        'utf8'
+      );
+      await writeDocsCatalogFixture(repoRoot, { extraPolicies });
+      await mkdir(join(repoRoot, '.agent', 'task', 'templates'), { recursive: true });
+      await writeFile(
+        join(repoRoot, '.agent', 'task', 'templates', 'codex-cli-release-intake-template.md'),
+        ['# Codex CLI Release-Intake Issue Template', '', '## Release Evidence Axes', '- local CLI', ''].join('\n'),
+        'utf8'
+      );
+
+      const errors = await runDocsCheck(repoRoot);
+
+      expect(errors).toContainEqual(
+        expect.objectContaining({
+          file: '.agent/task/templates/codex-cli-release-intake-template.md',
+          rule: 'codex-release-intake-template-stale',
+          reference: 'missing marker: Supersedes / Holds Matrix'
+        })
+      );
+    }
+  });
+
   it('accepts the canonical Codex CLI release-intake template markers', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-release-intake-pass-'));
     createdDirs.push(repoRoot);
