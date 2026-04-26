@@ -174,6 +174,31 @@ describe('inspectCheckoutPosture', () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it('ignores inherited git config while classifying plain non-git directories', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'checkout-posture-bad-global-config-'));
+    const nonGitDir = join(root, 'plain-dir');
+    const badConfig = join(root, 'bad-gitconfig');
+    const originalGlobalConfig = process.env.GIT_CONFIG_GLOBAL;
+    try {
+      await mkdir(nonGitDir, { recursive: true });
+      await writeFile(badConfig, '[broken\n', 'utf8');
+      process.env.GIT_CONFIG_GLOBAL = badConfig;
+
+      const result = inspectCheckoutPosture(nonGitDir);
+
+      expect(result.status).toBe('unavailable');
+      expect(result.inside_git_worktree).toBe(false);
+      expect(result.detail).toContain('not inside a git worktree');
+    } finally {
+      if (originalGlobalConfig === undefined) {
+        delete process.env.GIT_CONFIG_GLOBAL;
+      } else {
+        process.env.GIT_CONFIG_GLOBAL = originalGlobalConfig;
+      }
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });
 
 async function createPostureRepoFixture(): Promise<PostureRepoFixture> {

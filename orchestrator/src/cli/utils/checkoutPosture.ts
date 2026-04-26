@@ -1,4 +1,6 @@
 import { spawnSync } from 'node:child_process';
+import { existsSync, statSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 
 export type CheckoutPostureStatus = 'current' | 'stale' | 'ahead' | 'diverged' | 'unavailable';
 
@@ -38,6 +40,7 @@ export interface CheckoutPostureInspection {
 
 const BASE_REF = 'origin/main';
 const GIT_TIMEOUT_MS = 5000;
+const EMPTY_GLOBAL_GIT_CONFIG = process.platform === 'win32' ? 'NUL' : '/dev/null';
 const PRIMARY_POSTURE_REFERENCE_PATHS = [
   'docs/guides/codex-version-policy.md',
   'docs/codex-posture-matrix.json',
@@ -62,14 +65,15 @@ const POSTURE_REFERENCE_PATHS = [
 
 export function inspectCheckoutPosture(repoRoot: string): CheckoutPostureInspection {
   const repoCheck = runGit(repoRoot, ['rev-parse', '--is-inside-work-tree']);
-  if (!repoCheck.ok && !isNotGitWorktreeResult(repoCheck)) {
+  const worktreeProbe = classifyWorktreeProbe(repoRoot, repoCheck);
+  if (worktreeProbe === 'unavailable') {
     return unavailableInspection(
       repoRoot,
       `Unable to determine whether the current directory is inside a git worktree: ${repoCheck.stderr || repoCheck.error || 'unknown git error'}`,
       'unknown'
     );
   }
-  if (repoCheck.stdout.trim() !== 'true') {
+  if (worktreeProbe === 'outside') {
     return unavailableInspection(repoRoot, 'Current directory is not inside a git worktree.', 'unknown', undefined, false);
   }
 
@@ -388,8 +392,40 @@ function parseCommit(stdout: string): CheckoutPostureCommit | null {
   };
 }
 
-function isNotGitWorktreeResult(result: GitCommandResult): boolean {
-  return result.stderr.includes('not a git repository (or any of the parent directories)');
+function classifyWorktreeProbe(repoRoot: string, result: GitCommandResult): 'inside' | 'outside' | 'unavailable' {
+  if (result.ok) {
+    return result.stdout.trim() === 'true' ? 'inside' : 'outside';
+  }
+  if (!result.error && result.status === 128 && isExistingDirectory(repoRoot) && !hasDiscoverableGitMarker(repoRoot)) {
+    return 'outside';
+  }
+  return 'unavailable';
+}
+
+function hasDiscoverableGitMarker(repoRoot: string): boolean {
+  let current = resolve(repoRoot);
+  if (!isExistingDirectory(current)) {
+    return false;
+  }
+
+  for (;;) {
+    if (existsSync(join(current, '.git'))) {
+      return true;
+    }
+    const parent = dirname(current);
+    if (parent === current) {
+      return false;
+    }
+    current = parent;
+  }
+}
+
+function isExistingDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 function unavailableInspection(
@@ -447,6 +483,9 @@ function runGit(
     encoding: 'utf8',
     env: {
       ...process.env,
+      GIT_CONFIG_COUNT: '0',
+      GIT_CONFIG_GLOBAL: EMPTY_GLOBAL_GIT_CONFIG,
+      GIT_CONFIG_NOSYSTEM: '1',
       GIT_OPTIONAL_LOCKS: '0'
     },
     stdio: ['ignore', 'pipe', 'pipe'],
