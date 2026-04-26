@@ -153,7 +153,7 @@ function rateLimitFromHeaders(headers) {
     remaining: remainingRaw === null ? null : Number(remainingRaw),
     limit: limitRaw === null ? null : Number(limitRaw),
     reset_epoch_seconds: resetRaw === null ? null : Number(resetRaw),
-    uncertain: remainingRaw === null || Number.isNaN(Number(remainingRaw)) || Number(remainingRaw) <= 0
+    uncertain: remainingRaw === null || Number.isNaN(Number(remainingRaw))
   };
 }
 
@@ -357,7 +357,7 @@ function findTruthBlocker(upstreamTruth) {
   if (upstreamTruth.github.rate_limit?.uncertain) {
     return {
       state: 'blocked_rate_limit_uncertain',
-      reason: 'GitHub API rate-limit remaining header is missing, invalid, or exhausted.'
+      reason: 'GitHub API rate-limit remaining header is missing or invalid.'
     };
   }
   const githubStable = upstreamTruth.github.stable?.version ?? null;

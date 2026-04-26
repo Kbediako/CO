@@ -581,9 +581,13 @@ describe('codex CLI release detector', () => {
     expect(artifact.mutation_result.action).toBe('dry_run');
   });
 
-  it('fails closed when a required workflow pin surface has no versioned pin', async () => {
+  it('fails closed when a required test pin surface has no versioned pin', async () => {
     const repo = await writeFixtureRepo();
-    await writeFile(join(repo, '.github', 'workflows', 'core-lane.yml'), 'run: npm install --global @openai/codex\n', 'utf8');
+    await writeFile(
+      join(repo, 'tests', 'pack-smoke.spec.ts'),
+      "const marketplaceCodexInstallCommand = 'npm install --global @openai/codex';\n",
+      'utf8'
+    );
 
     const { artifact, exitCode } = await runCodexCliReleaseDetector({
       repoRoot: repo,
@@ -594,10 +598,48 @@ describe('codex CLI release detector', () => {
 
     expect(exitCode).toBe(2);
     expect(artifact.decision_state).toBe('blocked_current_truth_unavailable');
-    expect(artifact.blocker_reason).toContain('.github/workflows/core-lane.yml');
+    expect(artifact.blocker_reason).toContain('tests/pack-smoke.spec.ts');
     expect(artifact.current_co.missing_surfaces).toContainEqual({
-      path: '.github/workflows/core-lane.yml',
+      path: 'tests/pack-smoke.spec.ts',
       error: 'missing versioned @openai/codex install pin'
+    });
+  });
+
+  it('accepts complete GitHub truth when the successful response consumes the last rate-limit quota', async () => {
+    const repo = await writeFixtureRepo({ auditedStable: '0.125.0' });
+    const baseFetch = mockFetch({ stable: '0.126.0' });
+    const zeroRemainingFetch = async (url: string) => {
+      const response = await baseFetch(url);
+      if (!url.includes('api.github.com')) {
+        return response;
+      }
+      return {
+        ...response,
+        headers: {
+          get(name: string) {
+            const normalized = name.toLowerCase();
+            if (normalized === 'x-ratelimit-remaining') return '0';
+            if (normalized === 'x-ratelimit-limit') return '5000';
+            if (normalized === 'x-ratelimit-reset') return '1770000000';
+            return null;
+          }
+        }
+      };
+    };
+
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: repo,
+      artifactPath: 'out/detection.json',
+      fetchImpl: zeroRemainingFetch,
+      dryRun: true,
+      env: {}
+    });
+
+    expect(exitCode).toBe(0);
+    expect(artifact.decision_state).toBe('new_audit_required');
+    expect(artifact.upstream_truth.github.rate_limit).toMatchObject({
+      remaining: 0,
+      uncertain: false
     });
   });
 
