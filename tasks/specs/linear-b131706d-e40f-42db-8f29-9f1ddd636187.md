@@ -1,0 +1,65 @@
+---
+id: 20260426-linear-b131706d-e40f-42db-8f29-9f1ddd636187
+title: CO-392 live-started released-pending-reopen refresh
+relates_to: docs/PRD-linear-b131706d-e40f-42db-8f29-9f1ddd636187.md
+risk: high
+owners:
+  - Codex
+last_review: 2026-04-26
+---
+
+# TECH_SPEC - CO-392 live-started released-pending-reopen refresh
+
+## Summary
+- Objective: recover stale no-run released-pending-reopen provider intake claims when fresh live Linear truth says the same issue is `In Progress/started`.
+- Scope: provider issue handoff refresh/reconcile behavior, provider-intake metadata updates, normal launcher/requeue eligibility, CO STATUS/provider-intake projection consistency, focused regressions.
+- Constraints: preserve CO-193 Ready/unstarted reclaim boundaries, preserve CO-189 same-issue live-worker duplicate protection, and do not broaden into CO-391 installed status/projection timeout work.
+
+## Issue-Shaping Contract
+- User-request translation carried forward: `CO-379` showed a no-run `released` claim with `provider_issue_released_pending_reopen:provider_issue_released:not_active`, stale cached `Ready/unstarted`, and live `In Progress/started`; control-host refresh drained but left the stale claim hidden from active/running/admission truth.
+- Protected terms / exact artifact and surface names: `CO-379`, `provider-intake-state.json`, `released-pending-reopen`, `provider_issue_released_pending_reopen:provider_issue_released:not_active`, stale cached `Ready/unstarted`, live Linear `In Progress/started`, `POST /api/v1/refresh`, `CO STATUS`, `active_issue_identifiers`, `running_issue_identifiers`, `run_id=null`, `run_manifest_path=null`.
+- Nearby wrong interpretations to reject: not CO-193 Ready/unstarted reclaim, not CO STATUS display-only projection, not a Linear filter issue, not dirty workspace cleanup, not manual state deletion, not unbounded polling.
+- Explicit non-goals carried forward: no admission cap weakening, no duplicate same-issue workers, no broad CO-391 projection timeout repair, no release-detection automation scope.
+
+## Parity / Alignment Matrix
+
+| Surface | Current Truth | Reference Truth | Target Truth |
+| --- | --- | --- | --- |
+| Provider intake claim | The stale no-run claim keeps cached `Ready/unstarted` after live started truth. | Live issue-by-id or bounded poll truth is newer and started. | The claim records fresh started metadata and either launches/requeues normally or records a concrete skip/recovery reason. |
+| Refresh drain | Accepted refresh can complete without mutating the stale claim. | Refresh completion should mean retained claims were reconciled or skipped with explicit evidence. | Refresh cannot silently preserve the stale started claim shape. |
+| Admission/status | CO STATUS omits the issue while capacity is available. | Provider intake active/admission truth should match live started work after recovery. | Active/running/admission surfaces reflect the recovered claim or the actionable blocker. |
+| Adjacent invariants | CO-193, CO-238, CO-181, and CO-391 own nearby but distinct gaps. | Adjacent lanes keep their existing behavior and tests. | This lane only adds the started no-run released-pending-reopen variant. |
+
+## Readiness Gate
+- Not done if: stale no-run released-pending-reopen claims keep `Ready/unstarted` after live started truth; refresh drains silently; CO STATUS hides the recovered issue; implementation duplicates same-issue workers; CO-193 or CO-189 regress.
+- Pre-implementation issue-quality review evidence: parent reviewed the CO-392 issue body and live workflow context, confirmed the issue was already `In Progress/started`, and kept scope to the no-run live-started released-pending-reopen refresh gap.
+- Safeguard ownership split: parent owned docs, implementation, validation, Linear workpad, PR lifecycle, and handoff; same-issue child lane `co379-live-started-regression` completed in `tests` scope and was rejected because its patch depended on fresh discovery returning already-started work instead of the direct issue-by-id recovery path required here.
+
+## Technical Requirements
+- Functional requirements:
+  - Detect no-run released claims whose reason starts with `provider_issue_released_pending_reopen:` and whose cached metadata is not already started.
+  - Spend at most one bounded direct issue-by-id probe per deferred refresh for that no-run pending-reopen shape when provider capacity is available.
+  - Refresh cached issue fields when live issue-by-id truth is newer and started.
+  - When live truth is started/eligible and the claim has no active run identity, use existing provider launch/requeue path or emit an explicit safe skip reason.
+  - Preserve same-issue live-worker and unreadable occupancy vetoes before launching.
+  - Preserve Ready/unstarted CO-193 behavior and terminal/reopened CO-238 behavior.
+  - Ensure provider-intake summary and CO STATUS selected projection do not continue to surface stale `Ready/unstarted` truth after recovery.
+- Non-functional requirements (performance, reliability, security): keep retained-claim issue-by-id reads bounded; no schema migration; no auth/secrets changes; retain audit evidence in provider intake.
+- Interfaces / contracts: `createProviderIssueHandoffService.refresh()`, released-claim reconcile helpers, `ProviderIntakeClaimRecord`, `buildProviderIntakeSummary()`, selected-run compatibility projection, `POST /api/v1/refresh`.
+
+## Architecture & Data
+- Architecture / design adjustments: add the narrow released-pending-reopen live-started branch to the existing refresh/reconcile flow so a no-run stale cached claim can perform one direct issue-by-id refresh before fresh discovery/status selection, while still respecting normal dispatch caps and same-issue run/occupancy vetoes.
+- Data model changes / migrations: no schema change; update existing issue metadata, state, reason, run identity, and retry fields through normal `upsertProviderIntakeClaim`.
+- External dependencies / integrations: existing Linear issue-by-id resolver and provider launcher; no new external service.
+
+## Validation Plan
+- Tests / checks: add a focused CO-379-shape regression in `ProviderIssueHandoffRefreshSerialization.test.ts`; run focused provider handoff tests; run adjacent CO-193 and CO-189 regression coverage; run build/lint/full test/docs gates before handoff.
+- Rollout verification: workpad records docs-review, focused tests, full gates, standalone review telemetry, and elegance review.
+- Monitoring / alerts: future incidents should show either refreshed started claim metadata, a launched/requeued worker, or a concrete skip reason instead of stale released `Ready/unstarted`.
+
+## Open Questions
+- None blocking.
+
+## Approvals
+- Reviewer: parent provider worker.
+- Date: 2026-04-26.
