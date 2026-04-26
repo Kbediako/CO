@@ -2155,6 +2155,130 @@ describe('runProviderIssueHandoffRefresh', () => {
     });
   });
 
+  it('updates live-started no-run pending-reopen metadata when state capacity is capped', async () => {
+    const { root, paths } = await createHostPaths();
+    const activePaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'linear-lin-active-live-started-cap'
+      },
+      'run-active-live-started-cap'
+    );
+    await mkdir(activePaths.runDir, { recursive: true });
+    await writeFile(
+      activePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-active-live-started-cap',
+        task_id: 'linear-lin-active-live-started-cap',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-active-live-started-cap',
+        issue_identifier: 'CO-184',
+        issue_updated_at: '2026-04-15T01:17:00.000Z',
+        updated_at: '2026-04-15T01:17:30.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-active-live-started-cap',
+      issue_id: 'lin-active-live-started-cap',
+      issue_identifier: 'CO-184',
+      issue_title: 'Active started capacity occupant',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T01:17:00.000Z',
+      task_id: 'linear-lin-active-live-started-cap',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_handoff_owned',
+      accepted_at: '2026-04-15T01:17:00.000Z',
+      updated_at: '2026-04-15T01:17:30.000Z',
+      last_delivery_id: 'delivery-active-live-started-cap',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_686_220_000,
+      run_id: 'run-active-live-started-cap',
+      run_manifest_path: activePaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+    pushCo185ReleasedPendingClaim(state, '', {
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T01:18:00.000Z',
+      run_id: null,
+      run_manifest_path: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-185-should-not-launch-while-capped',
+        manifestPath: '/tmp/provider-run/co-185-should-not-launch-while-capped-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-185',
+        identifier: 'CO-185',
+        title: 'Provider helper constraints',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-04-15T01:18:56.003Z'
+      })
+    }));
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: []
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 3,
+          max_concurrent_agents_by_state: {
+            'In Progress': 1
+          }
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-185'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.provider_key === 'linear:lin-issue-185')).toMatchObject({
+      state: 'accepted',
+      reason: 'provider_issue_refresh_start_blocked:max_concurrency',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T01:18:56.003Z',
+      task_id: 'linear-lin-issue-185',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
   it('blocks live-start no-run probes when same-issue occupancy is unreadable', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-15T01:20:00.000Z'));

@@ -5199,6 +5199,25 @@ export function createProviderIssueHandoffService(
                 )
               )
             ) {
+              if (
+                shouldProbeNoRunPendingReopenLiveStartedTruth &&
+                isProviderStartedWorkerTrackedIssue(resolution.trackedIssue)
+              ) {
+                const handoffResult = await launchStartForTrackedIssue({
+                  claim,
+                  trackedIssue: resolution.trackedIssue,
+                  reason: 'provider_issue_refresh_start_launched',
+                  previousRun: latestRun
+                });
+                if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
+                  noteOccupiedPollDispatchSlot(
+                    resolveClaimPollDispatchSlotKey(claimProviderKey, handoffResult.claim),
+                    claimProviderKey,
+                    resolution.trackedIssue
+                  );
+                }
+                continue;
+              }
               await refreshRetainedReleasedNotActiveClaimMetadata({
                 claim,
                 releaseRun,

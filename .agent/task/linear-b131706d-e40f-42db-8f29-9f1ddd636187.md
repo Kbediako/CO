@@ -29,15 +29,15 @@
 ## Validation
 - [x] `node scripts/delegation-guard.mjs` passed with 2 subagent manifests on 2026-04-26.
 - [x] `node scripts/spec-guard.mjs --dry-run` passed on 2026-04-26.
-- [x] Focused provider handoff regression(s). Evidence: `npm run test:core -- orchestrator/tests/ProviderIssueHandoffRefreshSerialization.test.ts` passed 36 tests on 2026-04-26.
-- [x] Adjacent CO-193 / CO-189 focused coverage passed 2 selected tests on 2026-04-26.
-- [x] `npm run build` passed on 2026-04-26.
-- [x] `npm run lint` passed on 2026-04-26 with 3 pre-existing warnings in `orchestrator/tests/DelegationMcpHealth.test.ts`.
-- [x] `npm run test` passed on 2026-04-26: 355 files, 4903 tests.
-- [x] `npm run docs:check` passed on 2026-04-26.
-- [x] `npm run docs:freshness` passed on 2026-04-26: 4809 docs, 4812 registry entries.
-- [x] `npm run repo:stewardship` passed on 2026-04-26: 5926 tracked files, 0 action-required.
-- [x] `node scripts/diff-budget.mjs` passed on 2026-04-26: files 9/25, lines 543/1200.
+- [x] Focused provider handoff regression(s). Evidence: `npm run test:core -- orchestrator/tests/ProviderIssueHandoffRefreshSerialization.test.ts` passed 37 tests on 2026-04-26 after the capped-admission fix.
+- [x] Adjacent CO-193 / CO-189 focused coverage passed 2 selected tests on 2026-04-26 after the capped-admission fix.
+- [x] `npm run build` passed on 2026-04-26 after the capped-admission fix.
+- [x] `npm run lint` passed on 2026-04-26 after the capped-admission fix with 3 pre-existing warnings in `orchestrator/tests/DelegationMcpHealth.test.ts`.
+- [x] `npm run test` passed on 2026-04-26 after the capped-admission fix: 355 files, 4920 tests.
+- [x] `npm run docs:check` passed on 2026-04-26 after the capped-admission fix.
+- [x] `npm run docs:freshness` passed on 2026-04-26 after the capped-admission fix: 4815 docs, 4818 registry entries.
+- [x] `npm run repo:stewardship` passed on 2026-04-26 after the capped-admission fix: 5938 tracked files, 0 action-required.
+- [x] `node scripts/diff-budget.mjs` passed on 2026-04-26 after the capped-admission fix: working-tree files 3/25, lines 145/1200; advisory stacked aggregate files 9/25, lines 693/1200.
 - [ ] Manifest-backed forced standalone review
 - [ ] Explicit elegance/minimality pass
 - [ ] PR attach and ready-review drain before review transition
@@ -48,6 +48,8 @@
 - 2026-04-26: Focused `ProviderIssueHandoffRefreshSerialization.test.ts` passed with the CO-379-shape regression.
 - 2026-04-26: Docs-review surfaced a high-signal P1 that the live-start probe could bypass same-issue unreadable/foreign occupancy. Parent fixed the probe to skip occupied provider keys and added a regression where unreadable same-issue occupancy blocks the direct probe while capacity remains available.
 - 2026-04-26: Core validation reran after the P1 fix: focused refresh suite, adjacent CO-193/CO-189 tests, build, lint, full test, docs gates, repo stewardship, and diff budget all passed.
+- 2026-04-26: Forced standalone review surfaced a P2 capped-admission gap: a successful live-start probe followed by state-specific capacity exhaustion could preserve stale pending-reopen metadata. Parent fixed the capped path to route live-started no-run pending-reopen claims through normal admission for both special-probe and normally budgeted direct-read paths, which writes live metadata plus `provider_issue_refresh_start_blocked:max_concurrency`, and added a state-cap regression.
+- 2026-04-26: Full validation reran after the capped-admission fix: focused refresh suite, adjacent CO-193/CO-189 tests, delegation/spec guards, build, lint, full test, docs gates, repo stewardship, and diff budget all passed.
 
 ## Notes
 - Do not hand-edit or delete `provider-intake-state.json` as the fix.
