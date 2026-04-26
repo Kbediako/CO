@@ -11,6 +11,10 @@ on:
         default: false
         type: boolean
 
+concurrency:
+  group: codex-cli-release-detector
+  cancel-in-progress: false
+
 jobs:
   detect:
     name: Detect upstream Codex CLI release

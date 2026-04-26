@@ -287,6 +287,67 @@ function paginatedGithubFetch() {
   return { fetchImpl, calls };
 }
 
+function laterPageHigherStableFetch() {
+  const calls: string[] = [];
+  const firstPageStable = '0.125.1';
+  const latestStable = '0.126.0';
+  const pageOne = [
+    {
+      tag_name: `rust-v${firstPageStable}`,
+      prerelease: false,
+      published_at: '2026-04-26T00:00:00Z',
+      html_url: `https://github.com/openai/codex/releases/tag/rust-v${firstPageStable}`
+    },
+    ...Array.from({ length: 99 }, (_, index) => ({
+      tag_name: `rust-v0.126.0-alpha.${99 - index}`,
+      prerelease: true,
+      published_at: `2026-04-26T01:${String(index).padStart(2, '0')}:00Z`,
+      html_url: `https://github.com/openai/codex/releases/tag/rust-v0.126.0-alpha.${99 - index}`
+    }))
+  ];
+  const pageTwo = [
+    {
+      tag_name: `rust-v${latestStable}`,
+      prerelease: false,
+      published_at: '2026-04-26T02:00:00Z',
+      html_url: `https://github.com/openai/codex/releases/tag/rust-v${latestStable}`
+    }
+  ];
+  const npmMetadata = {
+    name: '@openai/codex',
+    'dist-tags': {
+      latest: latestStable
+    },
+    time: {
+      [latestStable]: '2026-04-26T02:01:00.000Z',
+      modified: '2026-04-26T02:01:00.000Z'
+    }
+  };
+  const fetchImpl = async (url: string) => {
+    calls.push(url);
+    return {
+      ok: true,
+      status: 200,
+      headers: {
+        get(name: string) {
+          const normalized = name.toLowerCase();
+          if (normalized === 'x-ratelimit-remaining') return '4999';
+          if (normalized === 'x-ratelimit-limit') return '5000';
+          if (normalized === 'x-ratelimit-reset') return '1770000000';
+          return null;
+        }
+      },
+      async json() {
+        if (!url.includes('api.github.com')) {
+          return npmMetadata;
+        }
+        return url.includes('page=2') ? pageTwo : pageOne;
+      }
+    };
+  };
+  return { fetchImpl, calls };
+}
+
 function createLinearRunner(action = 'created') {
   const calls: string[][] = [];
   const descriptions: string[] = [];
@@ -499,6 +560,24 @@ describe('codex CLI release detector', () => {
     expect(calls.some((url) => url.includes('page=2'))).toBe(true);
   });
 
+  it('continues GitHub pagination when the first page already has a lower stable release', async () => {
+    const repo = await writeFixtureRepo();
+    const { fetchImpl, calls } = laterPageHigherStableFetch();
+
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: repo,
+      artifactPath: 'out/detection.json',
+      fetchImpl,
+      dryRun: true,
+      env: {}
+    });
+
+    expect(exitCode).toBe(0);
+    expect(artifact.decision_state).toBe('new_audit_required');
+    expect(artifact.upstream_truth.github.stable.version).toBe('0.126.0');
+    expect(calls.some((url) => url.includes('page=2'))).toBe(true);
+  });
+
   it('fails closed when Linear auth is missing for a required mutation', async () => {
     const repo = await writeFixtureRepo();
 
@@ -574,12 +653,17 @@ describe('codex CLI release detector', () => {
         workflow_dispatch?: { inputs?: Record<string, { type?: string; default?: boolean }> };
       };
       jobs?: Record<string, { steps?: Array<{ name?: string; env?: Record<string, string>; run?: string }> }>;
+      concurrency?: { group?: string; 'cancel-in-progress'?: boolean };
     };
 
     expect(workflow.on?.schedule?.[0]?.cron).toBe('37 8 * * *');
     expect(workflow.on?.workflow_dispatch?.inputs?.dry_run).toMatchObject({
       type: 'boolean',
       default: false
+    });
+    expect(workflow.concurrency).toMatchObject({
+      group: 'codex-cli-release-detector',
+      'cancel-in-progress': false
     });
     const detectStep = workflow.jobs?.detect?.steps?.find((step) => step.name === 'Detect upstream release truth');
     expect(detectStep?.env).toMatchObject({

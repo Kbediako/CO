@@ -193,8 +193,7 @@ async function fetchGithubReleases(fetchImpl, githubRepo, headers) {
     const pageReleases = Array.isArray(result.json) ? result.json : [];
     releases.push(...pageReleases);
 
-    const classified = classifyGithubReleases(releases);
-    if (classified.stable || pageReleases.length < perPage) {
+    if (pageReleases.length < perPage) {
       return {
         releases,
         rate_limit: mergeRateLimits(rateLimits)
