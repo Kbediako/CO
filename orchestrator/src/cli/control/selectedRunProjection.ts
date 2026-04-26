@@ -1885,7 +1885,7 @@ function resolveProviderLinearWorkerRunArtifactReconciliation(
     return null;
   }
   const claim = findProviderLinearWorkerClaimForContext(providerIntakeState, context);
-  if (claim && isActiveProviderIntakeClaim(claim)) {
+  if (claim && isActiveProviderLinearWorkerReconciliationClaim(claim)) {
     return null;
   }
   const replacementRun = findNewerTerminalProviderLinearWorkerContext(allContexts, context);
@@ -1974,6 +1974,31 @@ function resolveProviderLinearWorkerRunArtifactReconciliation(
         }
       : null
   };
+}
+
+function isActiveProviderLinearWorkerReconciliationClaim(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'reason' | 'issue_state' | 'issue_state_type'>
+): boolean {
+  switch (claim.state) {
+    case 'accepted':
+    case 'starting':
+    case 'running':
+    case 'resuming':
+    case 'resumable':
+      return true;
+    case 'handoff_failed':
+      if (claim.reason === 'provider_issue_merge_closeout_action_required') {
+        return false;
+      }
+      return !isTerminalProviderLinearIssueState(claim.issue_state, claim.issue_state_type);
+    case 'released':
+    case 'completed':
+    case 'stale':
+    case 'duplicate':
+    case 'ignored':
+    default:
+      return false;
+  }
 }
 
 function applyProviderLinearWorkerRunArtifactReconciliation(

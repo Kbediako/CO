@@ -6923,6 +6923,95 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('reconciles retry-queued terminal provider claims as stale run artifacts', async () => {
+    const { root, paths } = await createHostPaths();
+    const providerEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-done'
+    };
+    const stalePaths = resolveRunPaths(providerEnv, 'run-stale-active');
+    await mkdir(stalePaths.runDir, { recursive: true });
+    await writeFile(
+      stalePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-stale-active',
+        task_id: 'linear-lin-done',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-done',
+        issue_identifier: 'CO-DONE',
+        started_at: '2026-03-20T00:55:00.000Z',
+        updated_at: '2026-03-20T01:00:00.000Z',
+        summary: 'stale active-looking provider run',
+        commands: []
+      }),
+      'utf8'
+    );
+    const baseClaim = createProviderIntakeState(stalePaths.manifestPath).claims[0]!;
+    const providerIntakeState: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-03-20T01:10:00.000Z',
+      rehydrated_at: '2026-03-20T01:10:00.000Z',
+      latest_provider_key: 'linear:lin-done',
+      latest_reason: 'provider_issue_completed',
+      claims: [
+        {
+          ...baseClaim,
+          provider_key: 'linear:lin-done',
+          issue_id: 'lin-done',
+          issue_identifier: 'CO-DONE',
+          issue_title: 'Done issue',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          task_id: 'linear-lin-done',
+          state: 'completed',
+          reason: 'provider_issue_completed',
+          updated_at: '2026-03-20T01:10:00.000Z',
+          run_id: 'run-stale-active',
+          run_manifest_path: stalePaths.manifestPath,
+          retry_queued: true,
+          retry_attempt: 1,
+          retry_due_at: '2026-03-20T01:15:00.000Z',
+          retry_error: 'legacy retry marker should not keep completed claim active'
+        }
+      ]
+    };
+
+    const discovery = await discoverCompatibilityCollectionContexts(
+      createProjectionContext(paths, providerIntakeState)
+    );
+
+    expect(discovery.running.map((entry) => entry.runId)).not.toContain('run-stale-active');
+    const reconciled = discovery.all.find((entry) => entry.runId === 'run-stale-active');
+    expect(reconciled).toMatchObject({
+      rawStatus: 'succeeded',
+      statusReason: 'provider_claim_completed',
+      summary: expect.stringContaining('provider claim is completed')
+    });
+    const reconciliation = JSON.parse(
+      await readFile(join(stalePaths.runDir, 'provider-linear-worker-reconciliation.json'), 'utf8')
+    ) as Record<string, unknown>;
+    expect(reconciliation).toMatchObject({
+      kind: 'provider-linear-worker-run-artifact-reconciliation',
+      status: 'reconciled',
+      reconciled_status: 'succeeded',
+      reason: 'provider_claim_completed',
+      manifest: {
+        run_id: 'run-stale-active',
+        status: 'in_progress'
+      },
+      provider_claim: {
+        state: 'completed',
+        reason: 'provider_issue_completed',
+        run_id: 'run-stale-active'
+      },
+      recorded_at: '2026-03-20T01:10:00.000Z'
+    });
+  });
+
   it('reconciles todo-blocked released claims as stale provider artifacts', async () => {
     const { root, paths } = await createHostPaths();
     const providerEnv = {
