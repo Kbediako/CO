@@ -70,6 +70,7 @@ const PROVIDER_LINEAR_CHILD_PIPELINE_IDS = new Set([
 const PROVIDER_COMPATIBILITY_FULL_RECONCILIATION_CLAIM_LIMIT = 16;
 const PROVIDER_COMPATIBILITY_SYNTHETIC_LOCAL_SCAN_MANIFEST_LIMIT = 64;
 const PROVIDER_COMPATIBILITY_SYNTHETIC_LOCAL_SCAN_TASK_LIMIT = 64;
+const PROVIDER_COMPATIBILITY_SYNTHETIC_LOCAL_SCAN_TASK_RECENCY_SAMPLE_LIMIT = 128;
 const PROVIDER_COMPATIBILITY_SYNTHETIC_LOCAL_SCAN_RUNS_PER_TASK = 2;
 
 interface SyntheticTaskLocalManifestCandidate {
@@ -451,7 +452,7 @@ async function selectRecentSyntheticTaskEntries(
   taskEntries: string[],
   providerIntakeRunEntries: Map<string, Set<string>>
 ): Promise<string[]> {
-  const withRecency = await Promise.all(
+  const withCheapRecency = await Promise.all(
     taskEntries.map(async (taskEntry) => ({
       taskEntry,
       recencyAt: await readSyntheticTaskEntryLatestCheapRecencyIso(
@@ -461,15 +462,47 @@ async function selectRecentSyntheticTaskEntries(
       )
     }))
   );
-  return withRecency
-    .sort((left, right) => {
-      const recencyComparison = compareIsoTimestamp(right.recencyAt, left.recencyAt);
-      return recencyComparison !== 0
-        ? recencyComparison
-        : right.taskEntry.localeCompare(left.taskEntry);
-    })
+  const manifestRankCandidates = withCheapRecency
+    .sort(compareSyntheticTaskEntryRecencyDesc)
+    .slice(0, PROVIDER_COMPATIBILITY_SYNTHETIC_LOCAL_SCAN_TASK_RECENCY_SAMPLE_LIMIT);
+  const withManifestRecency = await Promise.all(
+    manifestRankCandidates.map(async (entry) => ({
+      taskEntry: entry.taskEntry,
+      recencyAt: selectLatestIsoTimestamp(
+        entry.recencyAt,
+        await readSyntheticTaskEntryLatestManifestRecencyIso(
+          runsRoot,
+          entry.taskEntry,
+          providerIntakeRunEntries.get(entry.taskEntry)
+        )
+      )
+    }))
+  );
+  return withManifestRecency
+    .sort(compareSyntheticTaskEntryRecencyDesc)
     .slice(0, PROVIDER_COMPATIBILITY_SYNTHETIC_LOCAL_SCAN_TASK_LIMIT)
     .map((entry) => entry.taskEntry);
+}
+
+async function readSyntheticTaskEntryLatestManifestRecencyIso(
+  runsRoot: string,
+  taskEntry: string,
+  skippedRunEntries?: Set<string>
+): Promise<string | null> {
+  const cliRoot = join(runsRoot, taskEntry, 'cli');
+  const runEntries = (await readSyntheticTaskRunEntryCheapRecencies(cliRoot))
+    .filter(({ runEntry }) => !skippedRunEntries?.has(runEntry))
+    .sort(compareSyntheticRunEntryRecencyDesc)
+    .slice(0, PROVIDER_COMPATIBILITY_SYNTHETIC_LOCAL_SCAN_RUNS_PER_TASK);
+  const manifestRecencies = await Promise.all(
+    runEntries.map(({ runEntry }) =>
+      readManifestRecencyIso(join(cliRoot, runEntry, 'manifest.json'))
+    )
+  );
+  return manifestRecencies.reduce<string | null>(
+    (latest, recencyAt) => selectLatestIsoTimestamp(latest, recencyAt),
+    null
+  );
 }
 
 async function readSyntheticTaskLocalManifestCandidates(
@@ -556,6 +589,14 @@ function compareSyntheticRunEntryRecencyDesc(
 ): number {
   const recencyComparison = compareIsoTimestamp(right.recencyAt, left.recencyAt);
   return recencyComparison !== 0 ? recencyComparison : right.runEntry.localeCompare(left.runEntry);
+}
+
+function compareSyntheticTaskEntryRecencyDesc(
+  left: { taskEntry: string; recencyAt: string | null },
+  right: { taskEntry: string; recencyAt: string | null }
+): number {
+  const recencyComparison = compareIsoTimestamp(right.recencyAt, left.recencyAt);
+  return recencyComparison !== 0 ? recencyComparison : right.taskEntry.localeCompare(left.taskEntry);
 }
 
 function compareSyntheticTaskLocalManifestCandidateRecencyDesc(
