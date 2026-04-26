@@ -2416,6 +2416,74 @@ describe('runProviderIssueHandoffRefresh', () => {
     });
   });
 
+  it('preserves fresh-discovery slots when live-started pending-reopen truth is already in the poll snapshot', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    pushCo185ReleasedPendingClaim(state, '', {
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T01:18:00.000Z',
+      run_id: null,
+      run_manifest_path: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-185-should-not-use-reserved-poll-snapshot-slot',
+        manifestPath: '/tmp/provider-run/co-185-should-not-use-reserved-poll-snapshot-slot.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async (input: { issueId: string }) => {
+      throw new Error(`unexpected direct issue refresh for ${input.issueId}`);
+    });
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: []
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-issue-185',
+          identifier: 'CO-185',
+          title: 'Provider helper constraints',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-15T01:18:56.003Z'
+        })
+      ],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.provider_key === 'linear:lin-issue-185')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T01:18:56.003Z',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
   it('blocks live-start no-run probes when same-issue occupancy is unreadable', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-15T01:20:00.000Z'));

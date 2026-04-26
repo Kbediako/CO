@@ -4853,8 +4853,9 @@ export function createProviderIssueHandoffService(
             !shouldBlockPendingReopenFreshDiscovery;
           const allowDirectIssueById =
             normallyAllowDirectIssueById || canUseNoRunPendingReopenLiveStartedProbe;
-          const usedNoRunPendingReopenLiveStartedProbe =
+          const shouldCountNoRunPendingReopenLiveStartedProbe =
             !normallyAllowDirectIssueById && canUseNoRunPendingReopenLiveStartedProbe;
+          let usedNoRunPendingReopenLiveStartedProbe = false;
           const resolution = await resolveRefreshTrackedIssueResolution({
             claim,
             trackedIssuesByKey,
@@ -4870,7 +4871,8 @@ export function createProviderIssueHandoffService(
               if (boundPreDiscoveryIssueByIdReads && activeRun === null) {
                 preDiscoveryNonActiveIssueByIdReads += 1;
               }
-              if (usedNoRunPendingReopenLiveStartedProbe) {
+              if (shouldCountNoRunPendingReopenLiveStartedProbe) {
+                usedNoRunPendingReopenLiveStartedProbe = true;
                 noRunPendingReopenLiveStartedProbeReads += 1;
               }
               recordRefreshProgress('refresh:claim_issue_by_id_reconcile', {

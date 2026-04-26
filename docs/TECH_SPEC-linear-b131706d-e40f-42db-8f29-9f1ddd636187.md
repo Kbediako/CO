@@ -22,6 +22,7 @@ last_review: 2026-04-26
 - Explicit non-goals carried forward: no admission cap weakening, no duplicate same-issue workers, no broad CO-391 projection timeout repair, no release-detection automation scope.
 
 ## Parity / Alignment Matrix
+
 | Surface | Current Truth | Reference Truth | Target Truth |
 | --- | --- | --- | --- |
 | Provider intake claim | The stale no-run claim keeps cached `Ready/unstarted` after live started truth. | Live issue-by-id or bounded poll truth is newer and started. | The claim records fresh started metadata and either launches/requeues normally or records a concrete skip/recovery reason. |
