@@ -28,7 +28,7 @@
 
 ## Validation
 - [x] Metadata regression proves every retained provider workflow fallback has owner, trigger, introduced date, review date, maximum lifetime, removal condition, and validation (`npm run test -- ProviderIssueHandoff.test.ts`, 376 passed).
-- [x] Focused provider workflow tests cover fallback activation and non-activation paths (`npm run test -- ProviderIssueHandoff.test.ts`, 376 passed).
+- [x] Existing ProviderIssueHandoff behavior coverage, rerun by the focused provider workflow command, covers fallback activation and non-activation paths (`npm run test -- ProviderIssueHandoff.test.ts`, 376 passed).
 - [x] `node scripts/spec-guard.mjs --dry-run`.
 - [x] `npm run build`.
 - [x] `npm run lint` (passed with existing warnings in `orchestrator/tests/DelegationMcpHealth.test.ts`).

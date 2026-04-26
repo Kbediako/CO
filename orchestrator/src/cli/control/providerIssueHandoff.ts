@@ -134,7 +134,7 @@ const PROVIDER_WORKFLOW_FALLBACK_EXPIRY_RECORDS: readonly ProviderWorkflowFallba
       'Remove after provider issue current-state authority owns canonical task identity for fresh starts, retries, and rehydrated claims without relying on provider-id fallback mapping.',
     validation: [
       'ProviderIssueHandoff.test.ts records bounded expiry metadata for provider workflow fallback paths',
-      'ProviderIssueHandoff.test.ts provider_issue_start_launched coverage keeps provider-id fallback activation observable'
+      'Existing ProviderIssueHandoff.test.ts provider_issue_start_launched coverage keeps provider-id fallback activation observable'
     ],
     large_refactor: 'required'
   },
@@ -153,7 +153,7 @@ const PROVIDER_WORKFLOW_FALLBACK_EXPIRY_RECORDS: readonly ProviderWorkflowFallba
       'Remove after provider issue current-state authority resolves retained claim, autopilot, fresh Linear, and run-manifest state through one authoritative decision path.',
     validation: [
       'ProviderIssueHandoff.test.ts records bounded expiry metadata for provider workflow fallback paths',
-      'ProviderIssueHandoff.test.ts retained released claim coverage validates activation and non-activation paths'
+      'Existing ProviderIssueHandoff.test.ts retained released claim coverage validates activation and non-activation paths'
     ],
     large_refactor: 'required'
   }

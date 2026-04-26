@@ -64,8 +64,8 @@
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `provider workflow` | provider-id mapping fallback (`mapping_source: provider_id_fallback`, `buildProviderFallbackTaskId`) | `expire fallback` | `CO-400` | Provider issue start/retry derives task identity from provider issue id instead of an explicit authoritative mapping record. | 2026-03-19 | 2026-05-10 | 2026-05-26 | Provider issue task identity is either renamed as a supported contract or replaced by a canonical mapping source with persisted-state compatibility handled by the large refactor. | Metadata regression plus provider start activation tests that assert `linear-<issue-id>` task ids and non-activation capacity paths. |
-| `provider workflow` | retained-claim/autopilot fallback for cached/synthetic current state | `expire fallback` | `CO-400` | Released or retained claims use cached claim state, retained run identity/proof, or autopilot/refetch fallback when live issue truth is deferred, unavailable, or stale. | 2026-03-20 | 2026-05-10 | 2026-05-26 | One provider issue current-state authority order replaces cached/synthetic arbitration while preserving fail-closed retained-claim safety. | Focused retained-claim activation/non-activation tests covering reclaim, unresolved retained run identity, completed blockers, pending reopen, and live proof. |
+| `provider workflow` | provider-id mapping fallback (`mapping_source: provider_id_fallback`, `buildProviderFallbackTaskId`) | `expire fallback` | `CO-400` | Provider issue start/retry derives task identity from provider issue id instead of an explicit authoritative mapping record. | 2026-03-19 | 2026-05-10 | 2026-05-26 | Provider issue task identity is either renamed as a supported contract or replaced by a canonical mapping source with persisted-state compatibility handled by the large refactor. | Metadata regression plus existing provider start activation tests that assert `linear-<issue-id>` task ids and non-activation capacity paths. |
+| `provider workflow` | retained-claim/autopilot fallback for cached/synthetic current state | `expire fallback` | `CO-400` | Released or retained claims use cached claim state, retained run identity/proof, or autopilot/refetch fallback when live issue truth is deferred, unavailable, or stale. | 2026-03-20 | 2026-05-10 | 2026-05-26 | One provider issue current-state authority order replaces cached/synthetic arbitration while preserving fail-closed retained-claim safety. | Metadata regression plus existing retained-claim activation/non-activation tests covering reclaim, unresolved retained run identity, completed blockers, pending reopen, and live proof. |
 
 ## Parity / Alignment Matrix
 - Current truth: provider workflow relies on provider-id fallback mapping and multiple retained-claim/autopilot fallback branches to decide task identity and current issue state.
@@ -76,7 +76,7 @@
 ## Validation Plan
 - Docs-first packet and registry mirrors parse and reference the correct TECH_SPEC.
 - Focused metadata regression proves every provider workflow fallback record carries owner, trigger, review date, maximum lifetime, removal condition, and validation.
-- Focused provider workflow tests cover fallback activation and non-activation paths.
+- Existing ProviderIssueHandoff behavior coverage, rerun by the focused provider workflow command, covers fallback activation and non-activation paths.
 - Relevant docs gates pass before review handoff.
 - Standalone review and elegance pass run before PR review transition.
 

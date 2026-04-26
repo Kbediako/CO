@@ -19,7 +19,7 @@ This mirror points to the canonical task spec at `tasks/specs/linear-fb31f0d5-56
   - provider-id mapping fallback (`provider_id_fallback` and `buildProviderFallbackTaskId`)
   - retained-claim/autopilot fallback paths that arbitrate current state through cached claim state, retained run identity/proof, or deferred fresh discovery
 - Use `CO-400` as the larger provider issue current-state authority owner.
-- Add focused tests that assert the metadata contract and preserve activation/non-activation behavior.
+- Add a focused metadata regression and rerun existing ProviderIssueHandoff behavior tests that preserve activation/non-activation behavior.
 
 ## Protected Surfaces
 - `provider workflow`
@@ -33,7 +33,7 @@ This mirror points to the canonical task spec at `tasks/specs/linear-fb31f0d5-56
 - Maximum lifetime: `2026-05-26`.
 - Owner: `CO-400` for removal/consolidation after CO-394 lands the expiry metadata.
 - Removal condition: one provider issue current-state authority order or supported mapping contract removes the need for cached/synthetic fallback arbitration.
-- Validation: metadata regression plus focused provider workflow activation/non-activation tests.
+- Validation: metadata regression plus existing provider workflow activation/non-activation tests in `ProviderIssueHandoff.test.ts`.
 
 ## Implementation Boundaries
 - Allowed:
@@ -48,9 +48,9 @@ This mirror points to the canonical task spec at `tasks/specs/linear-fb31f0d5-56
 
 ## Validation Contract
 - Focused tests:
-  - provider workflow expiry registry contains required fields for every retained path
-  - provider-id mapping activation still records the expected fallback task id and mapping source
-  - retained-claim non-activation fail-closed paths remain intact
+  - new metadata regression proves the provider workflow expiry registry contains required fields for every retained path
+  - existing provider-id mapping activation coverage still records the expected fallback task id and mapping source
+  - existing retained-claim non-activation coverage keeps fail-closed paths intact
 - Gates:
   - `node scripts/spec-guard.mjs --dry-run`
   - focused provider workflow test command
