@@ -86,15 +86,47 @@ function buildCompatibilitySource(
   };
 }
 
+function buildControlHostPresenterContext() {
+  return {
+    controlStore: { snapshot: () => CONTROL_STATE },
+    paths: {
+      manifestPath: '/repo/.runs/local-mcp/cli/control-host/manifest.json',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      logPath: '/repo/.runs/local-mcp/cli/control-host/log.txt'
+    },
+    readCompatibilityProjection: async () => ({
+      running: [],
+      retrying: [],
+      codexTotals: { input_tokens: 0, output_tokens: 0, total_tokens: 0, seconds_running: 0 },
+      rateLimits: null,
+      selected: null,
+      dispatchPilot: null,
+      tracked: null
+    })
+  };
+}
+
+async function readDisabledDispatchEvaluation() {
+  return {
+    issueIdentifier: null,
+    evaluation: {
+      summary: {
+        status: 'disabled', reason: 'pilot_disabled_default_off', source_status: 'disabled',
+        advisory_only: true,
+        source_setup: null
+      },
+      recommendation: null,
+      failure: null
+    }
+  };
+}
+
 describe('ObservabilityApiController', () => {
   it('resolves api routes and reserves dispatch from issue matching', () => {
     expect(resolveObservabilityApiRoute('/ui/data.json')).toEqual({ kind: 'none' });
     expect(resolveObservabilityApiRoute('/api/v1/state')).toEqual({ kind: 'state' });
     expect(resolveObservabilityApiRoute('/api/v1/refresh')).toEqual({ kind: 'refresh' });
     expect(resolveObservabilityApiRoute('/api/v1/dispatch')).toEqual({ kind: 'dispatch' });
-    expect(resolveObservabilityApiRoute('/api/v1/provider-worker/recover')).toEqual({
-      kind: 'provider_worker_recover'
-    });
     expect(resolveObservabilityApiRoute('/api/v1/%64ispatch')).toEqual({ kind: 'not_found' });
     expect(resolveObservabilityApiRoute('/api/v1/task-1038')).toEqual({
       kind: 'issue',
@@ -250,40 +282,12 @@ describe('ObservabilityApiController', () => {
         url: '/api/v1/provider-worker/recover'
       } as Pick<http.IncomingMessage, 'method' | 'url'>,
       res,
-      presenterContext: {
-        controlStore: {
-          snapshot: () => CONTROL_STATE
-        },
-        paths: {
-          manifestPath: '/repo/.runs/local-mcp/cli/control-host/manifest.json',
-          runDir: '/repo/.runs/local-mcp/cli/control-host',
-          logPath: '/repo/.runs/local-mcp/cli/control-host/log.txt'
-        },
-        readCompatibilityProjection: async () => ({
-          running: [],
-          retrying: [],
-          codexTotals: {
-            input_tokens: 0,
-            output_tokens: 0,
-            total_tokens: 0,
-            seconds_running: 0
-          },
-          rateLimits: null,
-          selected: null,
-          dispatchPilot: null,
-          tracked: null
-        })
-      },
+      presenterContext: buildControlHostPresenterContext(),
       readRequestBody: async () => ({
         issue_id: '0b2377a2-366f-4309-a508-610e524c9d94',
         action: 'relaunch'
       }),
-      requestRefresh: async () => ({
-        queued: true,
-        coalesced: false,
-        requested_at: '2026-03-21T15:02:00.000Z',
-        operations: ['reconcile']
-      }),
+      requestRefresh: async () => { throw new Error('unused'); },
       requestProviderWorkerRecover: async (input) => ({
         provider: input.provider,
         issue_id: input.issueId,
@@ -291,57 +295,25 @@ describe('ObservabilityApiController', () => {
         kind: 'start',
         reason: 'provider_issue_start_launched',
         claim: {
-          provider: input.provider,
-          issue_id: input.issueId,
-          issue_identifier: 'CO-393',
-          issue_state: 'In Progress',
-          issue_state_type: 'started',
-          state: 'starting',
-          reason: 'provider_issue_start_launched',
-          task_id: 'linear-0b2377a2-366f-4309-a508-610e524c9d94',
-          run_id: 'run-1',
+          provider: input.provider, issue_id: input.issueId, issue_identifier: 'CO-393',
+          issue_state: 'In Progress', issue_state_type: 'started', state: 'starting',
+          reason: 'provider_issue_start_launched', task_id: 'linear-0b2377a2-366f-4309-a508-610e524c9d94',
+          run_id: 'run-1', worker_host: null, launch_source: 'control-host',
+          launch_token_present: true, updated_at: '2026-04-26T17:44:00.000Z',
           run_manifest_path: '/repo/.runs/linear-issue/cli/run-1/manifest.json',
-          worker_host: null,
-          launch_source: 'control-host',
-          launch_token_present: true,
-          updated_at: '2026-04-26T17:44:00.000Z'
         }
       }),
-      readDispatchEvaluation: async () => ({
-        issueIdentifier: null,
-        evaluation: {
-          summary: {
-            status: 'disabled',
-            reason: 'pilot_disabled_default_off',
-            source_status: 'disabled',
-            advisory_only: true,
-            source_setup: null
-          },
-          recommendation: null,
-          failure: null
-        }
-      })
+      readDispatchEvaluation: readDisabledDispatchEvaluation
     });
 
     expect(handled).toBe(true);
     expect(state.statusCode).toBe(202);
     expect(state.body).toMatchObject({
-      mode: 'provider_worker_recover',
-      provider: 'linear',
-      issue_id: '0b2377a2-366f-4309-a508-610e524c9d94',
-      action: 'relaunch',
-      kind: 'start',
-      reason: 'provider_issue_start_launched',
-      claim: {
-        launch_source: 'control-host',
-        launch_token_present: true
-      },
-      traceability: {
-        surface: 'api_v1',
-        decision: 'acknowledged',
-        reason: 'provider_issue_start_launched',
-        issue_identifier: 'CO-393'
-      }
+      mode: 'provider_worker_recover', provider: 'linear',
+      issue_id: '0b2377a2-366f-4309-a508-610e524c9d94', action: 'relaunch',
+      kind: 'start', reason: 'provider_issue_start_launched',
+      claim: { launch_source: 'control-host', launch_token_present: true },
+      traceability: { decision: 'acknowledged', reason: 'provider_issue_start_launched', issue_identifier: 'CO-393' }
     });
   });
 
@@ -356,61 +328,17 @@ describe('ObservabilityApiController', () => {
         url: '/api/v1/provider-worker/recover'
       } as Pick<http.IncomingMessage, 'method' | 'url'>,
       res,
-      presenterContext: {
-        controlStore: {
-          snapshot: () => CONTROL_STATE
-        },
-        paths: {
-          manifestPath: '/repo/.runs/local-mcp/cli/control-host/manifest.json',
-          runDir: '/repo/.runs/local-mcp/cli/control-host',
-          logPath: '/repo/.runs/local-mcp/cli/control-host/log.txt'
-        },
-        readCompatibilityProjection: async () => ({
-          running: [],
-          retrying: [],
-          codexTotals: {
-            input_tokens: 0,
-            output_tokens: 0,
-            total_tokens: 0,
-            seconds_running: 0
-          },
-          rateLimits: null,
-          selected: null,
-          dispatchPilot: null,
-          tracked: null
-        })
-      },
+      presenterContext: buildControlHostPresenterContext(),
       readRequestBody: async () => {
         readBody = true;
-        return {
-          issue_id: '0b2377a2-366f-4309-a508-610e524c9d94',
-          action: 'relaunch'
-        };
+        return { issue_id: '0b2377a2-366f-4309-a508-610e524c9d94', action: 'relaunch' };
       },
-      requestRefresh: async () => ({
-        queued: true,
-        coalesced: false,
-        requested_at: '2026-03-21T15:02:00.000Z',
-        operations: ['reconcile']
-      }),
+      requestRefresh: async () => { throw new Error('unused'); },
       requestProviderWorkerRecover: async () => {
         recovered = true;
         throw new Error('session auth must not recover provider workers');
       },
-      readDispatchEvaluation: async () => ({
-        issueIdentifier: null,
-        evaluation: {
-          summary: {
-            status: 'disabled',
-            reason: 'pilot_disabled_default_off',
-            source_status: 'disabled',
-            advisory_only: true,
-            source_setup: null
-          },
-          recommendation: null,
-          failure: null
-        }
-      })
+      readDispatchEvaluation: readDisabledDispatchEvaluation
     });
 
     expect(handled).toBe(true);
@@ -420,17 +348,9 @@ describe('ObservabilityApiController', () => {
     expect(state.body).toMatchObject({
       error: {
         code: 'control_auth_required',
-        details: {
-          surface: 'api_v1',
-          required_auth: 'control',
-          provided_auth: 'session'
-        }
+        details: { surface: 'api_v1', required_auth: 'control', provided_auth: 'session' }
       },
-      traceability: {
-        surface: 'api_v1',
-        decision: 'rejected',
-        reason: 'control_auth_required'
-      }
+      traceability: { surface: 'api_v1', decision: 'rejected', reason: 'control_auth_required' }
     });
   });
 
