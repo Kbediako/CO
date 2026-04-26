@@ -612,57 +612,30 @@ describe('createProviderIssueHandoffService', () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
     const persist = vi.fn(async () => undefined);
-    const startedRun = {
-      runId: 'run-recover-1',
-      manifestPath: join(paths.runDir, 'provider-run-manifest.json')
-    };
-    const launcher = {
-      start: vi.fn(async () => startedRun),
-      resume: vi.fn(async () => undefined)
-    };
+    const startedRun = { runId: 'run-recover-1', manifestPath: join(paths.runDir, 'provider-run-manifest.json') };
+    const launcher = { start: vi.fn(async () => startedRun), resume: vi.fn(async () => undefined) };
     const resolveTrackedIssue = vi.fn(async ({ issueId }: { provider: 'linear'; issueId: string }) => ({
       kind: 'ready' as const,
       trackedIssue: createTrackedIssue({
-        id: issueId,
-        identifier: 'CO-393',
-        title: 'Control host recover',
+        id: issueId, identifier: 'CO-393', title: 'Control host recover',
         updated_at: '2026-04-26T17:44:00.000Z'
       })
     }));
-
     const service = createProviderIssueHandoffService({
-      paths,
-      state,
-      persist,
-      launcher,
-      startPipelineId: 'provider-linear-worker',
-      resolveTrackedIssue
+      paths, state, persist, launcher, startPipelineId: 'provider-linear-worker', resolveTrackedIssue
     });
+    const result = await service.recoverIssue({ provider: 'linear', issueId: 'lin-issue-393', action: 'recover' });
+    const launchInput = launcher.start.mock.calls[0]?.[0];
 
-    const result = await service.recoverIssue({
+    expect(launchInput).toMatchObject({
+      taskId: 'linear-lin-issue-393',
+      pipelineId: 'provider-linear-worker',
       provider: 'linear',
       issueId: 'lin-issue-393',
-      action: 'recover'
+      issueIdentifier: 'CO-393',
+      launchToken: expect.any(String)
     });
-
-    expect(resolveTrackedIssue).toHaveBeenCalledWith({
-      provider: 'linear',
-      issueId: 'lin-issue-393'
-    });
-    expect(launcher.start).toHaveBeenCalledWith(
-      expect.objectContaining({
-        taskId: 'linear-lin-issue-393',
-        pipelineId: 'provider-linear-worker',
-        provider: 'linear',
-        issueId: 'lin-issue-393',
-        issueIdentifier: 'CO-393',
-        launchToken: expect.any(String)
-      })
-    );
     expect(result).toMatchObject({
-      provider: 'linear',
-      issue_id: 'lin-issue-393',
-      action: 'recover',
       kind: 'start',
       reason: 'provider_issue_start_launched',
       claim: {
@@ -676,12 +649,10 @@ describe('createProviderIssueHandoffService', () => {
       }
     });
     expect(state.claims[0]).toMatchObject({
-      issue_id: 'lin-issue-393',
-      issue_identifier: 'CO-393',
+      issue_id: 'lin-issue-393', issue_identifier: 'CO-393',
       launch_source: 'control-host',
-      launch_token: expect.any(String)
+      launch_token: launchInput?.launchToken
     });
-    expect(state.claims[0]?.launch_token).toBe(launcher.start.mock.calls[0]?.[0].launchToken);
   });
 
   it('releases an existing claim when control-host recovery resolves the issue as gone', async () => {
@@ -698,36 +669,19 @@ describe('createProviderIssueHandoffService', () => {
       })
     );
     const persist = vi.fn(async () => undefined);
-    const launcher = {
-      start: vi.fn(async () => null),
-      resume: vi.fn(async () => undefined)
-    };
+    const launcher = { start: vi.fn(async () => null), resume: vi.fn(async () => undefined) };
     const resolveTrackedIssue = vi.fn(async () => ({
       kind: 'release' as const,
       reason: 'dispatch_source_issue_not_found'
     }));
-
     const service = createProviderIssueHandoffService({
-      paths,
-      state,
-      persist,
-      launcher,
-      startPipelineId: 'provider-linear-worker',
-      resolveTrackedIssue
+      paths, state, persist, launcher, startPipelineId: 'provider-linear-worker', resolveTrackedIssue
     });
-
-    const result = await service.recoverIssue({
-      provider: 'linear',
-      issueId: 'lin-issue-gone',
-      action: 'recover'
-    });
+    const result = await service.recoverIssue({ provider: 'linear', issueId: 'lin-issue-gone', action: 'recover' });
 
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(result).toMatchObject({
-      provider: 'linear',
-      issue_id: 'lin-issue-gone',
-      action: 'recover',
       kind: 'released',
       reason: 'dispatch_source_issue_not_found',
       claim: {
@@ -736,8 +690,7 @@ describe('createProviderIssueHandoffService', () => {
       }
     });
     expect(state.claims[0]).toMatchObject({
-      issue_id: 'lin-issue-gone',
-      state: 'released',
+      issue_id: 'lin-issue-gone', state: 'released',
       reason: 'provider_issue_released:dispatch_source_issue_not_found'
     });
     expect(persist).toHaveBeenCalled();

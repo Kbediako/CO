@@ -39,13 +39,7 @@ export async function runControlHostProviderWorkerRecoverCliShell(
   });
   const payload = {
     ...response,
-    control_host: {
-      base_url: target.baseUrl.toString(),
-      task_id: target.taskId,
-      run_id: target.runId,
-      run_dir: target.runDir,
-      manifest_path: target.manifestPath
-    }
+    control_host: { base_url: target.baseUrl.toString(), task_id: target.taskId, run_id: target.runId, run_dir: target.runDir, manifest_path: target.manifestPath }
   };
   if (format === 'json') {
     console.log(JSON.stringify(payload, null, 2));
@@ -62,13 +56,7 @@ export async function runControlHostProviderWorkerRecoverCliShell(
   }
 }
 
-async function requestProviderWorkerRecover(input: {
-  baseUrl: URL;
-  token: string;
-  issueId: string;
-  action: ProviderIssueRecoveryAction;
-  requestTimeoutMs: number;
-}): Promise<Record<string, unknown>> {
+async function requestProviderWorkerRecover(input: { baseUrl: URL; token: string; issueId: string; action: ProviderIssueRecoveryAction; requestTimeoutMs: number }): Promise<Record<string, unknown>> {
   const url = new URL('/api/v1/provider-worker/recover', input.baseUrl);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), input.requestTimeoutMs);
@@ -81,11 +69,7 @@ async function requestProviderWorkerRecover(input: {
         [CSRF_HEADER]: input.token,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        provider: 'linear',
-        issue_id: input.issueId,
-        action: input.action
-      }),
+      body: JSON.stringify({ provider: 'linear', issue_id: input.issueId, action: input.action }),
       signal: controller.signal
     });
   } catch (error) {
@@ -119,9 +103,7 @@ async function requestProviderWorkerRecover(input: {
 
 async function readResponseBody(response: Response): Promise<unknown> {
   const text = await response.text();
-  if (text.trim().length === 0) {
-    return null;
-  }
+  if (text.trim().length === 0) return null;
   try {
     return JSON.parse(text) as unknown;
   } catch {
@@ -130,13 +112,8 @@ async function readResponseBody(response: Response): Promise<unknown> {
 }
 
 function formatResponseBody(body: unknown): string {
-  if (typeof body === 'string') {
-    return body;
-  }
-  if (body === null) {
-    return 'empty response body';
-  }
-  return JSON.stringify(body);
+  if (typeof body === 'string') return body;
+  return body === null ? 'empty response body' : JSON.stringify(body);
 }
 
 function readRequestTimeoutMs(flags: ArgMap): number {
@@ -156,9 +133,7 @@ function readRequestTimeoutMs(flags: ArgMap): number {
 
 function readStringFlag(flags: ArgMap, key: string): string | undefined {
   const value = flags[key];
-  if (typeof value !== 'string') {
-    return undefined;
-  }
+  if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
 }
