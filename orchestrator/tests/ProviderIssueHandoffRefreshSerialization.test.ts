@@ -2369,6 +2369,106 @@ describe('runProviderIssueHandoffRefresh', () => {
     });
   });
 
+  it('does not launch normally budgeted live-start probes when same-issue occupancy is unreadable', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-15T01:20:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    pushCo185ReleasedPendingClaim(state, '', {
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T01:18:00.000Z',
+      run_id: null,
+      run_manifest_path: null
+    });
+    const unreadablePaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'linear-lin-issue-185-foreign-budgeted'
+      },
+      'run-unreadable-live-started-budgeted'
+    );
+    await mkdir(unreadablePaths.runDir, { recursive: true });
+    await writeFile(unreadablePaths.manifestPath, '{"run_id":"run-unreadable-live-started-budgeted"', 'utf8');
+    await writeFile(
+      join(unreadablePaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-185',
+        issue_identifier: 'CO-185',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        worker_host: 'worker-host-01',
+        attempt_started_at: new Date(Date.now() - 120_000).toISOString(),
+        updated_at: new Date(Date.now() - 60_000).toISOString()
+      }),
+      'utf8'
+    );
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-185-duplicate-budgeted-live-started',
+        manifestPath: '/tmp/provider-run/co-185-duplicate-budgeted-live-started-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-185',
+        identifier: 'CO-185',
+        title: 'Provider helper constraints',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-04-15T01:18:56.003Z'
+      })
+    }));
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: []
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 3,
+          max_concurrent_agents_by_state: {
+            'In Progress': 1
+          }
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-185'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T01:18:00.000Z',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
   it('keeps release-cancel retries for ordinary released not-active active runs with cached terminal state', async () => {
     const { root, paths } = await createHostPaths();
     const childPaths = await createCo185ActiveRun(root);

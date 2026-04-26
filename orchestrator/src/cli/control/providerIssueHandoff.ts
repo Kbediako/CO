@@ -4814,9 +4814,11 @@ export function createProviderIssueHandoffService(
               latestRun,
               hasPendingReleaseCancel
             });
+          const hasOccupiedPollDispatchProviderKey =
+            occupiedPollDispatchProviderKeys.has(claimProviderKey);
           const canUseNoRunPendingReopenLiveStartedProbe =
             shouldProbeNoRunPendingReopenLiveStartedTruth &&
-            !occupiedPollDispatchProviderKeys.has(claimProviderKey) &&
+            !hasOccupiedPollDispatchProviderKey &&
             pollDispatchBudget.remainingGlobalSlots() > 0 &&
             noRunPendingReopenLiveStartedProbeReads < 1;
           const retainedReleasedBlockerSnapshot =
@@ -5201,6 +5203,7 @@ export function createProviderIssueHandoffService(
             ) {
               if (
                 shouldProbeNoRunPendingReopenLiveStartedTruth &&
+                !hasOccupiedPollDispatchProviderKey &&
                 isProviderStartedWorkerTrackedIssue(resolution.trackedIssue)
               ) {
                 const handoffResult = await launchStartForTrackedIssue({
