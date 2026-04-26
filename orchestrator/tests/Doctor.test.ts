@@ -13,6 +13,7 @@ import {
   runDoctor,
   runDoctorCloudPreflight
 } from '../src/cli/doctor.js';
+import { CONFIG_AUTHORITY_MODE_ENV_KEY } from '../src/cli/config/repoConfigPolicy.js';
 import { REPO_CONFIG_PATH_ENV_KEY } from '../src/cli/config/userConfig.js';
 import { sanitizeProviderOverrideEnv } from '../src/cli/utils/providerOverrideEnv.js';
 import * as cloudPreflight from '../src/cli/utils/cloudPreflight.js';
@@ -132,12 +133,12 @@ function buildDoctorCloudEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessE
     ...sanitizeProviderOverrideEnv(process.env),
     CODEX_CLOUD_ENV_ID: '',
     CODEX_CLOUD_BRANCH: '',
+    [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'downstream-compatibility',
     CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: '',
     CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '',
     MCP_RUNNER_TASK_ID: '',
     TASK: '',
     CODEX_ORCHESTRATOR_TASK_ID: '',
-    CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '',
     CODEX_ORCHESTRATOR_ROOT: '',
     CODEX_ORCHESTRATOR_RUNTIME_MODE: '',
     CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: '',
@@ -2204,6 +2205,7 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
         environmentId: 'env_override',
         env: buildDoctorCloudEnv({
           CODEX_CLI_BIN: fakeCodexBin,
+          [CONFIG_AUTHORITY_MODE_ENV_KEY]: '',
           CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1'
         })
       });
@@ -2464,6 +2466,7 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
           ...process.env,
           CODEX_CLI_BIN: '/tmp/fake-codex',
           CODEX_CLOUD_BRANCH: '',
+          [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'downstream-compatibility',
           CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: '',
           CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: ''
         }

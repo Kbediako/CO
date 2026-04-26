@@ -378,6 +378,7 @@ function buildBootstrapEnv(overrides: Record<string, string | undefined>): NodeJ
   const env: NodeJS.ProcessEnv = { ...process.env };
   for (const key of [
     'CODEX_ORCHESTRATOR_PACKAGE_ROOT',
+    'CODEX_ORCHESTRATOR_CONFIG_MODE',
     'CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED',
     'TS_NODE_PROJECT'
   ]) {

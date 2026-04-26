@@ -84,7 +84,10 @@ import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
 import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
 import { acquireLockWithRetry, type LockRetryOptions } from '../persistence/lockFile.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
-import { REPO_CONFIG_REQUIRED_ENV_KEY } from './config/repoConfigPolicy.js';
+import {
+  CONFIG_AUTHORITY_MODE_ENV_KEY,
+  REPO_CONFIG_REQUIRED_ENV_KEY
+} from './config/repoConfigPolicy.js';
 import { REPO_CONFIG_PATH_ENV_KEY } from './config/userConfig.js';
 import {
   normalizeProviderLinearChildLanePathSelectors,
@@ -1595,6 +1598,7 @@ function applyProviderLinearWorkerContextEnv(
         (!isProviderLinearWorkerWorkspaceRoot(context.repoRoot) ||
           !existsSync(join(context.repoRoot, 'codex.orchestrator.json')))
       ) {
+        env[CONFIG_AUTHORITY_MODE_ENV_KEY] = 'downstream-compatibility';
         delete env[REPO_CONFIG_REQUIRED_ENV_KEY];
       }
     }

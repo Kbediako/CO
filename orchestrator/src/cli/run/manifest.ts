@@ -18,6 +18,7 @@ import { isoTimestamp } from '../utils/time.js';
 import { loadInstructionSet } from '../../../../packages/orchestrator/src/instructions/loader.js';
 import type { EnvironmentPaths } from './environment.js';
 import type { RunPaths } from './runPaths.js';
+import type { ConfigResolutionSummary } from '../services/pipelineResolver.js';
 import { resolveRunPaths, relativeToRepo } from './runPaths.js';
 import { materializeRunSource0, refreshRunMemoryObservability } from './source0.js';
 import { normalizeWorkspacePath } from './workspacePath.js';
@@ -47,6 +48,7 @@ export interface ManifestBootstrapOptions {
   issueId?: string | null;
   issueIdentifier?: string | null;
   issueUpdatedAt?: string | null;
+  configResolution?: ConfigResolutionSummary | null;
 }
 
 interface ProviderControlHostLocator {
@@ -179,6 +181,7 @@ export async function bootstrapManifest(runId: string, options: ManifestBootstra
     provider_launch_source: providerControlHostLocator.launchSource,
     provider_control_host_task_id: providerControlHostLocator.taskId,
     provider_control_host_run_id: providerControlHostLocator.runId,
+    config_resolution: options.configResolution ?? null,
     summary: null,
     metrics_recorded: false,
     resume_token: resumeToken,

@@ -1,7 +1,10 @@
 import { join } from 'node:path';
 
 import { readProviderControlHostLocatorFromEnv } from '../../../../scripts/lib/provider-run-contract.js';
-import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../config/repoConfigPolicy.js';
+import {
+  CONFIG_AUTHORITY_MODE_ENV_KEY,
+  REPO_CONFIG_REQUIRED_ENV_KEY
+} from '../config/repoConfigPolicy.js';
 import { REPO_CONFIG_PATH_ENV_KEY } from '../config/userConfig.js';
 
 const PROVIDER_REPO_CONFIG_PATH_ENV_KEY = 'CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH';
@@ -68,6 +71,7 @@ export function sanitizeProviderOverrideEnv(
     currentPackageRoot === providerPackageRoot;
   if (shouldStripRepoConfig) {
     delete sanitized[REPO_CONFIG_PATH_ENV_KEY];
+    sanitized[CONFIG_AUTHORITY_MODE_ENV_KEY] = 'downstream-compatibility';
     delete sanitized[REPO_CONFIG_REQUIRED_ENV_KEY];
   }
   if (shouldStripPackageRoot) {

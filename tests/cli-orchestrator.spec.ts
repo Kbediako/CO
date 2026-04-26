@@ -74,6 +74,7 @@ const TEST_TIMEOUT_MS = 15000;
 const ORIGINAL_ENV = {
   configOverrides: process.env.CODEX_CONFIG_OVERRIDES,
   mcpConfigOverrides: process.env.CODEX_MCP_CONFIG_OVERRIDES,
+  configMode: process.env.CODEX_ORCHESTRATOR_CONFIG_MODE,
   repoConfigRequired: process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED,
   providerOverrides: Object.fromEntries(
     PROVIDER_OVERRIDE_ENV_KEYS.map((key) => [key, process.env[key]])
@@ -93,6 +94,7 @@ describe('CodexOrchestrator CLI', () => {
     process.env.MCP_RUNNER_TASK_ID = '0101';
     process.env.CODEX_CONFIG_OVERRIDES = 'ui.control_enabled=false';
     delete process.env.CODEX_MCP_CONFIG_OVERRIDES;
+    delete process.env.CODEX_ORCHESTRATOR_CONFIG_MODE;
     delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
     for (const key of PROVIDER_OVERRIDE_ENV_KEYS) {
       delete process.env[key];
@@ -127,6 +129,11 @@ describe('CodexOrchestrator CLI', () => {
       delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
     } else {
       process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED = ORIGINAL_ENV.repoConfigRequired;
+    }
+    if (ORIGINAL_ENV.configMode === undefined) {
+      delete process.env.CODEX_ORCHESTRATOR_CONFIG_MODE;
+    } else {
+      process.env.CODEX_ORCHESTRATOR_CONFIG_MODE = ORIGINAL_ENV.configMode;
     }
     for (const key of PROVIDER_OVERRIDE_ENV_KEYS) {
       const value = ORIGINAL_ENV.providerOverrides[key];
