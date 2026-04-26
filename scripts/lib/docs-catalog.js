@@ -1,4 +1,4 @@
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { pathExists, toPosixPath } from './docs-helpers.js';
 
@@ -289,8 +289,110 @@ export function extractBundledSkillNamesFromMarkdown(content, policy = {}) {
   return [...new Set(results)].sort();
 }
 
+function normalizeMatrixRequirement(raw) {
+  if (!isObject(raw)) {
+    return {
+      label: 'matrix requirement',
+      contains: ''
+    };
+  }
+  const contains = normalizeString(raw.contains);
+  return {
+    label: normalizeString(raw.label) || contains || 'matrix requirement',
+    contains
+  };
+}
+
+function normalizeMatrixSurface(raw) {
+  const surface = isObject(raw) ? raw : {};
+  return {
+    path: normalizeCatalogPath(surface.path),
+    kind: normalizeString(surface.kind),
+    status: normalizeString(surface.status) || 'current',
+    requirements: Array.isArray(surface.requirements)
+      ? surface.requirements.map((requirement) => normalizeMatrixRequirement(requirement))
+      : []
+  };
+}
+
+function normalizeHistoricalReleaseEvidence(raw) {
+  if (!isObject(raw)) {
+    return null;
+  }
+  const pathValue = normalizeCatalogPath(raw.path);
+  if (!pathValue) {
+    return null;
+  }
+  return {
+    path: pathValue,
+    status: normalizeString(raw.status) || 'historical',
+    version: normalizeString(raw.version) || null,
+    title: normalizeString(raw.title) || null
+  };
+}
+
+function normalizeMatrixCurrent(raw) {
+  const current = isObject(raw) ? raw : {};
+  return {
+    codex_cli_version: normalizeString(current.codex_cli_version) || null,
+    latest_audited_candidate_cli_version: normalizeString(current.latest_audited_candidate_cli_version) || null,
+    marketplace_smoke_cli_version: normalizeString(current.marketplace_smoke_cli_version) || null,
+    cloud_canary_cli_version: normalizeString(current.cloud_canary_cli_version) || null,
+    model: normalizeString(current.model) || null,
+    default_runtime: normalizeString(current.default_runtime) || null,
+    explorer_fast_model: normalizeString(current.explorer_fast_model) || null,
+    unsupported_review_model: normalizeString(current.unsupported_review_model) || null
+  };
+}
+
+function deriveMatrixCliCompatibilityVersions(current) {
+  return [
+    current.latest_audited_candidate_cli_version,
+    current.marketplace_smoke_cli_version,
+    current.cloud_canary_cli_version
+  ]
+    .filter((version) => typeof version === 'string' && version.length > 0 && version !== current.codex_cli_version)
+    .filter((version, index, versions) => versions.indexOf(version) === index)
+    .sort();
+}
+
+export async function loadCodexPostureMatrix(repoRoot, relativePath) {
+  const matrixPath = normalizeCatalogPath(relativePath);
+  if (!matrixPath) {
+    throw new Error('Missing Codex posture matrix path.');
+  }
+  const resolvedRepoRoot = path.resolve(repoRoot);
+  const absolutePath = path.resolve(resolvedRepoRoot, matrixPath);
+  const relativeToRepoNative = path.relative(resolvedRepoRoot, absolutePath);
+  const relativeToRepo = toPosixPath(relativeToRepoNative);
+  if (relativeToRepo === '..' || relativeToRepo.startsWith('../') || path.isAbsolute(relativeToRepoNative)) {
+    throw new Error(`Invalid Codex posture matrix path outside repository: ${matrixPath}`);
+  }
+  const resolvedRepoRootReal = await realpath(resolvedRepoRoot);
+  const absolutePathReal = await realpath(absolutePath);
+  const realRelativeToRepoNative = path.relative(resolvedRepoRootReal, absolutePathReal);
+  const realRelativeToRepo = toPosixPath(realRelativeToRepoNative);
+  if (realRelativeToRepo === '..' || realRelativeToRepo.startsWith('../') || path.isAbsolute(realRelativeToRepoNative)) {
+    throw new Error(`Invalid Codex posture matrix path resolves outside repository: ${matrixPath}`);
+  }
+  const raw = JSON.parse(await readFile(absolutePathReal, 'utf8'));
+
+  return {
+    version: Number.isFinite(raw?.version) ? Number(raw.version) : 1,
+    source_path: relativeToRepo,
+    absolute_path: absolutePath,
+    current: normalizeMatrixCurrent(raw?.current),
+    surfaces: Array.isArray(raw?.surfaces) ? raw.surfaces.map((surface) => normalizeMatrixSurface(surface)) : [],
+    historical_release_evidence: Array.isArray(raw?.historical_release_evidence)
+      ? raw.historical_release_evidence
+          .map((evidence) => normalizeHistoricalReleaseEvidence(evidence))
+          .filter(Boolean)
+      : []
+  };
+}
+
 export async function readCurrentCodexPosture(repoRoot, policy = {}) {
-  const sourcePath = normalizeString(policy.source_path);
+  const sourcePath = normalizeString(policy.matrix_path) || normalizeString(policy.source_path);
   if (!sourcePath) {
     return {
       source_path: '',
@@ -299,7 +401,26 @@ export async function readCurrentCodexPosture(repoRoot, policy = {}) {
       model: null,
       default_runtime: null,
       explorer_fast_model: null,
-      unsupported_review_model: null
+      unsupported_review_model: null,
+      latest_audited_candidate_cli_version: null,
+      marketplace_smoke_cli_version: null,
+      cloud_canary_cli_version: null
+    };
+  }
+
+  if (sourcePath.endsWith('.json')) {
+    const matrix = await loadCodexPostureMatrix(repoRoot, sourcePath);
+    return {
+      source_path: matrix.source_path,
+      cli_version: matrix.current.codex_cli_version,
+      cli_compatibility_versions: deriveMatrixCliCompatibilityVersions(matrix.current),
+      model: matrix.current.model,
+      default_runtime: matrix.current.default_runtime,
+      explorer_fast_model: matrix.current.explorer_fast_model,
+      unsupported_review_model: matrix.current.unsupported_review_model,
+      latest_audited_candidate_cli_version: matrix.current.latest_audited_candidate_cli_version,
+      marketplace_smoke_cli_version: matrix.current.marketplace_smoke_cli_version,
+      cloud_canary_cli_version: matrix.current.cloud_canary_cli_version
     };
   }
 
@@ -320,7 +441,10 @@ export async function readCurrentCodexPosture(repoRoot, policy = {}) {
     default_runtime:
       /Local ([A-Za-z0-9_-]+) remains the expected default runtime path/.exec(content)?.[1] ?? null,
     explorer_fast_model: /explorer_fast[^\n]*`(gpt-[^`]+)`/i.exec(content)?.[1] ?? null,
-    unsupported_review_model: unsupportedReviewModel
+    unsupported_review_model: unsupportedReviewModel,
+    latest_audited_candidate_cli_version: /Latest audited stable candidate is Codex CLI\s+\(?`?([0-9]+\.[0-9]+\.[0-9]+)`?\)?/i.exec(content)?.[1] ?? null,
+    marketplace_smoke_cli_version: /downstream-smoke workflows[^\n]*`@openai\/codex@([0-9]+\.[0-9]+\.[0-9]+)`/i.exec(content)?.[1] ?? null,
+    cloud_canary_cli_version: /`cloud-canary` pins `@openai\/codex@([0-9]+\.[0-9]+\.[0-9]+)`/i.exec(content)?.[1] ?? null
   };
 }
 
