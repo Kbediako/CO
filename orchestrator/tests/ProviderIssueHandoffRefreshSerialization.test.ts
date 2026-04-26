@@ -2654,7 +2654,7 @@ describe('runProviderIssueHandoffRefresh', () => {
       throw new Error('same-issue occupied no-run claim should not use direct issue refresh');
     });
     const refetchTrackedIssues = vi.fn(async (input: { excludedIssueIds?: string[] }) => {
-      expect(input.excludedIssueIds).toContain('lin-issue-185');
+      expect(input.excludedIssueIds ?? []).toContain('lin-issue-185');
       return {
         kind: 'ready' as const,
         trackedIssues: []
