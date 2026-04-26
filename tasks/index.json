@@ -1,6 +1,52 @@
 {
   "items": [
     {
+      "id": "20260426-linear-7da2cd4d-977e-450a-b056-307edf560fe0",
+      "title": "Restore docs hygiene baseline for missing TASKS references and freshness registry drift",
+      "relates_to": "tasks/tasks-linear-7da2cd4d-977e-450a-b056-307edf560fe0.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-26",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "same-issue child lane docs-packet",
+          "date": "2026-04-26",
+          "status": "accepted",
+          "manifest": ".runs/linear-7da2cd4d-977e-450a-b056-307edf560fe0-docs-packet/cli/2026-04-26T00-18-48-548Z-109bd4df/manifest.json",
+          "source_anchor": "ctx:sha256:d5f97254034d50966075bb4a608873c35be50bef85c842aeaee6c8d48694c132#chunk:c000001",
+          "summary": "Child lane created the six-file CO-378 docs-first packet; parent accepted the scoped patch and owns current-main registry mirror updates, validation, Linear state, PR, and merge."
+        },
+        "current_main_reconciliation": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-26",
+          "status": "linear-1c101-current-main-already-restored",
+          "summary": "Stale workspace reproduced the six linear-1c101 missing-path failures, but current origin/main already contains the restored CO-276 packet through CO-332/CO-350/CO-370 lineage; CO-378 registers its packet and validates the current-main baseline."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-26",
+          "status": "bounded-success",
+          "telemetry": ".runs/linear-7da2cd4d-977e-450a-b056-307edf560fe0/cli/2026-04-26T00-15-26-194Z-066af6d3/review/telemetry.json",
+          "summary": "Review found no actionable diff-local docs/task packet or registry metadata issues; bounded-success with preserved command-intent termination boundary."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-26",
+          "status": "no-simplification-edits",
+          "artifact": "out/linear-7da2cd4d-977e-450a-b056-307edf560fe0/manual/elegance-review.md",
+          "summary": "Explicit minimality pass found the docs-only diff already limited to the required packet, registry rows, TASKS snapshot, and narrow freshness metadata refresh."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-7da2cd4d-977e-450a-b056-307edf560fe0.md",
+        "task": "tasks/tasks-linear-7da2cd4d-977e-450a-b056-307edf560fe0.md",
+        "agent_task": ".agent/task/linear-7da2cd4d-977e-450a-b056-307edf560fe0.md",
+        "docs": "docs/TECH_SPEC-linear-7da2cd4d-977e-450a-b056-307edf560fe0.md"
+      }
+    },
+    {
       "id": "20260426-linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f",
       "title": "CO-374 archive Core Lane dispatch discovery break",
       "relates_to": "tasks/tasks-linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md",
@@ -6989,12 +7035,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-26",
+      "last_review": "2026-04-26",
       "paths": {
         "spec": "tasks/specs/linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",
         "task": "tasks/tasks-linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",
         "agent_task": ".agent/task/linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",
         "docs": "docs/TECH_SPEC-linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md"
+      },
+      "approvals": {
+        "docs_freshness_refresh": {
+          "reviewer": "parent provider worker for CO-378",
+          "date": "2026-04-26",
+          "status": "reviewed-stale-cohort-refreshed",
+          "summary": "CO-378 reviewed the six stale CO-21 task packet/mirror registry rows on current origin/main and refreshed metadata without changing the workpad-contract implementation scope."
+        }
       }
     },
     {
