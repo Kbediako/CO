@@ -2075,6 +2075,176 @@ describe('runProviderIssueHandoffRefresh', () => {
     });
   });
 
+  it('refreshes stale released pending-reopen no-run claims from live started truth', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    pushCo185ReleasedPendingClaim(state, '', {
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T01:18:00.000Z',
+      run_id: null,
+      run_manifest_path: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-185-live-started-refresh',
+        manifestPath: '/tmp/provider-run/co-185-live-started-refresh-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-185',
+        identifier: 'CO-185',
+        title: 'Provider helper constraints',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-04-15T01:18:56.003Z'
+      })
+    }));
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: []
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-185'
+    });
+    expect(refetchTrackedIssues).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-185',
+      pipelineId: 'provider-linear-worker',
+      provider: 'linear',
+      issueId: 'lin-issue-185',
+      issueIdentifier: 'CO-185',
+      issueUpdatedAt: '2026-04-15T01:18:56.003Z',
+      launchToken: expect.any(String)
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_refresh_start_launched',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T01:18:56.003Z',
+      task_id: 'linear-lin-issue-185',
+      run_id: 'run-co-185-live-started-refresh',
+      run_manifest_path: '/tmp/provider-run/co-185-live-started-refresh-manifest.json'
+    });
+  });
+
+  it('blocks live-start no-run probes when same-issue occupancy is unreadable', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-15T01:20:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    pushCo185ReleasedPendingClaim(state, '', {
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T01:18:00.000Z',
+      run_id: null,
+      run_manifest_path: null
+    });
+    const unreadablePaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'linear-lin-issue-185-foreign'
+      },
+      'run-unreadable-live-started'
+    );
+    await mkdir(unreadablePaths.runDir, { recursive: true });
+    await writeFile(unreadablePaths.manifestPath, '{"run_id":"run-unreadable-live-started"', 'utf8');
+    await writeFile(
+      join(unreadablePaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        issue_id: 'lin-issue-185',
+        issue_identifier: 'CO-185',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        worker_host: 'worker-host-01',
+        attempt_started_at: new Date(Date.now() - 120_000).toISOString(),
+        updated_at: new Date(Date.now() - 60_000).toISOString()
+      }),
+      'utf8'
+    );
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-185-duplicate-live-started',
+        manifestPath: '/tmp/provider-run/co-185-duplicate-live-started-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => {
+      throw new Error('same-issue occupied no-run claim should not use direct issue refresh');
+    });
+    const refetchTrackedIssues = vi.fn(async (input: { excludedIssueIds?: string[] }) => {
+      expect(input.excludedIssueIds).toContain('lin-issue-185');
+      return {
+        kind: 'ready' as const,
+        trackedIssues: []
+      };
+    });
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T01:18:00.000Z',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
   it('keeps release-cancel retries for ordinary released not-active active runs with cached terminal state', async () => {
     const { root, paths } = await createHostPaths();
     const childPaths = await createCo185ActiveRun(root);
