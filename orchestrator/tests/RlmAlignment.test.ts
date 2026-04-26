@@ -7,13 +7,14 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   AlignmentChecker,
   AlignmentLedgerWriter,
+  DEFAULT_ALIGNMENT_POLICY,
   __test__ as alignmentTest,
   evaluateConsensus,
   scoreAlignment,
   shouldRunDeepAudit
 } from '../src/cli/rlm/alignment.js';
 
-const { incrementIntentVersion } = alignmentTest;
+const { incrementIntentVersion, resolvePolicy } = alignmentTest;
 
 let tempDir: string | null = null;
 
@@ -96,6 +97,33 @@ describe('alignment scoring', () => {
     expect(patch).toEqual({ major: 1, minor: 2, patch: 4, label: '1.2.4' });
     expect(minor).toEqual({ major: 1, minor: 3, patch: 0, label: '1.3.0' });
     expect(major).toEqual({ major: 2, minor: 0, patch: 0, label: '2.0.0' });
+  });
+
+  it('keeps route models aligned with the current CO model posture', () => {
+    expect(DEFAULT_ALIGNMENT_POLICY.route).toMatchObject({
+      sentinel_model: 'gpt-5.5',
+      high_reasoning_model: 'gpt-5.5',
+      arbitration_model: 'gpt-5.5',
+      high_reasoning_available: true
+    });
+  });
+
+  it('preserves explicit route model overrides', () => {
+    const policy = resolvePolicy({
+      route: {
+        sentinel_model: 'gpt-5.4',
+        high_reasoning_model: 'gpt-5.4',
+        arbitration_model: 'gpt-5.4',
+        high_reasoning_available: false
+      }
+    });
+
+    expect(policy.route).toMatchObject({
+      sentinel_model: 'gpt-5.4',
+      high_reasoning_model: 'gpt-5.4',
+      arbitration_model: 'gpt-5.4',
+      high_reasoning_available: false
+    });
   });
 });
 

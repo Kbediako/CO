@@ -250,7 +250,7 @@ describe('CodexOrchestrator cloud auto scout', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(result.notes[0]).toContain('Cloud preflight failed; falling back to mcp.');
+    expect(result.notes[0]).toContain('Cloud preflight failed; fallback_policy=auto');
     expect(result.manifest.cloud_fallback?.mode_used).toBe('mcp');
   });
 
@@ -305,8 +305,7 @@ describe('CodexOrchestrator cloud auto scout', () => {
       runtimeModeRequested: 'appserver',
       runtimeModeSource: 'default',
       envOverrides: {
-        CODEX_ORCHESTRATOR_RUNTIME_FALLBACK: 'deny',
-        CODEX_ORCHESTRATOR_APPSERVER_FORCE_PRECHECK_FAIL: '1'
+        CODEX_ORCHESTRATOR_RUNTIME_FALLBACK: 'auto'
       },
       task: { id: env.taskId, title: 'Task' },
       target: {
@@ -317,7 +316,7 @@ describe('CodexOrchestrator cloud auto scout', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(result.notes[0]).toContain('Cloud preflight failed; falling back to mcp.');
+    expect(result.notes[0]).toContain('Cloud preflight failed; fallback_policy=auto');
     expect(result.manifest.cloud_fallback?.mode_used).toBe('mcp');
     expect(result.manifest.runtime_mode_requested).toBe('cli');
     expect(result.manifest.runtime_mode).toBe('cli');
@@ -378,8 +377,7 @@ describe('CodexOrchestrator cloud auto scout', () => {
       runtimeModeRequested: 'appserver',
       runtimeModeSource: 'default',
       envOverrides: {
-        CODEX_ORCHESTRATOR_RUNTIME_FALLBACK: 'deny',
-        CODEX_ORCHESTRATOR_APPSERVER_FORCE_PRECHECK_FAIL: '1'
+        CODEX_ORCHESTRATOR_RUNTIME_FALLBACK: 'auto'
       },
       task: { id: env.taskId, title: 'Task' },
       target: {
@@ -390,7 +388,7 @@ describe('CodexOrchestrator cloud auto scout', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(result.notes[0]).toContain('Cloud preflight failed; falling back to mcp.');
+    expect(result.notes[0]).toContain('Cloud preflight failed; fallback_policy=auto');
     expect(result.manifest.cloud_fallback?.mode_used).toBe('mcp');
     expect(result.manifest.runtime_mode).toBe('cli');
     expect(startSpy).toHaveBeenCalledWith(
@@ -405,7 +403,7 @@ describe('CodexOrchestrator cloud auto scout', () => {
     );
   });
 
-  it('fails fast on preflight failure when cloud fallback is disabled', async () => {
+  it('fails fast on preflight failure when cloud fallback policy is strict', async () => {
     const env = normalizeEnvironmentPaths(resolveEnvironmentPaths());
     const pipeline: PipelineDefinition = {
       id: 'docs-review',
@@ -458,7 +456,7 @@ describe('CodexOrchestrator cloud auto scout', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.notes[0]).toContain('cloud fallback is disabled');
+    expect(result.notes[0]).toContain('fallback_policy=strict');
     expect(result.manifest.status).toBe('failed');
     expect(result.manifest.status_detail).toBe('cloud-preflight-failed');
     expect(result.manifest.completed_at).toBeTruthy();

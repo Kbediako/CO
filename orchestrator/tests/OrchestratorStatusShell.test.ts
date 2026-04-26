@@ -27,6 +27,11 @@ describe('orchestrator status shell', () => {
       runtime_mode_requested: 'appserver',
       runtime_mode: 'appserver',
       runtime_provider: 'AppServerRuntimeProvider',
+      config_resolution: {
+        mode: 'repo-authoritative',
+        reason: 'default repo-authoritative mode',
+        config_source: 'repo'
+      },
       runtime_fallback: null,
       cloud_execution: null,
       cloud_fallback: null
@@ -95,12 +100,22 @@ describe('orchestrator status shell', () => {
       runtime_mode_requested: 'cli',
       runtime_mode: 'appserver',
       runtime_provider: 'AppServerRuntimeProvider',
+      config_resolution: {
+        mode: 'downstream-compatibility',
+        reason: 'CODEX_ORCHESTRATOR_CONFIG_MODE=downstream-compatibility',
+        config_source: 'package'
+      },
       runtime_fallback: {
         occurred: true,
+        policy: 'auto',
+        policy_source: 'env',
         code: 'fallback-code',
         reason: 'appserver unavailable',
         from_mode: 'appserver',
         to_mode: 'cli',
+        original_target: 'runtime:appserver',
+        fallback_target: 'runtime:cli',
+        blocking_reason: 'appserver unavailable',
         checked_at: '2026-03-14T16:10:06.000Z'
       },
       cloud_execution: {
@@ -108,7 +123,19 @@ describe('orchestrator status shell', () => {
         status: 'running',
         status_url: 'https://example.invalid/status'
       },
-      cloud_fallback: null
+      cloud_fallback: {
+        mode_requested: 'cloud',
+        mode_used: 'mcp',
+        policy: 'auto',
+        policy_source: 'default',
+        original_target: 'execution:cloud',
+        fallback_target: 'execution:mcp',
+        blocking_reason: 'missing cloud environment',
+        reason:
+          'Cloud preflight failed; fallback_policy=auto original_target=execution:cloud fallback_target=execution:mcp blocking_reason=missing cloud environment',
+        issues: [{ code: 'missing_environment', message: 'missing cloud environment' }],
+        checked_at: '2026-03-14T16:10:07.000Z'
+      }
     } as never;
     const paths = {
       manifestPath: '/tmp/repo/.runs/task-2/cli/run-2/manifest.json',
@@ -151,9 +178,11 @@ describe('orchestrator status shell', () => {
       'Completed: in-progress',
       'Manifest: .runs/task-2/cli/run-2/manifest.json',
       'Runtime: appserver (requested cli) via AppServerRuntimeProvider',
-      'Runtime fallback: fallback-code — appserver unavailable',
+      'Runtime fallback: policy=auto code=fallback-code original_target=runtime:appserver fallback_target=runtime:cli blocking_reason=appserver unavailable',
+      'Configuration mode: downstream-compatibility (CODEX_ORCHESTRATOR_CONFIG_MODE=downstream-compatibility; source=package)',
       'Activity: 2026-03-14T16:10:05.000Z via manifest age=42s [stale]',
       'Cloud: cloud-123 [running] https://example.invalid/status',
+      'Cloud fallback: policy=auto original_target=execution:cloud fallback_target=execution:mcp blocking_reason=missing cloud environment',
       'Commands:',
       '  [failed] build — exit 1'
     ]);

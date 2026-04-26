@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp c97b3fe73d49b88e1531f6e10190a550f5117a629d8c75e2ea50ebaf5886d4bf -->
+<!-- codex:instruction-stamp d6ebd01f13a18688094218f1cb0c4cb4f671d95f808a5b20f9c7bdeb452b7a80 -->
 # Repository Agent Guidance
 
 Task-specific historical project blocks were removed from this file in `CO-88`. Use the active task packet under `.agent/task/**` for lane-scoped instructions instead of treating old project ids as repo-wide defaults.
@@ -26,8 +26,8 @@ Task-specific historical project blocks were removed from this file in `CO-88`. 
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.
 - Avoid ad-hoc command chains unless the work is a lightweight discovery step that does not require manifest evidence.
 - Use cloud mode when work is long-running/parallel and cloud prerequisites are ready; otherwise stay in local `mcp` mode.
-- Cloud preflight: confirm remote branch availability, non-interactive setup commands, and required cloud secrets/variables; if missing, record local fallback rationale in checklist/manifests.
-- For strict cloud lanes, set `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny` so preflight failures fail fast instead of falling back.
+- Cloud preflight: confirm remote branch availability, non-interactive setup commands, and required cloud secrets/variables; if missing under `auto` fallback, record the selected policy, original target, fallback target, and blocking reason in checklist/manifests.
+- For strict cloud lanes, set `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=strict` so preflight failures fail fast instead of rerouting.
 - Keep mode semantics explicit and orthogonal: `executionMode=mcp|cloud` and `runtimeMode=cli|appserver` are separate controls.
 - Local default runtime remains `appserver`, with `--runtime-mode cli` preserved as break-glass.
 - `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and must fail fast with actionable errors.
@@ -42,18 +42,22 @@ Task-specific historical project blocks were removed from this file in `CO-88`. 
 - Follow `.agent/SOPs/oracle-usage.md` for Oracle runs (tool cap: 11 attachments; unique basenames; attachments-first workflow).
 
 ## Codex Version Policy (Execution)
-- Current CO compatibility/adoption target is stable Codex CLI (`0.118.0`).
-- Current `0.118.0` posture re-audit confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, and `codex review --help` exposing `[PROMPT]` alongside scoped review flags.
-- Release-facing downstream-smoke workflows stay on the marketplace-capable version recorded in `docs/guides/codex-version-policy.md`, while `cloud-canary` pins the explicit audited candidate and the active target remains `0.118.0`.
-- Current model posture is `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
-- On ChatGPT-auth sessions, keep delegated/review surfaces on `gpt-5.4` unless a fresh provider lane explicitly validates `gpt-5.4-codex`.
+- Current CO-local ChatGPT-auth/appserver model posture is `gpt-5.5` / `xhigh` on Codex CLI `0.125.0` when live access smoke passes; release-facing cloud/downstream pins stay on the explicit promoted candidate recorded in `docs/guides/codex-version-policy.md`.
+- Current `0.124.0` CO-local posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, live `gpt-5.5` `xhigh` availability, and a post-build runtime-mode canary pass (`20/20` per scenario, `ready_for_default_flip=true`).
+- Release-facing downstream-smoke workflows and `cloud-canary` pin the explicit promoted candidate recorded in `docs/guides/codex-version-policy.md`.
+- Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
+- Portable packaged/generated config still keeps `gpt-5.4` / `xhigh` as the fallback for unavailable `gpt-5.5`, API/cloud portability gaps, or unproven downstream/no-network contexts; use `gpt-5.5` for delegated/review surfaces after live access smoke unless a fresh provider lane validates a Codex-suffixed model variant.
+- `codex-orchestrator doctor` treats `gpt-5.5` as non-drift when `codex debug models` verifies current model access; `codex-orchestrator codex defaults --yes` keeps fresh configs on portable fallback defaults, and `codex-orchestrator codex defaults --auth-scope chatgpt --yes` writes current ChatGPT-auth/appserver defaults after live access smoke without requiring extra marker metadata.
+- Caveat: app-server `model/list` still reports `gpt-5.4` as `isDefault=true`; CO-341 live app-server `model/list` and live `codex exec` show `gpt-5.5` supports `xhigh` for explicit local configuration, and the bundled debug model catalog may lag the live catalog.
+- CO-352 catalog caveat: local `0.125.0` live catalog lists `gpt-5.3-codex-spark`, but bundled `0.125.0` catalog does not, so downstream/no-network `explorer_fast` file/codebase-search-only posture remains unchanged.
+- Treat residual plugin warnings from CO-341 as local temporary plugin cache warnings unless evidence maps them to CO-owned plugin manifests.
 - CO may run newer stable/prerelease Codex builds in explicit task-scoped canary lanes only; do not treat them as automatic global defaults.
 - App-server remains the normal local runtime path, but provider workers still stay on `codex exec` / `codex exec resume` supervision until a separate app-server control seam lands with explicit authority guardrails.
 - Required policy checks for newer-version lanes:
   - `scripts/runtime-mode-canary.mjs`
   - Required cloud contract run: `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 npm run ci:cloud-canary`
-  - Required fallback contract run: `CODEX_CLOUD_ENV_ID=<env-id> CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`
-- If required checks fail, required cloud evidence is missing, or provider/model compatibility regresses, hold/revert and update decision evidence in `docs/TASKS.md`, `tasks/index.json`, and task checklist mirrors.
+  - Required fallback contract run: `CODEX_CLOUD_ENV_ID="" CODEX_CLOUD_CANARY_REQUIRED=1 CLOUD_CANARY_EXPECT_FALLBACK=1 npm run ci:cloud-canary`
+- If required checks fail, required cloud evidence is missing, or provider/model compatibility regresses, hold/revert only the affected surface and update decision evidence in `docs/TASKS.md`, `tasks/index.json`, and task checklist mirrors.
 - Canonical policy/cadence guide: `docs/guides/codex-version-policy.md`.
 
 ## MCP vs Collab (Decision Rule)
@@ -66,10 +70,10 @@ Task-specific historical project blocks were removed from this file in `CO-88`. 
 ## Standalone Reviews (Ad-hoc)
 - Prefer `npm run review` for ad-hoc reviews in this repo so task-scoped evidence is captured and delegation MCP remains enabled by default.
 - Use direct `codex review` only for quick best-effort checks when manifest-backed evidence is not needed.
-- In non-interactive/CI runs (stdin is not a TTY, or `CODEX_REVIEW_NON_INTERACTIVE=1` / `CODEX_NON_INTERACTIVE=1` / `CODEX_NO_INTERACTIVE=1`), `codex-orchestrator review`/`npm run review` prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1` is set.
-- Non-interactive lane policy: direct/manual wrapper runs stay handoff-only unless `FORCE_CODEX_REVIEW=1`; `docs-review` and `implementation-gate` explicitly force review execution; `docs-relevance-advisory` explicitly clears `FORCE_CODEX_REVIEW` and remains prompt-only/advisory; the `provider-linear-worker` pipeline exports `CODEX_REVIEW_NON_INTERACTIVE=1` and `FORCE_CODEX_REVIEW=1`, so its pre-handoff standalone review executes before `Human Review` / `In Review`.
+- In non-interactive/CI runs (stdin is not a TTY, or `CODEX_REVIEW_NON_INTERACTIVE=1` / `CODEX_NON_INTERACTIVE=1` / `CODEX_NO_INTERACTIVE=1`), direct/manual `codex-orchestrator review`/`npm run review` prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1` is set.
+- Non-interactive lane policy: direct/manual wrapper runs stay handoff-only unless `FORCE_CODEX_REVIEW=1`; authoritative gate lanes set `CODEX_REVIEW_AUTHORITATIVE_GATE=1`, require `NOTES`, and fail closed instead of printing prompt-only handoff success; `docs-review` and `implementation-gate` explicitly force review execution; `docs-relevance-advisory` explicitly clears `FORCE_CODEX_REVIEW` and remains prompt-only/advisory; the `provider-linear-worker` pipeline exports `CODEX_REVIEW_NON_INTERACTIVE=1`, `FORCE_CODEX_REVIEW=1`, and `CODEX_REVIEW_AUTHORITATIVE_GATE=1`, so its pre-handoff standalone review executes before `Human Review` / `In Review`.
 - Scoped wrapper policy: explicit `npm run review -- --uncommitted|--base|--commit` runs keep the full prompt/context in the saved `review/prompt.txt` and carry reviewer-visible scoped context via `--title` (user-provided when present, otherwise synthesized from `NOTES` + `--surface`).
-- Wrapper truthfulness: `codex review --help` in `0.118.0` exposes `[PROMPT]` with scoped review flags, but CO continues to rely on saved prompt artifacts plus bounded `--title` transport for deterministic scoped runs; if Codex rejects a synthesized scoped `--title`, the wrapper retries the same explicit scope without `--title` and falls back to artifact-only reviewer-visible context.
+- Wrapper truthfulness: `codex review --help` in `0.124.0` exposes `[PROMPT]` with scoped review flags, but CO continues to rely on saved prompt artifacts plus bounded `--title` transport for deterministic scoped runs; if Codex rejects a synthesized scoped `--title`, the wrapper retries the same explicit scope without `--title` and falls back to artifact-only reviewer-visible context.
 - Scoped surface limit: explicit `--uncommitted|--base|--commit` wrapper runs support only the default `diff` surface at the actual Codex layer; `--surface audit|architecture` requires an unscoped prompt-capable review.
 - Capture the standalone review approval (even if “no issues”) in the spec/task notes before implementation begins.
 - For manifest-backed review evidence, run `TASK=<task-id> NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --manifest <path>` (repo alias: `npm run review -- --manifest <path>`).

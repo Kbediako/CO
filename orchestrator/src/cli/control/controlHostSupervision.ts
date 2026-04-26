@@ -82,6 +82,7 @@ export interface ControlHostSupervisionState {
   last_signal: string | null;
   last_health_check_at: string | null;
   last_health_status: string | null;
+  last_probe_duration_ms?: number | null;
   consecutive_unhealthy_samples: number;
   restart_count: number;
   unhealthy_threshold: number;
@@ -136,6 +137,7 @@ export interface ControlHostSupervisionRestartRecord {
   message: string;
   consecutive_unhealthy_samples: number;
   child_pid: number | null;
+  probe_duration_ms?: number | null;
   diagnostic: ControlHostSupervisionHealthDiagnostic | null;
 }
 
@@ -146,6 +148,7 @@ export interface ControlHostSupervisionHealthEvaluation {
     | 'restart_required'
     | 'stale_restart_required'
     | 'active_worker_restart_quarantine'
+    | 'active_worker_probe_timeout_quarantine'
     | 'invalid_payload';
   message: string;
 }
@@ -355,6 +358,7 @@ export function buildInitialControlHostSupervisionState(input: {
     last_signal: null,
     last_health_check_at: null,
     last_health_status: null,
+    last_probe_duration_ms: null,
     consecutive_unhealthy_samples: 0,
     restart_count: input.restartCount ?? 0,
     unhealthy_threshold: input.config.unhealthyThreshold,
@@ -566,6 +570,108 @@ function resolveRepeatedActiveWorkerRestartQuarantine(input: {
   return null;
 }
 
+export function evaluateControlHostSupervisionProbeTimeoutDiagnostic(
+  diagnostic: ControlHostSupervisionHealthDiagnostic | null,
+  options: {
+    minPollingUpdatedAt?: string | null;
+    restartHistory?: ControlHostSupervisionRestartRecord[] | null;
+    activeWorkerRestartQuarantineMs?: number | null;
+    now?: string | null;
+  } = {}
+): ControlHostSupervisionHealthEvaluation | null {
+  if (!diagnostic || diagnostic.running_workers.length === 0) {
+    return null;
+  }
+  if (!isCurrentControlHostSupervisionPollingDiagnostic(diagnostic.polling, options.minPollingUpdatedAt)) {
+    return null;
+  }
+  const restartRequired = isProviderRefreshLifecycleRestartRequiredDiagnostic(diagnostic.polling);
+  const activeRefresh = isActiveProviderRefreshProbeTimeoutDiagnostic(diagnostic.polling);
+  if (!restartRequired && !activeRefresh) {
+    return null;
+  }
+  if (hasAvailableProviderWorkerCapacity(diagnostic)) {
+    return null;
+  }
+  const restartHistory = normalizeControlHostSupervisionRestartHistory(options.restartHistory);
+  if (restartHistory.length === 0) {
+    return null;
+  }
+  const currentSignature = buildControlHostSupervisionRestartSignature(diagnostic);
+  if (currentSignature === null) {
+    return null;
+  }
+  const nowMs = parseIsoTimestampToMs(options.now ?? new Date().toISOString());
+  const quarantineMs =
+    typeof options.activeWorkerRestartQuarantineMs === 'number' &&
+    Number.isFinite(options.activeWorkerRestartQuarantineMs)
+      ? Math.max(0, options.activeWorkerRestartQuarantineMs)
+      : DEFAULT_CONTROL_HOST_SUPERVISION_ACTIVE_WORKER_RESTART_QUARANTINE_MS;
+  for (let index = restartHistory.length - 1; index >= 0; index -= 1) {
+    const record = restartHistory[index];
+    const requestedAtMs = parseIsoTimestampToMs(record.requested_at);
+    if (
+      nowMs !== null &&
+      requestedAtMs !== null &&
+      nowMs - requestedAtMs > quarantineMs
+    ) {
+      break;
+    }
+    if (record.reason !== 'probe_timeout') {
+      return null;
+    }
+    const recordSignature = buildControlHostSupervisionRestartSignature(record.diagnostic);
+    if (recordSignature === null || recordSignature !== currentSignature) {
+      return null;
+    }
+    return {
+      healthy: true,
+      reason: 'active_worker_probe_timeout_quarantine',
+      message: `co-status probe timed out for the same active provider worker series already restarted at ${record.requested_at}; ${diagnostic.running_workers.length} active provider worker(s) remain visible in local provider-intake state, so supervision is quarantining repeated probe timeout restart churn while retaining the prior fail-closed timeout record.`
+    };
+  }
+  return null;
+}
+
+function isProviderRefreshLifecycleRestartRequiredDiagnostic(
+  polling: ControlHostSupervisionPollingDiagnostic | null
+): boolean {
+  if (!polling || polling.restart_required !== true) {
+    return false;
+  }
+  return (
+    polling.reason === 'provider_refresh_lifecycle_stuck' ||
+    polling.last_error === 'provider_refresh_lifecycle_stuck'
+  );
+}
+
+function isActiveProviderRefreshProbeTimeoutDiagnostic(
+  polling: ControlHostSupervisionPollingDiagnostic | null
+): boolean {
+  if (!polling || polling.checking !== true) {
+    return false;
+  }
+  if (polling.restart_required === true || polling.stuck === true) {
+    return false;
+  }
+  if (polling.reason !== null) {
+    return false;
+  }
+  return polling.refresh_phase?.startsWith('refresh:') === true;
+}
+
+function isCurrentControlHostSupervisionPollingDiagnostic(
+  polling: ControlHostSupervisionPollingDiagnostic | null,
+  minPollingUpdatedAt: string | null | undefined
+): boolean {
+  const minimumUpdatedAt = parseIsoTimestampToMs(minPollingUpdatedAt);
+  if (minimumUpdatedAt === null) {
+    return true;
+  }
+  const pollingUpdatedAt = parseIsoTimestampToMs(polling?.updated_at);
+  return pollingUpdatedAt !== null && pollingUpdatedAt >= minimumUpdatedAt;
+}
+
 function hasAvailableProviderWorkerCapacity(
   diagnostic: ControlHostSupervisionHealthDiagnostic
 ): boolean {
@@ -650,6 +756,7 @@ function normalizeControlHostSupervisionRestartRecord(
     message: readNonEmptyString(value.message) ?? '',
     consecutive_unhealthy_samples: readFiniteNumber(value.consecutive_unhealthy_samples) ?? 0,
     child_pid: readFiniteNumber(value.child_pid),
+    probe_duration_ms: readFiniteNumber(value.probe_duration_ms),
     diagnostic: normalizeStoredControlHostSupervisionHealthDiagnostic(value.diagnostic)
   };
 }
@@ -670,9 +777,24 @@ function buildControlHostSupervisionRestartSignature(
   // Quarantine repeated restart churn on the stable active-worker series, not on transient
   // refresh checkpoints that can legitimately drift within one stuck refresh cycle.
   return JSON.stringify({
-    reason: diagnostic.polling.reason ?? diagnostic.polling.last_error ?? null,
+    reason: buildControlHostSupervisionRestartReasonKey(diagnostic.polling),
     worker_series: workerSeries
   });
+}
+
+function buildControlHostSupervisionRestartReasonKey(
+  polling: ControlHostSupervisionPollingDiagnostic
+): string | null {
+  if (polling.reason) {
+    return polling.reason;
+  }
+  if (isActiveProviderRefreshProbeTimeoutDiagnostic(polling)) {
+    return 'active_provider_refresh_probe_timeout';
+  }
+  if (isProviderRefreshLifecycleRestartRequiredDiagnostic(polling)) {
+    return 'provider_refresh_lifecycle_stuck';
+  }
+  return polling.last_error ?? null;
 }
 
 function buildControlHostSupervisionWorkerSeriesKey(

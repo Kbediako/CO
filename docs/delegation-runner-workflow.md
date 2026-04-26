@@ -186,4 +186,4 @@ codex-orchestrator delegation cleanup-stale --yes
 - Use `codex exec` only for pre-task triage (no task id yet) or when delegation is unavailable.
 - Pass the manifest path whenever you need `delegate.question.*` or run control APIs.
 - `delegate.status` enforcement: active runs still require a valid `control_endpoint.json`; terminal runs (`succeeded`/`failed`/`cancelled`) can be read from manifest state even when control endpoint files are gone.
-- For cloud-focused workflows, avoid fallback dependence by setting `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny` (preflight failures fail fast).
+- For cloud-focused workflows, avoid fallback dependence by setting `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=strict` (preflight failures fail fast).

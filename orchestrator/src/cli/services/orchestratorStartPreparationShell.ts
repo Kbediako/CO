@@ -68,7 +68,8 @@ export async function runOrchestratorStartPreparationShell(
     issueProvider: params.options.issueProvider ?? null,
     issueId: params.options.issueId ?? null,
     issueIdentifier: params.options.issueIdentifier ?? null,
-    issueUpdatedAt: params.options.issueUpdatedAt ?? null
+    issueUpdatedAt: params.options.issueUpdatedAt ?? null,
+    configResolution: preparation.configResolution ?? null
   });
   params.applyRequestedRuntimeMode(manifest, runtimeModeResolution.mode);
   if (preparation.configNotice) {

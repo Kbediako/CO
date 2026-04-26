@@ -1,0 +1,216 @@
+{
+  "version": 1,
+  "current": {
+    "codex_cli_version": "0.125.0",
+    "latest_audited_candidate_cli_version": "0.125.0",
+    "marketplace_smoke_cli_version": "0.125.0",
+    "cloud_canary_cli_version": "0.124.0",
+    "model": "gpt-5.5",
+    "default_runtime": "appserver",
+    "explorer_fast_model": "gpt-5.3-codex-spark",
+    "unsupported_review_model": ""
+  },
+  "surfaces": [
+    {
+      "path": "README.md",
+      "kind": "front_door",
+      "status": "current",
+      "requirements": [
+        {
+          "label": "current CLI target",
+          "contains": "Current CO-local Codex CLI `{{current_cli_version}}` ChatGPT-auth/appserver posture"
+        },
+        {
+          "label": "current model posture",
+          "contains": "Current model posture: `{{current_model}}` / `xhigh`"
+        },
+        {
+          "label": "default runtime",
+          "contains": "Local default runtime: `{{default_runtime}}`"
+        }
+      ]
+    },
+    {
+      "path": "docs/README.md",
+      "kind": "current_navigation",
+      "status": "current",
+      "requirements": [
+        {
+          "label": "current CLI target",
+          "contains": "Current CO-local ChatGPT-auth/appserver model posture: `{{current_model}}` / `xhigh` on Codex CLI `{{current_cli_version}}`"
+        },
+        {
+          "label": "current model posture",
+          "contains": "Current model posture is `{{current_model}}` / `xhigh`"
+        },
+        {
+          "label": "explorer_fast exception",
+          "contains": "keep `explorer_fast` on `{{explorer_fast_model}}` for file/codebase search only"
+        },
+        {
+          "label": "default runtime",
+          "contains": "Local default runtime is `{{default_runtime}}`"
+        }
+      ]
+    },
+    {
+      "path": "docs/book/README.md",
+      "kind": "book_index",
+      "status": "current",
+      "requirements": [
+        {
+          "label": "public posture entry",
+          "contains": "[Public Posture](public-posture.md): current compatibility target, model/runtime posture, and evidence gates"
+        },
+        {
+          "label": "historical 0.124 evidence demotion",
+          "contains": "[Historical Codex CLI 0.124.0 Evidence](archive/codex-cli-0124-adoption.md): archive-only"
+        }
+      ]
+    },
+    {
+      "path": "docs/book/public-posture.md",
+      "kind": "public_posture",
+      "status": "current",
+      "requirements": [
+        {
+          "label": "release-facing package target",
+          "contains": "current release-facing package/downstream-smoke compatibility target is Codex CLI `{{marketplace_smoke_cli_version}}`"
+        },
+        {
+          "label": "current model posture",
+          "contains": "Current model posture: `{{current_model}}` / `xhigh`"
+        },
+        {
+          "label": "explorer_fast exception",
+          "contains": "`explorer_fast` remains the explicit `{{explorer_fast_model}}` exception for file/codebase search only"
+        }
+      ]
+    },
+    {
+      "path": "docs/public/downstream-setup.md",
+      "kind": "downstream_setup",
+      "status": "current",
+      "requirements": [
+        {
+          "label": "current CLI target",
+          "contains": "CO-local ChatGPT-auth/appserver posture now uses `{{current_model}}` / `xhigh` on Codex CLI `{{current_cli_version}}`"
+        },
+        {
+          "label": "marketplace add expectation",
+          "contains": "codex plugin marketplace add"
+        }
+      ]
+    },
+    {
+      "path": "docs/guides/codex-version-policy.md",
+      "kind": "version_policy",
+      "status": "current",
+      "requirements": [
+        {
+          "label": "current local CLI posture",
+          "contains": "Current CO-local ChatGPT-auth/appserver model posture is `{{current_model}}` / `xhigh` on Codex CLI `{{current_cli_version}}`"
+        },
+        {
+          "label": "release-facing package target",
+          "contains": "Current release-facing package/downstream-smoke compatibility target is Codex CLI `{{marketplace_smoke_cli_version}}`"
+        },
+        {
+          "label": "cloud execution candidate",
+          "contains": "Current cloud execution candidate remains Codex CLI `{{cloud_canary_cli_version}}`"
+        },
+        {
+          "label": "marketplace smoke pin",
+          "contains": "@openai/codex@{{marketplace_smoke_cli_version}}"
+        },
+        {
+          "label": "cloud canary pin",
+          "contains": "@openai/codex@{{cloud_canary_cli_version}}"
+        },
+        {
+          "label": "current model posture",
+          "contains": "Current model posture is `{{current_model}}` / `xhigh`"
+        },
+        {
+          "label": "explorer_fast exception",
+          "contains": "Keep `explorer_fast` as the only explicit `{{explorer_fast_model}}` exception"
+        },
+        {
+          "label": "default runtime",
+          "contains": "Local {{default_runtime}} remains the expected default runtime path"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/core-lane.yml",
+      "kind": "workflow_pin",
+      "status": "current",
+      "requirements": [
+        {
+          "label": "marketplace smoke workflow pin",
+          "contains": "npm install --global @openai/codex@{{marketplace_smoke_cli_version}}"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "kind": "workflow_pin",
+      "status": "current",
+      "requirements": [
+        {
+          "label": "release marketplace smoke workflow pin",
+          "contains": "npm install --global @openai/codex@{{marketplace_smoke_cli_version}}"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/pack-smoke-backstop.yml",
+      "kind": "workflow_pin",
+      "status": "current",
+      "requirements": [
+        {
+          "label": "pack-smoke backstop workflow pin",
+          "contains": "npm install --global @openai/codex@{{marketplace_smoke_cli_version}}"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/cloud-canary.yml",
+      "kind": "workflow_pin",
+      "status": "current",
+      "requirements": [
+        {
+          "label": "cloud canary workflow pin",
+          "contains": "npm install --global @openai/codex@{{cloud_canary_cli_version}}"
+        }
+      ]
+    },
+    {
+      "path": "tests/pack-smoke.spec.ts",
+      "kind": "pack_smoke_expectation",
+      "status": "current",
+      "requirements": [
+        {
+          "label": "marketplace install expectation",
+          "contains": "npm install --global @openai/codex@{{marketplace_smoke_cli_version}}"
+        },
+        {
+          "label": "cloud install expectation",
+          "contains": "npm install --global @openai/codex@{{cloud_canary_cli_version}}"
+        },
+        {
+          "label": "marketplace capability expectation",
+          "contains": "Marketplace smoke requires a Codex CLI with a supported marketplace add command (`codex plugin marketplace add` or `codex marketplace add`)"
+        }
+      ]
+    }
+  ],
+  "historical_release_evidence": [
+    {
+      "path": "docs/book/archive/codex-cli-0124-adoption.md",
+      "status": "archive",
+      "version": "0.124.0",
+      "title": "Historical Codex CLI 0.124.0 Evidence"
+    }
+  ]
+}

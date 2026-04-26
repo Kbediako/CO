@@ -122,5 +122,12 @@ describe('review-non-interactive-handoff', () => {
         stdinIsTTY: false
       })
     ).toBe(false);
+    expect(
+      shouldPrintNonInteractiveHandoff({
+        env: { CODEX_REVIEW_AUTHORITATIVE_GATE: '1', CODEX_REVIEW_NON_INTERACTIVE: '1' },
+        nonInteractive: true,
+        stdinIsTTY: false
+      })
+    ).toBe(false);
   });
 });

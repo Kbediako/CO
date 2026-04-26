@@ -1438,6 +1438,12 @@ function baseEnv(sandbox: string, codexBin: string): Record<string, string | und
   delete env.CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS;
   delete env.CODEX_REVIEW_DEBUG_TELEMETRY;
   delete env.CODEX_REVIEW_SURFACE;
+  delete env.CODEX_REVIEW_AUTHORITATIVE_GATE;
+  delete env.CODEX_REVIEW_BREAK_GLASS_NOTES_FALLBACK;
+  delete env.CODEX_REVIEW_BREAK_GLASS_OWNER;
+  delete env.CODEX_REVIEW_BREAK_GLASS_EXPIRES_AT;
+  delete env.CODEX_REVIEW_BREAK_GLASS_REASON;
+  delete env.CODEX_REVIEW_BREAK_GLASS_EVIDENCE;
   delete env.CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD;
   delete env.CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD;
   delete env.CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON;
@@ -2030,6 +2036,36 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stdout).toContain('Set FORCE_CODEX_REVIEW=1 to invoke `codex review` in this environment.');
   });
 
+  it('keeps non-authoritative handoff available without NOTES', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, '/missing/codex'),
+      FORCE_CODEX_REVIEW: '0',
+      NOTES: ''
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('Codex review handoff (non-interactive):');
+    expect(result.stderr).toContain('using a generated fallback for a non-authoritative review');
+  });
+
+  it('rejects prompt-only non-interactive handoff under the authoritative review gate', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, '/missing/codex'),
+      FORCE_CODEX_REVIEW: '0',
+      CODEX_REVIEW_AUTHORITATIVE_GATE: '1'
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).not.toContain('Codex review handoff (non-interactive):');
+    expect(result.stderr).toContain(
+      'CODEX_REVIEW_AUTHORITATIVE_GATE=1 disallows prompt-only non-interactive review handoff'
+    );
+  });
+
   it('still emits a non-interactive handoff prompt for large uncommitted scope without requiring an override', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
@@ -2093,23 +2129,45 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(heavyPrompt).not.toContain('Execution constraints (bounded review mode):');
   }, LONG_WAIT_TEST_TIMEOUT_MS * 2);
 
-  it('uses a generated NOTES fallback when NOTES is absent', async () => {
+  it('rejects missing NOTES instead of generating a routine fallback', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
-      NOTES: ''
+      NOTES: '',
+      CODEX_REVIEW_AUTHORITATIVE_GATE: '1'
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('NOTES is required for the authoritative review gate');
+    expect(result.stderr).not.toContain('using a generated fallback');
+  });
+
+  it('allows missing NOTES only with explicit break-glass waiver metadata', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      NOTES: '',
+      CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+      CODEX_REVIEW_BREAK_GLASS_NOTES_FALLBACK: '1',
+      CODEX_REVIEW_BREAK_GLASS_OWNER: 'parent-provider-worker',
+      CODEX_REVIEW_BREAK_GLASS_EXPIRES_AT: '2099-01-01T00:00:00.000Z',
+      CODEX_REVIEW_BREAK_GLASS_REASON: 'bounded emergency review before authored notes are available',
+      CODEX_REVIEW_BREAK_GLASS_EVIDENCE: '.runs/sample-task/cli/sample-run/manifest.json'
     });
 
     expect(result.exitCode).toBe(0);
-    expect(result.stderr).toContain('[run-review] NOTES was not provided; using a generated fallback.');
     const promptPath = join(dirname(manifestPath), 'review', 'prompt.txt');
     const prompt = await readFile(promptPath, 'utf8');
     expect(prompt).toContain('Agent notes:');
-    expect(prompt).toContain(
-      'Goal: standalone review handoff | Summary: auto-generated NOTES fallback (task=sample-task, surface=diff) | Risks: missing custom intent details may reduce review precision'
-    );
+    expect(prompt).toContain('Break-glass missing NOTES waiver');
+    expect(prompt).toContain('approved_by=parent-provider-worker');
+    expect(prompt).toContain('expires_at=2099-01-01T00:00:00.000Z');
+    expect(prompt).toContain('evidence=.runs/sample-task/cli/sample-run/manifest.json');
+    expect(prompt).not.toContain('auto-generated NOTES fallback');
   });
 
   it('ignores ambient fake-codex harness env in baseEnv', async () => {

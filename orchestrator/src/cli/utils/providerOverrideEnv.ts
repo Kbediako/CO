@@ -1,7 +1,10 @@
 import { join } from 'node:path';
 
 import { readProviderControlHostLocatorFromEnv } from '../../../../scripts/lib/provider-run-contract.js';
-import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../config/repoConfigPolicy.js';
+import {
+  CONFIG_AUTHORITY_MODE_ENV_KEY,
+  REPO_CONFIG_REQUIRED_ENV_KEY
+} from '../config/repoConfigPolicy.js';
 import { REPO_CONFIG_PATH_ENV_KEY } from '../config/userConfig.js';
 
 const PROVIDER_REPO_CONFIG_PATH_ENV_KEY = 'CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH';
@@ -14,6 +17,11 @@ const PROVIDER_OVERRIDE_MARKER_ENV_KEYS = [
   PROVIDER_REPO_CONFIG_PATH_ENV_KEY,
   PROVIDER_PACKAGE_ROOT_ENV_KEY
 ] as const;
+const PROVIDER_WORKSPACE_ARTIFACT_ENV_KEYS = [
+  'CODEX_ORCHESTRATOR_ROOT',
+  'CODEX_ORCHESTRATOR_RUNS_DIR',
+  'CODEX_ORCHESTRATOR_OUT_DIR'
+] as const;
 
 export {
   PROVIDER_OVERRIDE_ENV_KEYS,
@@ -23,9 +31,17 @@ export {
 };
 
 export function sanitizeProviderOverrideEnv(
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  options: {
+    stripWorkspaceArtifactEnv?: boolean;
+  } = {}
 ): NodeJS.ProcessEnv {
   const sanitized: NodeJS.ProcessEnv = { ...env };
+  if (options.stripWorkspaceArtifactEnv) {
+    for (const key of PROVIDER_WORKSPACE_ARTIFACT_ENV_KEYS) {
+      delete sanitized[key];
+    }
+  }
   const controlHostLocator = readProviderControlHostLocatorFromEnv(sanitized);
   if (!controlHostLocator) {
     return sanitized;
@@ -55,6 +71,7 @@ export function sanitizeProviderOverrideEnv(
     currentPackageRoot === providerPackageRoot;
   if (shouldStripRepoConfig) {
     delete sanitized[REPO_CONFIG_PATH_ENV_KEY];
+    sanitized[CONFIG_AUTHORITY_MODE_ENV_KEY] = 'downstream-compatibility';
     delete sanitized[REPO_CONFIG_REQUIRED_ENV_KEY];
   }
   if (shouldStripPackageRoot) {

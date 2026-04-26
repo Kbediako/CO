@@ -43,7 +43,8 @@ describe('orchestrator plan shell', () => {
         id: 'parent',
         title: 'Parent pipeline',
         description: null,
-        source: 'user'
+        source: 'user',
+        config_resolution: null
       },
       stages: [
         {

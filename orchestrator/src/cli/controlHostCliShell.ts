@@ -45,6 +45,7 @@ import {
   REPO_CONFIG_PATH_ENV_KEY,
 } from './config/userConfig.js';
 import {
+  CONFIG_AUTHORITY_MODE_ENV_KEY,
   REPO_CONFIG_REQUIRED_ENV_KEY
 } from './config/repoConfigPolicy.js';
 import {
@@ -330,6 +331,7 @@ export async function runControlHostCliShell(
               providerWorkflowConfigStore,
               input.workerHost
             );
+            assertResumeLaunchSpecMatchesAdmittedWorkerHost(input.workerHost, launchSpec);
             await spawnBackgroundCli(launchSpec, cliEntrypoint, [
               'resume',
               '--run',
@@ -820,6 +822,26 @@ async function resolveProviderResumeLaunchSpec(
   };
 }
 
+function assertResumeLaunchSpecMatchesAdmittedWorkerHost(
+  preferredWorkerHost: string | null | undefined,
+  launchSpec: ProviderLaunchSpec
+): void {
+  const normalizedPreferredWorkerHost = normalizeProviderWorkerHostName(preferredWorkerHost);
+  if (!normalizedPreferredWorkerHost) {
+    return;
+  }
+  if (launchSpec.transport.kind === 'local') {
+    throw new Error(
+      `Admitted provider resume host "${normalizedPreferredWorkerHost}" resolved to local at launch time; retry under refreshed admission so the local safety cap is reapplied.`
+    );
+  }
+  if (launchSpec.transport.host.name !== normalizedPreferredWorkerHost) {
+    throw new Error(
+      `Admitted provider resume host "${normalizedPreferredWorkerHost}" drifted to "${launchSpec.transport.host.name}" at launch time; retry under refreshed admission.`
+    );
+  }
+}
+
 async function resolveProviderLaunchConfigPath(
   env: EnvironmentPaths,
   providerWorkflowConfigStore?: ProviderWorkflowConfigStore
@@ -862,6 +884,7 @@ function buildProviderLaunchSpec(
       CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
       CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
       [REPO_CONFIG_PATH_ENV_KEY]: repoConfigPath,
+      [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'repo-authoritative',
       [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
       [PROVIDER_WORKER_HOST_ENV_KEY]: workerHost?.name ?? '',
       ...(workerHost ? { CODEX_ORCHESTRATOR_NODE_BIN: resolveRemoteProviderNodePath(workerHost) } : {}),
@@ -1001,6 +1024,7 @@ export const __test__ = {
   resolveRemoteProviderNodePath,
   resolveSpawnManifestWaitTimeoutMs,
   resolveProviderResumeLaunchSpec,
+  assertResumeLaunchSpecMatchesAdmittedWorkerHost,
   resolveProviderResumeTaskId,
   resolveProviderOverridePackageRoot,
   snapshotRunManifests,

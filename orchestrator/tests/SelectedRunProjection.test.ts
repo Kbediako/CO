@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -5371,6 +5371,419 @@ describe('SelectedRunProjection', () => {
     }
   );
 
+  it('hydrates selected appserver proof when only session-log ids are missing', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        started_at: '2026-04-17T00:30:00.000Z',
+        updated_at: '2026-04-17T00:35:00.000Z',
+        workspace_path: root
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          attempt_started_at: '2026-04-17T00:30:00.000Z',
+          current_turn_started_at: '2026-04-17T00:30:01.000Z',
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'thread-1-turn-2',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          session_log_thread_id: null,
+          session_log_turn_id: null,
+          session_log_session_id: null,
+          last_event: 'task_complete',
+          last_message: null,
+          last_event_at: '2026-04-17T00:35:00.000Z',
+          current_turn_activity: {
+            event: 'task_complete',
+            message_or_payload: null,
+            recorded_at: '2026-04-17T00:35:00.000Z',
+            source: 'stdout_jsonl',
+            turn_id: 'turn-2',
+            session_id: 'thread-1-turn-2'
+          },
+          tokens: {
+            input_tokens: 12,
+            output_tokens: 8,
+            total_tokens: 20
+          },
+          rate_limits: {
+            primary: {
+              used_percent: 10,
+              window_minutes: 300
+            },
+            secondary: {
+              used_percent: 20,
+              window_minutes: 10080
+            }
+          },
+          runtime: {
+            requested_mode: 'appserver',
+            selected_mode: 'appserver',
+            provider: 'AppServerRuntimeProvider',
+            runtime_session_id: 'appserver-run-child',
+            fallback: {
+              occurred: false,
+              code: null,
+              reason: null,
+              from_mode: null,
+              to_mode: null,
+              checked_at: '2026-04-17T00:30:00.000Z'
+            }
+          },
+          auth_provenance: {
+            provider_kind: 'codex',
+            runtime_mode: 'appserver',
+            runtime_provider: 'AppServerRuntimeProvider',
+            active_profile_fingerprint: null,
+            active_account_fingerprint: null,
+            cloud_env_id: 'env-appserver-proof',
+            cloud_branch: null,
+            credential_source: null,
+            auth_freshness: 'credential_source_unknown',
+            observed_at: '2026-04-17T00:30:00.000Z',
+            source: 'runtime_env:linear'
+          },
+          owner_phase: 'turn_completed',
+          owner_status: 'in_progress',
+          workspace_path: root,
+          child_lanes: [],
+          updated_at: '2026-04-17T00:35:00.000Z'
+        }),
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const codexHome = join(root, '.codex');
+    const sessionDir = join(codexHome, 'sessions', '2026', '04', '17');
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(
+      join(sessionDir, 'rollout-2026-04-17T00-30-02-000Z-thread-1.jsonl'),
+      [
+        JSON.stringify({
+          type: 'session_meta',
+          payload: {
+            id: 'thread-1',
+            cwd: root,
+            initial_prompt: 'You are the provider worker for Linear issue CO-2: Autonomous intake handoff'
+          }
+        }),
+        JSON.stringify({
+          type: 'turn_context',
+          payload: {
+            turn_id: 'turn-2'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-04-17T00:35:00.000Z',
+          type: 'event_msg',
+          payload: {
+            type: 'task_complete',
+            turn_id: 'turn-2'
+          }
+        })
+      ].join('\n'),
+      'utf8'
+    );
+
+    const previousCodexHome = process.env.CODEX_HOME;
+    process.env.CODEX_HOME = codexHome;
+    try {
+      const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+      expect(selected?.providerLinearWorkerProof).toMatchObject({
+        session_log_thread_id: 'thread-1',
+        session_log_turn_id: 'turn-2',
+        session_log_session_id: 'thread-1-turn-2',
+        appserver_supervision: {
+          turn_persistence_status: 'proven',
+          turn_persistence_source: 'session_log_hydration',
+          turn_persistence_blocker: null
+        }
+      });
+    } finally {
+      if (previousCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = previousCodexHome;
+      }
+    }
+  });
+
+  it('hydrates selected appserver proof when only supervision proof is missing', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        started_at: '2026-04-17T00:30:00.000Z',
+        updated_at: '2026-04-17T00:35:00.000Z',
+        workspace_path: root
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          attempt_started_at: '2026-04-17T00:30:00.000Z',
+          current_turn_started_at: '2026-04-17T00:30:01.000Z',
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          latest_session_id: 'thread-1-turn-2',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          session_log_thread_id: 'thread-1',
+          session_log_turn_id: 'turn-2',
+          session_log_session_id: 'thread-1-turn-2',
+          turn_count: 1,
+          last_event: 'task_complete',
+          last_message: null,
+          last_event_at: '2026-04-17T00:35:00.000Z',
+          current_turn_activity: {
+            event: 'task_complete',
+            message_or_payload: null,
+            recorded_at: '2026-04-17T00:35:00.000Z',
+            source: 'session_log_hydration',
+            turn_id: 'turn-2',
+            session_id: 'thread-1-turn-2'
+          },
+          tokens: {
+            input_tokens: 12,
+            output_tokens: 8,
+            total_tokens: 20
+          },
+          rate_limits: {
+            primary: {
+              used_percent: 10,
+              window_minutes: 300
+            }
+          },
+          runtime: {
+            requested_mode: 'appserver',
+            selected_mode: 'appserver',
+            provider: 'AppServerRuntimeProvider',
+            runtime_session_id: 'appserver-run-child',
+            fallback: {
+              occurred: false,
+              code: null,
+              reason: null,
+              from_mode: null,
+              to_mode: null,
+              checked_at: '2026-04-17T00:30:00.000Z'
+            }
+          },
+          auth_provenance: {
+            provider_kind: 'codex',
+            runtime_mode: 'appserver',
+            runtime_provider: 'AppServerRuntimeProvider',
+            active_profile_fingerprint: null,
+            active_account_fingerprint: null,
+            cloud_env_id: 'env-appserver-proof',
+            cloud_branch: null,
+            credential_source: null,
+            auth_freshness: 'credential_source_unknown',
+            observed_at: '2026-04-17T00:30:00.000Z',
+            source: 'runtime_env:linear'
+          },
+          appserver_supervision: null,
+          owner_phase: 'turn_completed',
+          owner_status: 'in_progress',
+          workspace_path: root,
+          child_lanes: [],
+          updated_at: '2026-04-17T00:35:00.000Z'
+        }),
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected?.providerLinearWorkerProof).toMatchObject({
+      appserver_supervision: {
+        selected_runtime: {
+          selected_mode: 'appserver',
+          runtime_session_id: 'appserver-run-child'
+        },
+        sticky_environment_id: 'env-appserver-proof',
+        sticky_environment_status: 'proven',
+        turn_persistence_status: 'proven',
+        turn_persistence_source: 'session_log_hydration',
+        pagination_status: 'blocked',
+        resume_status: 'not_requested',
+        fork_status: 'blocked',
+        jsonl_truth_retained: true,
+        session_log_truth_retained: true
+      }
+    });
+  }, 20_000);
+
+  it('does not refresh settled appserver-requested CLI fallback proofs for missing session-log truth', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        started_at: '2026-04-17T00:30:00.000Z',
+        updated_at: '2026-04-17T00:35:00.000Z',
+        workspace_path: root
+      }),
+      'utf8'
+    );
+    const fallback = {
+      occurred: true,
+      code: 'appserver-command-unavailable',
+      reason: 'Appserver preflight failed.',
+      from_mode: 'appserver',
+      to_mode: 'cli',
+      checked_at: '2026-04-17T00:30:00.000Z'
+    } as const;
+    const proof = buildProviderLinearWorkerProof({
+      attempt_started_at: '2026-04-17T00:30:00.000Z',
+      current_turn_started_at: '2026-04-17T00:30:01.000Z',
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-1',
+      latest_session_id: 'thread-1-turn-1',
+      latest_session_id_source: 'derived_from_thread_and_turn',
+      session_log_thread_id: null,
+      session_log_turn_id: null,
+      session_log_session_id: null,
+      turn_count: 1,
+      last_event: 'task_complete',
+      last_message: null,
+      last_event_at: '2026-04-17T00:35:00.000Z',
+      current_turn_activity: {
+        event: 'task_complete',
+        message_or_payload: null,
+        recorded_at: '2026-04-17T00:35:00.000Z',
+        source: 'stdout_jsonl',
+        turn_id: 'turn-1',
+        session_id: 'thread-1-turn-1'
+      },
+      tokens: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20
+      },
+      rate_limits: {
+        primary: {
+          used_percent: 10,
+          window_minutes: 300
+        }
+      },
+      runtime: {
+        requested_mode: 'appserver',
+        selected_mode: 'cli',
+        provider: 'CliRuntimeProvider',
+        runtime_session_id: null,
+        fallback
+      },
+      appserver_supervision: {
+        selected_runtime: {
+          requested_mode: 'appserver',
+          selected_mode: 'cli',
+          provider: 'CliRuntimeProvider',
+          runtime_session_id: null,
+          fallback
+        },
+        supervision_command: 'codex_exec',
+        appserver_session_id: null,
+        thread_id: 'thread-1',
+        latest_turn_id: 'turn-1',
+        latest_session_id: 'thread-1-turn-1',
+        session_log_thread_id: null,
+        session_log_turn_id: null,
+        session_log_session_id: null,
+        sticky_environment_id: null,
+        sticky_environment_status: 'blocked',
+        sticky_environment_blocker: 'configured_environment_id_missing',
+        turn_persistence_status: 'blocked',
+        turn_persistence_source: null,
+        turn_persistence_blocker: 'session_log_hydration_missing',
+        pagination_status: 'blocked',
+        pagination_blocker: 'appserver_pagination_probe_not_implemented',
+        resume_status: 'not_requested',
+        resume_source_thread_id: null,
+        resume_observed_thread_id: null,
+        resume_blocker: null,
+        fork_status: 'blocked',
+        fork_blocker: 'appserver_fork_probe_not_implemented',
+        jsonl_truth_retained: true,
+        session_log_truth_retained: false,
+        updated_at: '2026-04-17T00:35:00.000Z'
+      },
+      owner_phase: 'turn_completed',
+      owner_status: 'in_progress',
+      workspace_path: root,
+      child_lanes: [],
+      progress: null,
+      updated_at: '2026-04-17T00:35:00.000Z'
+    });
+    const proofRaw = JSON.stringify(proof, null, 2);
+    const proofPath = join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    await writeFile(proofPath, proofRaw, 'utf8');
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected?.providerLinearWorkerProof?.appserver_supervision).toMatchObject({
+      selected_runtime: {
+        requested_mode: 'appserver',
+        selected_mode: 'cli'
+      },
+      session_log_truth_retained: false,
+      turn_persistence_status: 'blocked',
+      turn_persistence_blocker: 'session_log_hydration_missing'
+    });
+    await expect(readFile(proofPath, 'utf8')).resolves.toBe(proofRaw);
+  });
+
   it('refreshes in-progress provider proofs from session telemetry during projection reads', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
@@ -5896,6 +6309,477 @@ describe('SelectedRunProjection', () => {
     });
   });
 
+  it('keeps full compatibility discovery for small provider-intake sets', async () => {
+    const { root, paths } = await createHostPaths();
+    const providerEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const providerPaths = resolveRunPaths(providerEnv, 'run-provider-active');
+    const unrelatedEnv = {
+      ...providerEnv,
+      taskId: 'linear-unrelated'
+    };
+    const unrelatedPaths = resolveRunPaths(unrelatedEnv, 'run-unrelated-active');
+    await Promise.all([
+      mkdir(providerPaths.runDir, { recursive: true }),
+      mkdir(unrelatedPaths.runDir, { recursive: true })
+    ]);
+    await writeFile(
+      providerPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-provider-active',
+        task_id: 'linear-lin-issue-1',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:16:00.000Z',
+        summary: 'provider-intake-backed active run',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      unrelatedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-unrelated-active',
+        task_id: 'linear-unrelated',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-unrelated',
+        issue_identifier: 'CO-999',
+        updated_at: '2026-03-20T01:17:00.000Z',
+        summary: 'unrelated active run should not be scanned',
+        commands: []
+      }),
+      'utf8'
+    );
+    const providerIntakeState = createProviderIntakeState(providerPaths.manifestPath);
+    providerIntakeState.claims[0] = {
+      ...providerIntakeState.claims[0]!,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      task_id: 'linear-lin-issue-1',
+      run_id: 'run-provider-active',
+      run_manifest_path: providerPaths.manifestPath
+    };
+
+    const discovery = await discoverCompatibilityCollectionContexts(
+      createProjectionContext(paths, providerIntakeState)
+    );
+
+    expect(discovery.running.map((entry) => entry.runId)).toEqual([
+      'run-unrelated-active',
+      'run-provider-active'
+    ]);
+    expect(discovery.all.map((entry) => entry.runId)).toContain('run-unrelated-active');
+  });
+
+  it('bounds high-volume provider-intake discovery to active claim directories', async () => {
+    const { root, paths } = await createHostPaths();
+    const activeEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-active'
+    };
+    const activePaths = resolveRunPaths(activeEnv, 'run-active');
+    const releasedEnv = {
+      ...activeEnv,
+      taskId: 'linear-released'
+    };
+    const releasedPaths = resolveRunPaths(releasedEnv, 'run-released-active-looking');
+    const releasedLocalRunId = '2026-03-20T03-20-00-000Z-released-local-active';
+    const releasedLocalPaths = resolveRunPaths(releasedEnv, releasedLocalRunId);
+    const releasedNoisePaths = Array.from({ length: 70 }, (_, index) => {
+      const taskId = `linear-zreleased-${index}`;
+      return {
+        index,
+        taskId,
+        paths: resolveRunPaths(
+          {
+            ...activeEnv,
+            taskId
+          },
+          `run-zreleased-${index}`
+        )
+      };
+    });
+    const localEnv = {
+      ...activeEnv,
+      taskId: 'local-active-tool'
+    };
+    const localPaths = resolveRunPaths(localEnv, 'run-local-active');
+    const syntheticLocalEnv = {
+      ...activeEnv,
+      taskId: 'linear-active-zzzz-docs-review'
+    };
+    const syntheticLocalRunId = '2026-03-20T03-18-00-000Z-linear-derived-local-active';
+    const syntheticLocalPaths = resolveRunPaths(
+      syntheticLocalEnv,
+      syntheticLocalRunId
+    );
+    const syntheticUnrelatedLocalEnv = {
+      ...activeEnv,
+      taskId: 'linear-unclaimed-local-tool'
+    };
+    const syntheticUnrelatedLocalRunId = '2026-03-20T03-19-00-000Z-linear-unclaimed-local-active';
+    const syntheticUnrelatedLocalPaths = resolveRunPaths(
+      syntheticUnrelatedLocalEnv,
+      syntheticUnrelatedLocalRunId
+    );
+    const syntheticProviderWorkerEnv = {
+      ...activeEnv,
+      taskId: 'linear-unclaimed-provider-worker'
+    };
+    const syntheticProviderWorkerRunId =
+      '2026-03-20T03-21-00-000Z-provider-worker-missing-issue-provider';
+    const syntheticProviderWorkerPaths = resolveRunPaths(
+      syntheticProviderWorkerEnv,
+      syntheticProviderWorkerRunId
+    );
+    const syntheticLinearDocsEnv = {
+      ...activeEnv,
+      taskId: 'linear-unclaimed-docs-review'
+    };
+    const syntheticLinearDocsRunId = '2026-03-20T03-23-00-000Z-linear-docs-review-active';
+    const syntheticLinearDocsPaths = resolveRunPaths(
+      syntheticLinearDocsEnv,
+      syntheticLinearDocsRunId
+    );
+    const syntheticRecentActivityEnv = {
+      ...activeEnv,
+      taskId: 'linear-old-run-recent-activity'
+    };
+    const syntheticRecentActivityRunId = '2026-03-20T00-05-00-000Z-old-run-recent-activity';
+    const syntheticRecentActivityPaths = resolveRunPaths(
+      syntheticRecentActivityEnv,
+      syntheticRecentActivityRunId
+    );
+    const syntheticNoisePaths = Array.from({ length: 70 }, (_, index) => {
+      const taskId = `linear-active-zlocal-noise-${index}`;
+      return {
+        index,
+        taskId,
+        runId: `2026-03-20T01-${String(index % 20).padStart(2, '0')}-00-000Z-zlocal-noise-${index}`,
+        paths: resolveRunPaths(
+          {
+            ...activeEnv,
+            taskId
+          },
+          `2026-03-20T01-${String(index % 20).padStart(2, '0')}-00-000Z-zlocal-noise-${index}`
+        )
+      };
+    });
+    await Promise.all([
+      mkdir(activePaths.runDir, { recursive: true }),
+      mkdir(releasedPaths.runDir, { recursive: true }),
+      mkdir(releasedLocalPaths.runDir, { recursive: true }),
+      mkdir(localPaths.runDir, { recursive: true }),
+      mkdir(syntheticLocalPaths.runDir, { recursive: true }),
+      mkdir(syntheticUnrelatedLocalPaths.runDir, { recursive: true }),
+      mkdir(syntheticProviderWorkerPaths.runDir, { recursive: true }),
+      mkdir(syntheticLinearDocsPaths.runDir, { recursive: true }),
+      mkdir(syntheticRecentActivityPaths.runDir, { recursive: true }),
+      ...releasedNoisePaths.map((entry) => mkdir(entry.paths.runDir, { recursive: true })),
+      ...syntheticNoisePaths.map((entry) => mkdir(entry.paths.runDir, { recursive: true }))
+    ]);
+    await writeFile(
+      activePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-active',
+        task_id: 'linear-active',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-active',
+        issue_identifier: 'CO-ACTIVE',
+        updated_at: '2026-03-20T01:16:00.000Z',
+        summary: 'active provider run',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      releasedPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-released-active-looking',
+        task_id: 'linear-released',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-released',
+        issue_identifier: 'CO-RELEASED',
+        updated_at: '2026-03-20T01:15:00.000Z',
+        summary: 'released historical run should not be scanned on high-volume status',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      localPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-local-active',
+        task_id: 'local-active-tool',
+        status: 'in_progress',
+        issue_identifier: 'LOCAL-ACTIVE',
+        updated_at: '2026-03-20T01:17:00.000Z',
+        summary: 'non-intake local run remains visible in high-volume mode',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      releasedLocalPaths.manifestPath,
+      JSON.stringify({
+        run_id: releasedLocalRunId,
+        task_id: 'linear-released',
+        status: 'in_progress',
+        issue_identifier: 'LOCAL-RELEASED-TASK',
+        updated_at: '2026-03-20T03:20:00.000Z',
+        summary: 'non-provider local run under an inactive provider-claim task remains visible',
+        commands: []
+      }),
+      'utf8'
+    );
+    await Promise.all(
+      releasedNoisePaths.map((entry) =>
+        writeFile(
+          entry.paths.manifestPath,
+          JSON.stringify({
+            run_id: `run-zreleased-${entry.index}`,
+            task_id: entry.taskId,
+            pipeline_id: 'provider-linear-worker',
+            status: 'in_progress',
+            issue_provider: 'linear',
+            issue_id: `lin-zreleased-${entry.index}`,
+            issue_identifier: `CO-ZREL-${entry.index}`,
+            updated_at: '2026-03-20T01:14:00.000Z',
+            summary: 'inactive retained provider history should not spend synthetic local scan budget',
+            commands: []
+          }),
+          'utf8'
+        )
+      )
+    );
+    await writeFile(
+      syntheticLocalPaths.manifestPath,
+      JSON.stringify({
+        run_id: syntheticLocalRunId,
+        task_id: 'linear-active-zzzz-docs-review',
+        status: 'in_progress',
+        issue_identifier: 'LOCAL-LINEAR-DERIVED',
+        updated_at: '2026-03-20T03:18:00.000Z',
+        summary: 'non-intake local run under a Linear-derived task id remains visible by bounded cheap recency',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      syntheticUnrelatedLocalPaths.manifestPath,
+      JSON.stringify({
+        run_id: syntheticUnrelatedLocalRunId,
+        task_id: 'linear-unclaimed-local-tool',
+        status: 'in_progress',
+        issue_identifier: 'LOCAL-LINEAR-UNCLAIMED',
+        updated_at: '2026-03-20T03:19:00.000Z',
+        summary: 'non-intake local run under an unclaimed Linear-looking task id remains visible by bounded cheap recency',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      syntheticProviderWorkerPaths.manifestPath,
+      JSON.stringify({
+        run_id: syntheticProviderWorkerRunId,
+        task_id: 'linear-unclaimed-provider-worker',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_id: 'lin-stale-provider',
+        issue_identifier: 'CO-STALE',
+        updated_at: '2026-03-20T03:21:00.000Z',
+        summary: 'provider-worker manifest without issue_provider should not be treated as local work',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      syntheticLinearDocsPaths.manifestPath,
+      JSON.stringify({
+        run_id: syntheticLinearDocsRunId,
+        task_id: 'linear-unclaimed-docs-review',
+        pipeline_id: 'docs-review',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-docs',
+        issue_identifier: 'CO-DOCS',
+        updated_at: '2026-03-20T03:23:00.000Z',
+        summary: 'linear-tagged non-provider-worker docs run remains visible',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      syntheticRecentActivityPaths.manifestPath,
+      JSON.stringify({
+        run_id: syntheticRecentActivityRunId,
+        task_id: 'linear-old-run-recent-activity',
+        status: 'in_progress',
+        issue_identifier: 'LOCAL-RECENT-ACTIVITY',
+        updated_at: '2026-03-20T03:22:00.000Z',
+        summary: 'older-started local run with recent activity should stay visible',
+        commands: []
+      }),
+      'utf8'
+    );
+    await Promise.all(
+      syntheticNoisePaths.map((entry) =>
+        writeFile(
+          entry.paths.manifestPath,
+          JSON.stringify({
+            run_id: entry.runId,
+            task_id: entry.taskId,
+            status: 'in_progress',
+            issue_identifier: `LOCAL-ZNOISE-${entry.index}`,
+            updated_at: `2026-03-20T01:${String(entry.index % 20).padStart(2, '0')}:00.000Z`,
+            summary: 'older non-intake synthetic local run should not hide newer local work',
+            commands: []
+          }),
+          'utf8'
+        )
+      )
+    );
+    const olderSyntheticTaskTime = new Date('2026-03-19T00:00:00.000Z');
+    const newerSyntheticTaskTime = new Date('2026-03-20T02:00:00.000Z');
+    const syntheticLocalActivityTime = new Date('2026-03-20T03:18:00.000Z');
+    const syntheticUnrelatedActivityTime = new Date('2026-03-20T03:19:00.000Z');
+    const releasedLocalActivityTime = new Date('2026-03-20T03:20:00.000Z');
+    const syntheticProviderWorkerActivityTime = new Date('2026-03-20T03:21:00.000Z');
+    const syntheticRecentActivityRunTime = new Date('2026-03-20T00:05:00.000Z');
+    const syntheticLinearDocsActivityTime = new Date('2026-03-20T03:23:00.000Z');
+    await Promise.all([
+      utimes(syntheticLocalPaths.runDir, syntheticLocalActivityTime, syntheticLocalActivityTime),
+      utimes(syntheticUnrelatedLocalPaths.runDir, syntheticUnrelatedActivityTime, syntheticUnrelatedActivityTime),
+      utimes(releasedLocalPaths.runDir, releasedLocalActivityTime, releasedLocalActivityTime),
+      utimes(
+        syntheticProviderWorkerPaths.runDir,
+        syntheticProviderWorkerActivityTime,
+        syntheticProviderWorkerActivityTime
+      ),
+      utimes(
+        syntheticLinearDocsPaths.runDir,
+        syntheticLinearDocsActivityTime,
+        syntheticLinearDocsActivityTime
+      ),
+      utimes(
+        syntheticRecentActivityPaths.runDir,
+        syntheticRecentActivityRunTime,
+        syntheticRecentActivityRunTime
+      ),
+      ...syntheticNoisePaths.map((entry) =>
+        utimes(
+          entry.paths.runDir,
+          new Date(`2026-03-20T01:${String(entry.index % 20).padStart(2, '0')}:00.000Z`),
+          new Date(`2026-03-20T01:${String(entry.index % 20).padStart(2, '0')}:00.000Z`)
+        )
+      )
+    ]);
+    await Promise.all(
+      syntheticNoisePaths.map((entry) =>
+        utimes(join(activeEnv.runsRoot, entry.taskId), newerSyntheticTaskTime, newerSyntheticTaskTime)
+      )
+    );
+    await Promise.all([
+      utimes(join(activeEnv.runsRoot, syntheticLocalEnv.taskId), olderSyntheticTaskTime, olderSyntheticTaskTime),
+      utimes(
+        join(activeEnv.runsRoot, syntheticUnrelatedLocalEnv.taskId),
+        olderSyntheticTaskTime,
+        olderSyntheticTaskTime
+      )
+    ]);
+    const baseClaim = createProviderIntakeState(activePaths.manifestPath).claims[0]!;
+    const providerIntakeState: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-03-20T01:20:00.000Z',
+      rehydrated_at: '2026-03-20T01:20:00.000Z',
+      latest_provider_key: 'linear:lin-active',
+      latest_reason: 'provider_issue_rehydrated_active_run',
+      claims: [
+        {
+          ...baseClaim,
+          provider_key: 'linear:lin-active',
+          issue_id: 'lin-active',
+          issue_identifier: 'CO-ACTIVE',
+          issue_title: 'Active issue',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          task_id: 'linear-active',
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          updated_at: '2026-03-20T01:20:00.000Z',
+          run_id: 'run-active',
+          run_manifest_path: activePaths.manifestPath
+        },
+        {
+          ...baseClaim,
+          provider_key: 'linear:lin-released',
+          issue_id: 'lin-released',
+          issue_identifier: 'CO-RELEASED',
+          issue_title: 'Released issue',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          task_id: 'linear-released',
+          state: 'released' as const,
+          reason: 'provider_issue_released:not_active',
+          updated_at: '2026-03-20T01:10:00.000Z',
+          run_id: 'run-released-active-looking',
+          run_manifest_path: releasedPaths.manifestPath
+        },
+        ...releasedNoisePaths.map((entry) => ({
+          ...baseClaim,
+          provider_key: `linear:lin-zreleased-${entry.index}`,
+          issue_id: `lin-zreleased-${entry.index}`,
+          issue_identifier: `CO-ZREL-${entry.index}`,
+          issue_title: `Released noise issue ${entry.index}`,
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          task_id: entry.taskId,
+          state: 'released' as const,
+          reason: 'provider_issue_released:not_active',
+          updated_at: '2026-03-20T01:10:00.000Z',
+          run_id: `run-zreleased-${entry.index}`,
+          run_manifest_path: entry.paths.manifestPath
+        }))
+      ]
+    };
+
+    const discovery = await discoverCompatibilityCollectionContexts(
+      createProjectionContext(paths, providerIntakeState)
+    );
+
+    const runningRunIds = discovery.running.map((entry) => entry.runId ?? '');
+    expect(runningRunIds).toEqual(
+      expect.arrayContaining([
+        syntheticLocalRunId,
+        syntheticUnrelatedLocalRunId,
+        syntheticLinearDocsRunId,
+        syntheticRecentActivityRunId,
+        releasedLocalRunId,
+        'run-local-active',
+        'run-active'
+      ])
+    );
+    const allRunIds = discovery.all.map((entry) => entry.runId ?? '');
+    expect(allRunIds).not.toContain('run-released-active-looking');
+    expect(allRunIds).not.toContain(syntheticProviderWorkerRunId);
+    expect(allRunIds.filter((runId) => runId.startsWith('run-zreleased-'))).toEqual([]);
+  });
+
   it('reconciles orphaned active provider manifests with released claim and newer terminal run truth', async () => {
     const { root, paths } = await createHostPaths();
     const orphanEnv = {
@@ -6036,6 +6920,95 @@ describe('SelectedRunProjection', () => {
         run_id: 'run-terminal-success',
         status: 'succeeded'
       }
+    });
+  });
+
+  it('reconciles retry-queued terminal provider claims as stale run artifacts', async () => {
+    const { root, paths } = await createHostPaths();
+    const providerEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-done'
+    };
+    const stalePaths = resolveRunPaths(providerEnv, 'run-stale-active');
+    await mkdir(stalePaths.runDir, { recursive: true });
+    await writeFile(
+      stalePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-stale-active',
+        task_id: 'linear-lin-done',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-done',
+        issue_identifier: 'CO-DONE',
+        started_at: '2026-03-20T00:55:00.000Z',
+        updated_at: '2026-03-20T01:00:00.000Z',
+        summary: 'stale active-looking provider run',
+        commands: []
+      }),
+      'utf8'
+    );
+    const baseClaim = createProviderIntakeState(stalePaths.manifestPath).claims[0]!;
+    const providerIntakeState: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-03-20T01:10:00.000Z',
+      rehydrated_at: '2026-03-20T01:10:00.000Z',
+      latest_provider_key: 'linear:lin-done',
+      latest_reason: 'provider_issue_completed',
+      claims: [
+        {
+          ...baseClaim,
+          provider_key: 'linear:lin-done',
+          issue_id: 'lin-done',
+          issue_identifier: 'CO-DONE',
+          issue_title: 'Done issue',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          task_id: 'linear-lin-done',
+          state: 'completed',
+          reason: 'provider_issue_completed',
+          updated_at: '2026-03-20T01:10:00.000Z',
+          run_id: 'run-stale-active',
+          run_manifest_path: stalePaths.manifestPath,
+          retry_queued: true,
+          retry_attempt: 1,
+          retry_due_at: '2026-03-20T01:15:00.000Z',
+          retry_error: 'legacy retry marker should not keep completed claim active'
+        }
+      ]
+    };
+
+    const discovery = await discoverCompatibilityCollectionContexts(
+      createProjectionContext(paths, providerIntakeState)
+    );
+
+    expect(discovery.running.map((entry) => entry.runId)).not.toContain('run-stale-active');
+    const reconciled = discovery.all.find((entry) => entry.runId === 'run-stale-active');
+    expect(reconciled).toMatchObject({
+      rawStatus: 'succeeded',
+      statusReason: 'provider_claim_completed',
+      summary: expect.stringContaining('provider claim is completed')
+    });
+    const reconciliation = JSON.parse(
+      await readFile(join(stalePaths.runDir, 'provider-linear-worker-reconciliation.json'), 'utf8')
+    ) as Record<string, unknown>;
+    expect(reconciliation).toMatchObject({
+      kind: 'provider-linear-worker-run-artifact-reconciliation',
+      status: 'reconciled',
+      reconciled_status: 'succeeded',
+      reason: 'provider_claim_completed',
+      manifest: {
+        run_id: 'run-stale-active',
+        status: 'in_progress'
+      },
+      provider_claim: {
+        state: 'completed',
+        reason: 'provider_issue_completed',
+        run_id: 'run-stale-active'
+      },
+      recorded_at: '2026-03-20T01:10:00.000Z'
     });
   });
 
@@ -6768,27 +7741,49 @@ describe('SelectedRunProjection', () => {
       })
     );
     const baseClaim = createProviderIntakeState(runPaths[0]!.manifestPath).claims[0]!;
+    const liveRehydrateClaims = cases.map((entry, index) => ({
+      ...baseClaim,
+      provider_key: `linear:${entry.issueId}`,
+      issue_id: entry.issueId,
+      issue_identifier: entry.issueIdentifier,
+      issue_title: 'Rehydrating active issue',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      task_id: entry.taskId,
+      state: 'released' as const,
+      reason: entry.reason,
+      updated_at: '2026-04-18T12:59:00.000Z',
+      run_id: entry.runId,
+      run_manifest_path: runPaths[index]!.manifestPath
+    }));
+    const completedFillerClaims = Array.from({ length: 17 }, (_, index) => ({
+      ...baseClaim,
+      provider_key: `linear:co-93-completed-${index}`,
+      issue_id: `co-93-completed-${index}`,
+      issue_identifier: `CO-93C-${index}`,
+      issue_title: 'Completed filler issue',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      task_id: `linear-co-93-completed-${index}`,
+      state: 'completed' as const,
+      reason: 'provider_issue_rehydrated_completed_run',
+      updated_at: '2026-04-18T12:00:00.000Z',
+      run_id: `run-co-93-completed-${index}`,
+      run_manifest_path: join(
+        runsRoot,
+        `linear-co-93-completed-${index}`,
+        'cli',
+        `run-co-93-completed-${index}`,
+        'manifest.json'
+      )
+    }));
     const providerIntakeState: ProviderIntakeState = {
       schema_version: 1,
       updated_at: '2026-04-18T13:00:00.000Z',
       rehydrated_at: '2026-04-18T13:00:00.000Z',
       latest_provider_key: 'linear:co-93-pending-reopen',
       latest_reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
-      claims: cases.map((entry, index) => ({
-        ...baseClaim,
-        provider_key: `linear:${entry.issueId}`,
-        issue_id: entry.issueId,
-        issue_identifier: entry.issueIdentifier,
-        issue_title: 'Rehydrating active issue',
-        issue_state: 'In Progress',
-        issue_state_type: 'started',
-        task_id: entry.taskId,
-        state: 'released',
-        reason: entry.reason,
-        updated_at: '2026-04-18T12:59:00.000Z',
-        run_id: entry.runId,
-        run_manifest_path: runPaths[index]!.manifestPath
-      }))
+      claims: [...liveRehydrateClaims, ...completedFillerClaims]
     };
 
     const discovery = await discoverCompatibilityCollectionContexts(

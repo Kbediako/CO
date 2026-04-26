@@ -17,6 +17,13 @@ import {
   resolveCodexCliReadiness,
   type CodexCliReadiness
 } from './utils/codexCli.js';
+import {
+  codexFeatureProbeDisablesMultiAgentV2,
+  codexFeatureProbeRejectsAgentMaxThreads,
+  readCodexFeatureProbe,
+  type CodexFeatureProbeResult
+} from './utils/codexFeatures.js';
+import { formatCheckoutPostureSummary, inspectCheckoutPosture, type CheckoutPostureInspection } from './utils/checkoutPosture.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
 import { resolveOptionalDependency, type OptionalResolutionSource } from './utils/optionalDeps.js';
 import {
@@ -47,10 +54,13 @@ import {
   BASELINE_AGENTS,
   BASELINE_MODEL,
   BASELINE_REVIEW_MODEL,
-  BASELINE_REASONING_MINIMUM
+  BASELINE_REASONING_MINIMUM,
+  formatModelDefaultExpectation,
+  isLocalModelOptIn
 } from './codexDefaultsSetup.js';
 import { CommandPlanner } from './adapters/CommandPlanner.js';
 import { PipelineResolver } from './services/pipelineResolver.js';
+import { resolveCloudFallbackPolicy as resolveSharedCloudFallbackPolicy } from './services/orchestratorCloudRouteFallbackContract.js';
 import { isRepoConfigRequired } from './config/repoConfigPolicy.js';
 import type { EnvironmentPaths } from './run/environment.js';
 import type { TaskContext } from '../types.js';
@@ -69,6 +79,13 @@ const OPTIONAL_DEPENDENCIES = [
 ];
 
 const PROVIDER_ROOT_RELATIVE_PATH = '.codex/providers';
+const CODEX_DEBUG_MODELS_JSON_ENV = 'CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON';
+
+interface DoctorCodexModelAccess {
+  status: 'ok' | 'unavailable';
+  models: ReadonlySet<string>;
+  detail: string;
+}
 
 export interface DoctorDependencyStatus {
   name: string;
@@ -119,9 +136,10 @@ export interface DoctorCodexDefaultsAdvisory {
       actual: string | null;
     };
     max_threads: {
-      status: 'ok' | 'advisory';
+      status: 'ok' | 'advisory' | 'skipped';
       expected_minimum: number;
       actual: number | null;
+      detail?: string;
     };
     max_depth: {
       status: 'ok' | 'advisory';
@@ -151,6 +169,7 @@ export interface DoctorResult {
     managed: CodexCliReadiness;
   };
   codex_defaults: DoctorCodexDefaultsAdvisory;
+  checkout_posture: CheckoutPostureInspection;
   collab: {
     status: 'ok' | 'disabled' | 'unavailable';
     enabled: boolean | null;
@@ -158,10 +177,13 @@ export interface DoctorResult {
     enablement: string[];
   };
   cloud: {
-    status: 'ok' | 'not_configured' | 'unavailable';
+    status: 'ok' | 'not_configured' | 'unavailable' | 'invalid_policy';
     env_id_configured: boolean;
     branch: string | null;
-    fallback_policy: 'allow' | 'deny';
+    fallback_policy: 'auto' | 'strict' | 'invalid';
+    fallback_policy_source: 'default' | 'env' | 'override' | 'invalid';
+    fallback_policy_raw: string | null;
+    fallback_policy_error: string | null;
     enablement: string[];
   };
   delegation: {
@@ -358,13 +380,12 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
   if (readiness.config.status !== 'ok') {
     missing.push(`${DEVTOOLS_SKILL_NAME}-config`);
   }
-  const codexDefaults = inspectCodexDefaultsAdvisory(process.env);
-
   const codexBin = resolveCodexCliBin(process.env);
   const managedOptIn = isManagedCodexCliEnabled(process.env);
   const managedCodex = resolveCodexCliReadiness(process.env);
-
-  const features = readCodexFeatureFlags(codexBin);
+  const featureProbe = readCodexFeatureProbe(codexBin, process.env);
+  const features = featureProbe.flags;
+  const codexDefaults = inspectCodexDefaultsAdvisory(process.env, codexBin, featureProbe);
   const collabFeatureKey: DoctorResult['collab']['feature_key'] =
     features === null
       ? null
@@ -389,10 +410,17 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
     typeof process.env.CODEX_CLOUD_BRANCH === 'string' && process.env.CODEX_CLOUD_BRANCH.trim().length > 0
       ? process.env.CODEX_CLOUD_BRANCH.trim().replace(/^refs\/heads\//u, '')
       : null;
+  const cloudFallbackPolicy = resolveCloudFallbackPolicyDiagnostic(process.env);
   const cloudStatus: DoctorResult['cloud']['status'] =
-    !cloudCmdAvailable ? 'unavailable' : cloudEnvIdConfigured ? 'ok' : 'not_configured';
-  const cloudFallbackPolicy: DoctorResult['cloud']['fallback_policy'] = resolveCloudFallbackPolicy();
+    cloudFallbackPolicy.policy === 'invalid'
+      ? 'invalid_policy'
+      : !cloudCmdAvailable
+        ? 'unavailable'
+        : cloudEnvIdConfigured
+          ? 'ok'
+          : 'not_configured';
   const repoRoot = resolveDoctorRepoRoot(cwd);
+  const checkoutPosture = inspectCheckoutPosture(repoRoot);
 
   const delegationSnapshot = inspectDelegationMcpConfig(process.env);
   const delegationTransport = classifyDelegationTransport(delegationSnapshot.entry);
@@ -411,12 +439,15 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
           : 'ok';
   const delegationBlocksOverallStatus = delegationStatus === 'missing-config';
   const providers = inspectProviderReadiness(repoRoot, process.env);
+  const checkoutPostureBlocksOverallStatus = checkoutPostureBlocksDoctorStatus(checkoutPosture);
 
   return {
     status:
       missing.length === 0 &&
       codexDefaults.status === 'ok' &&
       providers.status === 'ok' &&
+      !checkoutPostureBlocksOverallStatus &&
+      cloudStatus !== 'invalid_policy' &&
       !delegationBlocksOverallStatus
         ? 'ok'
         : 'warning',
@@ -428,6 +459,7 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
       managed: managedCodex
     },
     codex_defaults: codexDefaults,
+    checkout_posture: checkoutPosture,
     collab: {
       status: collabStatus,
       enabled: collabEnabled,
@@ -442,13 +474,19 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
       status: cloudStatus,
       env_id_configured: cloudEnvIdConfigured,
       branch: cloudBranch,
-      fallback_policy: cloudFallbackPolicy,
+      fallback_policy: cloudFallbackPolicy.policy,
+      fallback_policy_source: cloudFallbackPolicy.source,
+      fallback_policy_raw: cloudFallbackPolicy.raw_value,
+      fallback_policy_error: cloudFallbackPolicy.error,
       enablement: [
+        ...(cloudFallbackPolicy.error
+          ? [`Invalid CODEX_ORCHESTRATOR_CLOUD_FALLBACK value: ${cloudFallbackPolicy.error}`]
+          : []),
         'Set CODEX_CLOUD_ENV_ID to a valid Codex Cloud environment id.',
         'Optional: set CODEX_CLOUD_BRANCH (must exist on origin).',
         'Then run a pipeline stage in cloud mode with: codex-orchestrator start <pipeline> --cloud --target <stage-id>',
-        'Cloud fallback is a compatibility safety net; prefer fail-fast lanes with CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny.',
-        'If cloud preflight fails and fallback is allowed, CO falls back to mcp and records the reason in manifest.summary (surfaced in start output).'
+        'Set CODEX_ORCHESTRATOR_CLOUD_FALLBACK=auto for governed cloud-to-mcp reroute evidence, or strict to fail closed.',
+        'When auto reroutes after cloud preflight failure, CO records policy, original target, fallback target, and blocking reason in manifest.cloud_fallback and start output.'
       ]
     },
     delegation: {
@@ -509,6 +547,13 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
     },
     providers
   };
+}
+
+export function checkoutPostureBlocksDoctorStatus(
+  checkoutPosture: Pick<CheckoutPostureInspection, 'inside_git_worktree' | 'stale_docs_may_be' | 'status'>
+): boolean {
+  return checkoutPosture.stale_docs_may_be
+    || (checkoutPosture.status === 'unavailable' && checkoutPosture.inside_git_worktree);
 }
 
 export async function runDoctorCloudPreflight(options: {
@@ -809,9 +854,19 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
   lines.push(
     `  - model_reasoning_effort: ${result.codex_defaults.checks.model_reasoning_effort.status} (actual: ${result.codex_defaults.checks.model_reasoning_effort.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.model_reasoning_effort.expected_minimum})`
   );
-  lines.push(
-    `  - agents.max_threads: ${result.codex_defaults.checks.max_threads.status} (actual: ${result.codex_defaults.checks.max_threads.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.max_threads.expected_minimum})`
-  );
+  if (result.codex_defaults.checks.max_threads.status === 'skipped') {
+    lines.push(
+      `  - agents.max_threads: skipped (actual: ${result.codex_defaults.checks.max_threads.actual ?? '<unset>'}; ${result.codex_defaults.checks.max_threads.detail ?? 'omitted by policy'})`
+    );
+  } else if (result.codex_defaults.checks.max_threads.detail) {
+    lines.push(
+      `  - agents.max_threads: ${result.codex_defaults.checks.max_threads.status} (actual: ${result.codex_defaults.checks.max_threads.actual ?? '<unset>'}; ${result.codex_defaults.checks.max_threads.detail})`
+    );
+  } else {
+    lines.push(
+      `  - agents.max_threads: ${result.codex_defaults.checks.max_threads.status} (actual: ${result.codex_defaults.checks.max_threads.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.max_threads.expected_minimum})`
+    );
+  }
   lines.push(
     `  - agents.max_depth: ${result.codex_defaults.checks.max_depth.status} (actual: ${result.codex_defaults.checks.max_depth.actual ?? '<unset>'}, expected >= ${result.codex_defaults.checks.max_depth.expected_minimum} when set; <unset> accepted)`
   );
@@ -823,6 +878,8 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
   for (const line of result.codex_defaults.guidance) {
     lines.push(`  - ${line}`);
   }
+
+  lines.push(...formatCheckoutPostureSummary(result.checkout_posture));
 
   lines.push(`Collab: ${result.collab.status}`);
   if (result.collab.enabled !== null) {
@@ -839,6 +896,10 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
   lines.push(`  - CODEX_CLOUD_ENV_ID: ${result.cloud.env_id_configured ? 'set' : 'missing'}`);
   lines.push(`  - CODEX_CLOUD_BRANCH: ${result.cloud.branch ?? '<unset>'}`);
   lines.push(`  - fallback policy: ${result.cloud.fallback_policy}`);
+  lines.push(`  - fallback policy source: ${result.cloud.fallback_policy_source}`);
+  if (result.cloud.fallback_policy_error) {
+    lines.push(`    error: ${result.cloud.fallback_policy_error}`);
+  }
   for (const line of result.cloud.enablement) {
     lines.push(`  - ${line}`);
   }
@@ -1049,11 +1110,19 @@ function inspectProviderReadiness(
   };
 }
 
-function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): DoctorCodexDefaultsAdvisory {
+function inspectCodexDefaultsAdvisory(
+  env: NodeJS.ProcessEnv = process.env,
+  codexBin: string = resolveCodexCliBin(env),
+  featureProbe: CodexFeatureProbeResult | null = readCodexFeatureProbe(codexBin, env)
+): DoctorCodexDefaultsAdvisory {
   const configPath = join(resolveCodexHome(env), 'config.toml');
   const checks: DoctorCodexDefaultsAdvisory['checks'] = {
-    model: { status: 'advisory', expected: BASELINE_MODEL, actual: null },
-    review_model: { status: 'advisory', expected: BASELINE_REVIEW_MODEL, actual: null },
+    model: { status: 'advisory', expected: formatModelDefaultExpectation(BASELINE_MODEL), actual: null },
+    review_model: {
+      status: 'advisory',
+      expected: formatModelDefaultExpectation(BASELINE_REVIEW_MODEL),
+      actual: null
+    },
     model_reasoning_effort: { status: 'advisory', expected_minimum: BASELINE_REASONING_MINIMUM, actual: null },
     max_threads: { status: 'advisory', expected_minimum: BASELINE_AGENTS.max_threads, actual: null },
     max_depth: { status: 'advisory', expected_minimum: BASELINE_AGENTS.max_depth, actual: null }
@@ -1061,10 +1130,23 @@ function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): Doc
   let legacyMaxSpawnDepth: DoctorCodexDefaultsAdvisory['legacy_max_spawn_depth'] = null;
   const guidance: string[] = [
     'Run `codex-orchestrator codex defaults --yes` to apply additive baseline defaults.',
-    'Additive policy: unrelated config keys are preserved; existing role files stay untouched unless `--force` is set.',
+    'Additive policy: unrelated config keys are preserved; existing role files stay untouched unless `--force` is set or they exactly match a prior CO-managed model baseline.',
+    'When `features.multi_agent_v2=true`, omit `agents.max_threads`; Codex CLI 0.125+ rejects that key.',
     'Current CO baseline no longer seeds or expects `agents.max_spawn_depth`; keep it only as a legacy local override when an older parser/runtime still honors it.',
     'Leaving `agents.max_depth` unset remains accepted when local parser/runtime constraints require it.'
   ];
+  const featureProbeDisablesMultiAgentV2 =
+    featureProbe ? codexFeatureProbeDisablesMultiAgentV2(featureProbe) : false;
+  const featureProbeIndicatesMultiAgentV2 =
+    !featureProbeDisablesMultiAgentV2
+    && (featureProbe?.flags?.multi_agent_v2 === true
+      || (featureProbe ? codexFeatureProbeRejectsAgentMaxThreads(featureProbe) : false));
+  if (featureProbeIndicatesMultiAgentV2) {
+    checks.max_threads.status = 'skipped';
+    checks.max_threads.actual = null;
+    checks.max_threads.detail =
+      'features.multi_agent_v2=true; omit agents.max_threads because Codex CLI 0.125+ rejects it';
+  }
 
   if (!existsSync(configPath)) {
     return {
@@ -1100,12 +1182,43 @@ function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): Doc
   }
 
   const model = normalizeOptionalString(readStringValue(parsed.model));
-  checks.model.actual = model;
-  checks.model.status = model === BASELINE_MODEL ? 'ok' : 'advisory';
-
   const reviewModel = normalizeOptionalString(readStringValue(parsed.review_model));
+  const localModelCandidates = new Set(
+    [model, reviewModel].filter(isLocalModelOptIn)
+  );
+  const modelAccess =
+    localModelCandidates.size === 0
+      ? {
+          status: 'unavailable',
+          models: new Set<string>(),
+          detail: 'model access was not checked because no local ChatGPT-auth model is configured'
+        } satisfies DoctorCodexModelAccess
+      : inspectCodexModelAccess(codexBin, env);
+  const verifiedLocalModels = new Set(
+    [...localModelCandidates].filter(
+      (candidate) => modelAccess.status === 'ok' && modelAccess.models.has(candidate)
+    )
+  );
+  const unverifiedLocalModels = [...localModelCandidates].filter(
+    (candidate) => !verifiedLocalModels.has(candidate)
+  );
+  for (const candidate of unverifiedLocalModels) {
+    guidance.push(
+      `Configured local ChatGPT-auth model ${candidate} is not verified by \`codex debug models\`; rerun local access smoke or use the portable ${BASELINE_MODEL} fallback for this surface.`
+    );
+  }
+
+  checks.model.actual = model;
+  checks.model.status =
+    model === BASELINE_MODEL || (isLocalModelOptIn(model) && verifiedLocalModels.has(model))
+      ? 'ok'
+      : 'advisory';
+
   checks.review_model.actual = reviewModel;
-  checks.review_model.status = reviewModel === BASELINE_REVIEW_MODEL ? 'ok' : 'advisory';
+  checks.review_model.status =
+    reviewModel === BASELINE_REVIEW_MODEL || (isLocalModelOptIn(reviewModel) && verifiedLocalModels.has(reviewModel))
+      ? 'ok'
+      : 'advisory';
 
   const reasoning = normalizeOptionalString(readStringValue(parsed.model_reasoning_effort));
   checks.model_reasoning_effort.actual = reasoning;
@@ -1114,13 +1227,26 @@ function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): Doc
     : 'advisory';
 
   const agents = isRecord(parsed.agents) ? parsed.agents : {};
+  const multiAgentV2Enabled =
+    featureProbeIndicatesMultiAgentV2
+    || (!featureProbeDisablesMultiAgentV2
+      && readBooleanValue(readRecordValue(parsed, 'features')?.multi_agent_v2) === true);
   const maxThreads = readNumberValue(agents.max_threads);
   const maxDepth = readNumberValue(agents.max_depth);
   const maxSpawnDepth = readNumberValue(agents.max_spawn_depth);
+  const hasMaxThreads = Object.prototype.hasOwnProperty.call(agents, 'max_threads');
 
   checks.max_threads.actual = maxThreads;
-  checks.max_threads.status =
-    typeof maxThreads === 'number' && maxThreads >= BASELINE_AGENTS.max_threads ? 'ok' : 'advisory';
+  if (multiAgentV2Enabled) {
+    checks.max_threads.status = hasMaxThreads ? 'advisory' : 'skipped';
+    checks.max_threads.detail =
+      hasMaxThreads
+        ? 'features.multi_agent_v2=true; remove agents.max_threads because Codex CLI 0.125+ rejects it'
+        : 'features.multi_agent_v2=true; omit agents.max_threads because Codex CLI 0.125+ rejects it';
+  } else {
+    checks.max_threads.status =
+      typeof maxThreads === 'number' && maxThreads >= BASELINE_AGENTS.max_threads ? 'ok' : 'advisory';
+  }
   checks.max_depth.actual = maxDepth;
   checks.max_depth.status =
     maxDepth === null || (typeof maxDepth === 'number' && maxDepth >= BASELINE_AGENTS.max_depth) ? 'ok' : 'advisory';
@@ -1137,7 +1263,8 @@ function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): Doc
   }
 
   const allChecksOk =
-    Object.values(checks).every((check) => check.status === 'ok')
+    Object.values(checks).every((check) => check.status === 'ok' || check.status === 'skipped')
+    && unverifiedLocalModels.length === 0
     && legacyMaxSpawnDepth?.status !== 'advisory';
   return {
     status: allChecksOk ? 'ok' : 'advisory',
@@ -1146,6 +1273,72 @@ function inspectCodexDefaultsAdvisory(env: NodeJS.ProcessEnv = process.env): Doc
     legacy_max_spawn_depth: legacyMaxSpawnDepth,
     guidance
   };
+}
+
+function inspectCodexModelAccess(codexBin: string, env: NodeJS.ProcessEnv): DoctorCodexModelAccess {
+  const overrideJson = env[CODEX_DEBUG_MODELS_JSON_ENV];
+  if (typeof overrideJson === 'string' && overrideJson.trim().length > 0) {
+    return parseCodexDebugModels(overrideJson, `${CODEX_DEBUG_MODELS_JSON_ENV} override`);
+  }
+
+  const result = spawnSync(codexBin, ['debug', 'models'], {
+    encoding: 'utf8',
+    env,
+    timeout: 5000,
+    maxBuffer: 5 * 1024 * 1024
+  });
+  if (result.error) {
+    return {
+      status: 'unavailable',
+      models: new Set<string>(),
+      detail: result.error.message
+    };
+  }
+  if (result.status !== 0) {
+    const stderr = typeof result.stderr === 'string' ? result.stderr.trim() : '';
+    return {
+      status: 'unavailable',
+      models: new Set<string>(),
+      detail: stderr || `codex debug models exited ${result.status ?? 'without a status'}`
+    };
+  }
+  return parseCodexDebugModels(result.stdout, '`codex debug models`');
+}
+
+function parseCodexDebugModels(source: unknown, detailPrefix: string): DoctorCodexModelAccess {
+  if (typeof source !== 'string' || source.trim().length === 0) {
+    return {
+      status: 'unavailable',
+      models: new Set<string>(),
+      detail: `${detailPrefix} produced no model catalog output`
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(source);
+    const models = new Set<string>();
+    const entries = isRecord(parsed) && Array.isArray(parsed.models) ? parsed.models : [];
+    for (const entry of entries) {
+      if (!isRecord(entry)) {
+        continue;
+      }
+      const slug = readStringValue(entry.slug);
+      if (slug) {
+        models.add(slug);
+      }
+    }
+    return {
+      status: models.size > 0 ? 'ok' : 'unavailable',
+      models,
+      detail: `${detailPrefix} reported ${models.size} model(s)`
+    };
+  } catch (error) {
+    return {
+      status: 'unavailable',
+      models: new Set<string>(),
+      detail: error instanceof Error ? error.message : String(error)
+    };
+  }
 }
 
 function getTomlParser(): { parse: (source: string) => unknown } {
@@ -1390,16 +1583,28 @@ function normalizeOptionalString(value: string | null | undefined): string | nul
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function resolveCloudFallbackPolicy(env: NodeJS.ProcessEnv = process.env): 'allow' | 'deny' {
-  const raw = normalizeOptionalString(env.CODEX_ORCHESTRATOR_CLOUD_FALLBACK);
-  if (!raw) {
-    return 'allow';
+function resolveCloudFallbackPolicyDiagnostic(env: NodeJS.ProcessEnv = process.env): {
+  policy: DoctorResult['cloud']['fallback_policy'];
+  source: DoctorResult['cloud']['fallback_policy_source'];
+  raw_value: string | null;
+  error: string | null;
+} {
+  try {
+    const resolution = resolveSharedCloudFallbackPolicy(env);
+    return {
+      policy: resolution.policy,
+      source: resolution.source,
+      raw_value: resolution.raw_value,
+      error: null
+    };
+  } catch (error) {
+    return {
+      policy: 'invalid',
+      source: 'invalid',
+      raw_value: normalizeOptionalString(env.CODEX_ORCHESTRATOR_CLOUD_FALLBACK),
+      error: error instanceof Error ? error.message : String(error)
+    };
   }
-  const normalized = raw.toLowerCase();
-  if (['0', 'false', 'off', 'deny', 'disabled', 'never', 'strict'].includes(normalized)) {
-    return 'deny';
-  }
-  return 'allow';
 }
 
 async function resolvePlanMetadataCloudEnvironmentId(
@@ -1511,6 +1716,12 @@ function buildCloudPreflightGuidance(issues: CloudPreflightIssue[]): string[] {
       case 'missing_environment':
         guidance.push('Set CODEX_CLOUD_ENV_ID or provide target metadata.cloudEnvId.');
         break;
+      case 'environment_not_found':
+        guidance.push('Set CODEX_CLOUD_ENV_ID to a Codex Cloud environment visible to the active account; run `codex cloud` to list available environments.');
+        break;
+      case 'environment_unavailable':
+        guidance.push('Verify the active Codex account/profile can read CODEX_CLOUD_ENV_ID before running required cloud canaries.');
+        break;
       case 'branch_missing':
         guidance.push('Push the branch to origin or set CODEX_CLOUD_BRANCH to an existing remote branch.');
         break;
@@ -1529,40 +1740,6 @@ function buildCloudPreflightGuidance(issues: CloudPreflightIssue[]): string[] {
   }
 
   return [...new Set(guidance)];
-}
-
-function readCodexFeatureFlags(codexBin: string): Record<string, boolean> | null {
-  const result = spawnSync(codexBin, ['features', 'list'], {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: 5000
-  });
-  if (result.error || result.status !== 0) {
-    return null;
-  }
-  const stdout = String(result.stdout ?? '');
-  const flags: Record<string, boolean> = {};
-  for (const line of stdout.split(/\r?\n/u)) {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      continue;
-    }
-    const tokens = trimmed.split(/\s+/u);
-    if (tokens.length < 2) {
-      continue;
-    }
-    const name = tokens[0] ?? '';
-    const enabledToken = tokens[tokens.length - 1] ?? '';
-    if (!name) {
-      continue;
-    }
-    if (enabledToken === 'true') {
-      flags[name] = true;
-    } else if (enabledToken === 'false') {
-      flags[name] = false;
-    }
-  }
-  return flags;
 }
 
 function canRunCommand(command: string, args: string[]): boolean {

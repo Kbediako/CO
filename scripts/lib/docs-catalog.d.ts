@@ -52,16 +52,54 @@ export function summarizeDocsByClass(
 }>;
 export function listBundledSkillNames(repoRoot: string): Promise<string[]>;
 export function extractBundledSkillNamesFromMarkdown(content: string, policy?: Record<string, any>): string[];
+export interface CodexPostureMatrixRequirement {
+  label: string;
+  contains: string;
+}
+export interface CodexPostureMatrixSurface {
+  path: string;
+  kind: string;
+  status: string;
+  requirements: CodexPostureMatrixRequirement[];
+}
+export interface CodexPostureHistoricalReleaseEvidence {
+  path: string;
+  status: string;
+  version: string | null;
+  title: string | null;
+}
+export interface CodexPostureMatrix {
+  version: number;
+  source_path: string;
+  absolute_path: string;
+  current: {
+    codex_cli_version: string | null;
+    latest_audited_candidate_cli_version: string | null;
+    marketplace_smoke_cli_version: string | null;
+    cloud_canary_cli_version: string | null;
+    model: string | null;
+    default_runtime: string | null;
+    explorer_fast_model: string | null;
+    unsupported_review_model: string | null;
+  };
+  surfaces: CodexPostureMatrixSurface[];
+  historical_release_evidence: CodexPostureHistoricalReleaseEvidence[];
+}
+export function loadCodexPostureMatrix(repoRoot: string, relativePath: string): Promise<CodexPostureMatrix>;
 export function readCurrentCodexPosture(
   repoRoot: string,
   policy?: Record<string, any>
 ): Promise<{
   source_path: string;
   cli_version: string | null;
+  cli_compatibility_versions: string[];
   model: string | null;
   default_runtime: string | null;
   explorer_fast_model: string | null;
   unsupported_review_model: string | null;
+  latest_audited_candidate_cli_version: string | null;
+  marketplace_smoke_cli_version: string | null;
+  cloud_canary_cli_version: string | null;
 }>;
 export function extractCodexCliVersionMentions(content: string): string[];
 export function extractCodexModelMentions(content: string): string[];

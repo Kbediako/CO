@@ -4,7 +4,7 @@ import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
-import { mkdir, open, readFile, readdir, realpath, stat } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, realpath, rm, stat } from 'node:fs/promises';
 
 import { logger } from '../logger.js';
 import {
@@ -35,7 +35,11 @@ import { readSharedLinearBudgetStatus, type LinearBudgetStatus } from './control
 import {
   classifyProviderLinearWorkerLifecycle,
 } from './control/providerLinearWorkflowStates.js';
-import { readControlHostOwnershipOperatorHint } from './control/controlHostOwnership.js';
+import {
+  readControlHostOwnershipDiagnosticSummary,
+  readControlHostOwnershipOperatorHint,
+  type ControlHostOwnershipPollingPayload
+} from './control/controlHostOwnership.js';
 import {
   PROVIDER_LINEAR_AUDIT_ENV_VAR,
   PROVIDER_LINEAR_PARALLELIZATION_REASONS,
@@ -57,6 +61,12 @@ import {
   resolveProviderWorkspacePath
 } from './run/workspacePath.js';
 import {
+  countGuardrailCommands,
+  resolveGuardrailsRequiredForManifest,
+  resolveGuardrailsRequiredSourceForManifest,
+  stripNonApplicableGuardrailSummaryLines
+} from './run/manifest.js';
+import {
   buildRunMemoryPromptLines,
   selectRunMemoryForRole
 } from './run/runMemoryController.js';
@@ -74,7 +84,10 @@ import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
 import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
 import { acquireLockWithRetry, type LockRetryOptions } from '../persistence/lockFile.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
-import { REPO_CONFIG_REQUIRED_ENV_KEY } from './config/repoConfigPolicy.js';
+import {
+  CONFIG_AUTHORITY_MODE_ENV_KEY,
+  REPO_CONFIG_REQUIRED_ENV_KEY
+} from './config/repoConfigPolicy.js';
 import { REPO_CONFIG_PATH_ENV_KEY } from './config/userConfig.js';
 import {
   normalizeProviderLinearChildLanePathSelectors,
@@ -99,6 +112,7 @@ export const PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV =
   'CODEX_ORCHESTRATOR_PROVIDER_RESIDENT_SESSION_SEED';
 export const PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID = 'provider-linear-child-lane';
 export const PROVIDER_LINEAR_CHILD_LANE_RESERVED_SUMMARY = 'Child lane reserved before child run startup.';
+export const PROVIDER_LINEAR_CHILD_LANE_DIAGNOSTICS_FILENAME = 'provider-linear-child-lane-diagnostics.json';
 const PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME = 'provider-linear-child-lane-proof.json';
 const PROVIDER_LINEAR_WORKER_SESSION_LOG_HYDRATION_FILENAME =
   'provider-linear-worker-session-log-hydration.json';
@@ -108,6 +122,9 @@ const PROVIDER_LINEAR_WORKER_CHILD_LANES_LOCK_FILENAME = `${PROVIDER_LINEAR_WORK
 const PROVIDER_WORKER_DEFAULT_MAX_TURNS = 20;
 const PROVIDER_CONTROL_HOST_REFRESH_PATH = '/api/v1/refresh';
 const PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS = 15_000;
+const PROVIDER_CONTROL_HOST_REFRESH_RETRY_DELAY_MS = 250;
+const PROVIDER_CONTROL_HOST_REFRESH_FAILURE_FILENAME =
+  'provider-control-host-refresh-failure.json';
 const PROVIDER_LINEAR_TRACKED_ISSUE_RATE_LIMIT_MAX_WAIT_MS = 15_000;
 const PROVIDER_LINEAR_TRACKED_ISSUE_RATE_LIMIT_BUCKETS = [
   {
@@ -154,6 +171,9 @@ export const PROVIDER_SEMANTIC_STALL_RECHECK_DELAY_MS = 15 * 60 * 1000 + 1_000;
 const PROVIDER_WORKER_SESSION_LOG_POLL_INTERVAL_MS = 250;
 const PROVIDER_WORKER_SESSION_LOG_DISCOVERY_WINDOW_MS = 15 * 60 * 1000;
 const PROVIDER_WORKER_SESSION_LOG_HEADER_BYTES = 256 * 1024;
+const PROVIDER_LINEAR_CHILD_LANE_POST_STARTUP_NO_OUTPUT_MIN_STALE_MS = 60 * 1000;
+const PROVIDER_LINEAR_CHILD_LANE_RUNNER_IDENTITY_START_BEFORE_TOLERANCE_MS = 5 * 60 * 1000;
+const PROVIDER_LINEAR_CHILD_LANE_RUNNER_PROCESS_LOOKUP_TIMEOUT_MS = 2000;
 
 export interface ProviderLinearWorkerContext {
   manifest: Record<string, unknown>;
@@ -183,6 +203,7 @@ export interface ProviderLinearWorkerTokenUsage {
   input_tokens: number | null;
   output_tokens: number | null;
   total_tokens: number | null;
+  reasoning_output_tokens?: number | null;
 }
 
 export interface ProviderLinearResidentSessionSeed {
@@ -249,6 +270,13 @@ export type ProviderLinearWorkerChildLaneInFlightAction =
   | 'reject'
   | 'invalidate';
 
+export type ProviderLinearWorkerChildLaneRunnerIdentityStatus =
+  | 'not_recorded'
+  | 'not_live'
+  | 'matched'
+  | 'ambiguous'
+  | 'pid_reuse_suspected';
+
 export interface ProviderLinearWorkerChildLaneRecord {
   stream: string;
   pipeline_id: string;
@@ -259,6 +287,26 @@ export interface ProviderLinearWorkerChildLaneRecord {
   artifact_root: string;
   log_path: string | null;
   summary: string | null;
+  guardrails_required?: boolean | null;
+  guardrails_required_source?: string | null;
+  guardrail_command_count?: number | null;
+  runtime_mode?: string | null;
+  runtime_provider?: string | null;
+  heartbeat_at?: string | null;
+  heartbeat_stale_after_seconds?: number | null;
+  runner_pid?: number | null;
+  runner_started_at?: string | null;
+  runner_alive?: boolean | null;
+  runner_identity_status?: ProviderLinearWorkerChildLaneRunnerIdentityStatus | null;
+  runner_identity_reason?: string | null;
+  runner_observed_started_at?: string | null;
+  runner_command_line_matches?: boolean | null;
+  runtime_event?: string | null;
+  runtime_event_at?: string | null;
+  appserver_startup_observed?: boolean | null;
+  appserver_startup_observed_at?: string | null;
+  stale_invalidation_candidate?: boolean | null;
+  stale_invalidation_reason?: string | null;
   issue_id: string;
   issue_identifier: string;
   workspace_path: string | null;
@@ -287,6 +335,7 @@ export type ProviderLinearWorkerDiagnosticCategory =
   | 'cloud_denial'
   | 'guardian_timeout'
   | 'guardian_policy_denial'
+  | 'provider_stdin_bootstrap'
   | 'provider_runtime'
   | 'unknown';
 
@@ -304,12 +353,77 @@ export interface ProviderLinearWorkerAuthProvenance {
   source: string | null;
 }
 
+export type ProviderLinearWorkerControlAuthority =
+  | 'appserver'
+  | 'legacy_cli_break_glass';
+
+export interface ProviderLinearWorkerControlPlane {
+  authority: ProviderLinearWorkerControlAuthority;
+  transport: 'app-server-jsonl' | 'codex-exec-jsonl';
+  requested_runtime_mode: string | null;
+  selected_runtime_mode: string | null;
+  runtime_provider: string | null;
+  runtime_session_id: string | null;
+  fallback_occurred: boolean;
+  fallback_code: string | null;
+  fallback_reason: string | null;
+  normal_start_method: 'thread/start + turn/start' | 'codex exec';
+  resume_method: 'thread/resume + turn/start' | 'codex exec resume';
+  drain_method: 'turn/completed notification' | 'process exit';
+  restart_method: 'thread/resume from recorded thread_id' | 'codex exec resume from recorded thread_id';
+  state_read_model: 'provider-linear-worker-proof';
+  break_glass: boolean;
+  break_glass_reason: string | null;
+  observed_at: string | null;
+}
+
 export interface ProviderLinearWorkerFailureDiagnosis {
   diagnostic_category: ProviderLinearWorkerDiagnosticCategory;
   signal: string;
   guidance: string;
   source: string;
   observed_at: string | null;
+}
+
+export interface ProviderLinearWorkerRuntimeProof {
+  requested_mode: string | null;
+  selected_mode: string | null;
+  provider: string | null;
+  runtime_session_id: string | null;
+  fallback: RuntimeSelection['fallback'] | null;
+}
+
+export interface ProviderLinearWorkerAppServerSupervisionProof {
+  selected_runtime: ProviderLinearWorkerRuntimeProof;
+  supervision_command:
+    | 'appserver_thread_start'
+    | 'appserver_thread_resume'
+    | 'codex_exec'
+    | 'codex_exec_resume';
+  appserver_session_id: string | null;
+  thread_id: string | null;
+  latest_turn_id: string | null;
+  latest_session_id: string | null;
+  session_log_thread_id: string | null;
+  session_log_turn_id: string | null;
+  session_log_session_id: string | null;
+  sticky_environment_id: string | null;
+  sticky_environment_status: 'proven' | 'blocked' | 'not_applicable';
+  sticky_environment_blocker: string | null;
+  turn_persistence_status: 'proven' | 'blocked' | 'not_applicable';
+  turn_persistence_source: 'session_log_hydration' | null;
+  turn_persistence_blocker: string | null;
+  pagination_status: 'blocked' | 'not_applicable';
+  pagination_blocker: string | null;
+  resume_status: 'proven' | 'blocked' | 'not_requested' | 'not_applicable';
+  resume_source_thread_id: string | null;
+  resume_observed_thread_id: string | null;
+  resume_blocker: string | null;
+  fork_status: 'blocked' | 'not_requested' | 'not_applicable';
+  fork_blocker: string | null;
+  jsonl_truth_retained: boolean;
+  session_log_truth_retained: boolean;
+  updated_at: string | null;
 }
 
 export interface ProviderLinearWorkerProof {
@@ -322,14 +436,23 @@ export interface ProviderLinearWorkerProof {
   latest_turn_id: string | null;
   latest_session_id: string | null;
   latest_session_id_source: 'derived_from_thread_and_turn' | null;
+  session_log_thread_id?: string | null;
+  session_log_turn_id?: string | null;
+  session_log_session_id?: string | null;
+  resume_source_thread_id?: string | null;
   turn_count: number;
   last_event: string | null;
   last_message: string | null;
+  last_message_source?: ProviderLinearWorkerJsonlParseResult['finalMessageSource'];
+  last_message_delta_key?: string | null;
   last_event_at: string | null;
   current_turn_activity?: ProviderLinearWorkerCurrentTurnActivity | null;
   tokens: ProviderLinearWorkerTokenUsage;
   rate_limits: Record<string, unknown> | null;
+  runtime?: ProviderLinearWorkerRuntimeProof | null;
+  appserver_supervision?: ProviderLinearWorkerAppServerSupervisionProof | null;
   auth_provenance?: ProviderLinearWorkerAuthProvenance | null;
+  worker_control?: ProviderLinearWorkerControlPlane | null;
   failure_diagnosis?: ProviderLinearWorkerFailureDiagnosis | null;
   owner_phase: string;
   owner_status: 'in_progress' | 'succeeded' | 'failed';
@@ -352,6 +475,7 @@ export type ProviderLinearWorkerCurrentTurnActivitySource =
   | 'stdout_jsonl'
   | 'session_log_hydration'
   | 'stderr'
+  | 'appserver_runner'
   | 'exec_runner';
 
 export interface ProviderLinearWorkerCurrentTurnActivity {
@@ -377,10 +501,37 @@ export interface ProviderLinearTrackedIssueError {
   details?: Record<string, unknown>;
 }
 
+interface ProviderControlHostRefreshFailureDiagnostic {
+  schema_version: 1;
+  reason: 'provider_control_host_refresh_failed';
+  failure_kind: 'refresh_request_timeout' | 'fetch_failed' | 'request_failed';
+  message: string;
+  issue_id: string;
+  issue_identifier: string;
+  owner_status: ProviderLinearWorkerProof['owner_status'];
+  end_reason: string | null;
+  observed_at: string;
+  control_host_run_dir: string;
+  control_host_ownership: ControlHostOwnershipPollingPayload | null;
+  retry: {
+    attempts: number;
+    retried_after_stale_owner_reclaim: boolean;
+    recovered: false;
+  };
+}
+
 export interface ProviderLinearWorkerJsonlParseResult {
   threadId: string | null;
   turnId: string | null;
   finalMessage: string | null;
+  finalMessageSource?: 'agent_message_delta' | 'other' | null;
+  finalMessageDeltaKey?: string | null;
+  agentMessageDeltaBuffers?: Record<string, string>;
+  agentMessageDeltaSourceBuffers?: Record<
+    string,
+    Partial<Record<ProviderLinearWorkerCurrentTurnActivitySource, string>>
+  >;
+  agentMessageDeltaHydrationSeed?: ProviderWorkerAgentMessageDeltaHydrationSeed | null;
   lastEvent: string | null;
   lastEventAt: string | null;
   currentTurnActivity: ProviderLinearWorkerCurrentTurnActivity | null;
@@ -388,6 +539,13 @@ export interface ProviderLinearWorkerJsonlParseResult {
   rateLimits: Record<string, unknown> | null;
   authProvenance: ProviderLinearWorkerAuthProvenance | null;
   failureDiagnosis: ProviderLinearWorkerFailureDiagnosis | null;
+}
+
+interface ProviderWorkerAgentMessageDeltaHydrationSeed {
+  message: string;
+  deltaKey: string;
+  threadId: string | null;
+  turnId: string | null;
 }
 
 export interface ProviderLinearWorkerExecRequest {
@@ -406,6 +564,30 @@ export interface ProviderLinearWorkerExecResult {
   stderr: string;
 }
 
+export interface ProviderLinearWorkerAppServerTurnRequest {
+  command: string;
+  args: string[];
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  prompt: string;
+  resumeThreadId: string | null;
+  onStdoutChunk?: ((chunk: string) => void) | null;
+  abortSignal?: AbortSignal | null;
+}
+
+export type ProviderLinearWorkerAppServerCallbackResponse =
+  | {
+      kind: 'result';
+      result: Record<string, unknown>;
+    }
+  | {
+      kind: 'error';
+      error: {
+        code: number;
+        message: string;
+      };
+    };
+
 interface ProviderWorkerRunLocation {
   canonicalRunsRoot: string;
   taskId: string;
@@ -417,6 +599,8 @@ interface ProviderWorkerSessionLogTailState {
   offsetBytes: number;
   trailingText: string;
   bootstrapPending: boolean;
+  currentTurnStartedAt: string | null;
+  idRewindSignature: string | null;
 }
 
 interface ProviderWorkerSessionLogHydrationState {
@@ -425,6 +609,7 @@ interface ProviderWorkerSessionLogHydrationState {
   trailing_text: string;
   bootstrap_pending: boolean;
   proof_signature: string;
+  id_rewind_signature?: string | null;
 }
 
 interface ProviderControlHostManifestTarget {
@@ -452,6 +637,9 @@ export interface ProviderLinearWorkerDependencies {
   ) => Promise<RuntimeCodexCommandContext>;
   sleep: (ms: number) => Promise<void>;
   execRunner: (request: ProviderLinearWorkerExecRequest) => Promise<ProviderLinearWorkerExecResult>;
+  appServerTurnRunner: (
+    request: ProviderLinearWorkerAppServerTurnRequest
+  ) => Promise<ProviderLinearWorkerExecResult>;
   writeProof: (path: string, proof: ProviderLinearWorkerProof) => Promise<void>;
   log: Pick<typeof logger, 'info' | 'warn' | 'error'>;
 }
@@ -579,6 +767,600 @@ export function defaultExecRunner(
   });
 }
 
+function pickProviderLinearWorkerOfferedDenialDecision(decisions: unknown[]): string | null {
+  if (decisions.length === 0) {
+    return 'decline';
+  }
+  if (decisions.includes('decline')) {
+    return 'decline';
+  }
+  return decisions.includes('cancel') ? 'cancel' : null;
+}
+
+function buildProviderLinearWorkerUnavailableDecisionError(
+  method: string
+): ProviderLinearWorkerAppServerCallbackResponse {
+  return {
+    kind: 'error',
+    error: {
+      code: -32000,
+      message: `Provider worker app-server control has no safe offered decision for ${method}.`
+    }
+  };
+}
+
+function pickProviderLinearWorkerCommandApprovalDecision(
+  params: Record<string, unknown> | null
+): string | null {
+  const decisions = Array.isArray(params?.availableDecisions) ? params.availableDecisions : [];
+  const fallbackDenialDecision = pickProviderLinearWorkerOfferedDenialDecision(decisions);
+  if (hasProviderLinearWorkerCommandApprovalEscalation(params)) {
+    return fallbackDenialDecision;
+  }
+  if (decisions.length === 0 || decisions.includes('accept')) {
+    return 'accept';
+  }
+  return fallbackDenialDecision;
+}
+
+function hasProviderLinearWorkerGrantRoot(params: Record<string, unknown> | null): boolean {
+  return (
+    isProviderLinearWorkerEscalationRequest(params?.grantRoot) ||
+    isProviderLinearWorkerEscalationRequest(params?.grant_root)
+  );
+}
+
+function pickProviderLinearWorkerFileChangeApprovalDecision(params: Record<string, unknown> | null): string | null {
+  const decisions = Array.isArray(params?.availableDecisions) ? params.availableDecisions : [];
+  if (hasProviderLinearWorkerGrantRoot(params)) {
+    return pickProviderLinearWorkerOfferedDenialDecision(decisions);
+  }
+  if (decisions.length === 0 || decisions.includes('accept')) {
+    return 'accept';
+  }
+  return pickProviderLinearWorkerOfferedDenialDecision(decisions);
+}
+
+function pickProviderLinearWorkerLegacyPatchApprovalDecision(
+  params: Record<string, unknown> | null
+): string {
+  return hasProviderLinearWorkerGrantRoot(params) ? 'denied' : 'approved';
+}
+
+function hasProviderLinearWorkerCommandApprovalEscalation(
+  params: Record<string, unknown> | null
+): boolean {
+  const additionalPermissions = isRecord(params?.additionalPermissions)
+    ? params.additionalPermissions
+    : null;
+  const requestsNetworkPermission = isProviderLinearWorkerEscalationRequest(
+    additionalPermissions?.network
+  );
+  const requestsFileSystemPermission = isProviderLinearWorkerEscalationRequest(
+    additionalPermissions?.fileSystem
+  );
+  if (requestsNetworkPermission || requestsFileSystemPermission) {
+    return true;
+  }
+  if (isProviderLinearWorkerEscalationRequest(params?.networkApprovalContext)) {
+    return true;
+  }
+  if (
+    Array.isArray(params?.proposedExecpolicyAmendment) &&
+    params.proposedExecpolicyAmendment.length > 0
+  ) {
+    return true;
+  }
+  return (
+    Array.isArray(params?.proposedNetworkPolicyAmendments) &&
+    params.proposedNetworkPolicyAmendments.length > 0
+  );
+}
+
+function isProviderLinearWorkerEscalationRequest(value: unknown): boolean {
+  if (value === null || value === undefined || value === false) {
+    return false;
+  }
+  return true;
+}
+
+function buildProviderLinearWorkerPermissionsGrant(): Record<string, unknown> {
+  // Permission callbacks are escalation requests; provider workers grant no extra surface here.
+  return {};
+}
+
+export function buildProviderLinearWorkerAppServerCallbackResponse(
+  method: string,
+  params: Record<string, unknown> | null = null
+): ProviderLinearWorkerAppServerCallbackResponse {
+  switch (method) {
+    case 'item/commandExecution/requestApproval': {
+      const decision = pickProviderLinearWorkerCommandApprovalDecision(params);
+      if (!decision) {
+        return buildProviderLinearWorkerUnavailableDecisionError(method);
+      }
+      return {
+        kind: 'result',
+        result: {
+          decision
+        }
+      };
+    }
+    case 'item/fileChange/requestApproval': {
+      const decision = pickProviderLinearWorkerFileChangeApprovalDecision(params);
+      if (!decision) {
+        return buildProviderLinearWorkerUnavailableDecisionError(method);
+      }
+      return {
+        kind: 'result',
+        result: {
+          decision
+        }
+      };
+    }
+    case 'item/permissions/requestApproval':
+      return {
+        kind: 'result',
+        result: {
+          permissions: buildProviderLinearWorkerPermissionsGrant(),
+          scope: 'turn',
+          strictAutoReview: false
+        }
+      };
+    case 'applyPatchApproval':
+      return {
+        kind: 'result',
+        result: {
+          decision: pickProviderLinearWorkerLegacyPatchApprovalDecision(params)
+        }
+      };
+    case 'execCommandApproval':
+      return {
+        kind: 'result',
+        result: {
+          decision: hasProviderLinearWorkerCommandApprovalEscalation(params) ? 'denied' : 'approved'
+        }
+      };
+    case 'mcpServer/elicitation/request':
+      return {
+        kind: 'result',
+        result: {
+          action: 'decline',
+          content: null,
+          _meta: null
+        }
+      };
+    case 'item/tool/requestUserInput': {
+      const questions = Array.isArray(params?.questions) ? params.questions : [];
+      const answers: Record<string, { answers: string[] }> = {};
+      for (const question of questions) {
+        if (!isRecord(question)) {
+          continue;
+        }
+        const id = normalizeOptionalString(question.id);
+        if (id) {
+          answers[id] = { answers: [] };
+        }
+      }
+      return {
+        kind: 'result',
+        result: { answers }
+      };
+    }
+    case 'item/tool/call': {
+      const tool = normalizeOptionalString(params?.tool) ?? 'unknown';
+      return {
+        kind: 'result',
+        result: {
+          contentItems: [
+            {
+              type: 'inputText',
+              text: `Provider worker app-server control has no client implementation for dynamic tool ${tool}.`
+            }
+          ],
+          success: false
+        }
+      };
+    }
+    case 'account/chatgptAuthTokens/refresh':
+      return {
+        kind: 'error',
+        error: {
+          code: -32001,
+          message: 'Provider worker app-server control cannot refresh ChatGPT auth tokens.'
+        }
+      };
+    default:
+      return {
+        kind: 'error',
+        error: {
+          code: -32000,
+          message: `Provider worker app-server control does not service ${method} client callbacks.`
+        }
+      };
+  }
+}
+
+export async function defaultAppServerTurnRunner(
+  request: ProviderLinearWorkerAppServerTurnRequest
+): Promise<ProviderLinearWorkerExecResult> {
+  return await new Promise((resolvePromise, reject) => {
+    const abortSignal = request.abortSignal ?? null;
+    const buildAbortError = (): Error => {
+      const reason = abortSignal?.reason;
+      if (reason instanceof Error) {
+        return reason;
+      }
+      if (typeof reason === 'string' && reason.trim().length > 0) {
+        return new Error(reason);
+      }
+      return new Error('App-server turn aborted.');
+    };
+    if (abortSignal?.aborted) {
+      reject(buildAbortError());
+      return;
+    }
+
+    const child = spawn(request.command, request.args, {
+      cwd: request.cwd,
+      env: request.env,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    child.stdout?.setEncoding('utf8');
+    child.stderr?.setEncoding('utf8');
+
+    let nextId = 1;
+    let stdout = '';
+    let stderr = '';
+    let stdoutBuffer = '';
+    let settled = false;
+    let terminalTurnStatus: string | null = null;
+    let terminalTurnFailureDetail: string | null = null;
+    let abortError: Error | null = null;
+    let abortEscalationTimer: ReturnType<typeof setTimeout> | null = null;
+    const pending = new Map<
+      string,
+      {
+        method: string;
+        resolve: (value: unknown) => void;
+        reject: (error: Error) => void;
+      }
+    >();
+    let completeTurn: (() => void) | null = null;
+    const turnCompletion = new Promise<void>((resolve) => {
+      completeTurn = resolve;
+    });
+
+    const cleanupAbort = () => {
+      if (abortSignal) {
+        abortSignal.removeEventListener('abort', handleAbort);
+      }
+      if (abortEscalationTimer !== null) {
+        clearTimeout(abortEscalationTimer);
+        abortEscalationTimer = null;
+      }
+    };
+    const finalizeError = (error: Error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanupAbort();
+      for (const entry of pending.values()) {
+        entry.reject(error);
+      }
+      pending.clear();
+      if (child.exitCode === null && child.signalCode === null && !child.killed) {
+        child.kill();
+      }
+      reject(error);
+    };
+    const finalizeSuccess = (result: ProviderLinearWorkerExecResult) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanupAbort();
+      pending.clear();
+      if (child.exitCode === null && child.signalCode === null && !child.killed) {
+        child.kill();
+      }
+      resolvePromise(result);
+    };
+    const buildAppServerRuntimeError = (message: string, cause?: Error): Error => {
+      const stderrDetail = normalizeOptionalString(stderr);
+      const errorMessage = stderrDetail ? `${message}: ${stderrDetail}` : message;
+      const error = new Error(errorMessage);
+      if (cause) {
+        error.cause = cause;
+      }
+      return error;
+    };
+    function handleAbort(): void {
+      if (settled) {
+        return;
+      }
+      if (child.exitCode !== null || child.signalCode !== null) {
+        return;
+      }
+      abortError ??= buildAbortError();
+      if (child.exitCode === null && child.signalCode === null && !child.killed) {
+        child.kill();
+      }
+      if (abortEscalationTimer === null) {
+        abortEscalationTimer = setTimeout(() => {
+          if (settled || child.exitCode !== null || child.signalCode !== null) {
+            return;
+          }
+          child.kill('SIGKILL');
+        }, 5_000);
+        abortEscalationTimer.unref?.();
+      }
+    }
+
+    const emitProviderJsonl = (record: Record<string, unknown>) => {
+      const line = `${JSON.stringify(record)}\n`;
+      stdout += line;
+      try {
+        request.onStdoutChunk?.(line);
+      } catch (error) {
+        finalizeError(error instanceof Error ? error : new Error(String(error)));
+      }
+    };
+    const writeAppServerPayload = (payload: Record<string, unknown>): void => {
+      if (!child.stdin || child.stdin.destroyed || !child.stdin.writable) {
+        throw buildAppServerRuntimeError('app-server stdin is unavailable');
+      }
+      child.stdin.write(`${JSON.stringify(payload)}\n`);
+    };
+    const emitThreadStarted = (threadId: string | null): void => {
+      if (!threadId) {
+        return;
+      }
+      emitProviderJsonl({
+        type: 'thread.started',
+        thread_id: threadId
+      });
+      emitProviderJsonl({
+        type: 'session_meta',
+        payload: {
+          id: threadId,
+          cwd: request.cwd,
+          source: 'appserver'
+        }
+      });
+    };
+    const emitTurnContext = (turnId: string | null): void => {
+      if (!turnId) {
+        return;
+      }
+      emitProviderJsonl({
+        type: 'turn_context',
+        payload: {
+          turn_id: turnId
+        }
+      });
+    };
+    const observeTurnStatus = (turn: Record<string, unknown> | null): void => {
+      const status = normalizeOptionalString(turn?.status);
+      if (!status || status === 'inProgress') {
+        return;
+      }
+      terminalTurnStatus = status;
+      terminalTurnFailureDetail =
+        status === 'completed'
+          ? null
+          : buildProviderLinearWorkerAppServerTerminalFailureMessage(turn, status);
+      completeTurn?.();
+    };
+    const emitNotification = (payload: Record<string, unknown>): void => {
+      const method = normalizeOptionalString(payload.method);
+      const params = isRecord(payload.params) ? payload.params : null;
+      if (!method) {
+        return;
+      }
+      if (method === 'thread/started') {
+        emitThreadStarted(normalizeOptionalString(findRecordAtPaths(payload, [['params', 'thread']])?.id));
+      }
+      if (method === 'turn/started') {
+        emitTurnContext(normalizeOptionalString(findRecordAtPaths(payload, [['params', 'turn']])?.id));
+      }
+      if (method === 'turn/completed') {
+        observeTurnStatus(findRecordAtPaths(payload, [['params', 'turn']]));
+      }
+      emitProviderJsonl({
+        type: 'notification',
+        method,
+        params: params ?? {},
+        payload
+      });
+      if (method === 'turn/completed' && terminalTurnFailureDetail) {
+        emitProviderJsonl({
+          type: 'event_msg',
+          payload: {
+            type: 'diagnostic',
+            status: 'appserver_runtime_error',
+            message: terminalTurnFailureDetail
+          }
+        });
+      }
+    };
+    const handleServerRequest = (payload: Record<string, unknown>): void => {
+      const id = payload.id;
+      if (id === null || id === undefined) {
+        return;
+      }
+      const method = normalizeOptionalString(payload.method) ?? 'unknown';
+      const params = isRecord(payload.params) ? payload.params : {};
+      emitNotification({ method, params });
+      const callbackResponse = buildProviderLinearWorkerAppServerCallbackResponse(method, params);
+      const response =
+        callbackResponse.kind === 'result'
+          ? { id, result: callbackResponse.result }
+          : { id, error: callbackResponse.error };
+      writeAppServerPayload(response);
+    };
+    const handleJsonlPayload = (payload: unknown): void => {
+      if (!isRecord(payload)) {
+        return;
+      }
+      const id = payload.id;
+      if (id !== null && id !== undefined && normalizeOptionalString(payload.method)) {
+        handleServerRequest(payload);
+        return;
+      }
+      const pendingEntry = id === null || id === undefined ? null : pending.get(String(id));
+      if (pendingEntry) {
+        pending.delete(String(id));
+        if (payload.error) {
+          pendingEntry.reject(
+            new Error(`app-server ${pendingEntry.method} failed: ${JSON.stringify(payload.error)}`)
+          );
+          return;
+        }
+        pendingEntry.resolve(payload.result);
+        return;
+      }
+      emitNotification(payload);
+    };
+    const requestAppServer = async (method: string, params: Record<string, unknown> | undefined): Promise<unknown> => {
+      const id = nextId;
+      nextId += 1;
+      return await new Promise((resolve, rejectRequest) => {
+        pending.set(String(id), {
+          method,
+          resolve,
+          reject: rejectRequest
+        });
+        try {
+          writeAppServerPayload({ id, method, params });
+        } catch (error) {
+          pending.delete(String(id));
+          rejectRequest(error instanceof Error ? error : new Error(String(error)));
+        }
+      });
+    };
+    const notifyAppServer = (method: string, params?: Record<string, unknown>): void => {
+      writeAppServerPayload(params ? { method, params } : { method });
+    };
+
+    child.stdout?.on('data', (chunk) => {
+      stdoutBuffer += String(chunk);
+      while (stdoutBuffer.includes('\n')) {
+        const newlineIndex = stdoutBuffer.indexOf('\n');
+        const line = stdoutBuffer.slice(0, newlineIndex).trim();
+        stdoutBuffer = stdoutBuffer.slice(newlineIndex + 1);
+        if (!line) {
+          continue;
+        }
+        try {
+          handleJsonlPayload(JSON.parse(line) as unknown);
+        } catch (error) {
+          finalizeError(error instanceof Error ? error : new Error(String(error)));
+        }
+      }
+    });
+    child.stderr?.on('data', (chunk) => {
+      stderr += String(chunk);
+    });
+    child.once('error', (error) => {
+      const normalizedError = error instanceof Error ? error : new Error(String(error));
+      finalizeError(abortError ?? buildAppServerRuntimeError('app-server process error', normalizedError));
+    });
+    child.stdin?.once('error', (error) => {
+      const normalizedError = error instanceof Error ? error : new Error(String(error));
+      finalizeError(abortError ?? buildAppServerRuntimeError('app-server stdin write failed', normalizedError));
+    });
+    child.once('close', (exitCode, signal) => {
+      if (settled) {
+        return;
+      }
+      if (!abortError && terminalTurnStatus === 'completed') {
+        finalizeSuccess({
+          exitCode: 0,
+          stdout,
+          stderr
+        });
+        return;
+      }
+      const reason = signal ? `signal ${signal}` : `code ${exitCode ?? 'unknown'}`;
+      finalizeError(
+        abortError ?? buildAppServerRuntimeError(`app-server exited before turn completion with ${reason}`)
+      );
+    });
+    abortSignal?.addEventListener('abort', handleAbort, { once: true });
+    if (abortSignal?.aborted) {
+      handleAbort();
+    }
+
+    (async () => {
+      await requestAppServer('initialize', {
+        clientInfo: {
+          name: 'co_provider_linear_worker',
+          title: 'CO Provider Linear Worker',
+          version: '0.0.0'
+        },
+        capabilities: {
+          experimentalApi: true
+        }
+      });
+      notifyAppServer('initialized');
+
+      const threadResult = request.resumeThreadId
+        ? await requestAppServer('thread/resume', {
+            threadId: request.resumeThreadId,
+            cwd: request.cwd,
+            excludeTurns: true,
+            persistExtendedHistory: true
+          })
+        : await requestAppServer('thread/start', {
+            cwd: request.cwd,
+            experimentalRawEvents: false,
+            persistExtendedHistory: true
+          });
+      const threadResultRecord = isRecord(threadResult) ? threadResult : {};
+      const threadId =
+        normalizeOptionalString(findRecordAtPaths(threadResultRecord, [['thread']])?.id) ??
+        request.resumeThreadId;
+      emitThreadStarted(threadId);
+      if (!threadId) {
+        throw new Error('app-server thread start did not return a thread id.');
+      }
+
+      const turnResult = await requestAppServer('turn/start', {
+        threadId,
+        cwd: request.cwd,
+        input: [
+          {
+            type: 'text',
+            text: request.prompt,
+            text_elements: []
+          }
+        ]
+      });
+      const turnResultRecord = isRecord(turnResult) ? turnResult : {};
+      const turn = findRecordAtPaths(turnResultRecord, [['turn']]);
+      emitTurnContext(normalizeOptionalString(turn?.id));
+      observeTurnStatus(turn);
+      await turnCompletion;
+      const exitCode = terminalTurnStatus === 'completed' ? 0 : 1;
+      const finalStderr =
+        exitCode === 0 || !terminalTurnFailureDetail
+          ? stderr
+          : stderr
+            ? `${stderr.trimEnd()}\n${terminalTurnFailureDetail}`
+            : terminalTurnFailureDetail;
+      finalizeSuccess({
+        exitCode,
+        stdout,
+        stderr: finalStderr
+      });
+    })().catch((error) => {
+      finalizeError(error instanceof Error ? error : new Error(String(error)));
+    });
+  });
+}
+
 function envFlagEnabled(value: string | undefined): boolean {
   if (!value) {
     return false;
@@ -599,14 +1381,36 @@ function shouldForceNonInteractive(env: NodeJS.ProcessEnv): boolean {
   );
 }
 
+function ensureProviderLinearWorkerAuthoritativeReviewNotes(
+  env: NodeJS.ProcessEnv,
+  context: Pick<ProviderLinearWorkerContext, 'issueIdentifier' | 'taskId'>
+): void {
+  if (!envFlagEnabled(env.CODEX_REVIEW_AUTHORITATIVE_GATE) || normalizeOptionalString(env.NOTES)) {
+    return;
+  }
+  env.NOTES = [
+    `Goal: provider-linear-worker handoff review for ${context.issueIdentifier}`,
+    `Summary: provider-authored default NOTES for the authoritative pre-handoff review gate in task ${context.taskId}; worker commands may override with issue-specific context`,
+    'Risks: generic provider-worker notes are lower-signal than worker-authored closeout notes'
+  ].join(' | ');
+}
+
 function classifyExecRunnerFailure(
   error: unknown,
   spawnContext: {
     cwd: string;
+    useAppServerControl?: boolean;
   }
 ): ProviderLinearWorkerProof['end_reason'] {
+  if (spawnContext.useAppServerControl) {
+    return 'appserver_runtime_error';
+  }
   if ((error as NodeJS.ErrnoException)?.code === 'ENOENT' && existsSync(spawnContext.cwd)) {
     return 'runtime_parity_command_unavailable';
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  if (/\bapp-server\b/u.test(message)) {
+    return 'appserver_runtime_error';
   }
   return 'exec_runner_failed';
 }
@@ -617,6 +1421,62 @@ function normalizeOptionalString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function stringifyProviderLinearWorkerAppServerTurnError(value: unknown): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const direct = normalizeOptionalString(value);
+  if (direct) {
+    return direct;
+  }
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((item) => stringifyProviderLinearWorkerAppServerTurnError(item))
+      .filter((item): item is string => Boolean(item));
+    return normalizeOptionalString(parts.join('; '));
+  }
+  if (!isRecord(value)) {
+    return normalizeOptionalString(String(value));
+  }
+  const preferred = [
+    normalizeOptionalString(value.message),
+    normalizeOptionalString(value.error),
+    normalizeOptionalString(value.reason),
+    normalizeOptionalString(value.detail),
+    normalizeOptionalString(value.details),
+    stringifyProviderLinearWorkerAppServerTurnError(value.additionalDetails),
+    stringifyProviderLinearWorkerAppServerTurnError(value.additional_details),
+    normalizeOptionalString(value.code)
+  ].filter((item): item is string => Boolean(item));
+  if (preferred.length > 0) {
+    return preferred.join('; ');
+  }
+  try {
+    return normalizeOptionalString(JSON.stringify(value));
+  } catch {
+    return null;
+  }
+}
+
+function buildProviderLinearWorkerAppServerTerminalFailureMessage(
+  turn: Record<string, unknown> | null,
+  status: string
+): string {
+  const normalizedStatus = normalizeOptionalString(status) ?? 'failed';
+  const turnId = normalizeOptionalString(turn?.id);
+  const base = turnId
+    ? `app-server turn ${turnId} ${normalizedStatus}`
+    : `app-server turn ${normalizedStatus}`;
+  const errorDetail = stringifyProviderLinearWorkerAppServerTurnError(
+    turn?.error ?? turn?.failure ?? turn?.status_detail ?? turn?.statusDetail
+  );
+  return errorDetail ? `${base}: ${redactProviderWorkerDiagnosticText(errorDetail)}` : base;
+}
+
+function normalizeGuardrailsRequiredSource(value: unknown): string | null {
+  return value === 'explicit' || value === 'stage_detection' ? value : null;
 }
 
 function backfillProviderWorkerManifestControlHostProvenance(
@@ -1475,7 +2335,12 @@ function applyProviderLinearWorkerContextEnv(
       env[REPO_CONFIG_PATH_ENV_KEY] = preservedRepoConfigPath;
     } else {
       delete env[REPO_CONFIG_PATH_ENV_KEY];
-      if (inheritedRepoConfigPath) {
+      if (
+        inheritedRepoConfigPath &&
+        (!isProviderLinearWorkerWorkspaceRoot(context.repoRoot) ||
+          !existsSync(join(context.repoRoot, 'codex.orchestrator.json')))
+      ) {
+        env[CONFIG_AUTHORITY_MODE_ENV_KEY] = 'downstream-compatibility';
         delete env[REPO_CONFIG_REQUIRED_ENV_KEY];
       }
     }
@@ -1723,7 +2588,7 @@ function buildPreReviewHandoffGateSection(): string[] {
   return [
     '- Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff before opening a new PR for review handoff, before updating an already-attached PR for handoff, and before transitioning the issue to `Human Review` or `In Review`.',
     '- Use the repo heuristic for non-trivial work: about 2+ changed files or about 40+ changed lines, unless you record an explicit skip justification in the workpad.',
-    '- Run the standalone review first. When manifest-backed evidence matters, use the wrapper-led review path by default; if review tooling is unavailable or stalls without a concrete verdict, do a manual correctness/regressions/missing-tests review plus a manual elegance checklist and record that fallback instead of stalling.',
+    '- Run the standalone review first. When manifest-backed evidence matters, use the wrapper-led review path by default; if review tooling is unavailable or stalls without a concrete verdict, do not hand off to review state unless a break-glass waiver is recorded with owner, expiry, reason, and evidence. Only after that waiver may you do a manual correctness/regressions/missing-tests review plus a manual elegance checklist as the fallback evidence.',
     '- After addressing standalone-review findings, run an explicit elegance/minimality pass before PR create/update intended for handoff and before the review-state transition.',
     '- After opening or updating a PR, run the shipped `codex-orchestrator pr ready-review --pr <number> --quiet-minutes <window>` monitor (or the equivalent repo-local wrapper) and keep the issue out of review until that bounded automated-feedback drain exits cleanly or exposes a blocker that you resolve or explicitly push back on.',
     '- Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.'
@@ -1791,10 +2656,12 @@ function buildParallelizationGuidance(helperCommand: string, issueId: string): s
 
 function buildDeterministicMutationSuppressionSection(
   audit: ProviderLinearAuditSummary | null,
-  attemptStartedAt: string | null
+  attemptStartedAt: string | null,
+  issueId: string
 ): string[] {
   const suppressions = deriveDeterministicProviderMutationSuppressions(audit, {
-    recordedAtNotBefore: attemptStartedAt
+    recordedAtNotBefore: attemptStartedAt,
+    issueId
   });
   if (suppressions.length === 0) {
     return [];
@@ -1821,7 +2688,8 @@ export function buildProviderWorkerPrompt(
 ): string {
   const deterministicMutationSuppressions = buildDeterministicMutationSuppressionSection(
     attemptContext.linearAudit ?? null,
-    attemptContext.attemptStartedAt ?? null
+    attemptContext.attemptStartedAt ?? null,
+    issue.id
   );
   const runMemoryPromptLines = buildRunMemoryPromptLines(
     selectRunMemoryForRole({
@@ -1929,11 +2797,28 @@ export function parseProviderLinearWorkerJsonl(
     applyProviderLinearWorkerJsonlLine(state, line, 'stdout_jsonl', env);
   }
 
-  return state;
+  return snapshotProviderLinearWorkerPublicJsonlParseResult(state);
+}
+
+function snapshotProviderLinearWorkerPublicJsonlParseResult(
+  state: ProviderLinearWorkerJsonlParseResult
+): ProviderLinearWorkerJsonlParseResult {
+  return initializeProviderLinearWorkerJsonlInternalState({
+    threadId: state.threadId,
+    turnId: state.turnId,
+    finalMessage: state.finalMessage,
+    lastEvent: state.lastEvent,
+    lastEventAt: state.lastEventAt,
+    currentTurnActivity: state.currentTurnActivity,
+    tokens: state.tokens,
+    rateLimits: state.rateLimits,
+    authProvenance: state.authProvenance,
+    failureDiagnosis: state.failureDiagnosis
+  }, state.finalMessageSource, state.finalMessageDeltaKey);
 }
 
 function buildEmptyProviderLinearWorkerJsonlParseResult(): ProviderLinearWorkerJsonlParseResult {
-  return {
+  return initializeProviderLinearWorkerJsonlInternalState({
     threadId: null,
     turnId: null,
     finalMessage: null,
@@ -1944,7 +2829,69 @@ function buildEmptyProviderLinearWorkerJsonlParseResult(): ProviderLinearWorkerJ
     rateLimits: null,
     authProvenance: null,
     failureDiagnosis: null
-  };
+  });
+}
+
+function initializeProviderLinearWorkerJsonlInternalState(
+  state: ProviderLinearWorkerJsonlParseResult,
+  finalMessageSource: ProviderLinearWorkerJsonlParseResult['finalMessageSource'] = null,
+  finalMessageDeltaKey: string | null = null
+): ProviderLinearWorkerJsonlParseResult {
+  Object.defineProperty(state, 'finalMessageSource', {
+    value: finalMessageSource,
+    writable: true,
+    enumerable: false,
+    configurable: true
+  });
+  Object.defineProperty(state, 'finalMessageDeltaKey', {
+    value: finalMessageSource === 'agent_message_delta' ? finalMessageDeltaKey : null,
+    writable: true,
+    enumerable: false,
+    configurable: true
+  });
+  Object.defineProperty(state, 'agentMessageDeltaBuffers', {
+    value: {},
+    writable: true,
+    enumerable: false,
+    configurable: true
+  });
+  Object.defineProperty(state, 'agentMessageDeltaSourceBuffers', {
+    value: {},
+    writable: true,
+    enumerable: false,
+    configurable: true
+  });
+  Object.defineProperty(state, 'agentMessageDeltaHydrationSeed', {
+    value: null,
+    writable: true,
+    enumerable: false,
+    configurable: true
+  });
+  return state;
+}
+
+function normalizeProviderLinearWorkerFinalMessageSource(
+  value: unknown
+): ProviderLinearWorkerJsonlParseResult['finalMessageSource'] {
+  return value === 'agent_message_delta' || value === 'other' ? value : null;
+}
+
+function selectProviderLinearWorkerProofFinalMessageSource(
+  proof: ProviderLinearWorkerProof
+): ProviderLinearWorkerJsonlParseResult['finalMessageSource'] {
+  if (!proof.last_message) {
+    return null;
+  }
+  return normalizeProviderLinearWorkerFinalMessageSource(proof.last_message_source) ?? 'other';
+}
+
+function selectProviderLinearWorkerProofFinalMessageDeltaKey(
+  proof: ProviderLinearWorkerProof
+): string | null {
+  if (selectProviderLinearWorkerProofFinalMessageSource(proof) !== 'agent_message_delta') {
+    return null;
+  }
+  return normalizeOptionalString(proof.last_message_delta_key);
 }
 
 function applyProviderLinearWorkerJsonlLine(
@@ -2024,7 +2971,20 @@ function applyProviderLinearWorkerJsonlRecord(
     }
     return changed;
   }
-  const eventSummary = extractProviderWorkerEventSummary(parsed);
+  let eventSummary = extractProviderWorkerEventSummary(parsed);
+  const accumulatedAgentMessage = accumulateProviderWorkerAgentMessageDelta(
+    state,
+    parsed,
+    activitySource
+  );
+  const finalMessageSource = accumulatedAgentMessage ? 'agent_message_delta' : 'other';
+  if (accumulatedAgentMessage) {
+    eventSummary = {
+      ...eventSummary,
+      event: eventSummary.event ?? 'item/agentMessage/delta',
+      message: accumulatedAgentMessage
+    };
+  }
   if (eventSummary.event && eventSummary.event !== state.lastEvent) {
     state.lastEvent = eventSummary.event;
     changed = true;
@@ -2033,8 +2993,21 @@ function applyProviderLinearWorkerJsonlRecord(
     state.lastEventAt = eventSummary.at;
     changed = true;
   }
-  if (eventSummary.message && eventSummary.message !== state.finalMessage) {
+  if (
+    eventSummary.message &&
+    eventSummary.message !== state.finalMessage &&
+    shouldReplaceProviderLinearWorkerFinalMessage(
+      state.finalMessage,
+      state.finalMessageSource,
+      eventSummary.message,
+      finalMessageSource,
+      parsed
+    )
+  ) {
     state.finalMessage = eventSummary.message;
+    state.finalMessageSource = finalMessageSource;
+    state.finalMessageDeltaKey =
+      finalMessageSource === 'agent_message_delta' ? state.finalMessageDeltaKey ?? null : null;
     changed = true;
   }
   const nextCurrentTurnActivity = selectPreferredProviderLinearWorkerCurrentTurnActivity(
@@ -2055,7 +3028,7 @@ function applyProviderLinearWorkerJsonlRecord(
   }
   const observedTokens = extractProviderWorkerTokenUsage(parsed);
   if (observedTokens && hasProviderWorkerTokenUsage(observedTokens)) {
-    state.tokens = observedTokens;
+    state.tokens = mergeProviderWorkerObservedTokenUsage(state.tokens, observedTokens);
     changed = true;
   }
   const observedRateLimits = extractProviderWorkerRateLimits(parsed);
@@ -2090,18 +3063,6 @@ function applyProviderLinearWorkerJsonlRecord(
   return changed;
 }
 
-function applyProviderLinearWorkerSessionJsonlLine(
-  state: ProviderLinearWorkerJsonlParseResult,
-  line: string,
-  env: NodeJS.ProcessEnv = process.env
-): boolean {
-  const parsed = parseProviderWorkerSessionJsonlLine(line);
-  if (!parsed) {
-    return false;
-  }
-  return applyProviderLinearWorkerSessionJsonlRecord(state, parsed, env);
-}
-
 function applyProviderLinearWorkerSessionJsonlRecord(
   state: ProviderLinearWorkerJsonlParseResult,
   parsed: Record<string, unknown>,
@@ -2119,6 +3080,11 @@ function resetProviderLinearWorkerTurnScopedTelemetry(
 ): void {
   state.lastEvent = null;
   state.finalMessage = null;
+  state.finalMessageSource = null;
+  state.finalMessageDeltaKey = null;
+  state.agentMessageDeltaBuffers = {};
+  state.agentMessageDeltaSourceBuffers = {};
+  state.agentMessageDeltaHydrationSeed = null;
   state.lastEventAt = null;
   state.currentTurnActivity = null;
   state.failureDiagnosis = null;
@@ -2128,8 +3094,153 @@ function isProviderLinearWorkerBookkeepingRecord(parsed: Record<string, unknown>
   return parsed.type === 'session_meta' || parsed.type === 'turn_context' || parsed.type === 'thread.started';
 }
 
+function readProviderWorkerMethod(input: Record<string, unknown>): string | null {
+  const payload = isRecord(input.payload) ? input.payload : null;
+  return normalizeOptionalString(input.method) ?? normalizeOptionalString(payload?.method);
+}
+
+function readProviderWorkerParams(input: Record<string, unknown>): Record<string, unknown> | null {
+  const payload = isRecord(input.payload) ? input.payload : null;
+  return isRecord(input.params) ? input.params : isRecord(payload?.params) ? payload.params : null;
+}
+
+function readFirstProviderWorkerRawStringAtPaths(
+  input: Record<string, unknown>,
+  paths: string[][]
+): string | null {
+  for (const path of paths) {
+    let current: unknown = input;
+    for (const segment of path) {
+      if (!isRecord(current)) {
+        current = undefined;
+        break;
+      }
+      current = current[segment];
+    }
+    if (typeof current === 'string') {
+      return current;
+    }
+  }
+  return null;
+}
+
+function accumulateProviderWorkerAgentMessageDelta(
+  state: ProviderLinearWorkerJsonlParseResult,
+  parsed: Record<string, unknown>,
+  activitySource: ProviderLinearWorkerCurrentTurnActivitySource
+): string | null {
+  if (readProviderWorkerMethod(parsed)?.toLowerCase() !== 'item/agentmessage/delta') {
+    return null;
+  }
+  const delta = readFirstProviderWorkerRawStringAtPaths(parsed, [
+    ['params', 'delta'],
+    ['payload', 'params', 'delta'],
+    ['delta'],
+    ['payload', 'delta']
+  ]);
+  if (delta === null) {
+    return null;
+  }
+  const params = readProviderWorkerParams(parsed);
+  const threadId =
+    normalizeOptionalString(params?.threadId) ??
+    normalizeOptionalString(params?.thread_id) ??
+    state.threadId ??
+    'unknown-thread';
+  const turnId = extractProviderWorkerActivityTurnId(parsed) ?? state.turnId ?? 'unknown-turn';
+  const itemId =
+    normalizeOptionalString(params?.itemId) ??
+    normalizeOptionalString(params?.item_id) ??
+    'unknown-item';
+  const key = `${threadId}:${turnId}:${itemId}`;
+  state.agentMessageDeltaBuffers ??= {};
+  state.agentMessageDeltaSourceBuffers ??= {};
+  const sourceBuffers = state.agentMessageDeltaSourceBuffers[key] ?? {};
+  state.agentMessageDeltaSourceBuffers[key] = sourceBuffers;
+  let existingMessage = state.agentMessageDeltaBuffers[key];
+  let existingSourceMessage = sourceBuffers[activitySource];
+  const hydrationSeed = state.agentMessageDeltaHydrationSeed ?? null;
+  if (
+    existingMessage === undefined &&
+    hydrationSeed &&
+    providerWorkerAgentMessageDeltaHydrationSeedMatches(hydrationSeed, key, threadId, turnId)
+  ) {
+    existingMessage = hydrationSeed.message;
+    existingSourceMessage = hydrationSeed.message;
+    state.agentMessageDeltaHydrationSeed = null;
+  }
+  const accumulatedSourceMessage = `${existingSourceMessage ?? ''}${delta}`;
+  sourceBuffers[activitySource] = accumulatedSourceMessage;
+  const accumulated = mergeProviderWorkerAgentMessageDeltaAggregate(
+    existingMessage,
+    accumulatedSourceMessage,
+    delta
+  );
+  state.agentMessageDeltaBuffers[key] = accumulated;
+  state.finalMessageDeltaKey = key;
+  return accumulated;
+}
+
+function mergeProviderWorkerAgentMessageDeltaAggregate(
+  existingMessage: string | undefined,
+  accumulatedSourceMessage: string,
+  delta: string
+): string {
+  if (existingMessage === undefined) {
+    return accumulatedSourceMessage;
+  }
+  if (accumulatedSourceMessage === existingMessage) {
+    return existingMessage;
+  }
+  if (accumulatedSourceMessage.startsWith(existingMessage)) {
+    return accumulatedSourceMessage;
+  }
+  if (existingMessage.startsWith(accumulatedSourceMessage)) {
+    return existingMessage;
+  }
+  return `${existingMessage}${delta}`;
+}
+
+function providerWorkerAgentMessageDeltaHydrationSeedMatches(
+  seed: ProviderWorkerAgentMessageDeltaHydrationSeed,
+  key: string,
+  threadId: string,
+  turnId: string
+): boolean {
+  return (
+    seed.deltaKey === key &&
+    (seed.threadId === null || seed.threadId === threadId) &&
+    (seed.turnId === null || seed.turnId === turnId)
+  );
+}
+
+function shouldReplaceProviderLinearWorkerFinalMessage(
+  currentMessage: string | null,
+  currentSource: ProviderLinearWorkerJsonlParseResult['finalMessageSource'],
+  candidateMessage: string,
+  candidateSource: ProviderLinearWorkerJsonlParseResult['finalMessageSource'],
+  parsed: Record<string, unknown>
+): boolean {
+  if (!currentMessage) {
+    return true;
+  }
+  if (candidateSource === 'agent_message_delta') {
+    return true;
+  }
+  const method = readProviderWorkerMethod(parsed)?.toLowerCase();
+  if (currentSource === 'agent_message_delta' && method) {
+    return false;
+  }
+  return Boolean(candidateMessage);
+}
+
 function hasProviderWorkerTokenUsage(value: ProviderLinearWorkerTokenUsage): boolean {
-  return value.input_tokens !== null || value.output_tokens !== null || value.total_tokens !== null;
+  return (
+    value.input_tokens !== null ||
+    value.output_tokens !== null ||
+    value.total_tokens !== null ||
+    value.reasoning_output_tokens != null
+  );
 }
 
 function maxProviderWorkerNullableNumber(left: number | null, right: number | null): number | null {
@@ -2146,11 +3257,36 @@ function mergeProviderWorkerTokenUsageFloor(
   current: ProviderLinearWorkerTokenUsage,
   observed: ProviderLinearWorkerTokenUsage
 ): ProviderLinearWorkerTokenUsage {
-  return {
+  const merged: ProviderLinearWorkerTokenUsage = {
     input_tokens: maxProviderWorkerNullableNumber(current.input_tokens, observed.input_tokens),
     output_tokens: maxProviderWorkerNullableNumber(current.output_tokens, observed.output_tokens),
     total_tokens: maxProviderWorkerNullableNumber(current.total_tokens, observed.total_tokens)
   };
+  const reasoningOutputTokens = maxProviderWorkerNullableNumber(
+    current.reasoning_output_tokens ?? null,
+    observed.reasoning_output_tokens ?? null
+  );
+  if (reasoningOutputTokens !== null) {
+    merged.reasoning_output_tokens = reasoningOutputTokens;
+  }
+  return merged;
+}
+
+function mergeProviderWorkerObservedTokenUsage(
+  current: ProviderLinearWorkerTokenUsage,
+  observed: ProviderLinearWorkerTokenUsage
+): ProviderLinearWorkerTokenUsage {
+  const merged: ProviderLinearWorkerTokenUsage = {
+    input_tokens: observed.input_tokens ?? current.input_tokens,
+    output_tokens: observed.output_tokens ?? current.output_tokens,
+    total_tokens: observed.total_tokens ?? current.total_tokens
+  };
+  const reasoningOutputTokens =
+    observed.reasoning_output_tokens ?? current.reasoning_output_tokens ?? null;
+  if (reasoningOutputTokens !== null) {
+    merged.reasoning_output_tokens = reasoningOutputTokens;
+  }
+  return merged;
 }
 
 function providerWorkerTokenUsageFallsBehindFloor(
@@ -2264,7 +3400,15 @@ function extractProviderWorkerActivityTurnId(parsed: Record<string, unknown>): s
     return normalizeOptionalString(parsed.turn_id);
   }
   const payload = isRecord(parsed.payload) ? parsed.payload : null;
-  return normalizeOptionalString(payload?.turn_id);
+  const params = isRecord(parsed.params) ? parsed.params : null;
+  const payloadParams = isRecord(payload?.params) ? payload.params : null;
+  return (
+    normalizeOptionalString(payload?.turn_id) ??
+    normalizeOptionalString(params?.turnId) ??
+    normalizeOptionalString(params?.turn_id) ??
+    normalizeOptionalString(payloadParams?.turnId) ??
+    normalizeOptionalString(payloadParams?.turn_id)
+  );
 }
 
 function synchronizeProviderLinearWorkerCurrentTurnActivity(
@@ -2415,16 +3559,33 @@ function normalizeProviderWorkerTokenUsage(
     'totalTokens',
     'total'
   ]);
+  const reasoningOutputTokens = readTokenCount(input, [
+    'reasoning_output_tokens',
+    'reasoningOutputTokens',
+    'total_reasoning_output_tokens',
+    'totalReasoningOutputTokens',
+    'reasoning_tokens',
+    'reasoningTokens'
+  ]);
   const normalizedTotalTokens =
     totalTokens ?? (inputTokens !== null && outputTokens !== null ? inputTokens + outputTokens : null);
-  if (inputTokens === null && outputTokens === null && normalizedTotalTokens === null) {
+  if (
+    inputTokens === null &&
+    outputTokens === null &&
+    normalizedTotalTokens === null &&
+    reasoningOutputTokens === null
+  ) {
     return null;
   }
-  return {
+  const usage: ProviderLinearWorkerTokenUsage = {
     input_tokens: inputTokens,
     output_tokens: outputTokens,
     total_tokens: normalizedTotalTokens
   };
+  if (reasoningOutputTokens !== null) {
+    usage.reasoning_output_tokens = reasoningOutputTokens;
+  }
+  return usage;
 }
 
 function readTokenCount(input: Record<string, unknown>, keys: string[]): number | null {
@@ -3169,7 +4330,7 @@ function isProviderWorkerTrustedDiagnosticMessageCarrier(
   input: Record<string, unknown>,
   source: ProviderLinearWorkerCurrentTurnActivitySource
 ): boolean {
-  if (source === 'stderr' || source === 'exec_runner') {
+  if (source === 'stderr' || source === 'exec_runner' || source === 'appserver_runner') {
     return true;
   }
   const payload = isRecord(input.payload) ? input.payload : null;
@@ -3359,6 +4520,29 @@ function hasProviderWorkerQuotaFailureSignal(
   return statusValues.some((value) => quotaFailureStatuses.has(value));
 }
 
+function hasProviderWorkerStdinBootstrapSignal(normalizedSignal: string): boolean {
+  return /\breading\s+additional\s+input\s+from\s+stdin\b/u.test(normalizedSignal);
+}
+
+const PROVIDER_WORKER_STDIN_BOOTSTRAP_DIAGNOSTIC_VALUES = new Set([
+  'provider_stdin_bootstrap',
+  'provider_worker_stdin_bootstrap',
+  'codex_stdin_bootstrap',
+  'stdin_bootstrap',
+  'stdin_bootstrap_failure',
+  'reading_additional_input_from_stdin',
+  'reading_additional_input_stdin',
+  'additional_input_from_stdin'
+]);
+
+const PROVIDER_WORKER_RUNTIME_DIAGNOSTIC_VALUES = new Set([
+  ...PROVIDER_WORKER_STDIN_BOOTSTRAP_DIAGNOSTIC_VALUES,
+  'provider_runtime',
+  'runtime_parity_command_unavailable',
+  'appserver_runtime_error',
+  'codex_exec_error'
+]);
+
 function classifyProviderWorkerFailureDiagnosis(
   input: Record<string, unknown>,
   source: ProviderLinearWorkerCurrentTurnActivitySource
@@ -3382,7 +4566,8 @@ function classifyProviderWorkerFailureDiagnosis(
     observed_at: timestamp
   });
   const structuredCategory = classifyProviderWorkerStructuredDiagnosticCategory(input);
-  if (structuredCategory) {
+  const hasStdinBootstrapSignal = hasProviderWorkerStdinBootstrapSignal(normalizedClassification);
+  if (structuredCategory && structuredCategory !== 'provider_runtime') {
     return build(structuredCategory, providerWorkerDiagnosticGuidance(structuredCategory));
   }
   const guardianTimeoutSignal =
@@ -3459,6 +4644,15 @@ function classifyProviderWorkerFailureDiagnosis(
       'Codex Cloud environment configuration is missing or invalid; set CODEX_CLOUD_ENV_ID or task metadata.'
     );
   }
+  if (hasStdinBootstrapSignal) {
+    return build(
+      'provider_stdin_bootstrap',
+      providerWorkerDiagnosticGuidance('provider_stdin_bootstrap')
+    );
+  }
+  if (structuredCategory) {
+    return build(structuredCategory, providerWorkerDiagnosticGuidance(structuredCategory));
+  }
   if (
     /\b(appserver|provider runtime|runtime parity|codex exec|enoent|websocket|rpc)\b/u.test(
       normalizedClassification
@@ -3490,6 +4684,8 @@ function providerWorkerDiagnosticGuidance(
       return 'Codex Cloud environment configuration is missing or invalid; set CODEX_CLOUD_ENV_ID or task metadata.';
     case 'auth_mismatch':
       return 'The active Codex account/auth profile appears mismatched or unavailable; verify the selected profile/account.';
+    case 'provider_stdin_bootstrap':
+      return 'Codex exited during stdin bootstrap before issue execution; inspect the control-host to provider-linear-worker Codex exec stdin/prompt handoff, not issue-specific content.';
     case 'provider_runtime':
       return 'Provider/runtime execution is implicated; inspect runtime selection and provider command logs.';
     default:
@@ -3574,14 +4770,10 @@ function classifyProviderWorkerStructuredDiagnosticValue(
   ) {
     return 'env_config';
   }
-  if (
-    [
-      'provider_runtime',
-      'runtime_parity_command_unavailable',
-      'appserver_runtime_error',
-      'codex_exec_error'
-    ].includes(normalized)
-  ) {
+  if (PROVIDER_WORKER_RUNTIME_DIAGNOSTIC_VALUES.has(normalized)) {
+    if (PROVIDER_WORKER_STDIN_BOOTSTRAP_DIAGNOSTIC_VALUES.has(normalized)) {
+      return 'provider_stdin_bootstrap';
+    }
     return 'provider_runtime';
   }
   return null;
@@ -3601,7 +4793,8 @@ function classifyProviderWorkerStructuredDiagnosticCategory(
 
 function classifyProviderWorkerStderrFailureDiagnosis(
   stderr: string,
-  observedAt: string
+  observedAt: string,
+  source: Extract<ProviderLinearWorkerCurrentTurnActivitySource, 'appserver_runner' | 'stderr'> = 'stderr'
 ): ProviderLinearWorkerFailureDiagnosis | null {
   const message = normalizeOptionalString(stderr);
   if (!message) {
@@ -3612,42 +4805,43 @@ function classifyProviderWorkerStderrFailureDiagnosis(
     message,
     timestamp: observedAt
   };
-  const classifiedDiagnosis = classifyProviderWorkerFailureDiagnosis(diagnosticInput, 'stderr');
+  const classifiedDiagnosis = classifyProviderWorkerFailureDiagnosis(diagnosticInput, source);
   if (classifiedDiagnosis) {
     return classifiedDiagnosis;
   }
   return {
     diagnostic_category: 'provider_runtime',
-    signal: buildProviderWorkerDiagnosticSignal(diagnosticInput, 'stderr'),
+    signal: buildProviderWorkerDiagnosticSignal(diagnosticInput, source),
     guidance: providerWorkerDiagnosticGuidance('provider_runtime'),
-    source: 'stderr',
+    source,
     observed_at: observedAt
   };
 }
 
-function classifyProviderWorkerExecRunnerFailureDiagnosis(
+function classifyProviderWorkerTurnRunnerFailureDiagnosis(
   error: unknown,
   observedAt: string,
-  endReason: ProviderLinearWorkerProof['end_reason']
+  endReason: ProviderLinearWorkerProof['end_reason'],
+  source: Extract<ProviderLinearWorkerCurrentTurnActivitySource, 'appserver_runner' | 'exec_runner'>
 ): ProviderLinearWorkerFailureDiagnosis {
   const errorMessage = normalizeOptionalString((error as Error)?.message) ?? String(error);
   const errorCode = normalizeOptionalString((error as NodeJS.ErrnoException)?.code);
   const diagnosticInput = {
-    type: 'exec_runner_error',
+    type: source === 'appserver_runner' ? 'appserver_runner_error' : 'exec_runner_error',
     status_detail: endReason,
     error: errorCode ? `${errorCode}: ${errorMessage}` : errorMessage,
     message: errorMessage,
     timestamp: observedAt
   };
-  const classifiedDiagnosis = classifyProviderWorkerFailureDiagnosis(diagnosticInput, 'exec_runner');
+  const classifiedDiagnosis = classifyProviderWorkerFailureDiagnosis(diagnosticInput, source);
   if (classifiedDiagnosis) {
     return classifiedDiagnosis;
   }
   return {
     diagnostic_category: 'provider_runtime',
-    signal: buildProviderWorkerDiagnosticSignal(diagnosticInput, 'exec_runner'),
+    signal: buildProviderWorkerDiagnosticSignal(diagnosticInput, source),
     guidance: providerWorkerDiagnosticGuidance('provider_runtime'),
-    source: 'exec_runner',
+    source,
     observed_at: observedAt
   };
 }
@@ -3681,6 +4875,16 @@ function humanizeProviderWorkerMethod(method: string, input: Record<string, unkn
       const itemLabel = humanizeProviderWorkerItemType(itemType);
       return itemLabel ? `item ${action}: ${itemLabel}` : `item ${action}`;
     }
+    case 'item/agentmessage/delta': {
+      const delta =
+        readFirstProviderWorkerStringAtPaths(input, [
+          ['params', 'delta'],
+          ['payload', 'params', 'delta'],
+          ['delta'],
+          ['payload', 'delta']
+        ]) ?? null;
+      return delta ? `agent message delta: ${delta}` : 'agent message delta';
+    }
     case 'turn/started':
       return 'turn started';
     case 'turn/completed': {
@@ -3691,7 +4895,10 @@ function humanizeProviderWorkerMethod(method: string, input: Record<string, unkn
         ['payload', 'turn']
       ]);
       const status = normalizeOptionalString(turn?.status);
-      return status ? `turn completed (${status})` : 'turn completed';
+      if (!status || status === 'completed') {
+        return null;
+      }
+      return buildProviderLinearWorkerAppServerTerminalFailureMessage(turn, status);
     }
     default:
       return null;
@@ -3713,6 +4920,9 @@ function formatProviderWorkerTokenUsageSummary(
   }
   if (typeof usage.total_tokens === 'number' && Number.isFinite(usage.total_tokens)) {
     parts.push(`total ${Math.max(0, Math.trunc(usage.total_tokens))}`);
+  }
+  if (typeof usage.reasoning_output_tokens === 'number' && Number.isFinite(usage.reasoning_output_tokens)) {
+    parts.push(`reasoning ${Math.max(0, Math.trunc(usage.reasoning_output_tokens))}`);
   }
   return parts.length > 0 ? parts.join(' / ') : null;
 }
@@ -4029,6 +5239,7 @@ function resetProviderWorkerSessionLogTailState(state: ProviderWorkerSessionLogT
   state.offsetBytes = 0;
   state.trailingText = '';
   state.bootstrapPending = true;
+  state.idRewindSignature = null;
 }
 
 function normalizeProviderWorkerSessionLogHydrationState(
@@ -4050,27 +5261,34 @@ function normalizeProviderWorkerSessionLogHydrationState(
     offset_bytes: offsetBytes,
     trailing_text: typeof value.trailing_text === 'string' ? value.trailing_text : '',
     bootstrap_pending: typeof value.bootstrap_pending === 'boolean' ? value.bootstrap_pending : true,
-    proof_signature: typeof value.proof_signature === 'string' ? value.proof_signature : ''
+    proof_signature: typeof value.proof_signature === 'string' ? value.proof_signature : '',
+    id_rewind_signature: typeof value.id_rewind_signature === 'string' ? value.id_rewind_signature : null
   };
 }
 
 function buildProviderWorkerSessionLogTailState(
   path: string,
-  hydrationState: ProviderWorkerSessionLogHydrationState | null
+  hydrationState: ProviderWorkerSessionLogHydrationState | null,
+  currentTurnStartedAt: string | null = null
 ): ProviderWorkerSessionLogTailState {
+  const normalizedCurrentTurnStartedAt = normalizeOptionalString(currentTurnStartedAt);
   if (!hydrationState || hydrationState.path !== path) {
     return {
       path,
       offsetBytes: 0,
       trailingText: '',
-      bootstrapPending: true
+      bootstrapPending: true,
+      currentTurnStartedAt: normalizedCurrentTurnStartedAt,
+      idRewindSignature: null
     };
   }
   return {
     path,
     offsetBytes: hydrationState.offset_bytes,
     trailingText: hydrationState.trailing_text,
-    bootstrapPending: hydrationState.bootstrap_pending
+    bootstrapPending: hydrationState.bootstrap_pending,
+    currentTurnStartedAt: normalizedCurrentTurnStartedAt,
+    idRewindSignature: hydrationState.id_rewind_signature ?? null
   };
 }
 
@@ -4080,13 +5298,17 @@ function snapshotProviderWorkerSessionLogTailState(
   if (!state.path) {
     return null;
   }
-  return {
+  const snapshot: ProviderWorkerSessionLogHydrationState = {
     path: state.path,
     offset_bytes: state.offsetBytes,
     trailing_text: state.trailingText,
     bootstrap_pending: state.bootstrapPending,
     proof_signature: ''
   };
+  if (state.idRewindSignature) {
+    snapshot.id_rewind_signature = state.idRewindSignature;
+  }
+  return snapshot;
 }
 
 function selectProviderLinearWorkerCurrentTurnActivity(
@@ -4130,6 +5352,8 @@ function buildProviderWorkerSessionLogHydrationProofSignature(
     latest_session_id_source: proof.latest_session_id_source ?? null,
     last_event: proof.last_event ?? null,
     last_message: proof.last_message ?? null,
+    last_message_source: normalizeProviderLinearWorkerFinalMessageSource(proof.last_message_source),
+    last_message_delta_key: selectProviderLinearWorkerProofFinalMessageDeltaKey(proof),
     last_event_at: proof.last_event_at ?? null,
     current_turn_activity:
       synchronizeProviderLinearWorkerCurrentTurnActivity(
@@ -4143,7 +5367,42 @@ function buildProviderWorkerSessionLogHydrationProofSignature(
     tokens: proof.tokens ?? null,
     rate_limits: proof.rate_limits ?? null,
     auth_provenance: proof.auth_provenance ?? null,
+    worker_control: proof.worker_control ?? null,
     failure_diagnosis: proof.failure_diagnosis ?? null
+  });
+}
+
+function providerLinearWorkerProofNeedsSessionLogIdHydration(
+  proof: ProviderLinearWorkerProof
+): boolean {
+  const selectedMode =
+    proof.runtime?.selected_mode ?? proof.auth_provenance?.runtime_mode ?? null;
+  if (selectedMode !== 'appserver') {
+    return false;
+  }
+  if (!proof.thread_id || !proof.latest_turn_id || !proof.latest_session_id) {
+    return false;
+  }
+  return (
+    proof.session_log_thread_id !== proof.thread_id ||
+    proof.session_log_turn_id !== proof.latest_turn_id ||
+    proof.session_log_session_id !== proof.latest_session_id
+  );
+}
+
+function buildProviderWorkerSessionLogIdHydrationRewindSignature(
+  proof: ProviderLinearWorkerProof
+): string | null {
+  if (!providerLinearWorkerProofNeedsSessionLogIdHydration(proof)) {
+    return null;
+  }
+  return JSON.stringify({
+    thread_id: proof.thread_id ?? null,
+    latest_turn_id: proof.latest_turn_id ?? null,
+    latest_session_id: proof.latest_session_id ?? null,
+    session_log_thread_id: proof.session_log_thread_id ?? null,
+    session_log_turn_id: proof.session_log_turn_id ?? null,
+    session_log_session_id: proof.session_log_session_id ?? null
   });
 }
 
@@ -4161,6 +5420,7 @@ async function readProviderWorkerSessionLogDelta(
     state.offsetBytes = 0;
     state.trailingText = '';
     state.bootstrapPending = true;
+    state.idRewindSignature = null;
   }
   const bytesToRead = fileStat.size - state.offsetBytes;
   if (bytesToRead <= 0) {
@@ -4190,16 +5450,84 @@ function parseProviderWorkerSessionJsonlLine(line: string): Record<string, unkno
   }
 }
 
+interface ProviderWorkerSessionLogApplyResult {
+  changed: boolean;
+  observed: boolean;
+  observedThreadId: string | null;
+  observedTurnId: string | null;
+}
+
+function extractProviderWorkerSessionLogObservedThreadId(
+  parsed: Record<string, unknown>
+): string | null {
+  const payload = isRecord(parsed.payload) ? parsed.payload : null;
+  if (parsed.type === 'session_meta' && payload) {
+    return normalizeOptionalString(payload.id);
+  }
+  if (parsed.type === 'thread.started') {
+    return normalizeOptionalString(parsed.thread_id);
+  }
+  return null;
+}
+
+function extractProviderWorkerSessionLogObservedTurnId(
+  parsed: Record<string, unknown>
+): string | null {
+  const payload = isRecord(parsed.payload) ? parsed.payload : null;
+  if (parsed.type === 'turn_context' && payload) {
+    return normalizeOptionalString(payload.turn_id);
+  }
+  return extractProviderWorkerActivityTurnId(parsed);
+}
+
+function observeProviderWorkerSessionLogLines(
+  lines: readonly string[]
+): Pick<ProviderWorkerSessionLogApplyResult, 'observed' | 'observedThreadId' | 'observedTurnId'> {
+  let observed = false;
+  let observedThreadId: string | null = null;
+  let observedTurnId: string | null = null;
+  for (const line of lines) {
+    const parsed = parseProviderWorkerSessionJsonlLine(line);
+    if (!parsed) {
+      continue;
+    }
+    observed = true;
+    observedThreadId = extractProviderWorkerSessionLogObservedThreadId(parsed) ?? observedThreadId;
+    observedTurnId = extractProviderWorkerSessionLogObservedTurnId(parsed) ?? observedTurnId;
+  }
+  return {
+    observed,
+    observedThreadId,
+    observedTurnId
+  };
+}
+
+function observeProviderWorkerSessionLogAppliedLines(input: {
+  lines: readonly string[];
+  linesToApply: readonly string[];
+  bootstrapPending: boolean;
+}): Pick<ProviderWorkerSessionLogApplyResult, 'observed' | 'observedThreadId' | 'observedTurnId'> {
+  const observationLines =
+    !input.bootstrapPending || input.linesToApply.length === input.lines.length
+      ? input.lines
+      : input.linesToApply;
+  return observeProviderWorkerSessionLogLines(observationLines);
+}
+
 function selectProviderWorkerSessionBootstrapLines(
   lines: string[],
   options: {
     requireTurnContext: boolean;
+    currentTurnStartedAt?: string | null;
+    currentTurnId?: string | null;
+    allowCompletedBootstrapTurn?: boolean;
   } = { requireTurnContext: false }
 ): string[] {
   let latestSessionMetaIndex = -1;
   let latestTurnContextIndex = -1;
   let latestTurnId: string | null = null;
   let latestTurnCompleted = false;
+  let latestTurnCompletedIndex = -1;
   for (let index = 0; index < lines.length; index += 1) {
     const parsed = parseProviderWorkerSessionJsonlLine(lines[index] ?? '');
     if (!parsed) {
@@ -4212,6 +5540,7 @@ function selectProviderWorkerSessionBootstrapLines(
       latestTurnContextIndex = index;
       latestTurnId = normalizeOptionalString(parsed.payload.turn_id);
       latestTurnCompleted = false;
+      latestTurnCompletedIndex = -1;
     }
     if (parsed.type === 'event_msg' && isRecord(parsed.payload) && parsed.payload.type === 'task_complete') {
       const completedTurnId = normalizeOptionalString(parsed.payload.turn_id);
@@ -4220,6 +5549,7 @@ function selectProviderWorkerSessionBootstrapLines(
         (!latestTurnId || !completedTurnId || completedTurnId === latestTurnId)
       ) {
         latestTurnCompleted = true;
+        latestTurnCompletedIndex = index;
       }
     }
   }
@@ -4230,7 +5560,36 @@ function selectProviderWorkerSessionBootstrapLines(
     return lines;
   }
   if (latestTurnCompleted) {
-    return latestSessionMetaIndex >= 0 ? [lines[latestSessionMetaIndex] ?? ''] : [];
+    const currentTurnId = normalizeOptionalString(options.currentTurnId);
+    const allowCompletedBootstrapTurn = options.allowCompletedBootstrapTurn ?? true;
+    if (!allowCompletedBootstrapTurn && currentTurnId === null) {
+      return latestSessionMetaIndex >= 0 ? [lines[latestSessionMetaIndex] ?? ''] : [];
+    }
+    if (currentTurnId !== null && latestTurnId !== null && latestTurnId !== currentTurnId) {
+      return latestSessionMetaIndex >= 0 ? [lines[latestSessionMetaIndex] ?? ''] : [];
+    }
+    const currentTurnMatchesCompletedLog = currentTurnId !== null && latestTurnId === currentTurnId;
+    const completedLine =
+      latestTurnCompletedIndex >= 0 ? lines[latestTurnCompletedIndex] ?? '' : '';
+    const completedLineHasTimestamp = providerWorkerSessionJsonlLineTimestamp(completedLine) !== null;
+    const completedFloorLine =
+      completedLine && completedLineHasTimestamp
+        ? completedLine
+        : lines[latestTurnContextIndex] ?? '';
+    if (
+      !currentTurnMatchesCompletedLog &&
+      !isProviderWorkerSessionBootstrapLineAtOrAfter(
+        completedFloorLine,
+        options.currentTurnStartedAt ?? null
+      )
+    ) {
+      return latestSessionMetaIndex >= 0 ? [lines[latestSessionMetaIndex] ?? ''] : [];
+    }
+    const bootstrapLines =
+      latestSessionMetaIndex >= 0 && latestSessionMetaIndex < latestTurnContextIndex
+        ? [lines[latestSessionMetaIndex] ?? '']
+        : [];
+    return [...bootstrapLines, ...lines.slice(latestTurnContextIndex)];
   }
   const bootstrapLines =
     latestSessionMetaIndex >= 0 && latestSessionMetaIndex < latestTurnContextIndex
@@ -4239,12 +5598,84 @@ function selectProviderWorkerSessionBootstrapLines(
   return [...bootstrapLines, ...lines.slice(latestTurnContextIndex)];
 }
 
+function seedProviderWorkerAgentMessageDeltaHydration(
+  state: ProviderLinearWorkerJsonlParseResult,
+  proof: ProviderLinearWorkerProof,
+  tailState: ProviderWorkerSessionLogTailState
+): void {
+  if (tailState.offsetBytes <= 0) {
+    return;
+  }
+  if (selectProviderLinearWorkerProofFinalMessageSource(proof) !== 'agent_message_delta') {
+    return;
+  }
+  const message =
+    typeof proof.last_message === 'string' && proof.last_message.length > 0
+      ? proof.last_message
+      : null;
+  if (message === null) {
+    return;
+  }
+  const deltaKey = selectProviderLinearWorkerProofFinalMessageDeltaKey(proof);
+  if (!deltaKey) {
+    return;
+  }
+  state.agentMessageDeltaHydrationSeed = {
+    message,
+    deltaKey,
+    threadId: proof.thread_id ?? proof.session_log_thread_id ?? null,
+    turnId: proof.latest_turn_id ?? proof.session_log_turn_id ?? null
+  };
+}
+
+function providerWorkerSessionJsonlLineTimestamp(line: string): string | null {
+  const parsed = parseProviderWorkerSessionJsonlLine(line);
+  if (!parsed) {
+    return null;
+  }
+  const lineTimestamp = normalizeOptionalString(parsed.timestamp);
+  if (lineTimestamp) {
+    return lineTimestamp;
+  }
+  const payload = isRecord(parsed.payload) ? parsed.payload : null;
+  return payload
+    ? normalizeOptionalString(payload.timestamp) ??
+      normalizeOptionalString(payload.created_at) ??
+      normalizeOptionalString(payload.at)
+    : null;
+}
+
+function isProviderWorkerSessionBootstrapLineAtOrAfter(
+  line: string,
+  floorTimestamp: string | null
+): boolean {
+  const normalizedFloor = normalizeOptionalString(floorTimestamp);
+  if (!normalizedFloor) {
+    return false;
+  }
+  const lineTimestamp = providerWorkerSessionJsonlLineTimestamp(line);
+  return lineTimestamp !== null && compareIsoTimestamp(lineTimestamp, normalizedFloor) >= 0;
+}
+
+function shouldAllowCompletedProviderWorkerSessionBootstrapTurn(
+  proof: ProviderLinearWorkerProof
+): boolean {
+  if (proof.latest_turn_id !== null) {
+    return true;
+  }
+  const continuityState = proof.resident_session?.continuity_state ?? null;
+  return continuityState !== 'guarded_resume_pending' && continuityState !== 'guarded_resume_active';
+}
+
 function applyProviderWorkerSessionLogDelta(
   parseState: ProviderLinearWorkerJsonlParseResult,
   tailState: ProviderWorkerSessionLogTailState,
   chunk: string,
-  env: NodeJS.ProcessEnv = process.env
-): boolean {
+  env: NodeJS.ProcessEnv = process.env,
+  options: {
+    allowCompletedBootstrapTurn?: boolean;
+  } = {}
+): ProviderWorkerSessionLogApplyResult {
   const combined = `${tailState.trailingText}${chunk}`;
   const lines = combined.split(/\r?\n/u);
   tailState.trailingText = lines.pop() ?? '';
@@ -4255,45 +5686,76 @@ function applyProviderWorkerSessionLogDelta(
   const requireTurnContext = tailState.bootstrapPending && parseState.turnId === null;
   const linesToApply =
     tailState.bootstrapPending && lines.length > 0
-      ? selectProviderWorkerSessionBootstrapLines(lines, { requireTurnContext })
+      ? selectProviderWorkerSessionBootstrapLines(lines, {
+          requireTurnContext,
+          currentTurnStartedAt: tailState.currentTurnStartedAt,
+          currentTurnId: parseState.turnId,
+          allowCompletedBootstrapTurn: options.allowCompletedBootstrapTurn
+        })
       : lines;
+  const observation = observeProviderWorkerSessionLogAppliedLines({
+    lines,
+    linesToApply,
+    bootstrapPending: tailState.bootstrapPending
+  });
   let changed = false;
   for (const line of linesToApply) {
-    changed = applyProviderLinearWorkerSessionJsonlLine(parseState, line, env) || changed;
+    const parsed = parseProviderWorkerSessionJsonlLine(line);
+    if (!parsed) {
+      continue;
+    }
+    changed = applyProviderLinearWorkerSessionJsonlRecord(parseState, parsed, env) || changed;
   }
   if (tailState.bootstrapPending && lines.length > 0) {
     tailState.bootstrapPending = requireTurnContext && parseState.turnId === null;
   }
-  return changed;
+  return { changed, ...observation };
 }
 
 function flushProviderWorkerSessionLogTail(
   parseState: ProviderLinearWorkerJsonlParseResult,
   tailState: ProviderWorkerSessionLogTailState,
-  env: NodeJS.ProcessEnv = process.env
-): boolean {
+  env: NodeJS.ProcessEnv = process.env,
+  options: {
+    allowCompletedBootstrapTurn?: boolean;
+  } = {}
+): ProviderWorkerSessionLogApplyResult {
   const trailingLine = tailState.trailingText.trim();
   if (!trailingLine) {
     tailState.trailingText = '';
-    return false;
+    return { changed: false, observed: false, observedThreadId: null, observedTurnId: null };
   }
   if (!parseProviderWorkerSessionJsonlLine(trailingLine)) {
-    return false;
+    return { changed: false, observed: false, observedThreadId: null, observedTurnId: null };
   }
   tailState.trailingText = '';
   const shouldBootstrap = tailState.bootstrapPending;
   const requireTurnContext = shouldBootstrap && parseState.turnId === null;
   const trailingLines = shouldBootstrap
-    ? selectProviderWorkerSessionBootstrapLines([trailingLine], { requireTurnContext })
+    ? selectProviderWorkerSessionBootstrapLines([trailingLine], {
+        requireTurnContext,
+        currentTurnStartedAt: tailState.currentTurnStartedAt,
+        currentTurnId: parseState.turnId,
+        allowCompletedBootstrapTurn: options.allowCompletedBootstrapTurn
+      })
     : [trailingLine];
+  const observation = observeProviderWorkerSessionLogAppliedLines({
+    lines: [trailingLine],
+    linesToApply: trailingLines,
+    bootstrapPending: shouldBootstrap
+  });
   let changed = false;
   for (const line of trailingLines) {
-    changed = applyProviderLinearWorkerSessionJsonlLine(parseState, line, env) || changed;
+    const parsed = parseProviderWorkerSessionJsonlLine(line);
+    if (!parsed) {
+      continue;
+    }
+    changed = applyProviderLinearWorkerSessionJsonlRecord(parseState, parsed, env) || changed;
   }
   if (shouldBootstrap) {
     tailState.bootstrapPending = requireTurnContext && parseState.turnId === null;
   }
-  return changed;
+  return { changed, ...observation };
 }
 
 function normalizeProviderLinearWorkerProofForUpdatedAtComparison(
@@ -4301,10 +5763,48 @@ function normalizeProviderLinearWorkerProofForUpdatedAtComparison(
 ): Record<string, unknown> {
   return {
     ...proof,
+    current_turn_started_at: proof.current_turn_started_at ?? null,
+    session_log_thread_id: proof.session_log_thread_id ?? null,
+    session_log_turn_id: proof.session_log_turn_id ?? null,
+    session_log_session_id: proof.session_log_session_id ?? null,
+    resume_source_thread_id: proof.resume_source_thread_id ?? null,
+    current_turn_activity: proof.current_turn_activity ?? null,
+    runtime: proof.runtime ?? null,
+    appserver_supervision: proof.appserver_supervision
+      ? {
+          ...proof.appserver_supervision,
+          updated_at: null
+        }
+      : proof.appserver_supervision ?? null,
+    auth_provenance: proof.auth_provenance ?? null,
+    failure_diagnosis: proof.failure_diagnosis ?? null,
+    worker_host: proof.worker_host ?? null,
+    source_setup: proof.source_setup ?? null,
+    linear_budget: proof.linear_budget ?? null,
+    tracked_issue_error: proof.tracked_issue_error ?? null,
+    resident_session: proof.resident_session ?? null,
     parallelization: proof.parallelization ?? null,
     progress: null,
     updated_at: null
   };
+}
+
+function stableProviderLinearWorkerProofComparisonString(value: unknown): string {
+  return JSON.stringify(sortProviderLinearWorkerProofComparisonValue(value));
+}
+
+function sortProviderLinearWorkerProofComparisonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sortProviderLinearWorkerProofComparisonValue(entry));
+  }
+  if (!isRecord(value)) {
+    return value;
+  }
+  return Object.fromEntries(
+    Object.keys(value)
+      .sort()
+      .map((key) => [key, sortProviderLinearWorkerProofComparisonValue(value[key])])
+  );
 }
 
 function selectProviderLinearWorkerProofTelemetryFields(
@@ -4316,14 +5816,21 @@ function selectProviderLinearWorkerProofTelemetryFields(
     latest_turn_id: proof.latest_turn_id ?? null,
     latest_session_id: proof.latest_session_id ?? null,
     latest_session_id_source: proof.latest_session_id_source ?? null,
+    session_log_thread_id: proof.session_log_thread_id ?? null,
+    session_log_turn_id: proof.session_log_turn_id ?? null,
+    session_log_session_id: proof.session_log_session_id ?? null,
+    resume_source_thread_id: proof.resume_source_thread_id ?? null,
     turn_count: proof.turn_count,
     last_event: proof.last_event ?? null,
     last_message: proof.last_message ?? null,
+    last_message_source: normalizeProviderLinearWorkerFinalMessageSource(proof.last_message_source),
+    last_message_delta_key: selectProviderLinearWorkerProofFinalMessageDeltaKey(proof),
     last_event_at: proof.last_event_at ?? null,
     current_turn_activity: selectProviderLinearWorkerCurrentTurnActivity(proof) ?? null,
     tokens: proof.tokens,
     rate_limits: proof.rate_limits ?? null,
     auth_provenance: proof.auth_provenance ?? null,
+    worker_control: proof.worker_control ?? null,
     failure_diagnosis: proof.failure_diagnosis ?? null,
     owner_phase: proof.owner_phase,
     owner_status: proof.owner_status,
@@ -4359,7 +5866,8 @@ function deriveProviderLinearWorkerParallelizationRecord(input: {
 function buildProviderLinearWorkerTurnBootstrapProof(
   proof: ProviderLinearWorkerProof,
   turnCount: number,
-  updatedAt: string
+  updatedAt: string,
+  resumeSourceThreadId: string | null = null
 ): ProviderLinearWorkerProof {
   return {
     ...proof,
@@ -4367,8 +5875,14 @@ function buildProviderLinearWorkerTurnBootstrapProof(
     latest_turn_id: null,
     latest_session_id: null,
     latest_session_id_source: null,
+    session_log_thread_id: null,
+    session_log_turn_id: null,
+    session_log_session_id: null,
+    resume_source_thread_id: resumeSourceThreadId,
     last_event: null,
     last_message: null,
+    last_message_source: null,
+    last_message_delta_key: null,
     last_event_at: null,
     current_turn_activity: null,
     tokens: buildEmptyProviderLinearWorkerTokenUsage(),
@@ -4457,6 +5971,9 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
       issueId: input.proof.issue_id
     }
   ).slice(input.parallelizationDecisionCountBeforeTurn);
+  const currentTurnBoundary =
+    normalizeOptionalString(input.proof.current_turn_started_at) ??
+    normalizeOptionalString(input.proof.attempt_started_at);
   if (currentTurnParallelizationDecisions.length === 0) {
     return {
       endReason: 'parallelization_decision_missing',
@@ -4475,7 +5992,7 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
   if (parallelization.decision !== 'parallelize_now') {
     if (!hasCurrentTurnChildLaneLaunch(
       input.proof.child_lanes,
-      input.proof.current_turn_started_at
+      currentTurnBoundary
     )) {
       return null;
     }
@@ -4487,7 +6004,7 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
   }
   if (hasCurrentTurnSuccessfulChildLaneLaunch(
     input.proof.child_lanes,
-    input.proof.current_turn_started_at
+    currentTurnBoundary
   )) {
     return null;
   }
@@ -4527,9 +6044,80 @@ function shouldAdvanceProviderLinearWorkerProofUpdatedAt(
     );
   }
   return (
-    JSON.stringify(normalizeProviderLinearWorkerProofForUpdatedAtComparison(currentProof)) !==
-    JSON.stringify(normalizeProviderLinearWorkerProofForUpdatedAtComparison(nextProof))
+    stableProviderLinearWorkerProofComparisonString(
+      normalizeProviderLinearWorkerProofForUpdatedAtComparison(currentProof)
+    ) !==
+    stableProviderLinearWorkerProofComparisonString(
+      normalizeProviderLinearWorkerProofForUpdatedAtComparison(nextProof)
+    )
   );
+}
+
+function selectProviderWorkerScopedSessionLogIds(input: {
+  sessionLogObserved: boolean;
+  observedThreadId: string | null;
+  observedTurnId: string | null;
+  proof: ProviderLinearWorkerProof;
+  liveThreadId: string | null;
+  liveTurnId: string | null;
+}): {
+  sessionLogThreadId: string | null;
+  sessionLogTurnId: string | null;
+  sessionLogSessionId: string | null;
+} {
+  const proofThreadId = input.proof.session_log_thread_id ?? null;
+  const proofTurnId = input.proof.session_log_turn_id ?? null;
+  const proofThreadMatchesLive =
+    proofThreadId !== null &&
+    input.liveThreadId !== null &&
+    proofThreadId === input.liveThreadId;
+  const proofTurnMatchesLive =
+    proofTurnId !== null && input.liveTurnId !== null && proofTurnId === input.liveTurnId;
+  const observedThreadMatchesLive =
+    input.observedThreadId !== null &&
+    input.liveThreadId !== null &&
+    input.observedThreadId === input.liveThreadId;
+  const observedTurnMatchesLive =
+    input.observedTurnId !== null &&
+    input.liveTurnId !== null &&
+    input.observedTurnId === input.liveTurnId;
+
+  let sessionLogThreadId: string | null;
+  let sessionLogTurnId: string | null;
+  if (input.sessionLogObserved) {
+    if (observedThreadMatchesLive) {
+      sessionLogThreadId = input.observedThreadId;
+      sessionLogTurnId = observedTurnMatchesLive ? input.observedTurnId : null;
+    } else if (
+      input.observedThreadId === null &&
+      observedTurnMatchesLive &&
+      input.liveThreadId !== null
+    ) {
+      sessionLogThreadId = input.liveThreadId;
+      sessionLogTurnId = input.observedTurnId;
+    } else if (proofThreadMatchesLive) {
+      sessionLogThreadId = proofThreadId;
+      sessionLogTurnId = proofTurnMatchesLive ? proofTurnId : null;
+    } else {
+      sessionLogThreadId = null;
+      sessionLogTurnId = null;
+    }
+  } else if (proofThreadMatchesLive) {
+    sessionLogThreadId = proofThreadId;
+    sessionLogTurnId = proofTurnMatchesLive ? proofTurnId : null;
+  } else {
+    sessionLogThreadId = input.proof.session_log_thread_id ?? null;
+    sessionLogTurnId = input.proof.session_log_turn_id ?? null;
+  }
+
+  return {
+    sessionLogThreadId,
+    sessionLogTurnId,
+    sessionLogSessionId: deriveLatestTurnSessionId({
+      threadId: sessionLogThreadId,
+      turnId: sessionLogTurnId
+    }).sessionId
+  };
 }
 
 async function hydrateProviderLinearWorkerProofFromSessionLog(
@@ -4574,28 +6162,41 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
   }
 
   const proofCurrentTurnActivity = selectProviderLinearWorkerCurrentTurnActivity(proof);
-  const parseState: ProviderLinearWorkerJsonlParseResult = {
-    threadId: proof.thread_id,
-    turnId: proof.latest_turn_id,
-    lastEvent: proof.last_event,
-    finalMessage: proof.last_message,
-    lastEventAt: proof.last_event_at,
-    currentTurnActivity: proofCurrentTurnActivity,
-    tokens: proof.tokens ?? buildEmptyProviderLinearWorkerTokenUsage(),
-    rateLimits: proof.rate_limits,
-    authProvenance: proof.auth_provenance ?? null,
-    failureDiagnosis: proof.failure_diagnosis ?? null
-  };
+  const parseState = initializeProviderLinearWorkerJsonlInternalState(
+    {
+      threadId: proof.thread_id,
+      turnId: proof.latest_turn_id,
+      lastEvent: proof.last_event,
+      finalMessage: proof.last_message,
+      lastEventAt: proof.last_event_at,
+      currentTurnActivity: proofCurrentTurnActivity,
+      tokens: proof.tokens ?? buildEmptyProviderLinearWorkerTokenUsage(),
+      rateLimits: proof.rate_limits,
+      authProvenance: proof.auth_provenance ?? null,
+      failureDiagnosis: proof.failure_diagnosis ?? null
+    },
+    selectProviderLinearWorkerProofFinalMessageSource(proof),
+    selectProviderLinearWorkerProofFinalMessageDeltaKey(proof)
+  );
   const restoreProofTelemetryFloor = () => {
     parseState.threadId = proof.thread_id;
     parseState.turnId = proof.latest_turn_id;
     parseState.lastEvent = proof.last_event;
     parseState.finalMessage = proof.last_message;
+    parseState.finalMessageSource = selectProviderLinearWorkerProofFinalMessageSource(proof);
+    parseState.finalMessageDeltaKey = selectProviderLinearWorkerProofFinalMessageDeltaKey(proof);
+    parseState.agentMessageDeltaBuffers = {};
+    parseState.agentMessageDeltaSourceBuffers = {};
+    parseState.agentMessageDeltaHydrationSeed = null;
     parseState.lastEventAt = proof.last_event_at;
     parseState.currentTurnActivity = proofCurrentTurnActivity;
     parseState.failureDiagnosis = proof.failure_diagnosis ?? null;
   };
-  let tailState = buildProviderWorkerSessionLogTailState(sessionLogPath, hydrationState);
+  let tailState = buildProviderWorkerSessionLogTailState(
+    sessionLogPath,
+    hydrationState,
+    proof.current_turn_started_at ?? null
+  );
   let preserveProofTelemetryFloor = false;
   if (hydrationState && hydrationState.path === sessionLogPath) {
     const proofSignature = buildProviderWorkerSessionLogHydrationProofSignature(proof);
@@ -4608,14 +6209,18 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
           path: sessionLogPath,
           offsetBytes: fileStat.size,
           trailingText: tailState.trailingText,
-          bootstrapPending: true
+          bootstrapPending: true,
+          currentTurnStartedAt: tailState.currentTurnStartedAt,
+          idRewindSignature: tailState.idRewindSignature
         };
       } else if (fileStat.size < tailState.offsetBytes) {
         tailState = {
           path: sessionLogPath,
           offsetBytes: 0,
           trailingText: '',
-          bootstrapPending: true
+          bootstrapPending: true,
+          currentTurnStartedAt: tailState.currentTurnStartedAt,
+          idRewindSignature: null
         };
       } else {
         preserveProofTelemetryFloor = true;
@@ -4626,12 +6231,48 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
       }
     }
   }
+  const idHydrationRewindSignature =
+    buildProviderWorkerSessionLogIdHydrationRewindSignature(proof);
+  if (idHydrationRewindSignature === null) {
+    tailState = {
+      ...tailState,
+      idRewindSignature: null
+    };
+  } else if (
+    tailState.offsetBytes > 0 &&
+    tailState.idRewindSignature !== idHydrationRewindSignature
+  ) {
+    tailState = {
+      path: sessionLogPath,
+      offsetBytes: 0,
+      trailingText: '',
+      bootstrapPending: true,
+      currentTurnStartedAt: tailState.currentTurnStartedAt,
+      idRewindSignature: idHydrationRewindSignature
+    };
+  }
+  seedProviderWorkerAgentMessageDeltaHydration(parseState, proof, tailState);
+  let sessionLogObserved = false;
+  let observedSessionLogThreadId = proof.session_log_thread_id ?? null;
+  let observedSessionLogTurnId = proof.session_log_turn_id ?? null;
+  const allowCompletedBootstrapTurn =
+    shouldAllowCompletedProviderWorkerSessionBootstrapTurn(proof);
   try {
     const delta = await readProviderWorkerSessionLogDelta(tailState);
     if (delta) {
-      applyProviderWorkerSessionLogDelta(parseState, tailState, delta, env);
+      const deltaApply = applyProviderWorkerSessionLogDelta(parseState, tailState, delta, env, {
+        allowCompletedBootstrapTurn
+      });
+      sessionLogObserved = deltaApply.observed || sessionLogObserved;
+      observedSessionLogThreadId = deltaApply.observedThreadId ?? observedSessionLogThreadId;
+      observedSessionLogTurnId = deltaApply.observedTurnId ?? observedSessionLogTurnId;
     }
-    flushProviderWorkerSessionLogTail(parseState, tailState, env);
+    const tailApply = flushProviderWorkerSessionLogTail(parseState, tailState, env, {
+      allowCompletedBootstrapTurn
+    });
+    sessionLogObserved = tailApply.observed || sessionLogObserved;
+    observedSessionLogThreadId = tailApply.observedThreadId ?? observedSessionLogThreadId;
+    observedSessionLogTurnId = tailApply.observedTurnId ?? observedSessionLogTurnId;
   } catch {
     return {
       proof,
@@ -4673,14 +6314,30 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     parseState.rateLimits !== null &&
     providerWorkerTokenUsageFallsBehindFloor(proofTokenFloor, parseState.tokens);
   const persistedTailState = snapshotProviderWorkerSessionLogTailState(tailState);
+  const scopedSessionLogIds = selectProviderWorkerScopedSessionLogIds({
+    sessionLogObserved,
+    observedThreadId: observedSessionLogThreadId,
+    observedTurnId: observedSessionLogTurnId,
+    proof,
+    liveThreadId,
+    liveTurnId
+  });
   const hydratedProof: ProviderLinearWorkerProof = {
     ...proof,
     thread_id: liveThreadId,
     latest_turn_id: liveTurnId,
     latest_session_id: session.sessionId,
     latest_session_id_source: session.source,
+    session_log_thread_id: scopedSessionLogIds.sessionLogThreadId,
+    session_log_turn_id: scopedSessionLogIds.sessionLogTurnId,
+    session_log_session_id: scopedSessionLogIds.sessionLogSessionId,
     last_event: parseState.lastEvent ?? null,
     last_message: parseState.finalMessage ?? null,
+    last_message_source: parseState.finalMessage ? parseState.finalMessageSource ?? null : null,
+    last_message_delta_key:
+      parseState.finalMessage && parseState.finalMessageSource === 'agent_message_delta'
+        ? parseState.finalMessageDeltaKey ?? null
+        : null,
     last_event_at: parseState.lastEventAt ?? null,
     current_turn_activity:
       synchronizeProviderLinearWorkerCurrentTurnActivity(
@@ -4757,6 +6414,210 @@ export function deriveLatestTurnSessionId(input: {
   return {
     sessionId: `${input.threadId}-${input.turnId}`,
     source: 'derived_from_thread_and_turn'
+  };
+}
+
+function selectProviderLinearWorkerSessionLogProofForScope(input: {
+  proof: ProviderLinearWorkerProof;
+  threadId: string | null;
+  turnId: string | null;
+  sessionId: string | null;
+  scopeChanged: boolean;
+}): {
+  sessionLogThreadId: string | null;
+  sessionLogTurnId: string | null;
+  sessionLogSessionId: string | null;
+} {
+  const sessionLogThreadId = input.proof.session_log_thread_id ?? null;
+  const sessionLogTurnId = input.proof.session_log_turn_id ?? null;
+  const sessionLogSessionId = input.proof.session_log_session_id ?? null;
+  if (!input.scopeChanged) {
+    return { sessionLogThreadId, sessionLogTurnId, sessionLogSessionId };
+  }
+  if (
+    sessionLogThreadId &&
+    sessionLogTurnId &&
+    sessionLogSessionId &&
+    sessionLogThreadId === input.threadId &&
+    sessionLogTurnId === input.turnId &&
+    sessionLogSessionId === input.sessionId
+  ) {
+    return { sessionLogThreadId, sessionLogTurnId, sessionLogSessionId };
+  }
+  return { sessionLogThreadId: null, sessionLogTurnId: null, sessionLogSessionId: null };
+}
+
+function buildProviderLinearWorkerRuntimeProof(
+  selection: RuntimeSelection
+): ProviderLinearWorkerRuntimeProof {
+  return {
+    requested_mode: selection.requested_mode,
+    selected_mode: selection.selected_mode,
+    provider: selection.provider,
+    runtime_session_id: selection.runtime_session_id,
+    fallback: selection.fallback
+  };
+}
+
+function normalizeProviderLinearWorkerRuntimeProof(
+  proof: ProviderLinearWorkerProof
+): ProviderLinearWorkerRuntimeProof {
+  const existing = proof.runtime ?? null;
+  const authProvenance = proof.auth_provenance ?? null;
+  return {
+    requested_mode: existing?.requested_mode ?? authProvenance?.runtime_mode ?? null,
+    selected_mode: existing?.selected_mode ?? authProvenance?.runtime_mode ?? null,
+    provider: existing?.provider ?? authProvenance?.runtime_provider ?? null,
+    runtime_session_id: existing?.runtime_session_id ?? null,
+    fallback: existing?.fallback ?? null
+  };
+}
+
+function normalizeProviderLinearWorkerRuntimeProofIfRelevant(
+  proof: ProviderLinearWorkerProof
+): ProviderLinearWorkerRuntimeProof | null {
+  const runtime = normalizeProviderLinearWorkerRuntimeProof(proof);
+  if (
+    runtime.requested_mode ||
+    runtime.selected_mode ||
+    runtime.provider ||
+    runtime.runtime_session_id ||
+    runtime.fallback ||
+    proof.auth_provenance?.runtime_mode ||
+    proof.auth_provenance?.runtime_provider
+  ) {
+    return runtime;
+  }
+  return null;
+}
+
+function shouldEmitProviderLinearWorkerAppServerSupervisionProof(
+  proof: ProviderLinearWorkerProof
+): boolean {
+  const runtime = normalizeProviderLinearWorkerRuntimeProofIfRelevant(proof);
+  return (
+    runtime?.requested_mode === 'appserver' ||
+    runtime?.selected_mode === 'appserver' ||
+    runtime?.fallback?.from_mode === 'appserver' ||
+    runtime?.fallback?.to_mode === 'appserver' ||
+    proof.auth_provenance?.runtime_mode === 'appserver'
+  );
+}
+
+function buildProviderLinearWorkerAppServerSupervisionProofIfRelevant(
+  proof: ProviderLinearWorkerProof
+): ProviderLinearWorkerAppServerSupervisionProof | null {
+  return shouldEmitProviderLinearWorkerAppServerSupervisionProof(proof)
+    ? buildProviderLinearWorkerAppServerSupervisionProof(proof)
+    : null;
+}
+
+function buildProviderLinearWorkerAppServerSupervisionProof(
+  proof: ProviderLinearWorkerProof
+): ProviderLinearWorkerAppServerSupervisionProof {
+  const selectedRuntime = normalizeProviderLinearWorkerRuntimeProof(proof);
+  const selectedMode = selectedRuntime.selected_mode ?? proof.auth_provenance?.runtime_mode ?? null;
+  const appserverSelected = selectedMode === 'appserver';
+  const appserverIntended =
+    appserverSelected ||
+    selectedRuntime.requested_mode === 'appserver' ||
+    selectedRuntime.fallback?.from_mode === 'appserver' ||
+    proof.auth_provenance?.runtime_mode === 'appserver';
+  const stickyEnvironmentId =
+    normalizeOptionalString(proof.auth_provenance?.cloud_env_id) ?? null;
+  const sessionLogThreadId = normalizeOptionalString(proof.session_log_thread_id) ?? null;
+  const sessionLogTurnId = normalizeOptionalString(proof.session_log_turn_id) ?? null;
+  const sessionLogSessionId = normalizeOptionalString(proof.session_log_session_id) ?? null;
+  const hasTurnPersistence = Boolean(
+    proof.thread_id &&
+      proof.latest_turn_id &&
+      proof.latest_session_id &&
+      sessionLogThreadId === proof.thread_id &&
+      sessionLogTurnId === proof.latest_turn_id &&
+      sessionLogSessionId === proof.latest_session_id
+  );
+  const residentResumeSourceThreadId =
+    normalizeOptionalString(proof.resident_session?.source_thread_id) ?? null;
+  const recordedResumeSourceThreadId =
+    normalizeOptionalString(proof.resume_source_thread_id) ?? null;
+  const inRunResumeRequested = appserverIntended && proof.turn_count > 1;
+  const supervisionCommand =
+    appserverSelected
+      ? residentResumeSourceThreadId || recordedResumeSourceThreadId || proof.turn_count > 1
+        ? 'appserver_thread_resume'
+        : 'appserver_thread_start'
+      : residentResumeSourceThreadId || recordedResumeSourceThreadId || proof.turn_count > 1
+        ? 'codex_exec_resume'
+        : 'codex_exec';
+  const resumeSourceThreadId =
+    residentResumeSourceThreadId ?? recordedResumeSourceThreadId;
+  const resumeRequested = Boolean(residentResumeSourceThreadId) || inRunResumeRequested;
+  const resumeThreadMatches =
+    resumeRequested &&
+    proof.thread_id !== null &&
+    resumeSourceThreadId !== null &&
+    proof.thread_id === resumeSourceThreadId;
+  const resumeThreadMismatch =
+    Boolean(resumeSourceThreadId) &&
+    proof.thread_id !== null &&
+    proof.thread_id !== resumeSourceThreadId;
+  const resumePersistedTurnObserved = resumeThreadMatches && hasTurnPersistence;
+  return {
+    selected_runtime: selectedRuntime,
+    supervision_command: supervisionCommand,
+    appserver_session_id: appserverSelected ? selectedRuntime.runtime_session_id : null,
+    thread_id: proof.thread_id,
+    latest_turn_id: proof.latest_turn_id,
+    latest_session_id: proof.latest_session_id,
+    session_log_thread_id: sessionLogThreadId,
+    session_log_turn_id: sessionLogTurnId,
+    session_log_session_id: sessionLogSessionId,
+    sticky_environment_id: stickyEnvironmentId,
+    sticky_environment_status: appserverIntended
+      ? stickyEnvironmentId
+        ? 'proven'
+        : 'blocked'
+      : 'not_applicable',
+    sticky_environment_blocker:
+      appserverIntended && !stickyEnvironmentId
+        ? 'configured_environment_id_missing'
+        : null,
+    turn_persistence_status: appserverIntended
+      ? hasTurnPersistence
+        ? 'proven'
+        : 'blocked'
+      : 'not_applicable',
+    turn_persistence_source: appserverIntended && hasTurnPersistence ? 'session_log_hydration' : null,
+    turn_persistence_blocker:
+      appserverIntended && !hasTurnPersistence
+        ? 'session_log_hydration_missing'
+        : null,
+    pagination_status: appserverIntended ? 'blocked' : 'not_applicable',
+    pagination_blocker: appserverIntended ? 'appserver_pagination_probe_not_implemented' : null,
+    resume_status: appserverIntended
+      ? resumeRequested
+        ? resumePersistedTurnObserved
+          ? 'proven'
+          : 'blocked'
+        : 'not_requested'
+      : 'not_applicable',
+    resume_source_thread_id: resumeSourceThreadId,
+    resume_observed_thread_id: resumeRequested ? proof.thread_id : null,
+    resume_blocker:
+      appserverIntended && resumeRequested && resumeThreadMismatch
+        ? 'guarded_resume_thread_mismatch'
+        : appserverIntended && resumeRequested && !resumeSourceThreadId
+          ? 'resume_source_thread_id_missing'
+        : appserverIntended && resumeRequested && !proof.thread_id
+          ? 'resume_thread_id_missing'
+          : appserverIntended && resumeRequested && !resumePersistedTurnObserved
+            ? 'resume_session_log_hydration_missing'
+          : null,
+    fork_status: appserverIntended ? 'blocked' : 'not_applicable',
+    fork_blocker: appserverIntended ? 'appserver_fork_probe_not_implemented' : null,
+    jsonl_truth_retained: true,
+    session_log_truth_retained: appserverSelected,
+    updated_at: proof.updated_at ?? null
   };
 }
 
@@ -4841,6 +6702,116 @@ function buildProviderWorkerRuntimeAuthProvenance(params: {
     observed_at: params.observedAt,
     source: params.sourceSetup?.provider ? `runtime_env:${params.sourceSetup.provider}` : 'runtime_env'
   };
+}
+
+function buildProviderWorkerControlPlane(params: {
+  runtime: RuntimeSelection;
+  observedAt: string;
+}): ProviderLinearWorkerControlPlane {
+  const isAppServerAuthority = params.runtime.selected_mode === 'appserver';
+  const fallback = params.runtime.fallback;
+  const breakGlassReason =
+    isAppServerAuthority
+      ? null
+      : fallback.occurred
+        ? `runtime_fallback:${fallback.code ?? 'unknown'}`
+        : 'runtime_mode_cli';
+  return isAppServerAuthority
+    ? {
+        authority: 'appserver',
+        transport: 'app-server-jsonl',
+        requested_runtime_mode: params.runtime.requested_mode,
+        selected_runtime_mode: params.runtime.selected_mode,
+        runtime_provider: params.runtime.provider,
+        runtime_session_id: params.runtime.runtime_session_id,
+        fallback_occurred: fallback.occurred,
+        fallback_code: fallback.code,
+        fallback_reason: fallback.reason,
+        normal_start_method: 'thread/start + turn/start',
+        resume_method: 'thread/resume + turn/start',
+        drain_method: 'turn/completed notification',
+        restart_method: 'thread/resume from recorded thread_id',
+        state_read_model: 'provider-linear-worker-proof',
+        break_glass: false,
+        break_glass_reason: null,
+        observed_at: params.observedAt
+      }
+    : {
+        authority: 'legacy_cli_break_glass',
+        transport: 'codex-exec-jsonl',
+        requested_runtime_mode: params.runtime.requested_mode,
+        selected_runtime_mode: params.runtime.selected_mode,
+        runtime_provider: params.runtime.provider,
+        runtime_session_id: params.runtime.runtime_session_id,
+        fallback_occurred: fallback.occurred,
+        fallback_code: fallback.code,
+        fallback_reason: fallback.reason,
+        normal_start_method: 'codex exec',
+        resume_method: 'codex exec resume',
+        drain_method: 'process exit',
+        restart_method: 'codex exec resume from recorded thread_id',
+        state_read_model: 'provider-linear-worker-proof',
+        break_glass: true,
+        break_glass_reason: breakGlassReason,
+        observed_at: params.observedAt
+      };
+}
+
+function applyProviderWorkerRuntimeSelectionToManifest(input: {
+  manifest: Record<string, unknown>;
+  runtime: RuntimeSelection;
+  workerControl: ProviderLinearWorkerControlPlane;
+}): boolean {
+  const before = JSON.stringify({
+    runtime_mode_requested: input.manifest.runtime_mode_requested ?? null,
+    runtime_mode: input.manifest.runtime_mode ?? null,
+    runtime_provider: input.manifest.runtime_provider ?? null,
+    runtime_fallback: input.manifest.runtime_fallback ?? null,
+    provider_worker_control: input.manifest.provider_worker_control ?? null
+  });
+  input.manifest.runtime_mode_requested = input.runtime.requested_mode;
+  input.manifest.runtime_mode = input.runtime.selected_mode;
+  input.manifest.runtime_provider = input.runtime.provider;
+  input.manifest.runtime_fallback = input.runtime.fallback;
+  input.manifest.provider_worker_control = input.workerControl;
+  const after = JSON.stringify({
+    runtime_mode_requested: input.manifest.runtime_mode_requested ?? null,
+    runtime_mode: input.manifest.runtime_mode ?? null,
+    runtime_provider: input.manifest.runtime_provider ?? null,
+    runtime_fallback: input.manifest.runtime_fallback ?? null,
+    provider_worker_control: input.manifest.provider_worker_control ?? null
+  });
+  return before !== after;
+}
+
+async function persistProviderWorkerRuntimeSelectionToManifests(input: {
+  context: ProviderLinearWorkerContext;
+  runtime: RuntimeSelection;
+  workerControl: ProviderLinearWorkerControlPlane;
+}): Promise<void> {
+  const controlHostChanged = applyProviderWorkerRuntimeSelectionToManifest({
+    manifest: input.context.controlHostManifest,
+    runtime: input.runtime,
+    workerControl: input.workerControl
+  });
+  if (input.context.manifestPath === input.context.controlHostManifestPath) {
+    if (controlHostChanged) {
+      await writeJsonAtomic(input.context.controlHostManifestPath, input.context.controlHostManifest);
+    }
+    return;
+  }
+
+  const selectedChanged = applyProviderWorkerRuntimeSelectionToManifest({
+    manifest: input.context.manifest,
+    runtime: input.runtime,
+    workerControl: input.workerControl
+  });
+  if (controlHostChanged) {
+    await writeJsonAtomic(input.context.controlHostManifestPath, input.context.controlHostManifest);
+  }
+  if (selectedChanged) {
+    await writeJsonAtomic(input.context.manifestPath, input.context.manifest);
+  }
 }
 
 async function readTrackedIssueOrThrow(input: {
@@ -5102,13 +7073,60 @@ interface ProviderLinearWorkerChildLaneManifestHydrationCandidate {
   laneWorkspacePath: string | null;
   patchArtifactPath: string | null;
   patchBytes: number | null;
+  guardrailsRequired: boolean | null;
+  guardrailsRequiredSource: string | null;
+  guardrailCommandCount: number | null;
   summaryRecordedAt: string | null;
+  runtimeMode: string | null;
+  runtimeProvider: string | null;
+  heartbeatAt: string | null;
+  heartbeatStaleAfterSeconds: number | null;
+  runnerPid: number | null;
+  runnerStartedAt: string | null;
+  runnerAlive: boolean | null;
+  runnerIdentityStatus: ProviderLinearWorkerChildLaneRunnerIdentityStatus | null;
+  runnerIdentityReason: string | null;
+  runnerObservedStartedAt: string | null;
+  runnerCommandLineMatches: boolean | null;
+  runtimeEvent: string | null;
+  runtimeEventAt: string | null;
+  appserverStartupObserved: boolean | null;
+  appserverStartupObservedAt: string | null;
+  staleInvalidationCandidate: boolean | null;
+  staleInvalidationReason: string | null;
+}
+
+interface ProviderLinearWorkerProcessInspection {
+  alive: boolean | null;
+  startedAt: string | null;
+  commandLine: string | null;
+  error: string | null;
+}
+
+interface ProviderLinearWorkerChildLaneRunnerIdentity {
+  alive: boolean | null;
+  status: ProviderLinearWorkerChildLaneRunnerIdentityStatus | null;
+  reason: string | null;
+  observedStartedAt: string | null;
+  commandLineMatches: boolean | null;
+}
+
+interface ProviderLinearWorkerChildLaneHydrationOptions {
+  now: () => string;
+  isProcessAlive?: (pid: number) => boolean;
+  inspectProcess?: (
+    pid: number
+  ) => ProviderLinearWorkerProcessInspection | Promise<ProviderLinearWorkerProcessInspection>;
 }
 
 async function hydrateProviderLinearWorkerChildLanesFromActiveManifests(
   runDir: string,
   childLanes: ProviderLinearWorkerChildLaneRecord[],
-  priorProofChildLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined = null
+  priorProofChildLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined = null,
+  options: ProviderLinearWorkerChildLaneHydrationOptions = {
+    now: () => new Date().toISOString(),
+    inspectProcess: inspectLocalProviderLinearChildLaneRunnerProcess
+  }
 ): Promise<ProviderLinearWorkerChildLaneRecord[]> {
   if (childLanes.length === 0) {
     return childLanes;
@@ -5122,7 +7140,8 @@ async function hydrateProviderLinearWorkerChildLanesFromActiveManifests(
       await hydrateProviderLinearWorkerChildLaneFromActiveManifest(
         parent,
         childLane,
-        findMatchingPriorHydratedProviderLinearWorkerChildLane(childLane, priorProofChildLanes)
+        findMatchingPriorHydratedProviderLinearWorkerChildLane(childLane, priorProofChildLanes),
+        options
       )
     )
   );
@@ -5130,7 +7149,11 @@ async function hydrateProviderLinearWorkerChildLanesFromActiveManifests(
 
 async function readHydratedProviderLinearWorkerChildLanesAndRepairLedger(
   runDir: string,
-  priorProofChildLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined = null
+  priorProofChildLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined = null,
+  options: ProviderLinearWorkerChildLaneHydrationOptions = {
+    now: () => new Date().toISOString(),
+    inspectProcess: inspectLocalProviderLinearChildLaneRunnerProcess
+  }
 ): Promise<ProviderLinearWorkerChildLaneRecord[]> {
   return await withProviderLinearWorkerChildLanesLock(runDir, async () => {
     const { records: existing, ledgerExists } = await readProviderLinearWorkerChildLanesWithPresence(runDir);
@@ -5146,7 +7169,8 @@ async function readHydratedProviderLinearWorkerChildLanesAndRepairLedger(
     const hydrated = await hydrateProviderLinearWorkerChildLanesFromActiveManifests(
       runDir,
       existing,
-      priorProofChildLanes
+      priorProofChildLanes,
+      options
     );
     const ledgerRecords = hydrated.map((childLane, index) =>
       preserveProviderLinearWorkerLaunchReservationLedgerIdentity(existing[index] ?? null, childLane)
@@ -5200,6 +7224,9 @@ function preserveProviderLinearWorkerLaunchReservationLedgerIdentity(
   ) {
     return hydrated;
   }
+  if (hydrated.stale_invalidation_candidate) {
+    return hydrated;
+  }
   return existing;
 }
 
@@ -5232,7 +7259,11 @@ async function readProviderLinearWorkerParentManifestHydrationMetadata(
 async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
   parent: ProviderLinearWorkerParentManifestHydrationMetadata,
   childLane: ProviderLinearWorkerChildLaneRecord,
-  priorHydratedChildLane: ProviderLinearWorkerChildLaneRecord | null = null
+  priorHydratedChildLane: ProviderLinearWorkerChildLaneRecord | null = null,
+  options: ProviderLinearWorkerChildLaneHydrationOptions = {
+    now: () => new Date().toISOString(),
+    inspectProcess: inspectLocalProviderLinearChildLaneRunnerProcess
+  }
 ): Promise<ProviderLinearWorkerChildLaneRecord> {
   if (isProviderLinearWorkerRetiredChildLanePlaceholder(childLane)) {
     return retireProviderLinearWorkerChildLanePlaceholder(childLane);
@@ -5246,7 +7277,13 @@ async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
   }
   const reservationPlaceholder = isProviderLinearWorkerChildLaneReservationPlaceholder(childLane);
   const candidate = reservationPlaceholder
-    ? await findMatchingProviderLinearWorkerChildLaneManifest(parent, childLane, childCliDir)
+    ? await findMatchingProviderLinearWorkerChildLaneManifest(
+      parent,
+      childLane,
+      childCliDir,
+      options,
+      priorHydratedChildLane
+    )
     : await readProviderLinearWorkerChildLaneManifestCandidate(
       parent,
       childLane,
@@ -5254,7 +7291,9 @@ async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
       resolveProviderLinearWorkerChildLanePath(
         childLane.manifest_path,
         childLane.workspace_path ?? parent.workspacePath
-      ) ?? join(childCliDir, childLane.run_id, 'manifest.json')
+      ) ?? join(childCliDir, childLane.run_id, 'manifest.json'),
+      options,
+      priorHydratedChildLane
     );
   if (!candidate) {
     return childLane;
@@ -5286,9 +7325,29 @@ async function hydrateProviderLinearWorkerChildLaneFromActiveManifest(
     log_path: candidate.logPath,
     summary,
     summary_recorded_at: summaryRecordedAt,
+    guardrails_required: candidate.guardrailsRequired,
+    guardrails_required_source: candidate.guardrailsRequiredSource,
+    guardrail_command_count: candidate.guardrailCommandCount,
     lane_workspace_path: candidate.laneWorkspacePath ?? childLane.lane_workspace_path,
     patch_artifact_path: candidate.patchArtifactPath ?? childLane.patch_artifact_path,
-    patch_bytes: candidate.patchBytes ?? childLane.patch_bytes
+    patch_bytes: candidate.patchBytes ?? childLane.patch_bytes,
+    runtime_mode: candidate.runtimeMode,
+    runtime_provider: candidate.runtimeProvider,
+    heartbeat_at: candidate.heartbeatAt,
+    heartbeat_stale_after_seconds: candidate.heartbeatStaleAfterSeconds,
+    runner_pid: candidate.runnerPid,
+    runner_started_at: candidate.runnerStartedAt,
+    runner_alive: candidate.runnerAlive,
+    runner_identity_status: candidate.runnerIdentityStatus,
+    runner_identity_reason: candidate.runnerIdentityReason,
+    runner_observed_started_at: candidate.runnerObservedStartedAt,
+    runner_command_line_matches: candidate.runnerCommandLineMatches,
+    runtime_event: candidate.runtimeEvent,
+    runtime_event_at: candidate.runtimeEventAt,
+    appserver_startup_observed: candidate.appserverStartupObserved,
+    appserver_startup_observed_at: candidate.appserverStartupObservedAt,
+    stale_invalidation_candidate: candidate.staleInvalidationCandidate,
+    stale_invalidation_reason: candidate.staleInvalidationReason
   };
 }
 
@@ -5312,6 +7371,8 @@ function isProviderLinearWorkerRetiredChildLanePlaceholder(
   return (
     childLane.status === 'launching' ||
     isActiveLookingProviderLinearWorkerChildLaneStatus(childLane.status) ||
+    childLane.status === 'stale_invalidation_candidate' ||
+    childLane.stale_invalidation_candidate === true ||
     Boolean(normalizeOptionalString(childLane.in_flight_action)) ||
     Boolean(runId?.startsWith('launching-')) ||
     isActiveLookingProviderLinearWorkerChildLaneSummary(summary)
@@ -5469,7 +7530,9 @@ function resolveProviderLinearWorkerChildLanePath(
 async function findMatchingProviderLinearWorkerChildLaneManifest(
   parent: ProviderLinearWorkerParentManifestHydrationMetadata,
   childLane: ProviderLinearWorkerChildLaneRecord,
-  childCliDir: string
+  childCliDir: string,
+  options: ProviderLinearWorkerChildLaneHydrationOptions,
+  priorHydratedChildLane: ProviderLinearWorkerChildLaneRecord | null = null
 ): Promise<ProviderLinearWorkerChildLaneManifestHydrationCandidate | null> {
   let entries: Array<{ isDirectory(): boolean; name: string }>;
   try {
@@ -5485,7 +7548,9 @@ async function findMatchingProviderLinearWorkerChildLaneManifest(
           parent,
           childLane,
           childCliDir,
-          join(childCliDir, entry.name, 'manifest.json')
+          join(childCliDir, entry.name, 'manifest.json'),
+          options,
+          priorHydratedChildLane
         )
       )
   );
@@ -5501,7 +7566,9 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
   parent: ProviderLinearWorkerParentManifestHydrationMetadata,
   childLane: ProviderLinearWorkerChildLaneRecord,
   childCliDir: string,
-  manifestPath: string
+  manifestPath: string,
+  options: ProviderLinearWorkerChildLaneHydrationOptions,
+  priorHydratedChildLane: ProviderLinearWorkerChildLaneRecord | null = null
 ): Promise<ProviderLinearWorkerChildLaneManifestHydrationCandidate | null> {
   let parsed: unknown;
   try {
@@ -5584,33 +7651,142 @@ async function readProviderLinearWorkerChildLaneManifestCandidate(
     manifestArtifactRoot,
     workspacePath
   );
+  const runtimeDiagnostics = await readProviderLinearWorkerChildLaneRuntimeDiagnostics(
+    parent,
+    childLane,
+    runId,
+    manifestArtifactRoot
+  );
+  const runtimeMode =
+    normalizeOptionalString(runtimeDiagnostics?.provider_linear_child_lane_runtime_selected_mode) ??
+    normalizeOptionalString(runtimeDiagnostics?.runtime_mode) ??
+    normalizeOptionalString(parsed.runtime_mode);
+  const runtimeProvider =
+    normalizeOptionalString(runtimeDiagnostics?.provider_linear_child_lane_runtime_provider) ??
+    normalizeOptionalString(runtimeDiagnostics?.runtime_provider) ??
+    normalizeOptionalString(parsed.runtime_provider);
+  const heartbeatAt = normalizeOptionalString(parsed.heartbeat_at);
+  const heartbeatStaleAfterSeconds = normalizeOptionalInteger(parsed.heartbeat_stale_after_seconds);
+  const rawRunnerPid = normalizeOptionalInteger(
+    runtimeDiagnostics?.provider_linear_child_lane_runner_pid ?? parsed.provider_linear_child_lane_runner_pid
+  );
+  const runnerPid = rawRunnerPid !== null && rawRunnerPid > 0 ? rawRunnerPid : null;
+  const runnerStartedAt = normalizeOptionalString(
+    runtimeDiagnostics?.provider_linear_child_lane_runner_started_at ??
+      parsed.provider_linear_child_lane_runner_started_at
+  );
+  const runnerIdentity = await inspectProviderLinearWorkerChildLaneRunnerIdentity({
+    runnerPid,
+    runnerStartedAt,
+    options
+  });
+  const runnerAlive = runnerIdentity.alive;
+  const runtimeEvent = normalizeOptionalString(
+    runtimeDiagnostics?.provider_linear_child_lane_runtime_event ?? parsed.provider_linear_child_lane_runtime_event
+  );
+  const runtimeEventAt = normalizeOptionalString(
+    runtimeDiagnostics?.provider_linear_child_lane_runtime_event_at ?? parsed.provider_linear_child_lane_runtime_event_at
+  );
+  const appserverStartupObserved =
+    runtimeEvent === 'appserver_startup_observed' ||
+    runtimeDiagnostics?.provider_linear_child_lane_appserver_startup_observed === true ||
+    parsed.provider_linear_child_lane_appserver_startup_observed === true;
+  const appserverStartupObservedAt = normalizeOptionalString(
+    runtimeDiagnostics?.provider_linear_child_lane_appserver_startup_observed_at ??
+      parsed.provider_linear_child_lane_appserver_startup_observed_at ??
+      (runtimeEvent === 'appserver_startup_observed' ? runtimeEventAt : null)
+  );
   const successfulStatus = isSuccessfulProviderLinearWorkerChildLaneStatus(status);
+  const patchArtifactPath = proofMetadata?.patchArtifactPath ?? null;
   const patchBytes = proofMetadata?.patchBytes ?? null;
-  const patchReady = Boolean(proofMetadata?.patchArtifactPath && patchBytes !== null && patchBytes > 0);
-  const hydratedStatus = successfulStatus && !patchReady ? 'in_progress' : status;
+  const proofOutputReady = Boolean(patchArtifactPath);
+  const patchReady = Boolean(patchArtifactPath && patchBytes !== null && patchBytes > 0);
+  const diagnosticStatus = successfulStatus && !proofOutputReady ? 'in_progress' : status;
+  const staleDiagnostic = resolveProviderLinearWorkerChildLanePostStartupNoOutputDiagnostic({
+    childLane,
+    status: diagnosticStatus,
+    runtimeMode,
+    heartbeatAt,
+    heartbeatStaleAfterSeconds,
+    runnerPid,
+    runnerStartedAt,
+    runnerAlive,
+    runnerIdentityStatus: runnerIdentity.status,
+    runnerIdentityReason: runnerIdentity.reason,
+    runtimeEvent,
+    runtimeEventAt,
+    appserverStartupObserved,
+    appserverStartupObservedAt,
+    proofOutputReady,
+    now: options.now
+  });
+  const hydratedStatus = staleDiagnostic
+    ? 'stale_invalidation_candidate'
+    : diagnosticStatus;
   const manifestTimestamp = latestProviderLinearWorkerChildLaneManifestTimestamp(parsed);
   const summaryRecordedAt = providerLinearWorkerChildLaneSummaryRecordedAt(
     parsed,
     proofMetadata?.updatedAt ?? null,
     startedAt
   );
+  const summary = staleDiagnostic?.summary ??
+    (
+      successfulStatus && !patchReady
+        ? patchBytes === 0
+          ? 'Child lane completed without patch output; waiting for parent ledger decision.'
+          : 'Child lane completed; waiting for patch proof metadata.'
+        : stripNonApplicableGuardrailSummaryLines(parsed, normalizeOptionalString(parsed.summary)) ??
+          normalizeOptionalString(parsed.status_detail)
+    );
+  const priorStaleSummaryRecordedAt =
+    staleDiagnostic &&
+    priorHydratedChildLane?.stale_invalidation_candidate === true &&
+    priorHydratedChildLane.stale_invalidation_reason === staleDiagnostic.reason
+      ? priorHydratedChildLane.summary_recorded_at
+      : null;
+  const currentStaleSummaryRecordedAt =
+    staleDiagnostic &&
+    childLane.stale_invalidation_candidate === true &&
+    childLane.stale_invalidation_reason === staleDiagnostic.reason
+      ? childLane.summary_recorded_at
+      : null;
+  const staleSummaryRecordedAt =
+    staleDiagnostic
+      ? currentStaleSummaryRecordedAt ?? priorStaleSummaryRecordedAt ?? staleDiagnostic.observedAt
+      : null;
   return {
     runId,
     status: hydratedStatus,
     manifestPath,
     artifactRoot: manifestArtifactRoot,
     logPath,
-    summary: successfulStatus && !patchReady
-      ? patchBytes === 0
-        ? 'Child lane completed without patch output; waiting for parent ledger decision.'
-        : 'Child lane completed; waiting for patch proof metadata.'
-      : normalizeOptionalString(parsed.summary) ?? normalizeOptionalString(parsed.status_detail),
+    summary,
     startedAt,
     updatedAt: manifestTimestamp,
     laneWorkspacePath: proofMetadata?.laneWorkspacePath ?? null,
-    patchArtifactPath: proofMetadata?.patchArtifactPath ?? null,
+    patchArtifactPath,
     patchBytes: proofMetadata?.patchBytes ?? null,
-    summaryRecordedAt
+    guardrailsRequired: resolveGuardrailsRequiredForManifest(parsed),
+    guardrailsRequiredSource: resolveGuardrailsRequiredSourceForManifest(parsed),
+    guardrailCommandCount: countGuardrailCommands(parsed),
+    summaryRecordedAt: staleSummaryRecordedAt ?? summaryRecordedAt,
+    runtimeMode,
+    runtimeProvider,
+    heartbeatAt,
+    heartbeatStaleAfterSeconds,
+    runnerPid,
+    runnerStartedAt,
+    runnerAlive,
+    runnerIdentityStatus: runnerIdentity.status,
+    runnerIdentityReason: runnerIdentity.reason,
+    runnerObservedStartedAt: runnerIdentity.observedStartedAt,
+    runnerCommandLineMatches: runnerIdentity.commandLineMatches,
+    runtimeEvent,
+    runtimeEventAt,
+    appserverStartupObserved,
+    appserverStartupObservedAt,
+    staleInvalidationCandidate: staleDiagnostic ? true : null,
+    staleInvalidationReason: staleDiagnostic?.reason ?? null
   };
 }
 
@@ -5619,6 +7795,444 @@ interface ProviderLinearWorkerChildLaneProofHydrationMetadata {
   patchArtifactPath: string | null;
   patchBytes: number | null;
   updatedAt: string | null;
+}
+
+async function readProviderLinearWorkerChildLaneRuntimeDiagnostics(
+  parent: ProviderLinearWorkerParentManifestHydrationMetadata,
+  childLane: ProviderLinearWorkerChildLaneRecord,
+  runId: string,
+  artifactRoot: string
+): Promise<Record<string, unknown> | null> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(
+      await readFile(join(artifactRoot, PROVIDER_LINEAR_CHILD_LANE_DIAGNOSTICS_FILENAME), 'utf8')
+    ) as unknown;
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed)) {
+    return null;
+  }
+  if (
+    normalizeOptionalString(parsed.parent_run_id) !== parent.runId ||
+    normalizeOptionalString(parsed.issue_id) !== childLane.issue_id ||
+    normalizeOptionalString(parsed.issue_identifier) !== childLane.issue_identifier ||
+    normalizeOptionalString(parsed.task_id) !== childLane.task_id ||
+    normalizeOptionalString(parsed.run_id) !== runId
+  ) {
+    return null;
+  }
+  if (parent.issueId && normalizeOptionalString(parsed.issue_id) !== parent.issueId) {
+    return null;
+  }
+  if (parent.issueIdentifier && normalizeOptionalString(parsed.issue_identifier) !== parent.issueIdentifier) {
+    return null;
+  }
+  const stream = normalizeOptionalString(parsed.stream);
+  if (stream && stream !== childLane.stream) {
+    return null;
+  }
+  return parsed;
+}
+
+async function inspectProviderLinearWorkerChildLaneRunnerIdentity(input: {
+  runnerPid: number | null;
+  runnerStartedAt: string | null;
+  options: ProviderLinearWorkerChildLaneHydrationOptions;
+}): Promise<ProviderLinearWorkerChildLaneRunnerIdentity> {
+  if (input.runnerPid === null) {
+    return {
+      alive: null,
+      status: 'not_recorded',
+      reason: 'runner_pid_not_recorded',
+      observedStartedAt: null,
+      commandLineMatches: null
+    };
+  }
+  const inspection = await readProviderLinearWorkerChildLaneRunnerProcessInspection(
+    input.runnerPid,
+    input.options
+  );
+  return resolveProviderLinearWorkerChildLaneRunnerIdentity({
+    runnerStartedAt: input.runnerStartedAt,
+    inspection
+  });
+}
+
+async function readProviderLinearWorkerChildLaneRunnerProcessInspection(
+  pid: number,
+  options: ProviderLinearWorkerChildLaneHydrationOptions
+): Promise<ProviderLinearWorkerProcessInspection> {
+  if (options.inspectProcess) {
+    try {
+      return normalizeProviderLinearWorkerProcessInspection(await options.inspectProcess(pid));
+    } catch (error) {
+      return {
+        alive: null,
+        startedAt: null,
+        commandLine: null,
+        error: providerLinearWorkerErrorMessage(error)
+      };
+    }
+  }
+  if (options.isProcessAlive) {
+    return {
+      alive: options.isProcessAlive(pid),
+      startedAt: null,
+      commandLine: null,
+      error: null
+    };
+  }
+  return await inspectLocalProviderLinearChildLaneRunnerProcess(pid);
+}
+
+function normalizeProviderLinearWorkerProcessInspection(
+  value: ProviderLinearWorkerProcessInspection | unknown
+): ProviderLinearWorkerProcessInspection {
+  if (!isRecord(value)) {
+    return {
+      alive: null,
+      startedAt: null,
+      commandLine: null,
+      error: 'process_identity_inspection_invalid'
+    };
+  }
+  return {
+    alive: typeof value.alive === 'boolean' ? value.alive : null,
+    startedAt: normalizeOptionalString(value.startedAt),
+    commandLine: normalizeOptionalString(value.commandLine),
+    error: normalizeOptionalString(value.error)
+  };
+}
+
+function resolveProviderLinearWorkerChildLaneRunnerIdentity(input: {
+  runnerStartedAt: string | null;
+  inspection: ProviderLinearWorkerProcessInspection;
+}): ProviderLinearWorkerChildLaneRunnerIdentity {
+  const commandLineMatches = resolveProviderLinearChildLaneRunnerCommandLineMatch(input.inspection.commandLine);
+  const recordedStartedMs = input.runnerStartedAt ? Date.parse(input.runnerStartedAt) : Number.NaN;
+  const recordedStartIdentityError =
+    !input.runnerStartedAt
+      ? 'runner_started_at_missing'
+      : Number.isFinite(recordedStartedMs)
+        ? null
+        : 'runner_started_at_unparseable';
+  if (input.inspection.alive === false) {
+    if (recordedStartIdentityError) {
+      return {
+        alive: null,
+        status: 'ambiguous',
+        reason: recordedStartIdentityError,
+        observedStartedAt: input.inspection.startedAt,
+        commandLineMatches
+      };
+    }
+    return {
+      alive: false,
+      status: 'not_live',
+      reason: 'runner_pid_not_live',
+      observedStartedAt: input.inspection.startedAt,
+      commandLineMatches
+    };
+  }
+  if (input.inspection.alive !== true) {
+    const lookupFailureReason = input.inspection.error
+      ? `process_identity_lookup_failed:${truncateProviderLinearWorkerDiagnosticReason(input.inspection.error)}`
+      : 'process_identity_lookup_unknown';
+    return {
+      alive: null,
+      status: 'ambiguous',
+      reason: recordedStartIdentityError ?? lookupFailureReason,
+      observedStartedAt: input.inspection.startedAt,
+      commandLineMatches
+    };
+  }
+  if (commandLineMatches !== true) {
+    const reason =
+      commandLineMatches === false
+        ? 'process_command_line_mismatch'
+        : input.inspection.error
+          ? `process_identity_lookup_failed:${truncateProviderLinearWorkerDiagnosticReason(input.inspection.error)}`
+          : 'process_command_line_unavailable';
+    return {
+      alive: null,
+      status: commandLineMatches === false ? 'pid_reuse_suspected' : 'ambiguous',
+      reason,
+      observedStartedAt: input.inspection.startedAt,
+      commandLineMatches
+    };
+  }
+  if (recordedStartIdentityError) {
+    return {
+      alive: null,
+      status: 'ambiguous',
+      reason: recordedStartIdentityError,
+      observedStartedAt: input.inspection.startedAt,
+      commandLineMatches
+    };
+  }
+  if (!input.inspection.startedAt) {
+    return {
+      alive: null,
+      status: 'ambiguous',
+      reason: input.inspection.error
+        ? `process_start_time_unavailable:${truncateProviderLinearWorkerDiagnosticReason(input.inspection.error)}`
+        : 'process_start_time_unavailable',
+      observedStartedAt: null,
+      commandLineMatches
+    };
+  }
+  const observedStartedMs = Date.parse(input.inspection.startedAt);
+  if (!Number.isFinite(observedStartedMs)) {
+    return {
+      alive: null,
+      status: 'ambiguous',
+      reason: 'process_start_time_unparseable',
+      observedStartedAt: input.inspection.startedAt,
+      commandLineMatches
+    };
+  }
+  if (observedStartedMs > recordedStartedMs) {
+    return {
+      alive: null,
+      status: 'pid_reuse_suspected',
+      reason: 'process_started_after_recorded_runner_start',
+      observedStartedAt: input.inspection.startedAt,
+      commandLineMatches
+    };
+  }
+  if (observedStartedMs < recordedStartedMs - PROVIDER_LINEAR_CHILD_LANE_RUNNER_IDENTITY_START_BEFORE_TOLERANCE_MS) {
+    return {
+      alive: null,
+      status: 'pid_reuse_suspected',
+      reason: 'process_start_time_mismatch',
+      observedStartedAt: input.inspection.startedAt,
+      commandLineMatches
+    };
+  }
+  return {
+    alive: true,
+    status: 'matched',
+    reason: 'process_identity_matched',
+    observedStartedAt: input.inspection.startedAt,
+    commandLineMatches
+  };
+}
+
+async function inspectLocalProviderLinearChildLaneRunnerProcess(
+  pid: number
+): Promise<ProviderLinearWorkerProcessInspection> {
+  if (!isLocalProcessAlive(pid)) {
+    return {
+      alive: false,
+      startedAt: null,
+      commandLine: null,
+      error: null
+    };
+  }
+  const [startedAtResult, commandLineResult] = await Promise.all([
+    readLocalProcessPsOutput(pid, 'lstart='),
+    readLocalProcessCommandLine(pid)
+  ]);
+  if (startedAtResult.output === null && commandLineResult.output === null && !isLocalProcessAlive(pid)) {
+    return {
+      alive: false,
+      startedAt: null,
+      commandLine: null,
+      error: 'process_exited_before_identity_lookup'
+    };
+  }
+  const startedAt = startedAtResult.output ? parseLocalProcessStartedAt(startedAtResult.output) : null;
+  const startError = startedAtResult.output && !startedAt
+    ? `process_start_time_unparseable:${startedAtResult.output}`
+    : startedAtResult.error;
+  const error = [startError, commandLineResult.error]
+    .map((value) => normalizeOptionalString(value))
+    .filter((value): value is string => Boolean(value))
+    .join('; ');
+  return {
+    alive: true,
+    startedAt,
+    commandLine: commandLineResult.output,
+    error: error || null
+  };
+}
+
+async function readLocalProcessCommandLine(
+  pid: number
+): Promise<{ output: string | null; error: string | null }> {
+  const commandResult = await readLocalProcessPsOutput(pid, 'command=');
+  if (commandResult.output !== null) {
+    return commandResult;
+  }
+  const argsResult = await readLocalProcessPsOutput(pid, 'args=');
+  if (argsResult.output !== null) {
+    return argsResult;
+  }
+  return {
+    output: null,
+    error: [commandResult.error, argsResult.error]
+      .map((value) => normalizeOptionalString(value))
+      .filter((value): value is string => Boolean(value))
+      .join('; ') || null
+  };
+}
+
+async function readLocalProcessPsOutput(
+  pid: number,
+  outputColumn: string
+): Promise<{ output: string | null; error: string | null }> {
+  return await new Promise((resolvePromise) => {
+    let stdout = '';
+    let stderr = '';
+    let completed = false;
+    let timedOut = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const child = spawn('ps', ['-ww', '-p', String(pid), '-o', outputColumn], {
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    const finish = (result: { output: string | null; error: string | null }) => {
+      if (completed) {
+        return;
+      }
+      completed = true;
+      if (timer) {
+        clearTimeout(timer);
+      }
+      resolvePromise(result);
+    };
+    timer = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGKILL');
+    }, PROVIDER_LINEAR_CHILD_LANE_RUNNER_PROCESS_LOOKUP_TIMEOUT_MS);
+    child.stdout?.on('data', (chunk) => {
+      stdout += String(chunk);
+    });
+    child.stderr?.on('data', (chunk) => {
+      stderr += String(chunk);
+    });
+    child.on('error', (error) => {
+      finish({
+        output: null,
+        error: providerLinearWorkerErrorMessage(error)
+      });
+    });
+    child.on('close', (code) => {
+      if (timedOut) {
+        finish({
+          output: null,
+          error: 'process_identity_lookup_timeout'
+        });
+        return;
+      }
+      const output = normalizeOptionalString(stdout);
+      if (code === 0 && output) {
+        finish({
+          output,
+          error: null
+        });
+        return;
+      }
+      finish({
+        output: null,
+        error: normalizeOptionalString(stderr) ?? `ps exited with code ${code ?? 'unknown'}`
+      });
+    });
+  });
+}
+
+function parseLocalProcessStartedAt(value: string): string | null {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return null;
+  }
+  const parsed = Date.parse(normalized);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
+}
+
+function resolveProviderLinearChildLaneRunnerCommandLineMatch(commandLine: string | null): boolean | null {
+  const normalized = normalizeOptionalString(commandLine);
+  if (!normalized) {
+    return null;
+  }
+  return normalized.includes('providerLinearChildLaneRunner');
+}
+
+function truncateProviderLinearWorkerDiagnosticReason(value: string): string {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return 'unknown';
+  }
+  return normalized.length > 160 ? `${normalized.slice(0, 157)}...` : normalized;
+}
+
+function providerLinearWorkerErrorMessage(error: unknown): string {
+  return normalizeOptionalString((error as Error)?.message) ?? String(error);
+}
+
+function resolveProviderLinearWorkerChildLanePostStartupNoOutputDiagnostic(input: {
+  childLane: ProviderLinearWorkerChildLaneRecord;
+  status: string;
+  runtimeMode: string | null;
+  heartbeatAt: string | null;
+  heartbeatStaleAfterSeconds: number | null;
+  runnerPid: number | null;
+  runnerStartedAt: string | null;
+  runnerAlive: boolean | null;
+  runnerIdentityStatus: ProviderLinearWorkerChildLaneRunnerIdentityStatus | null;
+  runnerIdentityReason: string | null;
+  runtimeEvent: string | null;
+  runtimeEventAt: string | null;
+  appserverStartupObserved: boolean | null;
+  appserverStartupObservedAt: string | null;
+  proofOutputReady: boolean;
+  now: () => string;
+}): { observedAt: string; reason: string; summary: string } | null {
+  if (
+    !isActiveLookingProviderLinearWorkerChildLaneStatus(input.status) ||
+    input.runtimeMode !== 'appserver' ||
+    input.appserverStartupObserved !== true ||
+    input.proofOutputReady
+  ) {
+    return null;
+  }
+  const heartbeatMs = input.heartbeatAt ? Date.parse(input.heartbeatAt) : Number.NaN;
+  const now = input.now();
+  const nowMs = Date.parse(now);
+  if (!Number.isFinite(heartbeatMs) || !Number.isFinite(nowMs)) {
+    return null;
+  }
+  const staleAfterMs = Math.max(
+    PROVIDER_LINEAR_CHILD_LANE_POST_STARTUP_NO_OUTPUT_MIN_STALE_MS,
+    (input.heartbeatStaleAfterSeconds ?? 0) * 1000
+  );
+  if (nowMs - heartbeatMs <= staleAfterMs) {
+    return null;
+  }
+  if (input.runnerAlive !== false || input.runnerIdentityStatus !== 'not_live') {
+    return null;
+  }
+  const stream = input.childLane.stream || input.childLane.task_id || input.childLane.run_id;
+  const runnerState =
+    input.runnerPid !== null
+      ? `providerLinearChildLaneRunner pid ${input.runnerPid} is not live` +
+        (input.runnerStartedAt ? ` for recorded start ${input.runnerStartedAt}` : '')
+      : 'providerLinearChildLaneRunner pid was not recorded';
+  const identityState = input.runnerIdentityReason
+    ? ` Runner identity proof: ${input.runnerIdentityReason}.`
+    : '';
+  const startupAt = input.appserverStartupObservedAt ?? input.runtimeEventAt ?? 'unknown time';
+  const reason = 'post_startup_no_output_heartbeat_stale_runner_dead';
+  return {
+    observedAt: now,
+    reason,
+    summary:
+      `Child lane ${stream} is a stale invalidation candidate: appserver startup was observed at ${startupAt}, ` +
+      `manifest heartbeat stopped at ${input.heartbeatAt}, ${runnerState}, and no proof/patch output is present. ` +
+      identityState +
+      'Invalidate the lane and rerun parent-owned validation, or relaunch under CLI for scoped diagnosis.'
+  };
 }
 
 async function readProviderLinearWorkerChildLaneProofHydrationMetadata(
@@ -5726,7 +8340,10 @@ function buildProviderLinearWorkerHydratedChildLaneSummary(
   childLane: ProviderLinearWorkerChildLaneRecord,
   candidate: ProviderLinearWorkerChildLaneManifestHydrationCandidate
 ): string {
-  if (candidate.summary?.startsWith('Child lane completed')) {
+  if (
+    candidate.summary &&
+    (candidate.status === 'stale_invalidation_candidate' || candidate.summary.startsWith('Child lane completed'))
+  ) {
     return candidate.summary;
   }
   const label = childLane.stream || childLane.task_id || candidate.runId;
@@ -5974,6 +8591,9 @@ function normalizeProviderLinearWorkerChildLaneRecord(
     artifact_root: artifactRoot,
     log_path: normalizeOptionalString(value.log_path),
     summary: normalizeOptionalString(value.summary),
+    guardrails_required: typeof value.guardrails_required === 'boolean' ? value.guardrails_required : null,
+    guardrails_required_source: normalizeGuardrailsRequiredSource(value.guardrails_required_source),
+    guardrail_command_count: normalizeOptionalInteger(value.guardrail_command_count),
     issue_id: issueId,
     issue_identifier: issueIdentifier,
     workspace_path: normalizeOptionalString(value.workspace_path),
@@ -5994,6 +8614,30 @@ function normalizeProviderLinearWorkerChildLaneRecord(
     lane_workspace_path: normalizeOptionalString(value.lane_workspace_path),
     patch_artifact_path: normalizeOptionalString(value.patch_artifact_path),
     patch_bytes: normalizeOptionalInteger(value.patch_bytes),
+    runtime_mode: normalizeOptionalString(value.runtime_mode),
+    runtime_provider: normalizeOptionalString(value.runtime_provider),
+    heartbeat_at: normalizeOptionalString(value.heartbeat_at),
+    heartbeat_stale_after_seconds: normalizeOptionalInteger(value.heartbeat_stale_after_seconds),
+    runner_pid: normalizeOptionalInteger(value.runner_pid),
+    runner_started_at: normalizeOptionalString(value.runner_started_at),
+    runner_alive: typeof value.runner_alive === 'boolean' ? value.runner_alive : null,
+    runner_identity_status: normalizeProviderLinearWorkerChildLaneRunnerIdentityStatus(
+      value.runner_identity_status
+    ),
+    runner_identity_reason: normalizeOptionalString(value.runner_identity_reason),
+    runner_observed_started_at: normalizeOptionalString(value.runner_observed_started_at),
+    runner_command_line_matches:
+      typeof value.runner_command_line_matches === 'boolean' ? value.runner_command_line_matches : null,
+    runtime_event: normalizeOptionalString(value.runtime_event),
+    runtime_event_at: normalizeOptionalString(value.runtime_event_at),
+    appserver_startup_observed:
+      typeof value.appserver_startup_observed === 'boolean' ? value.appserver_startup_observed : null,
+    appserver_startup_observed_at: normalizeOptionalString(value.appserver_startup_observed_at),
+    stale_invalidation_candidate:
+      typeof value.stale_invalidation_candidate === 'boolean'
+        ? value.stale_invalidation_candidate
+        : null,
+    stale_invalidation_reason: normalizeOptionalString(value.stale_invalidation_reason),
     decision,
     in_flight_action: inFlightAction,
     in_flight_started_at: normalizeOptionalString(value.in_flight_started_at),
@@ -6055,6 +8699,28 @@ function normalizeChildLaneInFlightAction(
     ? value
     : null;
 }
+
+function normalizeProviderLinearWorkerChildLaneRunnerIdentityStatus(
+  value: unknown
+): ProviderLinearWorkerChildLaneRunnerIdentityStatus | null {
+  return value === 'not_recorded' ||
+    value === 'not_live' ||
+    value === 'matched' ||
+    value === 'ambiguous' ||
+    value === 'pid_reuse_suspected'
+    ? value
+    : null;
+}
+
+function isLocalProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException)?.code === 'EPERM';
+  }
+}
+
 async function resolveProviderWorkerRunLocation(
   currentManifestPath: string,
 ): Promise<ProviderWorkerRunLocation | null> {
@@ -6337,112 +9003,273 @@ async function requestProviderControlHostRefresh(input: {
     return;
   }
   let controlHostRunDir: string | null = null;
-  try {
-    const manifestTarget = await resolveProviderControlHostManifestPath(
-      input.currentManifestPath,
-      input.env,
-      input.manifest
-    );
-    if (!manifestTarget) {
-      return;
-    }
-    const canonicalRunsRoot = manifestTarget.currentRun.canonicalRunsRoot;
-    const canonicalRunDir = await realpathOrResolveIfMissing(dirname(manifestTarget.manifestPath));
-    controlHostRunDir = canonicalRunDir;
-    const canonicalManifestPath = await realpathOrResolveIfMissing(
-      resolve(canonicalRunDir, basename(manifestTarget.manifestPath))
-    );
-    if (
-      !isPathWithinRoot(canonicalRunDir, canonicalRunsRoot) ||
-      !isPathWithinRoot(canonicalManifestPath, canonicalRunsRoot)
-    ) {
-      throw new Error('control-host manifest path invalid');
-    }
-    const workerTaskId = resolveProviderWorkerTaskId(manifestTarget.currentRun, input.manifest);
-    if (!workerTaskId) {
-      throw new Error('provider task id unavailable');
-    }
-    const controlHostRepoRoot = await resolveProviderControlHostRepoRoot({
-      manifestPath: canonicalManifestPath,
-      workerWorkspacePath: input.repoRoot,
-      taskId: workerTaskId
-    });
-    if (!controlHostRepoRoot) {
-      throw new Error('control-host repo root unavailable');
-    }
-    const allowedBindHosts = await resolveAllowedControlHostBindHosts(controlHostRepoRoot, input.env);
-    const endpointPath = resolve(canonicalRunDir, 'control_endpoint.json');
-    const canonicalEndpointPath = await realpath(endpointPath);
-    if (!isPathWithinRoot(canonicalEndpointPath, canonicalRunDir)) {
-      throw new Error('control endpoint path invalid');
-    }
-    const endpointRaw = await readFile(canonicalEndpointPath, 'utf8');
-    const endpoint = JSON.parse(endpointRaw) as { base_url?: unknown; token_path?: unknown };
-    const baseUrl = validateControlHostBaseUrl(endpoint.base_url, allowedBindHosts);
-    const resolvedTokenPath =
-      typeof endpoint.token_path === 'string' && endpoint.token_path.trim().length > 0
-        ? resolve(canonicalRunDir, endpoint.token_path)
-        : resolve(canonicalRunDir, 'control_auth.json');
-    if (!isPathWithinRoot(resolvedTokenPath, canonicalRunDir)) {
-      throw new Error('control auth path invalid');
-    }
-    const canonicalTokenPath = await realpath(resolvedTokenPath);
-    if (!isPathWithinRoot(canonicalTokenPath, canonicalRunDir)) {
-      throw new Error('control auth path invalid');
-    }
-    const token = await readControlEndpointToken(canonicalTokenPath);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS);
-    const requestSignal = input.abortSignal
-      ? AbortSignal.any([controller.signal, input.abortSignal])
-      : controller.signal;
+  let attempts = 0;
+  let retriedAfterStaleOwnerReclaim = false;
+  while (attempts < 2) {
+    attempts += 1;
     try {
-      const response = await fetch(new URL(PROVIDER_CONTROL_HOST_REFRESH_PATH, baseUrl), {
-        method: 'POST',
-        redirect: 'error',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-          [CSRF_HEADER]: token
-        },
-        body: JSON.stringify({
-          action: 'refresh',
-          source: 'provider-linear-worker',
-          issue_id: input.proof.issue_id,
-          issue_identifier: input.proof.issue_identifier,
-          owner_status: input.proof.owner_status,
-          end_reason: input.proof.end_reason
-        }),
-        signal: requestSignal
+      controlHostRunDir = await requestProviderControlHostRefreshOnce({
+        currentManifestPath: input.currentManifestPath,
+        env: input.env,
+        manifest: input.manifest,
+        proof: input.proof,
+        repoRoot: input.repoRoot,
+        abortSignal: input.abortSignal
       });
-      const responseBody = await response.text();
-      if (response.status !== 202) {
-        const responseDetail = responseBody.trim();
-        throw new Error(
-          responseDetail
-            ? `refresh request failed with status ${response.status}: ${responseDetail}`
-            : `refresh request failed with status ${response.status}`
-        );
+      if (controlHostRunDir) {
+        try {
+          await rm(join(controlHostRunDir, PROVIDER_CONTROL_HOST_REFRESH_FAILURE_FILENAME), {
+            force: true
+          });
+        } catch (cleanupError) {
+          input.log.warn(
+            `provider-linear-worker could not clear stale ${PROVIDER_CONTROL_HOST_REFRESH_FAILURE_FILENAME} for ${input.proof.issue_identifier}: ${
+              (cleanupError as Error)?.message ?? String(cleanupError)
+            }`
+          );
+        }
       }
-    } finally {
-      clearTimeout(timer);
-    }
-  } catch (error) {
-    if (input.abortSignal?.aborted === true) {
+      return;
+    } catch (error) {
+      if (input.abortSignal?.aborted === true) {
+        return;
+      }
+      const message = getProviderControlHostRefreshFailureMessage(error);
+      controlHostRunDir ??= await resolveProviderControlHostRunDirForDiagnostic({
+        currentManifestPath: input.currentManifestPath,
+        env: input.env,
+        manifest: input.manifest
+      }).catch(() => null);
+      const ownershipDiagnostic = controlHostRunDir
+        ? await readControlHostOwnershipDiagnosticSummary(controlHostRunDir).catch(() => null)
+        : null;
+      if (
+        attempts === 1 &&
+        shouldRetryProviderControlHostRefreshAfterStaleOwnerReclaim(message, ownershipDiagnostic)
+      ) {
+        retriedAfterStaleOwnerReclaim = true;
+        await sleep(PROVIDER_CONTROL_HOST_REFRESH_RETRY_DELAY_MS, undefined, {
+          signal: input.abortSignal
+        }).catch(() => undefined);
+        if (input.abortSignal?.aborted) {
+          return;
+        }
+        continue;
+      }
+      if (controlHostRunDir) {
+        try {
+          await writeProviderControlHostRefreshFailureDiagnostic({
+            runDir: controlHostRunDir,
+            message,
+            issueId: input.proof.issue_id,
+            issueIdentifier: input.proof.issue_identifier,
+            ownerStatus: input.proof.owner_status,
+            endReason: input.proof.end_reason,
+            ownershipDiagnostic,
+            attempts,
+            retriedAfterStaleOwnerReclaim
+          });
+        } catch (persistError) {
+          input.log.warn(
+            `provider-linear-worker could not persist ${PROVIDER_CONTROL_HOST_REFRESH_FAILURE_FILENAME} for ${input.proof.issue_identifier}: ${
+              (persistError as Error)?.message ?? String(persistError)
+            }`
+          );
+        }
+      }
+      const ownershipHint = controlHostRunDir
+        ? await readControlHostOwnershipOperatorHint(controlHostRunDir).catch(() => null)
+        : null;
+      input.log.warn(
+        `provider-linear-worker could not request control-host refresh for ${input.proof.issue_identifier}: ${message}${
+          ownershipHint ? `; ${ownershipHint}` : ''
+        }`
+      );
       return;
     }
-    const message = (error as Error)?.name === 'AbortError'
-      ? 'refresh request timeout'
-      : (error as Error)?.message ?? String(error);
-    const ownershipHint = controlHostRunDir
-      ? await readControlHostOwnershipOperatorHint(controlHostRunDir).catch(() => null)
-      : null;
-    input.log.warn(
-      `provider-linear-worker could not request control-host refresh for ${input.proof.issue_identifier}: ${message}${
-        ownershipHint ? `; ${ownershipHint}` : ''
-      }`
-    );
   }
+}
+
+async function resolveProviderControlHostRunDirForDiagnostic(input: {
+  currentManifestPath: string;
+  env: NodeJS.ProcessEnv;
+  manifest: Record<string, unknown>;
+}): Promise<string | null> {
+  const manifestTarget = await resolveProviderControlHostManifestPath(
+    input.currentManifestPath,
+    input.env,
+    input.manifest
+  );
+  if (!manifestTarget) {
+    return null;
+  }
+  const canonicalRunDir = await realpathOrResolveIfMissing(dirname(manifestTarget.manifestPath));
+  return isPathWithinRoot(canonicalRunDir, manifestTarget.currentRun.canonicalRunsRoot)
+    ? canonicalRunDir
+    : null;
+}
+
+async function requestProviderControlHostRefreshOnce(input: {
+  currentManifestPath: string;
+  env: NodeJS.ProcessEnv;
+  manifest: Record<string, unknown>;
+  proof: ProviderLinearWorkerProof;
+  repoRoot: string;
+  abortSignal?: AbortSignal;
+}): Promise<string | null> {
+  const manifestTarget = await resolveProviderControlHostManifestPath(
+    input.currentManifestPath,
+    input.env,
+    input.manifest
+  );
+  if (!manifestTarget) {
+    return null;
+  }
+  const canonicalRunsRoot = manifestTarget.currentRun.canonicalRunsRoot;
+  const canonicalRunDir = await realpathOrResolveIfMissing(dirname(manifestTarget.manifestPath));
+  const canonicalManifestPath = await realpathOrResolveIfMissing(
+    resolve(canonicalRunDir, basename(manifestTarget.manifestPath))
+  );
+  if (
+    !isPathWithinRoot(canonicalRunDir, canonicalRunsRoot) ||
+    !isPathWithinRoot(canonicalManifestPath, canonicalRunsRoot)
+  ) {
+    throw new Error('control-host manifest path invalid');
+  }
+  const workerTaskId = resolveProviderWorkerTaskId(manifestTarget.currentRun, input.manifest);
+  if (!workerTaskId) {
+    throw new Error('provider task id unavailable');
+  }
+  const controlHostRepoRoot = await resolveProviderControlHostRepoRoot({
+    manifestPath: canonicalManifestPath,
+    workerWorkspacePath: input.repoRoot,
+    taskId: workerTaskId
+  });
+  if (!controlHostRepoRoot) {
+    throw new Error('control-host repo root unavailable');
+  }
+  const allowedBindHosts = await resolveAllowedControlHostBindHosts(controlHostRepoRoot, input.env);
+  const endpointPath = resolve(canonicalRunDir, 'control_endpoint.json');
+  const canonicalEndpointPath = await realpath(endpointPath);
+  if (!isPathWithinRoot(canonicalEndpointPath, canonicalRunDir)) {
+    throw new Error('control endpoint path invalid');
+  }
+  const endpointRaw = await readFile(canonicalEndpointPath, 'utf8');
+  const endpoint = JSON.parse(endpointRaw) as { base_url?: unknown; token_path?: unknown };
+  const baseUrl = validateControlHostBaseUrl(endpoint.base_url, allowedBindHosts);
+  const resolvedTokenPath =
+    typeof endpoint.token_path === 'string' && endpoint.token_path.trim().length > 0
+      ? resolve(canonicalRunDir, endpoint.token_path)
+      : resolve(canonicalRunDir, 'control_auth.json');
+  if (!isPathWithinRoot(resolvedTokenPath, canonicalRunDir)) {
+    throw new Error('control auth path invalid');
+  }
+  const canonicalTokenPath = await realpath(resolvedTokenPath);
+  if (!isPathWithinRoot(canonicalTokenPath, canonicalRunDir)) {
+    throw new Error('control auth path invalid');
+  }
+  const token = await readControlEndpointToken(canonicalTokenPath);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS);
+  const requestSignal = input.abortSignal
+    ? AbortSignal.any([controller.signal, input.abortSignal])
+    : controller.signal;
+  try {
+    const response = await fetch(new URL(PROVIDER_CONTROL_HOST_REFRESH_PATH, baseUrl), {
+      method: 'POST',
+      redirect: 'error',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        [CSRF_HEADER]: token
+      },
+      body: JSON.stringify({
+        action: 'refresh',
+        source: 'provider-linear-worker',
+        issue_id: input.proof.issue_id,
+        issue_identifier: input.proof.issue_identifier,
+        owner_status: input.proof.owner_status,
+        end_reason: input.proof.end_reason
+      }),
+      signal: requestSignal
+    });
+    if (response.status !== 202) {
+      const responseBody = await response.text().catch(() => '');
+      const responseDetail = responseBody.trim();
+      throw new Error(
+        responseDetail
+          ? `refresh request failed with status ${response.status}: ${responseDetail}`
+          : `refresh request failed with status ${response.status}`
+      );
+    }
+    return canonicalRunDir;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function getProviderControlHostRefreshFailureMessage(error: unknown): string {
+  return (error as Error)?.name === 'AbortError'
+    ? 'refresh request timeout'
+    : (error as Error)?.message ?? String(error);
+}
+
+function shouldRetryProviderControlHostRefreshAfterStaleOwnerReclaim(
+  message: string,
+  ownershipDiagnostic: ControlHostOwnershipPollingPayload | null
+): boolean {
+  return (
+    ownershipDiagnostic?.reason === 'stale_control_host_owner' &&
+    ownershipDiagnostic.status === 'stale_reclaimed' &&
+    (message === 'refresh request timeout' || message.includes('fetch failed'))
+  );
+}
+
+function classifyProviderControlHostRefreshFailure(
+  message: string
+): ProviderControlHostRefreshFailureDiagnostic['failure_kind'] {
+  if (message === 'refresh request timeout') {
+    return 'refresh_request_timeout';
+  }
+  if (message.includes('fetch failed')) {
+    return 'fetch_failed';
+  }
+  return 'request_failed';
+}
+
+async function writeProviderControlHostRefreshFailureDiagnostic(input: {
+  runDir: string;
+  message: string;
+  issueId: string;
+  issueIdentifier: string;
+  ownerStatus: ProviderLinearWorkerProof['owner_status'];
+  endReason: string | null;
+  ownershipDiagnostic: ControlHostOwnershipPollingPayload | null;
+  attempts: number;
+  retriedAfterStaleOwnerReclaim: boolean;
+}): Promise<void> {
+  const diagnostic: ProviderControlHostRefreshFailureDiagnostic = {
+    schema_version: 1,
+    reason: 'provider_control_host_refresh_failed',
+    failure_kind: classifyProviderControlHostRefreshFailure(input.message),
+    message: input.message,
+    issue_id: input.issueId,
+    issue_identifier: input.issueIdentifier,
+    owner_status: input.ownerStatus,
+    end_reason: input.endReason,
+    observed_at: new Date().toISOString(),
+    control_host_run_dir: input.runDir,
+    control_host_ownership: input.ownershipDiagnostic,
+    retry: {
+      attempts: input.attempts,
+      retried_after_stale_owner_reclaim: input.retriedAfterStaleOwnerReclaim,
+      recovered: false
+    }
+  };
+  await writeJsonAtomic(
+    join(input.runDir, PROVIDER_CONTROL_HOST_REFRESH_FAILURE_FILENAME),
+    diagnostic
+  );
 }
 async function writeProofSnapshot(
   deps: ProviderLinearWorkerDependencies,
@@ -6461,6 +9288,7 @@ async function writeProofSnapshot(
     );
     const proofWithHydratedSources = {
       ...proof,
+      runtime: normalizeProviderLinearWorkerRuntimeProofIfRelevant(proof),
       linear_audit: linearAudit,
       child_streams: childStreams,
       child_lanes: childLanes,
@@ -6475,6 +9303,8 @@ async function writeProofSnapshot(
     };
     const hydratedProof = {
       ...proofWithHydratedSources,
+      appserver_supervision:
+        buildProviderLinearWorkerAppServerSupervisionProofIfRelevant(proofWithHydratedSources),
       progress: deriveProviderLinearWorkerProgressSnapshot({
         proof: proofWithHydratedSources,
         now: deps.now
@@ -6496,6 +9326,10 @@ export async function refreshProviderLinearWorkerProofSnapshot(
     updatedAtComparisonScope?: 'full' | 'telemetry';
     skipSessionLogHydration?: boolean;
     emitProgressEvent?: (message: string) => void;
+    isProcessAlive?: (pid: number) => boolean;
+    inspectProcess?: (
+      pid: number
+    ) => ProviderLinearWorkerProcessInspection | Promise<ProviderLinearWorkerProcessInspection>;
   } = {}
 ): Promise<ProviderLinearWorkerProof | null> {
   return await withProviderLinearWorkerProofLock(runDir, async () => {
@@ -6516,10 +9350,16 @@ export async function refreshProviderLinearWorkerProofSnapshot(
     const childStreams = await readProviderLinearWorkerChildStreams(runDir);
     const childLanes = await readHydratedProviderLinearWorkerChildLanesAndRepairLedger(
       runDir,
-      parsed.child_lanes
+      parsed.child_lanes,
+      {
+        now,
+        isProcessAlive: options.isProcessAlive,
+        inspectProcess: options.inspectProcess
+      }
     );
     const proofWithHydratedSources: ProviderLinearWorkerProof = {
       ...parsed,
+      runtime: normalizeProviderLinearWorkerRuntimeProofIfRelevant(parsed),
       linear_audit: linearAudit,
       child_streams: childStreams,
       child_lanes: childLanes,
@@ -6546,31 +9386,67 @@ export async function refreshProviderLinearWorkerProofSnapshot(
     const proofWithSessionTelemetry = proofWithSessionTelemetryResult.proof;
     const hydratedWithoutUpdatedAt: ProviderLinearWorkerProof = {
       ...proofWithSessionTelemetry,
+      appserver_supervision:
+        buildProviderLinearWorkerAppServerSupervisionProofIfRelevant(proofWithSessionTelemetry),
       progress: deriveProviderLinearWorkerProgressSnapshot({
         proof: proofWithSessionTelemetry,
         now
       })
     };
-    const hydrated: ProviderLinearWorkerProof = {
+    const nextUpdatedAt = shouldAdvanceProviderLinearWorkerProofUpdatedAt(
+      parsed,
+      hydratedWithoutUpdatedAt,
+      options.updatedAtComparisonScope ?? 'full'
+    )
+      ? now()
+      : parsed.updated_at ?? null;
+    const hydratedBase: ProviderLinearWorkerProof = {
       ...hydratedWithoutUpdatedAt,
-      updated_at: shouldAdvanceProviderLinearWorkerProofUpdatedAt(
-        parsed,
-        hydratedWithoutUpdatedAt,
-        options.updatedAtComparisonScope ?? 'full'
-      )
-        ? now()
-        : parsed.updated_at ?? null
+      updated_at: nextUpdatedAt
+    };
+    const hydrated: ProviderLinearWorkerProof = {
+      ...hydratedBase,
+      appserver_supervision: buildProviderLinearWorkerAppServerSupervisionProofIfRelevant(hydratedBase)
     };
     await writeProof(proofPath, hydrated);
     await writeProviderWorkerSessionLogHydrationState(runDir, proofWithSessionTelemetryResult.hydrationState);
     if (
       options.emitProgressEvent &&
-      JSON.stringify(parsed.progress ?? null) !== JSON.stringify(hydrated.progress ?? null)
+      buildProviderLinearWorkerProgressSemanticSignature(parsed.progress ?? null)
+        !== buildProviderLinearWorkerProgressSemanticSignature(hydrated.progress ?? null)
     ) {
       options.emitProgressEvent(formatProviderLinearWorkerProgressEvent(hydrated));
     }
     return hydrated;
   });
+}
+
+export function buildProviderLinearWorkerProgressSemanticSignature(
+  progress: ProviderLinearWorkerProgressSnapshot | null | undefined
+): string | null {
+  if (!progress) {
+    return null;
+  }
+  // Hydration metadata changes often outnumber operator-visible state changes.
+  return JSON.stringify({
+    phase: progress.phase ?? null,
+    kind: progress.kind ?? null,
+    status: progress.status ?? null,
+    summary: progress.summary ?? null,
+    stall_classification: progress.stall_classification ?? null,
+    stall_reason: progress.stall_reason ?? null,
+    recovery_recommendation: progress.recovery_recommendation ?? null
+  });
+}
+
+export function shouldEmitProviderLinearWorkerProgressSignatureTransition(
+  previousSignature: string | null | undefined,
+  nextSignature: string | null
+): boolean {
+  if (previousSignature === undefined && nextSignature === null) {
+    return false;
+  }
+  return previousSignature !== nextSignature;
 }
 
 function formatProviderLinearWorkerProgressEvent(proof: ProviderLinearWorkerProof): string {
@@ -6594,6 +9470,7 @@ export async function runProviderLinearWorker(
       await sleep(ms);
     },
     execRunner: defaultExecRunner,
+    appServerTurnRunner: defaultAppServerTurnRunner,
     writeProof: async (path, proof) => writeJsonAtomic(path, proof),
     log: logger,
     ...dependencyOverrides
@@ -6607,7 +9484,14 @@ export async function runProviderLinearWorker(
     ...env,
     ...runtimeContext.env
   };
+  const explicitRepoConfigRequired =
+    Object.prototype.hasOwnProperty.call(env, REPO_CONFIG_REQUIRED_ENV_KEY)
+      ? env[REPO_CONFIG_REQUIRED_ENV_KEY]
+      : undefined;
   applyProviderLinearWorkerContextEnv(childEnv, context);
+  if (explicitRepoConfigRequired !== undefined) {
+    childEnv[REPO_CONFIG_REQUIRED_ENV_KEY] = explicitRepoConfigRequired;
+  }
   const auditPath = resolve(context.runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME);
   const workerPid = String(process.pid);
   childEnv[PROVIDER_LINEAR_AUDIT_ENV_VAR] = auditPath;
@@ -6621,8 +9505,18 @@ export async function runProviderLinearWorker(
     childEnv.CODEX_NO_INTERACTIVE = '1';
     childEnv.CODEX_INTERACTIVE = '0';
   }
+  ensureProviderLinearWorkerAuthoritativeReviewNotes(childEnv, context);
 
   const attemptStartedAt = deps.now();
+  const workerControl = buildProviderWorkerControlPlane({
+    runtime: runtimeContext.runtime,
+    observedAt: attemptStartedAt
+  });
+  await persistProviderWorkerRuntimeSelectionToManifests({
+    context,
+    runtime: runtimeContext.runtime,
+    workerControl
+  });
   let finalProof: ProviderLinearWorkerProof = {
     issue_id: context.issueId,
     issue_identifier: context.issueIdentifier,
@@ -6633,19 +9527,28 @@ export async function runProviderLinearWorker(
     latest_turn_id: null,
     latest_session_id: null,
     latest_session_id_source: null,
+    session_log_thread_id: null,
+    session_log_turn_id: null,
+    session_log_session_id: null,
+    resume_source_thread_id: residentSessionSeed?.source_thread_id ?? null,
     turn_count: 0,
     last_event: null,
     last_message: null,
+    last_message_source: null,
+    last_message_delta_key: null,
     last_event_at: null,
     current_turn_activity: null,
     tokens: buildEmptyProviderLinearWorkerTokenUsage(),
     rate_limits: null,
+    runtime: buildProviderLinearWorkerRuntimeProof(runtimeContext.runtime),
+    appserver_supervision: null,
     auth_provenance: buildProviderWorkerRuntimeAuthProvenance({
       env: childEnv,
       runtime: runtimeContext.runtime,
       sourceSetup: context.sourceSetup,
       observedAt: attemptStartedAt
     }),
+    worker_control: workerControl,
     failure_diagnosis: null,
     owner_phase: 'bootstrapping',
     owner_status: 'in_progress',
@@ -6666,12 +9569,12 @@ export async function runProviderLinearWorker(
     end_reason: null,
     updated_at: attemptStartedAt
   };
-  let lastProgressSignature: string | null = null;
+  let lastProgressSignature: string | null | undefined = undefined;
 
   const emitSemanticProgressIfChanged = (proof: ProviderLinearWorkerProof): void => {
     const progress = proof.progress ?? null;
-    const signature = progress ? JSON.stringify(progress) : null;
-    if (!signature || signature === lastProgressSignature) {
+    const signature = buildProviderLinearWorkerProgressSemanticSignature(progress);
+    if (!shouldEmitProviderLinearWorkerProgressSignatureTransition(lastProgressSignature, signature)) {
       return;
     }
     lastProgressSignature = signature;
@@ -6796,6 +9699,9 @@ export async function runProviderLinearWorker(
       let liveStdoutBuffer = '';
       let liveProofSignature: string | null = null;
       const liveParseState = buildEmptyProviderLinearWorkerJsonlParseResult();
+      let liveSessionLogThreadId: string | null = null;
+      let liveSessionLogTurnId: string | null = null;
+      let liveSessionLogSessionId: string | null = null;
       const scheduleTrailingLiveRefresh = (): void => {
         if (liveRefreshClosed || !liveRefreshPending || liveRefreshRequest !== null || liveRefreshTimer !== null) {
           return;
@@ -6921,10 +9827,29 @@ export async function runProviderLinearWorker(
           latest_turn_id: liveTurnId,
           latest_session_id: session.sessionId,
           latest_session_id_source: session.source,
+          session_log_thread_id:
+            liveSessionLogThreadId ?? (liveScopeChanged ? null : finalProof.session_log_thread_id ?? null),
+          session_log_turn_id:
+            liveSessionLogTurnId ?? (liveScopeChanged ? null : finalProof.session_log_turn_id ?? null),
+          session_log_session_id:
+            liveSessionLogSessionId ?? (liveScopeChanged ? null : finalProof.session_log_session_id ?? null),
+          resume_source_thread_id: finalProof.resume_source_thread_id ?? null,
           turn_count: turnNumber,
           last_event: liveParseState.lastEvent ?? (liveScopeChanged ? null : finalProof.last_event),
           last_message:
             liveParseState.finalMessage ?? (liveScopeChanged ? null : finalProof.last_message),
+          last_message_source: liveParseState.finalMessage
+            ? liveParseState.finalMessageSource ?? null
+            : liveScopeChanged
+              ? null
+              : normalizeProviderLinearWorkerFinalMessageSource(finalProof.last_message_source),
+          last_message_delta_key: liveParseState.finalMessage
+            ? liveParseState.finalMessageSource === 'agent_message_delta'
+              ? liveParseState.finalMessageDeltaKey ?? null
+              : null
+            : liveScopeChanged
+              ? null
+              : selectProviderLinearWorkerProofFinalMessageDeltaKey(finalProof),
           last_event_at:
             liveParseState.lastEventAt ?? (liveScopeChanged ? null : finalProof.last_event_at),
           current_turn_activity:
@@ -6956,9 +9881,15 @@ export async function runProviderLinearWorker(
           latest_turn_id: nextProof.latest_turn_id,
           latest_session_id: nextProof.latest_session_id,
           latest_session_id_source: nextProof.latest_session_id_source,
+          session_log_thread_id: nextProof.session_log_thread_id ?? null,
+          session_log_turn_id: nextProof.session_log_turn_id ?? null,
+          session_log_session_id: nextProof.session_log_session_id ?? null,
+          resume_source_thread_id: nextProof.resume_source_thread_id ?? null,
           turn_count: nextProof.turn_count,
           last_event: nextProof.last_event,
           last_message: nextProof.last_message,
+          last_message_source: nextProof.last_message_source ?? null,
+          last_message_delta_key: nextProof.last_message_delta_key ?? null,
           last_event_at: nextProof.last_event_at,
           current_turn_activity: nextProof.current_turn_activity ?? null,
           tokens: nextProof.tokens,
@@ -7022,6 +9953,12 @@ export async function runProviderLinearWorker(
         })) ??
         deriveSharedRepoCheckoutPathFallback(context.repoRoot, context.taskId);
       const continueResidentSessionOnBoot = turnNumber === 1 && residentSessionSeed !== null;
+      const resumeSourceThreadIdForTurn =
+        continueResidentSessionOnBoot
+          ? residentSessionSeed?.source_thread_id ?? null
+          : turnNumber > 1
+            ? threadId ?? finalProof.thread_id ?? null
+            : null;
       const prompt = buildProviderWorkerPrompt(
         issue,
         turnNumber,
@@ -7038,11 +9975,16 @@ export async function runProviderLinearWorker(
       );
       const args =
         continueResidentSessionOnBoot
-          ? ['exec', 'resume', '--json', residentSessionSeed?.source_thread_id ?? '', prompt]
+          ? ['exec', 'resume', '--json', resumeSourceThreadIdForTurn ?? '', prompt]
           : turnNumber === 1
           ? ['exec', '--json', prompt]
-          : ['exec', 'resume', '--json', threadId ?? '', prompt];
-      const resolved = resolveRuntimeCodexCommand(args, runtimeContext);
+          : ['exec', 'resume', '--json', resumeSourceThreadIdForTurn ?? '', prompt];
+      const useAppServerControl = runtimeContext.runtime.selected_mode === 'appserver';
+      const resumeThreadId = resumeSourceThreadIdForTurn;
+      const resolved = resolveRuntimeCodexCommand(
+        useAppServerControl ? ['app-server'] : args,
+        runtimeContext
+      );
       let stopLiveSessionTailResolve: (() => void) | null = null;
       let liveSessionTailStopped = false;
       const stopLiveSessionTailPromise = new Promise<void>((resolve) => {
@@ -7057,19 +9999,24 @@ export async function runProviderLinearWorker(
       };
       const previousTurnProof = finalProof;
       const turnStartedAt = deps.now();
+      finalProof = await writeProofSnapshot(
+        deps,
+        context.runDir,
+        auditPath,
+        buildProviderLinearWorkerTurnBootstrapProof(
+          finalProof,
+          turnNumber,
+          turnStartedAt,
+          resumeSourceThreadIdForTurn
+        ),
+        childEnv
+      );
       const parallelizationDecisionCountBeforeTurn = readProviderLinearParallelizationSnapshots(
         finalProof.linear_audit,
         {
           issueId: finalProof.issue_id
         }
       ).length;
-      finalProof = await writeProofSnapshot(
-        deps,
-        context.runDir,
-        auditPath,
-        buildProviderLinearWorkerTurnBootstrapProof(finalProof, turnNumber, turnStartedAt),
-        childEnv
-      );
       emitSemanticProgressIfChanged(finalProof);
       const liveSessionTailState: ProviderWorkerSessionLogTailState | null =
         runtimeContext.runtime.selected_mode === 'appserver'
@@ -7077,9 +10024,15 @@ export async function runProviderLinearWorker(
               path: null,
               offsetBytes: 0,
               trailingText: '',
-              bootstrapPending: true
+              bootstrapPending: true,
+              currentTurnStartedAt: turnStartedAt,
+              idRewindSignature: null
             }
           : null;
+      const allowCompletedSessionBootstrapTurn =
+        turnNumber === 1 &&
+        previousTurnProof.latest_turn_id === null &&
+        !continueResidentSessionOnBoot;
       const liveSessionTailPromise =
         liveSessionTailState === null
           ? Promise.resolve()
@@ -7113,7 +10066,29 @@ export async function runProviderLinearWorker(
                 }
                 if (liveSessionTailState.path !== null) {
                   const delta = await readProviderWorkerSessionLogDelta(liveSessionTailState);
-                  if (delta && applyProviderWorkerSessionLogDelta(liveParseState, liveSessionTailState, delta, childEnv)) {
+                  const deltaApply =
+                    delta
+                      ? applyProviderWorkerSessionLogDelta(
+                          liveParseState,
+                          liveSessionTailState,
+                          delta,
+                          childEnv,
+                          { allowCompletedBootstrapTurn: allowCompletedSessionBootstrapTurn }
+                        )
+                      : {
+                          changed: false,
+                          observed: false,
+                          observedThreadId: null,
+                          observedTurnId: null
+                        };
+                  if (deltaApply.observed) {
+                    liveSessionLogThreadId =
+                      deltaApply.observedThreadId ?? liveSessionLogThreadId;
+                    liveSessionLogTurnId = deltaApply.observedTurnId ?? liveSessionLogTurnId;
+                    liveSessionLogSessionId = deriveLatestTurnSessionId({
+                      threadId: liveSessionLogThreadId,
+                      turnId: liveSessionLogTurnId
+                    }).sessionId;
                     queueLiveProofWrite();
                   }
                 }
@@ -7125,7 +10100,60 @@ export async function runProviderLinearWorker(
                   stopLiveSessionTailPromise
                 ]);
               }
-              if (liveSessionTailState.path !== null && flushProviderWorkerSessionLogTail(liveParseState, liveSessionTailState, childEnv)) {
+              if (liveSessionTailState.path === null) {
+                const liveSessionThreadHint =
+                  threadId ?? liveParseState.threadId ?? finalProof.thread_id ?? null;
+                liveSessionTailState.path = await discoverProviderWorkerSessionLogPath({
+                  env:
+                    liveSessionThreadHint
+                      ? { ...childEnv, CODEX_THREAD_ID: liveSessionThreadHint }
+                      : childEnv,
+                  workspacePath: context.workspacePath ?? context.repoRoot,
+                  issue: {
+                    identifier: issue.identifier,
+                    title: issue.title
+                  },
+                  startedAt: finalProof.attempt_started_at ?? null
+                });
+              }
+              const emptyTailApply = {
+                changed: false,
+                observed: false,
+                observedThreadId: null as string | null,
+                observedTurnId: null as string | null
+              };
+              let tailApply = emptyTailApply;
+              if (liveSessionTailState.path !== null) {
+                const delta = await readProviderWorkerSessionLogDelta(liveSessionTailState);
+                const deltaApply = delta
+                  ? applyProviderWorkerSessionLogDelta(
+                      liveParseState,
+                      liveSessionTailState,
+                      delta,
+                      childEnv,
+                      { allowCompletedBootstrapTurn: allowCompletedSessionBootstrapTurn }
+                    )
+                  : emptyTailApply;
+                const flushApply = flushProviderWorkerSessionLogTail(
+                  liveParseState,
+                  liveSessionTailState,
+                  childEnv,
+                  { allowCompletedBootstrapTurn: allowCompletedSessionBootstrapTurn }
+                );
+                tailApply = {
+                  changed: deltaApply.changed || flushApply.changed,
+                  observed: deltaApply.observed || flushApply.observed,
+                  observedThreadId: flushApply.observedThreadId ?? deltaApply.observedThreadId,
+                  observedTurnId: flushApply.observedTurnId ?? deltaApply.observedTurnId
+                };
+              }
+              if (tailApply.observed) {
+                liveSessionLogThreadId = tailApply.observedThreadId ?? liveSessionLogThreadId;
+                liveSessionLogTurnId = tailApply.observedTurnId ?? liveSessionLogTurnId;
+                liveSessionLogSessionId = deriveLatestTurnSessionId({
+                  threadId: liveSessionLogThreadId,
+                  turnId: liveSessionLogTurnId
+                }).sessionId;
                 queueLiveProofWrite();
               }
             })().catch((error) => {
@@ -7137,14 +10165,24 @@ export async function runProviderLinearWorker(
             });
       let execResult: ProviderLinearWorkerExecResult;
       try {
-        execResult = await deps.execRunner({
-          command: resolved.command,
-          args: resolved.args,
-          cwd: context.repoRoot,
-          env: childEnv,
-          mirrorOutput: false,
-          onStdoutChunk: handleLiveStdoutChunk
-        });
+        execResult = useAppServerControl
+          ? await deps.appServerTurnRunner({
+              command: resolved.command,
+              args: resolved.args,
+              cwd: context.repoRoot,
+              env: childEnv,
+              prompt,
+              resumeThreadId,
+              onStdoutChunk: handleLiveStdoutChunk
+            })
+          : await deps.execRunner({
+              command: resolved.command,
+              args: resolved.args,
+              cwd: context.repoRoot,
+              env: childEnv,
+              mirrorOutput: false,
+              onStdoutChunk: handleLiveStdoutChunk
+            });
       } catch (error) {
         stopLiveSessionTail();
         await liveSessionTailPromise;
@@ -7161,8 +10199,15 @@ export async function runProviderLinearWorker(
               latest_turn_id: previousTurnProof.latest_turn_id,
               latest_session_id: previousTurnProof.latest_session_id,
               latest_session_id_source: previousTurnProof.latest_session_id_source,
+              session_log_thread_id: previousTurnProof.session_log_thread_id,
+              session_log_turn_id: previousTurnProof.session_log_turn_id,
+              session_log_session_id: previousTurnProof.session_log_session_id,
               last_event: previousTurnProof.last_event,
               last_message: previousTurnProof.last_message,
+              last_message_source: normalizeProviderLinearWorkerFinalMessageSource(
+                previousTurnProof.last_message_source
+              ),
+              last_message_delta_key: selectProviderLinearWorkerProofFinalMessageDeltaKey(previousTurnProof),
               last_event_at: previousTurnProof.last_event_at,
               current_turn_activity: selectProviderLinearWorkerCurrentTurnActivity(previousTurnProof),
               tokens: previousTurnProof.tokens,
@@ -7176,13 +10221,19 @@ export async function runProviderLinearWorker(
               rate_limits: finalProof.rate_limits ?? previousTurnProof.rate_limits
             };
         const endReason = classifyExecRunnerFailure(error, {
-          cwd: context.repoRoot
+          cwd: context.repoRoot,
+          useAppServerControl
         });
         finalProof = {
           ...failedProofBase,
           failure_diagnosis:
             liveParseState.failureDiagnosis ??
-            classifyProviderWorkerExecRunnerFailureDiagnosis(error, turnStartedAt, endReason),
+            classifyProviderWorkerTurnRunnerFailureDiagnosis(
+              error,
+              turnStartedAt,
+              endReason,
+              useAppServerControl ? 'appserver_runner' : 'exec_runner'
+            ),
           owner_phase: 'ended',
           owner_status: 'failed',
           end_reason: endReason,
@@ -7200,7 +10251,11 @@ export async function runProviderLinearWorker(
       const stderrFailureDiagnosis =
         execResult.exitCode === 0
           ? null
-          : classifyProviderWorkerStderrFailureDiagnosis(execResult.stderr, turnStartedAt);
+          : classifyProviderWorkerStderrFailureDiagnosis(
+              execResult.stderr,
+              turnStartedAt,
+              useAppServerControl ? 'appserver_runner' : 'stderr'
+            );
       threadId = parsed.threadId ?? finalProof.thread_id ?? threadId;
       const parsedThreadChanged = Boolean(threadId && threadId !== finalProof.thread_id);
       if (
@@ -7225,7 +10280,39 @@ export async function runProviderLinearWorker(
       turnId = parsed.turnId ?? (parsedThreadChanged ? null : finalProof.latest_turn_id ?? turnId);
       const parsedTurnChanged = Boolean(turnId && turnId !== finalProof.latest_turn_id);
       const parsedScopeChanged = parsedThreadChanged || parsedTurnChanged;
+      const preferAppServerSessionLogFinalMessage = Boolean(
+        useAppServerControl &&
+        finalProof.last_message &&
+        finalProof.session_log_turn_id &&
+        !parsedScopeChanged
+      );
       const session = deriveLatestTurnSessionId({ threadId, turnId });
+      const sessionLogProof = selectProviderLinearWorkerSessionLogProofForScope({
+        proof: finalProof,
+        threadId,
+        turnId,
+        sessionId: session.sessionId,
+        scopeChanged: parsedScopeChanged
+      });
+      const nextLastMessage = preferAppServerSessionLogFinalMessage
+        ? finalProof.last_message
+        : parsed.finalMessage ?? (parsedScopeChanged ? null : finalProof.last_message);
+      const nextLastMessageSource = preferAppServerSessionLogFinalMessage
+        ? normalizeProviderLinearWorkerFinalMessageSource(finalProof.last_message_source)
+        : parsed.finalMessage
+          ? parsed.finalMessageSource ?? null
+          : parsedScopeChanged
+            ? null
+            : normalizeProviderLinearWorkerFinalMessageSource(finalProof.last_message_source);
+      const nextLastMessageDeltaKey = preferAppServerSessionLogFinalMessage
+        ? selectProviderLinearWorkerProofFinalMessageDeltaKey(finalProof)
+        : parsed.finalMessage
+          ? parsed.finalMessageSource === 'agent_message_delta'
+            ? parsed.finalMessageDeltaKey ?? null
+            : null
+          : parsedScopeChanged
+            ? null
+            : selectProviderLinearWorkerProofFinalMessageDeltaKey(finalProof);
 
       finalProof = {
         issue_id: context.issueId,
@@ -7237,9 +10324,15 @@ export async function runProviderLinearWorker(
         latest_turn_id: turnId,
         latest_session_id: session.sessionId,
         latest_session_id_source: session.source,
+        session_log_thread_id: sessionLogProof.sessionLogThreadId,
+        session_log_turn_id: sessionLogProof.sessionLogTurnId,
+        session_log_session_id: sessionLogProof.sessionLogSessionId,
+        resume_source_thread_id: finalProof.resume_source_thread_id ?? null,
         turn_count: turnNumber,
         last_event: parsed.lastEvent ?? (parsedScopeChanged ? null : finalProof.last_event),
-        last_message: parsed.finalMessage ?? (parsedScopeChanged ? null : finalProof.last_message),
+        last_message: nextLastMessage,
+        last_message_source: nextLastMessageSource,
+        last_message_delta_key: nextLastMessageDeltaKey,
         last_event_at:
           parsed.lastEventAt ?? (parsedScopeChanged ? null : finalProof.last_event_at),
         current_turn_activity:
@@ -7250,13 +10343,16 @@ export async function runProviderLinearWorker(
           ) ?? (parsedScopeChanged ? null : selectProviderLinearWorkerCurrentTurnActivity(finalProof)),
         tokens: hasProviderWorkerTokenUsage(parsed.tokens) ? parsed.tokens : finalProof.tokens,
         rate_limits: parsed.rateLimits ?? finalProof.rate_limits,
+        runtime: finalProof.runtime ?? buildProviderLinearWorkerRuntimeProof(runtimeContext.runtime),
+        appserver_supervision: finalProof.appserver_supervision ?? null,
         auth_provenance: mergeProviderWorkerAuthProvenance(
           finalProof.auth_provenance ?? null,
           parsed.authProvenance
         ),
+        worker_control: finalProof.worker_control ?? workerControl,
         failure_diagnosis:
-          parsed.failureDiagnosis ??
-          stderrFailureDiagnosis ??
+          (useAppServerControl ? stderrFailureDiagnosis : parsed.failureDiagnosis) ??
+          (useAppServerControl ? parsed.failureDiagnosis : stderrFailureDiagnosis) ??
           (parsedScopeChanged ? null : finalProof.failure_diagnosis ?? null),
         owner_phase: execResult.exitCode === 0 ? 'turn_completed' : 'turn_failed',
         owner_status: execResult.exitCode === 0 ? 'in_progress' : 'failed',
@@ -7280,11 +10376,14 @@ export async function runProviderLinearWorker(
       finalProof = await persistProof(finalProof);
 
       if (execResult.exitCode !== 0) {
+        const endReason = useAppServerControl
+          ? 'appserver_runtime_error'
+          : `codex_exit_${execResult.exitCode ?? 'unknown'}`;
         finalProof = {
           ...finalProof,
           owner_phase: 'ended',
           owner_status: 'failed',
-          end_reason: `codex_exit_${execResult.exitCode ?? 'unknown'}`,
+          end_reason: endReason,
           updated_at: deps.now()
         };
         finalProof = await persistProof(finalProof);

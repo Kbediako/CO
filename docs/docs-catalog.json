@@ -52,7 +52,7 @@
   },
   "policies": {
     "codex_posture": {
-      "source_path": "docs/guides/codex-version-policy.md"
+      "source_path": "docs/codex-posture-matrix.json"
     },
     "readme_front_door": {
       "path": "README.md",
@@ -60,9 +60,32 @@
       "max_h2_sections": 9
     },
     "bundled_skills_roster": {
-      "doc_path": "README.md",
-      "section_heading": "## Skills (bundled)",
+      "doc_path": "skills/README.md",
+      "section_heading": "# Bundled Skills",
       "list_intro": "Bundled skills"
+    },
+    "codex_release_intake": {
+      "template_path": ".agent/task/templates/codex-cli-release-intake-template.md",
+      "required_markers": [
+        "Codex CLI Release-Intake Issue Template",
+        "Release Evidence Axes",
+        "local CLI",
+        "package/downstream smoke",
+        "cloud-canary",
+        "workflow pins",
+        "model posture",
+        "docs surfaces",
+        "release notes",
+        "Supersedes / Holds Matrix",
+        "prior release evidence page",
+        "posture surface",
+        "Closeout Classification",
+        "adopt latest",
+        "intentionally hold",
+        "demote/archive-only",
+        "stale current-facing docs",
+        "workflow pins remain unclassified"
+      ]
     },
     "release_surface_paths": {
       "forbidden_tracked_prefixes": [
@@ -112,7 +135,7 @@
     },
     "rolling_freshness_cohorts": {
       "enabled": true,
-      "owner_issue": "CO-175",
+      "owner_issue": "CO-343",
       "policy_doc": "docs/guides/docs-freshness-cohorts.md",
       "window_days": 7,
       "max_cohorts": 2,
@@ -145,6 +168,69 @@
             "start": "1164",
             "end": "1195"
           }
+        },
+        {
+          "id": "co-343-apr-25-march-25-task-packets-1311-1318",
+          "last_review": "2026-03-25",
+          "cadence_days": 30,
+          "path_families": [
+            ".agent/task",
+            "docs/ACTION_PLAN-*",
+            "docs/PRD-*",
+            "docs/TECH_SPEC-*",
+            "tasks/specs",
+            "tasks/tasks-*"
+          ],
+          "path_prefixes": [
+            ".agent/task/1311-coordinator-symphony-full-parity-hardening-and-closure.md",
+            ".agent/task/1318-coordinator-symphony-current-linear-operational-parity.md",
+            ".agent/task/linear-4848ec97-cfab-45d9-9023-79107b496526.md",
+            ".agent/task/linear-74d145eb-305b-4b27-be84-21c248b22e4d.md",
+            ".agent/task/linear-9d962236-4c38-4b28-b144-007c6f3a1395.md",
+            ".agent/task/linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md",
+            ".agent/task/linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md",
+            ".agent/task/linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md",
+            "docs/ACTION_PLAN-linear-4848ec97-cfab-45d9-9023-79107b496526.md",
+            "docs/ACTION_PLAN-linear-74d145eb-305b-4b27-be84-21c248b22e4d.md",
+            "docs/ACTION_PLAN-linear-9d962236-4c38-4b28-b144-007c6f3a1395.md",
+            "docs/ACTION_PLAN-linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md",
+            "docs/ACTION_PLAN-linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md",
+            "docs/ACTION_PLAN-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md",
+            "docs/PRD-linear-4848ec97-cfab-45d9-9023-79107b496526.md",
+            "docs/PRD-linear-74d145eb-305b-4b27-be84-21c248b22e4d.md",
+            "docs/PRD-linear-9d962236-4c38-4b28-b144-007c6f3a1395.md",
+            "docs/PRD-linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md",
+            "docs/PRD-linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md",
+            "docs/PRD-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md",
+            "docs/TECH_SPEC-linear-4848ec97-cfab-45d9-9023-79107b496526.md",
+            "docs/TECH_SPEC-linear-74d145eb-305b-4b27-be84-21c248b22e4d.md",
+            "docs/TECH_SPEC-linear-9d962236-4c38-4b28-b144-007c6f3a1395.md",
+            "docs/TECH_SPEC-linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md",
+            "docs/TECH_SPEC-linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md",
+            "docs/TECH_SPEC-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md",
+            "tasks/specs/linear-4848ec97-cfab-45d9-9023-79107b496526.md",
+            "tasks/specs/linear-74d145eb-305b-4b27-be84-21c248b22e4d.md",
+            "tasks/specs/linear-9d962236-4c38-4b28-b144-007c6f3a1395.md",
+            "tasks/specs/linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md",
+            "tasks/specs/linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md",
+            "tasks/specs/linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md",
+            "tasks/tasks-linear-4848ec97-cfab-45d9-9023-79107b496526.md",
+            "tasks/tasks-linear-74d145eb-305b-4b27-be84-21c248b22e4d.md",
+            "tasks/tasks-linear-9d962236-4c38-4b28-b144-007c6f3a1395.md",
+            "tasks/tasks-linear-cc7d12e3-eabf-4168-827e-b3a023583e22.md",
+            "tasks/tasks-linear-e147ec4f-0860-4b18-91f6-22f16eaad06d.md",
+            "tasks/tasks-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md"
+          ],
+          "task_number_range": {
+            "start": "1311",
+            "end": "1318"
+          }
+        }
+      ],
+      "canonical_owner_issues": [
+        {
+          "canonical_owner_key": "docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30",
+          "owner_issue": "CO-320"
         }
       ],
       "action_after_window": "refresh, archive, reclassify, or file a new same-project baseline owner before feature-lane review handoff"
@@ -159,7 +245,7 @@
       "audience": "downstream users",
       "source_of_truth": [
         "docs/guides/codex-version-policy.md",
-        "skills/*/SKILL.md",
+        "skills/README.md",
         "docs/public/downstream-setup.md",
         "docs/public/provider-onboarding.md"
       ],
@@ -168,16 +254,172 @@
       "update_triggers": [
         "Codex compatibility posture changes",
         "default runtime posture changes",
-        "bundled skill roster changes",
         "front-door command-surface changes"
       ],
       "truth_checks": [
         "codex-cli-version",
         "model-posture",
         "default-runtime",
-        "bundled-skills-roster",
         "front-door-budget"
       ]
+    },
+    {
+      "path": "skills/README.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "shipped_companion",
+      "audience": "downstream Codex users",
+      "source_of_truth": [
+        "skills/*/SKILL.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 14,
+      "update_triggers": [
+        "bundled skill roster changes",
+        "skills install command changes"
+      ],
+      "truth_checks": [
+        "bundled-skills-roster"
+      ]
+    },
+    {
+      "path": "docs/book/README.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "public_guide",
+      "audience": "downstream users and maintainers",
+      "source_of_truth": [
+        "README.md",
+        "docs/public/downstream-setup.md",
+        "docs/public/provider-onboarding.md",
+        "docs/guides/codex-version-policy.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 14,
+      "update_triggers": [
+        "front-door README structure changes",
+        "public setup chapter changes",
+        "Codex compatibility posture changes"
+      ],
+      "truth_checks": []
+    },
+    {
+      "path": "docs/book/setup.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "public_guide",
+      "audience": "downstream users",
+      "source_of_truth": [
+        "README.md",
+        "docs/public/downstream-setup.md",
+        "docs/public/provider-onboarding.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 14,
+      "update_triggers": [
+        "install command changes",
+        "marketplace/plugin command changes",
+        "downstream bootstrap changes"
+      ],
+      "truth_checks": []
+    },
+    {
+      "path": "docs/book/operations.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "public_guide",
+      "audience": "downstream operators and maintainers",
+      "source_of_truth": [
+        "AGENTS.md",
+        "docs/public/downstream-setup.md",
+        "docs/standalone-review-guide.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 14,
+      "update_triggers": [
+        "orchestrator workflow changes",
+        "review handoff policy changes",
+        "validation floor changes"
+      ],
+      "truth_checks": []
+    },
+    {
+      "path": "docs/book/skills.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "public_guide",
+      "audience": "downstream users",
+      "source_of_truth": [
+        "skills/README.md",
+        "skills/*/SKILL.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 14,
+      "update_triggers": [
+        "bundled skill roster changes",
+        "skills install command changes"
+      ],
+      "truth_checks": []
+    },
+    {
+      "path": "docs/book/public-posture.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "public_guide",
+      "audience": "downstream users and reviewers",
+      "source_of_truth": [
+        "docs/guides/codex-version-policy.md",
+        "README.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 14,
+      "update_triggers": [
+        "Codex compatibility posture changes",
+        "model posture changes",
+        "runtime posture changes"
+      ],
+      "truth_checks": [
+        "codex-cli-version",
+        "model-posture",
+        "default-runtime"
+      ]
+    },
+    {
+      "path": "docs/book/local-hook-impact.md",
+      "status": "active",
+      "tier": 2,
+      "doc_class": "public_guide",
+      "audience": "maintainers and reviewers",
+      "source_of_truth": [
+        "local hook configuration",
+        "official OpenAI Codex hooks docs"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "local hook configuration changes",
+        "Codex hooks feature maturity changes"
+      ],
+      "truth_checks": []
+    },
+    {
+      "path": "docs/book/archive/codex-cli-0124-adoption.md",
+      "status": "historical",
+      "tier": 2,
+      "doc_class": "public_guide",
+      "audience": "maintainers and reviewers",
+      "source_of_truth": [
+        "docs/guides/codex-version-policy.md",
+        "official OpenAI Codex docs",
+        "local Codex CLI evidence"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "Codex CLI historical evidence retention changes",
+        "current posture documentation moves old evidence again"
+      ],
+      "truth_checks": []
     },
     {
       "path": "docs/public/downstream-setup.md",
@@ -332,6 +574,73 @@
       "truth_checks": []
     },
     {
+      "path": "docs/release-notes-template-addendum.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "active_guide",
+      "audience": "release maintainers",
+      "source_of_truth": [
+        ".github/workflows/release.yml",
+        "docs/skills-release.md",
+        "skills/release/SKILL.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "release workflow changes",
+        "bundled skill release-note policy changes",
+        "overview override behavior changes"
+      ],
+      "truth_checks": [
+        "release-runbook"
+      ]
+    },
+    {
+      "path": ".agent/SOPs/release.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "active_guide",
+      "audience": "release maintainers",
+      "source_of_truth": [
+        ".github/workflows/release.yml",
+        "skills/release/SKILL.md",
+        "docs/skills-release.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "release validation floor changes",
+        "release workflow changes",
+        "npm publish posture changes"
+      ],
+      "truth_checks": [
+        "release-runbook"
+      ]
+    },
+    {
+      "path": "skills/release/SKILL.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "shipped_skill",
+      "audience": "downstream Codex users",
+      "source_of_truth": [
+        ".agent/SOPs/release.md",
+        ".github/workflows/release.yml",
+        "docs/skills-release.md",
+        "docs/release-notes-template-addendum.md"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "release validation floor changes",
+        "release workflow changes",
+        "npm publish posture changes"
+      ],
+      "truth_checks": [
+        "release-runbook"
+      ]
+    },
+    {
       "path": "skills/delegation-usage/SKILL.md",
       "status": "active",
       "tier": 1,
@@ -395,6 +704,24 @@
         "model-posture",
         "default-runtime"
       ]
+    },
+    {
+      "path": ".agent/task/templates/codex-cli-release-intake-template.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "agent_policy",
+      "audience": "repo agents and maintainers",
+      "source_of_truth": [
+        "docs/guides/codex-version-policy.md",
+        "docs/docs-catalog.json"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "Codex CLI release-intake policy changes",
+        "release supersession gate changes"
+      ],
+      "truth_checks": []
     },
     {
       "path": "docs/TASKS.md",

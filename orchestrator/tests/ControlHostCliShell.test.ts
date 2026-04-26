@@ -9,7 +9,11 @@ import type { ProviderIssueHandoffService } from '../src/cli/control/providerIss
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
 
 import { __test__ as controlHostCliShellTest } from '../src/cli/controlHostCliShell.js';
-import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../src/cli/config/repoConfigPolicy.js';
+import {
+  CONFIG_AUTHORITY_MODE_ENV_KEY,
+  REPO_CONFIG_REQUIRED_ENV_KEY,
+  resolveConfigAuthorityMode
+} from '../src/cli/config/repoConfigPolicy.js';
 import { REPO_CONFIG_PATH_ENV_KEY } from '../src/cli/config/userConfig.js';
 import { createProviderWorkflowConfigStore } from '../src/cli/control/providerWorkflowConfigStore.js';
 import { PROVIDER_WORKER_HOST_ENV_KEY } from '../src/cli/control/providerWorkerHosts.js';
@@ -32,6 +36,7 @@ const {
   resolveRemoteProviderNodePath,
   resolveSpawnManifestWaitTimeoutMs,
   resolveProviderResumeLaunchSpec,
+  assertResumeLaunchSpecMatchesAdmittedWorkerHost,
   resolveProviderOverridePackageRoot,
   snapshotRunManifests,
   writeRemoteProviderScriptToSshChild
@@ -144,12 +149,37 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_OUT_DIR: '/repo/out',
         [REPO_CONFIG_PATH_ENV_KEY]:
           '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'repo-authoritative',
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         [PROVIDER_WORKER_HOST_ENV_KEY]: ''
       },
       transport: {
         kind: 'local'
       }
+    });
+  });
+
+  it('forces provider launches back to repo-authoritative mode under inherited compatibility envs', () => {
+    const env: EnvironmentPaths = {
+      repoRoot: '/repo',
+      runsRoot: '/repo/.runs',
+      outRoot: '/repo/out',
+      taskId: 'local-mcp'
+    };
+    const launchSpec = buildProviderLaunchSpec(
+      env,
+      '/repo/.workspaces/provider-task',
+      '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json'
+    );
+
+    expect(
+      resolveConfigAuthorityMode({
+        [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'downstream-compatibility',
+        ...launchSpec.envOverrides
+      })
+    ).toEqual({
+      mode: 'repo-authoritative',
+      reason: `${CONFIG_AUTHORITY_MODE_ENV_KEY}=repo-authoritative`
     });
   });
 
@@ -184,6 +214,7 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_OUT_DIR: '/repo/out',
         [REPO_CONFIG_PATH_ENV_KEY]:
           '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'repo-authoritative',
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         [PROVIDER_WORKER_HOST_ENV_KEY]: 'worker-host-01'
       },
@@ -673,6 +704,7 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
         [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
+        [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'repo-authoritative',
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         [PROVIDER_WORKER_HOST_ENV_KEY]: '',
         CO_LINEAR_WORKSPACE_ID: '',
@@ -733,6 +765,7 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
         [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
+        [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'repo-authoritative',
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         [PROVIDER_WORKER_HOST_ENV_KEY]: '',
         CO_LINEAR_WORKSPACE_ID: 'workspace-1',
@@ -780,6 +813,7 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
         [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
+        [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'repo-authoritative',
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         [PROVIDER_WORKER_HOST_ENV_KEY]: '',
         CO_LINEAR_WORKSPACE_ID: '',
@@ -820,6 +854,7 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
         [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
+        [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'repo-authoritative',
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         [PROVIDER_WORKER_HOST_ENV_KEY]: '',
         CO_LINEAR_WORKSPACE_ID: '',
@@ -868,6 +903,7 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
         [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
+        [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'repo-authoritative',
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         [PROVIDER_WORKER_HOST_ENV_KEY]: '',
         CO_LINEAR_WORKSPACE_ID: '',
@@ -1161,6 +1197,7 @@ describe('controlHostCliShell manifest discovery', () => {
             'control-host',
             'provider-workflow.last-known-good.json'
           ),
+        [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'repo-authoritative',
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         [PROVIDER_WORKER_HOST_ENV_KEY]: '',
         CO_LINEAR_WORKSPACE_ID: '',
@@ -1171,6 +1208,85 @@ describe('controlHostCliShell manifest discovery', () => {
         kind: 'local'
       }
     });
+  });
+
+  it('fails closed when an admitted remote resume degrades to local at launch time', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'control-host-cli-shell-'));
+    await initializeRepo(tempRoot);
+    const env: EnvironmentPaths = {
+      repoRoot: tempRoot,
+      runsRoot: join(tempRoot, '.runs'),
+      outRoot: join(tempRoot, 'out'),
+      taskId: 'local-mcp'
+    };
+    const childPaths = resolveRunPaths(
+      {
+        ...env,
+        taskId: 'linear-lin-issue-1'
+      },
+      'run-child'
+    );
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        workspace_path: join(tempRoot, '.workspaces', 'linear-lin-issue-1')
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        worker_host: 'worker-host-01'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(tempRoot, 'codex.orchestrator.json'),
+      JSON.stringify({
+        defaultPipeline: 'provider-linear-worker',
+        pipelines: [
+          {
+            id: 'provider-linear-worker',
+            title: 'Provider worker',
+            metadata: {
+              worker_hosts: {
+                hosts: [
+                  {
+                    name: 'worker-host-02',
+                    ssh_destination: 'codex@worker-host-02',
+                    max_concurrent_agents: 1
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }),
+      'utf8'
+    );
+    const providerWorkflowConfigStore = createProviderWorkflowConfigStore({
+      env,
+      runDir: join(tempRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      pipelineId: 'provider-linear-worker'
+    });
+    await providerWorkflowConfigStore.bootstrap();
+
+    const spec = await resolveProviderResumeLaunchSpec(
+      env,
+      'run-child',
+      providerWorkflowConfigStore,
+      'worker-host-01'
+    );
+
+    expect(spec.transport).toEqual({
+      kind: 'local'
+    });
+    expect(() => assertResumeLaunchSpecMatchesAdmittedWorkerHost('worker-host-01', spec)).toThrow(
+      'Admitted provider resume host "worker-host-01" resolved to local at launch time; retry under refreshed admission so the local safety cap is reapplied.'
+    );
   });
 
   it('ignores a stale persisted proof worker_host when resuming a newer attempt', async () => {

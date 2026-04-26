@@ -19,6 +19,7 @@ import {
 import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
 import { logger } from '../logger.js';
 import {
+  PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
   defaultExecRunner,
   loadProviderLinearWorkerContext,
   refreshProviderLinearWorkerProofSnapshot,
@@ -30,6 +31,15 @@ import {
   type ProviderLinearWorkerExecRequest,
   type ProviderLinearWorkerExecResult
 } from './providerLinearWorkerRunner.js';
+import {
+  isChildLaneParentDirtySuppressionCode,
+  findDeterministicProviderMutationSuppression,
+  resolveProviderLinearWorkerAttemptStartedAt
+} from './control/providerLinearWorkerTruth.js';
+import {
+  resolveProviderLinearAuditPath,
+  summarizeProviderLinearAuditPath
+} from './control/providerLinearWorkflowAudit.js';
 import {
   PROVIDER_LINEAR_CHILD_LANE_FILES_ENV,
   PROVIDER_LINEAR_CHILD_LANE_INSTRUCTIONS_ENV,
@@ -59,6 +69,12 @@ import {
 } from './utils/packageProgramResolver.js';
 import { slugify } from './utils/strings.js';
 import { parseTrailingJsonObject } from './utils/trailingJsonObject.js';
+import {
+  countGuardrailCommands,
+  resolveGuardrailsRequiredForManifest,
+  resolveGuardrailsRequiredSourceForManifest,
+  stripNonApplicableGuardrailSummaryLines
+} from './run/manifest.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -67,6 +83,7 @@ const PROVIDER_LINEAR_CHILD_LANE_MUTATION_REASON =
   'Only the parent provider-linear-worker may mutate the issue lifecycle. Same-issue child lanes are bounded helpers that must return patch artifacts for parent review.';
 export const PROVIDER_LINEAR_CHILD_LANE_PARALLEL_FIRST_CAP = 2;
 const PROVIDER_LINEAR_CHILD_LANE_IN_FLIGHT_STALE_MS = 30 * 60 * 1000;
+const PROVIDER_LINEAR_CHILD_LANE_LAUNCH_RECOVERY_POLL_INTERVAL_MS = 250;
 const PROVIDER_LINEAR_CHILD_LANE_ENV_KEYS_TO_REMOVE = [
   'MCP_RUNNER_TASK_ID',
   'CODEX_ORCHESTRATOR_TASK_ID',
@@ -103,6 +120,9 @@ export interface ProviderLinearChildLaneRunResult {
   manifest_path: string;
   log_path: string | null;
   summary: string | null;
+  guardrails_required: boolean | null;
+  guardrails_required_source: string | null;
+  guardrail_command_count: number | null;
   runtime_mode_requested: string | null;
   runtime_mode: string | null;
   runtime_provider: string | null;
@@ -155,9 +175,15 @@ interface ParentIssueSnapshot {
   issue_state_type: string | null;
 }
 
+interface ProviderLinearChildLaneDirectoryEntry {
+  name: string;
+  isDirectory: () => boolean;
+}
+
 interface ProviderLinearChildLaneShellDependencies {
   execRunner: (request: ProviderLinearWorkerExecRequest) => Promise<ProviderLinearWorkerExecResult>;
   readParentDirtyPaths: (workspacePath: string) => Promise<string[]>;
+  readDir: (path: string) => Promise<ProviderLinearChildLaneDirectoryEntry[]>;
   transactChildLanes: <T>(
     runDir: string,
     action: (
@@ -174,11 +200,13 @@ interface ProviderLinearChildLaneShellDependencies {
   applyPatchArtifact: (workspacePath: string, patchPath: string) => Promise<void>;
   readChildLaneProof: (proofPath: string) => Promise<ProviderLinearChildLaneProof>;
   now: () => string;
+  sleep: (ms: number) => Promise<void>;
   warn: (message: string) => void;
 }
 
 const DEFAULT_DEPENDENCIES: ProviderLinearChildLaneShellDependencies = {
   execRunner: defaultExecRunner,
+  readDir: async (path) => await readdir(path, { withFileTypes: true }),
   transactChildLanes: async (runDir, action) => await transactProviderLinearWorkerChildLanes(runDir, action),
   readParentDirtyPaths: async (workspacePath) => {
     const modified = await execFileAsync('git', ['-C', workspacePath, 'diff', '--name-only', '--relative', 'HEAD', '--'], {
@@ -212,6 +240,11 @@ const DEFAULT_DEPENDENCIES: ProviderLinearChildLaneShellDependencies = {
   readChildLaneProof: async (proofPath) =>
     JSON.parse(await readFile(proofPath, 'utf8')) as ProviderLinearChildLaneProof,
   now: () => new Date().toISOString(),
+  sleep: async (ms) => {
+    await new Promise((resolvePromise) => {
+      setTimeout(resolvePromise, ms);
+    });
+  },
   warn: (message) => {
     logger.warn(message);
   }
@@ -277,6 +310,7 @@ export async function runProviderLinearChildLaneShell(
     !context.providerControlHostRunId ||
     !context.providerControlHostMatchesManifest
   ) {
+    const message = formatProviderWorkerChildLaneProvenanceInvalidMessage(context, env);
     return failureResult({
       action: normalizeAction(params.action) ?? 'launch',
       issueId: context.issueId,
@@ -286,7 +320,7 @@ export async function runProviderLinearChildLaneShell(
       childRun: null,
       childLane: null,
       code: 'provider_worker_child_lane_provenance_invalid',
-      message: 'linear child-lane requires provider control-host provenance recorded on the parent provider-worker manifest and matching active environment.',
+      message,
       status: 412
     });
   }
@@ -421,6 +455,25 @@ async function launchChildLane(
     });
   }
   if (dirtyScopeConflict) {
+    const retrySuppression = await resolveSameAttemptParentDirtyRetrySuppression(
+      context.runDir,
+      context.issueId,
+      params.env
+    );
+    if (retrySuppression) {
+      return failureResult({
+        action: 'launch',
+        issueId: context.issueId,
+        issueIdentifier: context.issueIdentifier,
+        sourceSetup,
+        stream,
+        childRun: null,
+        childLane: null,
+        code: 'provider_worker_child_lane_parent_dirty_retry_suppressed',
+        message: `${dirtyScopeConflict} Same-attempt retry suppression is in effect: ${retrySuppression.instruction}`,
+        status: 409
+      });
+    }
     return failureResult({
       action: 'launch',
       issueId: context.issueId,
@@ -556,16 +609,75 @@ async function launchChildLane(
   });
   applyResolvedProgramInvocationEnvOverrides(childStartEnv, invocation.envOverrides);
 
-  let execResult: ProviderLinearWorkerExecResult;
+  const execAbortController = new AbortController();
+  let execSettled = false;
+  const execPromise = deps.execRunner({
+    command: invocation.command,
+    args,
+    cwd: context.repoRoot,
+    env: childStartEnv,
+    mirrorOutput: false,
+    abortSignal: execAbortController.signal
+  });
+  void execPromise.then(
+    () => {
+      execSettled = true;
+    },
+    () => {
+      execSettled = true;
+    }
+  );
+
+  let execResult: ProviderLinearWorkerExecResult | null = null;
+  let recoveredLaunch: ProviderLinearChildLaneLaunchRecoveryCandidate | null = null;
+  let launchError: unknown = null;
+  const recoveredLaunchPromise = waitForRecoveredChildLaneLaunchCandidate({
+    reservation: launchReservation,
+    context,
+    childRunsRoot,
+    deps,
+    isExecSettled: () => execSettled,
+    now
+  });
+  const advisoryRecoveredLaunchPromise = recoveredLaunchPromise.catch((error) => {
+    deps.warn(
+      `provider-linear-child-lane warning: ignored launch-recovery scan failure while awaiting exec result: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return null;
+  });
   try {
-    execResult = await deps.execRunner({
-      command: invocation.command,
-      args,
-      cwd: context.repoRoot,
-      env: childStartEnv,
-      mirrorOutput: false
-    });
+    const launchOutcome = await Promise.race([
+      execPromise.then((result) => ({ kind: 'exec' as const, result })),
+      advisoryRecoveredLaunchPromise.then((recovered) => ({ kind: 'recovered' as const, recovered }))
+    ]);
+    if (launchOutcome.kind === 'recovered') {
+      if (launchOutcome.recovered) {
+        recoveredLaunch = launchOutcome.recovered;
+        if (!execSettled) {
+          execAbortController.abort(
+            new Error(
+              `Recovered child lane ${recoveredLaunch.childRun.run_id} from manifest/proof while the launcher reservation still reported ${launchReservation.run_id}.`
+            )
+          );
+        }
+      }
+    } else {
+      execResult = launchOutcome.result;
+    }
+    if (!execResult) {
+      try {
+        execResult = await execPromise;
+      } catch (error) {
+        launchError = error;
+      }
+    }
   } catch (error) {
+    launchError = error;
+  }
+  if (!recoveredLaunch) {
+    recoveredLaunch = await advisoryRecoveredLaunchPromise;
+  }
+  if (launchError && !recoveredLaunch) {
     await removeReservedChildLane(context.runDir, launchReservation, deps);
     return failureResult({
       action: 'launch',
@@ -576,19 +688,25 @@ async function launchChildLane(
       childRun: null,
       childLane: null,
       code: 'provider_worker_child_lane_launch_failed',
-      message: error instanceof Error ? error.message : String(error),
+      message: launchError instanceof Error ? launchError.message : String(launchError),
       status: 502
     });
   }
-  const childRun = parseProviderChildLaneRunResult(
-    execResult.stdout,
-    context.repoRoot,
-    childStartEnv.CODEX_ORCHESTRATOR_RUNS_DIR ?? join(context.repoRoot, '.runs'),
-    childTaskId
-  );
+  const childRun =
+    recoveredLaunch?.childRun ??
+    (execResult
+      ? await parseProviderChildLaneRunResult(
+          execResult.stdout,
+          context.repoRoot,
+          childStartEnv.CODEX_ORCHESTRATOR_RUNS_DIR ?? join(context.repoRoot, '.runs'),
+          childTaskId
+        )
+      : null);
   if (!childRun) {
     await removeReservedChildLane(context.runDir, launchReservation, deps);
-    const detail = [execResult.stderr.trim(), execResult.stdout.trim()].filter(Boolean)[0] ?? 'unknown child-lane output';
+    const detail = execResult
+      ? [execResult.stderr.trim(), execResult.stdout.trim()].filter(Boolean)[0] ?? 'unknown child-lane output'
+      : 'unknown child-lane output';
     return failureResult({
       action: 'launch',
       issueId: context.issueId,
@@ -604,7 +722,7 @@ async function launchChildLane(
   }
 
   const proofPath = join(childRun.artifact_root, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME);
-  const childProof = await deps.readChildLaneProof(proofPath).catch(() => null);
+  const childProof = recoveredLaunch?.proof ?? (await deps.readChildLaneProof(proofPath).catch(() => null));
   if (childRun.status === 'succeeded' && (!childProof || !childProof.patch_artifact_path)) {
     await removeReservedChildLane(context.runDir, launchReservation, deps);
     return failureResult({
@@ -620,8 +738,8 @@ async function launchChildLane(
       status: 502
     });
   }
-  let recordedScope = scope;
-  if (childProof?.scope) {
+  let recordedScope = recoveredLaunch?.childLane.scope ?? scope;
+  if (!recoveredLaunch && childProof?.scope) {
     try {
       const proofScope = resolveProviderLinearChildLaneScopeContract(childProof.scope);
       if (!areChildLaneScopesEquivalent(scope, proofScope)) {
@@ -657,40 +775,46 @@ async function launchChildLane(
     }
   }
 
-  const zeroBytePatch = execResult.exitCode === 0 && childRun.status === 'succeeded' && childProof?.patch_bytes === 0;
-  const childLane: ProviderLinearWorkerChildLaneRecord = {
-    stream,
-    pipeline_id: PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID,
-    task_id: childTaskId,
-    run_id: childRun.run_id,
-    status: childRun.status,
-    manifest_path: childRun.manifest_path,
-    artifact_root: childRun.artifact_root,
-    log_path: childRun.log_path,
-    summary: childRun.summary ?? normalizeOptionalString(childProof?.last_message),
-    issue_id: context.issueId,
-    issue_identifier: context.issueIdentifier,
-    workspace_path: context.repoRoot,
-    source_setup: sourceSetup,
-    launched_at: launchReservation.launched_at,
-    purpose,
-    instructions: normalizeOptionalString(params.instructions),
-    scope: recordedScope,
-    parent_snapshot: childProof?.parent_snapshot ?? {
-      ...parentSnapshot,
-      base_sha: baseSha,
-      captured_at: deps.now()
-    },
-    lane_workspace_path: childProof?.lane_workspace_path ?? null,
-    patch_artifact_path: childProof?.patch_artifact_path ?? null,
-    patch_bytes: childProof?.patch_bytes ?? null,
-    decision: zeroBytePatch ? 'rejected' : 'pending',
-    in_flight_action: null,
-    decision_at: zeroBytePatch ? deps.now() : null,
-    decision_reason: zeroBytePatch
-      ? buildNoOutputAdvisoryChildLaneDecisionReason(childRun)
-      : null
-  };
+  const childLane: ProviderLinearWorkerChildLaneRecord =
+    recoveredLaunch?.childLane ?? (() => {
+      const zeroBytePatch =
+        execResult?.exitCode === 0 && childRun.status === 'succeeded' && childProof?.patch_bytes === 0;
+      return {
+        stream,
+        pipeline_id: PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID,
+        task_id: childTaskId,
+        run_id: childRun.run_id,
+        status: childRun.status,
+        manifest_path: childRun.manifest_path,
+        artifact_root: childRun.artifact_root,
+        log_path: childRun.log_path,
+        summary: childRun.summary ?? normalizeOptionalString(childProof?.last_message),
+        guardrails_required: childRun.guardrails_required,
+        guardrails_required_source: childRun.guardrails_required_source,
+        guardrail_command_count: childRun.guardrail_command_count,
+        issue_id: context.issueId,
+        issue_identifier: context.issueIdentifier,
+        workspace_path: context.repoRoot,
+        source_setup: sourceSetup,
+        launched_at: launchReservation.launched_at,
+        purpose,
+        instructions: normalizeOptionalString(params.instructions),
+        scope: recordedScope,
+        parent_snapshot: childProof?.parent_snapshot ?? {
+          ...parentSnapshot,
+          base_sha: baseSha,
+          captured_at: deps.now()
+        },
+        lane_workspace_path: childProof?.lane_workspace_path ?? null,
+        patch_artifact_path: childProof?.patch_artifact_path ?? null,
+        patch_bytes: childProof?.patch_bytes ?? null,
+        decision: zeroBytePatch ? 'rejected' : 'pending',
+        in_flight_action: null,
+        in_flight_started_at: null,
+        decision_at: zeroBytePatch ? deps.now() : null,
+        decision_reason: zeroBytePatch ? buildNoOutputAdvisoryChildLaneDecisionReason(childRun) : null
+      };
+    })();
 
   let recordedChildLaneForResult = childLane;
   try {
@@ -753,7 +877,8 @@ async function launchChildLane(
     env: params.env,
     warningContext: `after recording child lane ${stream}`
   });
-  if (execResult.exitCode !== 0 || childRun.status !== 'succeeded') {
+  const launchExitedNonZero = recoveredLaunch ? false : execResult ? execResult.exitCode !== 0 : false;
+  if (launchExitedNonZero || childRun.status !== 'succeeded') {
     const childFailureDetail =
       normalizeOptionalString(childProof?.last_message) ??
       normalizeOptionalString(recordedChildLaneForResult.summary) ??
@@ -1240,6 +1365,55 @@ function childLaneDecisionFailureResult(input: {
   });
 }
 
+async function resolveSameAttemptParentDirtyRetrySuppression(
+  runDir: string,
+  issueId: string,
+  env: NodeJS.ProcessEnv
+): Promise<ReturnType<typeof findDeterministicProviderMutationSuppression>> {
+  const auditPath = resolveProviderLinearAuditPath(env);
+  if (!auditPath) {
+    return null;
+  }
+  let rawProof: string;
+  try {
+    rawProof = await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8');
+  } catch {
+    return null;
+  }
+  let parsedProof: Record<string, unknown>;
+  try {
+    parsedProof = JSON.parse(rawProof) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const attemptStartedAt = resolveProviderLinearWorkerAttemptStartedAt(parsedProof);
+  if (!attemptStartedAt) {
+    return null;
+  }
+  let audit = null;
+  try {
+    audit = await summarizeProviderLinearAuditPath(auditPath);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(
+      `provider linear child-lane warning: failed to summarize provider-linear audit at ${auditPath}; proceeding without same-attempt retry suppression. error=${message}`
+    );
+    return null;
+  }
+  const suppression = findDeterministicProviderMutationSuppression(
+    audit,
+    'child-lane',
+    {
+      recordedAtNotBefore: attemptStartedAt,
+      action: 'launch',
+      issueId
+    }
+  );
+  return suppression && isChildLaneParentDirtySuppressionCode(suppression.error_code)
+    ? suppression
+    : null;
+}
+
 async function finalizePendingChildLaneDecision(input: {
   action: 'reject' | 'invalidate';
   context: Pick<
@@ -1339,7 +1513,7 @@ async function resolvePendingChildLaneDecisionTarget(input: {
   childRunsRoot: string;
   stream: string;
   action: 'accept' | 'reject' | 'invalidate';
-  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof'>;
+  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof' | 'readDir'>;
   now: string;
 }): Promise<ResolvedPendingChildLaneDecisionTarget> {
   const target = findLatestPendingChildLane(input.records, input.stream);
@@ -1435,7 +1609,7 @@ async function repairPendingLaunchingChildLaneDecisionTarget(input: {
   >;
   childRunsRoot: string;
   action: 'accept' | 'reject' | 'invalidate';
-  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof'>;
+  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof' | 'readDir'>;
   now: string;
 }): Promise<{ records: ProviderLinearWorkerChildLaneRecord[]; target: ProviderLinearWorkerChildLaneRecord | null } | null> {
   if (input.target.status !== 'launching' || !input.target.run_id.startsWith('launching-')) {
@@ -1545,6 +1719,167 @@ function findChildLaneByIdentity(
   return records.find((entry) => matchesChildLaneRecordIdentity(entry, target)) ?? null;
 }
 
+interface ProviderLinearChildLaneLaunchRecoveryCandidate {
+  childRun: ProviderLinearChildLaneRunResult;
+  childLane: ProviderLinearWorkerChildLaneRecord;
+  proof: ProviderLinearChildLaneProof;
+}
+
+async function waitForRecoveredChildLaneLaunchCandidate(input: {
+  reservation: ProviderLinearWorkerChildLaneRecord;
+  context: Pick<
+    Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>,
+    'issueId' | 'issueIdentifier' | 'taskId' | 'runId' | 'repoRoot'
+  >;
+  childRunsRoot: string;
+  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof' | 'readDir' | 'sleep' | 'warn'>;
+  isExecSettled: () => boolean;
+  now: string;
+}): Promise<ProviderLinearChildLaneLaunchRecoveryCandidate | null> {
+  const readRecoveredCandidate = async (): Promise<ProviderLinearChildLaneLaunchRecoveryCandidate | null> => {
+    try {
+      return await findRecoveredChildLaneLaunchCandidate({
+        reservation: input.reservation,
+        context: input.context,
+        childRunsRoot: input.childRunsRoot,
+        deps: input.deps,
+        now: input.now
+      });
+    } catch (error) {
+      input.deps.warn(
+        `provider-linear-child-lane warning: failed to scan for recovered child-lane launch candidate: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      return null;
+    }
+  };
+  while (!input.isExecSettled()) {
+    const candidate = await readRecoveredCandidate();
+    if (candidate) {
+      return candidate;
+    }
+    await input.deps.sleep(PROVIDER_LINEAR_CHILD_LANE_LAUNCH_RECOVERY_POLL_INTERVAL_MS);
+  }
+  return await readRecoveredCandidate();
+}
+
+async function findRecoveredChildLaneLaunchCandidate(input: {
+  reservation: ProviderLinearWorkerChildLaneRecord;
+  context: Pick<
+    Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>,
+    'issueId' | 'issueIdentifier' | 'taskId' | 'runId' | 'repoRoot'
+  >;
+  childRunsRoot: string;
+  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof' | 'readDir'>;
+  now: string;
+}): Promise<ProviderLinearChildLaneLaunchRecoveryCandidate | null> {
+  const childTaskCliRoot = join(input.childRunsRoot, input.reservation.task_id, 'cli');
+  let entries;
+  try {
+    entries = await input.deps.readDir(childTaskCliRoot);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+  const candidates: ProviderLinearChildLaneLaunchRecoveryCandidate[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name === input.reservation.run_id) {
+      continue;
+    }
+    const runId = (() => {
+      try {
+        return sanitizeRunId(entry.name);
+      } catch {
+        return null;
+      }
+    })();
+    if (!runId) {
+      continue;
+    }
+    const candidate = await readRecoveredChildLaneLaunchCandidate({
+      reservation: input.reservation,
+      context: input.context,
+      childRunsRoot: input.childRunsRoot,
+      deps: input.deps,
+      now: input.now,
+      runId
+    }).catch(() => null);
+    if (candidate) {
+      candidates.push(candidate);
+    }
+  }
+  // Fail closed when recovery is ambiguous; parent repair needs one exact child run candidate.
+  return candidates.length === 1 ? candidates[0]! : null;
+}
+
+async function readRecoveredChildLaneLaunchCandidate(input: {
+  reservation: ProviderLinearWorkerChildLaneRecord;
+  context: Pick<
+    Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>,
+    'issueId' | 'issueIdentifier' | 'taskId' | 'runId' | 'repoRoot'
+  >;
+  childRunsRoot: string;
+  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof'>;
+  now: string;
+  runId: string;
+}): Promise<ProviderLinearChildLaneLaunchRecoveryCandidate | null> {
+  const artifactRoot = resolve(input.childRunsRoot, input.reservation.task_id, 'cli', input.runId);
+  const manifestPath = join(artifactRoot, 'manifest.json');
+  let rawManifest: Record<string, unknown>;
+  try {
+    rawManifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const childRun = parseProviderLinearChildLaneRunManifest({
+    manifest: rawManifest,
+    repoRoot: input.context.repoRoot,
+    artifactRoot,
+    manifestPath,
+    taskId: input.reservation.task_id,
+    runId: input.runId,
+    parentRunId: input.context.runId,
+    issueId: input.context.issueId,
+    issueIdentifier: input.context.issueIdentifier
+  });
+  if (!childRun) {
+    return null;
+  }
+  const proof = await input.deps.readChildLaneProof(join(artifactRoot, PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME)).catch(
+    () => null
+  );
+  if (!proof || !proof.scope || !proof.parent_snapshot) {
+    return null;
+  }
+  const childLane = buildRepairedChildLaneRecord({
+    reservation: input.reservation,
+    childRun,
+    proof,
+    now: input.now
+  });
+  const proofViolation = resolveChildLaneReservationRepairProofViolation({
+    reservation: input.reservation,
+    childRun,
+    candidate: childLane,
+    proof,
+    context: input.context,
+    repoRoot: input.context.repoRoot,
+    childRunsRoot: input.childRunsRoot,
+    action: childRun.status === 'succeeded' ? 'accept' : 'reject'
+  });
+  if (proofViolation) {
+    return null;
+  }
+  return {
+    childRun,
+    childLane,
+    proof
+  };
+}
+
 async function findChildLaneReservationRepairCandidate(input: {
   reservation: ProviderLinearWorkerChildLaneRecord;
   context: Pick<
@@ -1553,13 +1888,13 @@ async function findChildLaneReservationRepairCandidate(input: {
   >;
   childRunsRoot: string;
   action: 'accept' | 'reject' | 'invalidate';
-  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof'>;
+  deps: Pick<ProviderLinearChildLaneShellDependencies, 'readChildLaneProof' | 'readDir'>;
   now: string;
 }): Promise<ProviderLinearWorkerChildLaneRecord | null> {
   const childTaskCliRoot = join(input.childRunsRoot, input.reservation.task_id, 'cli');
   let entries;
   try {
-    entries = await readdir(childTaskCliRoot, { withFileTypes: true });
+    entries = await input.deps.readDir(childTaskCliRoot);
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
       return null;
@@ -1705,7 +2040,13 @@ function parseProviderLinearChildLaneRunManifest(input: {
     artifact_root: input.artifactRoot,
     manifest_path: input.manifestPath,
     log_path: logPath,
-    summary: normalizeOptionalString(input.manifest.summary),
+    summary: stripNonApplicableGuardrailSummaryLines(
+      input.manifest,
+      normalizeOptionalString(input.manifest.summary)
+    ),
+    guardrails_required: resolveGuardrailsRequiredForManifest(input.manifest),
+    guardrails_required_source: resolveGuardrailsRequiredSourceForManifest(input.manifest),
+    guardrail_command_count: countGuardrailCommands(input.manifest),
     runtime_mode_requested: normalizeOptionalString(input.manifest.runtime_mode_requested),
     runtime_mode: normalizeOptionalString(input.manifest.runtime_mode),
     runtime_provider: normalizeOptionalString(input.manifest.runtime_provider)
@@ -1729,6 +2070,9 @@ function buildRepairedChildLaneRecord(input: {
     artifact_root: input.childRun.artifact_root,
     log_path: input.childRun.log_path,
     summary: input.childRun.summary,
+    guardrails_required: input.childRun.guardrails_required,
+    guardrails_required_source: input.childRun.guardrails_required_source,
+    guardrail_command_count: input.childRun.guardrail_command_count,
     issue_id: input.reservation.issue_id,
     issue_identifier: input.reservation.issue_identifier,
     workspace_path: input.reservation.workspace_path,
@@ -1747,6 +2091,27 @@ function buildRepairedChildLaneRecord(input: {
     decision_at: zeroBytePatch ? input.now : null,
     decision_reason: zeroBytePatch ? buildNoOutputAdvisoryChildLaneDecisionReason(input.childRun) : null
   };
+}
+
+function resolveChildLaneReservationRecoveryTimingViolation(input: {
+  reservation: ProviderLinearWorkerChildLaneRecord;
+  proof: ProviderLinearChildLaneProof;
+}): string | null {
+  const reservationLaunchedAt = normalizeOptionalString(input.reservation.launched_at);
+  const proofCompletedAt =
+    normalizeOptionalString(input.proof.updated_at) ?? normalizeOptionalString(input.proof.last_event_at);
+  if (!reservationLaunchedAt || !proofCompletedAt) {
+    return 'Child lane proof timing is missing; cannot repair or recover a launching reservation safely.';
+  }
+  const reservationLaunchedMs = Date.parse(reservationLaunchedAt);
+  const proofCompletedMs = Date.parse(proofCompletedAt);
+  if (!Number.isFinite(reservationLaunchedMs) || !Number.isFinite(proofCompletedMs)) {
+    return 'Child lane proof timing is invalid; cannot repair or recover a launching reservation safely.';
+  }
+  if (proofCompletedMs < reservationLaunchedMs) {
+    return 'Child lane proof completion predates the pending launching reservation.';
+  }
+  return null;
 }
 
 function resolveChildLaneReservationRepairProofViolation(input: {
@@ -1773,6 +2138,13 @@ function resolveChildLaneReservationRepairProofViolation(input: {
   }
   if (normalizeOptionalString(input.proof.status) !== input.childRun.status) {
     return 'Child lane proof status does not match the child manifest status.';
+  }
+  const recoveryTimingViolation = resolveChildLaneReservationRecoveryTimingViolation({
+    reservation: input.reservation,
+    proof: input.proof
+  });
+  if (recoveryTimingViolation) {
+    return recoveryTimingViolation;
   }
   const artifactRoot = resolveAcceptedChildLaneArtifactRoot(
     input.repoRoot,
@@ -2615,12 +2987,12 @@ function resolveCodexOrchestratorInvocation(env: NodeJS.ProcessEnv): {
   return { command: invocation.command, argsPrefix: invocation.args, envOverrides: invocation.envOverrides };
 }
 
-function parseProviderChildLaneRunResult(
+async function parseProviderChildLaneRunResult(
   raw: string,
   repoRoot: string,
   childRunsRoot: string,
   taskId: string
-): ProviderLinearChildLaneRunResult | null {
+): Promise<ProviderLinearChildLaneRunResult | null> {
   const parsed = parseTrailingJsonObject(raw);
   if (!parsed) {
     return null;
@@ -2654,6 +3026,19 @@ function parseProviderChildLaneRunResult(
   ) {
     return null;
   }
+  let manifestRecord: Record<string, unknown> | null = null;
+  try {
+    const candidate = JSON.parse(await readFile(resolvedManifestPath, 'utf8')) as unknown;
+    if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+      manifestRecord = candidate as Record<string, unknown>;
+    }
+  } catch {
+    manifestRecord = null;
+  }
+  const rawSummary = normalizeOptionalString(parsed.summary);
+  const summary = manifestRecord
+    ? stripNonApplicableGuardrailSummaryLines(manifestRecord, rawSummary)
+    : rawSummary;
   return {
     run_id: safeRunId,
     task_id: taskId,
@@ -2662,7 +3047,10 @@ function parseProviderChildLaneRunResult(
     artifact_root: resolvedArtifactRoot,
     manifest_path: resolvedManifestPath,
     log_path: normalizedLogPath,
-    summary: normalizeOptionalString(parsed.summary),
+    summary,
+    guardrails_required: manifestRecord ? resolveGuardrailsRequiredForManifest(manifestRecord) : null,
+    guardrails_required_source: manifestRecord ? resolveGuardrailsRequiredSourceForManifest(manifestRecord) : null,
+    guardrail_command_count: manifestRecord ? countGuardrailCommands(manifestRecord) : null,
     runtime_mode_requested: normalizeOptionalString(parsed.runtime_mode_requested),
     runtime_mode: normalizeOptionalString(parsed.runtime_mode),
     runtime_provider: normalizeOptionalString(parsed.runtime_provider)
@@ -2726,6 +3114,38 @@ function failureResult(input: {
       status: input.status
     }
   };
+}
+
+function formatProviderWorkerChildLaneProvenanceInvalidMessage(
+  context: Pick<
+    Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>,
+    | 'manifest'
+    | 'manifestPath'
+    | 'providerControlHostRecordedInManifest'
+    | 'providerControlHostMatchesManifest'
+  >,
+  env: NodeJS.ProcessEnv
+): string {
+  const manifestLaunchSource =
+    normalizeOptionalString(context.manifest.provider_launch_source) ??
+    normalizeOptionalString(context.manifest.providerLaunchSource);
+  const manifestTaskId =
+    normalizeOptionalString(context.manifest.provider_control_host_task_id) ??
+    normalizeOptionalString(context.manifest.providerControlHostTaskId);
+  const manifestRunId =
+    normalizeOptionalString(context.manifest.provider_control_host_run_id) ??
+    normalizeOptionalString(context.manifest.providerControlHostRunId);
+  const envLaunchSource = normalizeOptionalString(env[PROVIDER_LAUNCH_SOURCE_ENV]);
+  const envTaskId = normalizeOptionalString(env[PROVIDER_CONTROL_HOST_TASK_ID_ENV]);
+  const envRunId = normalizeOptionalString(env[PROVIDER_CONTROL_HOST_RUN_ID_ENV]);
+  return [
+    'linear child-lane requires provider control-host provenance recorded on the parent provider-worker manifest and matching active environment.',
+    'Required manifest fields: provider_launch_source=control-host, provider_control_host_task_id, provider_control_host_run_id.',
+    `Parent manifest: ${context.manifestPath}.`,
+    `Manifest values: provider_launch_source=${manifestLaunchSource ?? 'missing'}, provider_control_host_task_id=${manifestTaskId ?? 'missing'}, provider_control_host_run_id=${manifestRunId ?? 'missing'}.`,
+    `Active env values: ${PROVIDER_LAUNCH_SOURCE_ENV}=${envLaunchSource ?? 'missing'}, ${PROVIDER_CONTROL_HOST_TASK_ID_ENV}=${envTaskId ?? 'missing'}, ${PROVIDER_CONTROL_HOST_RUN_ID_ENV}=${envRunId ?? 'missing'}.`,
+    `recorded=${String(context.providerControlHostRecordedInManifest)} matches=${String(context.providerControlHostMatchesManifest)}.`
+  ].join(' ');
 }
 
 function normalizeOptionalString(value: unknown): string | null {

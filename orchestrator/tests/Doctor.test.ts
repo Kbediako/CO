@@ -7,12 +7,14 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildDelegationEnablementGuidance,
   buildDelegationDirectTransportGuidance,
+  checkoutPostureBlocksDoctorStatus,
   formatDoctorCloudPreflightSummary,
   formatDoctorSummary,
   inspectCodexSandboxSecurityAdvisories,
   runDoctor,
   runDoctorCloudPreflight
 } from '../src/cli/doctor.js';
+import { CONFIG_AUTHORITY_MODE_ENV_KEY } from '../src/cli/config/repoConfigPolicy.js';
 import { REPO_CONFIG_PATH_ENV_KEY } from '../src/cli/config/userConfig.js';
 import { sanitizeProviderOverrideEnv } from '../src/cli/utils/providerOverrideEnv.js';
 import * as cloudPreflight from '../src/cli/utils/cloudPreflight.js';
@@ -27,8 +29,14 @@ function testFingerprint(value: string): string {
     .slice(0, 16)}`;
 }
 
-async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<string> {
+async function writeFakeCodexBinary(
+  dir: string,
+  featureLine: string,
+  options: { exitCode?: number; stderr?: string } = {}
+): Promise<string> {
   const binPath = join(dir, 'codex');
+  const featureOutput = featureLine.length > 0 ? `  printf '%s\n' ${JSON.stringify(featureLine)}` : '';
+  const stderrOutput = options.stderr ? `  printf '%s\n' ${JSON.stringify(options.stderr)} >&2` : '';
   await writeFile(
     binPath,
     [
@@ -38,14 +46,19 @@ async function writeFakeCodexBinary(dir: string, featureLine: string): Promise<s
       '  exit 0',
       'fi',
       'if [ "$1" = "features" ] && [ "$2" = "list" ]; then',
-      `  echo "${featureLine}"`,
-      '  exit 0',
+      featureOutput,
+      stderrOutput,
+      `  exit ${options.exitCode ?? 0}`,
       'fi',
       'if [ "$1" = "cloud" ] && [ "$2" = "--help" ]; then',
       '  exit 0',
       'fi',
+      'if [ "$1" = "cloud" ] && [ "$2" = "list" ]; then',
+      '  echo "{\\"tasks\\":[{\\"id\\":\\"task-test\\",\\"environment_id\\":\\"$4\\"}]}"',
+      '  exit 0',
+      'fi',
       'exit 0'
-    ].join('\n'),
+    ].filter(Boolean).join('\n'),
     'utf8'
   );
   await chmod(binPath, 0o755);
@@ -121,12 +134,12 @@ function buildDoctorCloudEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessE
     ...sanitizeProviderOverrideEnv(process.env),
     CODEX_CLOUD_ENV_ID: '',
     CODEX_CLOUD_BRANCH: '',
+    [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'downstream-compatibility',
     CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: '',
     CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '',
     MCP_RUNNER_TASK_ID: '',
     TASK: '',
     CODEX_ORCHESTRATOR_TASK_ID: '',
-    CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '',
     CODEX_ORCHESTRATOR_ROOT: '',
     CODEX_ORCHESTRATOR_RUNTIME_MODE: '',
     CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: '',
@@ -137,6 +150,30 @@ function buildDoctorCloudEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessE
 }
 
 describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
+  it('blocks an overall ok status for unavailable posture inside git worktrees only', () => {
+    expect(
+      checkoutPostureBlocksDoctorStatus({
+        status: 'unavailable',
+        inside_git_worktree: true,
+        stale_docs_may_be: false
+      })
+    ).toBe(true);
+    expect(
+      checkoutPostureBlocksDoctorStatus({
+        status: 'unavailable',
+        inside_git_worktree: false,
+        stale_docs_may_be: false
+      })
+    ).toBe(false);
+    expect(
+      checkoutPostureBlocksDoctorStatus({
+        status: 'stale',
+        inside_git_worktree: true,
+        stale_docs_may_be: true
+      })
+    ).toBe(true);
+  });
+
   it('reports missing devtools config and skill when absent', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
@@ -155,6 +192,39 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
         delete process.env.CODEX_HOME;
       } else {
         process.env.CODEX_HOME = originalCodexHome;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('skips missing-config max_threads recommendation when Codex feature output enables multi_agent_v2', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-missing-config-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempHome, 'multi_agent_v2 experimental true');
+    try {
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('advisory');
+      expect(result.codex_defaults.config.status).toBe('missing');
+      expect(result.codex_defaults.checks.max_threads.status).toBe('skipped');
+      expect(result.codex_defaults.checks.max_threads.actual).toBeNull();
+      expect(result.codex_defaults.checks.max_threads.detail).toContain('omit agents.max_threads');
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('agents.max_threads: skipped');
+      expect(summary).toContain('features.multi_agent_v2=true; omit agents.max_threads');
+      expect(summary).not.toContain('agents.max_threads: advisory');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
       }
       await rm(tempHome, { recursive: true, force: true });
     }
@@ -213,6 +283,450 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
         delete process.env.CODEX_HOME;
       } else {
         process.env.CODEX_HOME = originalCodexHome;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('accepts access-verified local gpt-5.5 models', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalDebugModelsJson = process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON = JSON.stringify({
+      models: [{ slug: 'gpt-5.4' }, { slug: 'gpt-5.5' }]
+    });
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.5"',
+          'review_model = "gpt-5.5"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[agents]',
+          'max_threads = 12'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('ok');
+      expect(result.codex_defaults.checks.model.status).toBe('ok');
+      expect(result.codex_defaults.checks.review_model.status).toBe('ok');
+      expect(result.codex_defaults.checks.model.actual).toBe('gpt-5.5');
+      expect(result.codex_defaults.checks.review_model.actual).toBe('gpt-5.5');
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain(
+        'model: ok (actual: gpt-5.5, expected: gpt-5.5 when ChatGPT-auth access is verified (fallback: gpt-5.4))'
+      );
+      expect(summary).toContain(
+        'review_model: ok (actual: gpt-5.5, expected: gpt-5.5 when ChatGPT-auth access is verified (fallback: gpt-5.4))'
+      );
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalDebugModelsJson === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON = originalDebugModelsJson;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('accepts unmarked gpt-5.5 defaults when access is verified', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalDebugModelsJson = process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON = JSON.stringify({
+      models: [{ slug: 'gpt-5.5' }]
+    });
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.5"',
+          'review_model = "gpt-5.5"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[agents]',
+          'max_threads = 12'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('ok');
+      expect(result.codex_defaults.checks.model.status).toBe('ok');
+      expect(result.codex_defaults.checks.review_model.status).toBe('ok');
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain(
+        'model: ok (actual: gpt-5.5, expected: gpt-5.5 when ChatGPT-auth access is verified (fallback: gpt-5.4))'
+      );
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalDebugModelsJson === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON = originalDebugModelsJson;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('flags configured gpt-5.5 models when model access evidence is missing', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalDebugModelsJson = process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON = JSON.stringify({
+      models: [{ slug: 'gpt-5.4' }]
+    });
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.5"',
+          'review_model = "gpt-5.5"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[agents]',
+          'max_threads = 12'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('advisory');
+      expect(result.codex_defaults.checks.model.status).toBe('advisory');
+      expect(result.codex_defaults.checks.review_model.status).toBe('advisory');
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain(
+        'Configured local ChatGPT-auth model gpt-5.5 is not verified by `codex debug models`'
+      );
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalDebugModelsJson === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON = originalDebugModelsJson;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('ignores stale legacy markers when portable fallback defaults are active', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalDebugModelsJson = process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON = JSON.stringify({
+      models: [{ slug: 'gpt-5.4' }]
+    });
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[codex_orchestrator]',
+          'local_model_opt_in = "gpt-5.5"',
+          '',
+          '[agents]',
+          'max_threads = 12'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('ok');
+      expect(result.codex_defaults.checks.model.status).toBe('ok');
+      expect(result.codex_defaults.checks.review_model.status).toBe('ok');
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('Codex defaults advisory: ok');
+      expect(summary).not.toContain('local model opt-in');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalDebugModelsJson === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON = originalDebugModelsJson;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('skips max_threads recommendation when multi_agent_v2 is enabled and the key is absent', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[features]',
+          'multi_agent_v2 = true',
+          '',
+          '[agents]'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('ok');
+      expect(result.codex_defaults.checks.max_threads.status).toBe('skipped');
+      expect(result.codex_defaults.checks.max_threads.actual).toBeNull();
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('agents.max_threads: skipped');
+      expect(summary).toContain('features.multi_agent_v2=true; omit agents.max_threads');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('flags max_threads as invalid when multi_agent_v2 is enabled and the key is present', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-invalid-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[features]',
+          'multi_agent_v2 = true',
+          '',
+          '[agents]',
+          'max_threads = 12'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('advisory');
+      expect(result.codex_defaults.checks.max_threads.status).toBe('advisory');
+      expect(result.codex_defaults.checks.max_threads.actual).toBe(12);
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('features.multi_agent_v2=true; remove agents.max_threads');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('flags max_threads as invalid under multi_agent_v2 even when the value is nonnumeric', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-string-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[features]',
+          'multi_agent_v2 = true',
+          '',
+          '[agents]',
+          'max_threads = "12"'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('advisory');
+      expect(result.codex_defaults.checks.max_threads.status).toBe('advisory');
+      expect(result.codex_defaults.checks.max_threads.actual).toBeNull();
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('features.multi_agent_v2=true; remove agents.max_threads');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('uses Codex feature output to apply multi_agent_v2 max_threads rules', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-feature-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempHome, 'multi_agent_v2 experimental true');
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[agents]'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('ok');
+      expect(result.codex_defaults.checks.max_threads.status).toBe('skipped');
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('features.multi_agent_v2=true; omit agents.max_threads');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('keeps max_threads baseline when the live feature probe explicitly disables multi_agent_v2', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-false-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempHome, 'multi_agent_v2 experimental false', {
+      stderr: 'invalid config: agents.max_threads is rejected when features.multi_agent_v2=true'
+    });
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[features]',
+          'multi_agent_v2 = true',
+          '',
+          '[agents]',
+          'max_threads = 12'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('ok');
+      expect(result.codex_defaults.checks.max_threads.status).toBe('ok');
+      expect(result.codex_defaults.checks.max_threads.actual).toBe(12);
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('agents.max_threads: ok (actual: 12, expected >= 12)');
+      expect(summary).not.toContain('features.multi_agent_v2=true; omit agents.max_threads');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('flags max_threads when Codex rejects the current config before feature flags can be listed', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-reject-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempHome, '', {
+      exitCode: 1,
+      stderr: 'invalid config: agents.max_threads is rejected when features.multi_agent_v2=true'
+    });
+    try {
+      await writeFile(join(tempHome, 'config.toml'), ['[agents]', 'max_threads = 12'].join('\n'), 'utf8');
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('advisory');
+      expect(result.codex_defaults.checks.max_threads.status).toBe('advisory');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
       }
       await rm(tempHome, { recursive: true, force: true });
     }
@@ -1134,7 +1648,7 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       expect(result.codex_defaults.checks.review_model.status).toBe('advisory');
       expect(result.codex_defaults.checks.review_model.actual).toBe('gpt-5.3-codex');
       expect(formatDoctorSummary(result).join('\n')).toContain(
-        'review_model: advisory (actual: gpt-5.3-codex, expected: gpt-5.4)'
+        'review_model: advisory (actual: gpt-5.3-codex, expected: gpt-5.5 when ChatGPT-auth access is verified (fallback: gpt-5.4))'
       );
     } finally {
       if (originalCodexHome === undefined) {
@@ -1716,6 +2230,7 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
         environmentId: 'env_override',
         env: buildDoctorCloudEnv({
           CODEX_CLI_BIN: fakeCodexBin,
+          [CONFIG_AUTHORITY_MODE_ENV_KEY]: '',
           CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: '1'
         })
       });
@@ -1976,6 +2491,7 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
           ...process.env,
           CODEX_CLI_BIN: '/tmp/fake-codex',
           CODEX_CLOUD_BRANCH: '',
+          [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'downstream-compatibility',
           CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: '',
           CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: ''
         }

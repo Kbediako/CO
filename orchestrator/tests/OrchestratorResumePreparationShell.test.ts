@@ -53,7 +53,12 @@ describe('runOrchestratorResumePreparationShell', () => {
       runtime_mode: 'appserver',
       heartbeat_interval_seconds: 2,
       summary: 'existing summary',
-      run_id: 'run-1'
+      run_id: 'run-1',
+      config_resolution: {
+        mode: 'repo-authoritative',
+        reason: 'default repo-authoritative mode',
+        config_source: 'repo'
+      }
     } as never;
     const paths = {
       runDir: '/tmp/repo/.runs/task-1/run-1',
@@ -70,6 +75,11 @@ describe('runOrchestratorResumePreparationShell', () => {
       pipeline,
       pipelineSource: null,
       runtimeModeDefault: 'appserver',
+      configResolution: {
+        mode: 'downstream-compatibility',
+        reason: 'CODEX_ORCHESTRATOR_CONFIG_MODE=downstream-compatibility',
+        config_source: 'package'
+      },
       configNotice: 'repo config active',
       envOverrides: { RESUME_OVERRIDE: '1' },
       planner: { label: 'planner' },
@@ -139,6 +149,13 @@ describe('runOrchestratorResumePreparationShell', () => {
       taskIdOverride: 'task-1',
       targetStageId: 'stage-1',
       planTargetFallback: 'manifest-target',
+      configResolution: {
+        mode: 'downstream-compatibility',
+        reason: 'resume policy allowed packaged compatibility fallback',
+        config_source: 'repo'
+      },
+      configNotice:
+        'Configuration mode: downstream-compatibility (resume policy allowed packaged compatibility fallback); using repo-local codex.orchestrator.json with packaged fallback enabled.',
       envOverrides: { DESIGN_PIPELINE: '1' }
     });
     expect(resolveRuntimeModeImpl).toHaveBeenCalledWith(
@@ -151,6 +168,7 @@ describe('runOrchestratorResumePreparationShell', () => {
       })
     );
     expect(applyRequestedRuntimeMode).toHaveBeenCalledWith(manifest, 'cli');
+    expect(manifest.config_resolution).toEqual(preparation.configResolution);
     expect(appendSummaryImpl).toHaveBeenCalledWith(manifest, 'repo config active');
     expect(schedule).toHaveBeenCalledWith({ manifest: true, heartbeat: true, force: true });
     expect(manifest.plan_target_id).toBe('preview-target');
@@ -375,6 +393,11 @@ describe('runOrchestratorResumePreparationShell', () => {
     expect(result.runtimeModeResolution).toEqual({ mode: 'cli', source: 'manifest' });
     expect(applyRequestedRuntimeMode).toHaveBeenCalledWith(manifest, 'cli');
     expect(appendSummaryImpl).not.toHaveBeenCalled();
+    expect(manifest.config_resolution).toEqual({
+      mode: 'downstream-compatibility',
+      reason: 'resume policy allowed packaged compatibility fallback',
+      config_source: 'repo'
+    });
     expect(manifest.plan_target_id).toBe('planner-target');
     expect(createPersister).toHaveBeenCalledWith(
       expect.objectContaining({

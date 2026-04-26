@@ -4,6 +4,11 @@ import { promisify } from 'node:util';
 
 import { resolveCodexCliBin } from '../utils/codexCli.js';
 import { isoTimestamp } from '../utils/time.js';
+import {
+  describeFallbackTarget,
+  resolveRuntimeFallbackPolicy,
+  type RuntimeFallbackPolicyResolution
+} from './fallbackPolicy.js';
 import type {
   RuntimeFallbackMetadata,
   RuntimeMode,
@@ -14,6 +19,7 @@ import type {
 const execFileAsync = promisify(execFile);
 const APP_SERVER_HELP_TIMEOUT_MS = 8000;
 const LOGIN_STATUS_TIMEOUT_MS = 8000;
+const RUNTIME_FALLBACK_ENV_KEY = 'CODEX_ORCHESTRATOR_RUNTIME_FALLBACK';
 
 function envFlagEnabled(value: string | undefined): boolean {
   if (!value) {
@@ -23,25 +29,21 @@ function envFlagEnabled(value: string | undefined): boolean {
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
-function allowRuntimeFallback(env: NodeJS.ProcessEnv, override: boolean | undefined): boolean {
-  if (typeof override === 'boolean') {
-    return override;
-  }
-  const raw = env.CODEX_ORCHESTRATOR_RUNTIME_FALLBACK;
-  if (!raw) {
-    return true;
-  }
-  const normalized = raw.trim().toLowerCase();
-  return !['0', 'false', 'off', 'deny', 'disabled', 'never', 'strict'].includes(normalized);
-}
-
-function createNoFallback(now: () => string): RuntimeFallbackMetadata {
+function createNoFallback(
+  now: () => string,
+  policyResolution: RuntimeFallbackPolicyResolution
+): RuntimeFallbackMetadata {
   return {
     occurred: false,
+    policy: policyResolution.policy,
+    policy_source: policyResolution.source,
     code: null,
     reason: null,
     from_mode: null,
     to_mode: null,
+    original_target: null,
+    fallback_target: null,
+    blocking_reason: null,
     checked_at: now()
   };
 }
@@ -51,16 +53,84 @@ function createFallback(params: {
   reason: string;
   fromMode: RuntimeMode;
   toMode: RuntimeMode;
+  originalTarget: string;
+  fallbackTarget: string;
+  policyResolution: RuntimeFallbackPolicyResolution;
   now: () => string;
 }): RuntimeFallbackMetadata {
   return {
     occurred: true,
+    policy: params.policyResolution.policy,
+    policy_source: params.policyResolution.source,
     code: params.code,
     reason: params.reason,
     from_mode: params.fromMode,
     to_mode: params.toMode,
+    original_target: params.originalTarget,
+    fallback_target: params.fallbackTarget,
+    blocking_reason: params.reason,
     checked_at: params.now()
   };
+}
+
+function createBlockedFallback(params: {
+  code: string;
+  reason: string;
+  fromMode: RuntimeMode;
+  toMode: RuntimeMode | null;
+  originalTarget: string;
+  fallbackTarget: string | null;
+  policyResolution: RuntimeFallbackPolicyResolution;
+  now: () => string;
+}): RuntimeFallbackMetadata {
+  return {
+    occurred: false,
+    policy: params.policyResolution.policy,
+    policy_source: params.policyResolution.source,
+    code: params.code,
+    reason: params.reason,
+    from_mode: params.fromMode,
+    to_mode: params.toMode,
+    original_target: params.originalTarget,
+    fallback_target: params.fallbackTarget,
+    blocking_reason: params.reason,
+    checked_at: params.now()
+  };
+}
+
+export class RuntimeSelectionFailure extends Error {
+  readonly runtimeFallback: RuntimeFallbackMetadata;
+
+  constructor(message: string, runtimeFallback: RuntimeFallbackMetadata) {
+    super(message);
+    this.name = 'RuntimeSelectionFailure';
+    this.runtimeFallback = runtimeFallback;
+  }
+}
+
+export function getRuntimeSelectionFailureMetadata(error: unknown): RuntimeFallbackMetadata | null {
+  if (!error || typeof error !== 'object') {
+    return null;
+  }
+  const candidate = (error as { runtimeFallback?: unknown }).runtimeFallback;
+  if (!candidate || typeof candidate !== 'object') {
+    return null;
+  }
+  return candidate as RuntimeFallbackMetadata;
+}
+
+function buildFallbackPolicyFailureMessage(params: {
+  policyResolution: RuntimeFallbackPolicyResolution;
+  originalTarget: string;
+  fallbackTarget: string | null;
+  blockingReason: string;
+}): string {
+  return (
+    `Runtime fallback policy=${params.policyResolution.policy} ` +
+    `original_target=${params.originalTarget} ` +
+    `fallback_target=${describeFallbackTarget(params.fallbackTarget)} ` +
+    `blocking_reason=${params.blockingReason}`
+  );
 }
 
 function summarizePreflightFailures(issues: Array<{ code: string; message: string }>): string {
@@ -91,17 +161,6 @@ function buildEnoentProbeIssue(params: {
     return buildRuntimeWorkspaceUnavailableIssue(params.repoRoot);
   }
   return buildCodexCommandUnavailableIssue(params.codexBin);
-}
-
-function resolveRequestedMode(options: RuntimeSelectionOptions): RuntimeMode {
-  if (
-    options.executionMode === 'cloud' &&
-    options.requestedMode === 'appserver' &&
-    (options.source === 'default' || options.source === 'manifest')
-  ) {
-    return 'cli';
-  }
-  return options.requestedMode;
 }
 
 async function runCodexProbe(
@@ -238,13 +297,63 @@ export async function resolveRuntimeSelection(
   options: RuntimeSelectionOptions
 ): Promise<RuntimeSelection> {
   const now = options.now ?? isoTimestamp;
-  const requestedMode = resolveRequestedMode(options);
+  const requestedMode = options.requestedMode;
+  const policyResolution = resolveRuntimeFallbackPolicy({
+    env: options.env,
+    envKey: RUNTIME_FALLBACK_ENV_KEY,
+    override: options.allowFallback
+  });
 
   if (options.executionMode === 'cloud' && requestedMode === 'appserver') {
-    throw new Error(
-      'Unsupported mode combination: executionMode=cloud does not support runtimeMode=appserver. ' +
-        'Use --runtime-mode cli or remove the runtime override for cloud execution.'
-    );
+    const blockingReason =
+      'Unsupported mode combination: executionMode=cloud does not support runtimeMode=appserver.';
+    const explicitSource = options.source === 'flag' || options.source === 'env' || options.source === 'config';
+    if (explicitSource || policyResolution.policy === 'strict') {
+      const fallbackTarget = 'execution:cloud/runtime:cli';
+      const fallback = createBlockedFallback({
+        code: 'cloud-appserver-unsupported',
+        reason: blockingReason,
+        fromMode: 'appserver',
+        toMode: 'cli',
+        originalTarget: 'execution:cloud/runtime:appserver',
+        fallbackTarget,
+        policyResolution,
+        now
+      });
+      throw new RuntimeSelectionFailure(
+        `${blockingReason} ${buildFallbackPolicyFailureMessage({
+          policyResolution,
+          originalTarget: fallback.original_target ?? 'execution:cloud/runtime:appserver',
+          fallbackTarget: fallback.fallback_target,
+          blockingReason
+        })} Use --runtime-mode cli or remove the runtime override for cloud execution.`,
+        fallback
+      );
+    }
+
+    return {
+      requested_mode: 'appserver',
+      selected_mode: 'cli',
+      source: options.source,
+      provider: 'CliRuntimeProvider',
+      env_overrides: {
+        CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: 'cli',
+        CODEX_ORCHESTRATOR_RUNTIME_MODE: 'cli',
+        CODEX_RUNTIME_MODE: 'cli',
+        CODEX_ORCHESTRATOR_APPSERVER_SESSION_ID: ''
+      },
+      runtime_session_id: null,
+      fallback: createFallback({
+        code: 'cloud-appserver-unsupported',
+        reason: blockingReason,
+        fromMode: 'appserver',
+        toMode: 'cli',
+        originalTarget: 'execution:cloud/runtime:appserver',
+        fallbackTarget: 'execution:cloud/runtime:cli',
+        policyResolution,
+        now
+      })
+    };
   }
 
   if (requestedMode === 'cli') {
@@ -260,7 +369,7 @@ export async function resolveRuntimeSelection(
         CODEX_ORCHESTRATOR_APPSERVER_SESSION_ID: ''
       },
       runtime_session_id: null,
-      fallback: createNoFallback(now)
+      fallback: createNoFallback(now, policyResolution)
     };
   }
 
@@ -283,15 +392,30 @@ export async function resolveRuntimeSelection(
         CODEX_RUNTIME_MODE: 'appserver'
       },
       runtime_session_id: runtimeSessionId,
-      fallback: createNoFallback(now)
+      fallback: createNoFallback(now, policyResolution)
     };
   }
 
   const reason = summarizePreflightFailures(preflight.issues);
-  const fallbackAllowed = allowRuntimeFallback(options.env, options.allowFallback);
-  if (!fallbackAllowed) {
-    throw new Error(
-      `${reason} Runtime fallback is disabled by CODEX_ORCHESTRATOR_RUNTIME_FALLBACK.`
+  if (policyResolution.policy === 'strict') {
+    const fallback = createBlockedFallback({
+      code: preflight.issues[0]?.code ?? 'appserver-preflight-failed',
+      reason,
+      fromMode: 'appserver',
+      toMode: 'cli',
+      originalTarget: 'runtime:appserver',
+      fallbackTarget: 'runtime:cli',
+      policyResolution,
+      now
+    });
+    throw new RuntimeSelectionFailure(
+      `${reason} ${buildFallbackPolicyFailureMessage({
+        policyResolution,
+        originalTarget: fallback.original_target ?? 'runtime:appserver',
+        fallbackTarget: fallback.fallback_target,
+        blockingReason: reason
+      })}`,
+      fallback
     );
   }
 
@@ -312,6 +436,9 @@ export async function resolveRuntimeSelection(
       reason,
       fromMode: 'appserver',
       toMode: 'cli',
+      originalTarget: 'runtime:appserver',
+      fallbackTarget: 'runtime:cli',
+      policyResolution,
       now
     })
   };

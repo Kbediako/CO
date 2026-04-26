@@ -15,12 +15,14 @@ import type { CliManifest } from '../types.js';
 import { logger } from '../../logger.js';
 import type { RuntimeMode } from '../runtime/types.js';
 import { buildTaskMemoryContext } from './plannerMemory.js';
+import type { ConfigResolutionSummary } from './pipelineResolver.js';
 
 export interface RunPreparationResult {
   env: EnvironmentPaths;
   pipeline: PipelineDefinition;
   pipelineSource: string | null;
   runtimeModeDefault: RuntimeMode | null;
+  configResolution: ConfigResolutionSummary | null;
   configNotice: string | null;
   envOverrides: NodeJS.ProcessEnv;
   planner: CommandPlanner;
@@ -41,6 +43,7 @@ export interface PrepareRunOptions {
   resolver?: PipelineResolver;
   pipeline?: PipelineDefinition;
   pipelineSource?: string | null;
+  configResolution?: ConfigResolutionSummary | null;
   configNotice?: string | null;
   envOverrides?: NodeJS.ProcessEnv;
   planner?: CommandPlanner;
@@ -83,6 +86,7 @@ export async function prepareRun(options: PrepareRunOptions): Promise<RunPrepara
         pipeline: options.pipeline,
         userConfig: null,
         source: options.pipelineSource ?? null,
+        configResolution: options.configResolution ?? null,
         configNotice: options.configNotice ?? null,
         envOverrides: options.envOverrides ?? {}
       }
@@ -105,6 +109,7 @@ export async function prepareRun(options: PrepareRunOptions): Promise<RunPrepara
     pipeline: resolvedPipeline.pipeline,
     pipelineSource: resolvedPipeline.source ?? null,
     runtimeModeDefault: options.runtimeModeDefault ?? resolvedPipeline.userConfig?.runtimeMode ?? null,
+    configResolution: resolvedPipeline.configResolution ?? null,
     configNotice: resolvedPipeline.configNotice ?? null,
     envOverrides: resolvedPipeline.envOverrides ?? {},
     planner,

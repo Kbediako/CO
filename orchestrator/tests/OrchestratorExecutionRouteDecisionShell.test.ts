@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { routeOrchestratorExecution } from '../src/cli/services/orchestratorExecutionRouteDecisionShell.js';
+import { RuntimeSelectionFailure } from '../src/cli/runtime/provider.js';
 import type { OrchestratorExecutionRouteOptions } from '../src/cli/services/orchestratorExecutionRouter.js';
-import type { RuntimeSelection } from '../src/cli/runtime/types.js';
+import type { RuntimeFallbackMetadata, RuntimeSelection } from '../src/cli/runtime/types.js';
 import type { OrchestratorExecutionRouteState } from '../src/cli/services/orchestratorExecutionRouteState.js';
 
 const mockState = vi.hoisted(() => ({
@@ -57,10 +58,15 @@ function createRuntimeSelection(overrides: Partial<RuntimeSelection> = {}): Runt
     runtime_session_id: null,
     fallback: {
       occurred: false,
+      policy: 'auto',
+      policy_source: 'default',
       code: null,
       reason: null,
       from_mode: null,
       to_mode: null,
+      original_target: null,
+      fallback_target: null,
+      blocking_reason: null,
       checked_at: '2026-03-13T00:00:00.000Z'
     },
     env_overrides: {},
@@ -139,6 +145,35 @@ describe('routeOrchestratorExecution', () => {
     expect(options.manifest.status).toBe('failed');
     expect(options.manifest.status_detail).toBe('runtime-selection-failed');
     expect(options.manifest.summary).toBe('Runtime selection failed: provider missing');
+    expect(mockState.cloudRouteShell).not.toHaveBeenCalled();
+    expect(mockState.localRouteShell).not.toHaveBeenCalled();
+  });
+
+  it('preserves strict runtime fallback evidence when runtime selection fails closed', async () => {
+    const fallback: RuntimeFallbackMetadata = {
+      occurred: false,
+      policy: 'strict',
+      policy_source: 'env',
+      code: 'forced-preflight-failure',
+      reason: 'Appserver preflight failed (forced-preflight-failure). Forced failure.',
+      from_mode: 'appserver',
+      to_mode: 'cli',
+      original_target: 'runtime:appserver',
+      fallback_target: 'runtime:cli',
+      blocking_reason: 'Appserver preflight failed (forced-preflight-failure). Forced failure.',
+      checked_at: '2026-04-26T01:00:00.000Z'
+    };
+    mockState.resolveRouteState.mockRejectedValue(
+      new RuntimeSelectionFailure('strict runtime fallback blocked', fallback)
+    );
+
+    const options = createOptions();
+    const result = await routeOrchestratorExecution(options);
+
+    expect(result.success).toBe(false);
+    expect(options.manifest.status).toBe('failed');
+    expect(options.manifest.status_detail).toBe('runtime-selection-failed');
+    expect(options.manifest.runtime_fallback).toBe(fallback);
     expect(mockState.cloudRouteShell).not.toHaveBeenCalled();
     expect(mockState.localRouteShell).not.toHaveBeenCalled();
   });

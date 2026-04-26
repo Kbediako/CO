@@ -1,3 +1,4 @@
+import type { RuntimeFallbackPolicy, RuntimeFallbackPolicySource } from './cli/runtime/fallbackPolicy.js';
 import type { RuntimeMode } from './cli/runtime/types.js';
 
 export type ExecutionMode = 'mcp' | 'cloud';
@@ -72,6 +73,8 @@ export interface BuildResult {
   runId: string;
   success: boolean;
   notes?: string;
+  failureStage?: string | null;
+  failureArtifactPath?: string | null;
   cloudExecution?: CloudExecutionSummary | null;
 }
 
@@ -154,8 +157,13 @@ export interface RuntimeSummary {
   modeUsed: RuntimeMode;
   provider: string;
   fallbackOccurred: boolean;
+  fallbackPolicy: RuntimeFallbackPolicy | null;
+  fallbackPolicySource: RuntimeFallbackPolicySource | null;
   fallbackCode: string | null;
   fallbackReason: string | null;
+  originalTarget: string | null;
+  fallbackTarget: string | null;
+  blockingReason: string | null;
   checkedAt: string | null;
 }
 
@@ -182,6 +190,11 @@ export interface CloudExecutionSummary {
 export interface CloudFallbackSummary {
   modeRequested: 'cloud';
   modeUsed: 'mcp';
+  policy: RuntimeFallbackPolicy;
+  policySource: RuntimeFallbackPolicySource;
+  originalTarget: 'execution:cloud';
+  fallbackTarget: 'execution:mcp';
+  blockingReason: string;
   reason: string;
   issues: Array<{ code: string; message: string }>;
   checkedAt: string;

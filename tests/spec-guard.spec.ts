@@ -469,6 +469,34 @@ describe('spec-guard script', () => {
     expect(stdout).toContain(`tasks/specs/0001-initial.md: last_review ${staleReviewDate}`);
   });
 
+  it('does not skip stale active specs when canonical owner overrides are malformed', async () => {
+    const repo = await initRepository();
+    const staleReviewDate = reviewDateDaysAgo(31);
+    await writeDocsCatalog(
+      repo,
+      rollingFreshnessPolicy({
+        canonical_owner_issues: {
+          canonical_owner_key: 'docs_freshness_candidate|doc_class:task_packet|path_family:tasks/specs',
+          owner_issue: 'CO-320'
+        }
+      })
+    );
+
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      ['---', 'status: in_progress', `last_review: ${staleReviewDate}`, '---', '', 'Active spec.'].join('\n')
+    );
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).not.toContain('Spec guard rolling freshness cohort entries');
+    expect(stdout).toContain(`tasks/specs/0001-initial.md: last_review ${staleReviewDate}`);
+  });
+
   it('fails closed when docs catalog parsing fails', async () => {
     const repo = await initRepository();
     await mkdir(join(repo, 'docs'), { recursive: true });

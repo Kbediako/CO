@@ -12,6 +12,18 @@ import {
 import { normalizeProviderWorkerHostName } from './providerWorkerHosts.js';
 
 const PROVIDER_INTAKE_CLAIM_LIMIT = 128;
+const TERMINAL_PROVIDER_INTAKE_ISSUE_STATES = new Set([
+  'closed',
+  'cancelled',
+  'canceled',
+  'duplicate',
+  'done'
+]);
+const TERMINAL_PROVIDER_INTAKE_ISSUE_STATE_TYPES = new Set([
+  'completed',
+  'cancelled',
+  'canceled'
+]);
 
 export type ProviderTaskMappingSource = 'provider_id_fallback';
 export type ProviderLaunchSource = 'control-host';
@@ -395,7 +407,7 @@ export function selectProviderIntakeClaim(
     return null;
   }
   const claims = [...state.claims].sort(compareProviderClaims);
-  const activeClaims = claims.filter((candidate) => isActiveProviderIntakeClaim(candidate.state));
+  const activeClaims = claims.filter(isActiveProviderIntakeClaim);
   return activeClaims[0] ?? claims[0] ?? null;
 }
 
@@ -404,7 +416,7 @@ export function buildProviderIntakeSummary(
 ): ProviderIntakeSummaryPayload | null {
   const normalizedState = normalizeProviderIntakeState(state);
   const claims = [...normalizedState.claims].sort(compareProviderClaims);
-  const activeClaims = claims.filter((candidate) => isActiveProviderIntakeClaim(candidate.state));
+  const activeClaims = claims.filter(isActiveProviderIntakeClaim);
   const runningClaims = claims.filter((candidate) => candidate.state === 'running');
   const claim = selectProviderIntakeClaim(normalizedState);
   if (!claim) {
@@ -662,15 +674,27 @@ function deriveProviderIntakeSummaryState(
   return claim.state;
 }
 
-function isActiveProviderIntakeClaim(state: ProviderIntakeClaimState): boolean {
-  switch (state) {
+export function isActiveProviderIntakeClaim(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'retry_queued' | 'issue_state' | 'issue_state_type'
+  >
+): boolean {
+  if (claim.retry_queued === true) {
+    return true;
+  }
+  switch (claim.state) {
     case 'accepted':
     case 'starting':
     case 'running':
     case 'resuming':
     case 'resumable':
-    case 'handoff_failed':
       return true;
+    case 'handoff_failed':
+      if (claim.reason === 'provider_issue_merge_closeout_action_required') {
+        return false;
+      }
+      return !isTerminalProviderIntakeIssueState(claim);
     case 'released':
     case 'completed':
     case 'stale':
@@ -679,6 +703,27 @@ function isActiveProviderIntakeClaim(state: ProviderIntakeClaimState): boolean {
     default:
       return false;
   }
+}
+
+function isTerminalProviderIntakeIssueState(
+  claim: Pick<ProviderIntakeClaimRecord, 'issue_state' | 'issue_state_type'>
+): boolean {
+  const normalizedState = normalizeProviderIntakeIssueStateValue(claim.issue_state);
+  const normalizedStateType = normalizeProviderIntakeIssueStateValue(claim.issue_state_type);
+  return (
+    (normalizedStateType !== null &&
+      TERMINAL_PROVIDER_INTAKE_ISSUE_STATE_TYPES.has(normalizedStateType)) ||
+    (normalizedState !== null &&
+      TERMINAL_PROVIDER_INTAKE_ISSUE_STATES.has(normalizedState))
+  );
+}
+
+function normalizeProviderIntakeIssueStateValue(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized.length > 0 ? normalized : null;
 }
 
 function compareProviderClaims(

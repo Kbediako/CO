@@ -14,6 +14,7 @@ import { logger } from '../src/logger.js';
 const ORIGINAL_ENV = {
   designPipeline: process.env.DESIGN_PIPELINE,
   designConfigPath: process.env.DESIGN_CONFIG_PATH,
+  configMode: process.env.CODEX_ORCHESTRATOR_CONFIG_MODE,
   repoConfigRequired: process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED,
   providerOverrides: Object.fromEntries(
     PROVIDER_OVERRIDE_ENV_KEYS.map((key) => [key, process.env[key]])
@@ -26,6 +27,7 @@ beforeEach(async () => {
   workspaceRoot = await mkdtemp(join(tmpdir(), 'pipeline-resolver-'));
   delete process.env.DESIGN_PIPELINE;
   delete process.env.DESIGN_CONFIG_PATH;
+  delete process.env.CODEX_ORCHESTRATOR_CONFIG_MODE;
   delete process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
   for (const key of PROVIDER_OVERRIDE_ENV_KEYS) {
     delete process.env[key];
@@ -49,6 +51,11 @@ afterEach(async () => {
   } else {
     process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED = ORIGINAL_ENV.repoConfigRequired;
   }
+  if (ORIGINAL_ENV.configMode === undefined) {
+    delete process.env.CODEX_ORCHESTRATOR_CONFIG_MODE;
+  } else {
+    process.env.CODEX_ORCHESTRATOR_CONFIG_MODE = ORIGINAL_ENV.configMode;
+  }
   for (const key of PROVIDER_OVERRIDE_ENV_KEYS) {
     const value = ORIGINAL_ENV.providerOverrides[key];
     if (value === undefined) {
@@ -62,6 +69,7 @@ afterEach(async () => {
 
 describe('PipelineResolver env overrides', () => {
   it('returns design env overrides without mutating process.env', async () => {
+    enableDownstreamCompatibilityMode();
     const env: EnvironmentPaths = {
       repoRoot: workspaceRoot,
       runsRoot: join(workspaceRoot, '.runs'),
@@ -74,11 +82,17 @@ describe('PipelineResolver env overrides', () => {
 
     expect(process.env.DESIGN_CONFIG_PATH).toBeUndefined();
     expect(process.env.DESIGN_PIPELINE).toBeUndefined();
+    expect(result.configResolution).toEqual({
+      mode: 'downstream-compatibility',
+      reason: 'CODEX_ORCHESTRATOR_CONFIG_MODE=downstream-compatibility',
+      config_source: 'package'
+    });
     expect(result.envOverrides.DESIGN_CONFIG_PATH).toBe(join(workspaceRoot, 'design.config.yaml'));
     expect(result.envOverrides.DESIGN_PIPELINE).toBe('1');
   });
 
   it('does not override DESIGN_PIPELINE when already set', async () => {
+    enableDownstreamCompatibilityMode();
     process.env.DESIGN_PIPELINE = '0';
     const env: EnvironmentPaths = {
       repoRoot: workspaceRoot,
@@ -95,6 +109,7 @@ describe('PipelineResolver env overrides', () => {
   });
 
   it('respects caller-provided processEnv when deciding DESIGN_PIPELINE override', async () => {
+    enableDownstreamCompatibilityMode();
     const env: EnvironmentPaths = {
       repoRoot: workspaceRoot,
       runsRoot: join(workspaceRoot, '.runs'),
@@ -116,6 +131,7 @@ describe('PipelineResolver env overrides', () => {
   });
 
   it('logs design defaults usage when repo design config is missing', async () => {
+    enableDownstreamCompatibilityMode();
     const env: EnvironmentPaths = {
       repoRoot: workspaceRoot,
       runsRoot: join(workspaceRoot, '.runs'),
@@ -133,6 +149,7 @@ describe('PipelineResolver env overrides', () => {
   });
 
   it('logs repo design config path when the file exists', async () => {
+    enableDownstreamCompatibilityMode();
     const env: EnvironmentPaths = {
       repoRoot: workspaceRoot,
       runsRoot: join(workspaceRoot, '.runs'),
@@ -150,8 +167,7 @@ describe('PipelineResolver env overrides', () => {
     );
   });
 
-  it('fails fast when strict repo-config mode is enabled and repo config is missing', async () => {
-    process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED = '1';
+  it('fails fast by default when repo config is missing', async () => {
     const env: EnvironmentPaths = {
       repoRoot: workspaceRoot,
       runsRoot: join(workspaceRoot, '.runs'),
@@ -206,6 +222,85 @@ describe('PipelineResolver env overrides', () => {
     );
   });
 
+  it('uses packaged rlm only for the explicit downstream missing-pipeline fallback', async () => {
+    enableDownstreamCompatibilityMode();
+    await writeFile(
+      join(workspaceRoot, 'codex.orchestrator.json'),
+      JSON.stringify(
+        {
+          defaultPipeline: 'docs-review',
+          pipelines: [
+            {
+              id: 'docs-review',
+              title: 'Docs Review',
+              guardrailsRequired: false,
+              stages: [
+                {
+                  kind: 'command',
+                  id: 'docs',
+                  title: 'Docs',
+                  command: 'echo docs'
+                }
+              ]
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const env: EnvironmentPaths = {
+      repoRoot: workspaceRoot,
+      runsRoot: join(workspaceRoot, '.runs'),
+      outRoot: join(workspaceRoot, 'out'),
+      taskId: 'task-compat-rlm'
+    };
+
+    const resolver = new PipelineResolver();
+    const result = await resolver.resolve(env, { pipelineId: 'rlm' });
+
+    expect(result.pipeline.id).toBe('rlm');
+    expect(result.configResolution).toEqual({
+      mode: 'downstream-compatibility',
+      reason:
+        'Configuration mode: downstream-compatibility; repo config is missing the rlm pipeline, so the packaged compatibility pipeline is active. ' +
+        'Add rlm to your repo-local codex.orchestrator.json to avoid compatibility fallback.',
+      config_source: 'package'
+    });
+  });
+
+  it('does not use packaged rlm when repo pipeline config is malformed', async () => {
+    enableDownstreamCompatibilityMode();
+    await writeFile(
+      join(workspaceRoot, 'codex.orchestrator.json'),
+      JSON.stringify(
+        {
+          defaultPipeline: 'rlm',
+          pipelines: {
+            id: 'rlm',
+            title: 'Malformed RLM',
+            stages: []
+          }
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const env: EnvironmentPaths = {
+      repoRoot: workspaceRoot,
+      runsRoot: join(workspaceRoot, '.runs'),
+      outRoot: join(workspaceRoot, 'out'),
+      taskId: 'task-malformed-rlm'
+    };
+
+    const resolver = new PipelineResolver();
+    await expect(resolver.resolve(env, { pipelineId: 'rlm' })).rejects.toThrow(
+      /codex\.orchestrator\.json pipelines must be an array/
+    );
+  });
+
   // Uses the real repo config to catch drift between shipped pipelines and docs.
   it('wires frontend testing pipeline with explicit devtools opt-in', async () => {
     const testDir = fileURLToPath(new URL('.', import.meta.url));
@@ -251,6 +346,7 @@ describe('PipelineResolver env overrides', () => {
     expect(testEnv.CODEX_VITEST_PROGRESS).toBe('1');
     expect(testEnv.FORCE_CODEX_REVIEW).toBe('');
     expect(testEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('');
+    expect(testEnv.CODEX_REVIEW_AUTHORITATIVE_GATE).toBe('');
     expect(testEnv.CODEX_NON_INTERACTIVE).toBe('');
     expect(testEnv.CODEX_NO_INTERACTIVE).toBe('');
     expect(testEnv.CODEX_NONINTERACTIVE).toBe('');
@@ -291,21 +387,25 @@ describe('PipelineResolver env overrides', () => {
 
     expect(implementationReviewEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
     expect(implementationReviewEnv.FORCE_CODEX_REVIEW).toBe('1');
+    expect(implementationReviewEnv.CODEX_REVIEW_AUTHORITATIVE_GATE).toBe('1');
     expect(implementationReviewEnv.CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON).toBe(
       'Pipeline-owned implementation gate review accepts large uncommitted scope; use --base/--commit for narrower operator-driven review runs.'
     );
     expect(docsReviewEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
     expect(docsReviewEnv.FORCE_CODEX_REVIEW).toBe('1');
+    expect(docsReviewEnv.CODEX_REVIEW_AUTHORITATIVE_GATE).toBe('1');
     expect(docsReviewEnv.CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON).toBe(
       'Pipeline-owned docs review accepts large uncommitted scope; use --base/--commit for narrower operator-driven review runs.'
     );
     expect(docsRelevanceEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
     expect(docsRelevanceEnv.FORCE_CODEX_REVIEW).toBe('');
+    expect(docsRelevanceEnv.CODEX_REVIEW_AUTHORITATIVE_GATE).toBe('');
     expect(providerWorkerStage?.command).toBe(
       'node "$CODEX_ORCHESTRATOR_PACKAGE_ROOT/dist/orchestrator/src/cli/providerLinearWorkerRunner.js"'
     );
     expect(providerWorkerEnv.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
     expect(providerWorkerEnv.FORCE_CODEX_REVIEW).toBe('1');
+    expect(providerWorkerEnv.CODEX_REVIEW_AUTHORITATIVE_GATE).toBe('1');
   });
 });
 
@@ -341,4 +441,8 @@ function findCommandStageEnv(
     }
   }
   return {};
+}
+
+function enableDownstreamCompatibilityMode(): void {
+  process.env.CODEX_ORCHESTRATOR_CONFIG_MODE = 'downstream-compatibility';
 }
