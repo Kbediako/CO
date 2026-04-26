@@ -62,13 +62,7 @@ const PRIORITY_POSTURE_LINE_PATTERNS = [
   /\bCurrent cloud execution\b/u,
   /\bLatest app-server\b/u
 ];
-const POSTURE_REFERENCE_PATHS = [
-  ...PRIMARY_POSTURE_REFERENCE_PATHS,
-  'AGENTS.md',
-  'docs/AGENTS.md',
-  'README.md',
-  'templates/codex/AGENTS.md'
-];
+const POSTURE_REFERENCE_PATHS = PRIMARY_POSTURE_REFERENCE_PATHS;
 
 export function inspectCheckoutPosture(repoRoot: string): CheckoutPostureInspection {
   const repoCheck = runGit(repoRoot, ['rev-parse', '--is-inside-work-tree']);
@@ -243,8 +237,7 @@ function readPostureReference(repoRoot: string): CheckoutPostureInspection['post
 }
 
 function readLatestPostureCommit(repoRoot: string): CheckoutPostureCommit | null {
-  return readLatestCommitForPaths(repoRoot, PRIMARY_POSTURE_REFERENCE_PATHS)
-    ?? readLatestCommitForPaths(repoRoot, POSTURE_REFERENCE_PATHS);
+  return readLatestCommitForPaths(repoRoot, PRIMARY_POSTURE_REFERENCE_PATHS);
 }
 
 function readLatestCommitForPaths(repoRoot: string, paths: string[]): CheckoutPostureCommit | null {

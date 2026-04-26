@@ -128,14 +128,14 @@ describe('inspectCheckoutPosture', () => {
       runGit(repo, ['switch', '-c', 'main']);
       runGit(repo, ['config', 'user.name', 'Doctor Test']);
       runGit(repo, ['config', 'user.email', 'doctor@example.invalid']);
-      await writeFile(join(repo, 'README.unrelated.md'), '# downstream repo\n', 'utf8');
-      runGit(repo, ['add', 'README.unrelated.md']);
+      await writeFile(join(repo, 'README.md'), '# downstream repo\n', 'utf8');
+      runGit(repo, ['add', 'README.md']);
       runGit(repo, ['commit', '-m', 'Initial downstream repo']);
       runGit(repo, ['push', '-u', 'origin', 'main']);
       const initialCommit = runGit(repo, ['rev-parse', 'HEAD']);
 
-      await writeFile(join(repo, 'README.unrelated.md'), '# downstream repo\n\nnew unrelated work\n', 'utf8');
-      runGit(repo, ['add', 'README.unrelated.md']);
+      await writeFile(join(repo, 'README.md'), '# downstream repo\n\nnew unrelated work\n', 'utf8');
+      runGit(repo, ['add', 'README.md']);
       runGit(repo, ['commit', '-m', 'CO-321 unrelated downstream work']);
       runGit(repo, ['push', 'origin', 'main']);
       runGit(repo, ['fetch', 'origin', 'main:refs/remotes/origin/main']);
