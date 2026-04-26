@@ -1,6 +1,33 @@
 {
   "items": [
     {
+      "id": "20260427-linear-86da539a-e106-44d9-87ea-759281a00a81",
+      "title": "CO-395 review-wrapper fallback expiry",
+      "relates_to": "tasks/tasks-linear-86da539a-e106-44d9-87ea-759281a00a81.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-27",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-27",
+          "status": "accepted-parent-reconciled",
+          "manifest": ".runs/linear-86da539a-e106-44d9-87ea-759281a00a81-docs-packet-v2/cli/2026-04-26T20-13-09-221Z-1315cc57/manifest.json",
+          "source_anchor": "ctx:sha256:2ad735bd7603aa57616c6fa318ee89a796462b103bed9568d6fd16928618bd1e#chunk:c000001",
+          "child_source_anchor": "ctx:sha256:77c98bad7ca4cfe8e5367dc6eb6e20c1d9eff50fc4338300073a8c74303bb730#chunk:c000001",
+          "summary": "Docs-first packet accepted from same-issue child lane and reconciled by the parent after rebasing onto current origin/main. Current main contains docs/guides/fallback-expiry-and-refactor-policy.md from CO-382, so CO-395 treats that policy as authoritative and records concrete remove fallback / expire fallback / justify retaining fallback decisions for review-wrapper scoped prompt retry, synthesized title fallback, generated fallback notes, bounded-review contracts, and telemetry classification."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-86da539a-e106-44d9-87ea-759281a00a81.md",
+        "task": "tasks/tasks-linear-86da539a-e106-44d9-87ea-759281a00a81.md",
+        "agent_task": ".agent/task/linear-86da539a-e106-44d9-87ea-759281a00a81.md",
+        "docs": "docs/TECH_SPEC-linear-86da539a-e106-44d9-87ea-759281a00a81.md"
+      }
+    },
+    {
       "id": "20260426-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a",
       "title": "CO-394: expire provider workflow fallback mappings",
       "relates_to": "tasks/tasks-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md",
