@@ -348,6 +348,10 @@ export function resolveReviewNotes(options: {
     });
   }
   if (!options.authoritativeGate) {
+    // CO-395 justify retaining fallback: non-authoritative reviews still get an
+    // explicit generated marker so missing NOTES does not masquerade as caller
+    // intent. Authoritative gates fail closed unless a break-glass waiver is
+    // present.
     const fallback =
       `Goal: standalone review handoff | ` +
       `Summary: auto-generated NOTES fallback (task=${options.taskLabel}, surface=${options.surface}) | ` +
