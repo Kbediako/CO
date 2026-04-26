@@ -45,6 +45,7 @@ import {
   REPO_CONFIG_PATH_ENV_KEY,
 } from './config/userConfig.js';
 import {
+  CONFIG_AUTHORITY_MODE_ENV_KEY,
   REPO_CONFIG_REQUIRED_ENV_KEY
 } from './config/repoConfigPolicy.js';
 import {
@@ -883,6 +884,7 @@ function buildProviderLaunchSpec(
       CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
       CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
       [REPO_CONFIG_PATH_ENV_KEY]: repoConfigPath,
+      [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'repo-authoritative',
       [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
       [PROVIDER_WORKER_HOST_ENV_KEY]: workerHost?.name ?? '',
       ...(workerHost ? { CODEX_ORCHESTRATOR_NODE_BIN: resolveRemoteProviderNodePath(workerHost) } : {}),

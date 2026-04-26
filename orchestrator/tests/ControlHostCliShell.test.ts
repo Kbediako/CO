@@ -9,7 +9,11 @@ import type { ProviderIssueHandoffService } from '../src/cli/control/providerIss
 import type { EnvironmentPaths } from '../src/cli/run/environment.js';
 
 import { __test__ as controlHostCliShellTest } from '../src/cli/controlHostCliShell.js';
-import { REPO_CONFIG_REQUIRED_ENV_KEY } from '../src/cli/config/repoConfigPolicy.js';
+import {
+  CONFIG_AUTHORITY_MODE_ENV_KEY,
+  REPO_CONFIG_REQUIRED_ENV_KEY,
+  resolveConfigAuthorityMode
+} from '../src/cli/config/repoConfigPolicy.js';
 import { REPO_CONFIG_PATH_ENV_KEY } from '../src/cli/config/userConfig.js';
 import { createProviderWorkflowConfigStore } from '../src/cli/control/providerWorkflowConfigStore.js';
 import { PROVIDER_WORKER_HOST_ENV_KEY } from '../src/cli/control/providerWorkerHosts.js';
@@ -145,12 +149,37 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_OUT_DIR: '/repo/out',
         [REPO_CONFIG_PATH_ENV_KEY]:
           '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'repo-authoritative',
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         [PROVIDER_WORKER_HOST_ENV_KEY]: ''
       },
       transport: {
         kind: 'local'
       }
+    });
+  });
+
+  it('forces provider launches back to repo-authoritative mode under inherited compatibility envs', () => {
+    const env: EnvironmentPaths = {
+      repoRoot: '/repo',
+      runsRoot: '/repo/.runs',
+      outRoot: '/repo/out',
+      taskId: 'local-mcp'
+    };
+    const launchSpec = buildProviderLaunchSpec(
+      env,
+      '/repo/.workspaces/provider-task',
+      '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json'
+    );
+
+    expect(
+      resolveConfigAuthorityMode({
+        [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'downstream-compatibility',
+        ...launchSpec.envOverrides
+      })
+    ).toEqual({
+      mode: 'repo-authoritative',
+      reason: `${CONFIG_AUTHORITY_MODE_ENV_KEY}=repo-authoritative`
     });
   });
 
@@ -185,6 +214,7 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_OUT_DIR: '/repo/out',
         [REPO_CONFIG_PATH_ENV_KEY]:
           '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'repo-authoritative',
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         [PROVIDER_WORKER_HOST_ENV_KEY]: 'worker-host-01'
       },
@@ -674,6 +704,7 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
         [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
+        [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'repo-authoritative',
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         [PROVIDER_WORKER_HOST_ENV_KEY]: '',
         CO_LINEAR_WORKSPACE_ID: '',
@@ -734,6 +765,7 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
         [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
+        [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'repo-authoritative',
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         [PROVIDER_WORKER_HOST_ENV_KEY]: '',
         CO_LINEAR_WORKSPACE_ID: 'workspace-1',
@@ -781,6 +813,7 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
         [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
+        [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'repo-authoritative',
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         [PROVIDER_WORKER_HOST_ENV_KEY]: '',
         CO_LINEAR_WORKSPACE_ID: '',
@@ -821,6 +854,7 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
         [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
+        [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'repo-authoritative',
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         [PROVIDER_WORKER_HOST_ENV_KEY]: '',
         CO_LINEAR_WORKSPACE_ID: '',
@@ -869,6 +903,7 @@ describe('controlHostCliShell manifest discovery', () => {
         CODEX_ORCHESTRATOR_RUNS_DIR: env.runsRoot,
         CODEX_ORCHESTRATOR_OUT_DIR: env.outRoot,
         [REPO_CONFIG_PATH_ENV_KEY]: join(tempRoot, 'codex.orchestrator.json'),
+        [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'repo-authoritative',
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         [PROVIDER_WORKER_HOST_ENV_KEY]: '',
         CO_LINEAR_WORKSPACE_ID: '',
@@ -1162,6 +1197,7 @@ describe('controlHostCliShell manifest discovery', () => {
             'control-host',
             'provider-workflow.last-known-good.json'
           ),
+        [CONFIG_AUTHORITY_MODE_ENV_KEY]: 'repo-authoritative',
         [REPO_CONFIG_REQUIRED_ENV_KEY]: '1',
         [PROVIDER_WORKER_HOST_ENV_KEY]: '',
         CO_LINEAR_WORKSPACE_ID: '',
