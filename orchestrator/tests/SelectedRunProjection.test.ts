@@ -6635,7 +6635,6 @@ describe('SelectedRunProjection', () => {
     const releasedLocalActivityTime = new Date('2026-03-20T03:20:00.000Z');
     const syntheticProviderWorkerActivityTime = new Date('2026-03-20T03:21:00.000Z');
     const syntheticRecentActivityRunTime = new Date('2026-03-20T00:05:00.000Z');
-    const recentActivityTime = new Date('2026-03-20T03:22:00.000Z');
     await Promise.all([
       utimes(syntheticLocalPaths.runDir, syntheticLocalActivityTime, syntheticLocalActivityTime),
       utimes(syntheticUnrelatedLocalPaths.runDir, syntheticUnrelatedActivityTime, syntheticUnrelatedActivityTime),
