@@ -2369,7 +2369,7 @@ describe('runProviderIssueHandoffRefresh', () => {
     });
   });
 
-  it('does not launch normally budgeted live-start probes when same-issue occupancy is unreadable', async () => {
+  it('does not launch normally budgeted live-start probes when same-issue occupancy is unreadable and budget permits dispatch', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-15T01:20:00.000Z'));
 
@@ -2438,10 +2438,7 @@ describe('runProviderIssueHandoffRefresh', () => {
       resolveTrackedIssue,
       readFeatureToggles: () => ({
         agent: {
-          max_concurrent_agents: 3,
-          max_concurrent_agents_by_state: {
-            'In Progress': 1
-          }
+          max_concurrent_agents: 3
         }
       })
     });

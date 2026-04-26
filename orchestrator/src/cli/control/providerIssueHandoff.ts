@@ -5152,6 +5152,13 @@ export function createProviderIssueHandoffService(
               continue;
             }
             if (
+              shouldProbeNoRunPendingReopenLiveStartedTruth &&
+              hasOccupiedPollDispatchProviderKey
+            ) {
+              deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
+              continue;
+            }
+            if (
               usedNoRunPendingReopenLiveStartedProbe &&
               !isProviderStartedWorkerTrackedIssue(resolution.trackedIssue)
             ) {
