@@ -1,6 +1,6 @@
-# CO-345 Evidence Book: Codex CLI 0.124.0 Adoption Evidence
+# Historical CO-345 Evidence Book: Codex CLI 0.124.0 Adoption Evidence
 
-Scope: CO-345 README/book evidence page. This page preserves the CO-341/CO-345 `codex-cli 0.124.0` adoption step against repo evidence and official OpenAI Codex docs. Current posture has since moved: release-facing package/downstream-smoke compatibility and local ChatGPT-auth/appserver posture now use `0.125.0`, while cloud execution remains separately pinned to `0.124.0`. This page does not change runtime defaults.
+Scope: archived CO-345 README/book evidence page. This page preserves the CO-341/CO-345 `codex-cli 0.124.0` adoption step against repo evidence and official OpenAI Codex docs. Current posture has since moved: release-facing package/downstream-smoke compatibility and local ChatGPT-auth/appserver posture now use `0.125.0`, while cloud execution remains separately pinned to `0.124.0`. This archive page does not change runtime defaults and is not current posture guidance.
 
 ## Bottom Line
 

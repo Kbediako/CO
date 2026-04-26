@@ -403,8 +403,8 @@
       "truth_checks": []
     },
     {
-      "path": "docs/book/codex-cli-0124-adoption.md",
-      "status": "active",
+      "path": "docs/book/archive/codex-cli-0124-adoption.md",
+      "status": "historical",
       "tier": 2,
       "doc_class": "public_guide",
       "audience": "maintainers and reviewers",
@@ -416,9 +416,8 @@
       "owner": "Codex (top-level agent), Review agent",
       "cadence_days": 30,
       "update_triggers": [
-        "Codex CLI candidate audit changes",
-        "OpenAI Codex feature maturity changes",
-        "model catalog posture changes"
+        "Codex CLI historical evidence retention changes",
+        "current posture documentation moves old evidence again"
       ],
       "truth_checks": []
     },

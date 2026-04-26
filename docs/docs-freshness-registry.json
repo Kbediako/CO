@@ -45,6 +45,48 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-26",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-26",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-26",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-26",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-26",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-04-26",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -1173,13 +1215,6 @@
     },
     {
       "path": "docs/book/local-hook-impact.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-24",
-      "cadence_days": 30
-    },
-    {
-      "path": "docs/book/codex-cli-0124-adoption.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-04-24",
@@ -33727,6 +33762,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-04-26",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/book/archive/codex-cli-0124-adoption.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "archived",
+      "last_review": "2026-04-24",
       "cadence_days": 30
     }
   ]

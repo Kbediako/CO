@@ -26,6 +26,32 @@
       }
     },
     {
+      "id": "20260426-linear-f838cbde-8bb6-46de-bde2-b749f2e64422",
+      "title": "CO: retire stale 0.124 evidence-book residue after Codex 0.125 adoption",
+      "relates_to": "tasks/tasks-linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-26",
+      "approvals": {
+        "provider_worker_docs_packet": {
+          "reviewer": "Codex provider worker",
+          "date": "2026-04-26",
+          "status": "created",
+          "manifest": ".runs/linear-f838cbde-8bb6-46de-bde2-b749f2e64422/cli/2026-04-26T11-14-26-687Z-a01e7b92/manifest.json",
+          "source_anchor": "ctx:sha256:36aecdd1d31f000742d130136fe00806039121e7d92db144db5a9726604ea238#chunk:c000001",
+          "summary": "Docs-first packet created for CO-379. Scope retires stale 0.124 evidence-book residue by preserving CO-341/CO-345 evidence under explicit historical/archive status while keeping current-facing posture on Codex CLI 0.125.0 plus gpt-5.5/xhigh for validated local ChatGPT-auth/appserver use and gpt-5.4 only as portable fallback wording."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
+        "task": "tasks/tasks-linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
+        "agent_task": ".agent/task/linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
+        "docs": "docs/TECH_SPEC-linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md"
+      }
+    },
+    {
       "id": "20260426-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba",
       "title": "CO: promote resident app-server seam to authoritative provider-worker control plane",
       "relates_to": "tasks/tasks-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md",
