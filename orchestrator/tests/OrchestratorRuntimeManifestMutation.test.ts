@@ -34,10 +34,15 @@ describe('orchestrator runtime manifest mutation', () => {
     expect(manifest.runtime_provider).toBe('AppServerRuntimeProvider');
     expect(manifest.runtime_fallback).toEqual({
       occurred: false,
+      policy: 'auto',
+      policy_source: 'default',
       code: null,
       reason: null,
       from_mode: null,
       to_mode: null,
+      original_target: null,
+      fallback_target: null,
+      blocking_reason: null,
       checked_at: '2026-03-15T00:00:00.000Z'
     });
   });
@@ -52,10 +57,15 @@ describe('orchestrator runtime manifest mutation', () => {
       runtime_session_id: null,
       fallback: {
         occurred: true,
+        policy: 'auto',
+        policy_source: 'env',
         code: 'appserver-unavailable',
         reason: 'Appserver preflight failed',
         from_mode: 'appserver',
         to_mode: 'cli',
+        original_target: 'runtime:appserver',
+        fallback_target: 'runtime:cli',
+        blocking_reason: 'Appserver preflight failed',
         checked_at: '2026-03-15T00:01:00.000Z'
       },
       env_overrides: {

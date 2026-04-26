@@ -58,15 +58,17 @@ function makeConnectorDriftResult(): PipelineRunExecutionResult {
 }
 
 function makeFallbackResult(): PipelineRunExecutionResult {
+  const fallbackSummary =
+    'Cloud preflight failed; fallback_policy=auto original_target=execution:cloud fallback_target=execution:mcp blocking_reason=Missing CODEX_CLOUD_ENV_ID.';
   return {
     success: true,
-    notes: ['Cloud preflight failed; falling back to mcp. Missing CODEX_CLOUD_ENV_ID.'],
+    notes: [fallbackSummary],
     manifestPath: '.runs/task/cli/run-1/manifest.json',
     logPath: '.runs/task/cli/run-1/runner.ndjson',
     manifest: {
       status_detail: null,
       guardrails_required: true,
-      summary: 'Cloud preflight failed; falling back to mcp.',
+      summary: fallbackSummary,
       cloud_execution: null,
       commands: [
         {

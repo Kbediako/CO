@@ -26,8 +26,8 @@ Task-specific historical project blocks were removed from this file in `CO-88`. 
 - Use `codex-orchestrator` pipelines for planning, implementation, validation, and review work that touches the repo.
 - Avoid ad-hoc command chains unless the work is a lightweight discovery step that does not require manifest evidence.
 - Use cloud mode when work is long-running/parallel and cloud prerequisites are ready; otherwise stay in local `mcp` mode.
-- Cloud preflight: confirm remote branch availability, non-interactive setup commands, and required cloud secrets/variables; if missing, record local fallback rationale in checklist/manifests.
-- For strict cloud lanes, set `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny` so preflight failures fail fast instead of falling back.
+- Cloud preflight: confirm remote branch availability, non-interactive setup commands, and required cloud secrets/variables; if missing under `auto` fallback, record the selected policy, original target, fallback target, and blocking reason in checklist/manifests.
+- For strict cloud lanes, set `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=strict` so preflight failures fail fast instead of rerouting.
 - Keep mode semantics explicit and orthogonal: `executionMode=mcp|cloud` and `runtimeMode=cli|appserver` are separate controls.
 - Local default runtime remains `appserver`, with `--runtime-mode cli` preserved as break-glass.
 - `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and must fail fast with actionable errors.

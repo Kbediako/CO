@@ -2221,7 +2221,7 @@ describe('codex-orchestrator command surface', () => {
       manifest?: string;
     };
     expect(payload.status).toBe('failed');
-    expect(payload.summary).toContain('cloud fallback is disabled');
+    expect(payload.summary).toContain('fallback_policy=strict');
     expect(payload.summary).not.toContain('Runtime selection failed');
     const manifestPath = isAbsolute(payload.manifest ?? '')
       ? (payload.manifest as string)

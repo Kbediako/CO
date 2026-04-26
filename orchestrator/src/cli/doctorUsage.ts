@@ -589,7 +589,7 @@ function buildAdoptionRecommendations(params: {
   }
   if (params.cloudFallbackRuns > 0) {
     hints.push(
-      `Cloud fallback triggered in ${params.cloudFallbackRuns} run(s); treat fallback as a safety net and fix preflight issues. For fail-fast lanes set \`CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny\`.`
+      `Cloud fallback triggered in ${params.cloudFallbackRuns} run(s); treat fallback as a safety net and fix preflight issues. For fail-fast lanes set \`CODEX_ORCHESTRATOR_CLOUD_FALLBACK=strict\`.`
     );
   }
   if (params.cloudConfigured && params.cloudRuns === 0) {

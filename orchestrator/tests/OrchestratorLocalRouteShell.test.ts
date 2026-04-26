@@ -43,10 +43,15 @@ function createRuntimeSelection(overrides: Partial<RuntimeSelection> = {}): Runt
     runtime_session_id: null,
     fallback: {
       occurred: false,
+      policy: 'auto',
+      policy_source: 'default',
       code: null,
       reason: null,
       from_mode: null,
       to_mode: null,
+      original_target: null,
+      fallback_target: null,
+      blocking_reason: null,
       checked_at: '2026-03-14T00:00:00.000Z'
     },
     env_overrides: {},
@@ -132,10 +137,15 @@ describe('executeOrchestratorLocalRouteShell', () => {
           provider: 'CliRuntimeProvider',
           fallback: {
             occurred: true,
+            policy: 'auto',
+            policy_source: 'env',
             code: 'appserver-command-unavailable',
             reason: 'Appserver preflight failed.',
             from_mode: 'appserver',
             to_mode: 'cli',
+            original_target: 'runtime:appserver',
+            fallback_target: 'runtime:cli',
+            blocking_reason: 'Appserver preflight failed.',
             checked_at: '2026-03-13T00:00:00.000Z'
           }
         })
@@ -146,10 +156,10 @@ describe('executeOrchestratorLocalRouteShell', () => {
 
     expect(result.success).toBe(true);
     expect(result.notes).toEqual([
-      'Runtime fallback (appserver-command-unavailable): Appserver preflight failed.'
+      'Runtime fallback: policy=auto code=appserver-command-unavailable original_target=runtime:appserver fallback_target=runtime:cli blocking_reason=Appserver preflight failed.'
     ]);
     expect(options.manifest.summary).toBe(
-      'Runtime fallback (appserver-command-unavailable): Appserver preflight failed.'
+      'Runtime fallback: policy=auto code=appserver-command-unavailable original_target=runtime:appserver fallback_target=runtime:cli blocking_reason=Appserver preflight failed.'
     );
   });
 

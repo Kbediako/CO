@@ -62,7 +62,13 @@ describe('runSummaryWriter cloud execution projection', () => {
       cloud_fallback: {
         mode_requested: 'cloud',
         mode_used: 'mcp',
-        reason: 'Cloud preflight failed; falling back to mcp.',
+        policy: 'auto',
+        policy_source: 'default',
+        original_target: 'execution:cloud',
+        fallback_target: 'execution:mcp',
+        blocking_reason: 'Missing CODEX_CLOUD_ENV_ID.',
+        reason:
+          'Cloud preflight failed; fallback_policy=auto original_target=execution:cloud fallback_target=execution:mcp blocking_reason=Missing CODEX_CLOUD_ENV_ID.',
         issues: [{ code: 'missing_environment', message: 'Missing CODEX_CLOUD_ENV_ID.' }],
         checked_at: '2026-02-17T00:00:00.000Z'
       }
@@ -73,7 +79,13 @@ describe('runSummaryWriter cloud execution projection', () => {
     expect(runSummary.cloudFallback).toEqual({
       modeRequested: 'cloud',
       modeUsed: 'mcp',
-      reason: 'Cloud preflight failed; falling back to mcp.',
+      policy: 'auto',
+      policySource: 'default',
+      originalTarget: 'execution:cloud',
+      fallbackTarget: 'execution:mcp',
+      blockingReason: 'Missing CODEX_CLOUD_ENV_ID.',
+      reason:
+        'Cloud preflight failed; fallback_policy=auto original_target=execution:cloud fallback_target=execution:mcp blocking_reason=Missing CODEX_CLOUD_ENV_ID.',
       issues: [{ code: 'missing_environment', message: 'Missing CODEX_CLOUD_ENV_ID.' }],
       checkedAt: '2026-02-17T00:00:00.000Z'
     });
@@ -87,6 +99,11 @@ describe('runSummaryWriter cloud execution projection', () => {
       cloud_fallback: {
         mode_requested: 'cloud',
         mode_used: 'mcp',
+        policy: 'auto',
+        policy_source: 'default',
+        original_target: 'execution:cloud',
+        fallback_target: 'execution:mcp',
+        blocking_reason: 'fallback',
         reason: 'fallback',
         issues: [],
         checked_at: '2026-02-17T00:00:00.000Z'
