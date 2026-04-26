@@ -47,7 +47,7 @@
 
 ## Parent-Owned Follow-On Plan
 1. Decide the default allowed maximum lifetime for retained fallbacks.
-2. Define required fallback metadata: owner, trigger, review date, removal condition, and allowed maximum lifetime.
+2. Define required fallback metadata: owner, trigger, introduced date, review date, removal condition, and allowed maximum lifetime.
 3. Define large-refactor decision criteria for high-churn surfaces.
 4. Add docs-first or issue-template prompts requiring the fallback decision.
 5. Attach or create follow-ups for at least three of:
@@ -78,7 +78,7 @@
 
 ## Risks & Mitigations
 - Risk: policy becomes generic advice instead of an expiry mechanism.
-  - Mitigation: require owner, trigger, review date, removal condition, and allowed maximum lifetime.
+  - Mitigation: require owner, trigger, introduced date, review date, removal condition, and allowed maximum lifetime.
 - Risk: agents keep adding another `minor seam` instead of planning a `large refactor`.
   - Mitigation: require a decision threshold for the named high-churn surfaces.
 - Risk: follow-up ownership is left vague.
