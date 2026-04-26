@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
@@ -167,6 +168,46 @@ async function fetchJson(fetchImpl, url, headers) {
   };
 }
 
+function mergeRateLimits(rateLimits) {
+  const remainingValues = rateLimits.map((limit) => limit.remaining).filter((value) => value !== null);
+  const limitValues = rateLimits.map((limit) => limit.limit).filter((value) => value !== null);
+  const resetValues = rateLimits.map((limit) => limit.reset_epoch_seconds).filter((value) => value !== null);
+  return {
+    remaining: remainingValues.length > 0 ? Math.min(...remainingValues) : null,
+    limit: limitValues.length > 0 ? Math.max(...limitValues) : null,
+    reset_epoch_seconds: resetValues.length > 0 ? Math.max(...resetValues) : null,
+    uncertain: rateLimits.some((limit) => limit.uncertain)
+  };
+}
+
+async function fetchGithubReleases(fetchImpl, githubRepo, headers) {
+  const releases = [];
+  const rateLimits = [];
+  const perPage = 100;
+  const maxPages = 10;
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const url = `https://api.github.com/repos/${githubRepo}/releases?per_page=${perPage}&page=${page}`;
+    const result = await fetchJson(fetchImpl, url, headers);
+    rateLimits.push(result.rate_limit);
+    const pageReleases = Array.isArray(result.json) ? result.json : [];
+    releases.push(...pageReleases);
+
+    const classified = classifyGithubReleases(releases);
+    if (classified.stable || pageReleases.length < perPage) {
+      return {
+        releases,
+        rate_limit: mergeRateLimits(rateLimits)
+      };
+    }
+  }
+
+  return {
+    releases,
+    rate_limit: mergeRateLimits(rateLimits)
+  };
+}
+
 export async function collectUpstreamTruth({
   fetchImpl = globalThis.fetch,
   githubRepo = DEFAULT_GITHUB_REPO,
@@ -181,16 +222,15 @@ export async function collectUpstreamTruth({
     'X-GitHub-Api-Version': '2022-11-28',
     ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {})
   };
-  const githubUrl = `https://api.github.com/repos/${githubRepo}/releases?per_page=20`;
-  const npmUrl = `https://registry.npmjs.org/${encodeURIComponent(npmPackage).replace('%2F', '%2f')}`;
+  const npmUrl = `https://registry.npmjs.org/${encodeURIComponent(npmPackage).replaceAll('%2F', '%2f')}`;
   const [githubResult, npmResult] = await Promise.all([
-    fetchJson(fetchImpl, githubUrl, githubHeaders),
+    fetchGithubReleases(fetchImpl, githubRepo, githubHeaders),
     fetchJson(fetchImpl, npmUrl, { Accept: 'application/json' })
   ]);
   return {
     github: {
       repo: githubRepo,
-      ...classifyGithubReleases(githubResult.json),
+      ...classifyGithubReleases(githubResult.releases),
       rate_limit: githubResult.rate_limit
     },
     npm: classifyNpmMetadata(npmResult.json)
@@ -221,12 +261,31 @@ function matchPolicyVersion(content, pattern) {
   return match?.[1] ?? null;
 }
 
+function extractAuditedVersions(content) {
+  const versions = new Set();
+  const patterns = [
+    /\baudited(?: official)? `rust-v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)`/gi,
+    /\baudited[^.\n]*npm `@openai\/codex@(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)`/gi,
+    /\baudited[^.\n]*Codex CLI `(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)`/gi
+  ];
+  for (const pattern of patterns) {
+    for (const match of content.matchAll(pattern)) {
+      if (parseSemver(match[1])) {
+        versions.add(match[1]);
+      }
+    }
+  }
+  return [...versions];
+}
+
 export async function collectCurrentCoPins({ repoRoot = process.cwd(), readFileImpl = readFile } = {}) {
   const surfaces = [];
+  const surfaceContents = new Map();
   const missing = [];
   for (const surface of PIN_SURFACES) {
     try {
       const content = await readFileImpl(join(repoRoot, surface), 'utf8');
+      surfaceContents.set(surface, content);
       surfaces.push({
         path: surface,
         versions: extractVersions(content),
@@ -247,8 +306,8 @@ export async function collectCurrentCoPins({ repoRoot = process.cwd(), readFileI
   }
 
   const policy = surfaces.find((surface) => surface.path === 'docs/guides/codex-version-policy.md');
-  const policyContent = policy ? await readFileImpl(join(repoRoot, policy.path), 'utf8') : '';
-  const policyVersions = extractVersions(policyContent).filter((version) => !parseSemver(version)?.prerelease);
+  const policyContent = policy ? (surfaceContents.get(policy.path) ?? '') : '';
+  const policyVersions = extractAuditedVersions(policyContent).filter((version) => !parseSemver(version)?.prerelease);
   const lastAuditedVersion = sortVersionsDescending(policyVersions.map((version) => ({ version })))[0]?.version ?? null;
   const installPins = surfaces.flatMap((surface) =>
     surface.install_pins.map((version) => ({ path: surface.path, version }))
@@ -478,6 +537,17 @@ function parseLinearIssueFromResult(result) {
   };
 }
 
+function parseLinearJson(stdout, stderr, commandName) {
+  try {
+    return JSON.parse(stdout);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const stdoutSnippet = String(stdout ?? '').slice(0, 200);
+    const stderrSnippet = String(stderr ?? '').slice(0, 200);
+    throw new Error(`${commandName} returned invalid JSON: ${message}; stdout=${stdoutSnippet}; stderr=${stderrSnippet}`);
+  }
+}
+
 export function defaultLinearRunner({ nodePath = process.execPath, scriptPath = join(process.cwd(), 'dist/bin/codex-orchestrator.js') } = {}) {
   return async (args, options = {}) => {
     const { stdout, stderr } = await execFileAsync(nodePath, [scriptPath, 'linear', ...args], {
@@ -552,7 +622,7 @@ export async function runLinearMutation({
       'json'
     ];
     const createResultRaw = await linearRunner(createArgs, { cwd: repoRoot, env });
-    const createResult = JSON.parse(createResultRaw.stdout);
+    const createResult = parseLinearJson(createResultRaw.stdout, createResultRaw.stderr, 'Linear create-follow-up');
     const selectedIssue = parseLinearIssueFromResult(createResult);
     if (!selectedIssue.id && !selectedIssue.identifier) {
       throw new Error('Linear create-follow-up did not return a selected issue id or identifier.');
@@ -563,7 +633,7 @@ export async function runLinearMutation({
       ['upsert-workpad', '--issue-id', issueRef, '--body-file', temp.paths.workpad, '--format', 'json'],
       { cwd: repoRoot, env }
     );
-    const upsertResult = JSON.parse(upsertResultRaw.stdout);
+    const upsertResult = parseLinearJson(upsertResultRaw.stdout, upsertResultRaw.stderr, 'Linear upsert-workpad');
     return {
       action: createResult.action ?? createResult.operation ?? 'created_or_reused',
       canonical_owner_key: packet.canonicalOwnerKey,
@@ -729,7 +799,7 @@ Options:
 `);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (fileURLToPath(import.meta.url) === resolve(process.argv[1] ?? '')) {
   try {
     const args = parseArgs(process.argv.slice(2));
     if (args.help) {

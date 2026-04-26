@@ -49,6 +49,7 @@
   - bypassing the CO version-policy target, cloud canary gates, or marketplace smoke split from prior posture work
 
 ## Parity / Alignment Matrix
+
 | Surface | Current truth | Reference truth | Target truth |
 | -- | -- | -- | -- |
 | Version policy | `docs/guides/codex-version-policy.md` records the current CO compatibility/adoption target and audited candidate posture. | CO posture changes require release, npm, local runtime, cloud canary, fallback, and no-regression evidence. | Release detection reports candidate drift against the CO version-policy target without changing posture by itself. |
