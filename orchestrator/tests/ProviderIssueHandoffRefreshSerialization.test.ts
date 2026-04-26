@@ -2279,6 +2279,143 @@ describe('runProviderIssueHandoffRefresh', () => {
     });
   });
 
+  it('preserves fresh-discovery state slots for discovered live-started no-run pending-reopen claims', async () => {
+    const { root, paths } = await createHostPaths();
+    const activePaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'linear-lin-active-live-started-reserved'
+      },
+      'run-active-live-started-reserved'
+    );
+    await mkdir(activePaths.runDir, { recursive: true });
+    await writeFile(
+      activePaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-active-live-started-reserved',
+        task_id: 'linear-lin-active-live-started-reserved',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-active-live-started-reserved',
+        issue_identifier: 'CO-184',
+        issue_updated_at: '2026-04-15T01:17:00.000Z',
+        updated_at: '2026-04-15T01:17:30.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-active-live-started-reserved',
+      issue_id: 'lin-active-live-started-reserved',
+      issue_identifier: 'CO-184',
+      issue_title: 'Active started reserved slot occupant',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T01:17:00.000Z',
+      task_id: 'linear-lin-active-live-started-reserved',
+      mapping_source: 'provider_id_fallback',
+      state: 'running',
+      reason: 'provider_issue_handoff_owned',
+      accepted_at: '2026-04-15T01:17:00.000Z',
+      updated_at: '2026-04-15T01:17:30.000Z',
+      last_delivery_id: 'delivery-active-live-started-reserved',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_744_686_220_000,
+      run_id: 'run-active-live-started-reserved',
+      run_manifest_path: activePaths.manifestPath,
+      launch_source: null,
+      launch_token: null
+    });
+    pushCo185ReleasedPendingClaim(state, '', {
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-04-15T01:18:00.000Z',
+      run_id: null,
+      run_manifest_path: null
+    });
+
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-185-should-preserve-fresh-discovery-slot',
+        manifestPath: '/tmp/provider-run/co-185-should-preserve-fresh-discovery-slot-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async (input: { issueId: string }) => {
+      if (input.issueId !== 'lin-issue-185') {
+        throw new Error(`unexpected direct issue refresh for ${input.issueId}`);
+      }
+      return {
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-185',
+          identifier: 'CO-185',
+          title: 'Provider helper constraints',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-15T01:18:56.003Z'
+        })
+      };
+    });
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: []
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 3,
+          max_concurrent_agents_by_state: {
+            'In Progress': 2
+          }
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-active-live-started-reserved',
+          identifier: 'CO-184',
+          title: 'Active started reserved slot occupant',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-15T01:17:00.000Z'
+        }),
+      ],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-185'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.provider_key === 'linear:lin-issue-185')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-15T01:18:56.003Z',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
   it('blocks live-start no-run probes when same-issue occupancy is unreadable', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-15T01:20:00.000Z'));

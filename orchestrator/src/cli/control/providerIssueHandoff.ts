@@ -3096,9 +3096,13 @@ export function createProviderIssueHandoffService(
     claim: ProviderIntakeClaimRecord;
     trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at' | 'blocked_by'>;
   }): boolean => {
+    const claimReason = input.claim.reason ?? null;
     if (
       input.claim.state !== 'released' ||
-      input.claim.reason !== 'provider_issue_released:not_active'
+      (
+        claimReason !== 'provider_issue_released:not_active' &&
+        !isProviderIssueReleasedPendingReopen(claimReason)
+      )
     ) {
       return false;
     }
@@ -5199,19 +5203,24 @@ export function createProviderIssueHandoffService(
             }
             const shouldPreserveFreshDiscoverySlotForReleasedStart =
               shouldReserveFreshDiscoverySlot && !usedNoRunPendingReopenLiveStartedProbe;
+            const canDispatchReleasedStart = pollDispatchBudget.canDispatch(resolution.trackedIssue);
+            const canDispatchReleasedStartWhilePreservingFreshDiscoverySlot =
+              !shouldPreserveFreshDiscoverySlotForReleasedStart ||
+              pollDispatchBudget.canDispatchWhilePreservingFreshDiscoverySlot(
+                resolution.trackedIssue
+              );
             if (
-              !pollDispatchBudget.canDispatch(resolution.trackedIssue) ||
-              (
-                shouldPreserveFreshDiscoverySlotForReleasedStart &&
-                !pollDispatchBudget.canDispatchWhilePreservingFreshDiscoverySlot(
-                  resolution.trackedIssue
-                )
-              )
+              !canDispatchReleasedStart ||
+              !canDispatchReleasedStartWhilePreservingFreshDiscoverySlot
             ) {
               if (
                 shouldProbeNoRunPendingReopenLiveStartedTruth &&
                 !hasOccupiedPollDispatchProviderKey &&
-                isProviderStartedWorkerTrackedIssue(resolution.trackedIssue)
+                isProviderStartedWorkerTrackedIssue(resolution.trackedIssue) &&
+                (
+                  !canDispatchReleasedStart ||
+                  usedNoRunPendingReopenLiveStartedProbe
+                )
               ) {
                 const handoffResult = await launchStartForTrackedIssue({
                   claim,
