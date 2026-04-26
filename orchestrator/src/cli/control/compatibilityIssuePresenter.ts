@@ -188,7 +188,11 @@ function isTerminalHandoffFailedProviderSource(
   if (normalizeProviderLinearWorkflowState(claim?.state) !== 'handoff_failed') {
     return false;
   }
-  return isTerminalProviderIssueState(source);
+  return (
+    normalizeProviderLinearWorkflowState(claim?.reason) ===
+      'provider_issue_merge_closeout_action_required' ||
+    isTerminalProviderIssueState(source)
+  );
 }
 
 function isStaleInProgressTerminalReleasedProviderSource(

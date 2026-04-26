@@ -6417,10 +6417,19 @@ describe('SelectedRunProjection', () => {
       ...activeEnv,
       taskId: 'linear-active-zzzz-docs-review'
     };
-    const syntheticLocalRunId = '2026-03-20T01-30-00-000Z-linear-derived-local-active';
+    const syntheticLocalRunId = '2026-03-20T00-30-00-000Z-linear-derived-local-active';
     const syntheticLocalPaths = resolveRunPaths(
       syntheticLocalEnv,
       syntheticLocalRunId
+    );
+    const syntheticUnrelatedLocalEnv = {
+      ...activeEnv,
+      taskId: 'linear-unclaimed-local-tool'
+    };
+    const syntheticUnrelatedLocalRunId = '2026-03-20T00-31-00-000Z-linear-unclaimed-local-active';
+    const syntheticUnrelatedLocalPaths = resolveRunPaths(
+      syntheticUnrelatedLocalEnv,
+      syntheticUnrelatedLocalRunId
     );
     const syntheticNoisePaths = Array.from({ length: 70 }, (_, index) => {
       const taskId = `linear-active-zlocal-noise-${index}`;
@@ -6442,6 +6451,7 @@ describe('SelectedRunProjection', () => {
       mkdir(releasedPaths.runDir, { recursive: true }),
       mkdir(localPaths.runDir, { recursive: true }),
       mkdir(syntheticLocalPaths.runDir, { recursive: true }),
+      mkdir(syntheticUnrelatedLocalPaths.runDir, { recursive: true }),
       ...releasedNoisePaths.map((entry) => mkdir(entry.paths.runDir, { recursive: true })),
       ...syntheticNoisePaths.map((entry) => mkdir(entry.paths.runDir, { recursive: true }))
     ]);
@@ -6517,8 +6527,21 @@ describe('SelectedRunProjection', () => {
         task_id: 'linear-active-zzzz-docs-review',
         status: 'in_progress',
         issue_identifier: 'LOCAL-LINEAR-DERIVED',
-        updated_at: '2026-03-20T01:18:00.000Z',
-        summary: 'non-intake local run under a Linear-derived task id remains visible',
+        updated_at: '2026-03-20T03:18:00.000Z',
+        summary: 'older-started non-intake local run under a Linear-derived task id remains visible by manifest freshness',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      syntheticUnrelatedLocalPaths.manifestPath,
+      JSON.stringify({
+        run_id: syntheticUnrelatedLocalRunId,
+        task_id: 'linear-unclaimed-local-tool',
+        status: 'in_progress',
+        issue_identifier: 'LOCAL-LINEAR-UNCLAIMED',
+        updated_at: '2026-03-20T03:19:00.000Z',
+        summary: 'older-started non-intake local run under an unclaimed Linear-looking task id remains visible by manifest freshness',
         commands: []
       }),
       'utf8'
@@ -6544,14 +6567,17 @@ describe('SelectedRunProjection', () => {
     const newerSyntheticTaskTime = new Date('2026-03-20T02:00:00.000Z');
     await Promise.all(
       syntheticNoisePaths.map((entry) =>
-        utimes(join(activeEnv.runsRoot, entry.taskId), olderSyntheticTaskTime, olderSyntheticTaskTime)
+        utimes(join(activeEnv.runsRoot, entry.taskId), newerSyntheticTaskTime, newerSyntheticTaskTime)
       )
     );
-    await utimes(
-      join(activeEnv.runsRoot, syntheticLocalEnv.taskId),
-      newerSyntheticTaskTime,
-      newerSyntheticTaskTime
-    );
+    await Promise.all([
+      utimes(join(activeEnv.runsRoot, syntheticLocalEnv.taskId), olderSyntheticTaskTime, olderSyntheticTaskTime),
+      utimes(
+        join(activeEnv.runsRoot, syntheticUnrelatedLocalEnv.taskId),
+        olderSyntheticTaskTime,
+        olderSyntheticTaskTime
+      )
+    ]);
     const baseClaim = createProviderIntakeState(activePaths.manifestPath).claims[0]!;
     const providerIntakeState: ProviderIntakeState = {
       schema_version: 1,
@@ -6615,6 +6641,7 @@ describe('SelectedRunProjection', () => {
     expect(discovery.running.map((entry) => entry.runId)).toEqual(
       expect.arrayContaining([
         syntheticLocalRunId,
+        syntheticUnrelatedLocalRunId,
         'run-local-active',
         'run-active'
       ])
@@ -7494,27 +7521,49 @@ describe('SelectedRunProjection', () => {
       })
     );
     const baseClaim = createProviderIntakeState(runPaths[0]!.manifestPath).claims[0]!;
+    const liveRehydrateClaims = cases.map((entry, index) => ({
+      ...baseClaim,
+      provider_key: `linear:${entry.issueId}`,
+      issue_id: entry.issueId,
+      issue_identifier: entry.issueIdentifier,
+      issue_title: 'Rehydrating active issue',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      task_id: entry.taskId,
+      state: 'released' as const,
+      reason: entry.reason,
+      updated_at: '2026-04-18T12:59:00.000Z',
+      run_id: entry.runId,
+      run_manifest_path: runPaths[index]!.manifestPath
+    }));
+    const completedFillerClaims = Array.from({ length: 17 }, (_, index) => ({
+      ...baseClaim,
+      provider_key: `linear:co-93-completed-${index}`,
+      issue_id: `co-93-completed-${index}`,
+      issue_identifier: `CO-93C-${index}`,
+      issue_title: 'Completed filler issue',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      task_id: `linear-co-93-completed-${index}`,
+      state: 'completed' as const,
+      reason: 'provider_issue_rehydrated_completed_run',
+      updated_at: '2026-04-18T12:00:00.000Z',
+      run_id: `run-co-93-completed-${index}`,
+      run_manifest_path: join(
+        runsRoot,
+        `linear-co-93-completed-${index}`,
+        'cli',
+        `run-co-93-completed-${index}`,
+        'manifest.json'
+      )
+    }));
     const providerIntakeState: ProviderIntakeState = {
       schema_version: 1,
       updated_at: '2026-04-18T13:00:00.000Z',
       rehydrated_at: '2026-04-18T13:00:00.000Z',
       latest_provider_key: 'linear:co-93-pending-reopen',
       latest_reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
-      claims: cases.map((entry, index) => ({
-        ...baseClaim,
-        provider_key: `linear:${entry.issueId}`,
-        issue_id: entry.issueId,
-        issue_identifier: entry.issueIdentifier,
-        issue_title: 'Rehydrating active issue',
-        issue_state: 'In Progress',
-        issue_state_type: 'started',
-        task_id: entry.taskId,
-        state: 'released',
-        reason: entry.reason,
-        updated_at: '2026-04-18T12:59:00.000Z',
-        run_id: entry.runId,
-        run_manifest_path: runPaths[index]!.manifestPath
-      }))
+      claims: [...liveRehydrateClaims, ...completedFillerClaims]
     };
 
     const discovery = await discoverCompatibilityCollectionContexts(
