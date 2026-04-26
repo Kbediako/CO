@@ -581,6 +581,26 @@ describe('codex CLI release detector', () => {
     expect(artifact.mutation_result.action).toBe('dry_run');
   });
 
+  it('fails closed when a required workflow pin surface has no versioned pin', async () => {
+    const repo = await writeFixtureRepo();
+    await writeFile(join(repo, '.github', 'workflows', 'core-lane.yml'), 'run: npm install --global @openai/codex\n', 'utf8');
+
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: repo,
+      artifactPath: 'out/detection.json',
+      fetchImpl: mockFetch({ stable: '0.125.0' }),
+      env: {}
+    });
+
+    expect(exitCode).toBe(2);
+    expect(artifact.decision_state).toBe('blocked_current_truth_unavailable');
+    expect(artifact.blocker_reason).toContain('.github/workflows/core-lane.yml');
+    expect(artifact.current_co.missing_surfaces).toContainEqual({
+      path: '.github/workflows/core-lane.yml',
+      error: 'missing versioned @openai/codex install pin'
+    });
+  });
+
   it('derives the last audited version from explicit audit evidence only', async () => {
     const repo = await writeFixtureRepo({
       releasePin: '0.126.0',

@@ -22,6 +22,7 @@ const PIN_SURFACES = [
   'tests/pack-smoke.spec.ts'
 ];
 
+const VERSIONED_PIN_REQUIRED_SURFACES = new Set(PIN_SURFACES.filter((surface) => !surface.endsWith('codex-version-policy.md')));
 const RELEASE_INTAKE_TEMPLATE_PATH = '.agent/task/templates/codex-cli-release-intake-template.md';
 const PRIMARY_PRERELEASE_DIST_TAGS = new Set(['alpha', 'beta', 'next', 'rc', 'canary', 'experimental', 'dev']);
 
@@ -284,14 +285,18 @@ export async function collectCurrentCoPins({ repoRoot = process.cwd(), readFileI
   for (const surface of PIN_SURFACES) {
     try {
       const content = await readFileImpl(join(repoRoot, surface), 'utf8');
+      const installPins = [
+        ...content.matchAll(/npm install --global @openai\/codex@(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/g)
+      ].map((match) => match[1]);
       surfaceContents.set(surface, content);
       surfaces.push({
         path: surface,
         versions: extractVersions(content),
-        install_pins: [...content.matchAll(/npm install --global @openai\/codex@(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/g)].map(
-          (match) => match[1]
-        )
+        install_pins: installPins
       });
+      if (VERSIONED_PIN_REQUIRED_SURFACES.has(surface) && installPins.length === 0) {
+        missing.push({ path: surface, error: 'missing versioned @openai/codex install pin' });
+      }
     } catch (error) {
       missing.push({ path: surface, error: error instanceof Error ? error.message : String(error) });
     }
