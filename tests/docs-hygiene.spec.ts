@@ -1661,6 +1661,60 @@ describe('docs hygiene tooling', () => {
     expect(errors.find((error) => error.rule === 'doc-posture-stale')).toBeUndefined();
   });
 
+  it('falls back to source_path when matrix_path is configured but empty', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-matrix-empty-path-fallback-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      extraPolicies: {
+        codex_posture: {
+          matrix_path: '',
+          source_path: 'docs/codex-posture-matrix.json'
+        }
+      }
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      current: {
+        codex_cli_version: '0.125.0'
+      },
+      surfaces: [
+        {
+          path: 'README.md',
+          kind: 'front_door',
+          status: 'current',
+          requirements: [
+            {
+              label: 'current CLI target',
+              contains: 'Codex CLI `{{current_cli_version}}`'
+            }
+          ]
+        }
+      ]
+    });
+    await writeFile(join(repoRoot, 'README.md'), '# Fixture\n\nNo posture here.\n', 'utf8');
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'README.md',
+        rule: 'codex-posture-matrix-drift',
+        reference: 'current CLI target: expected "Codex CLI `0.125.0`"'
+      })
+    );
+  });
+
   it('fails closed when the configured posture matrix path escapes the repository', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-matrix-escape-'));
     createdDirs.push(repoRoot);
@@ -1919,6 +1973,52 @@ describe('docs hygiene tooling', () => {
     );
   });
 
+  it('reports unresolved matrix requirement template tokens instead of silently dropping them', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-matrix-requirement-token-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json'
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      surfaces: [
+        {
+          path: 'README.md',
+          kind: 'front_door',
+          status: 'current',
+          requirements: [
+            {
+              label: 'marketplace typo',
+              contains: '@openai/codex@{{marketplace_smoke_cli_versoin}}'
+            }
+          ]
+        }
+      ]
+    });
+    await writeFile(join(repoRoot, 'README.md'), '# Fixture\n', 'utf8');
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'docs/codex-posture-matrix.json',
+        rule: 'codex-posture-matrix-unresolved',
+        reference: 'README.md:marketplace typo unresolved token(s): marketplace_smoke_cli_versoin'
+      })
+    );
+  });
+
   it('reports matrix surfaces with no requirements instead of silently skipping them', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-matrix-empty-requirements-'));
     createdDirs.push(repoRoot);
@@ -2114,6 +2214,51 @@ describe('docs hygiene tooling', () => {
           'active current-facing release evidence mentions Codex CLI version(s) 0.124.0 without current/historical/archive matrix status'
       })
     );
+  });
+
+  it('ignores external Codex release evidence links when checking current-facing navigation', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-active-history-external-nav-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs', 'book'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json',
+      entries: [
+        {
+          path: 'docs/book/index.md',
+          status: 'active',
+          doc_class: 'public_guide',
+          truth_checks: []
+        }
+      ]
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      current: {
+        codex_cli_version: '0.125.0',
+        cloud_canary_cli_version: '0.124.0'
+      }
+    });
+    await writeFile(
+      join(repoRoot, 'docs', 'book', 'index.md'),
+      ['# Book', '', '- [Codex 0.124 adoption evidence](https://example.com/codex-0.124-adoption)', ''].join(
+        '\n'
+      ),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors.find((error) => error.rule === 'codex-posture-history-active')).toBeUndefined();
   });
 
   it('still scans release evidence links in current matrix-managed navigation docs', async () => {

@@ -675,12 +675,9 @@ async function maybeLoadCodexPostureMatrixFromPolicy(
   repoRoot: string,
   policy: Record<string, unknown> | undefined
 ): Promise<CodexPostureMatrix | null> {
+  const matrixPath = typeof policy?.matrix_path === 'string' ? normalizePolicyPath(policy.matrix_path) : '';
   const sourcePath =
-    typeof policy?.matrix_path === 'string'
-      ? normalizePolicyPath(policy.matrix_path)
-      : typeof policy?.source_path === 'string'
-        ? normalizePolicyPath(policy.source_path)
-        : '';
+    matrixPath || (typeof policy?.source_path === 'string' ? normalizePolicyPath(policy.source_path) : '');
   if (!sourcePath.endsWith('.json')) {
     return null;
   }
@@ -909,7 +906,10 @@ async function checkActiveHistoricalReleaseEvidence(input: {
       }
     }
     for (const link of extractCodexReleaseEvidenceLinks(file, content)) {
-      if (link.path && (historicalPaths.has(link.path) || currentEvidencePaths.has(link.path))) {
+      if (!link.path) {
+        continue;
+      }
+      if (historicalPaths.has(link.path) || currentEvidencePaths.has(link.path)) {
         continue;
       }
       for (const version of link.versions) {
