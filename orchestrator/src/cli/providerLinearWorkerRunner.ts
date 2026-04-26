@@ -791,11 +791,17 @@ function hasProviderLinearWorkerGrantRoot(params: Record<string, unknown> | null
 }
 
 function pickProviderLinearWorkerFileChangeApprovalDecision(params: Record<string, unknown> | null): string {
+  const decisions = Array.isArray(params?.availableDecisions) ? params.availableDecisions : [];
   if (hasProviderLinearWorkerGrantRoot(params)) {
-    const decisions = Array.isArray(params?.availableDecisions) ? params.availableDecisions : [];
     return decisions.includes('cancel') && !decisions.includes('decline') ? 'cancel' : 'decline';
   }
-  return 'accept';
+  if (decisions.length === 0 || decisions.includes('accept')) {
+    return 'accept';
+  }
+  if (decisions.includes('decline')) {
+    return 'decline';
+  }
+  return decisions.includes('cancel') ? 'cancel' : 'decline';
 }
 
 function pickProviderLinearWorkerLegacyPatchApprovalDecision(

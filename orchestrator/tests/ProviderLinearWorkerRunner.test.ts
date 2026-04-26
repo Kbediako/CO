@@ -9683,6 +9683,22 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
     expect(
       buildProviderLinearWorkerAppServerCallbackResponse('item/fileChange/requestApproval', {
+        availableDecisions: ['acceptForSession', 'decline']
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'decline' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/fileChange/requestApproval', {
+        availableDecisions: ['cancel']
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'cancel' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/fileChange/requestApproval', {
         grantRoot: '/tmp/workspace'
       })
     ).toEqual({
