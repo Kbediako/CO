@@ -347,6 +347,10 @@ export async function runReviewLaunchAttemptShell(
       await reportFailure(error, launchContext);
       throw error;
     }
+    // CO-395 justify retaining fallback: durable bounded-review safety contract.
+    // This retry preserves the logical scope in the prompt, adds no-validation
+    // guidance, uses read-only sandboxing, and records the original command-intent
+    // boundary in success telemetry instead of masking it as clean success.
     console.log(
       '[run-review] bounded review blocked a validation command; retrying once with reviewer-visible inline no-validation context so the reviewer can produce a verdict without running validation.'
     );
@@ -379,6 +383,13 @@ export async function runReviewLaunchAttemptShell(
       return;
     }
     if (shouldRetryScopedWithoutSynthesizedTitle(error, options.cliOptions)) {
+      // CO-395 expire fallback metadata:
+      // Owner: review wrapper / CO-395. Trigger: Codex rejects synthesized scoped
+      // --title transport. Introduced: CO-43 on 2026-03-30. Review by:
+      // 2026-05-10. Maximum lifetime: 2026-05-26. Removal condition: current
+      // audited Codex target accepts synthesized scoped titles for
+      // --base/--commit/--uncommitted, or prompt transport is consolidated by a
+      // larger review-wrapper refactor.
       const scopedArtifactOnlyOptions = {
         ...options.cliOptions,
         title: undefined,
@@ -428,23 +439,8 @@ export async function runReviewLaunchAttemptShell(
       throw error;
     }
     if (shouldRetryWithoutScopeFlags(error)) {
-      if (launchedWithExplicitScope) {
-        if (
-          options.retryWithoutScopeFlagsGateError &&
-          shouldRewriteRetryFailureAsScopeGate(error, options.cliOptions)
-        ) {
-          const retryGateError = buildRetryWithoutScopeFlagsGateError(
-            error,
-            options.repoRoot,
-            options.retryWithoutScopeFlagsGateError
-          );
-          await reportFailure(retryGateError, scopedLaunchContext);
-          throw retryGateError;
-        }
-        await reportFailure(error, scopedLaunchContext);
-        throw error;
-      }
       if (
+        launchedWithExplicitScope &&
         options.retryWithoutScopeFlagsGateError &&
         shouldRewriteRetryFailureAsScopeGate(error, options.cliOptions)
       ) {
@@ -456,27 +452,11 @@ export async function runReviewLaunchAttemptShell(
         await reportFailure(retryGateError, scopedLaunchContext);
         throw retryGateError;
       }
-      const unscopedArgs = buildReviewArgs(options.cliOptions, options.prompt, {
-        includeScopeFlags: false,
-        disableDelegationMcp
-      });
-      const unscopedLaunchContext = buildReviewLaunchContext(options.cliOptions, {
-        includeScopeFlags: false
-      });
-      const resolvedUnscoped = resolveCommand(unscopedArgs, options.runtimeContext);
-      if (resolvedReviewCommandsEqual(resolvedScoped, resolvedUnscoped)) {
-        await reportFailure(error, scopedLaunchContext);
-        throw error;
-      }
-      console.log('[run-review] codex CLI rejected scope flags with a custom prompt; retrying without flags.');
-      try {
-        const retryExecution = await options.runReview(resolvedUnscoped);
-        await reportSuccess(retryExecution, unscopedLaunchContext);
-        return;
-      } catch (retryError) {
-        await reportFailure(retryError, unscopedLaunchContext);
-        throw retryError;
-      }
+      // CO-395 remove fallback: never retry by dropping explicit scope flags.
+      // Unscoped prompt failures also remain real launch failures; the wrapper no
+      // longer changes the review contract to obtain a verdict.
+      await reportFailure(error, scopedLaunchContext);
+      throw error;
     }
 
     await reportFailure(error, scopedLaunchContext);
