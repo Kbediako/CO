@@ -64,7 +64,7 @@
         },
         {
           "label": "historical 0.124 evidence demotion",
-          "contains": "[Codex CLI 0.124.0 Adoption Evidence](codex-cli-0124-adoption.md): historical"
+          "contains": "[Historical Codex CLI 0.124.0 Evidence](archive/codex-cli-0124-adoption.md): archive-only"
         }
       ]
     },
@@ -207,10 +207,10 @@
   ],
   "historical_release_evidence": [
     {
-      "path": "docs/book/codex-cli-0124-adoption.md",
-      "status": "historical",
+      "path": "docs/book/archive/codex-cli-0124-adoption.md",
+      "status": "archive",
       "version": "0.124.0",
-      "title": "Codex CLI 0.124.0 Adoption Evidence"
+      "title": "Historical Codex CLI 0.124.0 Evidence"
     }
   ]
 }

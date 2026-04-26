@@ -2633,7 +2633,7 @@ describe('docs hygiene tooling', () => {
           requirements: [
             {
               label: 'historical evidence demotion',
-              contains: '[Codex CLI 0.124.0 Adoption Evidence](codex-cli-0124-adoption.md): historical'
+              contains: '[Historical Codex CLI 0.124.0 Evidence](archive/codex-cli-0124-adoption.md): archive-only'
             }
           ]
         }
@@ -2644,7 +2644,7 @@ describe('docs hygiene tooling', () => {
       [
         '# Book',
         '',
-        '- [Codex CLI 0.124.0 Adoption Evidence](codex-cli-0124-adoption.md): historical',
+        '- [Historical Codex CLI 0.124.0 Evidence](archive/codex-cli-0124-adoption.md): archive-only',
         '- [Codex CLI 0.124.0 Adoption Evidence](codex-cli-0124-stray.md)',
         ''
       ].join('\n'),

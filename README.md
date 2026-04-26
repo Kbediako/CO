@@ -70,7 +70,7 @@ Run artifacts live under `.runs/<task-id>/` and summaries under `out/<task-id>/`
 
 ## Downstream Setup
 
-- [Book index](docs/book/README.md): setup, operations, skills, public posture, and CO-345 evidence notes
+- [Book index](docs/book/README.md): setup, operations, skills, public posture, and historical release evidence notes
 - [Bundled skills](skills/README.md): shipped skill roster and install behavior
 - [Downstream setup](docs/public/downstream-setup.md): install, repo bootstrap, machine setup, and first run
 - [Provider onboarding](docs/public/provider-onboarding.md): Linear and provider-worker setup
