@@ -1822,6 +1822,40 @@ describe('docs hygiene tooling', () => {
     );
   });
 
+  it('flags an invalid Codex CLI release-intake template path', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-release-intake-invalid-path-'));
+    createdDirs.push(repoRoot);
+
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      extraPolicies: {
+        codex_release_intake: {
+          template_path: '   ',
+          required_markers: ['Release Evidence Axes']
+        }
+      }
+    });
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: '.agent/task/templates/codex-cli-release-intake-template.md',
+        rule: 'codex-release-intake-template-stale',
+        reference: 'invalid template_path'
+      })
+    );
+  });
+
   it('accepts the canonical Codex CLI release-intake template markers', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-release-intake-pass-'));
     createdDirs.push(repoRoot);

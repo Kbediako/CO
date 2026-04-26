@@ -683,7 +683,13 @@ async function checkCodexReleaseIntakeTemplate(
     typeof policy?.template_path === 'string' ? policy.template_path : DEFAULT_CODEX_RELEASE_INTAKE_TEMPLATE_PATH;
   const templatePath = normalizePolicyPath(configuredPath);
   if (!templatePath) {
-    return [];
+    return [
+      {
+        file: configuredPath.trim() || DEFAULT_CODEX_RELEASE_INTAKE_TEMPLATE_PATH,
+        rule: 'codex-release-intake-template-stale',
+        reference: 'invalid template_path'
+      }
+    ];
   }
 
   const absolutePath = path.join(repoRoot, templatePath);
