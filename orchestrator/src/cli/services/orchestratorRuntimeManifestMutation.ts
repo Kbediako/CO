@@ -12,10 +12,15 @@ export function applyRequestedRuntimeModeToManifest(
   manifest.runtime_provider = mode === 'appserver' ? 'AppServerRuntimeProvider' : 'CliRuntimeProvider';
   manifest.runtime_fallback = {
     occurred: false,
+    policy: 'auto',
+    policy_source: 'default',
     code: null,
     reason: null,
     from_mode: null,
     to_mode: null,
+    original_target: null,
+    fallback_target: null,
+    blocking_reason: null,
     checked_at: isoTimestampImpl()
   };
 }

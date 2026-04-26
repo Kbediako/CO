@@ -363,10 +363,15 @@ function createRuntimeContext(
       runtime_session_id: null,
       fallback: {
         occurred: false,
+        policy: 'auto',
+        policy_source: 'default',
         code: null,
         reason: null,
         from_mode: null,
         to_mode: null,
+        original_target: null,
+        fallback_target: null,
+        blocking_reason: null,
         checked_at: '2026-03-21T09:00:00.000Z'
       },
       env_overrides: {},
@@ -389,10 +394,15 @@ function createAppServerRuntimeContext(
       runtime_session_id: 'appserver-run-child',
       fallback: {
         occurred: false,
+        policy: 'auto',
+        policy_source: 'default',
         code: null,
         reason: null,
         from_mode: null,
         to_mode: null,
+        original_target: null,
+        fallback_target: null,
+        blocking_reason: null,
         checked_at: '2026-03-21T09:00:00.000Z'
       },
       env_overrides: {},
@@ -9210,6 +9220,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       'CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH',
       join(olderRunDir, 'provider-workflow.last-known-good.json')
     );
+    vi.stubEnv('CODEX_ORCHESTRATOR_CONFIG_MODE', 'repo-authoritative');
     vi.stubEnv('CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED', '1');
     vi.stubEnv('CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT', olderIssueWorkspacePath);
     vi.stubEnv('CODEX_ORCHESTRATOR_PACKAGE_ROOT', olderIssueWorkspacePath);
@@ -9265,6 +9276,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_SOURCE).toBeUndefined();
     expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_LAUNCH_TOKEN).toBeUndefined();
     expect(turnEnv.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBeUndefined();
+    expect(turnEnv.CODEX_ORCHESTRATOR_CONFIG_MODE).toBe('downstream-compatibility');
     expect(turnEnv.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED).toBeUndefined();
     expect(turnEnv.CODEX_ORCHESTRATOR_PROVIDER_REPO_CONFIG_PATH).toBeUndefined();
     expect(turnEnv.CODEX_ORCHESTRATOR_PACKAGE_ROOT).toBeUndefined();

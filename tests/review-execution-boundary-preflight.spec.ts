@@ -27,8 +27,16 @@ function makeRuntimeContext() {
       provider: 'chatgpt',
       fallback: {
         occurred: false,
+        policy: 'auto',
+        policy_source: 'default',
         code: null,
-        reason: null
+        reason: null,
+        from_mode: null,
+        to_mode: null,
+        original_target: null,
+        fallback_target: null,
+        blocking_reason: null,
+        checked_at: '2026-04-26T00:00:00.000Z'
       }
     },
     env: {}

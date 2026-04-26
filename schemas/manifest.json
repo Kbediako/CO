@@ -279,13 +279,25 @@
     "runtime_fallback": {
       "type": ["object", "null"],
       "additionalProperties": false,
-      "required": ["occurred", "code", "reason", "from_mode", "to_mode", "checked_at"],
+      "required": [
+        "occurred",
+        "code",
+        "reason",
+        "from_mode",
+        "to_mode",
+        "checked_at"
+      ],
       "properties": {
         "occurred": { "type": "boolean" },
+        "policy": { "type": "string", "enum": ["auto", "strict"] },
+        "policy_source": { "type": "string", "enum": ["default", "env", "override"] },
         "code": { "type": ["string", "null"] },
         "reason": { "type": ["string", "null"] },
         "from_mode": { "type": ["string", "null"], "enum": ["cli", "appserver", null] },
         "to_mode": { "type": ["string", "null"], "enum": ["cli", "appserver", null] },
+        "original_target": { "type": ["string", "null"] },
+        "fallback_target": { "type": ["string", "null"] },
+        "blocking_reason": { "type": ["string", "null"] },
         "checked_at": { "type": ["string", "null"] }
       }
     },
@@ -423,10 +435,21 @@
     "cloud_fallback": {
       "type": ["object", "null"],
       "additionalProperties": false,
-      "required": ["mode_requested", "mode_used", "reason", "issues", "checked_at"],
+      "required": [
+        "mode_requested",
+        "mode_used",
+        "reason",
+        "issues",
+        "checked_at"
+      ],
       "properties": {
         "mode_requested": { "type": "string", "enum": ["cloud"] },
         "mode_used": { "type": "string", "enum": ["mcp"] },
+        "policy": { "type": "string", "enum": ["auto", "strict"] },
+        "policy_source": { "type": "string", "enum": ["default", "env", "override"] },
+        "original_target": { "type": "string", "const": "execution:cloud" },
+        "fallback_target": { "type": "string", "const": "execution:mcp" },
+        "blocking_reason": { "type": "string", "minLength": 1 },
         "reason": { "type": "string", "minLength": 1 },
         "issues": {
           "type": "array",

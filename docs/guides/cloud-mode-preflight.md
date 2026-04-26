@@ -67,25 +67,26 @@ CO-199 classifies the `rust-v0.121.0` sandbox/security release deltas before any
 
 ## Fallback Behavior (No Cloud Wiring)
 
-If preflight fails, CO:
+Cloud fallback is explicit. With the default `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=auto` policy, if preflight fails, CO:
 1. Records a warning in `manifest.summary`
-2. Writes a structured fallback block at `manifest.cloud_fallback` (reason + issue codes/messages + timestamp)
-3. Falls back to `mcp` for the requested work
-4. Surfaces the reason in `start` stdout as `Cloud fallback: ...` (and in `--format json` via `cloud_fallback_reason`)
-5. Surfaces current fallback policy in `doctor` output (`fallback policy: allow|deny`)
+2. Writes a structured fallback block at `manifest.cloud_fallback` with `policy`, `policy_source`, `original_target`, `fallback_target`, `blocking_reason`, issue codes/messages, and timestamp
+3. Reroutes to `mcp` for the requested work
+4. Surfaces the selected policy, original target, fallback target, and blocking reason in `start` stdout as `Cloud fallback: ...` and in JSON output under `cloud_fallback`
+5. Surfaces current fallback policy in `doctor` output (`fallback policy: auto|strict`)
 
-This means repos without cloud setup can still run the same pipelines without extra configuration; cloud is a best-effort acceleration path.
+This means repos without cloud setup can still run the same pipelines without extra configuration when auto policy is selected, while still leaving machine-readable evidence of the reroute.
 
-## Fail-Fast Cloud Mode (No Fallback)
+## Fail-Fast Cloud Mode (Strict)
 
 For cloud-focused lanes, avoid relying on fallback and fail fast on preflight issues:
 
 ```bash
-export CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny
+export CODEX_ORCHESTRATOR_CLOUD_FALLBACK=strict
 ```
 
-Accepted deny values: `deny`, `strict`, `false`, `0`, `off`, `disabled`, `never`.
-When set, cloud preflight failures stop the run with `status_detail=cloud-preflight-failed`.
+Accepted strict aliases: `strict`, `deny`, `denied`, `false`, `0`, `off`, `disabled`, `never`.
+Accepted auto aliases: `auto`, `allow`, `allowed`, `true`, `yes`, `1`, `on`, `enabled`.
+When strict is selected, cloud preflight failures stop the run with `status_detail=cloud-preflight-failed` and include the policy, original target, fallback target, and blocking reason in the failure detail.
 
 ## Observability + Issue Logging
 

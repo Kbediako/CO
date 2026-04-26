@@ -71,7 +71,7 @@ export function sanitizeProviderOverrideEnv(
     currentPackageRoot === providerPackageRoot;
   if (shouldStripRepoConfig) {
     delete sanitized[REPO_CONFIG_PATH_ENV_KEY];
-    delete sanitized[CONFIG_AUTHORITY_MODE_ENV_KEY];
+    sanitized[CONFIG_AUTHORITY_MODE_ENV_KEY] = 'downstream-compatibility';
     delete sanitized[REPO_CONFIG_REQUIRED_ENV_KEY];
   }
   if (shouldStripPackageRoot) {

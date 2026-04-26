@@ -17,7 +17,7 @@ describe('sanitizeProviderOverrideEnv', () => {
     });
 
     expect(sanitized.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBeUndefined();
-    expect(sanitized.CODEX_ORCHESTRATOR_CONFIG_MODE).toBeUndefined();
+    expect(sanitized.CODEX_ORCHESTRATOR_CONFIG_MODE).toBe('downstream-compatibility');
     expect(sanitized.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED).toBeUndefined();
     expect(sanitized.CODEX_ORCHESTRATOR_PACKAGE_ROOT).toBe('/tmp/child-package-root');
   });

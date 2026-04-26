@@ -222,6 +222,11 @@ describe('runDoctorUsage', () => {
             cloud_fallback: {
               mode_requested: 'cloud',
               mode_used: 'mcp',
+              policy: 'auto',
+              policy_source: 'default',
+              original_target: 'execution:cloud',
+              fallback_target: 'execution:mcp',
+              blocking_reason: 'CODEX_CLOUD_ENV_ID is not configured.',
               reason: 'Cloud preflight failed.',
               issues: [{ code: 'missing_environment', message: 'CODEX_CLOUD_ENV_ID is not configured.' }],
               checked_at: '2026-02-17T00:00:01.000Z'

@@ -97,13 +97,18 @@ const KNOWN_NON_GUARDRAIL_PIPELINE_IDS = new Set([
   'provider-linear-worker',
   'provider-linear-child-lane'
 ]);
-function createDefaultRuntimeFallback() {
+function createDefaultRuntimeFallback(): NonNullable<CliManifest['runtime_fallback']> {
   return {
     occurred: false,
+    policy: 'auto',
+    policy_source: 'default',
     code: null,
     reason: null,
     from_mode: null,
     to_mode: null,
+    original_target: null,
+    fallback_target: null,
+    blocking_reason: null,
     checked_at: isoTimestamp()
   };
 }

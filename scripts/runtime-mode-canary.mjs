@@ -298,7 +298,8 @@ function createChecks(expectedDefaultMode) {
           (expectedDefaultMode === 'cli' && manifest?.runtime_provider === 'CliRuntimeProvider'),
         reason: `expected runtime_provider to match ${expectedDefaultMode} default, received ${manifest?.runtime_provider ?? '<missing>'}`
       }),
-      ({ manifest }) => ({ ok: manifest?.runtime_fallback?.occurred === false, reason: 'expected runtime_fallback.occurred=false for default-mode lane' })
+      ({ manifest }) => ({ ok: manifest?.runtime_fallback?.occurred === false, reason: 'expected runtime_fallback.occurred=false for default-mode lane' }),
+      ({ manifest }) => ({ ok: manifest?.runtime_fallback?.policy === 'auto', reason: `expected runtime_fallback.policy=auto, received ${manifest?.runtime_fallback?.policy ?? '<missing>'}` })
     ],
     appserverSuccess: [
       ({ exitCode }) => ({ ok: exitCode === 0, reason: `expected exitCode=0, received ${exitCode}` }),
@@ -306,7 +307,8 @@ function createChecks(expectedDefaultMode) {
       ({ manifest }) => ({ ok: manifest?.runtime_mode_requested === 'appserver', reason: `expected runtime_mode_requested=appserver, received ${manifest?.runtime_mode_requested ?? '<missing>'}` }),
       ({ manifest }) => ({ ok: manifest?.runtime_mode === 'appserver', reason: `expected runtime_mode=appserver, received ${manifest?.runtime_mode ?? '<missing>'}` }),
       ({ manifest }) => ({ ok: manifest?.runtime_provider === 'AppServerRuntimeProvider', reason: `expected runtime_provider=AppServerRuntimeProvider, received ${manifest?.runtime_provider ?? '<missing>'}` }),
-      ({ manifest }) => ({ ok: manifest?.runtime_fallback?.occurred === false, reason: 'expected runtime_fallback.occurred=false' })
+      ({ manifest }) => ({ ok: manifest?.runtime_fallback?.occurred === false, reason: 'expected runtime_fallback.occurred=false' }),
+      ({ manifest }) => ({ ok: manifest?.runtime_fallback?.policy === 'auto', reason: `expected runtime_fallback.policy=auto, received ${manifest?.runtime_fallback?.policy ?? '<missing>'}` })
     ],
     forcedFallback: [
       ({ exitCode }) => ({ ok: exitCode === 0, reason: `expected exitCode=0, received ${exitCode}` }),
@@ -315,17 +317,29 @@ function createChecks(expectedDefaultMode) {
       ({ manifest }) => ({ ok: manifest?.runtime_mode === 'cli', reason: `expected runtime_mode=cli, received ${manifest?.runtime_mode ?? '<missing>'}` }),
       ({ manifest }) => ({ ok: manifest?.runtime_provider === 'CliRuntimeProvider', reason: `expected runtime_provider=CliRuntimeProvider, received ${manifest?.runtime_provider ?? '<missing>'}` }),
       ({ manifest }) => ({ ok: manifest?.runtime_fallback?.occurred === true, reason: 'expected runtime_fallback.occurred=true' }),
-      ({ manifest }) => ({ ok: manifest?.runtime_fallback?.code === 'forced-preflight-failure', reason: `expected fallback code forced-preflight-failure, received ${manifest?.runtime_fallback?.code ?? '<missing>'}` })
+      ({ manifest }) => ({ ok: manifest?.runtime_fallback?.policy === 'auto', reason: `expected runtime_fallback.policy=auto, received ${manifest?.runtime_fallback?.policy ?? '<missing>'}` }),
+      ({ manifest }) => ({ ok: manifest?.runtime_fallback?.code === 'forced-preflight-failure', reason: `expected fallback code forced-preflight-failure, received ${manifest?.runtime_fallback?.code ?? '<missing>'}` }),
+      ({ manifest }) => ({ ok: manifest?.runtime_fallback?.original_target === 'runtime:appserver', reason: `expected original_target=runtime:appserver, received ${manifest?.runtime_fallback?.original_target ?? '<missing>'}` }),
+      ({ manifest }) => ({ ok: manifest?.runtime_fallback?.fallback_target === 'runtime:cli', reason: `expected fallback_target=runtime:cli, received ${manifest?.runtime_fallback?.fallback_target ?? '<missing>'}` }),
+      ({ manifest }) => ({
+        ok: typeof manifest?.runtime_fallback?.blocking_reason === 'string' && manifest.runtime_fallback.blocking_reason.trim().length > 0,
+        reason: 'expected runtime_fallback.blocking_reason'
+      })
     ],
     unsupportedCombo: [
       ({ exitCode }) => ({ ok: exitCode !== 0, reason: `expected non-zero exitCode for failed run, received ${exitCode}` }),
       ({ manifest }) => ({ ok: manifest?.status === 'failed', reason: `expected status=failed, received ${manifest?.status ?? '<missing>'}` }),
       ({ manifest }) => ({ ok: manifest?.status_detail === 'runtime-selection-failed', reason: `expected status_detail=runtime-selection-failed, received ${manifest?.status_detail ?? '<missing>'}` }),
+      ({ manifest }) => ({ ok: manifest?.runtime_fallback?.occurred === false, reason: `expected runtime_fallback.occurred=false, received ${manifest?.runtime_fallback?.occurred ?? '<missing>'}` }),
+      ({ manifest }) => ({ ok: manifest?.runtime_fallback?.policy === 'strict', reason: `expected runtime_fallback.policy=strict, received ${manifest?.runtime_fallback?.policy ?? '<missing>'}` }),
+      ({ manifest }) => ({ ok: manifest?.runtime_fallback?.code === 'cloud-appserver-unsupported', reason: `expected runtime_fallback.code=cloud-appserver-unsupported, received ${manifest?.runtime_fallback?.code ?? '<missing>'}` }),
+      ({ manifest }) => ({ ok: manifest?.runtime_fallback?.original_target === 'execution:cloud/runtime:appserver', reason: `expected runtime_fallback.original_target=execution:cloud/runtime:appserver, received ${manifest?.runtime_fallback?.original_target ?? '<missing>'}` }),
+      ({ manifest }) => ({ ok: manifest?.runtime_fallback?.fallback_target === 'execution:cloud/runtime:cli', reason: `expected runtime_fallback.fallback_target=execution:cloud/runtime:cli, received ${manifest?.runtime_fallback?.fallback_target ?? '<missing>'}` }),
       ({ manifest }) => ({
         ok:
-          typeof manifest?.runtime_fallback?.reason === 'string' ||
-          typeof manifest?.status_detail === 'string',
-        reason: 'expected runtime failure details to be present'
+          typeof manifest?.runtime_fallback?.blocking_reason === 'string' &&
+          manifest.runtime_fallback.blocking_reason.trim().length > 0,
+        reason: 'expected runtime_fallback.blocking_reason'
       })
     ]
   };
@@ -433,7 +447,9 @@ Options:
           CODEX_REVIEW_NON_INTERACTIVE: '1',
           CODEX_ORCHESTRATOR_ROOT: repoDir,
           CODEX_ORCHESTRATOR_RUNS_DIR: join(repoDir, '.runs'),
-          CODEX_ORCHESTRATOR_OUT_DIR: join(repoDir, 'out')
+          CODEX_ORCHESTRATOR_OUT_DIR: join(repoDir, 'out'),
+          CODEX_ORCHESTRATOR_CLOUD_FALLBACK: 'auto',
+          CODEX_ORCHESTRATOR_RUNTIME_FALLBACK: 'auto'
         };
 
         const defaultModeLabel = `canary-default-mode-${runSuffix}`;
@@ -547,7 +563,8 @@ Options:
           env: {
             ...baseEnv,
             MCP_RUNNER_TASK_ID: `${taskId}-${unsupportedLabel}`,
-            CODEX_ORCHESTRATOR_CLOUD_FALLBACK: 'deny',
+            CODEX_ORCHESTRATOR_CLOUD_FALLBACK: 'strict',
+            CODEX_ORCHESTRATOR_RUNTIME_FALLBACK: 'strict',
             CODEX_CLOUD_ENV_ID: 'env-runtime-canary'
           },
           args: [

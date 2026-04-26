@@ -31,10 +31,15 @@ function createRuntimeSelection(overrides: Partial<RuntimeSelection> = {}): Runt
     runtime_session_id: null,
     fallback: {
       occurred: false,
+      policy: 'auto',
+      policy_source: 'default',
       code: null,
       reason: null,
       from_mode: null,
       to_mode: null,
+      original_target: null,
+      fallback_target: null,
+      blocking_reason: null,
       checked_at: '2026-03-14T00:00:00.000Z'
     },
     env_overrides: {},
@@ -114,8 +119,8 @@ describe('executeOrchestratorCloudRouteShell', () => {
     });
 
     const expectedDetail =
-      'Cloud preflight failed; falling back to mcp. ' +
-      'Missing CODEX_CLOUD_ENV_ID (or target metadata.cloudEnvId). ' +
+      'Cloud preflight failed; fallback_policy=auto original_target=execution:cloud fallback_target=execution:mcp ' +
+      'blocking_reason=Missing CODEX_CLOUD_ENV_ID (or target metadata.cloudEnvId). ' +
       "Cloud branch 'router-preflight' was not found on origin. Push it first or set CODEX_CLOUD_BRANCH to an existing remote branch.";
 
     expect(result.success).toBe(true);
@@ -124,6 +129,9 @@ describe('executeOrchestratorCloudRouteShell', () => {
     expect(manifest.cloud_fallback).toMatchObject({
       mode_requested: 'cloud',
       mode_used: 'mcp',
+      policy: 'auto',
+      original_target: 'execution:cloud',
+      fallback_target: 'execution:mcp',
       reason: expectedDetail
     });
     expect(reroute).toHaveBeenCalledOnce();
@@ -190,8 +198,8 @@ describe('executeOrchestratorCloudRouteShell', () => {
     expect(result.success).toBe(false);
     expect(failExecutionRoute).toHaveBeenCalledWith(
       'cloud-preflight-failed',
-      'Cloud preflight failed and cloud fallback is disabled. ' +
-        'Missing CODEX_CLOUD_ENV_ID (or target metadata.cloudEnvId). ' +
+      'Cloud preflight failed; fallback_policy=strict original_target=execution:cloud fallback_target=execution:mcp ' +
+        'blocking_reason=Missing CODEX_CLOUD_ENV_ID (or target metadata.cloudEnvId). ' +
         "Cloud branch 'router-preflight' was not found on origin. Push it first or set CODEX_CLOUD_BRANCH to an existing remote branch."
     );
   });

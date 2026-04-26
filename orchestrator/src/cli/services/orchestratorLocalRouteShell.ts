@@ -13,6 +13,7 @@ import type {
   OrchestratorAutoScoutParams
 } from './orchestratorExecutionRouter.js';
 import type { OrchestratorExecutionRouteState } from './orchestratorExecutionRouteState.js';
+import { describeFallbackTarget } from '../runtime/fallbackPolicy.js';
 import type { RuntimeMode } from '../runtime/types.js';
 
 export interface OrchestratorLocalRouteShellOptions {
@@ -59,9 +60,17 @@ export async function executeOrchestratorLocalRouteShell(
     defaultFailureStatusDetail: 'pipeline-failed',
     beforeStart: ({ notes }) => {
       if (state.runtimeSelection.fallback.occurred) {
+        const fallback = state.runtimeSelection.fallback;
         const fallbackCode = state.runtimeSelection.fallback.code ?? 'runtime-fallback';
-        const fallbackReason = state.runtimeSelection.fallback.reason ?? 'runtime fallback occurred';
-        const fallbackSummary = `Runtime fallback (${fallbackCode}): ${fallbackReason}`;
+        const fallbackReason =
+          state.runtimeSelection.fallback.blocking_reason ??
+          state.runtimeSelection.fallback.reason ??
+          'runtime fallback occurred';
+        const fallbackSummary =
+          `Runtime fallback: policy=${fallback.policy} policy_source=${fallback.policy_source} code=${fallbackCode} ` +
+          `original_target=${describeFallbackTarget(fallback.original_target)} ` +
+          `fallback_target=${describeFallbackTarget(fallback.fallback_target)} ` +
+          `blocking_reason=${fallbackReason}`;
         appendSummary(manifest, fallbackSummary);
         notes.push(fallbackSummary);
       }
