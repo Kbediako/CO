@@ -4,7 +4,10 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { resolveRuntimeMode } from '../src/cli/runtime/mode.js';
-import { resolveRuntimeSelection } from '../src/cli/runtime/provider.js';
+import {
+  RuntimeSelectionFailure,
+  resolveRuntimeSelection
+} from '../src/cli/runtime/provider.js';
 
 describe('runtime mode resolution', () => {
   it('resolves precedence as flag > env > config > manifest > default', () => {
@@ -98,9 +101,10 @@ describe('runtime provider selection', () => {
     expect(selection.selected_mode).toBe('cli');
     expect(selection.provider).toBe('CliRuntimeProvider');
     expect(selection.fallback.occurred).toBe(false);
+    expect(selection.fallback.policy).toBe('auto');
   });
 
-  it('falls back from appserver to cli when forced preflight failure is set', async () => {
+  it('auto-reroutes from appserver to cli with machine-readable fallback evidence', async () => {
     const selection = await resolveRuntimeSelection({
       requestedMode: 'appserver',
       source: 'env',
@@ -116,7 +120,46 @@ describe('runtime provider selection', () => {
     expect(selection.selected_mode).toBe('cli');
     expect(selection.provider).toBe('CliRuntimeProvider');
     expect(selection.fallback.occurred).toBe(true);
+    expect(selection.fallback.policy).toBe('auto');
     expect(selection.fallback.code).toBe('forced-preflight-failure');
+    expect(selection.fallback.original_target).toBe('runtime:appserver');
+    expect(selection.fallback.fallback_target).toBe('runtime:cli');
+    expect(selection.fallback.blocking_reason).toContain('Forced appserver preflight failure');
+  });
+
+  it('strict mode fails closed when appserver preflight fails', async () => {
+    try {
+      await resolveRuntimeSelection({
+        requestedMode: 'appserver',
+        source: 'env',
+        executionMode: 'mcp',
+        repoRoot: process.cwd(),
+        env: {
+          CODEX_ORCHESTRATOR_RUNTIME_FALLBACK: 'strict',
+          CODEX_ORCHESTRATOR_APPSERVER_FORCE_PRECHECK_FAIL: '1'
+        },
+        runId: 'runtime-strict-fallback'
+      });
+      throw new Error('Expected strict runtime fallback policy to fail closed');
+    } catch (error) {
+      expect(error).toBeInstanceOf(RuntimeSelectionFailure);
+      expect((error as Error).message).toMatch(
+        /Runtime fallback policy=strict original_target=runtime:appserver fallback_target=runtime:cli/
+      );
+      expect((error as RuntimeSelectionFailure).runtimeFallback).toMatchObject({
+        occurred: false,
+        policy: 'strict',
+        policy_source: 'env',
+        code: 'forced-preflight-failure',
+        from_mode: 'appserver',
+        to_mode: 'cli',
+        original_target: 'runtime:appserver',
+        fallback_target: 'runtime:cli'
+      });
+      expect((error as RuntimeSelectionFailure).runtimeFallback.blocking_reason).toContain(
+        'Forced appserver preflight failure'
+      );
+    }
   });
 
   it('reports codex command unavailability truthfully when the configured binary is missing', async () => {
@@ -137,6 +180,7 @@ describe('runtime provider selection', () => {
       expect(selection.selected_mode).toBe('cli');
       expect(selection.provider).toBe('CliRuntimeProvider');
       expect(selection.fallback.occurred).toBe(true);
+      expect(selection.fallback.policy).toBe('auto');
       expect(selection.fallback.code).toBe('codex-command-unavailable');
       expect(selection.fallback.reason).toContain('Codex CLI executable');
     } finally {
@@ -165,6 +209,7 @@ describe('runtime provider selection', () => {
       expect(selection.selected_mode).toBe('cli');
       expect(selection.provider).toBe('CliRuntimeProvider');
       expect(selection.fallback.occurred).toBe(true);
+      expect(selection.fallback.policy).toBe('auto');
       expect(selection.fallback.code).toBe('runtime-workspace-unavailable');
       expect(selection.fallback.reason).toContain('repo root is unavailable');
     } finally {
@@ -173,19 +218,32 @@ describe('runtime provider selection', () => {
   });
 
   it('fails fast for unsupported cloud+appserver mode', async () => {
-    await expect(
-      resolveRuntimeSelection({
+    try {
+      await resolveRuntimeSelection({
         requestedMode: 'appserver',
         source: 'flag',
         executionMode: 'cloud',
         repoRoot: process.cwd(),
         env: {},
         runId: 'runtime-unsupported'
-      })
-    ).rejects.toThrow(/Unsupported mode combination/);
+      });
+      throw new Error('Expected explicit cloud appserver mode to fail closed');
+    } catch (error) {
+      expect(error).toBeInstanceOf(RuntimeSelectionFailure);
+      expect((error as Error).message).toMatch(/Unsupported mode combination/);
+      expect((error as RuntimeSelectionFailure).runtimeFallback).toMatchObject({
+        occurred: false,
+        policy: 'auto',
+        code: 'cloud-appserver-unsupported',
+        from_mode: 'appserver',
+        to_mode: 'cli',
+        original_target: 'execution:cloud/runtime:appserver',
+        fallback_target: 'execution:cloud/runtime:cli'
+      });
+    }
   });
 
-  it('coerces implicit default appserver mode to cli for cloud execution', async () => {
+  it('auto-reroutes implicit default appserver mode to cli for cloud execution with fallback evidence', async () => {
     const selection = await resolveRuntimeSelection({
       requestedMode: 'appserver',
       source: 'default',
@@ -195,13 +253,50 @@ describe('runtime provider selection', () => {
       runId: 'runtime-cloud-default'
     });
 
-    expect(selection.requested_mode).toBe('cli');
+    expect(selection.requested_mode).toBe('appserver');
     expect(selection.selected_mode).toBe('cli');
     expect(selection.provider).toBe('CliRuntimeProvider');
-    expect(selection.fallback.occurred).toBe(false);
+    expect(selection.fallback).toMatchObject({
+      occurred: true,
+      policy: 'auto',
+      code: 'cloud-appserver-unsupported',
+      original_target: 'execution:cloud/runtime:appserver',
+      fallback_target: 'execution:cloud/runtime:cli'
+    });
   });
 
-  it('coerces manifest-derived appserver mode to cli for cloud execution', async () => {
+  it('strict mode fails closed for implicit default cloud appserver mode', async () => {
+    try {
+      await resolveRuntimeSelection({
+        requestedMode: 'appserver',
+        source: 'default',
+        executionMode: 'cloud',
+        repoRoot: process.cwd(),
+        env: {
+          CODEX_ORCHESTRATOR_RUNTIME_FALLBACK: 'strict'
+        },
+        runId: 'runtime-cloud-default-strict'
+      });
+      throw new Error('Expected strict runtime fallback policy to fail closed');
+    } catch (error) {
+      expect(error).toBeInstanceOf(RuntimeSelectionFailure);
+      expect((error as Error).message).toMatch(
+        /Runtime fallback policy=strict original_target=execution:cloud\/runtime:appserver fallback_target=execution:cloud\/runtime:cli/
+      );
+      expect((error as RuntimeSelectionFailure).runtimeFallback).toMatchObject({
+        occurred: false,
+        policy: 'strict',
+        policy_source: 'env',
+        code: 'cloud-appserver-unsupported',
+        from_mode: 'appserver',
+        to_mode: 'cli',
+        original_target: 'execution:cloud/runtime:appserver',
+        fallback_target: 'execution:cloud/runtime:cli'
+      });
+    }
+  });
+
+  it('auto-reroutes manifest-derived appserver mode to cli for cloud execution', async () => {
     const selection = await resolveRuntimeSelection({
       requestedMode: 'appserver',
       source: 'manifest',
@@ -211,9 +306,12 @@ describe('runtime provider selection', () => {
       runId: 'runtime-cloud-manifest'
     });
 
-    expect(selection.requested_mode).toBe('cli');
+    expect(selection.requested_mode).toBe('appserver');
     expect(selection.selected_mode).toBe('cli');
     expect(selection.provider).toBe('CliRuntimeProvider');
-    expect(selection.fallback.occurred).toBe(false);
+    expect(selection.fallback.occurred).toBe(true);
+    expect(selection.fallback.policy).toBe('auto');
+    expect(selection.fallback.original_target).toBe('execution:cloud/runtime:appserver');
+    expect(selection.fallback.fallback_target).toBe('execution:cloud/runtime:cli');
   });
 });

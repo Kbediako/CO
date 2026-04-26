@@ -2,6 +2,7 @@ import type { ExecutionMode } from '../../types.js';
 import { resolveCodexCommand } from '../utils/devtools.js';
 import { resolveRuntimeMode } from './mode.js';
 import { resolveRuntimeSelection } from './provider.js';
+import { describeFallbackTarget, type RuntimeFallbackPolicy } from './fallbackPolicy.js';
 import type { RuntimeMode, RuntimeSelection } from './types.js';
 
 export interface RuntimeCodexCommandContext {
@@ -16,7 +17,7 @@ export interface RuntimeCodexCommandContextOptions {
   env?: NodeJS.ProcessEnv;
   runId: string;
   configDefault?: RuntimeMode | string | null;
-  allowFallback?: boolean;
+  allowFallback?: boolean | RuntimeFallbackPolicy;
 }
 
 export async function createRuntimeCodexCommandContext(
@@ -55,11 +56,18 @@ export function resolveRuntimeCodexCommand(
 }
 
 export function formatRuntimeSelectionSummary(selection: RuntimeSelection): string {
-  const base = `runtime requested=${selection.requested_mode} selected=${selection.selected_mode} provider=${selection.provider}`;
+  const base =
+    `runtime requested=${selection.requested_mode} selected=${selection.selected_mode} provider=${selection.provider}` +
+    ` fallback_policy=${selection.fallback.policy} fallback_policy_source=${selection.fallback.policy_source}`;
   if (!selection.fallback.occurred) {
     return base;
   }
   const code = selection.fallback.code ?? 'unknown';
   const reason = selection.fallback.reason ?? 'fallback occurred';
-  return `${base} fallback=${code} (${reason})`;
+  return (
+    `${base} fallback=${code} ` +
+    `original_target=${describeFallbackTarget(selection.fallback.original_target)} ` +
+    `fallback_target=${describeFallbackTarget(selection.fallback.fallback_target)} ` +
+    `blocking_reason=${selection.fallback.blocking_reason ?? reason}`
+  );
 }

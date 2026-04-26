@@ -1,6 +1,7 @@
 import { logger } from '../../logger.js';
 import { appendSummary, finalizeStatus } from '../run/manifest.js';
 import type { PipelineRunExecutionResult } from '../types.js';
+import { getRuntimeSelectionFailureMetadata } from '../runtime/provider.js';
 import { executeOrchestratorCloudRouteShell } from './orchestratorCloudRouteShell.js';
 import {
   resolveOrchestratorExecutionRouteState,
@@ -69,6 +70,10 @@ export async function routeOrchestratorExecution(
       applyRuntimeSelection: options.applyRuntimeSelection
     });
   } catch (error) {
+    const runtimeFallback = getRuntimeSelectionFailureMetadata(error);
+    if (runtimeFallback) {
+      options.manifest.runtime_fallback = runtimeFallback;
+    }
     const detail = `Runtime selection failed: ${(error as Error)?.message ?? String(error)}`;
     return failExecutionRoute(options, 'runtime-selection-failed', detail);
   }
