@@ -86,7 +86,7 @@ Control-host status surfaces:
 
 ## Docs-First Prompt
 
-Any task that touches fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam language must include this table in the PRD, TECH_SPEC, or checklist:
+Any task that adds, retains, or touches fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior must include this table in the PRD, TECH_SPEC, or checklist:
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
