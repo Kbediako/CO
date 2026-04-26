@@ -50,7 +50,7 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
 
 ## Wrapper behavior notes
 - Set `TASK` or `MCP_RUNNER_TASK_ID` so the review prompt includes task context instead of `unknown-task`.
-- `NOTES` is required for authoritative review gates. Missing notes fail unless `CODEX_REVIEW_BREAK_GLASS_NOTES_FALLBACK=1` is paired with `CODEX_REVIEW_BREAK_GLASS_OWNER`, `CODEX_REVIEW_BREAK_GLASS_EXPIRES_AT`, `CODEX_REVIEW_BREAK_GLASS_REASON`, and `CODEX_REVIEW_BREAK_GLASS_EVIDENCE`.
+- `NOTES` is required for authoritative review gates. Missing notes fail unless `CODEX_REVIEW_BREAK_GLASS_NOTES_FALLBACK=1` is paired with `CODEX_REVIEW_BREAK_GLASS_OWNER`, `CODEX_REVIEW_BREAK_GLASS_EXPIRES_AT`, `CODEX_REVIEW_BREAK_GLASS_REASON`, and `CODEX_REVIEW_BREAK_GLASS_EVIDENCE`; `CODEX_REVIEW_BREAK_GLASS_EXPIRES_AT` must be a valid future timestamp, and expired or malformed values are rejected.
 - In CI or when `CODEX_REVIEW_NON_INTERACTIVE=1`/`CODEX_NON_INTERACTIVE=1` (or `CODEX_NO_INTERACTIVE=1`) is set, direct/manual wrapper runs print a “review handoff” prompt and exit unless `FORCE_CODEX_REVIEW=1` is set. When `CODEX_REVIEW_AUTHORITATIVE_GATE=1` is set, prompt-only handoff fails closed instead of counting as review completion.
 - Non-interactive lane matrix:
   - Direct/manual wrapper runs stay handoff-only unless you set `FORCE_CODEX_REVIEW=1`.

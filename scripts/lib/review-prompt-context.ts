@@ -393,7 +393,7 @@ function formatMissingReviewNotesWaiver(options: {
   waiver: MissingReviewNotesWaiver;
 }): string {
   const approvedBy = requireWaiverField(
-    options.waiver.approvedBy ?? options.waiver.owner,
+    options.waiver.approvedBy?.trim() || options.waiver.owner,
     'approved_by'
   );
   const reason = requireWaiverField(options.waiver.reason, 'reason');

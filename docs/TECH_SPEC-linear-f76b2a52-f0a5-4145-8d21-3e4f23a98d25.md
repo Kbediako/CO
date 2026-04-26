@@ -2,6 +2,8 @@
 id: 20260426-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25
 title: "CO-380 authoritative review gate"
 relates_to: docs/PRD-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md
+related_prd: docs/PRD-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md
+related_action_plan: docs/ACTION_PLAN-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md
 risk: high
 owners:
   - Codex

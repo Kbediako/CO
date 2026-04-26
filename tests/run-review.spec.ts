@@ -2151,6 +2151,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const result = await runReviewCommand(manifestPath, {
       ...baseEnv(sandbox, codexBin),
       NOTES: '',
+      CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
       CODEX_REVIEW_BREAK_GLASS_NOTES_FALLBACK: '1',
       CODEX_REVIEW_BREAK_GLASS_OWNER: 'parent-provider-worker',
       CODEX_REVIEW_BREAK_GLASS_EXPIRES_AT: '2099-01-01T00:00:00.000Z',
