@@ -2167,10 +2167,17 @@ describe('codex-orchestrator command surface', () => {
     );
     const jsonStart = stdout.indexOf('{');
     const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
-      pipeline?: { id?: string; config_resolution?: { mode?: string } | null };
+      pipeline?: {
+        id?: string;
+        config_resolution?: { mode?: string; reason?: string; config_source?: string | null } | null;
+      };
     };
     expect(payload.pipeline?.id).toBe('docs-review');
-    expect(payload.pipeline?.config_resolution?.mode).toBe('downstream-compatibility');
+    expect(payload.pipeline?.config_resolution).toEqual({
+      mode: 'downstream-compatibility',
+      reason: 'CODEX_ORCHESTRATOR_CONFIG_MODE=downstream-compatibility',
+      config_source: 'package'
+    });
   }, TEST_TIMEOUT);
 
   it('rejects conflicting explicit config mode and legacy repo config flag', async () => {
@@ -2211,10 +2218,17 @@ describe('codex-orchestrator command surface', () => {
     );
     const jsonStart = stdout.indexOf('{');
     const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
-      pipeline?: { id?: string; config_resolution?: { mode?: string } | null };
+      pipeline?: {
+        id?: string;
+        config_resolution?: { mode?: string; reason?: string; config_source?: string | null } | null;
+      };
     };
     expect(payload.pipeline?.id).toBe('docs-relevance-advisory');
-    expect(payload.pipeline?.config_resolution?.mode).toBe('downstream-compatibility');
+    expect(payload.pipeline?.config_resolution).toEqual({
+      mode: 'downstream-compatibility',
+      reason: 'CODEX_ORCHESTRATOR_CONFIG_MODE=downstream-compatibility',
+      config_source: 'package'
+    });
   }, TEST_TIMEOUT);
 
   it('warns when explicit downstream compatibility plan uses packaged fallback config', async () => {
