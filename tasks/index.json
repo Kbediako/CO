@@ -1,6 +1,35 @@
 {
   "items": [
     {
+      "id": "20260426-linear-67e2ffd2-a653-4d69-9241-5f32c459a682",
+      "title": "CO-386 Codex CLI release-intake supersession workflow",
+      "relates_to": "tasks/tasks-linear-67e2ffd2-a653-4d69-9241-5f32c459a682.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-26",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-26",
+          "status": "produced",
+          "manifest": ".runs/linear-67e2ffd2-a653-4d69-9241-5f32c459a682-docs-packet/cli/2026-04-26T02-01-05-570Z-cf7b5e23/manifest.json",
+          "source_anchor": "ctx:sha256:aad8a7b6913c77cb5d07cb83c0b1766d268691fd3e688457d7f9b8bfd48a1742#chunk:c000001",
+          "summary": "Docs-first packet created for CO-386 Codex CLI release-intake. Source-0 contains metadata only, so the packet preserves the parent-provided protected terms: Codex CLI release-intake, supersession workflow, local CLI, package/downstream smoke, cloud-canary, workflow pins, model posture, docs surfaces, release notes, supersedes/holds matrix, and archive-only classification. Parent owns Linear/workpad reconciliation, docs-review, implementation, validation, PR lifecycle, and all non-docs surfaces."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-67e2ffd2-a653-4d69-9241-5f32c459a682.md",
+        "task": "tasks/tasks-linear-67e2ffd2-a653-4d69-9241-5f32c459a682.md",
+        "agent_task": ".agent/task/linear-67e2ffd2-a653-4d69-9241-5f32c459a682.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-67e2ffd2-a653-4d69-9241-5f32c459a682.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-67e2ffd2-a653-4d69-9241-5f32c459a682.md"
+        }
+      }
+    },
+    {
       "id": "20260426-linear-7da2cd4d-977e-450a-b056-307edf560fe0",
       "title": "Restore docs hygiene baseline for missing TASKS references and freshness registry drift",
       "relates_to": "tasks/tasks-linear-7da2cd4d-977e-450a-b056-307edf560fe0.md",
