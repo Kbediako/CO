@@ -237,6 +237,67 @@ describe('inspectCheckoutPosture', () => {
     }
   });
 
+  it('preserves operator safe.directory trust from normal global git config', async () => {
+    const fixture = await createPostureRepoFixture();
+    const home = join(fixture.root, 'home');
+    const originalHome = process.env.HOME;
+    const originalAssumeDifferentOwner = process.env.GIT_TEST_ASSUME_DIFFERENT_OWNER;
+    try {
+      await mkdir(home, { recursive: true });
+      await writeFile(join(home, '.gitconfig'), `[safe]\n\tdirectory = ${fixture.repo}\n`, 'utf8');
+      process.env.HOME = home;
+      process.env.GIT_TEST_ASSUME_DIFFERENT_OWNER = '1';
+
+      const result = inspectCheckoutPosture(fixture.repo);
+
+      expect(result.status).toBe('current');
+      expect(result.inside_git_worktree).toBe(true);
+      expect(result.detail).not.toContain('dubious ownership');
+    } finally {
+      if (originalHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = originalHome;
+      }
+      if (originalAssumeDifferentOwner === undefined) {
+        delete process.env.GIT_TEST_ASSUME_DIFFERENT_OWNER;
+      } else {
+        process.env.GIT_TEST_ASSUME_DIFFERENT_OWNER = originalAssumeDifferentOwner;
+      }
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves operator safe.directory trust from inherited git config env', async () => {
+    const fixture = await createPostureRepoFixture();
+    const safeConfig = join(fixture.root, 'safe-gitconfig');
+    const originalGitConfigGlobal = process.env.GIT_CONFIG_GLOBAL;
+    const originalAssumeDifferentOwner = process.env.GIT_TEST_ASSUME_DIFFERENT_OWNER;
+    try {
+      await writeFile(safeConfig, `[safe]\n\tdirectory = ${fixture.repo}\n`, 'utf8');
+      process.env.GIT_CONFIG_GLOBAL = safeConfig;
+      process.env.GIT_TEST_ASSUME_DIFFERENT_OWNER = '1';
+
+      const result = inspectCheckoutPosture(fixture.repo);
+
+      expect(result.status).toBe('current');
+      expect(result.inside_git_worktree).toBe(true);
+      expect(result.detail).not.toContain('dubious ownership');
+    } finally {
+      if (originalGitConfigGlobal === undefined) {
+        delete process.env.GIT_CONFIG_GLOBAL;
+      } else {
+        process.env.GIT_CONFIG_GLOBAL = originalGitConfigGlobal;
+      }
+      if (originalAssumeDifferentOwner === undefined) {
+        delete process.env.GIT_TEST_ASSUME_DIFFERENT_OWNER;
+      } else {
+        process.env.GIT_TEST_ASSUME_DIFFERENT_OWNER = originalAssumeDifferentOwner;
+      }
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  });
+
   it('ignores inherited git repo-selection env while probing the requested root', async () => {
     const fixture = await createPostureRepoFixture();
     const plainRoot = await mkdtemp(join(tmpdir(), 'checkout-posture-env-plain-'));

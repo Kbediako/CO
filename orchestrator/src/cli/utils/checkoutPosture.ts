@@ -40,7 +40,6 @@ export interface CheckoutPostureInspection {
 
 const BASE_REF = 'origin/main';
 const GIT_TIMEOUT_MS = 5000;
-const EMPTY_GLOBAL_GIT_CONFIG = process.platform === 'win32' ? 'NUL' : '/dev/null';
 const GIT_REPO_SELECTION_ENV_KEYS = [
   'GIT_ALTERNATE_OBJECT_DIRECTORIES',
   'GIT_COMMON_DIR',
@@ -492,9 +491,6 @@ function runGit(
     encoding: 'utf8',
     env: {
       ...env,
-      GIT_CONFIG_COUNT: '0',
-      GIT_CONFIG_GLOBAL: EMPTY_GLOBAL_GIT_CONFIG,
-      GIT_CONFIG_NOSYSTEM: '1',
       GIT_OPTIONAL_LOCKS: '0'
     },
     stdio: ['ignore', 'pipe', 'pipe'],
