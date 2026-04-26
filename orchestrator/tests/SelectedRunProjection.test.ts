@@ -6433,6 +6433,16 @@ describe('SelectedRunProjection', () => {
       syntheticUnrelatedLocalEnv,
       syntheticUnrelatedLocalRunId
     );
+    const syntheticProviderWorkerEnv = {
+      ...activeEnv,
+      taskId: 'linear-unclaimed-provider-worker'
+    };
+    const syntheticProviderWorkerRunId =
+      '2026-03-20T03-21-00-000Z-provider-worker-missing-issue-provider';
+    const syntheticProviderWorkerPaths = resolveRunPaths(
+      syntheticProviderWorkerEnv,
+      syntheticProviderWorkerRunId
+    );
     const syntheticNoisePaths = Array.from({ length: 70 }, (_, index) => {
       const taskId = `linear-active-zlocal-noise-${index}`;
       return {
@@ -6455,6 +6465,7 @@ describe('SelectedRunProjection', () => {
       mkdir(localPaths.runDir, { recursive: true }),
       mkdir(syntheticLocalPaths.runDir, { recursive: true }),
       mkdir(syntheticUnrelatedLocalPaths.runDir, { recursive: true }),
+      mkdir(syntheticProviderWorkerPaths.runDir, { recursive: true }),
       ...releasedNoisePaths.map((entry) => mkdir(entry.paths.runDir, { recursive: true })),
       ...syntheticNoisePaths.map((entry) => mkdir(entry.paths.runDir, { recursive: true }))
     ]);
@@ -6558,6 +6569,21 @@ describe('SelectedRunProjection', () => {
         issue_identifier: 'LOCAL-LINEAR-UNCLAIMED',
         updated_at: '2026-03-20T03:19:00.000Z',
         summary: 'non-intake local run under an unclaimed Linear-looking task id remains visible by bounded cheap recency',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      syntheticProviderWorkerPaths.manifestPath,
+      JSON.stringify({
+        run_id: syntheticProviderWorkerRunId,
+        task_id: 'linear-unclaimed-provider-worker',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_id: 'lin-stale-provider',
+        issue_identifier: 'CO-STALE',
+        updated_at: '2026-03-20T03:21:00.000Z',
+        summary: 'provider-worker manifest without issue_provider should not be treated as local work',
         commands: []
       }),
       'utf8'
@@ -6666,6 +6692,7 @@ describe('SelectedRunProjection', () => {
     );
     const allRunIds = discovery.all.map((entry) => entry.runId ?? '');
     expect(allRunIds).not.toContain('run-released-active-looking');
+    expect(allRunIds).not.toContain(syntheticProviderWorkerRunId);
     expect(allRunIds.filter((runId) => runId.startsWith('run-zreleased-'))).toEqual([]);
   });
 

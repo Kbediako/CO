@@ -580,10 +580,24 @@ function isSyntheticTaskLocalCompatibilityManifest(manifest: CliManifest): boole
   if (status !== 'in_progress') {
     return false;
   }
+  if (isProviderLinearWorkerCompatibilityManifest(manifestRecord)) {
+    return false;
+  }
   const issueProvider =
     readStringValue(manifestRecord, 'issue_provider') ??
     readStringValue(manifestRecord, 'issueProvider');
   return issueProvider !== 'linear';
+}
+
+function isProviderLinearWorkerCompatibilityManifest(manifestRecord: Record<string, unknown>): boolean {
+  const pipelineId = readStringValue(manifestRecord, 'pipeline_id', 'pipelineId');
+  if (pipelineId === PROVIDER_LINEAR_WORKER_PIPELINE_ID) {
+    return true;
+  }
+  return (
+    isRecord(manifestRecord.provider_linear_worker_proof) ||
+    isRecord(manifestRecord.providerLinearWorkerProof)
+  );
 }
 
 function collectProviderIntakeTaskEntries(
