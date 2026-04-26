@@ -4823,7 +4823,6 @@ export function createProviderIssueHandoffService(
           const canUseNoRunPendingReopenLiveStartedProbe =
             shouldProbeNoRunPendingReopenLiveStartedTruth &&
             !hasOccupiedPollDispatchProviderKey &&
-            pollDispatchBudget.remainingGlobalSlots() > 0 &&
             noRunPendingReopenLiveStartedProbeReads < 1;
           const retainedReleasedBlockerSnapshot =
             trackedIssueBlockersByKey?.get(claimProviderKey) ?? null;
