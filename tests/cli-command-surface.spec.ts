@@ -2173,6 +2173,30 @@ describe('codex-orchestrator command surface', () => {
     expect(payload.pipeline?.config_resolution?.mode).toBe('downstream-compatibility');
   }, TEST_TIMEOUT);
 
+  it('rejects conflicting explicit config mode and legacy repo config flag', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-conflicting-config-mode-'));
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out')
+    };
+
+    await expect(
+      runCli([
+        'plan',
+        'docs-review',
+        '--config-mode',
+        'repo-authoritative',
+        '--repo-config-required=false'
+      ], env)
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining(
+        'Conflicting config authority flags: --config-mode repo-authoritative conflicts with --repo-config-required=false'
+      )
+    });
+  }, TEST_TIMEOUT);
+
   it('plans docs-relevance-advisory pipeline from explicit downstream compatibility config', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-docs-relevance-advisory-'));
     const env = {

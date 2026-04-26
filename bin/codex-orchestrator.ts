@@ -357,6 +357,17 @@ function applyRepoConfigRequiredPolicy(flags: ArgMap): boolean {
   }
   if (explicitConfigMode) {
     const mode = normalizeConfigModeFlag(explicitConfigMode);
+    if (flags['repo-config-required'] !== undefined) {
+      const legacyRequired = parseBooleanSetting(flags['repo-config-required'], '--repo-config-required');
+      const legacyMode: ConfigAuthorityMode = legacyRequired ? 'repo-authoritative' : 'downstream-compatibility';
+      if (legacyMode !== mode) {
+        throw new Error(
+          `Conflicting config authority flags: --config-mode ${mode} conflicts with --repo-config-required=${String(
+            flags['repo-config-required']
+          )} (${legacyMode}). Use one selector or make both flags agree.`
+        );
+      }
+    }
     applyConfigModeEnv(mode);
     return mode === 'repo-authoritative';
   }
