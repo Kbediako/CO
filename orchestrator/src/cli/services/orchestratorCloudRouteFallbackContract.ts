@@ -1,8 +1,14 @@
 import process from 'node:process';
 
+import {
+  resolveRuntimeFallbackPolicy,
+  type RuntimeFallbackPolicyResolution
+} from '../runtime/fallbackPolicy.js';
 import type { RuntimeMode, RuntimeModeSource } from '../runtime/types.js';
 import type { CliManifest } from '../types.js';
 import { isoTimestamp } from '../utils/time.js';
+
+const CLOUD_FALLBACK_ENV_KEY = 'CODEX_ORCHESTRATOR_CLOUD_FALLBACK';
 
 function readCloudString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
@@ -41,14 +47,31 @@ export interface OrchestratorCloudFallbackContractInput {
 }
 
 export function allowCloudFallback(envOverrides?: NodeJS.ProcessEnv): boolean {
+  return resolveCloudFallbackPolicy(envOverrides).policy === 'auto';
+}
+
+export function resolveCloudFallbackPolicy(
+  envOverrides?: NodeJS.ProcessEnv
+): RuntimeFallbackPolicyResolution {
   const raw =
     readCloudString(envOverrides?.CODEX_ORCHESTRATOR_CLOUD_FALLBACK) ??
     readCloudString(process.env.CODEX_ORCHESTRATOR_CLOUD_FALLBACK);
-  if (!raw) {
-    return true;
-  }
-  const normalized = raw.toLowerCase();
-  return !['0', 'false', 'off', 'deny', 'disabled', 'never', 'strict'].includes(normalized);
+  return resolveRuntimeFallbackPolicy({
+    env: raw === null ? {} : { [CLOUD_FALLBACK_ENV_KEY]: raw },
+    envKey: CLOUD_FALLBACK_ENV_KEY
+  });
+}
+
+function formatCloudFallbackDetail(params: {
+  policyResolution: RuntimeFallbackPolicyResolution;
+  fallbackTarget: string;
+  issueSummary: string;
+}): string {
+  return (
+    `Cloud preflight failed; fallback_policy=${params.policyResolution.policy} ` +
+    `original_target=execution:cloud fallback_target=${params.fallbackTarget} ` +
+    `blocking_reason=${params.issueSummary}`
+  );
 }
 
 export function buildCloudPreflightFailureContract(
@@ -56,20 +79,32 @@ export function buildCloudPreflightFailureContract(
   issues: { code: string; message: string }[]
 ): OrchestratorCloudPreflightFailureContract {
   const issueSummary = issues.map((issue) => issue.message).join(' ');
-  if (!allowCloudFallback(input.envOverrides)) {
+  const policyResolution = resolveCloudFallbackPolicy(input.envOverrides);
+  const fallbackTarget = 'execution:mcp';
+  const detail = formatCloudFallbackDetail({
+    policyResolution,
+    fallbackTarget,
+    issueSummary
+  });
+
+  if (policyResolution.policy === 'strict') {
     return {
       outcome: 'fail',
-      detail: `Cloud preflight failed and cloud fallback is disabled. ${issueSummary}`
+      detail
     };
   }
 
-  const detail = `Cloud preflight failed; falling back to mcp. ${issueSummary}`;
   return {
     outcome: 'fallback',
     detail,
     manifestFallback: {
       mode_requested: 'cloud',
       mode_used: 'mcp',
+      policy: policyResolution.policy,
+      policy_source: policyResolution.source,
+      original_target: 'execution:cloud',
+      fallback_target: fallbackTarget,
+      blocking_reason: issueSummary,
       reason: detail,
       issues: normalizeCloudFallbackIssues(issues),
       checked_at: isoTimestamp()

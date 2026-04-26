@@ -464,6 +464,8 @@ export async function runCommandStage(
         providerLinearWorkerProof = null;
         providerLinearWorkerProofRecord = null;
       }
+      manifest.provider_linear_worker_tokens =
+        buildProviderLinearWorkerManifestTokenUsage(providerLinearWorkerProof?.tokens) ?? null;
       if (result.status === 'succeeded' && providerLinearWorkerProofRecord === null) {
         providerLinearWorkerFailureReason = 'provider_linear_worker_proof_missing_or_unreadable';
         effectiveSummary = buildProviderLinearWorkerTerminalSummary({
@@ -484,7 +486,8 @@ export async function runCommandStage(
       const mutationSuppressions = deriveDeterministicProviderMutationSuppressions(
         providerLinearWorkerProof?.linear_audit ?? null,
         {
-          recordedAtNotBefore: proofAttemptStartedAt
+          recordedAtNotBefore: proofAttemptStartedAt,
+          issueId: providerLinearWorkerProof?.issue_id ?? null
         }
       );
       const degradationSummary = formatDeterministicProviderMutationDegradationSummary(mutationSuppressions);
@@ -976,6 +979,41 @@ async function loadProviderLinearWorkerProof(
   } catch {
     return null;
   }
+}
+
+function buildProviderLinearWorkerManifestTokenUsage(
+  tokens: ProviderLinearWorkerProof['tokens'] | null | undefined
+): NonNullable<CliManifest['provider_linear_worker_tokens']> | null {
+  if (!tokens || typeof tokens !== 'object') {
+    return null;
+  }
+  const inputTokens = normalizeManifestTokenCount(tokens.input_tokens);
+  const outputTokens = normalizeManifestTokenCount(tokens.output_tokens);
+  const totalTokens = normalizeManifestTokenCount(tokens.total_tokens);
+  const reasoningOutputTokens = normalizeManifestTokenCount(tokens.reasoning_output_tokens);
+  if (
+    inputTokens === null &&
+    outputTokens === null &&
+    totalTokens === null &&
+    reasoningOutputTokens === null
+  ) {
+    return null;
+  }
+  const usage: NonNullable<CliManifest['provider_linear_worker_tokens']> = {
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+    total_tokens: totalTokens
+  };
+  if (reasoningOutputTokens !== null) {
+    usage.reasoning_output_tokens = reasoningOutputTokens;
+  }
+  return usage;
+}
+
+function normalizeManifestTokenCount(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(0, Math.trunc(value))
+    : null;
 }
 
 function coerceTelemetryString(value: unknown): string | null {

@@ -242,8 +242,9 @@ describe('runCoStatusAttachCliShell', () => {
 
     const output = stripAnsi(writes.join(''));
     expect(output).toContain('Dashboard error');
+    expect(output).toContain('current-host-unhealthy');
     expect(output).toContain('control-host unavailable');
-    expect(output).toContain('stale endpoint after control-host restart');
+    expect(output).toContain('stale endpoint');
     expect(output).toContain('control_endpoint.json');
   });
 

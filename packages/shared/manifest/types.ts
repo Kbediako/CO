@@ -32,6 +32,12 @@ export interface CodexOrchestratorCLIManifest {
   provider_launch_source?: string | null;
   provider_control_host_task_id?: string | null;
   provider_control_host_run_id?: string | null;
+  config_resolution?: {
+    mode: "repo-authoritative" | "downstream-compatibility";
+    reason: string;
+    config_source: "repo" | "package" | null;
+  } | null;
+  provider_linear_worker_tokens?: null | ProviderLinearWorkerTokenUsage;
   summary: string | null;
   metrics_recorded: boolean;
   resume_token: string;
@@ -116,15 +122,21 @@ export interface CodexOrchestratorCLIManifest {
     } | null;
   } | null;
   guardrails_required?: boolean | null;
+  guardrails_required_source?: "explicit" | "stage_detection" | null;
   runtime_mode_requested: "cli" | "appserver";
   runtime_mode: "cli" | "appserver";
   runtime_provider: "CliRuntimeProvider" | "AppServerRuntimeProvider";
   runtime_fallback: {
     occurred: boolean;
+    policy?: "auto" | "strict";
+    policy_source?: "default" | "env" | "override";
     code: string | null;
     reason: string | null;
     from_mode: "cli" | "appserver" | null;
     to_mode: "cli" | "appserver" | null;
+    original_target?: string | null;
+    fallback_target?: string | null;
+    blocking_reason?: string | null;
     checked_at: string | null;
   } | null;
   scheduler?: {
@@ -184,6 +196,11 @@ export interface CodexOrchestratorCLIManifest {
   cloud_fallback?: {
     mode_requested: "cloud";
     mode_used: "mcp";
+    policy?: "auto" | "strict";
+    policy_source?: "default" | "env" | "override";
+    original_target?: "execution:cloud";
+    fallback_target?: "execution:mcp";
+    blocking_reason?: string;
     reason: string;
     issues: {
       code: string;
@@ -496,6 +513,12 @@ export interface CodexOrchestratorCLIManifest {
   design_history?: null | DesignHistory;
   design_style_profile?: null | DesignStyleProfile;
   design_metrics?: null | DesignMetrics;
+}
+export interface ProviderLinearWorkerTokenUsage {
+  input_tokens: number | null;
+  output_tokens: number | null;
+  total_tokens: number | null;
+  reasoning_output_tokens?: number | null;
 }
 export interface CollabToolCall {
   observed_at: string;

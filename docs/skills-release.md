@@ -5,6 +5,8 @@ This guide defines how downstream users consume skills shipped with `@kbediako/c
 ## What ships
 - Bundled skills are stored under `skills/` in this repository and included in npm package files.
 - Global user skills in `$CODEX_HOME/skills` should take precedence when present; bundled skills are fallback defaults.
+- CO-196 posture lineage remains unchanged: npm package delivery is the baseline, and Codex plugin marketplace registration is additive coverage for Codex CLI `0.122.0` and newer command surfaces.
+- Marketplace command transition: Codex CLI `0.121.0` accepts both `codex marketplace add` and `codex plugin marketplace add`; Codex CLI `0.122.0+` requires `codex plugin marketplace add`; current Codex CLI `0.125.0` also supports `codex plugin marketplace upgrade` and `remove`.
 
 ## Install / refresh downstream
 1. Install or upgrade package:
@@ -29,6 +31,7 @@ This guide defines how downstream users consume skills shipped with `@kbediako/c
   - installs the packed tarball into a temp mock repo,
   - validates `codex-orchestrator review` artifact behavior in non-interactive + forced execution modes,
   - validates `codex-orchestrator skills install --only long-poll-wait` installs expected patience-first guidance,
-  - validates packaged Codex marketplace install/register coverage for `codex-orchestrator` through Codex `marketplace add` and plugin install/status checks.
+  - validates packaged Codex marketplace install/register coverage for `codex-orchestrator` through `codex plugin marketplace add` or the older legacy `marketplace add` fallback, plus plugin install/status checks.
 - Marketplace smoke is mandatory by default. A local development run that cannot install a marketplace-capable Codex CLI may skip only with both `PACK_SMOKE_ALLOW_MARKETPLACE_SKIP=1` and `PACK_SMOKE_MARKETPLACE_SKIP_REASON=<reason>`, and that result is non-coverage evidence, not marketplace proof.
-- CI standard: core-lane runs `npm run pack:smoke` automatically when downstream-facing paths change (CLI/package/skills/review-wrapper/docs wiring). Core-lane, pack-smoke backstop, and release workflows install `@openai/codex@0.121.0` before `npm run pack:smoke` so marketplace coverage is present in release-facing lanes.
+- CI standard: core-lane runs `npm run pack:smoke` automatically when downstream-facing paths change (CLI/package/skills/review-wrapper/docs wiring). Core-lane, pack-smoke backstop, and release workflows install `@openai/codex@0.125.0` before `npm run pack:smoke` so current plugin-marketplace coverage is present in release-facing lanes.
+- `cloud-canary` still installs the explicit posture candidate from `docs/guides/codex-version-policy.md`; it is the cloud execution/fallback evidence lane, not release-facing `pack:smoke` marketplace proof.

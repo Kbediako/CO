@@ -22,19 +22,22 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 - Codex CLI sync strategy: `docs/guides/upstream-codex-cli-sync.md`.
 
 ## Current Posture
-- Current CO compatibility/adoption target: Codex CLI `0.118.0`.
-- Newer Codex CLI candidates stay evidence-gated in `docs/guides/codex-version-policy.md`.
-- Current model posture: `gpt-5.4` for top-level, delegated subagent, and review surfaces; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
+- Current CO-local ChatGPT-auth/appserver model posture: `gpt-5.5` / `xhigh` on Codex CLI `0.125.0` when live access smoke passes.
+- Release-facing cloud/downstream pins remain evidence-gated in `docs/guides/codex-version-policy.md`; the exact CO-352 cloud blocker is the configured environment id not found.
+- Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
+- Portable packaged/generated defaults still keep `gpt-5.4` / `xhigh` as fallback values when `gpt-5.5`, API/cloud portability, or downstream/no-network access is not proven.
+- `codex-orchestrator doctor` treats `gpt-5.5` as non-drift when `codex debug models` verifies current model access; additive defaults keep fresh configs on portable fallback values unless `--auth-scope chatgpt` is explicitly requested after live access smoke, and they preserve compatible prior `gpt-5.5` role files without requiring extra marker metadata.
 - Local default runtime is `appserver`; keep `--runtime-mode cli` as break-glass.
 - Full posture and promotion gates live in `docs/guides/codex-version-policy.md`.
 
 ## Release Notes
 - Shipped skills note: `docs/release-notes-template-addendum.md`.
-- Optional overview override: add and commit a release overview file at .github/release-overview.md before tagging; the release workflow uses it when present.
+- Canonical promoted sections: generated `Overview` and `Bug Fixes` become top-level release-note sections; generated `Documentation` remains under `Full Changelog`.
+- Optional one-shot overview override: put release-specific narrative text in the signed annotated tag body before pushing the tag. The workflow reads the tag body for that release only and does not read .github/release-overview.md.
 
 ## How It Works
 - **Planner → Builder → Tester → Reviewer:** The core `TaskManager` (see `orchestrator/src/manager.ts`) wires together agent interfaces that decide *what* to run (planner), execute the selected pipeline stage (builder), verify results (tester), and give a final decision (reviewer).
-- **Execution modes:** Each plan item can flag canonical `requires_cloud`; planner output still carries legacy `requiresCloud` as a compatibility alias while current code should prefer `requires_cloud`. Task metadata can set `execution.parallel`, and the mode policy picks `mcp` (local MCP runtime) or `cloud` execution accordingly. Cloud runs perform a quick preflight (env id, codex availability, optional remote branch) and fall back to `mcp` with both summary text and a structured `cloud_fallback` manifest block when preflight fails.
+- **Execution modes:** Each plan item can flag canonical `requires_cloud`; planner output still carries legacy `requiresCloud` as a compatibility alias while current code should prefer `requires_cloud`. Task metadata can set `execution.parallel`, and the mode policy picks `mcp` (local MCP runtime) or `cloud` execution accordingly. Cloud runs perform a quick preflight (env id, codex availability, optional remote branch). `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=auto` reroutes failed cloud preflight to `mcp` with structured `cloud_fallback` evidence, while `strict` fails closed.
 - **Runtime provider modes:** `runtimeMode=cli|appserver` is orthogonal to `executionMode`; local default runtime is `appserver` with `cli` break-glass support preserved. Explicit `executionMode=cloud + runtimeMode=appserver` remains unsupported and fails fast.
 - **Advanced feature posture:** `js_repl` is enabled by default globally (local + cloud lanes). For deterministic cloud contracts, pin explicit feature lanes (`CODEX_CLOUD_ENABLE_FEATURES=js_repl` and separate `CODEX_CLOUD_DISABLE_FEATURES=js_repl` runs). Use `CODEX_CLOUD_DISABLE_FEATURES=js_repl` for task-scoped cloud break-glass; reserve `codex features disable js_repl` for global emergency toggles and re-enable with `codex features enable js_repl`; `memories` remains scoped to explicit eval lanes (legacy alias `memory_tool` is compatibility-only).
 - **Event-driven persistence:** Milestones emit typed events on `EventBus`. `PersistenceCoordinator` captures run summaries in the task state store and writes manifests so nothing is lost if the process crashes.
@@ -113,9 +116,9 @@ Use `npx @kbediako/codex-orchestrator resume --run <run-id>` to continue interru
 - `codex-orchestrator mcp serve [--repo <path>] [--dry-run] [-- <extra args>]`: launch the MCP stdio server (delegates to `codex mcp-server`; stdout guard keeps protocol-only output, logs to stderr).
 - `codex-orchestrator init codex [--cwd <path>] [--force]`: copy starter templates into a repo (includes `mcp-client.json`, `AGENTS.md`, downstream .codex/config.toml + .codex/agents/* role files sourced from `templates/codex/.codex/*`, and `codex.orchestrator.json`; no overwrite unless `--force`).
 - `codex-orchestrator setup [--yes] [--refresh-skills]`: one-shot bootstrap for downstream users (installs bundled skills, configures delegation + DevTools wiring, and prints policy/usage guidance). By default, setup does not overwrite existing skills; add `--refresh-skills` when you want to replace existing bundled skill files.
-- Canonical bundled skill roster lives in `README.md` ("Bundled skills" section), with shipped-file parity enforced against `skills/`.
-- `codex-orchestrator start [pipeline] [--auto-issue-log] [--repo-config-required]`: starts a pipeline run. `--auto-issue-log` writes failure bundles automatically (including setup failures before manifest creation); `--repo-config-required` disables packaged config fallback.
-- `codex-orchestrator flow [--task <task-id>] [--auto-issue-log] [--repo-config-required]`: runs `docs-review` then `implementation-gate` in sequence; stops on the first failure. `--auto-issue-log` writes failure bundles automatically (including setup failures before manifest creation); `--repo-config-required` disables packaged config fallback.
+- Canonical bundled skill roster lives in `skills/README.md`, with shipped-file parity enforced against `skills/`.
+- `codex-orchestrator start [pipeline] [--auto-issue-log] [--config-mode <repo-authoritative|downstream-compatibility>]`: starts a pipeline run. `--auto-issue-log` writes failure bundles automatically (including setup failures before manifest creation). The default `repo-authoritative` config mode requires repo-local `codex.orchestrator.json`; choose `--config-mode downstream-compatibility` to opt into packaged compatibility fallback. `--repo-config-required` remains a legacy alias.
+- `codex-orchestrator flow [--task <task-id>] [--auto-issue-log] [--config-mode <repo-authoritative|downstream-compatibility>]`: runs `docs-review` then `implementation-gate` in sequence; stops on the first failure. The same config-mode contract applies as `start`.
 - `codex-orchestrator doctor [--format json] [--usage] [--cloud-preflight] [--issue-log] [--apply]`: check optional tooling dependencies plus collab/cloud/delegation readiness and print enablement commands. `--usage` appends a local usage snapshot (scans `.runs/`) with adoption KPIs. `--issue-log` appends/creates `docs/codex-orchestrator-issues.md` (or `--issue-log-path`) and writes a JSON bundle under `out/<resolved-task>/doctor/issue-bundles/` with doctor context plus latest run context when available. `--apply` plans/applies quick fixes (use with `--yes`).
 - `codex-orchestrator devtools setup [--yes]`: print DevTools MCP setup instructions (`--yes` applies `codex mcp add ...`).
 - `codex-orchestrator delegation setup [--yes]`: configure delegation MCP wiring (`--yes` applies `codex mcp add ...`).
@@ -126,11 +129,11 @@ Use `npx @kbediako/codex-orchestrator resume --run <run-id>` to continue interru
 ## Publishing (npm)
 - Pack audit: `npm run pack:audit` (validates the tarball file list; run `npm run clean:dist && npm run build` first if `dist/` contains non-runtime artifacts).
 - Pack smoke: `npm run pack:smoke` (installs the tarball in a temp mock repo, runs CLI behavior checks including `review` artifacts and `long-poll-wait` skill install, and validates delegate-server JSONL; uses network). Treat this as a spot-check gate; use `npm run pack:audit` for full tarball inventory validation.
-- Release tags: `vX.Y.Z` or `vX.Y.Z-alpha.N` must match `package.json` version.
-- Dist-tags: stable publishes to `latest`; alpha publishes to `alpha` and uses a GitHub prerelease.
+- Release tags: `vX.Y.Z` or `vX.Y.Z-<prerelease>` must match `package.json` version, for example `vX.Y.Z-alpha.N`, `vX.Y.Z-beta.N`, or `vX.Y.Z-rc.N`.
+- Dist-tags: stable releases publish to `latest`; prereleases publish with a dist-tag derived from the leading prerelease label before the first `.` or `-`, lowercased and sanitized. Examples: `alpha.1` -> `alpha`, `beta.1` -> `beta`, `rc.1` -> `rc`; empty or numeric-leading labels fall back to `next`. Prerelease tags create a GitHub prerelease.
 - Publishing auth: workflow attempts OIDC trusted publishing first (`id-token: write` + `--provenance`), then falls back to `secrets.NPM_TOKEN` when OIDC is unavailable. `secrets.NPM_TOKEN` must be an npm automation token (not a token that requires OTP).
 - Trusted publisher config: npm expects workflow filename `release.yml` (the file must exist at `.github/workflows/release.yml` on the default branch). Leave environment blank unless the publish job sets `environment: ...`.
-- OIDC runtime prereqs: npm trusted publishing currently requires Node.js `22.14.0+` and npm `11.5.1+`; the publish job installs npm `^11.5.1` before publishing.
+- OIDC runtime prereqs: npm trusted publishing currently requires Node.js `22.14.0+` and npm `11.5.1+`; the publish job logs the runner versions, then runs the publish commands through `npx --yes npm@11.5.1` instead of mutating the runner-global npm install.
 
 ## Parallel Runs (Meta-Orchestration)
 The orchestrator executes a single pipeline serially. “Parallelism” comes from running multiple orchestrator runs at the same time, ideally in separate git worktrees so builds/tests don’t contend for the same working tree outputs.
@@ -220,8 +223,10 @@ Note: the commands below assume a source checkout; `scripts/` helpers are not in
 | --- | --- |
 | `npm run build` | Compiles TypeScript to `dist/` (required for packaging and running the CLI from `dist/`). |
 | `npm run lint` | Lints orchestrator, adapters, shared packages. Auto-runs `node scripts/build-patterns-if-needed.mjs` so codemods compile when missing/outdated. |
-| `npm run test` | Vitest suite covering orchestration core, CLI services, and patterns. |
-| `npm run eval:test` | Optional evaluation harness (enable when `evaluation/fixtures/**` is populated). |
+| `npm run test:core` | Narrow Core Lane matrix via `vitest.config.core.ts`; excludes `adapters/**` and `evaluation/tests/**`. |
+| `npm run test` | Default repo validation alias; runs `test:core` so the historical core-only surface stays explicit. |
+| `npm run test:all` | Explicit broader Vitest matrix (`test:core` + `test:adapters`) without implicitly enabling the opt-in evaluation lane. |
+| `npm run eval:test` | Optional evaluation-only harness lane; alias to `npm run test:evaluation` when `evaluation/fixtures/**` or evaluation scope is in play. |
 | `npm run docs:check` | Deterministically validates scripts/pipelines/paths referenced in agent-facing docs, current posture locks, bundled-skill roster parity, and the README front-door budget. |
 | `npm run docs:freshness` | Validates docs registry coverage plus catalog class coverage and writes a class-separated report to `out/<task-id>/docs-freshness.json`. |
 | `npm run repo:stewardship` | Audits every tracked file via `git ls-files`, classifies each tracked surface as `validate`, `update`, `delete`, or `retain_with_rationale`, and writes `out/<task-id>/repo-stewardship.json`. |

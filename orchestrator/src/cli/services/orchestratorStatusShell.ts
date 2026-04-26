@@ -6,6 +6,7 @@ import { loadManifest } from '../run/manifest.js';
 import { resolveRuntimeActivitySnapshot, type RuntimeActivitySnapshot } from '../run/runtimeActivity.js';
 import { relativeToRepo } from '../run/runPaths.js';
 import type { RunPaths } from '../run/runPaths.js';
+import { describeFallbackTarget } from '../runtime/fallbackPolicy.js';
 import type { CliManifest, StatusOptions } from '../types.js';
 
 export interface RunOrchestratorStatusShellParams {
@@ -37,6 +38,7 @@ export function buildOrchestratorStatusPayload(
     runtime_mode_requested: manifest.runtime_mode_requested,
     runtime_mode: manifest.runtime_mode,
     runtime_provider: manifest.runtime_provider,
+    config_resolution: manifest.config_resolution ?? null,
     runtime_fallback: manifest.runtime_fallback ?? null,
     cloud_execution: manifest.cloud_execution ?? null,
     cloud_fallback: manifest.cloud_fallback ?? null
@@ -59,9 +61,19 @@ export function renderOrchestratorStatus(
         (manifest.runtime_provider ? ` via ${manifest.runtime_provider}` : '')
     );
   }
-  if (manifest.runtime_fallback?.occurred) {
-    const fallbackCode = manifest.runtime_fallback.code ?? 'runtime-fallback';
-    logger.info(`Runtime fallback: ${fallbackCode} — ${manifest.runtime_fallback.reason ?? 'n/a'}`);
+  if (manifest.runtime_fallback?.occurred || manifest.runtime_fallback?.blocking_reason) {
+    const fallback = manifest.runtime_fallback;
+    logger.info(
+      `Runtime fallback: policy=${fallback.policy ?? 'auto'} code=${fallback.code ?? 'runtime-fallback'} ` +
+        `original_target=${describeFallbackTarget(fallback.original_target ?? null)} ` +
+        `fallback_target=${describeFallbackTarget(fallback.fallback_target ?? null)} ` +
+        `blocking_reason=${fallback.blocking_reason ?? fallback.reason ?? 'n/a'}`
+    );
+  }
+  if (manifest.config_resolution) {
+    logger.info(
+      `Configuration mode: ${manifest.config_resolution.mode} (${manifest.config_resolution.reason}; source=${manifest.config_resolution.config_source ?? 'none'})`
+    );
   }
   if (activity.observed_at) {
     const staleSuffix = activity.stale === null ? '' : activity.stale ? ' [stale]' : ' [active]';
@@ -73,6 +85,14 @@ export function renderOrchestratorStatus(
     logger.info(
       `Cloud: ${manifest.cloud_execution.task_id} [${manifest.cloud_execution.status}]` +
         (manifest.cloud_execution.status_url ? ` ${manifest.cloud_execution.status_url}` : '')
+    );
+  }
+  if (manifest.cloud_fallback) {
+    logger.info(
+      `Cloud fallback: policy=${manifest.cloud_fallback.policy ?? 'auto'} ` +
+        `original_target=${manifest.cloud_fallback.original_target ?? 'execution:cloud'} ` +
+        `fallback_target=${manifest.cloud_fallback.fallback_target ?? 'execution:mcp'} ` +
+        `blocking_reason=${manifest.cloud_fallback.blocking_reason ?? manifest.cloud_fallback.reason}`
     );
   }
   logger.info('Commands:');

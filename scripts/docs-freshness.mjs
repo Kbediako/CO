@@ -20,8 +20,13 @@ import {
 import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
-const STATUS_VALUES = new Set(['active', 'archived', 'deprecated']);
+const PRESERVED_HISTORICAL_STUB_STATUS = 'preserved_historical_stub';
+const STATUS_VALUES = new Set(['active', 'archived', 'deprecated', PRESERVED_HISTORICAL_STUB_STATUS]);
+const OWNER_REQUIRED_STATUSES = new Set(['active', 'deprecated']);
+const STALE_ELIGIBLE_STATUSES = new Set(['active', 'deprecated']);
 const OWNER_PLACEHOLDERS = new Set(['tbd', 'unassigned', 'owner']);
+const PRESERVED_HISTORICAL_STUB_PATH_PATTERNS = [/^tasks\/tasks-[^/]+\.md$/, /^\.agent\/task\/[^/]+\.md$/];
+const PRESERVED_HISTORICAL_STUB_HEADING_PATTERN = /^\s*#\s+Historical stub\b/i;
 
 function showUsage() {
   console.log(`Usage: node scripts/docs-freshness.mjs [options]
@@ -57,6 +62,15 @@ function normalizeDocPath(value) {
   const withoutDotPrefix = trimmed.replace(/^\.\//, '');
   const normalized = path.posix.normalize(withoutDotPrefix);
   return normalized === '.' ? '' : normalized.replace(/^\.\//, '');
+}
+
+function isApprovedPreservedHistoricalStubPath(docPath) {
+  const normalizedPath = normalizeDocPath(docPath);
+  return PRESERVED_HISTORICAL_STUB_PATH_PATTERNS.some((pattern) => pattern.test(normalizedPath));
+}
+
+function hasPreservedHistoricalStubHeading(content) {
+  return typeof content === 'string' && PRESERVED_HISTORICAL_STUB_HEADING_PATTERN.test(content);
 }
 
 async function loadRegistry(registryPath) {
@@ -143,6 +157,18 @@ function normalizeNonNegativeInteger(value, fallback) {
   return Number.isInteger(value) && value >= 0 ? value : fallback;
 }
 
+function normalizeOptionalString(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeOptionalBoolean(value) {
+  return typeof value === 'boolean' ? value : null;
+}
+
 function normalizeTaskNumberRange(value) {
   if (!value || typeof value !== 'object') {
     return null;
@@ -195,18 +221,56 @@ function normalizeBaselineCohorts(value) {
   return { cohorts, isValid: cohorts.length > 0 };
 }
 
+function normalizeCanonicalOwnerIssues(value) {
+  if (value === undefined || value === null) {
+    return { owners: [], isValid: true };
+  }
+  if (!Array.isArray(value)) {
+    return { owners: [], isValid: false };
+  }
+
+  const owners = value.map((item) => {
+    if (!item || typeof item !== 'object') {
+      return null;
+    }
+    const canonicalOwnerKey = normalizeOptionalString(item.canonical_owner_key);
+    const ownerIssue = normalizeOptionalString(item.owner_issue);
+    if (!canonicalOwnerKey || !ownerIssue) {
+      return null;
+    }
+    return {
+      canonical_owner_key: canonicalOwnerKey,
+      owner_issue: ownerIssue,
+      owner_issue_state: normalizeOptionalString(item.owner_issue_state),
+      owner_issue_state_type: normalizeOptionalString(item.owner_issue_state_type),
+      owner_issue_is_terminal: normalizeOptionalBoolean(item.owner_issue_is_terminal)
+    };
+  });
+
+  const validOwners = owners.filter(Boolean);
+  const ownerKeys = new Set(validOwners.map((item) => item.canonical_owner_key));
+  if (owners.some((item) => item === null) || ownerKeys.size !== validOwners.length) {
+    return { owners: validOwners, isValid: false };
+  }
+  return { owners: validOwners, isValid: true };
+}
+
 function normalizeRollingFreshnessPolicy(rawPolicy) {
   if (!rawPolicy || typeof rawPolicy !== 'object' || rawPolicy.enabled !== true) {
     return {
       enabled: false,
       is_valid: false,
       owner_issue: null,
+      owner_issue_state: null,
+      owner_issue_state_type: null,
+      owner_issue_is_terminal: null,
       policy_doc: null,
       window_days: 0,
       max_cohorts: 0,
       max_entries: 0,
       eligible_doc_classes: [],
       baseline_cohorts: [],
+      canonical_owner_issues: [],
       action_after_window: null
     };
   }
@@ -218,6 +282,7 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
   const maxEntries = Number.isInteger(rawPolicy.max_entries) && rawPolicy.max_entries > 0 ? rawPolicy.max_entries : null;
   const eligibleDocClasses = normalizeStringArray(rawPolicy.eligible_doc_classes, []);
   const baselineCohorts = normalizeBaselineCohorts(rawPolicy.baseline_cohorts);
+  const canonicalOwnerIssues = normalizeCanonicalOwnerIssues(rawPolicy.canonical_owner_issues);
 
   return {
     enabled: true,
@@ -228,15 +293,20 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
         maxCohorts !== null &&
         maxEntries !== null &&
         eligibleDocClasses.length > 0 &&
-        baselineCohorts.isValid
+        baselineCohorts.isValid &&
+        canonicalOwnerIssues.isValid
     ),
     owner_issue: ownerIssue,
+    owner_issue_state: normalizeOptionalString(rawPolicy.owner_issue_state),
+    owner_issue_state_type: normalizeOptionalString(rawPolicy.owner_issue_state_type),
+    owner_issue_is_terminal: normalizeOptionalBoolean(rawPolicy.owner_issue_is_terminal),
     policy_doc: policyDoc,
     window_days: normalizeNonNegativeInteger(rawPolicy.window_days, 0),
     max_cohorts: normalizePositiveInteger(rawPolicy.max_cohorts, 0),
     max_entries: normalizePositiveInteger(rawPolicy.max_entries, 0),
     eligible_doc_classes: eligibleDocClasses,
     baseline_cohorts: baselineCohorts.cohorts,
+    canonical_owner_issues: canonicalOwnerIssues.owners,
     action_after_window:
       typeof rawPolicy.action_after_window === 'string' ? rawPolicy.action_after_window.trim() || null : null
   };
@@ -553,10 +623,28 @@ export async function runDocsFreshness(
       issues.push('invalid last_review');
     }
 
-    if (status === 'active' || status === 'deprecated') {
+    if (OWNER_REQUIRED_STATUSES.has(status)) {
       if (!owner || OWNER_PLACEHOLDERS.has(owner.toLowerCase())) {
         issues.push('missing owner');
       }
+    }
+
+    let entryContent = null;
+    if (entryPath) {
+      const abs = path.resolve(repoRoot, entryPath);
+      if (!(await pathExists(abs))) {
+        missingOnDisk.push(entryPath);
+        metricsByClass.push({ doc_class: docClass, metric: 'missing_on_disk' });
+      } else if (status === PRESERVED_HISTORICAL_STUB_STATUS) {
+        entryContent = await readFile(abs, 'utf8');
+      }
+    }
+
+    if (
+      status === PRESERVED_HISTORICAL_STUB_STATUS &&
+      (!isApprovedPreservedHistoricalStubPath(entryPath) || !hasPreservedHistoricalStubHeading(entryContent))
+    ) {
+      issues.push('preserved_historical_stub requires a historical task continuity stub');
     }
 
     if (issues.length > 0) {
@@ -564,16 +652,8 @@ export async function runDocsFreshness(
       metricsByClass.push({ doc_class: docClass, metric: 'invalid_entries' });
     }
 
-    if (entryPath) {
-      const abs = path.resolve(repoRoot, entryPath);
-      if (!(await pathExists(abs))) {
-        missingOnDisk.push(entryPath);
-        metricsByClass.push({ doc_class: docClass, metric: 'missing_on_disk' });
-      }
-    }
-
     if (reviewDate && Number.isInteger(cadenceDays) && cadenceDays > 0) {
-      if (status === 'active' || status === 'deprecated') {
+      if (STALE_ELIGIBLE_STATUSES.has(status)) {
         const ageDays = computeAgeInDays(reviewDate, today);
         if (ageDays > cadenceDays) {
           rawStaleEntries.push({

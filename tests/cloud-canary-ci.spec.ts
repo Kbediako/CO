@@ -68,7 +68,12 @@ await mkdir(artifactRoot, { recursive: true });
 const fallback = {
   mode_requested: 'cloud',
   mode_used: 'mcp',
-  reason: 'Cloud preflight failed; falling back to mcp. Missing CODEX_CLOUD_ENV_ID.',
+  policy: 'auto',
+  policy_source: 'default',
+  original_target: 'execution:cloud',
+  fallback_target: 'execution:mcp',
+  blocking_reason: 'Missing CODEX_CLOUD_ENV_ID.',
+  reason: 'Cloud preflight failed; fallback_policy=auto original_target=execution:cloud fallback_target=execution:mcp blocking_reason=Missing CODEX_CLOUD_ENV_ID.',
   issues: ${JSON.stringify(fallbackIssues)}
 };
 const runSummaryPath = join(artifactRoot, 'run-summary.json');
@@ -91,6 +96,11 @@ await writeFile(
       cloudFallback: {
         modeRequested: fallback.mode_requested,
         modeUsed: fallback.mode_used,
+        policy: fallback.policy,
+        policySource: fallback.policy_source,
+        originalTarget: fallback.original_target,
+        fallbackTarget: fallback.fallback_target,
+        blockingReason: fallback.blocking_reason,
         reason: fallback.reason
       }
     },
@@ -129,7 +139,7 @@ function fallbackEnv(repo: string, binDir: string): NodeJS.ProcessEnv {
 describe('cloud-canary-ci fallback contract', () => {
   it('accepts expected missing-environment fallback evidence in required mode', async () => {
     const { repo, binDir } = await initFallbackCanaryRepo(
-      'Cloud preflight failed; falling back to mcp. Missing CODEX_CLOUD_ENV_ID.'
+      'Cloud preflight failed; fallback_policy=auto original_target=execution:cloud fallback_target=execution:mcp blocking_reason=Missing CODEX_CLOUD_ENV_ID.'
     );
 
     const { stdout } = await execFileAsync(process.execPath, [scriptPath], {
@@ -160,7 +170,7 @@ describe('cloud-canary-ci fallback contract', () => {
 
   it('does not treat success stdout identifiers as connectivity failures', async () => {
     const { repo, binDir } = await initFallbackCanaryRepo(
-      'Cloud preflight failed; falling back to mcp. Missing CODEX_CLOUD_ENV_ID.',
+      'Cloud preflight failed; fallback_policy=auto original_target=execution:cloud fallback_target=execution:mcp blocking_reason=Missing CODEX_CLOUD_ENV_ID.',
       'run-503-benign'
     );
 
@@ -176,7 +186,7 @@ describe('cloud-canary-ci fallback contract', () => {
 
   it('keeps stdout credential failures fatal in required fallback mode', async () => {
     const { repo, binDir } = await initFallbackCanaryRepo(
-      'Cloud preflight failed; falling back to mcp. Missing CODEX_CLOUD_ENV_ID.',
+      'Cloud preflight failed; fallback_policy=auto original_target=execution:cloud fallback_target=execution:mcp blocking_reason=Missing CODEX_CLOUD_ENV_ID.',
       'run-fallback',
       'Codex token unavailable.'
     );
@@ -195,7 +205,7 @@ describe('cloud-canary-ci fallback contract', () => {
 
   it('keeps explicit stdout connectivity failures fatal in required fallback mode', async () => {
     const { repo, binDir } = await initFallbackCanaryRepo(
-      'Cloud preflight failed; falling back to mcp. Missing CODEX_CLOUD_ENV_ID.',
+      'Cloud preflight failed; fallback_policy=auto original_target=execution:cloud fallback_target=execution:mcp blocking_reason=Missing CODEX_CLOUD_ENV_ID.',
       'run-fallback',
       'Network timeout while contacting the cloud endpoint.'
     );
@@ -214,7 +224,7 @@ describe('cloud-canary-ci fallback contract', () => {
 
   it('keeps stdout HTTP 503 failures fatal in required fallback mode', async () => {
     const { repo, binDir } = await initFallbackCanaryRepo(
-      'Cloud preflight failed; falling back to mcp. Missing CODEX_CLOUD_ENV_ID.',
+      'Cloud preflight failed; fallback_policy=auto original_target=execution:cloud fallback_target=execution:mcp blocking_reason=Missing CODEX_CLOUD_ENV_ID.',
       'run-fallback',
       'codex cloud exec failed with exit 1: HTTP 503'
     );
@@ -233,7 +243,7 @@ describe('cloud-canary-ci fallback contract', () => {
 
   it('does not treat benign stdout token identifiers as credential failures', async () => {
     const { repo, binDir } = await initFallbackCanaryRepo(
-      'Cloud preflight failed; falling back to mcp. Missing CODEX_CLOUD_ENV_ID.',
+      'Cloud preflight failed; fallback_policy=auto original_target=execution:cloud fallback_target=execution:mcp blocking_reason=Missing CODEX_CLOUD_ENV_ID.',
       'run-fallback',
       'run_id: canary-token-abc'
     );
@@ -249,7 +259,7 @@ describe('cloud-canary-ci fallback contract', () => {
 
   it('keeps credential failures fatal when fallback stderr also includes missing environment text', async () => {
     const { repo, binDir } = await initFallbackCanaryRepo(
-      'Cloud preflight failed; falling back to mcp. Missing CODEX_CLOUD_ENV_ID. Codex token unavailable.'
+      'Cloud preflight failed; fallback_policy=auto original_target=execution:cloud fallback_target=execution:mcp blocking_reason=Missing CODEX_CLOUD_ENV_ID. Codex token unavailable.'
     );
 
     await expect(
@@ -281,7 +291,7 @@ describe('cloud-canary-ci fallback contract', () => {
 
   it('keeps fallback manifests with additional issue codes fatal in required fallback mode', async () => {
     const { repo, binDir } = await initFallbackCanaryRepo(
-      'Cloud preflight failed; falling back to mcp. Missing CODEX_CLOUD_ENV_ID.',
+      'Cloud preflight failed; fallback_policy=auto original_target=execution:cloud fallback_target=execution:mcp blocking_reason=Missing CODEX_CLOUD_ENV_ID.',
       'run-fallback',
       '',
       [

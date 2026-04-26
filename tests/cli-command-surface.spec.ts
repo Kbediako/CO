@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { chmod, mkdir, mkdtemp, readFile, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -19,6 +19,7 @@ import { runEntrypointLikeExec } from './helpers/inProcessEntrypoint.js';
 const execFileAsync = promisify(execFile);
 const CLI_ENTRY = join(process.cwd(), 'bin', 'codex-orchestrator.ts');
 const CLI_ENTRY_DIST = join(process.cwd(), 'dist', 'bin', 'codex-orchestrator.js');
+const PACKAGE_JSON_PATH = fileURLToPath(new URL('../package.json', import.meta.url));
 const CLI_BOOT_TIMEOUT = 30000;
 const CLI_SOURCE_ENTRY_TIMEOUT = 60000;
 const TEST_TIMEOUT = CLI_BOOT_TIMEOUT;
@@ -32,6 +33,7 @@ const RUNTIME_TEST_ENV_KEYS = [
   'CODEX_RUNTIME_MODE'
 ] as const;
 const REPO_CONFIG_TEST_ENV_KEYS = [
+  'CODEX_ORCHESTRATOR_CONFIG_MODE',
   'CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED',
   REPO_CONFIG_PATH_ENV_KEY
 ] as const;
@@ -43,6 +45,7 @@ const DEFAULT_RUNTIME_TEST_ENV = {
 } satisfies NodeJS.ProcessEnv;
 const DEFAULT_REPO_CONFIG_TEST_ENV = {
   [REPO_CONFIG_PATH_ENV_KEY]: '',
+  CODEX_ORCHESTRATOR_CONFIG_MODE: '',
   CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: ''
 } satisfies NodeJS.ProcessEnv;
 
@@ -582,6 +585,28 @@ async function writeFakeCodexBinary(dir: string): Promise<string> {
       'if [ "$1" = "cloud" ] && [ "$2" = "--help" ]; then',
       '  exit 0',
       'fi',
+      'if [ "$1" = "cloud" ] && [ "$2" = "list" ]; then',
+      '  if [ -n "$CODEX_TEST_CLOUD_LIST_LOG" ]; then',
+      '    printf "%s\\n" "$*" >> "$CODEX_TEST_CLOUD_LIST_LOG"',
+      '  fi',
+      '  if [ -n "$CODEX_TEST_CLOUD_LIST_FAIL_MESSAGE" ]; then',
+      '    echo "$CODEX_TEST_CLOUD_LIST_FAIL_MESSAGE" 1>&2',
+      '    exit "${CODEX_TEST_CLOUD_LIST_FAIL_CODE:-1}"',
+      '  fi',
+      '  echo "{\\"tasks\\":[{\\"id\\":\\"task-test\\",\\"environment_id\\":\\"${CODEX_CLOUD_ENV_ID:-env-test}\\"}]}"',
+      '  exit 0',
+      'fi',
+      'if [ "$1" = "cloud" ] && [ "$2" = "exec" ]; then',
+      '  if [ -n "$CODEX_TEST_CLOUD_EXEC_LOG" ]; then',
+      '    printf "%s\\n" "$*" >> "$CODEX_TEST_CLOUD_EXEC_LOG"',
+      '  fi',
+      '  if [ -n "$CODEX_TEST_CLOUD_EXEC_FAIL_MESSAGE" ]; then',
+      '    echo "$CODEX_TEST_CLOUD_EXEC_FAIL_MESSAGE" 1>&2',
+      '    exit "${CODEX_TEST_CLOUD_EXEC_FAIL_CODE:-1}"',
+      '  fi',
+      '  echo "cloud exec mock ok"',
+      '  exit 0',
+      'fi',
       'if [ "$1" = "mcp" ] && [ "$2" = "list" ] && [ "$3" = "--json" ]; then',
       '  if [ -n "$CODEX_TEST_MCP_LIST_JSON" ]; then',
       '    echo "$CODEX_TEST_MCP_LIST_JSON"',
@@ -614,6 +639,7 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Usage: codex-orchestrator <command> [options]');
     expect(stdout).toContain('review [options]');
     expect(stdout).toContain('codex defaults');
+    expect(stdout).toContain('--auth-scope <portable|chatgpt>');
     expect(stdout).toContain('Quickstart (agent-first):');
     expect(stdout).toContain('codex-orchestrator flow --task <task-id>');
     expect(stdout).toContain('NOTES="Goal: ... | Summary: ... | Risks: ..." codex-orchestrator review --task <task-id>');
@@ -861,11 +887,12 @@ describe('codex-orchestrator command surface', () => {
     const { stdout } = await runCli(['codex', 'defaults', '--format', 'json'], env, CLI_BOOT_TIMEOUT);
     const payload = JSON.parse(stdout) as {
       status?: string;
-      plan?: { configPath?: string };
+      plan?: { configPath?: string; authScope?: string };
       changes?: Array<{ target?: string; status?: string }>;
     };
     expect(payload.status).toBe('planned');
     expect(payload.plan?.configPath).toBe(join(tempDir, 'config.toml'));
+    expect(payload.plan?.authScope).toBe('portable');
     expect(payload.changes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ target: 'config', status: 'pending' })
@@ -879,6 +906,7 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('docs-review');
     expect(stdout).toContain('implementation-gate');
     expect(stdout).toContain('--auto-issue-log [true|false]');
+    expect(stdout).toContain('--config-mode <repo-authoritative|downstream-compatibility>');
     expect(stdout).toContain('--repo-config-required [true|false]');
     expect(stdout).toContain('Examples:');
     expect(stdout).toContain('codex-orchestrator flow --task <task-id>');
@@ -934,6 +962,7 @@ describe('codex-orchestrator command surface', () => {
     expect(stdout).toContain('Usage: codex-orchestrator start');
     expect(stdout).toContain('Start a new run');
     expect(stdout).toContain('--auto-issue-log [true|false]');
+    expect(stdout).toContain('--config-mode <repo-authoritative|downstream-compatibility>');
     expect(stdout).toContain('--repo-config-required [true|false]');
     expect(stdout).toContain('Examples:');
     expect(stdout).toContain('codex-orchestrator start docs-review --task <task-id>');
@@ -1487,15 +1516,21 @@ describe('codex-orchestrator command surface', () => {
   }, CLI_SOURCE_ENTRY_TIMEOUT);
 
   it('prints self-check text output through the binary shell', async () => {
+    const packageVersion = JSON.parse(await readFile(PACKAGE_JSON_PATH, 'utf8')) as {
+      version: string;
+    };
     const { stdout } = await runCliSubprocess(['self-check'], undefined, CLI_BINARY_SHELL_TIMEOUT);
     expect(stdout).toContain('Status: ok');
     expect(stdout).toContain('Name: @kbediako/codex-orchestrator');
-    expect(stdout).toContain('Version: 0.1.38');
+    expect(stdout).toContain(`Version: ${packageVersion.version}`);
     expect(stdout).toContain(`Node: ${process.version}`);
     expect(stdout).toContain('Timestamp: ');
   }, CLI_BINARY_SHELL_TIMEOUT);
 
   it('prints self-check json output through the binary shell', async () => {
+    const packageVersion = JSON.parse(await readFile(PACKAGE_JSON_PATH, 'utf8')) as {
+      version: string;
+    };
     const { stdout } = await runCliSubprocess(
       ['self-check', '--format', 'json'],
       undefined,
@@ -1511,7 +1546,7 @@ describe('codex-orchestrator command surface', () => {
 
     expect(payload.status).toBe('ok');
     expect(payload.name).toBe('@kbediako/codex-orchestrator');
-    expect(payload.version).toBe('0.1.38');
+    expect(payload.version).toBe(packageVersion.version);
     expect(payload.node).toBe(process.version);
     expect(new Date(String(payload.timestamp)).toISOString()).toBe(payload.timestamp);
   }, CLI_BINARY_SHELL_TIMEOUT);
@@ -1587,6 +1622,34 @@ describe('codex-orchestrator command surface', () => {
     });
   }, TEST_TIMEOUT);
 
+  it('reports invalid cloud fallback policy in doctor JSON without crashing', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-doctor-invalid-cloud-fallback-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_ORCHESTRATOR_CLOUD_FALLBACK: 'bogus',
+      CODEX_CLOUD_ENV_ID: '',
+      CODEX_CLOUD_BRANCH: ''
+    };
+    const { stdout } = await runCli(['doctor', '--format', 'json'], env);
+    const payload = JSON.parse(stdout) as {
+      cloud?: {
+        status?: string;
+        fallback_policy?: string;
+        fallback_policy_source?: string;
+        fallback_policy_raw?: string | null;
+        fallback_policy_error?: string | null;
+      };
+    };
+
+    expect(payload.cloud?.status).toBe('invalid_policy');
+    expect(payload.cloud?.fallback_policy).toBe('invalid');
+    expect(payload.cloud?.fallback_policy_source).toBe('invalid');
+    expect(payload.cloud?.fallback_policy_raw).toBe('bogus');
+    expect(payload.cloud?.fallback_policy_error).toContain('Invalid fallback policy "bogus"');
+  }, TEST_TIMEOUT);
+
   it('emits doctor cloud preflight payload in JSON output', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-doctor-cloud-preflight-'));
     const fakeCodex = await writeFakeCodexBinary(tempDir);
@@ -1612,6 +1675,40 @@ describe('codex-orchestrator command surface', () => {
       expect.arrayContaining([expect.objectContaining({ code: 'missing_environment' })])
     );
     expect(payload.cloud_preflight?.guidance?.join('\n')).toContain('CODEX_CLOUD_ENV_ID');
+  }, TEST_TIMEOUT);
+
+  it('emits distinct doctor cloud preflight issue for configured but not-found env ids', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-doctor-cloud-preflight-not-found-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_CLOUD_ENV_ID: 'env-missing',
+      CODEX_CLOUD_BRANCH: '',
+      CODEX_TEST_CLOUD_LIST_FAIL_MESSAGE:
+        "Error: environment 'env-missing' not found; run `codex cloud` to list available environments"
+    };
+    const { stdout } = await runCli(['doctor', '--format', 'json', '--cloud-preflight'], env);
+    const payload = JSON.parse(stdout) as {
+      cloud_preflight?: {
+        ok?: boolean;
+        issues?: Array<{ code?: string; message?: string }>;
+        guidance?: string[];
+      };
+    };
+    const issueCodes = payload.cloud_preflight?.issues?.map((issue) => issue.code) ?? [];
+    expect(payload.cloud_preflight?.ok).toBe(false);
+    expect(issueCodes).toContain('environment_not_found');
+    expect(issueCodes).not.toContain('missing_environment');
+    expect(payload.cloud_preflight?.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'environment_not_found',
+          message: expect.stringContaining("environment 'env-missing' not found")
+        })
+      ])
+    );
+    expect(payload.cloud_preflight?.guidance?.join('\n')).toContain('codex cloud');
   }, TEST_TIMEOUT);
 
   it('writes doctor issue logs and bundles with downstream run context', async () => {
@@ -2021,6 +2118,35 @@ describe('codex-orchestrator command surface', () => {
     });
   }, TEST_TIMEOUT);
 
+  it('fails fast in default repo-authoritative mode when repo config is missing', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-default-repo-authoritative-'));
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out')
+    };
+    await expect(runCli(['plan', 'docs-review'], env)).rejects.toMatchObject({
+      stderr: expect.stringContaining('repo-authoritative config mode')
+    });
+  }, TEST_TIMEOUT);
+
+  it('uses repo-authoritative default for malformed legacy repo config env', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-malformed-legacy-repo-config-'));
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED: 'maybe'
+    };
+    await expect(
+      runCli(['plan', 'docs-review'], env, CLI_EXEC_TIMEOUT_MS, new Set(['CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED']))
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining('repo-authoritative config mode')
+    });
+  }, TEST_TIMEOUT);
+
   it('preserves explicit strict repo config env when it matches the ambient provider-worker value', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-strict-ambient-match-'));
     const originalStrictRepoConfig = process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED;
@@ -2069,12 +2195,44 @@ describe('codex-orchestrator command surface', () => {
     );
     const jsonStart = stdout.indexOf('{');
     const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
-      pipeline?: { id?: string };
+      pipeline?: {
+        id?: string;
+        config_resolution?: { mode?: string; reason?: string; config_source?: string | null } | null;
+      };
     };
     expect(payload.pipeline?.id).toBe('docs-review');
+    expect(payload.pipeline?.config_resolution).toEqual({
+      mode: 'downstream-compatibility',
+      reason: 'CODEX_ORCHESTRATOR_CONFIG_MODE=downstream-compatibility',
+      config_source: 'package'
+    });
   }, TEST_TIMEOUT);
 
-  it('plans docs-relevance-advisory pipeline from packaged fallback config', async () => {
+  it('rejects conflicting explicit config mode and legacy repo config flag', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-conflicting-config-mode-'));
+    const env = {
+      ...process.env,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out')
+    };
+
+    await expect(
+      runCli([
+        'plan',
+        'docs-review',
+        '--config-mode',
+        'repo-authoritative',
+        '--repo-config-required=false'
+      ], env)
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining(
+        'Conflicting config authority flags: --config-mode repo-authoritative conflicts with --repo-config-required=false'
+      )
+    });
+  }, TEST_TIMEOUT);
+
+  it('plans docs-relevance-advisory pipeline from explicit downstream compatibility config', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-docs-relevance-advisory-'));
     const env = {
       ...process.env,
@@ -2082,15 +2240,26 @@ describe('codex-orchestrator command surface', () => {
       CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
       CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out')
     };
-    const { stdout } = await runCli(['plan', 'docs-relevance-advisory', '--format', 'json'], env);
+    const { stdout } = await runCli(
+      ['plan', 'docs-relevance-advisory', '--format', 'json', '--config-mode', 'downstream-compatibility'],
+      env
+    );
     const jsonStart = stdout.indexOf('{');
     const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
-      pipeline?: { id?: string };
+      pipeline?: {
+        id?: string;
+        config_resolution?: { mode?: string; reason?: string; config_source?: string | null } | null;
+      };
     };
     expect(payload.pipeline?.id).toBe('docs-relevance-advisory');
+    expect(payload.pipeline?.config_resolution).toEqual({
+      mode: 'downstream-compatibility',
+      reason: 'CODEX_ORCHESTRATOR_CONFIG_MODE=downstream-compatibility',
+      config_source: 'package'
+    });
   }, TEST_TIMEOUT);
 
-  it('warns when plan uses packaged fallback config', async () => {
+  it('warns when explicit downstream compatibility plan uses packaged fallback config', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-plan-package-fallback-'));
     const env = {
       ...process.env,
@@ -2099,13 +2268,17 @@ describe('codex-orchestrator command surface', () => {
       CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
       MCP_RUNNER_TASK_ID: 'plan-package-fallback'
     };
-    const { stdout, stderr } = await runCli(['plan', 'docs-review', '--format', 'json'], env);
+    const { stdout, stderr } = await runCli(
+      ['plan', 'docs-review', '--format', 'json', '--config-mode', 'downstream-compatibility'],
+      env
+    );
     const jsonStart = stdout.indexOf('{');
     const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
       pipeline?: { id?: string };
     };
     expect(payload.pipeline?.id).toBe('docs-review');
-    expect(stderr).toContain('Using packaged fallback codex.orchestrator.json');
+    expect(stderr).toContain('Configuration mode: downstream-compatibility');
+    expect(stderr).toContain('using packaged compatibility codex.orchestrator.json');
   }, TEST_TIMEOUT);
 
   it('returns terminal failed status when strict cloud preflight fails', async () => {
@@ -2134,6 +2307,8 @@ describe('codex-orchestrator command surface', () => {
           'docs-review',
           '--execution-mode',
           'cloud',
+          '--config-mode',
+          'downstream-compatibility',
           '--target',
           'review',
           '--format',
@@ -2156,7 +2331,7 @@ describe('codex-orchestrator command surface', () => {
       manifest?: string;
     };
     expect(payload.status).toBe('failed');
-    expect(payload.summary).toContain('cloud fallback is disabled');
+    expect(payload.summary).toContain('fallback_policy=strict');
     expect(payload.summary).not.toContain('Runtime selection failed');
     const manifestPath = isAbsolute(payload.manifest ?? '')
       ? (payload.manifest as string)
@@ -2169,6 +2344,83 @@ describe('codex-orchestrator command surface', () => {
     expect(manifest.status).toBe('failed');
     expect(manifest.status_detail).toBe('cloud-preflight-failed');
     expect(manifest.completed_at).toBeTruthy();
+  }, FLOW_TARGET_TEST_TIMEOUT);
+
+  it('fails strict cloud preflight for configured but not-found env ids before cloud exec', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-cloud-preflight-env-not-found-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const cloudListLog = join(tempDir, 'cloud-list.log');
+    const cloudExecLog = join(tempDir, 'cloud-exec.log');
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_ORCHESTRATOR_ROOT: tempDir,
+      CODEX_ORCHESTRATOR_RUNS_DIR: join(tempDir, '.runs'),
+      CODEX_ORCHESTRATOR_OUT_DIR: join(tempDir, 'out'),
+      MCP_RUNNER_TASK_ID: 'cloud-preflight-env-not-found',
+      CODEX_ORCHESTRATOR_CLOUD_FALLBACK: 'deny',
+      CODEX_ORCHESTRATOR_RUNTIME_MODE: '',
+      CODEX_ORCHESTRATOR_RUNTIME_MODE_ACTIVE: '',
+      CODEX_RUNTIME_MODE: '',
+      CODEX_CLOUD_ENV_ID: 'env-missing',
+      CODEX_CLOUD_BRANCH: '',
+      CODEX_TEST_CLOUD_LIST_LOG: cloudListLog,
+      CODEX_TEST_CLOUD_EXEC_LOG: cloudExecLog,
+      CODEX_TEST_CLOUD_LIST_FAIL_MESSAGE:
+        "Error: environment 'env-missing' not found; run `codex cloud` to list available environments"
+    };
+    let stdout = '';
+    let exitCode = 0;
+    try {
+      await runCli(
+        [
+          'start',
+          'docs-review',
+          '--execution-mode',
+          'cloud',
+          '--config-mode',
+          'downstream-compatibility',
+          '--target',
+          'review',
+          '--format',
+          'json',
+          '--task',
+          'cloud-preflight-env-not-found'
+        ],
+        env,
+        FLOW_TARGET_TEST_TIMEOUT
+      );
+      throw new Error('expected cloud-preflight-env-not-found to exit non-zero');
+    } catch (error) {
+      ({ stdout, exitCode } = parseCliFailure(error));
+    }
+    expect(exitCode).not.toBe(0);
+    const jsonStart = stdout.indexOf('{');
+    const payload = JSON.parse(jsonStart >= 0 ? stdout.slice(jsonStart) : stdout) as {
+      status?: string;
+      summary?: string | null;
+      manifest?: string;
+    };
+    expect(payload.status).toBe('failed');
+    expect(payload.summary).toContain("environment 'env-missing' not found");
+
+    const commandLog = await readFile(cloudListLog, 'utf8');
+    expect(commandLog).toContain('cloud list --env env-missing --limit 1 --json');
+    await expect(readFile(cloudExecLog, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+
+    const manifestPath = isAbsolute(payload.manifest ?? '')
+      ? (payload.manifest as string)
+      : join(tempDir, payload.manifest ?? '');
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as {
+      status?: string;
+      status_detail?: string | null;
+      cloud_execution?: unknown;
+      cloud_fallback?: { issues?: Array<{ code?: string }> } | null;
+    };
+    expect(manifest.status).toBe('failed');
+    expect(manifest.status_detail).toBe('cloud-preflight-failed');
+    expect(manifest.cloud_execution).toBeFalsy();
+    expect(manifest.cloud_fallback).toBeFalsy();
   }, FLOW_TARGET_TEST_TIMEOUT);
 
   it('emits MCP enable plan payload in JSON output', async () => {

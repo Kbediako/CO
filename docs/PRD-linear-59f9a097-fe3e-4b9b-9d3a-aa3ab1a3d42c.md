@@ -2,6 +2,7 @@
 
 ## Added by Docs Child Lane 2026-04-17
 ## Refreshed by Docs Child Lane 2026-04-18
+## Refreshed by Parent Rework Lane 2026-04-21
 
 ## Traceability
 - Linear issue: `CO-211` / `59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c`
@@ -10,29 +11,32 @@
 - Source anchor: `ctx:sha256:d4239a4784c1cf71c95ab480b4a3821dc2c83dc3648d3b8d4a8c5387ccdfb3f8#chunk:c000001`
 - Shared source-0 metadata anchor: `ctx:sha256:737c3cf3d517b1a44673a4ef90593a10f7303f6e022a667e75cceca113e8acb8#chunk:c000001`
 - Apr 18 recurrence source anchor: `ctx:sha256:6a9427aa000f73b2f7d86bab415ae29c6ebbeb9172e159c03bc6d29ae012ff52#chunk:c000001`
+- Apr 21 Rework source anchor: `ctx:sha256:159ce815aa248f1705d76a533af179440608299883a742a504b31e83b029a294#chunk:c000001`
 - Docs packet child lane manifest: `.runs/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c-docs-packet/cli/2026-04-17T02-07-55-950Z-cb83673c/manifest.json`
 - Apr 18 docs refresh child lane manifest: `.runs/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c-docs-apr18-refresh/cli/2026-04-18T18-35-19-649Z-1ede381a/manifest.json`
+- Apr 21 Rework docs child lane manifest: `.runs/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c-docs-apr21-rework/cli/2026-04-21T10-55-06-746Z-91d3806a/manifest.json` (zero-byte advisory; parent owns this refresh)
 - Merged PR #506 commit: `e98d459f4dfdb47a22d981fedbf5ba11053d3a95` (`fix(control-host): quarantine repeated refresh-stuck restart churn`)
 - Source payload note: the shared source-0 payload is run metadata and prompt-pack provenance only; the current issue body was read through the packaged read-only `linear issue-context --issue-id 59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c --format json` helper.
 - Apr 18 source payload note: the recurrence refresh source-0 payload is also metadata/provenance only; the prompt-carried recurrence framing is after merged PR #506, and parent owns the source fix for quarantined samples preserving fail-closed unhealthy streaks and diagnostic retention.
+- Apr 21 Rework note: Linear reopened `CO-211` after live recurrence showed `status=restart_required`, `last_health_status=probe_timeout`, `restart_count=1374`, stale owner reclamation, and active `CO-225`, `CO-276`, and `CO-289` workers still heartbeating.
 
 ## Summary
-- Problem Statement: Apr 17 control-host churn showed repeated `provider_refresh_lifecycle_stuck` / `restart_required` recovery while active provider workers stayed healthy and kept progressing. PR #506 merged the initial repeated-churn quarantine, but Apr 18 recurrence evidence keeps this lane active until quarantined samples preserve fail-closed unhealthy streaks and diagnostic retention instead of erasing stuck truth. The problem is explicitly distinct from `CO-210`, which is scoped to CO STATUS child-lane manifest hydration semantics.
-- Desired Outcome: isolate and fix or quarantine the re-entry condition that causes repeated refresh-stuck restart churn, add machine-checkable restart-series evidence with `owner rotations`, `refresh phases`, and `surviving provider workers`, preserve request-budget/no-request-burn behavior, keep quarantined samples diagnostic-retentive and fail-closed, and prove post-recovery status through `co-status --format json` with `polling.stuck=false` and `polling.restart_required=false`.
+- Problem Statement: Apr 17 and Apr 18 control-host churn showed repeated `provider_refresh_lifecycle_stuck` / `restart_required` recovery while active provider workers stayed healthy and kept progressing. PR #506 and PR #544 landed the initial quarantine and diagnostic-retention fixes, but Apr 21 Rework evidence shows the same operator-visible churn through `probe_timeout` supervision restarts: the supervisor reached `restart_required` with `last_health_status=probe_timeout` while active provider workers were still heartbeating. The problem remains distinct from `CO-210`, which is scoped to CO STATUS child-lane manifest hydration semantics.
+- Desired Outcome: isolate and fix or quarantine the remaining re-entry condition that causes repeated restart churn, attach machine-checkable restart-series evidence to both `restart_required` and `probe_timeout` restart records, preserve `owner rotations`, `refresh phases`, and `surviving provider workers`, preserve request-budget/no-request-burn behavior, keep the first genuine stuck/timeout sample fail-closed, and prove post-recovery status through `co-status --format json` with `polling.stuck=false` and `polling.restart_required=false`.
 
 ## User Request Translation (Context Anchor)
-- User intent / needs (in your own words): refresh the docs-first packet and registry/checklist mirrors for `CO-211` after Apr 18 recurrence evidence following merged PR #506, preserving the exact churn/observability contract while keeping parent-owned source fixes and validation out of this docs child lane.
+- User intent / needs (in your own words): complete the Rework attempt for `CO-211` after the Apr 21 live recurrence, preserving the exact churn/observability contract while extending the fix beyond repeated `provider_refresh_lifecycle_stuck` payloads to the `probe_timeout` restart path that still churns under healthy active workers.
 - Success criteria / acceptance:
   - reproduce or simulate the Apr 17 churn shape where active `CO-207` / `CO-210`-like provider workers stay alive while control-host polling repeatedly enters `provider_refresh_lifecycle_stuck` / `restart_required`
   - persist machine-checkable restart/churn evidence covering restart series, `owner rotations`, `refresh phases`, and `surviving provider workers`
   - diagnose which phase, request, or claim class exceeded `stalled_after_ms=45000`, including operation age, queued/checking state, and current provider keys
   - keep genuine stuck refresh truth, worker safety, and no-request-burn behavior from `CO-163`, `CO-179`, `CO-119`, and `CO-41`
-  - ensure the parent-owned recurrence fix keeps quarantined samples from clearing fail-closed unhealthy streaks or dropping diagnostic retention
+  - ensure recurrence fixes keep quarantined samples and probe-timeout samples from clearing fail-closed unhealthy streaks or dropping diagnostic retention
   - verify `co-status --format json` succeeds after recovery with `polling.stuck=false`, `polling.restart_required=false`, and live running provider workers
 - Constraints / non-goals:
-  - child lane owns only the docs packet and listed registry/checklist mirrors
   - parent owns authoritative source inspection, implementation, focused tests, docs-review, validation, Linear/workpad reconciliation, PR lifecycle, and merge
-  - parent owns the source fix for quarantined samples preserving fail-closed unhealthy streaks and diagnostic retention
+  - Apr 21 zero-byte docs child lane is advisory evidence only; it does not replace this parent docs refresh
+  - parent owns the source fix for probe-timeout restart records preserving diagnostic retention and active-worker safety
   - keep `CO-210` child-lane manifest hydration semantics out of scope
 
 ## Intent Checksum
@@ -85,6 +89,7 @@
 | Evidence | local artifacts show recovery, but restart series, `owner rotations`, `refresh phases`, and `surviving provider workers` are not durable enough for machine-checkable reconstruction | a single machine-checkable artifact records the full restart/churn sequence and surrounding provider state |
 | Diagnostics | stuck detection retains the 45s watchdog, but phase/request/claim detail is insufficient around `stalled_after_ms=45000` | diagnostics identify the blocked phase, request or claim class, operation age, queued/checking state, and current provider keys |
 | Post-PR #506 recurrence | the initial merged quarantine can stop repeated restart churn, but Apr 18 recurrence evidence requires diagnostic-retentive quarantined samples | quarantined samples preserve fail-closed unhealthy streaks and diagnostic retention while avoiding repeated active-worker restarts |
+| Apr 21 Rework recurrence | live supervision can still reach `restart_required` with `last_health_status=probe_timeout` and no diagnostic snapshot while active workers continue heartbeating | repeated timeout churn for the same active worker series is diagnosed from local persisted provider-intake state and quarantined only after the first fail-closed restart record preserves diagnostic context |
 | Worker safety | recovery succeeded without obvious worker death, but repeated churn risks hidden worker interference | supervised recovery preserves active `provider-linear-worker` issue processes for `CO-207` / `CO-210`-like runs |
 | Request-budget safety | prior lanes established no-request-burn behavior after `restart_required=true`, but churn ownership is still split across adjacent issues | churn fix preserves `CO-163` / `CO-179` no-request-burn safeguards and does not add new direct issue-by-id burn in the same stuck pass |
 | Status verification | read-only status recovered after restart and reported `polling.stuck=false` and `polling.restart_required=false` | `co-status --format json` remains the post-recovery proof surface and shows live running provider workers |
@@ -95,6 +100,7 @@
 - Add enough diagnostics to tell which refresh phase or claim/request class exceeded `stalled_after_ms=45000`.
 - Fix or quarantine the re-entry condition without killing active provider workers or reopening request burn.
 - Keep quarantine behavior auditable: quarantined samples must preserve fail-closed unhealthy streaks and diagnostic retention.
+- Keep probe-timeout behavior auditable: timeout restart records should retain local provider-intake diagnostics when the HTTP `co-status` probe itself cannot return JSON.
 - Preserve a no-regression path for `CO-194` stale terminal claims while covering the repeated-churn class.
 
 ## Non-Goals

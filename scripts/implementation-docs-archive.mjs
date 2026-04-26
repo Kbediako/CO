@@ -21,6 +21,10 @@ const ARCHIVE_MARKER = '<!-- docs-archive:stub -->';
 const DEFAULT_OWNER = 'Codex (top-level agent), Review agent';
 const TERMINAL_TASK_STATUSES = new Set(['succeeded', 'completed']);
 const REPORT_ONLY_FINDINGS_PATTERN = /^docs\/findings\/(\d+)-.*-deliberation\.md$/;
+const PRESERVED_HISTORICAL_STUB_STATUS = 'preserved_historical_stub';
+const REGISTRY_STATUS_ARCHIVE_ELIGIBLE = new Set(['archived', 'deprecated']);
+const PRESERVED_HISTORICAL_STUB_PATH_PATTERNS = [/^tasks\/tasks-[^/]+\.md$/, /^\.agent\/task\/[^/]+\.md$/];
+const PRESERVED_HISTORICAL_STUB_HEADING_PATTERN = /^\s*#\s+Historical stub\b/i;
 
 function showUsage() {
   console.log(`Usage: node scripts/implementation-docs-archive.mjs [options]
@@ -63,6 +67,22 @@ function globToRegExp(pattern) {
 
 function matchesAnyPattern(value, patterns) {
   return patterns.some((regex) => regex.test(value));
+}
+
+function isPreservedHistoricalStubStatus(status) {
+  return status === PRESERVED_HISTORICAL_STUB_STATUS;
+}
+
+function isApprovedPreservedHistoricalStubPath(relativePath) {
+  return PRESERVED_HISTORICAL_STUB_PATH_PATTERNS.some((pattern) => pattern.test(relativePath));
+}
+
+function hasPreservedHistoricalStubHeading(content) {
+  return typeof content === 'string' && PRESERVED_HISTORICAL_STUB_HEADING_PATTERN.test(content);
+}
+
+function isApprovedPreservedHistoricalStub(relativePath, content) {
+  return isApprovedPreservedHistoricalStubPath(relativePath) && hasPreservedHistoricalStubHeading(content);
 }
 
 function collectIndexedDocPaths(item) {
@@ -627,8 +647,18 @@ async function main() {
       continue;
     }
 
+    if (isPreservedHistoricalStubStatus(status) && isApprovedPreservedHistoricalStub(relativePath, content)) {
+      report.skipped.push({
+        path: relativePath,
+        reason: PRESERVED_HISTORICAL_STUB_STATUS,
+        context: { ...candidate, lineCount, status }
+      });
+      report.totals.skipped += 1;
+      continue;
+    }
+
     const eligibleReasons = [];
-    if (status === 'archived' || status === 'deprecated') {
+    if (REGISTRY_STATUS_ARCHIVE_ELIGIBLE.has(status)) {
       eligibleReasons.push('registry_status');
     }
     if (candidate.ageDays >= policy.retainDays) {
@@ -684,8 +714,21 @@ async function main() {
       continue;
     }
 
+    if (
+      isPreservedHistoricalStubStatus(status) &&
+      isApprovedPreservedHistoricalStub(normalizedRelativePath, content)
+    ) {
+      report.skipped.push({
+        path: normalizedRelativePath,
+        reason: PRESERVED_HISTORICAL_STUB_STATUS,
+        context: strayContext
+      });
+      report.totals.skipped += 1;
+      continue;
+    }
+
     const eligibleReasons = [];
-    if (status === 'archived' || status === 'deprecated') {
+    if (REGISTRY_STATUS_ARCHIVE_ELIGIBLE.has(status)) {
       eligibleReasons.push('registry_status');
     }
     if (reviewDate) {

@@ -128,9 +128,10 @@ function normalizeUserConfig(config: ConfigFile | null, source: ConfigSource): U
   }
   const runtimeMode = normalizeRuntimeMode(config.runtimeMode);
   const stageSets = normalizeStageSets(config.stageSets);
-  const pipelines = Array.isArray(config.pipelines)
-    ? config.pipelines.map((pipeline) => expandPipelineStages(pipeline, stageSets))
-    : config.pipelines;
+  if (config.pipelines !== undefined && !Array.isArray(config.pipelines)) {
+    throw new Error('codex.orchestrator.json pipelines must be an array.');
+  }
+  const pipelines = config.pipelines?.map((pipeline) => expandPipelineStages(pipeline, stageSets));
   return {
     pipelines,
     defaultPipeline: config.defaultPipeline,

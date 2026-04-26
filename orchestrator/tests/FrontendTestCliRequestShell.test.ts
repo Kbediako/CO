@@ -91,6 +91,7 @@ describe('runFrontendTestCliRequestShell', () => {
     const runFrontendTestCliShellMock = vi.fn(async () => {
       expect(process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH).toBeUndefined();
       expect(process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT).toBeUndefined();
+      expect(process.env.CODEX_ORCHESTRATOR_CONFIG_MODE).toBe('downstream-compatibility');
       expect(process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED).toBe('0');
     });
     const originalEnv = {
@@ -106,6 +107,7 @@ describe('runFrontendTestCliRequestShell', () => {
         process.env.CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT,
       CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH,
       CODEX_ORCHESTRATOR_PACKAGE_ROOT: process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT,
+      CODEX_ORCHESTRATOR_CONFIG_MODE: process.env.CODEX_ORCHESTRATOR_CONFIG_MODE,
       CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED:
         process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED
     };
@@ -117,6 +119,7 @@ describe('runFrontendTestCliRequestShell', () => {
     process.env.CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT = '/tmp/provider-package-root';
     process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_PATH = '/tmp/provider-workflow.last-known-good.json';
     process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT = '/tmp/provider-package-root';
+    process.env.CODEX_ORCHESTRATOR_CONFIG_MODE = 'repo-authoritative';
     process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED = '1';
 
     try {
@@ -127,6 +130,7 @@ describe('runFrontendTestCliRequestShell', () => {
           flags: {},
           resolveRuntimeModeFlag: vi.fn(() => undefined),
           applyRepoConfigRequiredPolicy: vi.fn(() => {
+            process.env.CODEX_ORCHESTRATOR_CONFIG_MODE = 'downstream-compatibility';
             process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED = '0';
             return false;
           }),
@@ -142,6 +146,7 @@ describe('runFrontendTestCliRequestShell', () => {
         '/tmp/provider-workflow.last-known-good.json'
       );
       expect(process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT).toBe('/tmp/provider-package-root');
+      expect(process.env.CODEX_ORCHESTRATOR_CONFIG_MODE).toBe('repo-authoritative');
       expect(process.env.CODEX_ORCHESTRATOR_REPO_CONFIG_REQUIRED).toBe('1');
     } finally {
       for (const [key, value] of Object.entries(originalEnv)) {
