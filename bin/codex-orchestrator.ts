@@ -52,6 +52,7 @@ import {
   DEFAULT_PROVIDER_START_PIPELINE_ID,
   runControlHostCliShell
 } from '../orchestrator/src/cli/controlHostCliShell.js';
+import { runControlHostProviderWorkerRecoverCliShell } from '../orchestrator/src/cli/controlHostProviderWorkerRecoverCliShell.js';
 import { runControlHostFreshnessGaugeCliShell } from '../orchestrator/src/cli/controlHostFreshnessGaugeCliShell.js';
 import { runControlHostSupervisionCliShell } from '../orchestrator/src/cli/controlHostSupervisionCliShell.js';
 import { runCoStatusAttachCliShell } from '../orchestrator/src/cli/coStatusAttachCliShell.js';
@@ -861,6 +862,23 @@ async function handleStatus(orchestrator: CodexOrchestrator, rawArgs: string[]):
 }
 
 async function handleControlHost(rawArgs: string[]): Promise<void> {
+  if (rawArgs[0] === 'recover' || rawArgs[0] === 'relaunch' || rawArgs[0] === 'nudge') {
+    const action = rawArgs[0];
+    const { positionals, flags } = parseArgs(rawArgs.slice(1));
+    if (isHelpRequest(positionals, flags)) {
+      printControlHostProviderWorkerRecoverHelp(action);
+      return;
+    }
+    if (positionals.length > 0) {
+      throw new Error(`Unknown control-host ${action} argument(s): ${positionals.join(' ')}`);
+    }
+    await runControlHostProviderWorkerRecoverCliShell({
+      action,
+      flags,
+      printHelp: () => printControlHostProviderWorkerRecoverHelp(action)
+    });
+    return;
+  }
   if (rawArgs[0] === 'freshness-gauge') {
     const { positionals, flags } = parseArgs(rawArgs.slice(1));
     if (isHelpRequest(positionals, flags)) {
@@ -1617,6 +1635,8 @@ Commands:
     --run <id>              Host run id for persisted state files (default: control-host).
     --pipeline <id>         Pipeline used for provider-driven starts (default: diagnostics).
     --format json           Emit machine-readable readiness output.
+  control-host recover|relaunch|nudge --issue-id <id> [options]
+    Ask the running root control-host to recover a specific Linear provider worker.
   control-host freshness-gauge [options]
     Replay local provider/control-host artifacts and emit throughput/freshness health JSON.
 
@@ -1704,6 +1724,7 @@ Commands:
     --mode <full|question_only|status_only>  Limit tool surface for child runs.
     --config "<key>=<value>[;...]"  Apply config overrides (repeat via separators).
   control-host            Run the persistent provider intake + oversight host.
+  control-host recover    Ask the running root control-host to recover a Linear provider worker.
   co-status               Attach the CO STATUS terminal viewer or emit the current snapshot from an already-running local control-host.
   version | --version
 
@@ -1919,6 +1940,9 @@ Options:
 function printControlHostHelp(): void {
   console.log(`Usage:
   codex-orchestrator control-host [options]
+  codex-orchestrator control-host recover --issue-id <linear-issue-id> [options]
+  codex-orchestrator control-host relaunch --issue-id <linear-issue-id> [options]
+  codex-orchestrator control-host nudge --issue-id <linear-issue-id> [options]
   codex-orchestrator control-host freshness-gauge [options]
   codex-orchestrator control-host supervise <install|status|restart|uninstall|run> [options]
 
@@ -1932,12 +1956,36 @@ Options:
 Read-only gauge subcommand:
   freshness-gauge      Replay existing local/sanitized artifacts and classify provider/control-host freshness.
 
+Provider-worker recovery subcommands:
+  recover              Ask the running root control-host to recover a specific Linear issue worker.
+  relaunch             Alias-shaped recovery request for operator relaunch workflows.
+  nudge                Alias-shaped recovery request for operator nudge workflows.
+
 Supervision subcommands:
   supervise install     Install a launchd LaunchAgent-backed local control-host supervisor.
   supervise status      Show the installed launchd/config/state status.
   supervise restart     Restart the installed control-host supervisor.
   supervise uninstall   Remove the installed launchd supervisor and generated artifacts.
   supervise run         Internal long-lived runner for launchd ProgramArguments.
+`);
+}
+
+function printControlHostProviderWorkerRecoverHelp(action: string): void {
+  console.log(`Usage: codex-orchestrator control-host ${action} --issue-id <linear-issue-id> [options]
+
+Ask an already-running root control-host to ${action} the provider worker for one Linear issue.
+This preserves control-host admission, launch-token, provenance, deterministic issue worktree,
+and root .runs/out artifact routing. Direct \`start provider-linear-worker\` remains unsupported.
+
+Options:
+  --issue-id <id>             Linear issue id/key to recover (required).
+  --task <id>                 Control-host artifact task id (default: local-mcp).
+  --run <id>                  Control-host run id (default: control-host).
+  --manifest-path <path>      Attach to a specific control-host manifest.
+  --run-dir <path>            Attach to a specific control-host run directory.
+  --request-timeout-ms <n>    HTTP request timeout (default: 25000).
+  --format json               Emit machine-readable result.
+  --help                      Show this message.
 `);
 }
 

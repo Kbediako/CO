@@ -56,6 +56,17 @@ export function createControlAuthenticatedRouteContext(
             allowIdleRestartRequiredRetry: true
           })
         : Promise.resolve(null),
+    requestProviderWorkerRecover: (recoverInput) =>
+      input.context.providerIssueHandoff
+        ? input.context.providerIssueHandoff.recoverIssue(recoverInput)
+        : Promise.resolve({
+            provider: recoverInput.provider,
+            issue_id: recoverInput.issueId,
+            action: recoverInput.action,
+            kind: 'skipped',
+            reason: 'provider_issue_handoff_unavailable',
+            claim: null
+          }),
     readRequestBody: () => readJsonBody(input.req),
     readDispatchEvaluation: () => input.runtimeSnapshot.readDispatchEvaluation(),
     onDispatchEvaluated: (record) => emitDispatchPilotAuditEvents(input.context, record),

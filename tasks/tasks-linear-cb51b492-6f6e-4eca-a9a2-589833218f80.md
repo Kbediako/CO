@@ -22,7 +22,7 @@
 - [x] Docs-review evidence captured before implementation handoff/review. Evidence: `.runs/linear-cb51b492-6f6e-4eca-a9a2-589833218f80-docs-review/cli/2026-04-25T17-59-08-846Z-5191378f/manifest.json` initially failed in `npm run docs:check` on pre-existing missing `linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb` docs paths; current `origin/main` now contains those paths and latest main Core Lane passed `docs:check`.
 
 ## Workflow Audit
-- [x] Initial child-lane audit inspected all 9 workflow files and 20 `uses:` references. Evidence: child lane manifest and report path `.child-lanes/workflow-scan-2026-04-25T17-49-36-168Z-9fad0145/out/linear-cb51b492-6f6e-4eca-a9a2-589833218f80/workflow-node24-audit.txt`.
+- [x] Initial child-lane audit inspected all 9 workflow files and 20 `uses:` references. Evidence: child lane manifest `.runs/linear-cb51b492-6f6e-4eca-a9a2-589833218f80-workflow-scan/cli/2026-04-25T17-49-36-168Z-9fad0145/manifest.json`; the child-lane-local report was not retained as a tracked repo artifact.
 - [x] Upstream action metadata checked for current and target action runtimes. Evidence: parent terminal verification of `action.yml` `runs.using`.
 - [x] Post-change scan confirms no supported Node 20-backed action majors remain. Evidence: `out/linear-cb51b492-6f6e-4eca-a9a2-589833218f80/manual/workflow-uses-post.txt` and zero-byte `out/linear-cb51b492-6f6e-4eca-a9a2-589833218f80/manual/workflow-node20-remaining-post.txt`.
 
