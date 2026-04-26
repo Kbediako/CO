@@ -6,6 +6,13 @@ export {
 } from './mode.js';
 export { resolveRuntimeSelection } from './provider.js';
 export {
+  describeFallbackTarget,
+  resolveRuntimeFallbackPolicy,
+  type RuntimeFallbackPolicy,
+  type RuntimeFallbackPolicyResolution,
+  type RuntimeFallbackPolicySource
+} from './fallbackPolicy.js';
+export {
   createRuntimeCodexCommandContext,
   resolveRuntimeCodexCommand,
   formatRuntimeSelectionSummary,

@@ -1,6 +1,36 @@
 {
   "items": [
     {
+      "id": "20260426-linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7",
+      "title": "CO: split runtime fallback routing into explicit auto and strict modes",
+      "relates_to": "tasks/tasks-linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-26",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-26",
+          "status": "produced",
+          "manifest": ".runs/linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7-docs-packet/cli/2026-04-26T00-20-46-760Z-f04d6b8b/manifest.json",
+          "source_anchor": "ctx:sha256:788ef44aebc402efe831ec3c10edf00a79653a06d72a8a43cc83c841572629b6#chunk:c000001",
+          "summary": "Docs-first packet created for CO-381 runtime fallback policy split. The packet preserves explicit auto and strict policy terms, requires selected policy/original target/fallback target/blocking reason evidence, names likely runtime/router/provider-worker/control-host implementation surfaces, and leaves production source, tests, Linear state, workpad, validation floor, review, and PR lifecycle to the parent lane."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md",
+        "task": "tasks/tasks-linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md",
+        "agent_task": ".agent/task/linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md"
+        }
+      }
+    },
+    {
       "id": "20260426-linear-7da2cd4d-977e-450a-b056-307edf560fe0",
       "title": "Restore docs hygiene baseline for missing TASKS references and freshness registry drift",
       "relates_to": "tasks/tasks-linear-7da2cd4d-977e-450a-b056-307edf560fe0.md",

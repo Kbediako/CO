@@ -43,8 +43,13 @@ export function applyRuntimeToRunSummary(runSummary: RunSummary, manifest: CliMa
     modeUsed: manifest.runtime_mode,
     provider: manifest.runtime_provider,
     fallbackOccurred: fallback?.occurred ?? false,
+    fallbackPolicy: fallback?.policy ?? null,
+    fallbackPolicySource: fallback?.policy_source ?? null,
     fallbackCode: fallback?.code ?? null,
     fallbackReason: fallback?.reason ?? null,
+    originalTarget: fallback?.original_target ?? null,
+    fallbackTarget: fallback?.fallback_target ?? null,
+    blockingReason: fallback?.blocking_reason ?? null,
     checkedAt: fallback?.checked_at ?? null
   };
 }
@@ -81,6 +86,11 @@ export function applyCloudFallbackToRunSummary(runSummary: RunSummary, manifest:
   runSummary.cloudFallback = {
     modeRequested: manifest.cloud_fallback.mode_requested,
     modeUsed: manifest.cloud_fallback.mode_used,
+    policy: manifest.cloud_fallback.policy ?? 'auto',
+    policySource: manifest.cloud_fallback.policy_source ?? 'default',
+    originalTarget: manifest.cloud_fallback.original_target ?? 'execution:cloud',
+    fallbackTarget: manifest.cloud_fallback.fallback_target ?? 'execution:mcp',
+    blockingReason: manifest.cloud_fallback.blocking_reason ?? manifest.cloud_fallback.reason,
     reason: manifest.cloud_fallback.reason,
     issues: manifest.cloud_fallback.issues.map((issue) => ({
       code: issue.code,

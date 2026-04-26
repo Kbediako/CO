@@ -124,10 +124,15 @@ function buildManifest(
     runtime_provider: 'AppServerRuntimeProvider',
     runtime_fallback: {
       occurred: false,
+      policy: 'auto',
+      policy_source: 'default',
       code: null,
       reason: null,
       from_mode: null,
       to_mode: null,
+      original_target: null,
+      fallback_target: null,
+      blocking_reason: null,
       checked_at: '2026-04-09T09:00:00.000Z'
     },
     cloud_execution: null,

@@ -36,7 +36,7 @@ const doctor: DoctorResult = {
     guidance: []
   },
   collab: { status: 'ok', enabled: true, feature_key: 'multi_agent', enablement: [] },
-  cloud: { status: 'ok', env_id_configured: true, branch: null, fallback_policy: 'allow', enablement: [] },
+  cloud: { status: 'ok', env_id_configured: true, branch: null, fallback_policy: 'auto', enablement: [] },
   delegation: { status: 'ok', config: { status: 'ok', path: '/tmp/config.toml' }, enablement: [] }
 };
 

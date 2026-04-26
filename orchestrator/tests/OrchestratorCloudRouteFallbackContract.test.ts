@@ -14,10 +14,15 @@ function createRuntimeSelection(overrides: Partial<RuntimeSelection> = {}): Runt
     runtime_session_id: null,
     fallback: {
       occurred: false,
+      policy: 'auto',
+      policy_source: 'default',
       code: null,
       reason: null,
       from_mode: null,
       to_mode: null,
+      original_target: null,
+      fallback_target: null,
+      blocking_reason: null,
       checked_at: '2026-03-14T00:00:00.000Z'
     },
     env_overrides: {},
@@ -71,13 +76,19 @@ describe('buildCloudPreflightFailureContract', () => {
       return;
     }
     expect(contract.detail).toBe(
-      'Cloud preflight failed; falling back to mcp. ' +
-        'Missing CODEX_CLOUD_ENV_ID (or target metadata.cloudEnvId). ' +
+      'Cloud preflight failed; fallback_policy=auto original_target=execution:cloud fallback_target=execution:mcp ' +
+        'blocking_reason=Missing CODEX_CLOUD_ENV_ID (or target metadata.cloudEnvId). ' +
         "Cloud branch 'router-preflight' was not found on origin. Push it first or set CODEX_CLOUD_BRANCH to an existing remote branch."
     );
     expect(contract.manifestFallback).toMatchObject({
       mode_requested: 'cloud',
       mode_used: 'mcp',
+      policy: 'auto',
+      original_target: 'execution:cloud',
+      fallback_target: 'execution:mcp',
+      blocking_reason:
+        'Missing CODEX_CLOUD_ENV_ID (or target metadata.cloudEnvId). ' +
+        "Cloud branch 'router-preflight' was not found on origin. Push it first or set CODEX_CLOUD_BRANCH to an existing remote branch.",
       reason: contract.detail
     });
     expect(contract.reroute).toEqual({
@@ -92,7 +103,7 @@ describe('buildCloudPreflightFailureContract', () => {
     });
   });
 
-  it('returns a fail contract when fallback is denied through environment policy', () => {
+  it('returns a fail contract when fallback is strict through environment policy', () => {
     vi.stubEnv('CODEX_ORCHESTRATOR_CLOUD_FALLBACK', 'deny');
 
     const contract = buildCloudPreflightFailureContract(createContractInput(), [
@@ -102,8 +113,8 @@ describe('buildCloudPreflightFailureContract', () => {
     expect(contract).toEqual({
       outcome: 'fail',
       detail:
-        'Cloud preflight failed and cloud fallback is disabled. ' +
-        'Missing CODEX_CLOUD_ENV_ID (or target metadata.cloudEnvId).'
+        'Cloud preflight failed; fallback_policy=strict original_target=execution:cloud fallback_target=execution:mcp ' +
+        'blocking_reason=Missing CODEX_CLOUD_ENV_ID (or target metadata.cloudEnvId).'
     });
   });
 
@@ -120,10 +131,14 @@ describe('buildCloudPreflightFailureContract', () => {
     );
 
     expect(contract.outcome).toBe('fallback');
+    if (contract.outcome === 'fallback') {
+      expect(contract.manifestFallback.policy).toBe('auto');
+      expect(contract.manifestFallback.policy_source).toBe('env');
+    }
   });
 
   it.each(['0', 'false', 'off', 'deny', 'disabled', 'never', 'strict'])(
-    'treats %s as a disabled fallback policy value',
+    'treats %s as a strict fallback policy value',
     (policyValue) => {
       const contract = buildCloudPreflightFailureContract(
         createContractInput({
@@ -137,9 +152,28 @@ describe('buildCloudPreflightFailureContract', () => {
       expect(contract).toEqual({
         outcome: 'fail',
         detail:
-          'Cloud preflight failed and cloud fallback is disabled. ' +
-          'Missing CODEX_CLOUD_ENV_ID (or target metadata.cloudEnvId).'
+          'Cloud preflight failed; fallback_policy=strict original_target=execution:cloud fallback_target=execution:mcp ' +
+          'blocking_reason=Missing CODEX_CLOUD_ENV_ID (or target metadata.cloudEnvId).'
       });
+    }
+  );
+
+  it.each(['1', 'true', 'on', 'allow', 'enabled', 'auto'])(
+    'treats %s as an auto fallback policy value',
+    (policyValue) => {
+      const contract = buildCloudPreflightFailureContract(
+        createContractInput({
+          envOverrides: {
+            CODEX_ORCHESTRATOR_CLOUD_FALLBACK: policyValue
+          }
+        }),
+        [{ code: 'missing_environment', message: 'Missing CODEX_CLOUD_ENV_ID (or target metadata.cloudEnvId).' }]
+      );
+
+      expect(contract.outcome).toBe('fallback');
+      if (contract.outcome === 'fallback') {
+        expect(contract.manifestFallback.policy).toBe('auto');
+      }
     }
   );
 });

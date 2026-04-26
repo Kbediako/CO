@@ -363,10 +363,15 @@ function createRuntimeContext(
       runtime_session_id: null,
       fallback: {
         occurred: false,
+        policy: 'auto',
+        policy_source: 'default',
         code: null,
         reason: null,
         from_mode: null,
         to_mode: null,
+        original_target: null,
+        fallback_target: null,
+        blocking_reason: null,
         checked_at: '2026-03-21T09:00:00.000Z'
       },
       env_overrides: {},
@@ -389,10 +394,15 @@ function createAppServerRuntimeContext(
       runtime_session_id: 'appserver-run-child',
       fallback: {
         occurred: false,
+        policy: 'auto',
+        policy_source: 'default',
         code: null,
         reason: null,
         from_mode: null,
         to_mode: null,
+        original_target: null,
+        fallback_target: null,
+        blocking_reason: null,
         checked_at: '2026-03-21T09:00:00.000Z'
       },
       env_overrides: {},

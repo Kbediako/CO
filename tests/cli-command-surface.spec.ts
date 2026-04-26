@@ -1618,6 +1618,34 @@ describe('codex-orchestrator command surface', () => {
     });
   }, TEST_TIMEOUT);
 
+  it('reports invalid cloud fallback policy in doctor JSON without crashing', async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'co-cli-doctor-invalid-cloud-fallback-'));
+    const fakeCodex = await writeFakeCodexBinary(tempDir);
+    const env = {
+      ...process.env,
+      CODEX_CLI_BIN: fakeCodex,
+      CODEX_ORCHESTRATOR_CLOUD_FALLBACK: 'bogus',
+      CODEX_CLOUD_ENV_ID: '',
+      CODEX_CLOUD_BRANCH: ''
+    };
+    const { stdout } = await runCli(['doctor', '--format', 'json'], env);
+    const payload = JSON.parse(stdout) as {
+      cloud?: {
+        status?: string;
+        fallback_policy?: string;
+        fallback_policy_source?: string;
+        fallback_policy_raw?: string | null;
+        fallback_policy_error?: string | null;
+      };
+    };
+
+    expect(payload.cloud?.status).toBe('invalid_policy');
+    expect(payload.cloud?.fallback_policy).toBe('invalid');
+    expect(payload.cloud?.fallback_policy_source).toBe('invalid');
+    expect(payload.cloud?.fallback_policy_raw).toBe('bogus');
+    expect(payload.cloud?.fallback_policy_error).toContain('Invalid fallback policy "bogus"');
+  }, TEST_TIMEOUT);
+
   it('emits doctor cloud preflight payload in JSON output', async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'co-cli-doctor-cloud-preflight-'));
     const fakeCodex = await writeFakeCodexBinary(tempDir);
@@ -2221,7 +2249,7 @@ describe('codex-orchestrator command surface', () => {
       manifest?: string;
     };
     expect(payload.status).toBe('failed');
-    expect(payload.summary).toContain('cloud fallback is disabled');
+    expect(payload.summary).toContain('fallback_policy=strict');
     expect(payload.summary).not.toContain('Runtime selection failed');
     const manifestPath = isAbsolute(payload.manifest ?? '')
       ? (payload.manifest as string)

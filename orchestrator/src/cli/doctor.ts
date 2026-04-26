@@ -59,6 +59,7 @@ import {
 } from './codexDefaultsSetup.js';
 import { CommandPlanner } from './adapters/CommandPlanner.js';
 import { PipelineResolver } from './services/pipelineResolver.js';
+import { resolveCloudFallbackPolicy as resolveSharedCloudFallbackPolicy } from './services/orchestratorCloudRouteFallbackContract.js';
 import { isRepoConfigRequired } from './config/repoConfigPolicy.js';
 import type { EnvironmentPaths } from './run/environment.js';
 import type { TaskContext } from '../types.js';
@@ -174,10 +175,13 @@ export interface DoctorResult {
     enablement: string[];
   };
   cloud: {
-    status: 'ok' | 'not_configured' | 'unavailable';
+    status: 'ok' | 'not_configured' | 'unavailable' | 'invalid_policy';
     env_id_configured: boolean;
     branch: string | null;
-    fallback_policy: 'allow' | 'deny';
+    fallback_policy: 'auto' | 'strict' | 'invalid';
+    fallback_policy_source: 'default' | 'env' | 'override' | 'invalid';
+    fallback_policy_raw: string | null;
+    fallback_policy_error: string | null;
     enablement: string[];
   };
   delegation: {
@@ -404,9 +408,15 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
     typeof process.env.CODEX_CLOUD_BRANCH === 'string' && process.env.CODEX_CLOUD_BRANCH.trim().length > 0
       ? process.env.CODEX_CLOUD_BRANCH.trim().replace(/^refs\/heads\//u, '')
       : null;
+  const cloudFallbackPolicy = resolveCloudFallbackPolicyDiagnostic(process.env);
   const cloudStatus: DoctorResult['cloud']['status'] =
-    !cloudCmdAvailable ? 'unavailable' : cloudEnvIdConfigured ? 'ok' : 'not_configured';
-  const cloudFallbackPolicy: DoctorResult['cloud']['fallback_policy'] = resolveCloudFallbackPolicy();
+    cloudFallbackPolicy.policy === 'invalid'
+      ? 'invalid_policy'
+      : !cloudCmdAvailable
+        ? 'unavailable'
+        : cloudEnvIdConfigured
+          ? 'ok'
+          : 'not_configured';
   const repoRoot = resolveDoctorRepoRoot(cwd);
 
   const delegationSnapshot = inspectDelegationMcpConfig(process.env);
@@ -432,6 +442,7 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
       missing.length === 0 &&
       codexDefaults.status === 'ok' &&
       providers.status === 'ok' &&
+      cloudStatus !== 'invalid_policy' &&
       !delegationBlocksOverallStatus
         ? 'ok'
         : 'warning',
@@ -457,13 +468,19 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
       status: cloudStatus,
       env_id_configured: cloudEnvIdConfigured,
       branch: cloudBranch,
-      fallback_policy: cloudFallbackPolicy,
+      fallback_policy: cloudFallbackPolicy.policy,
+      fallback_policy_source: cloudFallbackPolicy.source,
+      fallback_policy_raw: cloudFallbackPolicy.raw_value,
+      fallback_policy_error: cloudFallbackPolicy.error,
       enablement: [
+        ...(cloudFallbackPolicy.error
+          ? [`Invalid CODEX_ORCHESTRATOR_CLOUD_FALLBACK value: ${cloudFallbackPolicy.error}`]
+          : []),
         'Set CODEX_CLOUD_ENV_ID to a valid Codex Cloud environment id.',
         'Optional: set CODEX_CLOUD_BRANCH (must exist on origin).',
         'Then run a pipeline stage in cloud mode with: codex-orchestrator start <pipeline> --cloud --target <stage-id>',
-        'Cloud fallback is a compatibility safety net; prefer fail-fast lanes with CODEX_ORCHESTRATOR_CLOUD_FALLBACK=deny.',
-        'If cloud preflight fails and fallback is allowed, CO falls back to mcp and records the reason in manifest.summary (surfaced in start output).'
+        'Set CODEX_ORCHESTRATOR_CLOUD_FALLBACK=auto for governed cloud-to-mcp reroute evidence, or strict to fail closed.',
+        'When auto reroutes after cloud preflight failure, CO records policy, original target, fallback target, and blocking reason in manifest.cloud_fallback and start output.'
       ]
     },
     delegation: {
@@ -864,6 +881,10 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
   lines.push(`  - CODEX_CLOUD_ENV_ID: ${result.cloud.env_id_configured ? 'set' : 'missing'}`);
   lines.push(`  - CODEX_CLOUD_BRANCH: ${result.cloud.branch ?? '<unset>'}`);
   lines.push(`  - fallback policy: ${result.cloud.fallback_policy}`);
+  lines.push(`  - fallback policy source: ${result.cloud.fallback_policy_source}`);
+  if (result.cloud.fallback_policy_error) {
+    lines.push(`    error: ${result.cloud.fallback_policy_error}`);
+  }
   for (const line of result.cloud.enablement) {
     lines.push(`  - ${line}`);
   }
@@ -1547,16 +1568,28 @@ function normalizeOptionalString(value: string | null | undefined): string | nul
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function resolveCloudFallbackPolicy(env: NodeJS.ProcessEnv = process.env): 'allow' | 'deny' {
-  const raw = normalizeOptionalString(env.CODEX_ORCHESTRATOR_CLOUD_FALLBACK);
-  if (!raw) {
-    return 'allow';
+function resolveCloudFallbackPolicyDiagnostic(env: NodeJS.ProcessEnv = process.env): {
+  policy: DoctorResult['cloud']['fallback_policy'];
+  source: DoctorResult['cloud']['fallback_policy_source'];
+  raw_value: string | null;
+  error: string | null;
+} {
+  try {
+    const resolution = resolveSharedCloudFallbackPolicy(env);
+    return {
+      policy: resolution.policy,
+      source: resolution.source,
+      raw_value: resolution.raw_value,
+      error: null
+    };
+  } catch (error) {
+    return {
+      policy: 'invalid',
+      source: 'invalid',
+      raw_value: normalizeOptionalString(env.CODEX_ORCHESTRATOR_CLOUD_FALLBACK),
+      error: error instanceof Error ? error.message : String(error)
+    };
   }
-  const normalized = raw.toLowerCase();
-  if (['0', 'false', 'off', 'deny', 'disabled', 'never', 'strict'].includes(normalized)) {
-    return 'deny';
-  }
-  return 'allow';
 }
 
 async function resolvePlanMetadataCloudEnvironmentId(

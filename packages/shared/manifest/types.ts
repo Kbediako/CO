@@ -123,10 +123,15 @@ export interface CodexOrchestratorCLIManifest {
   runtime_provider: "CliRuntimeProvider" | "AppServerRuntimeProvider";
   runtime_fallback: {
     occurred: boolean;
+    policy?: "auto" | "strict";
+    policy_source?: "default" | "env" | "override";
     code: string | null;
     reason: string | null;
     from_mode: "cli" | "appserver" | null;
     to_mode: "cli" | "appserver" | null;
+    original_target?: string | null;
+    fallback_target?: string | null;
+    blocking_reason?: string | null;
     checked_at: string | null;
   } | null;
   scheduler?: {
@@ -186,6 +191,11 @@ export interface CodexOrchestratorCLIManifest {
   cloud_fallback?: {
     mode_requested: "cloud";
     mode_used: "mcp";
+    policy?: "auto" | "strict";
+    policy_source?: "default" | "env" | "override";
+    original_target?: "execution:cloud";
+    fallback_target?: "execution:mcp";
+    blocking_reason?: string;
     reason: string;
     issues: {
       code: string;

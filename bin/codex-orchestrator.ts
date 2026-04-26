@@ -77,11 +77,24 @@ interface RunOutputPayload {
   runtime_provider: string | null;
   runtime_fallback: {
     occurred: boolean;
+    policy?: string;
+    policy_source?: string;
     code: string | null;
     reason: string | null;
     from_mode: string | null;
     to_mode: string | null;
+    original_target?: string | null;
+    fallback_target?: string | null;
+    blocking_reason?: string | null;
     checked_at: string | null;
+  } | null;
+  cloud_fallback: {
+    policy?: string;
+    policy_source?: string;
+    original_target?: string | null;
+    fallback_target?: string | null;
+    blocking_reason?: string | null;
+    reason: string;
   } | null;
   cloud_fallback_reason: string | null;
   issue_log: DoctorIssueLogResult | null;
@@ -901,13 +914,25 @@ function emitRunOutput(
       runtime_provider?: string | null;
       runtime_fallback?: {
         occurred: boolean;
+        policy?: string;
+        policy_source?: string;
         code: string | null;
         reason: string | null;
         from_mode: string | null;
         to_mode: string | null;
+        original_target?: string | null;
+        fallback_target?: string | null;
+        blocking_reason?: string | null;
         checked_at: string | null;
       } | null;
-      cloud_fallback?: { reason: string } | null;
+      cloud_fallback?: {
+        policy?: string;
+        policy_source?: string;
+        original_target?: string | null;
+        fallback_target?: string | null;
+        blocking_reason?: string | null;
+        reason: string;
+      } | null;
     };
   },
   format: OutputFormat,
@@ -928,14 +953,23 @@ function emitRunOutput(
       `Runtime: ${payload.runtime_mode}${payload.runtime_mode_requested ? ` (requested ${payload.runtime_mode_requested})` : ''}` +
         (payload.runtime_provider ? ` via ${payload.runtime_provider}` : '')
     );
-    if (payload.runtime_fallback?.occurred) {
-      console.log(
-        `Runtime fallback: ${payload.runtime_fallback.code ?? 'runtime-fallback'} (${payload.runtime_fallback.reason ?? 'n/a'})`
-      );
-    }
   }
-  if (payload.cloud_fallback_reason) {
-    console.log(`Cloud fallback: ${payload.cloud_fallback_reason}`);
+  if (payload.runtime_fallback?.occurred || payload.runtime_fallback?.blocking_reason) {
+    console.log(
+      `Runtime fallback: policy=${payload.runtime_fallback.policy ?? 'auto'} ` +
+        `code=${payload.runtime_fallback.code ?? 'runtime-fallback'} ` +
+        `original_target=${payload.runtime_fallback.original_target ?? '<none>'} ` +
+        `fallback_target=${payload.runtime_fallback.fallback_target ?? '<none>'} ` +
+        `blocking_reason=${payload.runtime_fallback.blocking_reason ?? payload.runtime_fallback.reason ?? 'n/a'}`
+    );
+  }
+  if (payload.cloud_fallback) {
+    console.log(
+      `Cloud fallback: policy=${payload.cloud_fallback.policy ?? 'auto'} ` +
+        `original_target=${payload.cloud_fallback.original_target ?? 'execution:cloud'} ` +
+        `fallback_target=${payload.cloud_fallback.fallback_target ?? 'execution:mcp'} ` +
+        `blocking_reason=${payload.cloud_fallback.blocking_reason ?? payload.cloud_fallback.reason}`
+    );
   }
   if (payload.summary) {
     console.log('Summary:');
@@ -966,13 +1000,25 @@ function toRunOutputPayload(
       runtime_provider?: string | null;
       runtime_fallback?: {
         occurred: boolean;
+        policy?: string;
+        policy_source?: string;
         code: string | null;
         reason: string | null;
         from_mode: string | null;
         to_mode: string | null;
+        original_target?: string | null;
+        fallback_target?: string | null;
+        blocking_reason?: string | null;
         checked_at: string | null;
       } | null;
-      cloud_fallback?: { reason: string } | null;
+      cloud_fallback?: {
+        policy?: string;
+        policy_source?: string;
+        original_target?: string | null;
+        fallback_target?: string | null;
+        blocking_reason?: string | null;
+        reason: string;
+      } | null;
     };
   },
   issueLogCapture: AutoIssueLogCaptureResult = { issueLog: null, issueLogError: null }
@@ -988,6 +1034,7 @@ function toRunOutputPayload(
     runtime_mode: result.manifest.runtime_mode ?? null,
     runtime_provider: result.manifest.runtime_provider ?? null,
     runtime_fallback: result.manifest.runtime_fallback ?? null,
+    cloud_fallback: result.manifest.cloud_fallback ?? null,
     cloud_fallback_reason: result.manifest.cloud_fallback?.reason ?? null,
     issue_log: issueLogCapture.issueLog,
     issue_log_error: issueLogCapture.issueLogError

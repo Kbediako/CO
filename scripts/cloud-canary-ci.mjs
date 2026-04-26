@@ -653,6 +653,13 @@ async function main() {
     if (cloudFallback) {
       assert(cloudFallback.mode_requested === 'cloud', 'cloud_fallback.mode_requested should be "cloud".');
       assert(cloudFallback.mode_used === 'mcp', 'cloud_fallback.mode_used should be "mcp".');
+      assert(cloudFallback.policy === 'auto', 'cloud_fallback.policy should be "auto".');
+      assert(cloudFallback.original_target === 'execution:cloud', 'cloud_fallback.original_target should be "execution:cloud".');
+      assert(cloudFallback.fallback_target === 'execution:mcp', 'cloud_fallback.fallback_target should be "execution:mcp".');
+      assert(
+        typeof cloudFallback.blocking_reason === 'string' && cloudFallback.blocking_reason.trim().length > 0,
+        'cloud_fallback.blocking_reason is missing.'
+      );
       assert(typeof cloudFallback.reason === 'string' && cloudFallback.reason.trim().length > 0, 'cloud_fallback.reason is missing.');
       assert(Array.isArray(cloudFallback.issues) && cloudFallback.issues.length > 0, 'cloud_fallback.issues should include at least one preflight issue.');
       if (Array.isArray(cloudFallback.issues)) {
@@ -673,6 +680,22 @@ async function main() {
       assert(
         summaryFallback.modeUsed === cloudFallback.mode_used,
         'run-summary.cloudFallback.modeUsed does not match manifest.cloud_fallback.mode_used.'
+      );
+      assert(
+        summaryFallback.policy === cloudFallback.policy,
+        'run-summary.cloudFallback.policy does not match manifest.cloud_fallback.policy.'
+      );
+      assert(
+        summaryFallback.originalTarget === cloudFallback.original_target,
+        'run-summary.cloudFallback.originalTarget does not match manifest.cloud_fallback.original_target.'
+      );
+      assert(
+        summaryFallback.fallbackTarget === cloudFallback.fallback_target,
+        'run-summary.cloudFallback.fallbackTarget does not match manifest.cloud_fallback.fallback_target.'
+      );
+      assert(
+        summaryFallback.blockingReason === cloudFallback.blocking_reason,
+        'run-summary.cloudFallback.blockingReason does not match manifest.cloud_fallback.blocking_reason.'
       );
       assert(
         summaryFallback.reason === cloudFallback.reason,
