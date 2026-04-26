@@ -21,6 +21,7 @@
 7. Run standalone review, apply findings, run explicit elegance/minimality pass, update workpad, attach PR, and move to review only after checks/drain are clean.
 
 ## Fallback / Refactor Decision
+
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `provider workflow` | provider-id mapping fallback | `expire fallback` | `CO-400` | provider issue start/retry derives task identity from provider issue id | 2026-03-19 | 2026-05-10 | 2026-05-26 | provider issue task identity is renamed as supported or replaced by a canonical mapping source | metadata regression plus existing provider start activation tests |
