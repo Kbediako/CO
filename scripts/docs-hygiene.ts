@@ -965,7 +965,8 @@ function looksLikeCodexReleaseEvidenceText(value: string): boolean {
   return (
     haystack.includes('codex') &&
     /(adoption|audit|canary|candidate|evidence|posture|release)/u.test(haystack) &&
-    /(?:^|[^0-9])\d+[.-]\d+(?:[.-]\d+)?(?:[^0-9]|$)/u.test(haystack)
+    (/(?:^|[^0-9])\d+[.-]\d+(?:[.-]\d+)?(?:[^0-9]|$)/u.test(haystack) ||
+      /\bcodex[-_\s]*(?:cli[-_\s]*)?0[0-9]{3}(?:[^0-9]|$)/u.test(haystack))
   );
 }
 
@@ -975,20 +976,57 @@ function extractCodexReleaseEvidenceLinks(file: string, content: string): Array<
   for (const match of content.matchAll(pattern)) {
     const text = match[1] ?? '';
     const target = match[2] ?? '';
-    const haystack = `${text}\n${target}`;
-    if (!looksLikeCodexReleaseEvidenceText(haystack)) {
+    pushCodexReleaseEvidenceLink(links, file, text, target);
+  }
+  const referenceTargets = extractMarkdownReferenceTargets(content);
+  const referencePattern = /\[([^\]]+)\]\[([^\]]*)\]/g;
+  for (const match of content.matchAll(referencePattern)) {
+    const text = match[1] ?? '';
+    const label = match[2]?.trim() || text;
+    const target = referenceTargets.get(normalizeMarkdownReferenceLabel(label));
+    if (!target) {
       continue;
     }
-    links.push({
-      path: normalizeMarkdownLinkTarget(file, target),
-      versions: extractCodexReleaseEvidenceVersionMentions(haystack)
-    });
+    pushCodexReleaseEvidenceLink(links, file, text, target);
   }
   return links;
 }
 
+function pushCodexReleaseEvidenceLink(
+  links: Array<{ path: string; versions: string[] }>,
+  file: string,
+  text: string,
+  target: string
+): void {
+  const haystack = `${text}\n${target}`;
+  if (!looksLikeCodexReleaseEvidenceText(haystack)) {
+    return;
+  }
+  links.push({
+    path: normalizeMarkdownLinkTarget(file, target),
+    versions: extractCodexReleaseEvidenceVersionMentions(haystack)
+  });
+}
+
+function extractMarkdownReferenceTargets(content: string): Map<string, string> {
+  const targets = new Map<string, string>();
+  const pattern = /^[ \t]{0,3}\[([^\]]+)\]:[ \t]*(?:<([^>\n]+)>|([^ \t\n]+))/gm;
+  for (const match of content.matchAll(pattern)) {
+    const label = normalizeMarkdownReferenceLabel(match[1] ?? '');
+    const target = match[2] ?? match[3] ?? '';
+    if (label && target) {
+      targets.set(label, target);
+    }
+  }
+  return targets;
+}
+
+function normalizeMarkdownReferenceLabel(label: string): string {
+  return label.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 function normalizeMarkdownLinkTarget(file: string, target: string): string {
-  const trimmed = target.trim();
+  const trimmed = target.trim().replace(/^<([^>]+)>$/u, '$1');
   if (!trimmed || trimmed.startsWith('#') || /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(trimmed)) {
     return '';
   }
@@ -1004,16 +1042,23 @@ function normalizeMarkdownLinkTarget(file: string, target: string): string {
 
 function extractCodexReleaseEvidenceVersionMentions(content: string): string[] {
   const results = new Set<string>(extractCodexCliVersionMentions(content));
-  const patterns = [
+  const versionPatterns = [
     /\bcodex[-_\s]*(?:cli[-_\s]*)?([0-9]+[.-][0-9]+(?:[.-][0-9]+)?)\b/giu,
     /\bcodex\s+(?:cli\s+)?([0-9]+\.[0-9]+(?:\.[0-9]+)?)\b/giu
   ];
-  for (const pattern of patterns) {
+  for (const pattern of versionPatterns) {
     for (const match of content.matchAll(pattern)) {
       const version = normalizeCodexVersionMention(match[1] ?? '');
       if (version) {
         results.add(version);
       }
+    }
+  }
+  const zeroPaddedSlugPattern = /\bcodex[-_\s]*(?:cli[-_\s]*)?0([0-9]{3})(?=[^0-9]|$)/giu;
+  for (const match of content.matchAll(zeroPaddedSlugPattern)) {
+    const version = normalizeZeroPaddedCodexVersionSlug(match[1] ?? '');
+    if (version) {
+      results.add(version);
     }
   }
   return [...results].sort();
@@ -1029,6 +1074,14 @@ function normalizeCodexVersionMention(raw: string): string | null {
     return `${parts[0]}.${parts[1]}.0`;
   }
   return normalized;
+}
+
+function normalizeZeroPaddedCodexVersionSlug(raw: string): string | null {
+  const digits = raw.trim();
+  if (!/^[0-9]{3}$/.test(digits)) {
+    return null;
+  }
+  return `0.${digits}.0`;
 }
 
 

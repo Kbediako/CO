@@ -2216,6 +2216,63 @@ describe('docs hygiene tooling', () => {
     );
   });
 
+  it('fails stale reference-style Codex release evidence links in current-facing navigation', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-active-history-ref-nav-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs', 'book'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json',
+      entries: [
+        {
+          path: 'docs/book/index.md',
+          status: 'active',
+          doc_class: 'public_guide',
+          truth_checks: []
+        }
+      ]
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      current: {
+        codex_cli_version: '0.125.0',
+        cloud_canary_cli_version: '0.124.0'
+      }
+    });
+    await writeFile(
+      join(repoRoot, 'docs', 'book', 'index.md'),
+      [
+        '# Book',
+        '',
+        '- [Codex 0.124 adoption evidence][codex-0124]',
+        '',
+        '[codex-0124]: codex-cli-0124-adoption.md',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: 'docs/book/index.md',
+        rule: 'codex-posture-history-active',
+        reference:
+          'active current-facing release evidence mentions Codex CLI version(s) 0.124.0 without current/historical/archive matrix status'
+      })
+    );
+  });
+
   it('ignores external Codex release evidence links when checking current-facing navigation', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-active-history-external-nav-'));
     createdDirs.push(repoRoot);
@@ -2383,6 +2440,67 @@ describe('docs hygiene tooling', () => {
     await writeFile(
       join(repoRoot, 'docs', 'book', 'index.md'),
       ['# Book', '', '- [Codex 0.122 candidate evidence](codex-0.122-candidate-evidence.md)', ''].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors.find((error) => error.rule === 'codex-posture-history-active')).toBeUndefined();
+  });
+
+  it('allows current-facing navigation links to zero-padded matrix-managed candidate evidence', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-active-candidate-zero-padded-nav-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs', 'book'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json',
+      entries: [
+        {
+          path: 'docs/book/index.md',
+          status: 'active',
+          doc_class: 'public_guide',
+          truth_checks: []
+        }
+      ]
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      current: {
+        codex_cli_version: '0.118.0',
+        latest_audited_candidate_cli_version: '0.122.0'
+      },
+      surfaces: [
+        {
+          path: 'docs/book/codex-cli-0122-adoption.md',
+          kind: 'candidate_evidence',
+          status: 'candidate',
+          requirements: [
+            {
+              label: 'candidate evidence title',
+              contains: 'Codex CLI 0.122.0 Adoption Evidence'
+            }
+          ]
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'docs', 'book', 'codex-cli-0122-adoption.md'),
+      '# Codex CLI 0.122.0 Adoption Evidence\n\nCurrent candidate evidence for Codex CLI `0.122.0`.\n',
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'docs', 'book', 'index.md'),
+      ['# Book', '', '- [Codex CLI 0.122.0 Adoption Evidence](codex-cli-0122-adoption.md)', ''].join('\n'),
       'utf8'
     );
 
