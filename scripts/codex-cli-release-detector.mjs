@@ -80,7 +80,7 @@ export function classifyGithubReleases(releases) {
     if (!parsed) {
       continue;
     }
-    const prerelease = Boolean(release.prerelease ?? release.isPrerelease ?? parsed.prerelease);
+    const prerelease = Boolean(parsed.prerelease) || release.prerelease === true || release.isPrerelease === true;
     normalized.push({
       source: 'github',
       tag: tagName,

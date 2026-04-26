@@ -166,6 +166,30 @@ function mismatchFetch() {
   };
 }
 
+function mismarkedGithubPrereleaseFetch() {
+  const base = mockFetch({ stable: '0.125.0', prerelease: '0.126.0-alpha.2' });
+  return async (url: string) => {
+    const response = await base(url);
+    if (url.includes('api.github.com')) {
+      return {
+        ...response,
+        async json() {
+          const releases = await response.json();
+          return releases.map((release: { tag_name?: string; prerelease?: boolean }) =>
+            release.tag_name?.includes('-alpha.')
+              ? {
+                  ...release,
+                  prerelease: false
+                }
+              : release
+          );
+        }
+      };
+    }
+    return response;
+  };
+}
+
 function stalePrereleaseMismatchFetch() {
   const stable = '0.126.0';
   const githubReleases = [
@@ -360,6 +384,22 @@ describe('codex CLI release detector', () => {
     expect(artifact.decision_state).toBe('prerelease_observed');
     expect(artifact.candidate.version).toBe('0.126.0-alpha.2');
     expect(artifact.mutation_result.action).toBe('skipped');
+  });
+
+  it('treats semver prerelease GitHub tags as prerelease truth even when the flag is false', async () => {
+    const repo = await writeFixtureRepo();
+
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: repo,
+      artifactPath: 'out/detection.json',
+      fetchImpl: mismarkedGithubPrereleaseFetch(),
+      env: {}
+    });
+
+    expect(exitCode).toBe(0);
+    expect(artifact.decision_state).toBe('prerelease_observed');
+    expect(artifact.upstream_truth.github.stable.version).toBe('0.125.0');
+    expect(artifact.upstream_truth.github.prerelease.version).toBe('0.126.0-alpha.2');
   });
 
   it('ignores stale historical prerelease mismatches when stable truth agrees', async () => {
