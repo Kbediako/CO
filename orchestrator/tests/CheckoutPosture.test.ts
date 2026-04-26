@@ -141,6 +141,39 @@ describe('inspectCheckoutPosture', () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it('does not report git probe failures as non-git directories', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'checkout-posture-git-probe-failure-'));
+    const missingRepo = join(root, 'missing-repo');
+    try {
+      const result = inspectCheckoutPosture(missingRepo);
+
+      expect(result.status).toBe('unavailable');
+      expect(result.inside_git_worktree).toBe(true);
+      expect(result.detail).toContain('Unable to determine whether the current directory is inside a git worktree');
+      expect(result.detail).not.toContain('not inside a git worktree');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not report broken git metadata as a non-git directory', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'checkout-posture-broken-gitdir-'));
+    const repo = join(root, 'repo');
+    try {
+      await mkdir(repo, { recursive: true });
+      await writeFile(join(repo, '.git'), 'gitdir: /definitely/missing/gitdir\n', 'utf8');
+
+      const result = inspectCheckoutPosture(repo);
+
+      expect(result.status).toBe('unavailable');
+      expect(result.inside_git_worktree).toBe(true);
+      expect(result.detail).toContain('Unable to determine whether the current directory is inside a git worktree');
+      expect(result.detail).not.toContain('Current directory is not inside a git worktree');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });
 
 async function createPostureRepoFixture(): Promise<PostureRepoFixture> {

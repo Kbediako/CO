@@ -62,7 +62,14 @@ const POSTURE_REFERENCE_PATHS = [
 
 export function inspectCheckoutPosture(repoRoot: string): CheckoutPostureInspection {
   const repoCheck = runGit(repoRoot, ['rev-parse', '--is-inside-work-tree']);
-  if (!repoCheck.ok || repoCheck.stdout.trim() !== 'true') {
+  if (!repoCheck.ok && !isNotGitWorktreeResult(repoCheck)) {
+    return unavailableInspection(
+      repoRoot,
+      `Unable to determine whether the current directory is inside a git worktree: ${repoCheck.stderr || repoCheck.error || 'unknown git error'}`,
+      'unknown'
+    );
+  }
+  if (repoCheck.stdout.trim() !== 'true') {
     return unavailableInspection(repoRoot, 'Current directory is not inside a git worktree.', 'unknown', undefined, false);
   }
 
@@ -379,6 +386,10 @@ function parseCommit(stdout: string): CheckoutPostureCommit | null {
     committed_date: committedDate,
     subject
   };
+}
+
+function isNotGitWorktreeResult(result: GitCommandResult): boolean {
+  return result.stderr.includes('not a git repository (or any of the parent directories)');
 }
 
 function unavailableInspection(
