@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-04-26
 
-Use this policy when a task adds, retains, or touches a fallback, compatibility branch, legacy projection, cached proof path, break-glass route, or small seam on a high-churn CO control surface.
+Use this policy when a task adds, retains, or touches any fallback, compatibility branch, legacy projection, cached proof path, break-glass route, or small seam in the repo. The named high-churn CO control surfaces below use the tighter high-churn caps and refactor triggers.
 
 The governed high-churn surfaces are:
 
