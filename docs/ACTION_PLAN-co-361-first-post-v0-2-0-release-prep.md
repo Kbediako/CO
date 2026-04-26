@@ -6,7 +6,7 @@
 - Assumptions: current `origin/main` already contains the needed `0.125.0` local/package evidence; the remaining work is truthfulness and semver prep, not runtime enablement.
 
 ## Issue Readiness Gate
-- Intent checksum / protected terms carried forward: `first post-v0.2.0 release lane`, `gpt-5.5`, `Codex CLI 0.125.0 adoption evidence`, `not lazily hold appserver work`, `README.md`, `docs/guides/codex-version-policy.md`, `docs/book/public-posture.md`, `docs/book/README.md`, `docs/book/codex-cli-0124-adoption.md`, `package.json`, `package-lock.json`, `npm run pack:smoke`.
+- Intent checksum / protected terms carried forward: `first post-v0.2.0 release lane`, `gpt-5.5`, `Codex CLI 0.125.0 adoption evidence`, `not lazily hold appserver work`, `README.md`, `docs/guides/codex-version-policy.md`, `docs/book/public-posture.md`, `docs/book/README.md`, `docs/book/archive/codex-cli-0124-adoption.md`, `package.json`, `package-lock.json`, `npm run pack:smoke`.
 - Not done if: version bump lands without the public/package-surface fixes, or if the lane drifts into publish/tag/merge work.
 - Pre-implementation issue-quality review: current audit says the release-prep blocker is stale public/package posture wording, not missing `0.125.0` release-workflow or pack-smoke support on `main`.
 

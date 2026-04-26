@@ -1,7 +1,7 @@
 # PRD - CO-361 First Post-v0.2.0 Release Prep
 
 ## Summary
-- Problem Statement: `origin/main` is ready for the first release after `v0.2.0`, but `package.json` still reports `0.2.0`, `README.md` still routes the "Older package docs" link to `v0.1.38`, and release-facing posture summaries (`docs/guides/codex-version-policy.md`, `docs/book/public-posture.md`, and the `docs/book/README.md` pointer to `docs/book/codex-cli-0124-adoption.md`) still leave `0.124.0` looking like the active release-planning baseline even though current evidence separates local ChatGPT-auth/appserver `gpt-5.5` posture from Codex CLI `0.125.0` downstream-smoke/package evidence.
+- Problem Statement: `origin/main` is ready for the first release after `v0.2.0`, but `package.json` still reports `0.2.0`, `README.md` still routes the "Older package docs" link to `v0.1.38`, and release-facing posture summaries (`docs/guides/codex-version-policy.md`, `docs/book/public-posture.md`, and the `docs/book/README.md` pointer to `docs/book/archive/codex-cli-0124-adoption.md`) still leave `0.124.0` looking like the active release-planning baseline even though current evidence separates local ChatGPT-auth/appserver `gpt-5.5` posture from Codex CLI `0.125.0` downstream-smoke/package evidence.
 - Desired Outcome: prepare a clean release PR from current `origin/main` that bumps the package version, keeps the public package surfaces truthful for the first post-`v0.2.0` cut, clarifies that the remaining `0.124.0` hold is cloud-only rather than a blanket hold on local ChatGPT-auth appserver/model posture or package/downstream-smoke `0.125.0` compatibility, and leaves the `0.124.0` evidence page clearly historical instead of current.
 
 ## User Request Translation (Context Anchor)
@@ -35,7 +35,7 @@
   - `docs/guides/codex-version-policy.md`
   - `docs/book/public-posture.md`
   - `docs/book/README.md`
-  - `docs/book/codex-cli-0124-adoption.md`
+  - `docs/book/archive/codex-cli-0124-adoption.md`
   - `.github/workflows/release.yml`
   - `npm run pack:smoke`
   - `codex debug models`
@@ -60,7 +60,7 @@
   - next release branch is versioned for the first post-`v0.2.0` cut
   - README routes older package readers to `v0.2.0`
   - version policy and book/public summaries distinguish local ChatGPT-auth appserver/model posture plus package/downstream-smoke `0.125.0` compatibility from the still-separate cloud-only candidate lane
-  - `docs/book/codex-cli-0124-adoption.md` remains available as historical evidence instead of current posture guidance
+  - `docs/book/archive/codex-cli-0124-adoption.md` remains available as historical evidence instead of current posture guidance
 - Explicitly out-of-scope differences:
   - cloud execution promotion
   - provider-runtime or provider-supervision promotion
@@ -107,7 +107,7 @@
 
 ## Technical Considerations
 - Architectural Notes: this is a release-prep-only lane. It should change versioning and public posture wording, not runtime behavior.
-- Dependencies / Integrations: `README.md`, `docs/guides/codex-version-policy.md`, `docs/book/public-posture.md`, `docs/book/README.md`, `docs/book/codex-cli-0124-adoption.md`, `package.json`, `package-lock.json`, `.github/workflows/release.yml`, `npm run pack:audit`, `npm run pack:smoke`.
+- Dependencies / Integrations: `README.md`, `docs/guides/codex-version-policy.md`, `docs/book/public-posture.md`, `docs/book/README.md`, `docs/book/archive/codex-cli-0124-adoption.md`, `package.json`, `package-lock.json`, `.github/workflows/release.yml`, `npm run pack:audit`, `npm run pack:smoke`.
 
 ## Open Questions
 - Is `0.2.1` the correct next release number for this post-`v0.2.0` prep branch, or does downstream release-note review justify a larger bump later?
