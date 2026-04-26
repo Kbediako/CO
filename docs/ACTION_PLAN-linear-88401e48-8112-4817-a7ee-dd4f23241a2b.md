@@ -42,15 +42,15 @@
 5. Parent runs docs-review on the scaffold before implementation.
 6. Parent records the docs-review baseline blocker if it is unrelated to CO-382.
 7. Parent implements policy and checklist/template prompts for `remove fallback`, `expire fallback`, or `justify retaining fallback`.
-8. Parent maps at least three fallback-heavy areas to existing issues or new follow-ups.
+8. Parent maps all five named fallback-heavy areas to existing issues or new follow-ups.
 9. Parent validates docs gates and relevant focused tests without weakening existing safety checks.
 
 ## Parent-Owned Follow-On Plan
 1. Decide the default allowed maximum lifetime for retained fallbacks.
-2. Define required fallback metadata: owner, trigger, introduced date, review date, removal condition, and allowed maximum lifetime.
+2. Define required fallback metadata: owner, trigger, introduced date, review date, removal condition, allowed maximum lifetime, and validation evidence.
 3. Define large-refactor decision criteria for high-churn surfaces.
 4. Add docs-first or issue-template prompts requiring the fallback decision.
-5. Attach or create follow-ups for at least three of:
+5. Attach or create follow-ups for all five named fallback-heavy areas:
    - `provider workflow`: `CO-394`
    - `review wrapper`: `CO-395`
    - `runtime routing`: `CO-396`
@@ -78,7 +78,7 @@
 
 ## Risks & Mitigations
 - Risk: policy becomes generic advice instead of an expiry mechanism.
-  - Mitigation: require owner, trigger, introduced date, review date, removal condition, and allowed maximum lifetime.
+  - Mitigation: require owner, trigger, introduced date, review date, removal condition, allowed maximum lifetime, and validation evidence.
 - Risk: agents keep adding another `minor seam` instead of planning a `large refactor`.
   - Mitigation: require a decision threshold for the named high-churn surfaces.
 - Risk: follow-up ownership is left vague.

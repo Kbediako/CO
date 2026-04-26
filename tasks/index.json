@@ -58,11 +58,7 @@
         "spec": "tasks/specs/linear-88401e48-8112-4817-a7ee-dd4f23241a2b.md",
         "task": "tasks/tasks-linear-88401e48-8112-4817-a7ee-dd4f23241a2b.md",
         "agent_task": ".agent/task/linear-88401e48-8112-4817-a7ee-dd4f23241a2b.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-88401e48-8112-4817-a7ee-dd4f23241a2b.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-88401e48-8112-4817-a7ee-dd4f23241a2b.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-88401e48-8112-4817-a7ee-dd4f23241a2b.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-88401e48-8112-4817-a7ee-dd4f23241a2b.md"
       }
     },
     {
