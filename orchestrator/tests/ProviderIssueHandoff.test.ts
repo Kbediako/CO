@@ -9,7 +9,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createProviderIssueHandoffService,
-  discoverProviderIssueRuns
+  discoverProviderIssueRuns,
+  readProviderWorkflowFallbackExpiryRecords
 } from '../src/cli/control/providerIssueHandoff.js';
 import { runProviderIssueHandoffRefresh } from '../src/cli/control/controlServerPublicLifecycle.js';
 import { PROVIDER_LINEAR_AUDIT_ENV_VAR } from '../src/cli/control/providerLinearWorkflowAudit.js';
@@ -376,6 +377,35 @@ function getEarliestScheduledTimeoutByDelayRange(
 }
 
 describe('createProviderIssueHandoffService', () => {
+  it('records bounded expiry metadata for provider workflow fallback paths', () => {
+    const records = readProviderWorkflowFallbackExpiryRecords();
+
+    expect(records.map((record) => record.id)).toEqual([
+      'provider-id-mapping-fallback',
+      'retained-claim-autopilot-fallback'
+    ]);
+    for (const record of records) {
+      expect(record.surface).toBe('provider workflow');
+      expect(record.decision).toBe('expire fallback');
+      expect(record.owner).toBe('CO-400');
+      expect(record.review_date).toBe('2026-05-10');
+      expect(record.maximum_lifetime).toBe('2026-05-26');
+      expect(record.introduced_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(record.trigger).not.toHaveLength(0);
+      expect(record.removal_condition).not.toHaveLength(0);
+      expect(record.validation.length).toBeGreaterThan(1);
+      expect(record.large_refactor).toBe('required');
+    }
+
+    expect(records[0]?.trigger).toContain('buildProviderFallbackTaskId');
+    expect(records[0]?.validation.join('\n')).toContain('provider-id fallback activation');
+    expect(records[1]?.trigger).toContain('cached claim issue state');
+    expect(records[1]?.validation.join('\n')).toContain('activation and non-activation paths');
+
+    records[0]?.validation.push('mutated test copy');
+    expect(readProviderWorkflowFallbackExpiryRecords()[0]?.validation).not.toContain('mutated test copy');
+  });
+
   it('ignores child-stream and child-lane manifests without dropping provider workers that carry parent lineage', async () => {
     const { root, paths } = await createHostPaths();
     const providerRunDir = join(root, '.runs', 'linear-lin-issue-1', 'cli', 'provider-run-1');

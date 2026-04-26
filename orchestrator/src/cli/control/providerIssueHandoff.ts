@@ -98,6 +98,74 @@ import type {
   ProviderReviewHandoffPromotionRecord
 } from './providerMergeCloseout.js';
 
+export type ProviderWorkflowFallbackDecision =
+  | 'remove fallback'
+  | 'expire fallback'
+  | 'justify retaining fallback';
+
+export interface ProviderWorkflowFallbackExpiryRecord {
+  id: 'provider-id-mapping-fallback' | 'retained-claim-autopilot-fallback';
+  surface: 'provider workflow';
+  fallback: 'provider-id mapping fallback' | 'retained-claim/autopilot fallback';
+  decision: ProviderWorkflowFallbackDecision;
+  owner: string;
+  trigger: string;
+  introduced_date: string;
+  review_date: string;
+  maximum_lifetime: string;
+  removal_condition: string;
+  validation: string[];
+  large_refactor: 'required' | 'not_required';
+}
+
+const PROVIDER_WORKFLOW_FALLBACK_EXPIRY_RECORDS: readonly ProviderWorkflowFallbackExpiryRecord[] = [
+  {
+    id: 'provider-id-mapping-fallback',
+    surface: 'provider workflow',
+    fallback: 'provider-id mapping fallback',
+    decision: 'expire fallback',
+    owner: 'CO-400',
+    trigger:
+      'Provider issue handoff derives task identity with buildProviderFallbackTaskId and persists mapping_source=provider_id_fallback when no canonical provider task mapping exists.',
+    introduced_date: '2026-03-19',
+    review_date: '2026-05-10',
+    maximum_lifetime: '2026-05-26',
+    removal_condition:
+      'Remove after provider issue current-state authority owns canonical task identity for fresh starts, retries, and rehydrated claims without relying on provider-id fallback mapping.',
+    validation: [
+      'ProviderIssueHandoff.test.ts records bounded expiry metadata for provider workflow fallback paths',
+      'ProviderIssueHandoff.test.ts provider_issue_start_launched coverage keeps provider-id fallback activation observable'
+    ],
+    large_refactor: 'required'
+  },
+  {
+    id: 'retained-claim-autopilot-fallback',
+    surface: 'provider workflow',
+    fallback: 'retained-claim/autopilot fallback',
+    decision: 'expire fallback',
+    owner: 'CO-400',
+    trigger:
+      'Active claim refresh, retained released claims, and autopilot recovery fall back to cached claim issue state or retained run proof when fresh Linear state is unavailable or inconclusive.',
+    introduced_date: '2026-03-20',
+    review_date: '2026-05-10',
+    maximum_lifetime: '2026-05-26',
+    removal_condition:
+      'Remove after provider issue current-state authority resolves retained claim, autopilot, fresh Linear, and run-manifest state through one authoritative decision path.',
+    validation: [
+      'ProviderIssueHandoff.test.ts records bounded expiry metadata for provider workflow fallback paths',
+      'ProviderIssueHandoff.test.ts retained released claim coverage validates activation and non-activation paths'
+    ],
+    large_refactor: 'required'
+  }
+];
+
+export function readProviderWorkflowFallbackExpiryRecords(): ProviderWorkflowFallbackExpiryRecord[] {
+  return PROVIDER_WORKFLOW_FALLBACK_EXPIRY_RECORDS.map((record) => ({
+    ...record,
+    validation: [...record.validation]
+  }));
+}
+
 export interface ProviderIssueLauncher {
   start(input: {
     taskId: string;
