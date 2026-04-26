@@ -10291,7 +10291,8 @@ for await (const line of rl) {
         CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
         CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
         CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
-        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_CLOUD_ENV_ID: 'env-appserver-fallback'
       },
       {
         readTrackedIssue,
@@ -10351,6 +10352,7 @@ for await (const line of rl) {
         }
       },
       supervision_command: 'codex_exec',
+      sticky_environment_id: 'env-appserver-fallback',
       sticky_environment_status: 'proven',
       sticky_environment_blocker: null,
       turn_persistence_status: 'blocked',
