@@ -27,17 +27,17 @@
 - [x] Preserve CO-193 Ready/unstarted reclaim and CO-189 live-worker duplicate-protection coverage. Evidence: adjacent focused test run plus same-issue unreadable-occupancy regressions in `orchestrator/tests/ProviderIssueHandoffRefreshSerialization.test.ts`.
 
 ## Validation
-- [x] `node scripts/delegation-guard.mjs` passed with 2 subagent manifests on 2026-04-26.
-- [x] `node scripts/spec-guard.mjs --dry-run` passed on 2026-04-26.
+- [x] `node scripts/delegation-guard.mjs` passed with 2 subagent manifests on 2026-04-26 after merging current `origin/main`.
+- [x] `node scripts/spec-guard.mjs --dry-run` passed on 2026-04-26 after merging current `origin/main`.
 - [x] Focused provider handoff regression(s). Evidence: `npm run test:core -- orchestrator/tests/ProviderIssueHandoffRefreshSerialization.test.ts` passed 39 tests on 2026-04-26 after the fresh-discovery slot fix.
 - [x] Adjacent CO-193 / CO-189 focused coverage passed 2 selected tests on 2026-04-26 after the fresh-discovery slot fix.
-- [x] `npm run build` passed on 2026-04-26 after the fresh-discovery slot fix.
-- [x] `npm run lint` passed on 2026-04-26 after the fresh-discovery slot fix with 3 pre-existing warnings in `orchestrator/tests/DelegationMcpHealth.test.ts`.
-- [x] `npm run test` passed on 2026-04-26 after the fresh-discovery slot fix: 355 files, 4922 tests.
-- [x] `npm run docs:check` passed on 2026-04-26 after the fresh-discovery slot fix.
-- [x] `npm run docs:freshness` passed on 2026-04-26 after the fresh-discovery slot fix: 4821 docs, 4824 registry entries.
-- [x] `npm run repo:stewardship` passed on 2026-04-26 after the fresh-discovery slot fix: 5944 tracked files, 0 action-required.
-- [x] `node scripts/diff-budget.mjs` passed on 2026-04-26 after the fresh-discovery slot fix: working-tree files 2/25, lines 164/1200; advisory stacked aggregate files 9/25, lines 960/1200.
+- [x] `npm run build` passed on 2026-04-26 after merging current `origin/main`.
+- [x] `npm run lint` passed on 2026-04-26 after merging current `origin/main` with 3 pre-existing warnings in `orchestrator/tests/DelegationMcpHealth.test.ts`.
+- [x] `npm run test` passed on 2026-04-26 after merging current `origin/main`: 355 files, 4928 tests.
+- [x] `npm run docs:check` passed on 2026-04-26 after merging current `origin/main`.
+- [x] `npm run docs:freshness` passed on 2026-04-26 after merging current `origin/main`: 4827 docs, 4830 registry entries.
+- [x] `npm run repo:stewardship` passed on 2026-04-26 after merging current `origin/main`: 5950 tracked files, 0 action-required.
+- [x] `node scripts/diff-budget.mjs` passed on 2026-04-26 after merging current `origin/main`: working-tree files 0/25, lines 0/1200; advisory stacked aggregate files 9/25, lines 960/1200.
 - [x] Manifest-backed forced standalone review completed on 2026-04-26. Evidence: `.runs/linear-b131706d-e40f-42db-8f29-9f1ddd636187/cli/2026-04-26T10-05-24-694Z-37794f20/review/telemetry.json` reports `status=succeeded`, `review_outcome=bounded-success`, and `termination_boundary.kind=command-intent`; saved output contains no actionable `[P]` findings after retry.
 - [x] Explicit elegance/minimality pass completed. Evidence: `out/linear-b131706d-e40f-42db-8f29-9f1ddd636187/manual/elegance-review.md`.
 - [ ] PR attach and ready-review drain before review transition
@@ -57,6 +57,7 @@
 - 2026-04-26: Full validation reran after the normal-launch occupied-provider veto fix: focused refresh suite, adjacent CO-193/CO-189 tests, delegation/spec guards, build, lint, full test, docs gates, repo stewardship, and diff budget all passed.
 - 2026-04-26: Forced standalone review then surfaced a P2 fresh-discovery slot gap: a non-special live-start path could consume the state slot reserved for fresh discovery. Parent fixed the bypass condition, widened pending-reopen metadata refresh so preserved-slot claims update to live started truth, and added a reserved state-slot regression.
 - 2026-04-26: Full validation reran after the fresh-discovery slot fix: focused refresh suite, adjacent CO-193/CO-189 tests, delegation/spec guards, build, lint, full test, docs gates, repo stewardship, and diff budget all passed. Final forced standalone review completed with `review_outcome=bounded-success`, and explicit elegance review found no simplification patch needed.
+- 2026-04-26: Merged latest `origin/main` again after review/elegance, resolved the docs freshness registry conflict by preserving both CO-392 and incoming main entries, and reran post-merge gates: delegation guard, spec guard, build, lint, full test, docs:check, docs:freshness, repo:stewardship, and diff-budget all passed.
 
 ## Notes
 - Do not hand-edit or delete `provider-intake-state.json` as the fix.
