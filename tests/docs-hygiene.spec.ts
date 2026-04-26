@@ -1661,6 +1661,28 @@ describe('docs hygiene tooling', () => {
     expect(errors.find((error) => error.rule === 'doc-posture-stale')).toBeUndefined();
   });
 
+  it('fails closed when the configured posture matrix path escapes the repository', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-matrix-escape-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'docs'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: '../../../etc/passwd.json'
+    });
+
+    await expect(runDocsCheck(repoRoot)).rejects.toThrow('Invalid Codex posture matrix path outside repository');
+  });
+
   it('flags drift when matrix-governed workflow or pack-smoke pin expectations disagree', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-matrix-drift-'));
     createdDirs.push(repoRoot);

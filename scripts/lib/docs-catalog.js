@@ -361,12 +361,18 @@ export async function loadCodexPostureMatrix(repoRoot, relativePath) {
   if (!matrixPath) {
     throw new Error('Missing Codex posture matrix path.');
   }
-  const absolutePath = path.resolve(repoRoot, matrixPath);
+  const resolvedRepoRoot = path.resolve(repoRoot);
+  const absolutePath = path.resolve(resolvedRepoRoot, matrixPath);
+  const relativeToRepoNative = path.relative(resolvedRepoRoot, absolutePath);
+  const relativeToRepo = toPosixPath(relativeToRepoNative);
+  if (relativeToRepo === '..' || relativeToRepo.startsWith('../') || path.isAbsolute(relativeToRepoNative)) {
+    throw new Error(`Invalid Codex posture matrix path outside repository: ${matrixPath}`);
+  }
   const raw = JSON.parse(await readFile(absolutePath, 'utf8'));
 
   return {
     version: Number.isFinite(raw?.version) ? Number(raw.version) : 1,
-    source_path: toPosixPath(path.relative(repoRoot, absolutePath)),
+    source_path: relativeToRepo,
     absolute_path: absolutePath,
     current: normalizeMatrixCurrent(raw?.current),
     surfaces: Array.isArray(raw?.surfaces) ? raw.surfaces.map((surface) => normalizeMatrixSurface(surface)) : [],
