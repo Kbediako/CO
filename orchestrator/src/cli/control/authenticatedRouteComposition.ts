@@ -122,6 +122,7 @@ export function createAuthenticatedRouteDispatcherContext(
       }),
     handleObservabilityApi: () =>
       handleObservabilityApiRequest({
+        authKind: context.authKind,
         req: context.req,
         res: context.res,
         presenterContext: context.presenterContext,

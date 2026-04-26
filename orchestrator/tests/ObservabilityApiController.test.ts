@@ -244,6 +244,7 @@ describe('ObservabilityApiController', () => {
   it('accepts provider-worker recover requests through the control-host API', async () => {
     const { res, state } = createResponseRecorder();
     const handled = await handleObservabilityApiRequest({
+      authKind: 'control',
       req: {
         method: 'POST',
         url: '/api/v1/provider-worker/recover'
@@ -340,6 +341,95 @@ describe('ObservabilityApiController', () => {
         decision: 'acknowledged',
         reason: 'provider_issue_start_launched',
         issue_identifier: 'CO-393'
+      }
+    });
+  });
+
+  it('rejects provider-worker recover requests without control auth', async () => {
+    const { res, state } = createResponseRecorder();
+    let readBody = false;
+    let recovered = false;
+    const handled = await handleObservabilityApiRequest({
+      authKind: 'session',
+      req: {
+        method: 'POST',
+        url: '/api/v1/provider-worker/recover'
+      } as Pick<http.IncomingMessage, 'method' | 'url'>,
+      res,
+      presenterContext: {
+        controlStore: {
+          snapshot: () => CONTROL_STATE
+        },
+        paths: {
+          manifestPath: '/repo/.runs/local-mcp/cli/control-host/manifest.json',
+          runDir: '/repo/.runs/local-mcp/cli/control-host',
+          logPath: '/repo/.runs/local-mcp/cli/control-host/log.txt'
+        },
+        readCompatibilityProjection: async () => ({
+          running: [],
+          retrying: [],
+          codexTotals: {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0,
+            seconds_running: 0
+          },
+          rateLimits: null,
+          selected: null,
+          dispatchPilot: null,
+          tracked: null
+        })
+      },
+      readRequestBody: async () => {
+        readBody = true;
+        return {
+          issue_id: '0b2377a2-366f-4309-a508-610e524c9d94',
+          action: 'relaunch'
+        };
+      },
+      requestRefresh: async () => ({
+        queued: true,
+        coalesced: false,
+        requested_at: '2026-03-21T15:02:00.000Z',
+        operations: ['reconcile']
+      }),
+      requestProviderWorkerRecover: async () => {
+        recovered = true;
+        throw new Error('session auth must not recover provider workers');
+      },
+      readDispatchEvaluation: async () => ({
+        issueIdentifier: null,
+        evaluation: {
+          summary: {
+            status: 'disabled',
+            reason: 'pilot_disabled_default_off',
+            source_status: 'disabled',
+            advisory_only: true,
+            source_setup: null
+          },
+          recommendation: null,
+          failure: null
+        }
+      })
+    });
+
+    expect(handled).toBe(true);
+    expect(readBody).toBe(false);
+    expect(recovered).toBe(false);
+    expect(state.statusCode).toBe(403);
+    expect(state.body).toMatchObject({
+      error: {
+        code: 'control_auth_required',
+        details: {
+          surface: 'api_v1',
+          required_auth: 'control',
+          provided_auth: 'session'
+        }
+      },
+      traceability: {
+        surface: 'api_v1',
+        decision: 'rejected',
+        reason: 'control_auth_required'
       }
     });
   });

@@ -47,6 +47,7 @@ export interface ObservabilityApiDispatchAuditRecord {
 }
 
 export interface ObservabilityApiControllerContext {
+  authKind?: 'control' | 'session';
   req: Pick<http.IncomingMessage, 'method' | 'url'>;
   res: http.ServerResponse;
   presenterContext: ObservabilityPresenterContext;
@@ -173,6 +174,26 @@ export async function handleObservabilityApiRequest(
         writeObservabilityResponse(
           context.res,
           buildCompatibilityMethodNotAllowedResponse(context.presenterContext, 'POST')
+        );
+        return true;
+      }
+      if (context.authKind !== 'control') {
+        writeObservabilityResponse(
+          context.res,
+          buildCompatibilityErrorResponse({
+            status: 403,
+            code: 'control_auth_required',
+            message: 'Provider-worker recovery requires control authentication.',
+            details: {
+              surface: 'api_v1',
+              required_auth: 'control',
+              provided_auth: context.authKind ?? null
+            },
+            traceability: buildCompatibilityTraceability(context.presenterContext, {
+              decision: 'rejected',
+              reason: 'control_auth_required'
+            })
+          })
         );
         return true;
       }

@@ -102,6 +102,23 @@ describe('AuthenticatedControlRouteGate', () => {
     expect(state.body).toEqual({ error: 'runner_only' });
   });
 
+  it('rejects session tokens on provider-worker recovery', () => {
+    const { context, state } = createContext({
+      pathname: '/api/v1/provider-worker/recover',
+      req: createRequest({
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer session-token',
+          'x-csrf-token': 'session-token'
+        }
+      })
+    });
+
+    expect(admitAuthenticatedControlRoute(context)).toBeNull();
+    expect(state.statusCode).toBe(403);
+    expect(state.body).toEqual({ error: 'runner_only' });
+  });
+
   it('admits control tokens on runner-only endpoints', () => {
     const { context, state } = createContext({
       pathname: '/questions/enqueue',
