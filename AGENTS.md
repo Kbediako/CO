@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp f5451e0c97639cbb551a08a8e4db09142ff5816ce5470ca2b90a139e5da8f5cf -->
+<!-- codex:instruction-stamp d557b53b3e4fa59efc6ca6089847a4128e1a993fd091a37b64e11d4bbbaa9f95 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -102,7 +102,16 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - For autonomy-facing backlog or follow-up lanes, the docs packet must preserve the issue-shaping contract before implementation starts: user-request translation, protected terms / exact artifact and surface names, nearby wrong interpretations to reject, explicit non-goals, `Not done if`, and a current/reference/target parity matrix when the lane is about parity or alignment.
 - Before implementation, record a lightweight issue-quality review in the spec/task notes confirming the issue is not still plausibly narrower than the user's request.
 - The micro-task path is unavailable for parity/alignment lanes or work whose correctness depends on exact naming, exact surfaces, or protected wording.
+- The micro-task path is also unavailable when a task adds, retains, or touches fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior anywhere in the repo.
 - For low-risk tiny changes, use the bounded micro-task path in `docs/micro-task-path.md` (still requires task/spec evidence).
+
+## Fallback Expiry & Large Refactors
+- Follow `docs/guides/fallback-expiry-and-refactor-policy.md` whenever a task adds, retains, or touches fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior.
+- Every touched fallback or seam in a fallback-facing task must choose one decision before implementation: `remove fallback`, `expire fallback`, or `justify retaining fallback`.
+- Retained temporary fallbacks require an owner, trigger, introduced date, review date, allowed maximum lifetime, removal condition, and validation evidence.
+- Default maximum lifetime is 60 days; named high-churn control surfaces (`provider workflow`, `review wrapper`, `runtime routing`, `docs freshness ownership`, and `control-host status surfaces`) are capped at 30 days; security, auth, PII, customer-impacting, financial, or production-impact fallbacks are capped at 14 days; approved external migration bridges may use the documented 90-day exception.
+- Prefer a large refactor over another minor seam when authority is split across live/cached/legacy state, the same governed surface already carries two active fallbacks, the proposed branch spans multiple lifecycle phases, or the removal condition cannot be stated clearly.
+- Do not hand off an expired fallback to review unless it is removed, refreshed by a new issue-quality review, or the issue is moved to a real blocked state with the dependency recorded.
 
 ## Standalone Reviews (Ad-hoc)
 - Prefer `codex-orchestrator review` for ad-hoc reviews in this repo so task-scoped evidence is captured, delegation MCP remains available by default, and optional runtime guards can be applied when needed (`npm run review` is the repo-local alias).

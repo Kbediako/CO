@@ -1,6 +1,67 @@
 {
   "items": [
     {
+      "id": "20260426-linear-88401e48-8112-4817-a7ee-dd4f23241a2b",
+      "title": "CO-382 fallback-expiry and large-refactor policy",
+      "relates_to": "tasks/tasks-linear-88401e48-8112-4817-a7ee-dd4f23241a2b.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-26",
+      "approvals": {
+        "docs_scaffold_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-26",
+          "status": "produced",
+          "manifest": ".runs/linear-88401e48-8112-4817-a7ee-dd4f23241a2b-docs-scaffold/cli/2026-04-26T13-28-53-386Z-40489599/manifest.json",
+          "source_anchor": "ctx:sha256:f626c0060a758f54ce277c8a7d0cf2f3e1e1acea5ea6e244c8b83f55e3bcca44#chunk:c000001",
+          "summary": "Docs-first scaffold created for CO-382 fallback-expiry and large-refactor policy. Implementation, Linear follow-up mapping, validation, workpad, PR lifecycle, and Linear mutations remain parent-owned."
+        },
+        "docs_review_baseline": {
+          "reviewer": "docs-review child stream",
+          "date": "2026-04-26",
+          "status": "failed-stale-base-docs-check",
+          "manifest": ".runs/linear-88401e48-8112-4817-a7ee-dd4f23241a2b-co382-docs-review/cli/2026-04-26T13-39-08-440Z-7c300a3b/manifest.json",
+          "summary": "Pre-implementation docs-review was attempted before the latest origin/main merge and failed in npm run docs:check because the stale base referenced missing CO-276 packet files; current origin/main includes that packet."
+        },
+        "policy_implementation": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-26",
+          "status": "validated-review-clean",
+          "docs": "docs/guides/fallback-expiry-and-refactor-policy.md",
+          "follow_ups": [
+            "CO-394",
+            "CO-395",
+            "CO-396",
+            "CO-397",
+            "CO-398"
+          ],
+          "summary": "Added fallback-expiry and large-refactor policy, docs-first prompts, micro-task guardrail, and follow-up ownership for five fallback-heavy areas; validation gates passed, standalone-review P2 findings were addressed, and expiring follow-up rows now carry concrete oldest-known introduced dates."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-26",
+          "status": "bounded-success",
+          "telemetry": ".runs/linear-88401e48-8112-4817-a7ee-dd4f23241a2b/cli/2026-04-26T13-24-32-920Z-69101075/review/telemetry.json",
+          "review_outcome": "bounded-success",
+          "summary": "Manifest-backed review ran under FORCE_CODEX_REVIEW=1 and CODEX_REVIEW_AUTHORITATIVE_GATE=1; command-intent retry completed successfully and found no actionable regressions."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-26",
+          "status": "complete",
+          "summary": "Explicit minimality pass kept the docs/template/checklist-only solution, avoided runtime refactors in this posture lane, and left fallback-heavy implementation cleanups in CO-394 through CO-398."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-88401e48-8112-4817-a7ee-dd4f23241a2b.md",
+        "task": "tasks/tasks-linear-88401e48-8112-4817-a7ee-dd4f23241a2b.md",
+        "agent_task": ".agent/task/linear-88401e48-8112-4817-a7ee-dd4f23241a2b.md",
+        "docs": "docs/TECH_SPEC-linear-88401e48-8112-4817-a7ee-dd4f23241a2b.md"
+      }
+    },
+    {
       "id": "20260426-linear-1383a1c1-3937-4eb9-b205-050d299e85d5",
       "title": "CO-391 installed control-host timeout and stale terminal suppression",
       "relates_to": "tasks/tasks-linear-1383a1c1-3937-4eb9-b205-050d299e85d5.md",
