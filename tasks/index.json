@@ -54,6 +54,31 @@
       }
     },
     {
+      "id": "20260426-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a",
+      "title": "CO-394: expire provider workflow fallback mappings",
+      "relates_to": "tasks/tasks-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-26",
+      "approvals": {
+        "issue_quality": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-26",
+          "status": "approved",
+          "summary": "CO-394 is a provider workflow fallback-expiry lane; protected terms, non-goals, Not Done If, fallback decisions, and CO-400 large-refactor ownership are explicit.",
+          "evidence": ".runs/linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a-docs-review/cli/2026-04-26T20-25-15-629Z-413cf938/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md",
+        "task": "tasks/tasks-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md",
+        "agent_task": ".agent/task/linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md",
+        "docs": "docs/TECH_SPEC-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md"
+      }
+    },
+    {
       "id": "20260426-linear-0b2377a2-366f-4309-a508-610e524c9d94",
       "title": "CO-393: add supported provider-worker relaunch/recover command and guard direct starts",
       "relates_to": "tasks/tasks-linear-0b2377a2-366f-4309-a508-610e524c9d94.md",
