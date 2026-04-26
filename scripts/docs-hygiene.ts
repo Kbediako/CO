@@ -889,7 +889,8 @@ function checkCodexPostureMatrixPackagePins(
 
 function extractOpenAiCodexPackagePins(content: string): string[] {
   const pins = new Set<string>();
-  const pattern = /@openai\/codex@([0-9]+\.[0-9]+\.[0-9]+)/gu;
+  const pattern =
+    /@openai\/codex@([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?)(?=$|[^0-9A-Za-z.+-])/gu;
   for (const match of content.matchAll(pattern)) {
     const version = match[1];
     if (version) {

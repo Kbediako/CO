@@ -1884,6 +1884,66 @@ describe('docs hygiene tooling', () => {
     );
   });
 
+  it('flags prerelease Codex package pins in matrix-managed exact pin surfaces', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-matrix-prerelease-pin-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, '.github', 'workflows'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      codexPostureSourcePath: 'docs/codex-posture-matrix.json'
+    });
+    await writeCodexPostureMatrixFixture(repoRoot, {
+      current: {
+        marketplace_smoke_cli_version: '0.121.0'
+      },
+      surfaces: [
+        {
+          path: '.github/workflows/core-lane.yml',
+          kind: 'workflow_pin',
+          status: 'current',
+          requirements: [
+            {
+              label: 'marketplace smoke workflow pin',
+              contains: 'npm install --global @openai/codex@{{marketplace_smoke_cli_version}}'
+            }
+          ]
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, '.github', 'workflows', 'core-lane.yml'),
+      [
+        'name: core',
+        'jobs:',
+        '  smoke:',
+        '    steps:',
+        '      - run: npm install --global @openai/codex@0.121.0-beta.1',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: '.github/workflows/core-lane.yml',
+        rule: 'codex-posture-matrix-drift',
+        reference: 'unexpected Codex package pin(s) 0.121.0-beta.1; expected 0.121.0'
+      })
+    );
+  });
+
   it('reports malformed matrix surfaces instead of silently dropping them', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-matrix-malformed-'));
     createdDirs.push(repoRoot);
