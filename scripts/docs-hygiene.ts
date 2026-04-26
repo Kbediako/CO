@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { readFile, readdir, writeFile } from 'node:fs/promises';
+import { readFile, readdir, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
@@ -16,6 +16,7 @@ import {
   hasExpectedModelPostureLine,
   hasExpectedDefaultRuntimeLine,
   listBundledSkillNames,
+  loadCodexPostureMatrix,
   loadDocsCatalog,
   readCurrentCodexPosture,
   resolveDocsCatalogEntry
@@ -32,6 +33,9 @@ export type DocsCheckRule =
   | 'doc-posture-unresolved'
   | 'doc-posture-stale'
   | 'doc-runtime-posture-stale'
+  | 'codex-posture-matrix-unresolved'
+  | 'codex-posture-matrix-drift'
+  | 'codex-posture-history-active'
   | 'spark-policy-overbroad'
   | 'bundled-skill-roster-drift'
   | 'front-door-budget-exceeded'
@@ -313,7 +317,26 @@ function checkReleaseRunbookTruth(input: {
   return buildReleaseRunbookError(file, 'missing release runbook coverage', missing);
 }
 
+const CODEX_POSTURE_CURRENT_FACING_DOC_CLASSES = new Set([
+  'front_door',
+  'public_guide',
+  'repo_guide',
+  'agent_policy',
+  'active_guide',
+  'shipped_skill',
+  'shipped_companion',
+  'seeded_template'
+]);
 
+const CODEX_POSTURE_HISTORICAL_STATUSES = new Set(['archive', 'archived', 'demoted', 'historical', 'history']);
+const CODEX_POSTURE_CURRENT_STATUSES = new Set(['active', 'current', 'current-facing', 'current_facing']);
+const CODEX_POSTURE_CURRENT_EVIDENCE_STATUSES = new Set([
+  ...CODEX_POSTURE_CURRENT_STATUSES,
+  'candidate',
+  'compatibility-pin',
+  'compatibility_pin'
+]);
+const CODEX_POSTURE_PIN_SURFACE_KINDS = new Set(['workflow_pin', 'pack_smoke_expectation']);
 
 const MACHINE_LOCAL_PATH_PATTERNS = [
   /(?:file:\/\/)?\/Users\/[^\s`)>"]+/,
@@ -330,6 +353,10 @@ interface TasksIndex {
   items?: Array<{ id?: string; slug?: string; path?: string }>;
   specs?: unknown[];
 }
+
+type CodexPosture = Awaited<ReturnType<typeof readCurrentCodexPosture>>;
+type CodexPostureMatrix = Awaited<ReturnType<typeof loadCodexPostureMatrix>>;
+type DocsCatalogData = Awaited<ReturnType<typeof loadDocsCatalog>>;
 
 interface CliOptions {
   mode: 'check' | 'sync' | null;
@@ -402,6 +429,9 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
   const codexPosture = docsCatalog
     ? await readCurrentCodexPosture(repoRoot, docsCatalog.policies?.codex_posture)
     : null;
+  const codexPostureMatrix = docsCatalog
+    ? await maybeLoadCodexPostureMatrixFromPolicy(repoRoot, docsCatalog.policies?.codex_posture)
+    : null;
   const codexPostureSource =
     codexPosture?.source_path || String(docsCatalog?.policies?.codex_posture?.source_path || 'docs posture policy');
   const bundledSkillNames = docsCatalog ? await listBundledSkillNames(repoRoot) : [];
@@ -412,6 +442,17 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
     errors.push(...(await checkCodexReleaseIntakeTemplate(repoRoot, docsCatalog.policies?.codex_release_intake)));
     errors.push(...checkTrackedRuntimeArtifacts(repoRoot, docsCatalog.policies?.release_surface_paths));
     errors.push(...(await checkTopLevelDocsSprawl(repoRoot, docsCatalog.policies?.top_level_docs)));
+  }
+  if (docsCatalog && codexPosture && codexPostureMatrix) {
+    errors.push(
+      ...(await checkCodexPostureMatrix({
+        repoRoot,
+        docFiles,
+        docsCatalog,
+        codexPosture,
+        matrix: codexPostureMatrix
+      }))
+    );
   }
 
   for (const file of docFiles) {
@@ -628,6 +669,482 @@ function checkSparkFileSearchPolicy(input: {
     rule: 'spark-policy-overbroad',
     reference: `line ${violation.line}: ${violation.reason}`
   }));
+}
+
+async function maybeLoadCodexPostureMatrixFromPolicy(
+  repoRoot: string,
+  policy: Record<string, unknown> | undefined
+): Promise<CodexPostureMatrix | null> {
+  const matrixPath = typeof policy?.matrix_path === 'string' ? normalizePolicyPath(policy.matrix_path) : '';
+  const sourcePath =
+    matrixPath || (typeof policy?.source_path === 'string' ? normalizePolicyPath(policy.source_path) : '');
+  if (!sourcePath.endsWith('.json')) {
+    return null;
+  }
+  return loadCodexPostureMatrix(repoRoot, sourcePath);
+}
+
+async function checkCodexPostureMatrix(input: {
+  repoRoot: string;
+  docFiles: string[];
+  docsCatalog: DocsCatalogData;
+  codexPosture: CodexPosture;
+  matrix: CodexPostureMatrix;
+}): Promise<DocsCheckError[]> {
+  const errors: DocsCheckError[] = [];
+  if (input.matrix.surfaces.length === 0) {
+    errors.push({
+      file: input.matrix.source_path,
+      rule: 'codex-posture-matrix-unresolved',
+      reference: 'matrix surfaces missing'
+    });
+  }
+  for (const surface of input.matrix.surfaces) {
+    if (CODEX_POSTURE_HISTORICAL_STATUSES.has(surface.status.toLowerCase())) {
+      continue;
+    }
+    errors.push(...(await checkCodexPostureMatrixSurface(input.repoRoot, input.codexPosture, input.matrix, surface)));
+  }
+  errors.push(
+    ...(await checkActiveHistoricalReleaseEvidence({
+      repoRoot: input.repoRoot,
+      docFiles: input.docFiles,
+      docsCatalog: input.docsCatalog,
+      matrix: input.matrix
+    }))
+  );
+  return errors;
+}
+
+async function checkCodexPostureMatrixSurface(
+  repoRoot: string,
+  codexPosture: CodexPosture,
+  matrix: CodexPostureMatrix,
+  surface: CodexPostureMatrix['surfaces'][number]
+): Promise<DocsCheckError[]> {
+  const errors: DocsCheckError[] = [];
+  const surfacePath = normalizePolicyPath(surface.path);
+  if (!surfacePath) {
+    return [
+      {
+        file: matrix.source_path,
+        rule: 'codex-posture-matrix-unresolved',
+        reference: 'matrix surface missing path'
+      }
+    ];
+  }
+  const resolvedSurface = resolveMatrixSurfacePath(repoRoot, surfacePath);
+  if (!resolvedSurface) {
+    return [
+      {
+        file: matrix.source_path,
+        rule: 'codex-posture-matrix-unresolved',
+        reference: `${surfacePath}:matrix surface path escapes repository`
+      }
+    ];
+  }
+  const { absolutePath, repoRootAbs } = resolvedSurface;
+  if (!(await pathExists(absolutePath))) {
+    return [
+      {
+        file: surfacePath,
+        rule: 'codex-posture-matrix-unresolved',
+        reference: `matrix surface missing on disk from ${matrix.source_path}`
+      }
+    ];
+  }
+
+  const repoRootReal = await realpath(repoRootAbs);
+  const realAbsolutePath = await realpath(absolutePath);
+  if (!isPathInsideRepo(repoRootReal, realAbsolutePath)) {
+    return [
+      {
+        file: matrix.source_path,
+        rule: 'codex-posture-matrix-unresolved',
+        reference: `${surfacePath}:matrix surface path resolves outside repository`
+      }
+    ];
+  }
+
+  const content = await readFile(realAbsolutePath, 'utf8');
+  if (surface.requirements.length === 0) {
+    errors.push({
+      file: matrix.source_path,
+      rule: 'codex-posture-matrix-unresolved',
+      reference: `${surfacePath}:matrix surface missing requirements`
+    });
+    return errors;
+  }
+  for (const requirement of surface.requirements) {
+    if (!requirement.contains.trim()) {
+      errors.push({
+        file: matrix.source_path,
+        rule: 'codex-posture-matrix-unresolved',
+        reference: `${surfacePath}:${requirement.label} missing contains`
+      });
+      continue;
+    }
+    const resolved = resolveCodexPostureMatrixTemplate(requirement.contains, codexPosture);
+    if (resolved.unresolvedTokens.length > 0) {
+      errors.push({
+        file: matrix.source_path,
+        rule: 'codex-posture-matrix-unresolved',
+        reference: `${surfacePath}:${requirement.label} unresolved token(s): ${resolved.unresolvedTokens.join(', ')}`
+      });
+      continue;
+    }
+    if (!content.includes(resolved.value)) {
+      errors.push({
+        file: surfacePath,
+        rule: 'codex-posture-matrix-drift',
+        reference: `${requirement.label}: expected "${truncateReference(resolved.value, 180)}"`
+      });
+    }
+  }
+  errors.push(...checkCodexPostureMatrixPackagePins(content, surfacePath, surface, codexPosture));
+  return errors;
+}
+
+function resolveMatrixSurfacePath(repoRoot: string, surfacePath: string): { absolutePath: string; repoRootAbs: string } | null {
+  const repoRootAbs = path.resolve(repoRoot);
+  const absolutePath = path.resolve(repoRootAbs, surfacePath);
+  if (!isPathInsideRepo(repoRootAbs, absolutePath)) {
+    return null;
+  }
+  return { absolutePath, repoRootAbs };
+}
+
+function isPathInsideRepo(repoRootAbs: string, absolutePath: string): boolean {
+  const relativeToRepoNative = path.relative(repoRootAbs, absolutePath);
+  const relativePath = toPosixPath(relativeToRepoNative);
+  return relativePath !== '..' && !relativePath.startsWith('../') && !path.isAbsolute(relativeToRepoNative);
+}
+
+function resolveCodexPostureMatrixTemplate(
+  template: string,
+  codexPosture: CodexPosture
+): { value: string; unresolvedTokens: string[] } {
+  const tokens: Record<string, string | null | undefined> = {
+    current_cli_version: codexPosture.cli_version,
+    codex_cli_version: codexPosture.cli_version,
+    latest_audited_candidate_cli_version: codexPosture.latest_audited_candidate_cli_version,
+    marketplace_smoke_cli_version: codexPosture.marketplace_smoke_cli_version,
+    cloud_canary_cli_version: codexPosture.cloud_canary_cli_version,
+    current_model: codexPosture.model,
+    model: codexPosture.model,
+    default_runtime: codexPosture.default_runtime,
+    explorer_fast_model: codexPosture.explorer_fast_model,
+    unsupported_review_model: codexPosture.unsupported_review_model
+  };
+  const unresolvedTokens: string[] = [];
+  const value = template.replace(/\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g, (_match, token: string) => {
+    const replacement = tokens[token];
+    if (!replacement) {
+      unresolvedTokens.push(token);
+      return '';
+    }
+    return replacement;
+  });
+  return { value, unresolvedTokens: [...new Set(unresolvedTokens)].sort() };
+}
+
+function checkCodexPostureMatrixPackagePins(
+  content: string,
+  surfacePath: string,
+  surface: CodexPostureMatrix['surfaces'][number],
+  codexPosture: CodexPosture
+): DocsCheckError[] {
+  if (!CODEX_POSTURE_PIN_SURFACE_KINDS.has(surface.kind)) {
+    return [];
+  }
+
+  const expectedPins = new Set<string>();
+  for (const requirement of surface.requirements) {
+    const resolved = resolveCodexPostureMatrixTemplate(requirement.contains, codexPosture);
+    if (resolved.unresolvedTokens.length > 0) {
+      continue;
+    }
+    for (const pin of extractOpenAiCodexPackagePins(resolved.value)) {
+      expectedPins.add(pin);
+    }
+  }
+  if (expectedPins.size === 0) {
+    return [];
+  }
+
+  const observedPins = extractOpenAiCodexPackagePins(content);
+  const unexpectedPins = observedPins.filter((pin) => !expectedPins.has(pin));
+  if (unexpectedPins.length === 0) {
+    return [];
+  }
+
+  return [
+    {
+      file: surfacePath,
+      rule: 'codex-posture-matrix-drift',
+      reference: `unexpected Codex package pin(s) ${unexpectedPins.join(', ')}; expected ${[...expectedPins].sort().join(', ')}`
+    }
+  ];
+}
+
+function extractOpenAiCodexPackagePins(content: string): string[] {
+  const pins = new Set<string>();
+  const pattern =
+    /@openai\/codex@([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?)(?=$|[^0-9A-Za-z.+-])/gu;
+  for (const match of content.matchAll(pattern)) {
+    const version = match[1];
+    if (version) {
+      pins.add(version);
+    }
+  }
+  return [...pins].sort();
+}
+
+async function checkActiveHistoricalReleaseEvidence(input: {
+  repoRoot: string;
+  docFiles: string[];
+  docsCatalog: DocsCatalogData;
+  matrix: CodexPostureMatrix;
+}): Promise<DocsCheckError[]> {
+  const historicalPaths = new Set(
+    [
+      ...input.matrix.historical_release_evidence
+        .filter((entry) => CODEX_POSTURE_HISTORICAL_STATUSES.has(entry.status.toLowerCase()))
+        .map((entry) => normalizePolicyPath(entry.path)),
+      ...input.matrix.surfaces
+        .filter((surface) => CODEX_POSTURE_HISTORICAL_STATUSES.has(surface.status.toLowerCase()))
+        .map((surface) => normalizePolicyPath(surface.path))
+    ].filter((entry) => entry.length > 0)
+  );
+  const currentEvidencePaths = new Set(
+    input.matrix.surfaces
+      .filter(
+        (surface) =>
+          CODEX_POSTURE_CURRENT_EVIDENCE_STATUSES.has(surface.status.toLowerCase()) &&
+          isCodexReleaseEvidenceMatrixSurface(surface)
+      )
+      .map((surface) => normalizePolicyPath(surface.path))
+      .filter((entry) => entry.length > 0)
+  );
+  const errors: DocsCheckError[] = [];
+
+  for (const file of input.docFiles) {
+    const normalizedFile = normalizePolicyPath(file);
+    if (historicalPaths.has(normalizedFile) || currentEvidencePaths.has(normalizedFile)) {
+      continue;
+    }
+
+    const catalogEntry = resolveDocsCatalogEntry(file, input.docsCatalog);
+    if (!isCurrentFacingCodexPostureDoc(catalogEntry)) {
+      continue;
+    }
+
+    const content = await readFile(path.join(input.repoRoot, file), 'utf8');
+    const staleVersions = new Set<string>();
+    if (looksLikeCodexReleaseEvidencePage(file, content)) {
+      for (const version of extractCodexReleaseEvidenceVersionMentions(content)) {
+        staleVersions.add(version);
+      }
+    }
+    for (const link of extractCodexReleaseEvidenceLinks(file, content)) {
+      if (!link.path) {
+        continue;
+      }
+      if (historicalPaths.has(link.path) || currentEvidencePaths.has(link.path)) {
+        continue;
+      }
+      for (const version of link.versions) {
+        staleVersions.add(version);
+      }
+    }
+    if (staleVersions.size === 0) {
+      continue;
+    }
+
+    errors.push({
+      file,
+      rule: 'codex-posture-history-active',
+      reference: `active current-facing release evidence mentions Codex CLI version(s) ${[...staleVersions].sort().join(', ')} without current/historical/archive matrix status`
+    });
+  }
+
+  return errors;
+}
+
+function isCodexReleaseEvidenceMatrixSurface(surface: CodexPostureMatrix['surfaces'][number]): boolean {
+  const status = surface.status.toLowerCase();
+  if (CODEX_POSTURE_HISTORICAL_STATUSES.has(status)) {
+    return true;
+  }
+  if (CODEX_POSTURE_CURRENT_EVIDENCE_STATUSES.has(status) && !CODEX_POSTURE_CURRENT_STATUSES.has(status)) {
+    return true;
+  }
+  return /(adoption|audit|canary|candidate|evidence|release)/u.test(surface.kind.toLowerCase());
+}
+
+function isCurrentFacingCodexPostureDoc(
+  catalogEntry: ReturnType<typeof resolveDocsCatalogEntry>
+): boolean {
+  if (!catalogEntry) {
+    return false;
+  }
+  const status = catalogEntry.status.toLowerCase();
+  if (CODEX_POSTURE_HISTORICAL_STATUSES.has(status)) {
+    return false;
+  }
+  if (!CODEX_POSTURE_CURRENT_STATUSES.has(status)) {
+    return false;
+  }
+  return CODEX_POSTURE_CURRENT_FACING_DOC_CLASSES.has(catalogEntry.doc_class);
+}
+
+function looksLikeCodexReleaseEvidencePage(file: string, content: string): boolean {
+  const firstHeading = content
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => /^#{1,2}\s+/.test(line));
+  const haystack = `${file}\n${firstHeading ?? ''}`.toLowerCase();
+  return looksLikeCodexReleaseEvidenceText(haystack);
+}
+
+function looksLikeCodexReleaseEvidenceText(value: string): boolean {
+  const haystack = value.toLowerCase();
+  return (
+    haystack.includes('codex') &&
+    /(adoption|audit|canary|candidate|evidence|posture|release)/u.test(haystack) &&
+    (/(?:^|[^0-9])\d+[.-]\d+(?:[.-]\d+)?(?:[^0-9]|$)/u.test(haystack) ||
+      /\bcodex[-_\s]*(?:cli[-_\s]*)?0[0-9]{3}(?:[^0-9]|$)/u.test(haystack))
+  );
+}
+
+function extractCodexReleaseEvidenceLinks(file: string, content: string): Array<{ path: string; versions: string[] }> {
+  const links: Array<{ path: string; versions: string[] }> = [];
+  const pattern = /\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+  for (const match of content.matchAll(pattern)) {
+    const text = match[1] ?? '';
+    const target = match[2] ?? '';
+    pushCodexReleaseEvidenceLink(links, file, text, target);
+  }
+  const referenceTargets = extractMarkdownReferenceTargets(content);
+  const referencePattern = /\[([^\]]+)\]\[([^\]]*)\]/g;
+  for (const match of content.matchAll(referencePattern)) {
+    const text = match[1] ?? '';
+    const label = match[2]?.trim() || text;
+    const target = referenceTargets.get(normalizeMarkdownReferenceLabel(label));
+    if (!target) {
+      continue;
+    }
+    pushCodexReleaseEvidenceLink(links, file, text, target);
+  }
+  const shortcutReferencePattern = /\[([^\]]+)\]/g;
+  for (const match of content.matchAll(shortcutReferencePattern)) {
+    if (match.index && content[match.index - 1] === '!') {
+      continue;
+    }
+    const next = content[match.index + match[0].length] ?? '';
+    if (next === '(' || next === '[' || next === ':') {
+      continue;
+    }
+    const text = match[1] ?? '';
+    const target = referenceTargets.get(normalizeMarkdownReferenceLabel(text));
+    if (!target) {
+      continue;
+    }
+    pushCodexReleaseEvidenceLink(links, file, text, target);
+  }
+  return links;
+}
+
+function pushCodexReleaseEvidenceLink(
+  links: Array<{ path: string; versions: string[] }>,
+  file: string,
+  text: string,
+  target: string
+): void {
+  const haystack = `${text}\n${target}`;
+  if (!looksLikeCodexReleaseEvidenceText(haystack)) {
+    return;
+  }
+  links.push({
+    path: normalizeMarkdownLinkTarget(file, target),
+    versions: extractCodexReleaseEvidenceVersionMentions(haystack)
+  });
+}
+
+function extractMarkdownReferenceTargets(content: string): Map<string, string> {
+  const targets = new Map<string, string>();
+  const pattern = /^[ \t]{0,3}\[([^\]]+)\]:[ \t]*(?:<([^>\n]+)>|([^ \t\n]+))/gm;
+  for (const match of content.matchAll(pattern)) {
+    const label = normalizeMarkdownReferenceLabel(match[1] ?? '');
+    const target = match[2] ?? match[3] ?? '';
+    if (label && target) {
+      targets.set(label, target);
+    }
+  }
+  return targets;
+}
+
+function normalizeMarkdownReferenceLabel(label: string): string {
+  return label.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function normalizeMarkdownLinkTarget(file: string, target: string): string {
+  const trimmed = target.trim().replace(/^<([^>]+)>$/u, '$1');
+  if (!trimmed || trimmed.startsWith('#') || /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(trimmed)) {
+    return '';
+  }
+  const withoutFragment = trimmed.split(/[?#]/u)[0] ?? '';
+  if (!withoutFragment) {
+    return '';
+  }
+  if (withoutFragment.startsWith('/')) {
+    return normalizePolicyPath(withoutFragment.replace(/^\/+/, ''));
+  }
+  return normalizePolicyPath(path.posix.join(path.posix.dirname(file), withoutFragment));
+}
+
+function extractCodexReleaseEvidenceVersionMentions(content: string): string[] {
+  const results = new Set<string>(extractCodexCliVersionMentions(content));
+  const versionPatterns = [
+    /\bcodex[-_\s]*(?:cli[-_\s]*)?([0-9]+[.-][0-9]+(?:[.-][0-9]+)?)\b/giu,
+    /\bcodex\s+(?:cli\s+)?([0-9]+\.[0-9]+(?:\.[0-9]+)?)\b/giu
+  ];
+  for (const pattern of versionPatterns) {
+    for (const match of content.matchAll(pattern)) {
+      const version = normalizeCodexVersionMention(match[1] ?? '');
+      if (version) {
+        results.add(version);
+      }
+    }
+  }
+  const zeroPaddedSlugPattern = /\bcodex[-_\s]*(?:cli[-_\s]*)?0([0-9]{3})(?=[^0-9]|$)/giu;
+  for (const match of content.matchAll(zeroPaddedSlugPattern)) {
+    const version = normalizeZeroPaddedCodexVersionSlug(match[1] ?? '');
+    if (version) {
+      results.add(version);
+    }
+  }
+  return [...results].sort();
+}
+
+function normalizeCodexVersionMention(raw: string): string | null {
+  const normalized = raw.trim().replace(/-/g, '.');
+  if (!/^[0-9]+\.[0-9]+(?:\.[0-9]+)?$/.test(normalized)) {
+    return null;
+  }
+  const parts = normalized.split('.');
+  if (parts.length === 2) {
+    return `${parts[0]}.${parts[1]}.0`;
+  }
+  return normalized;
+}
+
+function normalizeZeroPaddedCodexVersionSlug(raw: string): string | null {
+  const digits = raw.trim();
+  if (!/^[0-9]{3}$/.test(digits)) {
+    return null;
+  }
+  return `0.${digits}.0`;
 }
 
 

@@ -32,6 +32,31 @@
       }
     },
     {
+      "id": "20260426-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25",
+      "title": "CO-380 authoritative review gate",
+      "relates_to": "tasks/tasks-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-26",
+      "approvals": {
+        "tests_child_lane": {
+          "reviewer": "bounded same-issue tests child lane plus parent provider worker",
+          "date": "2026-04-26",
+          "status": "accepted",
+          "manifest": ".runs/linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25-notes-contract-tests/cli/2026-04-26T00-23-19-232Z-fb205e4e/manifest.json",
+          "summary": "Child lane added focused review-prompt context tests so missing NOTES is exceptional under the authoritative review gate and break-glass waiver context is review-visible."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md",
+        "task": "tasks/tasks-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md",
+        "agent_task": ".agent/task/linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md",
+        "docs": "docs/TECH_SPEC-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md"
+      }
+    },
+    {
       "id": "20260426-linear-67e2ffd2-a653-4d69-9241-5f32c459a682",
       "title": "CO-386 Codex CLI release-intake supersession workflow",
       "relates_to": "tasks/tasks-linear-67e2ffd2-a653-4d69-9241-5f32c459a682.md",
@@ -55,6 +80,32 @@
         "task": "tasks/tasks-linear-67e2ffd2-a653-4d69-9241-5f32c459a682.md",
         "agent_task": ".agent/task/linear-67e2ffd2-a653-4d69-9241-5f32c459a682.md",
         "docs": "tasks/specs/linear-67e2ffd2-a653-4d69-9241-5f32c459a682.md"
+      }
+    },
+    {
+      "id": "20260426-linear-1856398b-7746-4d07-af6b-4ad207ffe2b9",
+      "title": "CO: make docs hygiene enforce a multi-surface Codex posture matrix",
+      "relates_to": "tasks/tasks-linear-1856398b-7746-4d07-af6b-4ad207ffe2b9.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-26",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-26",
+          "status": "produced",
+          "manifest": ".runs/linear-1856398b-7746-4d07-af6b-4ad207ffe2b9-docs-packet-v2/cli/2026-04-26T02-11-12-522Z-470a967d/manifest.json",
+          "source_anchor": "ctx:sha256:363de60f154c2d3fe3216bec435c5fdadf6c34c16a7095552bda42dd1832bf8a#chunk:c000001",
+          "summary": "Docs-first packet created for CO-387. The child checkout has no .runs tree, so source-0 was unavailable locally and the packet is anchored to the parent-provided issue text. Scope defines a parent-owned matrix-backed docs-hygiene implementation that validates README, docs/book or current navigation, public posture, downstream setup docs, version policy, workflow pins, and pack-smoke expectations, preserves historical evidence through archive/demotion/status metadata, and does not move runtime targets or workflow pins by itself."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-1856398b-7746-4d07-af6b-4ad207ffe2b9.md",
+        "task": "tasks/tasks-linear-1856398b-7746-4d07-af6b-4ad207ffe2b9.md",
+        "agent_task": ".agent/task/linear-1856398b-7746-4d07-af6b-4ad207ffe2b9.md",
+        "docs": "docs/TECH_SPEC-linear-1856398b-7746-4d07-af6b-4ad207ffe2b9.md"
       }
     },
     {

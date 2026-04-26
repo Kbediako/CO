@@ -52,7 +52,7 @@
   },
   "policies": {
     "codex_posture": {
-      "source_path": "docs/guides/codex-version-policy.md"
+      "source_path": "docs/codex-posture-matrix.json"
     },
     "readme_front_door": {
       "path": "README.md",

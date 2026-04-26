@@ -1202,6 +1202,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(firstPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
     expect(firstPrompt).toContain('about 2+ changed files or about 40+ changed lines');
     expect(firstPrompt).toContain('use the wrapper-led review path by default');
+    expect(firstPrompt).toContain('do not hand off to review state unless a break-glass waiver is recorded with owner, expiry, reason, and evidence');
     expect(firstPrompt).toContain('manual correctness/regressions/missing-tests review');
     expect(firstPrompt).toContain('manual elegance checklist');
     expect(firstPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
@@ -1273,6 +1274,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(continuationPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
     expect(continuationPrompt).toContain('about 2+ changed files or about 40+ changed lines');
     expect(continuationPrompt).toContain('use the wrapper-led review path by default');
+    expect(continuationPrompt).toContain('do not hand off to review state unless a break-glass waiver is recorded with owner, expiry, reason, and evidence');
     expect(continuationPrompt).toContain('manual correctness/regressions/missing-tests review');
     expect(continuationPrompt).toContain('manual elegance checklist');
     expect(continuationPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
@@ -3610,6 +3612,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     const expectedSharedRepoCheckoutPath = await realpath(tempRoot ?? '');
     expect(firstTurnPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
     expect(firstTurnPrompt).toContain('about 2+ changed files or about 40+ changed lines');
+    expect(firstTurnPrompt).toContain('do not hand off to review state unless a break-glass waiver is recorded with owner, expiry, reason, and evidence');
     expect(firstTurnPrompt).toContain('manual elegance checklist');
     expect(firstTurnPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
     expect(firstTurnPrompt).toContain('Ordinary eligible same-issue child-lane parallelisation is a runtime contract');
@@ -3638,6 +3641,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(firstTurnPrompt).toContain(`\`git -C "${expectedSharedRepoCheckoutPath}" merge --ff-only origin/main\``);
     expect(continuationPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
     expect(continuationPrompt).toContain('about 2+ changed files or about 40+ changed lines');
+    expect(continuationPrompt).toContain('do not hand off to review state unless a break-glass waiver is recorded with owner, expiry, reason, and evidence');
     expect(continuationPrompt).toContain('manual elegance checklist');
     expect(continuationPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
     expect(continuationPrompt).toContain('Ordinary eligible same-issue child-lane parallelisation is a runtime contract');
@@ -9323,7 +9327,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
-  it('forces standalone review execution env inside non-interactive provider worker turns', async () => {
+  it('forces standalone review execution env and seeds authoritative notes inside non-interactive provider worker turns', async () => {
     const { manifestPath } = await createManifestRoot();
     const readTrackedIssue = vi
       .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
@@ -9353,7 +9357,9 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
         CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
         CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
         FORCE_CODEX_REVIEW: '',
+        NOTES: '',
         CODEX_INTERACTIVE: '1'
       },
       {
@@ -9371,6 +9377,11 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(execRunner).toHaveBeenCalledTimes(1);
     expect(execRunner.mock.calls[0]?.[0].env.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
     expect(execRunner.mock.calls[0]?.[0].env.FORCE_CODEX_REVIEW).toBe('1');
+    expect(execRunner.mock.calls[0]?.[0].env.CODEX_REVIEW_AUTHORITATIVE_GATE).toBe('1');
+    expect(execRunner.mock.calls[0]?.[0].env.NOTES).toContain(
+      'provider-linear-worker handoff review for CO-2'
+    );
+    expect(execRunner.mock.calls[0]?.[0].env.NOTES).not.toContain('auto-generated NOTES fallback');
     expect(execRunner.mock.calls[0]?.[0].env.CODEX_NON_INTERACTIVE).toBe('1');
     expect(execRunner.mock.calls[0]?.[0].env.CODEX_NO_INTERACTIVE).toBe('1');
     expect(execRunner.mock.calls[0]?.[0].env.CODEX_INTERACTIVE).toBe('0');

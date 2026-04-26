@@ -1328,6 +1328,20 @@ function shouldForceNonInteractive(env: NodeJS.ProcessEnv): boolean {
   );
 }
 
+function ensureProviderLinearWorkerAuthoritativeReviewNotes(
+  env: NodeJS.ProcessEnv,
+  context: Pick<ProviderLinearWorkerContext, 'issueIdentifier' | 'taskId'>
+): void {
+  if (!envFlagEnabled(env.CODEX_REVIEW_AUTHORITATIVE_GATE) || normalizeOptionalString(env.NOTES)) {
+    return;
+  }
+  env.NOTES = [
+    `Goal: provider-linear-worker handoff review for ${context.issueIdentifier}`,
+    `Summary: provider-authored default NOTES for the authoritative pre-handoff review gate in task ${context.taskId}; worker commands may override with issue-specific context`,
+    'Risks: generic provider-worker notes are lower-signal than worker-authored closeout notes'
+  ].join(' | ');
+}
+
 function classifyExecRunnerFailure(
   error: unknown,
   spawnContext: {
@@ -2521,7 +2535,7 @@ function buildPreReviewHandoffGateSection(): string[] {
   return [
     '- Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff before opening a new PR for review handoff, before updating an already-attached PR for handoff, and before transitioning the issue to `Human Review` or `In Review`.',
     '- Use the repo heuristic for non-trivial work: about 2+ changed files or about 40+ changed lines, unless you record an explicit skip justification in the workpad.',
-    '- Run the standalone review first. When manifest-backed evidence matters, use the wrapper-led review path by default; if review tooling is unavailable or stalls without a concrete verdict, do a manual correctness/regressions/missing-tests review plus a manual elegance checklist and record that fallback instead of stalling.',
+    '- Run the standalone review first. When manifest-backed evidence matters, use the wrapper-led review path by default; if review tooling is unavailable or stalls without a concrete verdict, do not hand off to review state unless a break-glass waiver is recorded with owner, expiry, reason, and evidence. Only after that waiver may you do a manual correctness/regressions/missing-tests review plus a manual elegance checklist as the fallback evidence.',
     '- After addressing standalone-review findings, run an explicit elegance/minimality pass before PR create/update intended for handoff and before the review-state transition.',
     '- After opening or updating a PR, run the shipped `codex-orchestrator pr ready-review --pr <number> --quiet-minutes <window>` monitor (or the equivalent repo-local wrapper) and keep the issue out of review until that bounded automated-feedback drain exits cleanly or exposes a blocker that you resolve or explicitly push back on.',
     '- Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.'
@@ -9438,6 +9452,7 @@ export async function runProviderLinearWorker(
     childEnv.CODEX_NO_INTERACTIVE = '1';
     childEnv.CODEX_INTERACTIVE = '0';
   }
+  ensureProviderLinearWorkerAuthoritativeReviewNotes(childEnv, context);
 
   const attemptStartedAt = deps.now();
   const workerControl = buildProviderWorkerControlPlane({

@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 8fdcf7de73c87b19a85389bfa6322cae7f6f6322db6b17c2a1e99db6b1b1c3aa -->
+<!-- codex:instruction-stamp 8fd058ecd1c40213b588e1bf03b4fd53d96ed16b7f6c3d017948f0b861ef6dcb -->
 # Agent Enablement
 
 Task-specific project blocks were removed from this file in `CO-88`. Keep repo-wide guidance here and use `.agent/task/**` for active task-scoped instructions.
@@ -53,7 +53,7 @@ Task-specific project blocks were removed from this file in `CO-88`. Keep repo-w
 - `npm run build:patterns` — Compile codemods/linters/templates; run whenever `patterns/**` changes.
 - `node --loader ts-node/esm evaluation/harness/run-all.ts --mode=mcp` — Manual sweep to generate scenario artifacts for manifests.
 - `node scripts/diff-budget.mjs` — Enforces a small-diff budget before review; set `DIFF_BUDGET_OVERRIDE_REASON` to bypass with justification.
-- `codex-orchestrator review` (repo alias: `npm run review`) — Launches `codex review` with a non-interactive prompt that includes the latest run manifest path as evidence (reviews “current changes” by default); in CI or when stdin is not a TTY (or `CODEX_REVIEW_NON_INTERACTIVE` / `CODEX_NON_INTERACTIVE` / `CODEX_NO_INTERACTIVE` is set) it prints the handoff prompt and exits unless `FORCE_CODEX_REVIEW=1`; `NOTES` is recommended and should include goal, summary, risks, and optional questions (wrapper fallback notes are auto-generated when omitted).
+- `codex-orchestrator review` (repo alias: `npm run review`) — Launches `codex review` with a non-interactive prompt that includes the latest run manifest path as evidence (reviews “current changes” by default); in CI or when stdin is not a TTY (or `CODEX_REVIEW_NON_INTERACTIVE` / `CODEX_NON_INTERACTIVE` / `CODEX_NO_INTERACTIVE` is set) direct/manual runs print the handoff prompt and exit unless `FORCE_CODEX_REVIEW=1`; authoritative gate runs set `CODEX_REVIEW_AUTHORITATIVE_GATE=1`, require `NOTES`, and disallow prompt-only handoff success.
 - `codex-orchestrator plan [pipeline]` — Preview resolved pipeline stages without execution; add `--format json` for automation inputs.
 
 ### Runtime knobs (optional)
@@ -66,7 +66,7 @@ Task-specific project blocks were removed from this file in `CO-88`. Keep repo-w
 - `/prompts:review-handoff TASK=<task-id> MANIFEST=<path> NOTES=<goal + summary + risks + optional questions>` re-validates guardrails via `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, executes `npm run lint`, `npm run test`, optional `npm run eval:test`, runs `node scripts/diff-budget.mjs`, then runs `npm run review`, and ensures approvals/escalations are logged in `$MANIFEST` before checklists flip.
 - Standalone review (outside pipelines): prefer `codex-orchestrator review` for manifest-backed evidence and delegation-aware defaults (`npm run review` is a repo-local alias); use direct `codex review` only for quick best-effort checks when manifest evidence is not required.
 - Prompt compatibility: do not combine prompt arguments with `--uncommitted`, `--base`, or `--commit`; use either diff-scoped review (no prompt) or prompt-only review. See `docs/standalone-review-guide.md`.
-- For manifest evidence, run `TASK=<task-id> NOTES="..." MANIFEST=<path> codex-orchestrator review --manifest <path>` (or `npm run review -- --manifest <path>` in this repo, or ensure `MCP_RUNNER_TASK_ID` is already set). In non-interactive/CI (`CODEX_REVIEW_NON_INTERACTIVE=1`, `CODEX_NON_INTERACTIVE=1`, or `CODEX_NO_INTERACTIVE=1`) it prints the handoff prompt unless `FORCE_CODEX_REVIEW=1` is set.
+- For manifest evidence, run `TASK=<task-id> NOTES="..." MANIFEST=<path> codex-orchestrator review --manifest <path>` (or `npm run review -- --manifest <path>` in this repo, or ensure `MCP_RUNNER_TASK_ID` is already set). In non-interactive/CI (`CODEX_REVIEW_NON_INTERACTIVE=1`, `CODEX_NON_INTERACTIVE=1`, or `CODEX_NO_INTERACTIVE=1`) direct/manual runs print the handoff prompt unless `FORCE_CODEX_REVIEW=1` is set; authoritative gate lanes also set `CODEX_REVIEW_AUTHORITATIVE_GATE=1` so prompt-only handoff fails closed.
 - Always use these prompts before running diagnostics or prepping a review; they are the canonical way to drive the orchestrator so manifests, approvals, and docs stay in sync across machines.
 
 ### Frontend Testing Pipeline (Core)
