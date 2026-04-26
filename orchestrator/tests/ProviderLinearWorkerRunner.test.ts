@@ -13,8 +13,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   appendProviderLinearWorkerChildLaneRecord,
   appendProviderLinearWorkerChildStreamRecord,
+  buildProviderLinearWorkerAppServerCallbackResponse,
   buildProviderLinearWorkerProgressSemanticSignature,
   buildProviderWorkerPrompt,
+  defaultAppServerTurnRunner,
   loadProviderLinearWorkerContext,
   parseProviderLinearWorkerJsonl,
   PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV,
@@ -2077,6 +2079,28 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.100Z');
   });
 
+  it('preserves streamed appserver assistant text across later telemetry notifications', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-1"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+        '{"type":"notification","method":"item/agentMessage/delta","params":{"threadId":"thread-1","turnId":"turn-1","itemId":"msg-1","delta":"app-server "}}',
+        '{"type":"notification","method":"item/agentMessage/delta","params":{"threadId":"thread-1","turnId":"turn-1","itemId":"msg-1","delta":"final answer"}}',
+        '{"type":"notification","method":"thread/tokenUsage/updated","params":{"tokenUsage":{"total":{"inputTokens":18,"outputTokens":6,"totalTokens":24}}},"timestamp":"2026-03-21T09:00:00.100Z"}',
+        '{"type":"notification","method":"account/rateLimits/updated","params":{"rateLimits":{}},"timestamp":"2026-03-21T09:00:00.200Z"}'
+      ].join('\n')
+    );
+
+    expect(parsed.tokens).toEqual({
+      input_tokens: 18,
+      output_tokens: 6,
+      total_tokens: 24
+    });
+    expect(parsed.lastEvent).toBe('account/rateLimits/updated');
+    expect(parsed.finalMessage).toBe('app-server final answer');
+    expect(parsed.lastEventAt).toBe('2026-03-21T09:00:00.200Z');
+  });
+
   it('keeps token-update humanization aligned with parser-supported tokenUsage shapes', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [
@@ -2572,6 +2596,94 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     ]) {
       expect(signal).toContain(fragment);
     }
+  });
+
+  it('redacts app-server terminal turn error details before diagnostics are persisted', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-provider-appserver-terminal-redaction-'));
+    extraTempRoots.push(root);
+    const scriptPath = join(root, 'fake-app-server-terminal-redaction.mjs');
+    await writeFile(
+      scriptPath,
+      `
+import readline from 'node:readline';
+
+const rl = readline.createInterface({ input: process.stdin });
+const send = (payload) => process.stdout.write(JSON.stringify(payload) + '\\n');
+
+for await (const line of rl) {
+  const message = JSON.parse(line);
+  if (message.method === 'initialize') {
+    send({ id: message.id, result: {} });
+    continue;
+  }
+  if (message.method === 'thread/start') {
+    send({ id: message.id, result: { thread: { id: 'thread-secret' } } });
+    continue;
+  }
+  if (message.method === 'turn/start') {
+    send({ id: message.id, result: { turn: { id: 'turn-secret', status: 'inProgress' } } });
+    send({
+      method: 'turn/completed',
+      params: {
+        threadId: 'thread-secret',
+        turn: {
+          id: 'turn-secret',
+          status: 'failed',
+          error: {
+            message:
+              'model stream failed OPENAI_API_KEY=secret-openai-key refresh_token secret-refresh-token operator@example.com'
+          }
+        }
+      }
+    });
+    setTimeout(() => process.exit(0), 50);
+    continue;
+  }
+}
+`
+    );
+
+    const result = await defaultAppServerTurnRunner({
+      command: process.execPath,
+      args: [scriptPath],
+      cwd: root,
+      env: process.env,
+      prompt: 'exercise terminal redaction',
+      resumeThreadId: null
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('app-server turn turn-secret failed');
+    expect(result.stderr).toContain('OPENAI_API_KEY=<redacted>');
+    expect(result.stderr).toContain('refresh_token <redacted>');
+    expect(result.stderr).toContain('<email-redacted>');
+    expect(result.stderr).not.toContain('secret-openai-key');
+    expect(result.stderr).not.toContain('secret-refresh-token');
+    expect(result.stderr).not.toContain('operator@example.com');
+
+    const parsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'notification',
+        method: 'turn/completed',
+        params: {
+          turn: {
+            id: 'turn-secret',
+            status: 'failed',
+            error: {
+              message:
+                'model stream failed OPENAI_API_KEY=secret-openai-key refresh_token secret-refresh-token operator@example.com'
+            }
+          }
+        }
+      })
+    );
+    expect(parsed.finalMessage).toContain('app-server turn turn-secret failed');
+    expect(parsed.finalMessage).toContain('OPENAI_API_KEY=<redacted>');
+    expect(parsed.finalMessage).toContain('refresh_token <redacted>');
+    expect(parsed.finalMessage).toContain('<email-redacted>');
+    expect(parsed.finalMessage).not.toContain('secret-openai-key');
+    expect(parsed.finalMessage).not.toContain('secret-refresh-token');
+    expect(parsed.finalMessage).not.toContain('operator@example.com');
   });
 
   it('redacts whitespace-separated credential labels from provider diagnostics', () => {
@@ -3820,7 +3932,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         })
       );
 
-    const execRunner = vi.fn(async (request) => {
+    const execRunner = vi.fn();
+    const appServerTurnRunner = vi.fn(async (request) => {
       await appendStaySerialParallelizationDecisionAuditForRequest(request, {
         turnIndex: 1
       });
@@ -3852,6 +3965,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           })
         ),
         execRunner,
+        appServerTurnRunner,
         now: vi
           .fn()
           .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
@@ -3880,7 +3994,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           provider: 'AppServerRuntimeProvider',
           runtime_session_id: 'appserver-run-child'
         },
-        supervision_command: 'codex_exec',
+        supervision_command: 'appserver_thread_start',
         appserver_session_id: 'appserver-run-child',
         thread_id: 'thread-app',
         latest_turn_id: 'turn-app-1',
@@ -3934,7 +4048,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         })
       );
 
-    const execRunner = vi.fn(async (request) => {
+    const execRunner = vi.fn();
+    const appServerTurnRunner = vi.fn(async (request) => {
       await appendStaySerialParallelizationDecisionAuditForRequest(request, {
         turnIndex: 1
       });
@@ -3993,6 +4108,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           })
         ),
         execRunner,
+        appServerTurnRunner,
         sleep: async () => {
           await new Promise((resolve) => setTimeout(resolve, 1));
         },
@@ -4041,7 +4157,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         })
       );
 
-    const execRunner = vi.fn(async (request) => {
+    const execRunner = vi.fn();
+    const appServerTurnRunner = vi.fn(async (request) => {
       await appendStaySerialParallelizationDecisionAuditForRequest(request, {
         turnIndex: 1
       });
@@ -4091,6 +4208,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           })
         ),
         execRunner,
+        appServerTurnRunner,
         sleep: async () => {
           await new Promise((resolve) => setTimeout(resolve, 1));
         },
@@ -4119,10 +4237,11 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     const { manifestPath, runDir } = await createManifestRoot();
     const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
     const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-app.jsonl');
-    let execCallCount = 0;
-    const execRunner = vi.fn(async (request) => {
-      execCallCount += 1;
-      if (execCallCount === 1) {
+    const execRunner = vi.fn();
+    let appServerCallCount = 0;
+    const appServerTurnRunner = vi.fn(async (request) => {
+      appServerCallCount += 1;
+      if (appServerCallCount === 1) {
         await appendStaySerialParallelizationDecisionAuditForRequest(request, {
           turnIndex: 1
         });
@@ -4184,6 +4303,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
             })
           ),
           execRunner,
+          appServerTurnRunner,
           sleep: async () => {
             await new Promise((resolve) => setTimeout(resolve, 1));
           },
@@ -4196,7 +4316,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       )
     ).rejects.toThrow('spawn failed');
 
-    expect(execRunner).toHaveBeenCalledTimes(2);
+    expect(execRunner).not.toHaveBeenCalled();
+    expect(appServerTurnRunner).toHaveBeenCalledTimes(2);
     const written = JSON.parse(
       await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
     ) as Record<string, unknown>;
@@ -4210,11 +4331,14 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       session_log_session_id: 'thread-app-turn-app-1',
       owner_phase: 'ended',
       owner_status: 'failed',
-      end_reason: 'exec_runner_failed',
+      end_reason: 'appserver_runtime_error',
       appserver_supervision: {
         turn_persistence_status: 'proven',
         turn_persistence_source: 'session_log_hydration',
         turn_persistence_blocker: null
+      },
+      failure_diagnosis: {
+        source: 'appserver_runner'
       }
     });
   }, 20_000);
@@ -4266,7 +4390,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
             runtime_session_id: 'appserver-run-child'
           })
         ),
-        execRunner: vi.fn(async (request) => {
+        execRunner: vi.fn(),
+        appServerTurnRunner: vi.fn(async (request) => {
           await appendStaySerialParallelizationDecisionAuditForRequest(request, {
             turnIndex: 1
           });
@@ -4316,7 +4441,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       latest_turn_id: null,
       latest_session_id: null,
       appserver_supervision: {
-        supervision_command: 'codex_exec_resume',
+        supervision_command: 'appserver_thread_resume',
         sticky_environment_status: 'proven',
         turn_persistence_status: 'blocked',
         turn_persistence_blocker: 'session_log_hydration_missing',
@@ -4343,7 +4468,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       session_log_turn_id: null,
       session_log_session_id: null,
       appserver_supervision: {
-        supervision_command: 'codex_exec_resume',
+        supervision_command: 'appserver_thread_resume',
         turn_persistence_status: 'blocked',
         turn_persistence_blocker: 'session_log_hydration_missing',
         resume_status: 'blocked',
@@ -4451,7 +4576,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       session_log_turn_id: 'turn-app-1',
       session_log_session_id: 'thread-app-turn-app-1',
       appserver_supervision: {
-        supervision_command: 'codex_exec',
+        supervision_command: 'appserver_thread_start',
         turn_persistence_status: 'proven',
         turn_persistence_source: 'session_log_hydration',
         turn_persistence_blocker: null,
@@ -5022,13 +5147,15 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
 
   it('uses guarded resident-session seeds to resume the prior thread on worker turn one', async () => {
     const { manifestPath } = await createManifestRoot();
-    const execRunner = vi.fn(async (request) => {
+    const execRunner = vi.fn();
+    const appServerTurnRunner = vi.fn(async (request) => {
       await appendStaySerialParallelizationDecisionAuditForRequest(request, {
         turnIndex: 1
       });
       return {
         exitCode: 0,
         stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
           '{"type":"turn_context","payload":{"turn_id":"turn-21"}}',
           '{"type":"event_msg","payload":{"type":"agent_message","message":"guarded resume complete"}}',
           '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-21","timestamp":"2026-03-21T09:00:01.500Z"}}'
@@ -5066,6 +5193,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           })
         ),
         execRunner,
+        appServerTurnRunner,
         now: vi
           .fn()
           .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
@@ -5074,15 +5202,16 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       }
     );
 
-    expect(execRunner).toHaveBeenCalledTimes(1);
-    expect(execRunner.mock.calls[0]?.[0].args).toEqual([
-      'exec',
-      'resume',
-      '--json',
-      'thread-1',
-      expect.stringContaining('Continuation guidance')
-    ]);
-    expect(String(execRunner.mock.calls[0]?.[0].args[4] ?? '')).toContain(
+    expect(execRunner).not.toHaveBeenCalled();
+    expect(appServerTurnRunner).toHaveBeenCalledTimes(1);
+    expect(appServerTurnRunner.mock.calls[0]?.[0]).toMatchObject({
+      args: ['app-server'],
+      resumeThreadId: 'thread-1'
+    });
+    expect(String(appServerTurnRunner.mock.calls[0]?.[0].prompt ?? '')).toContain(
+      'Continuation guidance'
+    );
+    expect(String(appServerTurnRunner.mock.calls[0]?.[0].prompt ?? '')).toContain(
       'logical resident turn #21'
     );
     expect(proof).toMatchObject({
@@ -7547,6 +7676,185 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(secondHydration.offset_bytes).toBeGreaterThan(firstHydration.offset_bytes);
   });
 
+  it('seeds app-server delta buffers from proof when hydration resumes mid-message', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    await writeFile(proofPath, JSON.stringify(buildInProgressProof({ last_event: null })), 'utf8');
+
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    await mkdir(sessionDir, { recursive: true });
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-1.jsonl');
+    const firstSessionLog = [
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.000Z',
+        type: 'session_meta',
+        payload: {
+          id: 'thread-1',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        }
+      }),
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.050Z',
+        type: 'turn_context',
+        payload: { turn_id: 'turn-1' }
+      }),
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.100Z',
+        type: 'notification',
+        method: 'item/agentMessage/delta',
+        params: {
+          threadId: 'thread-1',
+          turnId: 'turn-1',
+          itemId: 'msg-1',
+          delta: 'app-server '
+        }
+      })
+    ].join('\n');
+    await writeFile(sessionLogPath, firstSessionLog, 'utf8');
+
+    const firstRefresh = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:10.000Z',
+      async (path, proof) => await writeFile(path, `${JSON.stringify(proof, null, 2)}\n`, 'utf8'),
+      {
+        CODEX_HOME: tempRoot!
+      }
+    );
+    const firstHydration = await readPersistedSessionLogHydrationState(hydrationPath);
+    expect(firstRefresh).toMatchObject({
+      latest_turn_id: 'turn-1',
+      last_message: 'app-server ',
+      last_message_source: 'agent_message_delta',
+      last_message_delta_key: 'thread-1:turn-1:msg-1'
+    });
+
+    const secondSessionLog = [
+      firstSessionLog,
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.200Z',
+        type: 'notification',
+        method: 'item/agentMessage/delta',
+        params: {
+          threadId: 'thread-1',
+          turnId: 'turn-1',
+          itemId: 'msg-1',
+          delta: 'turn complete'
+        }
+      })
+    ].join('\n');
+    await writeFile(sessionLogPath, secondSessionLog, 'utf8');
+
+    const secondRefresh = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:20.000Z',
+      async (path, proof) => await writeFile(path, `${JSON.stringify(proof, null, 2)}\n`, 'utf8'),
+      {
+        CODEX_HOME: tempRoot!
+      }
+    );
+    const secondHydration = await readPersistedSessionLogHydrationState(hydrationPath);
+
+    expect(secondRefresh).toMatchObject({
+      latest_turn_id: 'turn-1',
+      last_message: 'app-server turn complete',
+      last_message_source: 'agent_message_delta',
+      last_message_delta_key: 'thread-1:turn-1:msg-1'
+    });
+    expect(secondHydration).toEqual({
+      path: sessionLogPath,
+      offset_bytes: Buffer.byteLength(secondSessionLog, 'utf8'),
+      trailing_text: '',
+      bootstrap_pending: false,
+      proof_signature: expect.any(String)
+    });
+    expect(secondHydration.offset_bytes).toBeGreaterThan(firstHydration.offset_bytes);
+  });
+
+  it('does not seed app-server delta hydration across assistant message items', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    await writeFile(proofPath, JSON.stringify(buildInProgressProof({ last_event: null })), 'utf8');
+
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    await mkdir(sessionDir, { recursive: true });
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-1.jsonl');
+    const firstSessionLog = [
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.000Z',
+        type: 'session_meta',
+        payload: {
+          id: 'thread-1',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        }
+      }),
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.050Z',
+        type: 'turn_context',
+        payload: { turn_id: 'turn-1' }
+      }),
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.100Z',
+        type: 'notification',
+        method: 'item/agentMessage/delta',
+        params: {
+          threadId: 'thread-1',
+          turnId: 'turn-1',
+          itemId: 'msg-1',
+          delta: 'first message'
+        }
+      })
+    ].join('\n');
+    await writeFile(sessionLogPath, firstSessionLog, 'utf8');
+
+    await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:10.000Z',
+      async (path, proof) => await writeFile(path, `${JSON.stringify(proof, null, 2)}\n`, 'utf8'),
+      {
+        CODEX_HOME: tempRoot!
+      }
+    );
+
+    const secondSessionLog = [
+      firstSessionLog,
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.200Z',
+        type: 'notification',
+        method: 'item/agentMessage/delta',
+        params: {
+          threadId: 'thread-1',
+          turnId: 'turn-1',
+          itemId: 'msg-2',
+          delta: 'second message'
+        }
+      })
+    ].join('\n');
+    await writeFile(sessionLogPath, secondSessionLog, 'utf8');
+
+    const secondRefresh = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:20.000Z',
+      async (path, proof) => await writeFile(path, `${JSON.stringify(proof, null, 2)}\n`, 'utf8'),
+      {
+        CODEX_HOME: tempRoot!
+      }
+    );
+
+    expect(secondRefresh).toMatchObject({
+      latest_turn_id: 'turn-1',
+      last_message: 'second message',
+      last_message_source: 'agent_message_delta',
+      last_message_delta_key: 'thread-1:turn-1:msg-2'
+    });
+  });
+
   it('persists canonical current-turn activity from session-log hydration across refreshes', async () => {
     const { runDir } = await createManifestRoot();
     const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
@@ -9165,6 +9473,1161 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(execRunner.mock.calls[0]?.[0].env.CODEX_NON_INTERACTIVE).toBe('1');
     expect(execRunner.mock.calls[0]?.[0].env.CODEX_NO_INTERACTIVE).toBe('1');
     expect(execRunner.mock.calls[0]?.[0].env.CODEX_INTERACTIVE).toBe('0');
+  });
+
+  it('uses app-server JSONL as the authoritative provider-worker control plane when appserver runtime is selected', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-app.jsonl');
+    const authoritativeSessionLogLines = [
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.000Z',
+        type: 'session_meta',
+        payload: {
+          id: 'thread-app',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        }
+      }),
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.050Z',
+        type: 'turn_context',
+        payload: { turn_id: 'turn-app-1' }
+      }),
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.060Z',
+        type: 'notification',
+        method: 'item/agentMessage/delta',
+        params: {
+          threadId: 'thread-app',
+          turnId: 'turn-app-1',
+          itemId: 'msg-authoritative',
+          delta: 'app-server '
+        }
+      }),
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.070Z',
+        type: 'notification',
+        method: 'item/agentMessage/delta',
+        params: {
+          threadId: 'thread-app',
+          turnId: 'turn-app-1',
+          itemId: 'msg-authoritative',
+          delta: 'turn complete'
+        }
+      }),
+      JSON.stringify({
+        timestamp: '2026-03-21T09:00:00.080Z',
+        type: 'notification',
+        method: 'turn/completed',
+        params: {
+          threadId: 'thread-app',
+          turn: { id: 'turn-app-1', status: 'completed' }
+        }
+      })
+    ];
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(createTrackedIssue())
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed'
+        })
+      );
+    const execRunner = vi.fn();
+    const appServerTurnRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      await mkdir(sessionDir, { recursive: true });
+      await writeFile(sessionLogPath, authoritativeSessionLogLines.join('\n'), 'utf8');
+      request.onStdoutChunk?.(
+        [
+          '{"type":"thread.started","thread_id":"thread-app"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-app-1"}}',
+          ''
+        ].join('\n')
+      );
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-app"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-app-1"}}',
+          '{"type":"notification","method":"item/agentMessage/delta","params":{"threadId":"thread-app","turnId":"turn-app-1","itemId":"msg-stdout","delta":"stdout "}}',
+          '{"type":"notification","method":"item/agentMessage/delta","params":{"threadId":"thread-app","turnId":"turn-app-1","itemId":"msg-stdout","delta":"must not win"}}',
+          '{"type":"notification","method":"item/completed","params":{"threadId":"thread-app","turnId":"turn-app-1","item":{"type":"message"}}}',
+          '{"type":"notification","method":"turn/completed","params":{"threadId":"thread-app","turn":{"id":"turn-app-1","status":"completed"}}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_HOME: tempRoot ?? undefined
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () => createAppServerRuntimeContext()),
+        execRunner,
+        appServerTurnRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(execRunner).not.toHaveBeenCalled();
+    expect(appServerTurnRunner).toHaveBeenCalledTimes(1);
+    expect(appServerTurnRunner.mock.calls[0]?.[0]).toMatchObject({
+      args: ['app-server'],
+      cwd: tempRoot,
+      resumeThreadId: null
+    });
+    expect(String(appServerTurnRunner.mock.calls[0]?.[0].prompt)).toContain(
+      'full first-turn task prompt'
+    );
+    expect(proof).toMatchObject({
+      thread_id: 'thread-app',
+      latest_turn_id: 'turn-app-1',
+      last_message: 'app-server turn complete',
+      last_message_source: 'agent_message_delta',
+      owner_status: 'succeeded',
+      end_reason: 'issue_inactive',
+      worker_control: {
+        authority: 'appserver',
+        transport: 'app-server-jsonl',
+        normal_start_method: 'thread/start + turn/start',
+        resume_method: 'thread/resume + turn/start',
+        drain_method: 'turn/completed notification',
+        restart_method: 'thread/resume from recorded thread_id',
+        state_read_model: 'provider-linear-worker-proof',
+        break_glass: false
+      },
+      appserver_supervision: {
+        supervision_command: 'appserver_thread_start'
+      }
+    });
+    await writeFile(
+      sessionLogPath,
+      [
+        ...authoritativeSessionLogLines,
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.100Z',
+          type: 'notification',
+          method: 'thread/tokenUsage/updated',
+          params: {
+            tokenUsage: {
+              total: { inputTokens: 18, outputTokens: 6, totalTokens: 24 }
+            }
+          }
+        })
+      ].join('\n'),
+      'utf8'
+    );
+    const refreshedProof = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      join(runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME),
+      () => '2026-03-21T09:00:02.000Z',
+      undefined,
+      {
+        CODEX_HOME: tempRoot ?? undefined
+      }
+    );
+    expect(refreshedProof).toMatchObject({
+      last_event: 'thread/tokenUsage/updated',
+      last_message: 'app-server turn complete',
+      last_message_source: 'agent_message_delta'
+    });
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>;
+    expect(manifest).toMatchObject({
+      runtime_mode_requested: 'appserver',
+      runtime_mode: 'appserver',
+      runtime_provider: 'AppServerRuntimeProvider',
+      provider_worker_control: {
+        authority: 'appserver',
+        transport: 'app-server-jsonl',
+        state_read_model: 'provider-linear-worker-proof'
+      }
+    });
+  });
+
+  it('deduplicates app-server streamed deltas seen from stdout and session-log hydration', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-app.jsonl');
+    const execRunner = vi.fn();
+    const appServerTurnRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      const liveLines = [
+        '{"type":"thread.started","thread_id":"thread-app"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-app-1"}}',
+        '{"type":"notification","method":"item/agentMessage/delta","params":{"threadId":"thread-app","turnId":"turn-app-1","itemId":"msg-1","delta":"app-server "}}',
+        '{"type":"notification","method":"item/agentMessage/delta","params":{"threadId":"thread-app","turnId":"turn-app-1","itemId":"msg-1","delta":"turn complete"}}'
+      ];
+      for (const line of liveLines) {
+        request.onStdoutChunk?.(`${line}\n`);
+      }
+      await mkdir(sessionDir, { recursive: true });
+      await writeFile(
+        sessionLogPath,
+        [
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:00.000Z',
+            type: 'session_meta',
+            payload: {
+              id: 'thread-app',
+              cwd: tempRoot,
+              initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+            }
+          }),
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:00.050Z',
+            type: 'turn_context',
+            payload: { turn_id: 'turn-app-1' }
+          }),
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:00.100Z',
+            type: 'notification',
+            method: 'item/agentMessage/delta',
+            params: {
+              threadId: 'thread-app',
+              turnId: 'turn-app-1',
+              itemId: 'msg-1',
+              delta: 'app-server '
+            }
+          }),
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:00.200Z',
+            type: 'notification',
+            method: 'item/agentMessage/delta',
+            params: {
+              threadId: 'thread-app',
+              turnId: 'turn-app-1',
+              itemId: 'msg-1',
+              delta: 'turn complete'
+            }
+          })
+        ].join('\n'),
+        'utf8'
+      );
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      throw new Error('app-server failed after duplicate stream');
+    });
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+          CODEX_HOME: tempRoot ?? undefined
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+          resolveRuntimeContext: vi.fn(async () => createAppServerRuntimeContext()),
+          execRunner,
+          appServerTurnRunner,
+          sleep: async () => {
+            await new Promise((resolve) => setTimeout(resolve, 1));
+          },
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:01.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      )
+    ).rejects.toThrow('app-server failed after duplicate stream');
+
+    expect(execRunner).not.toHaveBeenCalled();
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      thread_id: 'thread-app',
+      latest_turn_id: 'turn-app-1',
+      last_message: 'app-server turn complete',
+      last_message_source: 'agent_message_delta',
+      last_message_delta_key: 'thread-app:turn-app-1:msg-1',
+      owner_status: 'failed',
+      end_reason: 'appserver_runtime_error'
+    });
+  }, 20_000);
+
+  it('answers app-server callback requests with provider-worker control decisions', () => {
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/commandExecution/requestApproval', {
+        availableDecisions: ['decline', 'accept']
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'accept' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/commandExecution/requestApproval', {
+        availableDecisions: ['decline']
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'decline' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/commandExecution/requestApproval', {
+        availableDecisions: ['cancel']
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'cancel' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/commandExecution/requestApproval', {
+        availableDecisions: ['acceptForSession', 'decline']
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'decline' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/commandExecution/requestApproval', {
+        availableDecisions: ['acceptForSession']
+      })
+    ).toEqual({
+      kind: 'error',
+      error: {
+        code: -32000,
+        message:
+          'Provider worker app-server control has no safe offered decision for item/commandExecution/requestApproval.'
+      }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/commandExecution/requestApproval', {
+        availableDecisions: ['decline', 'accept'],
+        additionalPermissions: {
+          network: { enabled: true }
+        }
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'decline' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/commandExecution/requestApproval', {
+        availableDecisions: ['decline', 'accept'],
+        additionalPermissions: {
+          network: {}
+        }
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'decline' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/commandExecution/requestApproval', {
+        availableDecisions: ['decline', 'accept'],
+        networkApprovalContext: {}
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'decline' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/commandExecution/requestApproval', {
+        availableDecisions: ['decline', 'accept'],
+        additionalPermissions: {
+          network: false,
+          fileSystem: false
+        }
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'accept' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/fileChange/requestApproval')
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'accept' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/fileChange/requestApproval', {
+        availableDecisions: ['acceptForSession', 'decline']
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'decline' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/fileChange/requestApproval', {
+        availableDecisions: ['acceptForSession']
+      })
+    ).toEqual({
+      kind: 'error',
+      error: {
+        code: -32000,
+        message:
+          'Provider worker app-server control has no safe offered decision for item/fileChange/requestApproval.'
+      }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/fileChange/requestApproval', {
+        availableDecisions: ['cancel']
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'cancel' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/fileChange/requestApproval', {
+        grantRoot: '/tmp/workspace'
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'decline' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/fileChange/requestApproval', {
+        grantRoot: '/tmp/workspace',
+        availableDecisions: ['cancel']
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'cancel' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/fileChange/requestApproval', {
+        grantRoot: false
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'accept' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/permissions/requestApproval', {
+        permissions: {
+          network: { enabled: true },
+          fileSystem: {
+            read: ['/tmp/read'],
+            write: ['/tmp/write'],
+            globScanMaxDepth: 3
+          }
+        }
+      })
+    ).toEqual({
+      kind: 'result',
+      result: {
+        permissions: {},
+        scope: 'turn',
+        strictAutoReview: false
+      }
+    });
+    expect(buildProviderLinearWorkerAppServerCallbackResponse('applyPatchApproval')).toEqual({
+      kind: 'result',
+      result: { decision: 'approved' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('applyPatchApproval', {
+        grantRoot: '/tmp/workspace'
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'denied' }
+    });
+    expect(buildProviderLinearWorkerAppServerCallbackResponse('execCommandApproval')).toEqual({
+      kind: 'result',
+      result: { decision: 'approved' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('execCommandApproval', {
+        additionalPermissions: {
+          network: true
+        }
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'denied' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('execCommandApproval', {
+        additionalPermissions: {
+          network: {}
+        }
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'denied' }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('execCommandApproval', {
+        additionalPermissions: {
+          network: false,
+          fileSystem: false
+        }
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { decision: 'approved' }
+    });
+    expect(buildProviderLinearWorkerAppServerCallbackResponse('mcpServer/elicitation/request')).toEqual({
+      kind: 'result',
+      result: {
+        action: 'decline',
+        content: null,
+        _meta: null
+      }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/tool/requestUserInput', {
+        questions: [{ id: 'q-1' }]
+      })
+    ).toEqual({
+      kind: 'result',
+      result: { answers: { 'q-1': { answers: [] } } }
+    });
+    expect(
+      buildProviderLinearWorkerAppServerCallbackResponse('item/tool/call', {
+        tool: 'unknownTool'
+      })
+    ).toEqual({
+      kind: 'result',
+      result: {
+        contentItems: [
+          {
+            type: 'inputText',
+            text: 'Provider worker app-server control has no client implementation for dynamic tool unknownTool.'
+          }
+        ],
+        success: false
+      }
+    });
+    expect(buildProviderLinearWorkerAppServerCallbackResponse('account/chatgptAuthTokens/refresh')).toEqual({
+      kind: 'error',
+      error: {
+        code: -32001,
+        message: 'Provider worker app-server control cannot refresh ChatGPT auth tokens.'
+      }
+    });
+  });
+
+  it('routes app-server server requests by method before pending client response ids', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-provider-appserver-callback-'));
+    extraTempRoots.push(root);
+    const scriptPath = join(root, 'fake-app-server.mjs');
+    await writeFile(
+      scriptPath,
+      `
+import readline from 'node:readline';
+
+const rl = readline.createInterface({ input: process.stdin });
+let initializeRequestId = null;
+let callbackAnswered = false;
+let initialized = false;
+const failTimer = setTimeout(() => {
+  console.error('callback response missing');
+  process.exit(2);
+}, 2_000);
+
+for await (const line of rl) {
+  const message = JSON.parse(line);
+  if (message.method === 'initialize') {
+    initializeRequestId = message.id;
+    process.stdout.write(JSON.stringify({
+      id: message.id,
+      method: 'item/commandExecution/requestApproval',
+      params: { availableDecisions: ['decline'] }
+    }) + '\\n');
+    continue;
+  }
+  if (!message.method && message.id === initializeRequestId) {
+    if (message.result?.decision !== 'decline') {
+      console.error('unexpected callback decision: ' + JSON.stringify(message.result));
+      process.exit(3);
+    }
+    callbackAnswered = true;
+    process.stdout.write(JSON.stringify({ id: initializeRequestId, result: {} }) + '\\n');
+    continue;
+  }
+  if (message.method === 'initialized') {
+    initialized = true;
+    continue;
+  }
+  if (message.method === 'thread/start') {
+    if (!callbackAnswered || !initialized) {
+      console.error('thread start before callback completion');
+      process.exit(4);
+    }
+    process.stdout.write(JSON.stringify({
+      id: message.id,
+      result: { thread: { id: 'thread-callback' } }
+    }) + '\\n');
+    continue;
+  }
+  if (message.method === 'turn/start') {
+    process.stdout.write(JSON.stringify({
+      id: message.id,
+      result: { turn: { id: 'turn-callback', status: 'inProgress' } }
+    }) + '\\n');
+    process.stdout.write(JSON.stringify({
+      method: 'turn/completed',
+      params: {
+        threadId: 'thread-callback',
+        turn: { id: 'turn-callback', status: 'completed' }
+      }
+    }) + '\\n');
+    clearTimeout(failTimer);
+    continue;
+  }
+}
+`
+    );
+
+    const result = await defaultAppServerTurnRunner({
+      command: process.execPath,
+      args: [scriptPath],
+      cwd: root,
+      env: process.env,
+      prompt: 'complete callback-routing canary',
+      resumeThreadId: null
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('"thread_id":"thread-callback"');
+    expect(result.stdout).toContain('"turn_id":"turn-callback"');
+    expect(result.stdout).toContain('"method":"item/commandExecution/requestApproval"');
+  });
+
+  it('treats app-server process close after a completed turn notification as success', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-provider-appserver-close-after-complete-'));
+    extraTempRoots.push(root);
+    const scriptPath = join(root, 'fake-app-server-close-after-complete.mjs');
+    await writeFile(
+      scriptPath,
+      `
+import readline from 'node:readline';
+
+const rl = readline.createInterface({ input: process.stdin });
+const send = (payload) => process.stdout.write(JSON.stringify(payload) + '\\n');
+
+for await (const line of rl) {
+  const message = JSON.parse(line);
+  if (message.method === 'initialize') {
+    send({ id: message.id, result: {} });
+    continue;
+  }
+  if (message.method === 'initialized') {
+    continue;
+  }
+  if (message.method === 'thread/start') {
+    send({ id: message.id, result: { thread: { id: 'thread-close' } } });
+    continue;
+  }
+  if (message.method === 'turn/start') {
+    send({ id: message.id, result: { turn: { id: 'turn-close', status: 'inProgress' } } });
+    send({
+      method: 'turn/completed',
+      params: {
+        threadId: 'thread-close',
+        turn: { id: 'turn-close', status: 'completed' }
+      }
+    });
+    process.stdout.end(() => process.exit(0));
+    continue;
+  }
+}
+`
+    );
+
+    const result = await defaultAppServerTurnRunner({
+      command: process.execPath,
+      args: [scriptPath],
+      cwd: root,
+      env: process.env,
+      prompt: 'complete close-after-turn canary',
+      resumeThreadId: null
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('"turn_id":"turn-close"');
+  });
+
+  it('preserves app-server terminal turn failure details in runner stderr and diagnostics', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-provider-appserver-failed-turn-'));
+    extraTempRoots.push(root);
+    const scriptPath = join(root, 'fake-app-server-failed-turn.mjs');
+    await writeFile(
+      scriptPath,
+      `
+import readline from 'node:readline';
+
+const rl = readline.createInterface({ input: process.stdin });
+
+for await (const line of rl) {
+  const message = JSON.parse(line);
+  if (message.method === 'initialize') {
+    process.stdout.write(JSON.stringify({ id: message.id, result: {} }) + '\\n');
+    continue;
+  }
+  if (message.method === 'initialized') {
+    continue;
+  }
+  if (message.method === 'thread/start') {
+    process.stdout.write(JSON.stringify({
+      id: message.id,
+      result: { thread: { id: 'thread-failed' } }
+    }) + '\\n');
+    continue;
+  }
+  if (message.method === 'turn/start') {
+    process.stdout.write(JSON.stringify({
+      id: message.id,
+      result: { turn: { id: 'turn-failed', status: 'inProgress' } }
+    }) + '\\n');
+    process.stdout.write(JSON.stringify({
+      method: 'turn/completed',
+      params: {
+        threadId: 'thread-failed',
+        turn: {
+          id: 'turn-failed',
+          status: 'failed',
+          error: {
+            message: 'turn failed',
+            additionalDetails: 'model stream closed before final response'
+          }
+        }
+      }
+    }) + '\\n');
+    continue;
+  }
+}
+`
+    );
+
+    const result = await defaultAppServerTurnRunner({
+      command: process.execPath,
+      args: [scriptPath],
+      cwd: root,
+      env: process.env,
+      prompt: 'complete failed-turn canary',
+      resumeThreadId: null
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      'app-server turn turn-failed failed: turn failed; model stream closed before final response'
+    );
+    expect(result.stdout).toContain('"status":"appserver_runtime_error"');
+    expect(result.stdout).toContain('model stream closed before final response');
+  });
+
+  it('preserves app-server stderr when the process exits before turn completion', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-provider-appserver-early-exit-'));
+    extraTempRoots.push(root);
+    const scriptPath = join(root, 'fake-app-server-early-exit.mjs');
+    await writeFile(
+      scriptPath,
+      `
+import readline from 'node:readline';
+
+const rl = readline.createInterface({ input: process.stdin });
+
+for await (const line of rl) {
+  const message = JSON.parse(line);
+  if (message.method === 'initialize') {
+    process.stdout.write(JSON.stringify({ id: message.id, result: {} }) + '\\n');
+    process.stderr.write('protocol pipe closed after initialize\\n');
+    process.exit(7);
+  }
+}
+`
+    );
+
+    await expect(
+      defaultAppServerTurnRunner({
+        command: process.execPath,
+        args: [scriptPath],
+        cwd: root,
+        env: process.env,
+        prompt: 'early exit canary',
+        resumeThreadId: null
+      })
+    ).rejects.toThrow(/protocol pipe closed after initialize/u);
+  });
+
+  it('keeps codex exec as labeled break-glass control when appserver falls back to cli', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(createTrackedIssue())
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed'
+        })
+      );
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-cli"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-cli-1"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-cli-1"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+    const appServerTurnRunner = vi.fn();
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_CLOUD_ENV_ID: 'env-appserver-fallback'
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () =>
+          createRuntimeContext({
+            requested_mode: 'appserver',
+            selected_mode: 'cli',
+            provider: 'CliRuntimeProvider',
+            fallback: {
+              occurred: true,
+              code: 'appserver_unavailable',
+              reason: 'codex app-server unavailable',
+              from_mode: 'appserver',
+              to_mode: 'cli',
+              checked_at: '2026-03-21T09:00:00.000Z'
+            }
+          })
+        ),
+        execRunner,
+        appServerTurnRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(appServerTurnRunner).not.toHaveBeenCalled();
+    expect(execRunner).toHaveBeenCalledTimes(1);
+    expect(execRunner.mock.calls[0]?.[0].args).toEqual([
+      'exec',
+      '--json',
+      expect.stringContaining('full first-turn task prompt')
+    ]);
+    expect(proof.worker_control).toMatchObject({
+      authority: 'legacy_cli_break_glass',
+      transport: 'codex-exec-jsonl',
+      fallback_occurred: true,
+      fallback_code: 'appserver_unavailable',
+      normal_start_method: 'codex exec',
+      resume_method: 'codex exec resume',
+      drain_method: 'process exit',
+      break_glass: true,
+      break_glass_reason: 'runtime_fallback:appserver_unavailable'
+    });
+    expect(proof.appserver_supervision).toMatchObject({
+      selected_runtime: {
+        requested_mode: 'appserver',
+        selected_mode: 'cli',
+        provider: 'CliRuntimeProvider',
+        fallback: {
+          occurred: true,
+          code: 'appserver_unavailable',
+          from_mode: 'appserver',
+          to_mode: 'cli'
+        }
+      },
+      supervision_command: 'codex_exec',
+      sticky_environment_id: 'env-appserver-fallback',
+      sticky_environment_status: 'proven',
+      sticky_environment_blocker: null,
+      turn_persistence_status: 'blocked',
+      turn_persistence_blocker: 'session_log_hydration_missing',
+      resume_status: 'not_requested',
+      resume_blocker: null,
+      pagination_status: 'blocked',
+      fork_status: 'blocked',
+      jsonl_truth_retained: true,
+      session_log_truth_retained: false
+    });
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>;
+    expect(manifest).toMatchObject({
+      runtime_mode_requested: 'appserver',
+      runtime_mode: 'cli',
+      runtime_provider: 'CliRuntimeProvider',
+      provider_worker_control: {
+        authority: 'legacy_cli_break_glass',
+        transport: 'codex-exec-jsonl',
+        fallback_code: 'appserver_unavailable',
+        break_glass: true
+      }
+    });
+  });
+
+  it('resumes resident provider-worker continuity through app-server thread/resume', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const issue = createTrackedIssue();
+    const completedIssue = createTrackedIssue({
+      state: 'Done',
+      state_type: 'completed'
+    });
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(issue)
+      .mockResolvedValueOnce(issue)
+      .mockResolvedValueOnce(completedIssue);
+    let callCount = 0;
+    const appServerTurnRunner = vi.fn(async (request) => {
+      callCount += 1;
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+        turnIndex: callCount,
+        recordedAtBase: callCount === 1 ? '2026-03-21T09:00:00.000Z' : '2026-03-21T09:01:00.000Z'
+      });
+      return {
+        exitCode: 0,
+        stdout:
+          callCount === 1
+            ? [
+                '{"type":"thread.started","thread_id":"thread-app"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-app-1"}}',
+                '{"type":"notification","method":"turn/completed","params":{"threadId":"thread-app","turn":{"id":"turn-app-1","status":"completed"}}}'
+              ].join('\n')
+            : [
+                '{"type":"thread.started","thread_id":"thread-app"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-app-2"}}',
+                '{"type":"notification","method":"turn/completed","params":{"threadId":"thread-app","turn":{"id":"turn-app-2","status":"completed"}}}'
+              ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '2'
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () => createAppServerRuntimeContext()),
+        execRunner: vi.fn(),
+        appServerTurnRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:01:00.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(appServerTurnRunner).toHaveBeenCalledTimes(2);
+    expect(appServerTurnRunner.mock.calls[0]?.[0].resumeThreadId).toBeNull();
+    expect(appServerTurnRunner.mock.calls[1]?.[0].resumeThreadId).toBe('thread-app');
+    expect(proof).toMatchObject({
+      thread_id: 'thread-app',
+      latest_turn_id: 'turn-app-2',
+      latest_session_id: 'thread-app-turn-app-2',
+      owner_status: 'succeeded',
+      end_reason: 'issue_inactive',
+      worker_control: {
+        authority: 'appserver',
+        resume_method: 'thread/resume + turn/start'
+      }
+    });
+  });
+
+  it('restarts resident provider-worker continuity through app-server thread/resume on a seeded first turn', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const appServerTurnRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+        turnIndex: 1
+      });
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-21"}}',
+          '{"type":"notification","method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-21","status":"completed"}}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        [PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV]: JSON.stringify({
+          source_run_id: 'run-prev',
+          source_updated_at: '2026-03-21T08:59:59.000Z',
+          source_end_reason: 'max_turns_reached_issue_still_active',
+          source_thread_id: 'thread-1',
+          logical_turn_count: 20,
+          restart_count: 1
+        })
+      },
+      {
+        readTrackedIssue: vi.fn(async () =>
+          createTrackedIssue({
+            state: 'Merging',
+            state_type: 'started',
+            assignee_id: null,
+            assignee_name: null
+          })
+        ),
+        resolveRuntimeContext: vi.fn(async () => createAppServerRuntimeContext()),
+        execRunner: vi.fn(),
+        appServerTurnRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(appServerTurnRunner).toHaveBeenCalledTimes(1);
+    expect(appServerTurnRunner.mock.calls[0]?.[0].resumeThreadId).toBe('thread-1');
+    expect(String(appServerTurnRunner.mock.calls[0]?.[0].prompt)).toContain(
+      'logical resident turn #21'
+    );
+    expect(proof).toMatchObject({
+      thread_id: 'thread-1',
+      latest_turn_id: 'turn-21',
+      latest_session_id: 'thread-1-turn-21',
+      owner_status: 'succeeded',
+      end_reason: 'max_turns_reached_issue_still_active',
+      worker_control: {
+        authority: 'appserver',
+        restart_method: 'thread/resume from recorded thread_id'
+      },
+      resident_session: {
+        logical_turn_count: 21,
+        restart_count: 1,
+        continuity_state: 'guarded_resume_active',
+        source_run_id: 'run-prev',
+        source_thread_id: 'thread-1'
+      }
+    });
+  });
+
+  it('fails closed on app-server control errors without silently falling back to codex exec', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const execRunner = vi.fn();
+    const appServerTurnRunner = vi.fn(async () => {
+      throw new Error('app-server turn failed: transport closed');
+    });
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+          resolveRuntimeContext: vi.fn(async () => createAppServerRuntimeContext()),
+          execRunner,
+          appServerTurnRunner,
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:01.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      )
+    ).rejects.toThrow('app-server turn failed');
+
+    expect(execRunner).not.toHaveBeenCalled();
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      owner_phase: 'ended',
+      owner_status: 'failed',
+      end_reason: 'appserver_runtime_error',
+      worker_control: {
+        authority: 'appserver',
+        transport: 'app-server-jsonl',
+        break_glass: false
+      },
+      failure_diagnosis: {
+        diagnostic_category: 'provider_runtime'
+      }
+    });
+  });
+
+  it('classifies app-server terminal failed exits as appserver runtime failures with protocol details', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const execRunner = vi.fn();
+    const appServerTurnRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 1,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-app"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-app-1"}}',
+          '{"type":"notification","method":"turn/completed","params":{"threadId":"thread-app","turn":{"id":"turn-app-1","status":"failed","error":{"message":"model stream closed before final response"}}}}'
+        ].join('\n'),
+        stderr: 'app-server turn turn-app-1 failed: model stream closed before final response'
+      };
+    });
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+          resolveRuntimeContext: vi.fn(async () => createAppServerRuntimeContext()),
+          execRunner,
+          appServerTurnRunner,
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:01.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      )
+    ).rejects.toThrow('exit code 1');
+
+    expect(execRunner).not.toHaveBeenCalled();
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      owner_phase: 'ended',
+      owner_status: 'failed',
+      end_reason: 'appserver_runtime_error',
+      failure_diagnosis: {
+        diagnostic_category: 'provider_runtime',
+        source: 'appserver_runner',
+        signal: expect.stringContaining('model stream closed before final response')
+      }
+    });
   });
 
   it('pins the live worker lineage into turn env and clears stale control-host locator env', async () => {
@@ -14450,7 +15913,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       {
         readTrackedIssue: vi.fn(async () => issue),
         resolveRuntimeContext: vi.fn(async () => createAppServerRuntimeContext()),
-        execRunner,
+        appServerTurnRunner: execRunner,
         writeProof,
         now: vi
           .fn()
@@ -15069,7 +16532,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       {
         readTrackedIssue,
         resolveRuntimeContext: vi.fn(async () => createAppServerRuntimeContext()),
-        execRunner,
+        appServerTurnRunner: execRunner,
         writeProof,
         now: vi
           .fn()
@@ -15182,7 +16645,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       {
         readTrackedIssue,
         resolveRuntimeContext: vi.fn(async () => createAppServerRuntimeContext()),
-        execRunner,
+        appServerTurnRunner: execRunner,
         writeProof,
         now: vi
           .fn()

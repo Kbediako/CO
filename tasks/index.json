@@ -17,6 +17,33 @@
       }
     },
     {
+      "id": "20260426-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba",
+      "title": "CO: promote resident app-server seam to authoritative provider-worker control plane",
+      "relates_to": "tasks/tasks-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-26",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-26",
+          "status": "accepted_and_parent_reconciled",
+          "manifest": ".runs/linear-358ad1ac-46e4-4eaa-a610-b983dac28aba/cli/2026-04-26T03-48-02-269Z-9be693a5/manifest.json",
+          "source_anchor": "ctx:sha256:1d9326aedeb79238be318d1be827130d7e533ba7c4b559c24f7f31873770193c#chunk:c000001",
+          "summary": "Docs-first packet created by the bounded docs child lane for CO-389 and accepted by the parent lane. Parent verified source-0 payload `.runs/linear-358ad1ac-46e4-4eaa-a610-b983dac28aba/cli/2026-04-26T03-48-02-269Z-9be693a5/memory/source-0/source.txt` and reconciled the packet to source anchor `ctx:sha256:1d9326aedeb79238be318d1be827130d7e533ba7c4b559c24f7f31873770193c#chunk:c000001`. The packet preserves the protected contract for provider-worker control paths, control-host read models, runtime proof, exec/resume fallback posture, continuity canaries, failure semantics, and rollback behavior. Parent owns Linear/workpad state, implementation, validation, PR lifecycle, and wider mirrors outside child file scope.",
+          "source_payload": ".runs/linear-358ad1ac-46e4-4eaa-a610-b983dac28aba/cli/2026-04-26T03-48-02-269Z-9be693a5/memory/source-0/source.txt"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md",
+        "task": "tasks/tasks-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md",
+        "docs": "docs/TECH_SPEC-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md",
+        "agent_task": ".agent/task/linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md"
+      }
+    },
+    {
       "id": "20260426-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25",
       "title": "CO-380 authoritative review gate",
       "relates_to": "tasks/tasks-linear-f76b2a52-f0a5-4145-8d21-3e4f23a98d25.md",
