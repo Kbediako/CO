@@ -21,12 +21,12 @@ jobs:
       CODEX_CLOUD_CANARY_REQUIRED: ${{ github.event_name != 'pull_request' && secrets.CODEX_CLOUD_ENV_ID != '' && (secrets.CODEX_API_KEY != '' || secrets.OPENAI_API_KEY != '') && '1' || '0' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
@@ -65,7 +65,7 @@ jobs:
 
       - name: Upload cloud canary artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cloud-canary-${{ github.run_id }}
           path: |

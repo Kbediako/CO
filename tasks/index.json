@@ -1,6 +1,35 @@
 {
   "items": [
     {
+      "id": "20260425-linear-cb51b492-6f6e-4eca-a9a2-589833218f80",
+      "title": "CO workflows: upgrade Node 20 GitHub Actions before Node 24 runner switch",
+      "relates_to": "tasks/tasks-linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-25",
+      "approvals": {
+        "same_issue_child_lane": {
+          "reviewer": "bounded same-issue tests child lane",
+          "date": "2026-04-25",
+          "status": "succeeded-advisory-zero-byte-patch",
+          "manifest": ".runs/linear-cb51b492-6f6e-4eca-a9a2-589833218f80-workflow-scan/cli/2026-04-25T17-49-36-168Z-9fad0145/manifest.json",
+          "summary": "workflow-scan inspected all 9 .github/workflows files and 20 uses references; parent owns implementation and final post-change scan because the lane produced no accepted patch."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md",
+        "task": "tasks/tasks-linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md",
+        "agent_task": ".agent/task/linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md"
+        }
+      }
+    },
+    {
       "id": "20260426-linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f",
       "title": "CO-374 archive Core Lane dispatch discovery break",
       "relates_to": "tasks/tasks-linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md",
@@ -6989,7 +7018,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-26",
+      "last_review": "2026-04-26",
       "paths": {
         "spec": "tasks/specs/linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",
         "task": "tasks/tasks-linear-df2bd49b-2dd6-413f-8d90-af40d033dace.md",

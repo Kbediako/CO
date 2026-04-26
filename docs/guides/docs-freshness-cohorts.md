@@ -278,3 +278,16 @@ CO-352 replayed onto current `origin/main` on Apr 25 and reproduced a date-bound
 
 ### Rolling Disposition
 CO-352 declares `co-343-apr-25-march-25-task-packets-1311-1318` as an in-window rolling cohort under the existing live maintenance owner `CO-343`. This does not refresh `last_review` dates or hide the debt: `docs:freshness` continues to emit the cohort in `rolling_freshness_cohorts`, and CO-343 remains responsible for resolving it by review, archive, reclassification, or a new owner path before the rolling window expires.
+
+## Apr 26 Targeted CO-21 Reviewed Refresh
+
+### Reproduction / Baseline Findings
+CO-378 reproduced the remaining Apr 26 blocker while unblocking CO-375:
+
+- `npm run docs:freshness` reported `6` stale rows, all for the completed CO-21 workpad-contract packet `linear-df2bd49b-2dd6-413f-8d90-af40d033dace`.
+- `docs:freshness:maintain` reported `blocking_changed_paths=[]` but resolved the configured maintenance owner to `CO-343`, which live Linear showed as `Done` and outside the configured project.
+- The original CO-378 missing-path blocker for `linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb` no longer reproduced on current `origin/main`.
+- Live CO-21 evidence showed PR `#304` merged, the issue state is `Done`, and its single workpad comment already records terminal closeout and validation.
+
+### Post-refresh Disposition
+CO-378 reviews the CO-21 terminal packet directly instead of changing rolling policy, increasing caps, or hiding the debt under terminal `CO-343`. The exact CO-21 registry rows plus matching spec/task-index review dates are refreshed to `last_review=2026-04-26`; stale specs `0955` and `0956` are also refreshed as the hard spec-guard tail for this branch.
