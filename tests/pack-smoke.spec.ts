@@ -1235,7 +1235,7 @@ describe('scripts/pack-smoke marketplace coverage contract', () => {
     const publishJob = workflow.jobs?.publish;
     expect(publishJob, 'release workflow must define a publish job').toBeDefined();
     const steps = getWorkflowSteps(publishJob as WorkflowJob);
-    const setupNodeStep = steps.find((step) => step.uses === 'actions/setup-node@v4');
+    const setupNodeStep = steps.find((step) => step.uses === 'actions/setup-node@v6');
     const setupNodeWith = setupNodeStep?.with as Record<string, unknown> | undefined;
     expect(String(setupNodeWith?.['node-version']), 'publish job must pin a Node 24 build with npm 11.5.1+').toBe('24.5.0');
 

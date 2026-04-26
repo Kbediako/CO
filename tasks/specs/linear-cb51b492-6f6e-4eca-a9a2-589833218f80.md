@@ -1,0 +1,152 @@
+---
+id: 20260425-linear-cb51b492-6f6e-4eca-a9a2-589833218f80
+title: "CO workflows: upgrade Node 20 GitHub Actions before Node 24 runner switch"
+relates_to: docs/PRD-linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md
+risk: medium
+owners:
+  - Codex
+last_review: 2026-04-25
+related_action_plan: docs/ACTION_PLAN-linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md
+task_checklists:
+  - tasks/tasks-linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md
+---
+
+## Canonical Reference
+- PRD: `docs/PRD-linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md`
+- TECH_SPEC mirror: `docs/TECH_SPEC-linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md`
+- Task checklist: `tasks/tasks-linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md`
+- Parent manifest: `.runs/linear-cb51b492-6f6e-4eca-a9a2-589833218f80/cli/2026-04-25T17-47-23-480Z-e6f61136/manifest.json`
+- Child lane audit manifest: `.runs/linear-cb51b492-6f6e-4eca-a9a2-589833218f80-workflow-scan/cli/2026-04-25T17-49-36-168Z-9fad0145/manifest.json`
+- Source anchor: `ctx:sha256:c6bead4d2205d1022e06ab482206a5a2708419b83f02950ab0bdb6e1fbea2a1d#chunk:c000001`
+
+## Summary
+- Objective: upgrade CO GitHub Actions workflow action majors away from Node 20-backed runtimes before the GitHub Actions Node 24 runner switch on `2026-06-02`.
+- Scope:
+  - every workflow under `.github/workflows/**`
+  - action runtime metadata audit for all external `uses:` references
+  - workflow YAML edits for supported Node 24-compatible action majors
+  - docs-first packet, task mirrors, workflow scan artifacts, validation, and review handoff evidence
+- Constraints:
+  - preserve workflow behavior, permissions, cache behavior, artifact names/paths, release behavior, and archive PR behavior
+  - preserve explicit CI `node-version` values because those install repo runtime versions, not action runtime versions
+  - avoid unrelated workflow cleanup
+
+## Issue-Shaping Contract
+- User-request translation carried forward: CO-375 is a workflow dependency posture lane to replace Node 20-backed GitHub Actions action majors with Node 24-compatible majors before GitHub's `2026-06-02` switch.
+- Protected terms / exact artifact and surface names:
+  - `.github/workflows/**`
+  - `actions/checkout@v4`
+  - `actions/setup-node@v4`
+  - `peter-evans/create-pull-request@v6`
+  - `actions/upload-artifact@v4`
+  - `actions/download-artifact@v4`
+  - `actions/github-script@v7`
+  - `Core Lane`
+  - `Cloud Canary`
+  - `archive automation`
+  - `release`
+- Nearby wrong interpretations to reject:
+  - installed `node-version` values must be upgraded to Node 24
+  - local reusable workflow references are action runtime deprecations
+  - workflow permissions or release/archive behavior can be simplified as part of this lane
+  - only the three issue-named actions require an audit
+- Explicit non-goals carried forward:
+  - no CI installed Node version baseline change
+  - no release policy or Codex CLI target change
+  - no archive policy redesign
+  - no unrelated workflow cleanup
+
+## Parity / Alignment Matrix
+- Current truth:
+  - child audit found 20 `uses:` references across 9 workflow files
+  - `actions/checkout@v4`, `actions/setup-node@v4`, `actions/upload-artifact@v4`, `actions/download-artifact@v4`, `actions/github-script@v7`, and `peter-evans/create-pull-request@v6` declare Node 20 runtimes
+  - `peter-evans/enable-pull-request-automerge@v3` is composite, not a Node action runtime
+- Reference truth:
+  - upstream action metadata for selected replacements declares `node24`
+  - existing workflows intentionally use major tags and preserve action inputs across routine major posture bumps
+- Target truth / intended delta:
+  - checkout uses `actions/checkout@v6`
+  - setup-node uses `actions/setup-node@v6`
+  - upload-artifact uses `actions/upload-artifact@v7`
+  - download-artifact uses `actions/download-artifact@v8`
+  - github-script uses `actions/github-script@v9`
+  - create-pull-request uses `peter-evans/create-pull-request@v8`
+  - composite automerge action and local reusable workflow references remain unchanged unless validation proves a blocker
+- Explicitly out-of-scope differences:
+  - changing `node-version` values
+  - changing workflow triggers, schedules, permissions, commands, or artifact paths
+  - changing archive branch names, PR labels, auto-merge policy, or release publish policy
+
+## Readiness Gate
+- Not done if:
+  - a known Node 20-backed action major remains after implementation where a supported Node 24 major exists
+  - post-change scan is missing or does not cover all workflow files
+  - workflow behavior-sensitive inputs drift without explicit justification
+  - validation/review/elegance results are not recorded before review handoff
+- Pre-implementation issue-quality review evidence:
+  - 2026-04-25: live Linear context confirmed CO-375 was `Ready`, had no existing workpad, and no attached PR; it was moved to `In Progress` before active coding.
+  - 2026-04-25: same-issue child lane `workflow-scan` completed successfully with audit manifest `.runs/linear-cb51b492-6f6e-4eca-a9a2-589833218f80-workflow-scan/cli/2026-04-25T17-49-36-168Z-9fad0145/manifest.json`.
+  - 2026-04-25: upstream tag metadata was checked for current and target actions, confirming target selected majors declare `node24`.
+- Safeguard ownership split:
+  - parent owns Linear state/workpad, docs packet, workflow implementation, validation, review, PR lifecycle, and handoff
+  - same-issue child lane owns only the initial workflow audit report and has no accepted patch
+
+## Technical Requirements
+- Functional requirements:
+  1. Audit every `.github/workflows/**` workflow for `uses:` references.
+  2. Upgrade Node 20-backed action majors with supported Node 24 replacements:
+     - `actions/checkout@v4` -> `actions/checkout@v6`
+     - `actions/setup-node@v4` -> `actions/setup-node@v6`
+     - `actions/upload-artifact@v4` -> `actions/upload-artifact@v7`
+     - `actions/download-artifact@v4` -> `actions/download-artifact@v8`
+     - `actions/github-script@v7` -> `actions/github-script@v9`
+     - `peter-evans/create-pull-request@v6` -> `peter-evans/create-pull-request@v8`
+  3. Leave `peter-evans/enable-pull-request-automerge@v3` unchanged because it is composite and not a Node 20 action runtime.
+  4. Preserve all existing action inputs, workflow permissions, triggers, schedules, env, release publish behavior, and archive PR behavior.
+- Non-functional requirements:
+  - no new runtime dependencies
+  - minimal workflow diff
+  - machine-checkable workflow scan before and after
+- Interfaces / contracts:
+  - workflow `uses:` references are the change surface
+  - `node-version` remains the repo command runtime and is not changed by this action-runtime lane
+
+## Architecture & Data
+- Architecture / design adjustments:
+  - no orchestrator architecture changes
+  - workflow dependency posture only
+- Data model changes / migrations:
+  - none
+- External dependencies / integrations:
+  - GitHub Actions marketplace actions and upstream action metadata
+  - Linear helper for workpad/state/PR attachment
+
+## Validation Plan
+- Tests / checks:
+  - pre/post workflow action scan
+  - `node scripts/delegation-guard.mjs`
+  - `node scripts/spec-guard.mjs --dry-run`
+  - `npm run build`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run docs:check`
+  - `npm run docs:freshness`
+  - `npm run repo:stewardship`
+  - `node scripts/diff-budget.mjs`
+  - manifest-backed `codex-orchestrator review` / `npm run review` under `FORCE_CODEX_REVIEW=1`
+  - explicit elegance/minimality pass
+- Rollout verification:
+  - Core Lane workflow YAML preserves checkout full history, Node 20 install, npm cache, and command sequence
+  - Cloud Canary workflow YAML preserves canary commands and artifact upload paths
+  - Archive automation workflow YAML preserves archive branch sync, create PR inputs, and auto-merge handling
+  - Release workflow YAML preserves tag verification, tarball artifact fallback, GitHub release asset fallback, and npm publish behavior
+- Monitoring / alerts:
+  - future GitHub Actions deprecation warnings should be triaged through a similar workflow action runtime audit
+
+## Open Questions
+- None currently.
+
+## Approvals
+- Reviewer: pending standalone review
+- Date: 2026-04-25
