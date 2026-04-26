@@ -439,8 +439,7 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
           : 'ok';
   const delegationBlocksOverallStatus = delegationStatus === 'missing-config';
   const providers = inspectProviderReadiness(repoRoot, process.env);
-  const checkoutPostureBlocksOverallStatus =
-    checkoutPosture.stale_docs_may_be || (checkoutPosture.status === 'unavailable' && checkoutPosture.head !== null);
+  const checkoutPostureBlocksOverallStatus = checkoutPostureBlocksDoctorStatus(checkoutPosture);
 
   return {
     status:
@@ -548,6 +547,13 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
     },
     providers
   };
+}
+
+export function checkoutPostureBlocksDoctorStatus(
+  checkoutPosture: Pick<CheckoutPostureInspection, 'inside_git_worktree' | 'stale_docs_may_be' | 'status'>
+): boolean {
+  return checkoutPosture.stale_docs_may_be
+    || (checkoutPosture.status === 'unavailable' && checkoutPosture.inside_git_worktree);
 }
 
 export async function runDoctorCloudPreflight(options: {

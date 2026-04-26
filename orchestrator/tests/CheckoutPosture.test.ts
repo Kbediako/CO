@@ -23,6 +23,7 @@ describe('inspectCheckoutPosture', () => {
       const result = inspectCheckoutPosture(fixture.repo);
 
       expect(result.status).toBe('stale');
+      expect(result.inside_git_worktree).toBe(true);
       expect(result.ahead).toBe(0);
       expect(result.behind).toBe(1);
       expect(result.dirty.status).toBe('dirty');
@@ -55,6 +56,7 @@ describe('inspectCheckoutPosture', () => {
       const result = inspectCheckoutPosture(fixture.repo);
 
       expect(result.status).toBe('current');
+      expect(result.inside_git_worktree).toBe(true);
       expect(result.ahead).toBe(0);
       expect(result.behind).toBe(0);
       expect(result.dirty.status).toBe('clean');
@@ -75,6 +77,7 @@ describe('inspectCheckoutPosture', () => {
       const result = inspectCheckoutPosture(fixture.repo);
 
       expect(result.status).toBe('ahead');
+      expect(result.inside_git_worktree).toBe(true);
       expect(result.ahead).toBe(1);
       expect(result.behind).toBe(0);
       expect(result.stale_docs_may_be).toBe(false);
@@ -101,6 +104,7 @@ describe('inspectCheckoutPosture', () => {
       const result = inspectCheckoutPosture(repo);
 
       expect(result.status).toBe('unavailable');
+      expect(result.inside_git_worktree).toBe(true);
       expect(result.ahead).toBeNull();
       expect(result.behind).toBeNull();
       expect(result.dirty.status).toBe('clean');
@@ -109,6 +113,30 @@ describe('inspectCheckoutPosture', () => {
       expect(formatCheckoutPostureSummary(result).join('\n')).toContain(
         'comparison: unavailable against origin/main'
       );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps unborn-HEAD git worktrees distinguishable from non-git directories', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'checkout-posture-unborn-'));
+    const repo = join(root, 'repo');
+    const nonGitDir = join(root, 'non-git');
+    try {
+      await mkdir(repo, { recursive: true });
+      await mkdir(nonGitDir, { recursive: true });
+      runGit(repo, ['init', '-b', 'main']);
+
+      const result = inspectCheckoutPosture(repo);
+      const nonGitResult = inspectCheckoutPosture(nonGitDir);
+
+      expect(result.status).toBe('unavailable');
+      expect(result.inside_git_worktree).toBe(true);
+      expect(result.head).toBeNull();
+      expect(result.detail).toContain('origin/main is not available locally');
+      expect(nonGitResult.status).toBe('unavailable');
+      expect(nonGitResult.inside_git_worktree).toBe(false);
+      expect(nonGitResult.detail).toContain('not inside a git worktree');
     } finally {
       await rm(root, { recursive: true, force: true });
     }

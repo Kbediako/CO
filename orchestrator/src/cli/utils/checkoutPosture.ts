@@ -12,6 +12,7 @@ export interface CheckoutPostureCommit {
 export interface CheckoutPostureInspection {
   status: CheckoutPostureStatus;
   repo_root: string;
+  inside_git_worktree: boolean;
   base_ref: 'origin/main';
   ahead: number | null;
   behind: number | null;
@@ -62,7 +63,7 @@ const POSTURE_REFERENCE_PATHS = [
 export function inspectCheckoutPosture(repoRoot: string): CheckoutPostureInspection {
   const repoCheck = runGit(repoRoot, ['rev-parse', '--is-inside-work-tree']);
   if (!repoCheck.ok || repoCheck.stdout.trim() !== 'true') {
-    return unavailableInspection(repoRoot, 'Current directory is not inside a git worktree.', 'unknown');
+    return unavailableInspection(repoRoot, 'Current directory is not inside a git worktree.', 'unknown', undefined, false);
   }
 
   const dirty = inspectDirtyWork(repoRoot);
@@ -117,6 +118,7 @@ export function inspectCheckoutPosture(repoRoot: string): CheckoutPostureInspect
   return {
     status,
     repo_root: repoRoot,
+    inside_git_worktree: true,
     base_ref: BASE_REF,
     ahead,
     behind,
@@ -383,11 +385,13 @@ function unavailableInspection(
   repoRoot: string,
   detail: string,
   dirtyStatus: 'clean' | 'dirty' | 'unknown',
-  dirty?: CheckoutPostureInspection['dirty']
+  dirty?: CheckoutPostureInspection['dirty'],
+  insideGitWorktree = true
 ): CheckoutPostureInspection {
   return {
     status: 'unavailable',
     repo_root: repoRoot,
+    inside_git_worktree: insideGitWorktree,
     base_ref: BASE_REF,
     ahead: null,
     behind: null,
@@ -416,10 +420,18 @@ function formatCommit(commit: CheckoutPostureCommit): string {
   return `${commit.short_hash} ${commit.committed_date} ${commit.subject}`;
 }
 
+interface GitCommandResult {
+  ok: boolean;
+  stdout: string;
+  stderr: string;
+  status: number | null;
+  error: string | null;
+}
+
 function runGit(
   repoRoot: string,
   args: string[]
-): { ok: boolean; stdout: string; stderr: string; status: number | null; error: string | null } {
+): GitCommandResult {
   const result = spawnSync('git', ['-C', repoRoot, ...args], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
