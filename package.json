@@ -61,6 +61,7 @@
     "repo:stewardship": "node scripts/repo-stewardship-audit.mjs --check",
     "docs:sync": "node --loader ts-node/esm scripts/docs-hygiene.ts --sync",
     "ci:cloud-canary": "node scripts/cloud-canary-ci.mjs",
+    "codex:release-detect": "node scripts/codex-cli-release-detector.mjs",
     "canary:js-repl-usage": "node scripts/js-repl-usage-matrix.mjs",
     "canary:runtime": "node scripts/runtime-mode-canary.mjs",
     "prelint": "node scripts/build-patterns-if-needed.mjs",

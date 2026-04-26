@@ -1,0 +1,58 @@
+name: Codex CLI Release Detector
+
+on:
+  schedule:
+    - cron: '37 8 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Evaluate without creating or refreshing Linear intake issues.'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  detect:
+    name: Detect upstream Codex CLI release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Detect upstream release truth
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '0' }}
+        run: |
+          args=(
+            --source-issue-id b7074b86-3d38-4dfe-baa9-73b2cc8d686f
+            --artifact out/codex-cli-release-detection/detection.json
+          )
+          if [ "$DRY_RUN" = "1" ]; then
+            args+=(--dry-run)
+          fi
+          npm run codex:release-detect -- "${args[@]}"
+
+      - name: Upload release detector artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: codex-cli-release-detection-${{ github.run_id }}
+          path: out/codex-cli-release-detection/
+          if-no-files-found: ignore
