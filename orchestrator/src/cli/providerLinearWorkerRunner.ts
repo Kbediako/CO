@@ -785,8 +785,8 @@ function pickProviderLinearWorkerCommandApprovalDecision(params: Record<string, 
 
 function hasProviderLinearWorkerGrantRoot(params: Record<string, unknown> | null): boolean {
   return (
-    (params?.grantRoot !== null && params?.grantRoot !== undefined) ||
-    (params?.grant_root !== null && params?.grant_root !== undefined)
+    isProviderLinearWorkerEscalationRequest(params?.grantRoot) ||
+    isProviderLinearWorkerEscalationRequest(params?.grant_root)
   );
 }
 
@@ -816,14 +816,16 @@ function hasProviderLinearWorkerCommandApprovalEscalation(
   const additionalPermissions = isRecord(params?.additionalPermissions)
     ? params.additionalPermissions
     : null;
-  const requestsNetworkPermission =
-    additionalPermissions?.network !== null && additionalPermissions?.network !== undefined;
-  const requestsFileSystemPermission =
-    additionalPermissions?.fileSystem !== null && additionalPermissions?.fileSystem !== undefined;
+  const requestsNetworkPermission = isProviderLinearWorkerEscalationRequest(
+    additionalPermissions?.network
+  );
+  const requestsFileSystemPermission = isProviderLinearWorkerEscalationRequest(
+    additionalPermissions?.fileSystem
+  );
   if (requestsNetworkPermission || requestsFileSystemPermission) {
     return true;
   }
-  if (isRecord(params?.networkApprovalContext)) {
+  if (isProviderLinearWorkerEscalationRequest(params?.networkApprovalContext)) {
     return true;
   }
   if (
@@ -836,6 +838,13 @@ function hasProviderLinearWorkerCommandApprovalEscalation(
     Array.isArray(params?.proposedNetworkPolicyAmendments) &&
     params.proposedNetworkPolicyAmendments.length > 0
   );
+}
+
+function isProviderLinearWorkerEscalationRequest(value: unknown): boolean {
+  if (value === null || value === undefined || value === false) {
+    return false;
+  }
+  return true;
 }
 
 function buildProviderLinearWorkerPermissionsGrant(): Record<string, unknown> {
@@ -882,7 +891,7 @@ export function buildProviderLinearWorkerAppServerCallbackResponse(
       return {
         kind: 'result',
         result: {
-          decision: 'approved'
+          decision: hasProviderLinearWorkerCommandApprovalEscalation(params) ? 'denied' : 'approved'
         }
       };
     case 'mcpServer/elicitation/request':
@@ -1042,6 +1051,9 @@ export async function defaultAppServerTurnRunner(
     };
     function handleAbort(): void {
       if (settled) {
+        return;
+      }
+      if (child.exitCode !== null || child.signalCode !== null) {
         return;
       }
       abortError ??= buildAbortError();
@@ -1234,6 +1246,14 @@ export async function defaultAppServerTurnRunner(
     });
     child.once('close', (exitCode, signal) => {
       if (settled) {
+        return;
+      }
+      if (!abortError && terminalTurnStatus === 'completed') {
+        finalizeSuccess({
+          exitCode: 0,
+          stdout,
+          stderr
+        });
         return;
       }
       const reason = signal ? `signal ${signal}` : `code ${exitCode ?? 'unknown'}`;
@@ -10053,20 +10073,53 @@ export async function runProviderLinearWorker(
                   stopLiveSessionTailPromise
                 ]);
               }
-              const tailApply =
-                liveSessionTailState.path !== null
-                  ? flushProviderWorkerSessionLogTail(
+              if (liveSessionTailState.path === null) {
+                const liveSessionThreadHint =
+                  threadId ?? liveParseState.threadId ?? finalProof.thread_id ?? null;
+                liveSessionTailState.path = await discoverProviderWorkerSessionLogPath({
+                  env:
+                    liveSessionThreadHint
+                      ? { ...childEnv, CODEX_THREAD_ID: liveSessionThreadHint }
+                      : childEnv,
+                  workspacePath: context.workspacePath ?? context.repoRoot,
+                  issue: {
+                    identifier: issue.identifier,
+                    title: issue.title
+                  },
+                  startedAt: finalProof.attempt_started_at ?? null
+                });
+              }
+              const emptyTailApply = {
+                changed: false,
+                observed: false,
+                observedThreadId: null as string | null,
+                observedTurnId: null as string | null
+              };
+              let tailApply = emptyTailApply;
+              if (liveSessionTailState.path !== null) {
+                const delta = await readProviderWorkerSessionLogDelta(liveSessionTailState);
+                const deltaApply = delta
+                  ? applyProviderWorkerSessionLogDelta(
                       liveParseState,
                       liveSessionTailState,
+                      delta,
                       childEnv,
                       { allowCompletedBootstrapTurn: allowCompletedSessionBootstrapTurn }
                     )
-                  : {
-                      changed: false,
-                      observed: false,
-                      observedThreadId: null,
-                      observedTurnId: null
-                    };
+                  : emptyTailApply;
+                const flushApply = flushProviderWorkerSessionLogTail(
+                  liveParseState,
+                  liveSessionTailState,
+                  childEnv,
+                  { allowCompletedBootstrapTurn: allowCompletedSessionBootstrapTurn }
+                );
+                tailApply = {
+                  changed: deltaApply.changed || flushApply.changed,
+                  observed: deltaApply.observed || flushApply.observed,
+                  observedThreadId: flushApply.observedThreadId ?? deltaApply.observedThreadId,
+                  observedTurnId: flushApply.observedTurnId ?? deltaApply.observedTurnId
+                };
+              }
               if (tailApply.observed) {
                 liveSessionLogThreadId = tailApply.observedThreadId ?? liveSessionLogThreadId;
                 liveSessionLogTurnId = tailApply.observedTurnId ?? liveSessionLogTurnId;
@@ -10200,6 +10253,12 @@ export async function runProviderLinearWorker(
       turnId = parsed.turnId ?? (parsedThreadChanged ? null : finalProof.latest_turn_id ?? turnId);
       const parsedTurnChanged = Boolean(turnId && turnId !== finalProof.latest_turn_id);
       const parsedScopeChanged = parsedThreadChanged || parsedTurnChanged;
+      const preferAppServerSessionLogFinalMessage = Boolean(
+        useAppServerControl &&
+        finalProof.last_message &&
+        finalProof.session_log_turn_id &&
+        !parsedScopeChanged
+      );
       const session = deriveLatestTurnSessionId({ threadId, turnId });
       const sessionLogProof = selectProviderLinearWorkerSessionLogProofForScope({
         proof: finalProof,
@@ -10208,6 +10267,25 @@ export async function runProviderLinearWorker(
         sessionId: session.sessionId,
         scopeChanged: parsedScopeChanged
       });
+      const nextLastMessage = preferAppServerSessionLogFinalMessage
+        ? finalProof.last_message
+        : parsed.finalMessage ?? (parsedScopeChanged ? null : finalProof.last_message);
+      const nextLastMessageSource = preferAppServerSessionLogFinalMessage
+        ? normalizeProviderLinearWorkerFinalMessageSource(finalProof.last_message_source)
+        : parsed.finalMessage
+          ? parsed.finalMessageSource ?? null
+          : parsedScopeChanged
+            ? null
+            : normalizeProviderLinearWorkerFinalMessageSource(finalProof.last_message_source);
+      const nextLastMessageDeltaKey = preferAppServerSessionLogFinalMessage
+        ? selectProviderLinearWorkerProofFinalMessageDeltaKey(finalProof)
+        : parsed.finalMessage
+          ? parsed.finalMessageSource === 'agent_message_delta'
+            ? parsed.finalMessageDeltaKey ?? null
+            : null
+          : parsedScopeChanged
+            ? null
+            : selectProviderLinearWorkerProofFinalMessageDeltaKey(finalProof);
 
       finalProof = {
         issue_id: context.issueId,
@@ -10225,19 +10303,9 @@ export async function runProviderLinearWorker(
         resume_source_thread_id: finalProof.resume_source_thread_id ?? null,
         turn_count: turnNumber,
         last_event: parsed.lastEvent ?? (parsedScopeChanged ? null : finalProof.last_event),
-        last_message: parsed.finalMessage ?? (parsedScopeChanged ? null : finalProof.last_message),
-        last_message_source: parsed.finalMessage
-          ? parsed.finalMessageSource ?? null
-          : parsedScopeChanged
-            ? null
-            : normalizeProviderLinearWorkerFinalMessageSource(finalProof.last_message_source),
-        last_message_delta_key: parsed.finalMessage
-          ? parsed.finalMessageSource === 'agent_message_delta'
-            ? parsed.finalMessageDeltaKey ?? null
-            : null
-          : parsedScopeChanged
-            ? null
-            : selectProviderLinearWorkerProofFinalMessageDeltaKey(finalProof),
+        last_message: nextLastMessage,
+        last_message_source: nextLastMessageSource,
+        last_message_delta_key: nextLastMessageDeltaKey,
         last_event_at:
           parsed.lastEventAt ?? (parsedScopeChanged ? null : finalProof.last_event_at),
         current_turn_activity:

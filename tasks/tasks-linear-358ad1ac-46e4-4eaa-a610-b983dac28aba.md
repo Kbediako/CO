@@ -21,7 +21,7 @@
 ## Source / Assumptions
 
 - [x] Shared source anchor recorded. Evidence: `ctx:sha256:1d9326aedeb79238be318d1be827130d7e533ba7c4b559c24f7f31873770193c#chunk:c000001`.
-- [x] Parent verified the shared source payload after accepting the docs child lane. Evidence: `../../.runs/linear-358ad1ac-46e4-4eaa-a610-b983dac28aba/cli/2026-04-26T03-48-02-269Z-9be693a5/memory/source-0/source.txt`, `docs/PRD-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md`, `tasks/specs/linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md`.
+- [x] Parent verified the shared source payload after accepting the docs child lane. Evidence: `.runs/linear-358ad1ac-46e4-4eaa-a610-b983dac28aba/cli/2026-04-26T03-48-02-269Z-9be693a5/memory/source-0/source.txt`, `docs/PRD-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md`, `tasks/specs/linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md`.
 - [x] Protected terms preserved: `resident app-server seam`, `authoritative provider-worker control plane`, `provider-worker control paths`, `control-host read models`, `runtime proof`, `codex exec`, `codex exec resume`, `drain`, `restart`, `resume`, `state/read-model continuity`, `manifests`, `CO STATUS/control-host`, `workpad evidence`, and `migration canaries`.
 - [x] Parent/child ownership split recorded. Evidence: PRD, TECH_SPEC, ACTION_PLAN, and this checklist.
 
@@ -40,8 +40,8 @@
 - [x] Child-lane `jq empty tasks/index.json`. Evidence: command exited `0` on 2026-04-26.
 - [x] Child-lane protected-term grep. Evidence: `rg -n "resident app-server seam|authoritative provider-worker control plane|provider-worker control paths|control-host read models|runtime proof|codex exec|codex exec resume|drain|restart|resume|state/read-model continuity|manifests|CO STATUS/control-host|workpad evidence|migration canaries|BEAM rewrite|distributed scheduling|SSH worker pool|unsafe mid-turn hot reload|remote shell/watch authority" docs/PRD-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md docs/TECH_SPEC-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md docs/ACTION_PLAN-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md tasks/specs/linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md tasks/tasks-linear-358ad1ac-46e4-4eaa-a610-b983dac28aba.md` exited `0`.
 - [x] Child-lane whitespace check. Evidence: `git diff --check -- tasks/index.json` exited `0`; scoped trailing-whitespace scan over the five new packet files plus `tasks/index.json` exited `0`.
-- [ ] Parent `node scripts/spec-guard.mjs --dry-run`. Evidence: pending parent lane.
-- [ ] Parent docs-review evidence captured before implementation. Evidence: pending parent manifest.
+- [x] Parent `node scripts/spec-guard.mjs --dry-run`. Evidence: passed before PR handoff and again after PR feedback fix on 2026-04-26.
+- [x] Parent docs-review evidence captured. Evidence: `.runs/linear-358ad1ac-46e4-4eaa-a610-b983dac28aba-docs-review-post-feedback/cli/2026-04-26T09-35-41-488Z-26b76662/manifest.json`.
 - [x] Parent focused provider-worker authority and runtime-proof regressions. Evidence: `npx vitest run orchestrator/tests/ProviderLinearWorkerRunner.test.ts orchestrator/tests/ControlStatusDashboard.test.ts orchestrator/tests/SelectedRunPresenter.test.ts` passed on 2026-04-26.
 - [x] Parent control-host read-model and CO STATUS authority-provenance regressions. Evidence: `npx vitest run orchestrator/tests/ControlStatusDashboard.test.ts orchestrator/tests/SelectedRunPresenter.test.ts` passed on 2026-04-26.
 - [x] Parent migration canaries for drain, restart, resume, failure semantics, and rollback. Evidence: `npx vitest run orchestrator/tests/ProviderLinearWorkerRunner.test.ts` passed on 2026-04-26.
