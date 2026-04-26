@@ -56,11 +56,13 @@ async function writeDocsCatalogFixture(
   {
     entries = [],
     patterns = [],
-    readmeBudget = { max_lines: 240, max_h2_sections: 9 }
+    readmeBudget = { max_lines: 240, max_h2_sections: 9 },
+    extraPolicies = {}
   }: {
     entries?: Array<Record<string, unknown>>;
     patterns?: Array<Record<string, unknown>>;
     readmeBudget?: { max_lines: number; max_h2_sections: number };
+    extraPolicies?: Record<string, unknown>;
   } = {}
 ) {
   await mkdir(join(repoRoot, 'docs', 'guides'), { recursive: true });
@@ -97,7 +99,8 @@ async function writeDocsCatalogFixture(
             doc_path: 'README.md',
             section_heading: '## Skills (bundled)',
             list_intro: 'Bundled skills'
-          }
+          },
+          ...extraPolicies
         },
         entries,
         patterns
@@ -1777,6 +1780,235 @@ describe('docs hygiene tooling', () => {
     const errors = await runDocsCheck(repoRoot);
 
     expect(errors.filter((error) => error.rule === 'release-runbook-stale')).toEqual([]);
+  });
+
+  it('flags Codex CLI release-intake template drift when a required marker is missing', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-release-intake-fail-'));
+    createdDirs.push(repoRoot);
+
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      extraPolicies: {
+        codex_release_intake: {
+          template_path: '.agent/task/templates/codex-cli-release-intake-template.md',
+          required_markers: ['Release Evidence Axes', 'Supersedes / Holds Matrix']
+        }
+      }
+    });
+    await mkdir(join(repoRoot, '.agent', 'task', 'templates'), { recursive: true });
+    await writeFile(
+      join(repoRoot, '.agent', 'task', 'templates', 'codex-cli-release-intake-template.md'),
+      ['# Codex CLI Release-Intake Issue Template', '', '## Release Evidence Axes', '- local CLI', ''].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: '.agent/task/templates/codex-cli-release-intake-template.md',
+        rule: 'codex-release-intake-template-stale',
+        reference: 'missing marker: Supersedes / Holds Matrix'
+      })
+    );
+  });
+
+  it('flags an invalid Codex CLI release-intake template path', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-release-intake-invalid-path-'));
+    createdDirs.push(repoRoot);
+
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      extraPolicies: {
+        codex_release_intake: {
+          template_path: '   ',
+          required_markers: ['Release Evidence Axes']
+        }
+      }
+    });
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: '.agent/task/templates/codex-cli-release-intake-template.md',
+        rule: 'codex-release-intake-template-stale',
+        reference: 'invalid template_path'
+      })
+    );
+  });
+
+  it('flags Codex CLI release-intake template paths outside the repository', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-release-intake-outside-path-'));
+    createdDirs.push(repoRoot);
+
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      extraPolicies: {
+        codex_release_intake: {
+          template_path: '../outside-template.md',
+          required_markers: ['Release Evidence Axes']
+        }
+      }
+    });
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({
+        file: '../outside-template.md',
+        rule: 'codex-release-intake-template-stale',
+        reference: 'invalid template_path'
+      })
+    );
+  });
+
+  it('validates the default Codex CLI release-intake template when the policy is absent or disabled', async () => {
+    for (const [policyCase, extraPolicies] of [
+      ['absent', {}],
+      [
+        'disabled',
+        {
+          codex_release_intake: {
+            enabled: false,
+            template_path: 'docs/custom-release-intake-template.md',
+            required_markers: ['Custom Disabled Marker']
+          }
+        }
+      ]
+    ] as const) {
+      const repoRoot = await mkdtemp(join(tmpdir(), `docs-hygiene-release-intake-default-${policyCase}-`));
+      createdDirs.push(repoRoot);
+
+      await writeFile(
+        join(repoRoot, 'package.json'),
+        JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+        'utf8'
+      );
+      await writeFile(
+        join(repoRoot, 'codex.orchestrator.json'),
+        JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+        'utf8'
+      );
+      await writeDocsCatalogFixture(repoRoot, { extraPolicies });
+      await mkdir(join(repoRoot, '.agent', 'task', 'templates'), { recursive: true });
+      await writeFile(
+        join(repoRoot, '.agent', 'task', 'templates', 'codex-cli-release-intake-template.md'),
+        ['# Codex CLI Release-Intake Issue Template', '', '## Release Evidence Axes', '- local CLI', ''].join('\n'),
+        'utf8'
+      );
+
+      const errors = await runDocsCheck(repoRoot);
+
+      expect(errors).toContainEqual(
+        expect.objectContaining({
+          file: '.agent/task/templates/codex-cli-release-intake-template.md',
+          rule: 'codex-release-intake-template-stale',
+          reference: 'missing marker: Supersedes / Holds Matrix'
+        })
+      );
+    }
+  });
+
+  it('accepts the canonical Codex CLI release-intake template markers', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-hygiene-release-intake-pass-'));
+    createdDirs.push(repoRoot);
+
+    await writeFile(
+      join(repoRoot, 'package.json'),
+      JSON.stringify({ name: 'fixture', scripts: { lint: 'echo ok' } }, null, 2),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'codex.orchestrator.json'),
+      JSON.stringify({ pipelines: [{ id: 'diagnostics' }] }, null, 2),
+      'utf8'
+    );
+    await writeDocsCatalogFixture(repoRoot, {
+      extraPolicies: {
+        codex_release_intake: {
+          template_path: '.agent/task/templates/codex-cli-release-intake-template.md',
+          required_markers: [
+            'Release Evidence Axes',
+            'local CLI',
+            'package/downstream smoke',
+            'cloud-canary',
+            'workflow pins',
+            'model posture',
+            'docs surfaces',
+            'release notes',
+            'Supersedes / Holds Matrix',
+            'prior release evidence page',
+            'posture surface',
+            'Closeout Classification',
+            'adopt latest',
+            'intentionally hold',
+            'demote/archive-only',
+            'stale current-facing docs',
+            'workflow pins remain unclassified'
+          ]
+        }
+      }
+    });
+    await mkdir(join(repoRoot, '.agent', 'task', 'templates'), { recursive: true });
+    await writeFile(
+      join(repoRoot, '.agent', 'task', 'templates', 'codex-cli-release-intake-template.md'),
+      [
+        '# Codex CLI Release-Intake Issue Template',
+        '',
+        '## Release Evidence Axes',
+        '- local CLI',
+        '- package/downstream smoke',
+        '- cloud-canary',
+        '- workflow pins',
+        '- model posture',
+        '- docs surfaces',
+        '- release notes',
+        '',
+        '## Supersedes / Holds Matrix',
+        'Every prior release evidence page and posture surface gets a row.',
+        '',
+        '## Closeout Classification',
+        '- adopt latest',
+        '- intentionally hold',
+        '- demote/archive-only',
+        '- stale current-facing docs',
+        '- workflow pins remain unclassified',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const errors = await runDocsCheck(repoRoot);
+
+    expect(errors.filter((error) => error.rule === 'codex-release-intake-template-stale')).toEqual([]);
   });
 
   it('syncs mirrors for an active task idempotently', async () => {

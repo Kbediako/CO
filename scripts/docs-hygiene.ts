@@ -36,6 +36,7 @@ export type DocsCheckRule =
   | 'bundled-skill-roster-drift'
   | 'front-door-budget-exceeded'
   | 'release-runbook-stale'
+  | 'codex-release-intake-template-stale'
   | 'tracked-runtime-artifact'
   | 'public-doc-absolute-path'
   | 'top-level-doc-sprawl';
@@ -96,6 +97,29 @@ const RELEASE_FULL_MATRIX_COMMANDS = [
   'npm run test:adapters',
   'npm run test:evaluation',
   'npm run eval:test'
+] as const;
+
+const DEFAULT_CODEX_RELEASE_INTAKE_TEMPLATE_PATH = '.agent/task/templates/codex-cli-release-intake-template.md';
+
+const DEFAULT_CODEX_RELEASE_INTAKE_MARKERS = [
+  'Codex CLI Release-Intake Issue Template',
+  'Release Evidence Axes',
+  'local CLI',
+  'package/downstream smoke',
+  'cloud-canary',
+  'workflow pins',
+  'model posture',
+  'docs surfaces',
+  'release notes',
+  'Supersedes / Holds Matrix',
+  'prior release evidence page',
+  'posture surface',
+  'Closeout Classification',
+  'adopt latest',
+  'intentionally hold',
+  'demote/archive-only',
+  'stale current-facing docs',
+  'workflow pins remain unclassified'
 ] as const;
 
 const RELEASE_LOCAL_SIGNING_REQUIREMENTS = [
@@ -385,6 +409,7 @@ export async function runDocsCheck(repoRoot: string): Promise<DocsCheckError[]> 
   const rosterPolicy = docsCatalog?.policies?.bundled_skills_roster ?? {};
   const releaseWorkflowTruth = docsCatalog ? await readReleaseWorkflowTruth(repoRoot) : null;
   if (docsCatalog) {
+    errors.push(...(await checkCodexReleaseIntakeTemplate(repoRoot, docsCatalog.policies?.codex_release_intake)));
     errors.push(...checkTrackedRuntimeArtifacts(repoRoot, docsCatalog.policies?.release_surface_paths));
     errors.push(...(await checkTopLevelDocsSprawl(repoRoot, docsCatalog.policies?.top_level_docs)));
   }
@@ -644,6 +669,63 @@ function checkTrackedRuntimeArtifacts(
   }
 
   return errors;
+}
+
+async function checkCodexReleaseIntakeTemplate(
+  repoRoot: string,
+  policy: { enabled?: unknown; template_path?: unknown; required_markers?: unknown } | undefined
+): Promise<DocsCheckError[]> {
+  const activePolicy = policy?.enabled === false ? undefined : policy;
+  const configuredPath =
+    typeof activePolicy?.template_path === 'string'
+      ? activePolicy.template_path
+      : DEFAULT_CODEX_RELEASE_INTAKE_TEMPLATE_PATH;
+  const templatePath = normalizePolicyPath(configuredPath);
+  if (!templatePath) {
+    return [
+      {
+        file: configuredPath.trim() || DEFAULT_CODEX_RELEASE_INTAKE_TEMPLATE_PATH,
+        rule: 'codex-release-intake-template-stale',
+        reference: 'invalid template_path'
+      }
+    ];
+  }
+
+  const repoRootAbs = path.resolve(repoRoot);
+  const absolutePath = path.resolve(repoRootAbs, templatePath);
+  const relativePath = path.relative(repoRootAbs, absolutePath);
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    return [
+      {
+        file: templatePath,
+        rule: 'codex-release-intake-template-stale',
+        reference: 'invalid template_path'
+      }
+    ];
+  }
+
+  if (!(await pathExists(absolutePath))) {
+    return [
+      {
+        file: templatePath,
+        rule: 'codex-release-intake-template-stale',
+        reference: 'missing template'
+      }
+    ];
+  }
+
+  const content = await readFile(absolutePath, 'utf8');
+  const configuredMarkers = normalizeStringArrayPolicy(activePolicy?.required_markers);
+  const requiredMarkers =
+    configuredMarkers.length > 0 ? configuredMarkers : [...DEFAULT_CODEX_RELEASE_INTAKE_MARKERS];
+
+  return requiredMarkers
+    .filter((marker) => !content.includes(marker))
+    .map((marker) => ({
+      file: templatePath,
+      rule: 'codex-release-intake-template-stale' as const,
+      reference: `missing marker: ${marker}`
+    }));
 }
 
 async function checkTopLevelDocsSprawl(

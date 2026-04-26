@@ -64,6 +64,29 @@
       "section_heading": "# Bundled Skills",
       "list_intro": "Bundled skills"
     },
+    "codex_release_intake": {
+      "template_path": ".agent/task/templates/codex-cli-release-intake-template.md",
+      "required_markers": [
+        "Codex CLI Release-Intake Issue Template",
+        "Release Evidence Axes",
+        "local CLI",
+        "package/downstream smoke",
+        "cloud-canary",
+        "workflow pins",
+        "model posture",
+        "docs surfaces",
+        "release notes",
+        "Supersedes / Holds Matrix",
+        "prior release evidence page",
+        "posture surface",
+        "Closeout Classification",
+        "adopt latest",
+        "intentionally hold",
+        "demote/archive-only",
+        "stale current-facing docs",
+        "workflow pins remain unclassified"
+      ]
+    },
     "release_surface_paths": {
       "forbidden_tracked_prefixes": [
         ".runs/",
@@ -682,6 +705,24 @@
         "model-posture",
         "default-runtime"
       ]
+    },
+    {
+      "path": ".agent/task/templates/codex-cli-release-intake-template.md",
+      "status": "active",
+      "tier": 1,
+      "doc_class": "agent_policy",
+      "audience": "repo agents and maintainers",
+      "source_of_truth": [
+        "docs/guides/codex-version-policy.md",
+        "docs/docs-catalog.json"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "Codex CLI release-intake policy changes",
+        "release supersession gate changes"
+      ],
+      "truth_checks": []
     },
     {
       "path": "docs/TASKS.md",
