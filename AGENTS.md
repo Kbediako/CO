@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp b2c2eeab0472ca379819cdbffc7f010725656f839c7e581e574bfab4b83b53a6 -->
+<!-- codex:instruction-stamp d557b53b3e4fa59efc6ca6089847a4128e1a993fd091a37b64e11d4bbbaa9f95 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -109,7 +109,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Follow `docs/guides/fallback-expiry-and-refactor-policy.md` whenever a task adds, retains, or touches fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior.
 - Every touched fallback or seam in a fallback-facing task must choose one decision before implementation: `remove fallback`, `expire fallback`, or `justify retaining fallback`.
 - Retained temporary fallbacks require an owner, trigger, introduced date, review date, allowed maximum lifetime, removal condition, and validation evidence.
-- Default maximum lifetime is 60 days; named high-churn control surfaces (`provider workflow`, `review wrapper`, `runtime routing`, `docs freshness ownership`, and `control-host status surfaces`) are capped at 30 days unless an approved external migration bridge uses the documented 90-day exception.
+- Default maximum lifetime is 60 days; named high-churn control surfaces (`provider workflow`, `review wrapper`, `runtime routing`, `docs freshness ownership`, and `control-host status surfaces`) are capped at 30 days; security, auth, PII, customer-impacting, financial, or production-impact fallbacks are capped at 14 days; approved external migration bridges may use the documented 90-day exception.
 - Prefer a large refactor over another minor seam when authority is split across live/cached/legacy state, the same governed surface already carries two active fallbacks, the proposed branch spans multiple lifecycle phases, or the removal condition cannot be stated clearly.
 - Do not hand off an expired fallback to review unless it is removed, refreshed by a new issue-quality review, or the issue is moved to a real blocked state with the dependency recorded.
 
