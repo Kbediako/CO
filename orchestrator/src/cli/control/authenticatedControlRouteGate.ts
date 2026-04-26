@@ -86,6 +86,7 @@ function isRunnerOnlyEndpoint(pathname: string, method: string | undefined): boo
     normalized === '/confirmations/consume' ||
     normalized === '/confirmations/validate' ||
     normalized === '/delegation/register' ||
+    normalized === '/api/v1/provider-worker/recover' ||
     normalized === '/questions/enqueue' ||
     normalized === '/security/violation'
   );

@@ -128,6 +128,34 @@ export interface ProviderIssueHandoffResult {
   claim: ProviderIntakeClaimRecord;
 }
 
+export type ProviderIssueRecoveryAction = 'recover' | 'relaunch' | 'nudge';
+
+export interface ProviderIssueHandoffRecoveryClaim {
+  provider: 'linear';
+  issue_id: string;
+  issue_identifier: string | null;
+  issue_state: string | null;
+  issue_state_type: string | null;
+  state: ProviderIntakeClaimRecord['state'];
+  reason: string | null;
+  task_id: string | null;
+  run_id: string | null;
+  run_manifest_path: string | null;
+  worker_host: string | null;
+  launch_source: ProviderIntakeClaimRecord['launch_source'];
+  launch_token_present: boolean;
+  updated_at: string | null;
+}
+
+export interface ProviderIssueHandoffRecoveryResult {
+  provider: 'linear';
+  issue_id: string;
+  action: ProviderIssueRecoveryAction;
+  kind: ProviderIssueHandoffResult['kind'] | 'released' | 'skipped';
+  reason: string;
+  claim: ProviderIssueHandoffRecoveryClaim | null;
+}
+
 export type ProviderTrackedIssuePollResolution =
   | { kind: 'ready'; trackedIssues: LiveLinearTrackedIssue[] }
   | { kind: 'skip'; reason: string };
@@ -249,6 +277,11 @@ function resolveRehydratedActiveRunWorkerHost(
 }
 
 export interface ProviderIssueHandoffService {
+  recoverIssue(input: {
+    provider: 'linear';
+    issueId: string;
+    action: ProviderIssueRecoveryAction;
+  }): Promise<ProviderIssueHandoffRecoveryResult>;
   handleAcceptedTrackedIssue(input: {
     trackedIssue: LiveLinearTrackedIssue;
     deliveryId: string | null;
@@ -6193,6 +6226,85 @@ export function createProviderIssueHandoffService(
   };
 
   providerIssueHandoffService = {
+    async recoverIssue(input): Promise<ProviderIssueHandoffRecoveryResult> {
+      const readRecoveryClaim = (): ProviderIntakeClaimRecord | null =>
+        readProviderIntakeClaimByIssueRef(options.state, input.provider, input.issueId);
+      return await runWithConfiguredWorkerHostsCache(async () =>
+        await runWithProviderIssueRunDiscoveryCache(async () =>
+          await runWithRefreshLifecycleLock(async () => {
+            if (!resolveTrackedIssueWhenNotStuck) {
+              return buildProviderIssueRecoveryResult({
+                provider: input.provider,
+                issueId: input.issueId,
+                action: input.action,
+                kind: 'skipped',
+                reason: 'provider_issue_recover_resolution_unavailable',
+                claim: readRecoveryClaim()
+              });
+            }
+
+            const resolution = await resolveTrackedIssueWhenNotStuck({
+              provider: input.provider,
+              issueId: input.issueId
+            });
+            if (resolution.kind === 'release') {
+              const existingClaim = readRecoveryClaim();
+              if (existingClaim) {
+                const claimRuns = await discoverProviderIssueRunsForCurrentOperation({
+                  provider: input.provider,
+                  issueId: existingClaim.issue_id
+                });
+                const attachableClaimRuns = filterProviderIssueRunsForStartPipeline(
+                  claimRuns,
+                  startPipelineId
+                );
+                await releaseClaim({
+                  claim: existingClaim,
+                  nextReason: `provider_issue_released:${stripProviderIssueReleasedPrefix(resolution.reason)}`,
+                  releaseRun: resolveProviderReleaseRun(existingClaim, attachableClaimRuns)
+                });
+              }
+              return buildProviderIssueRecoveryResult({
+                provider: input.provider,
+                issueId: existingClaim?.issue_id ?? input.issueId,
+                action: input.action,
+                kind: 'released',
+                reason: resolution.reason,
+                claim: readRecoveryClaim()
+              });
+            }
+            if (resolution.kind === 'skip') {
+              const existingClaim = readRecoveryClaim();
+              return buildProviderIssueRecoveryResult({
+                provider: input.provider,
+                issueId: existingClaim?.issue_id ?? input.issueId,
+                action: input.action,
+                kind: 'skipped',
+                reason: resolution.reason,
+                claim: existingClaim
+              });
+            }
+
+            const result = await processTrackedIssueCandidate({
+              trackedIssue: resolution.trackedIssue,
+              deliveryId: null,
+              event: 'control_host_provider_worker_recover',
+              action: input.action,
+              webhookTimestamp: null
+            });
+            return buildProviderIssueRecoveryResult({
+              provider: input.provider,
+              issueId: input.issueId,
+              action: input.action,
+              kind: result.kind,
+              reason: result.reason,
+              claim: result.claim
+            });
+          })
+        )
+      );
+    },
+
     async handleAcceptedTrackedIssue(input): Promise<ProviderIssueHandoffResult> {
       return await runWithConfiguredWorkerHostsCache(async () =>
         await runWithProviderIssueRunDiscoveryCache(async () =>
@@ -6854,6 +6966,57 @@ function mergeCloseoutSnapshotShowsMerged(
 
 function normalizeOptionalString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+function buildProviderIssueRecoveryResult(input: {
+  provider: 'linear';
+  issueId: string;
+  action: ProviderIssueRecoveryAction;
+  kind: ProviderIssueHandoffRecoveryResult['kind'];
+  reason: string;
+  claim: ProviderIntakeClaimRecord | null | undefined;
+}): ProviderIssueHandoffRecoveryResult {
+  return {
+    provider: input.provider,
+    issue_id: input.issueId,
+    action: input.action,
+    kind: input.kind,
+    reason: input.reason,
+    claim: input.claim ? summarizeProviderIssueRecoveryClaim(input.claim) : null
+  };
+}
+
+function readProviderIntakeClaimByIssueRef(
+  state: ProviderIntakeState,
+  provider: 'linear',
+  issueRef: string
+): ProviderIntakeClaimRecord | null {
+  return readProviderIntakeClaim(state, buildProviderIssueKey(provider, issueRef)) ??
+    state.claims.find((claim) =>
+      claim.provider === provider &&
+      (claim.issue_id === issueRef || claim.issue_identifier === issueRef)
+    ) ?? null;
+}
+
+function summarizeProviderIssueRecoveryClaim(
+  claim: ProviderIntakeClaimRecord
+): ProviderIssueHandoffRecoveryClaim {
+  return {
+    provider: claim.provider,
+    issue_id: claim.issue_id,
+    issue_identifier: normalizeOptionalString(claim.issue_identifier),
+    issue_state: normalizeOptionalString(claim.issue_state),
+    issue_state_type: normalizeOptionalString(claim.issue_state_type),
+    state: claim.state,
+    reason: normalizeOptionalString(claim.reason),
+    task_id: normalizeOptionalString(claim.task_id),
+    run_id: normalizeOptionalString(claim.run_id),
+    run_manifest_path: normalizeOptionalString(claim.run_manifest_path),
+    worker_host: normalizeOptionalString(claim.worker_host),
+    launch_source: claim.launch_source ?? null,
+    launch_token_present: normalizeOptionalString(claim.launch_token) !== null,
+    updated_at: normalizeOptionalString(claim.updated_at)
+  };
 }
 
 function shouldClearStaleReviewPromotionForTrackedIssue(input: {

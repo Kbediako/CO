@@ -22,6 +22,10 @@ import type { QuestionRecord } from './questions.js';
 import type { DelegationTokenStore } from './delegationTokens.js';
 import type { ProviderIssueHandoffRefreshRequestOutcome } from './controlServerPublicLifecycle.js';
 import type { CompatibilityRefreshAcknowledgement } from './observabilitySurface.js';
+import type {
+  ProviderIssueHandoffRecoveryResult,
+  ProviderIssueRecoveryAction
+} from './providerIssueHandoff.js';
 
 type PresenterContext =
   Parameters<typeof handleUiDataRequest>[0]['presenterContext'] &
@@ -65,6 +69,11 @@ export interface AuthenticatedRouteCompositionContext {
   persist: AuthenticatedRouteCompositionPersist;
   runtime: AuthenticatedRouteCompositionRuntime;
   refreshProviderIssues?(): Promise<ProviderIssueHandoffRefreshRequestOutcome | null>;
+  requestProviderWorkerRecover?(input: {
+    provider: 'linear';
+    issueId: string;
+    action: ProviderIssueRecoveryAction;
+  }): Promise<ProviderIssueHandoffRecoveryResult>;
   readRequestBody(): Promise<Record<string, unknown>>;
   readDispatchEvaluation(): Promise<{
     issueIdentifier: string | null;
@@ -113,6 +122,7 @@ export function createAuthenticatedRouteDispatcherContext(
       }),
     handleObservabilityApi: () =>
       handleObservabilityApiRequest({
+        authKind: context.authKind,
         req: context.req,
         res: context.res,
         presenterContext: context.presenterContext,
@@ -123,6 +133,7 @@ export function createAuthenticatedRouteDispatcherContext(
           await context.runtime.requestRefresh();
           return buildRefreshAcknowledgement(requestedAt, providerRefresh ?? null);
         },
+        requestProviderWorkerRecover: context.requestProviderWorkerRecover,
         readDispatchEvaluation: () => context.readDispatchEvaluation(),
         onDispatchEvaluated: (record) => context.onDispatchEvaluated(record)
       }),
