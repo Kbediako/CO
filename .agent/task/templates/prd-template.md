@@ -53,7 +53,7 @@
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `<Yes|No>`.
 - If yes, choose for each fallback: `remove fallback`, `expire fallback`, or `justify retaining fallback`.
 - For `expire fallback`, record owner, trigger, introduced date, review date, allowed maximum lifetime, removal condition, and validation.
-- For `justify retaining fallback`, explain why this is a durable compatibility contract rather than temporary fallback debt.
+- For `justify retaining fallback`, record contract name, owning surface, proof that it is steady-state behavior, tests/docs that describe it as a supported path, and why it is not governed as an expiring fallback.
 - Large-refactor check: explain why another minor seam is acceptable, or name the large-refactor plan/follow-up.
 
 ## Open Questions

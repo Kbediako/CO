@@ -12,6 +12,7 @@
 - Not done if:
 - Pre-implementation issue-quality review:
 - Fallback / refactor decision: choose `remove fallback`, `expire fallback`, `justify retaining fallback`, or `Not applicable`; retained fallbacks must name owner, trigger, introduced date, review date, maximum lifetime, removal condition, and validation.
+- Durable retention evidence: for `justify retaining fallback`, record contract name, owning surface, steady-state proof, tests/docs, and why it is not governed as an expiring fallback.
 - Large-refactor check: record whether another minor seam is acceptable under `docs/guides/fallback-expiry-and-refactor-policy.md`.
 
 ## Milestones & Sequencing
