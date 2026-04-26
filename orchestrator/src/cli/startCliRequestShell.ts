@@ -57,20 +57,16 @@ export interface RunStartCliRequestShellParams {
 
 export interface ProviderLinearWorkerStartGuardInput {
   pipelineId: string | undefined;
+  taskId?: string | null;
   issueId?: string | null;
   issueIdentifier?: string | null;
   env?: NodeJS.ProcessEnv | Record<string, string | undefined>;
 }
 
-interface ProviderLinearWorkerStartGuardContext {
-  issueId: string;
-  issueIdentifier: string | null;
-  launchSource: string | null;
-  controlHostTaskId: string | null;
-  controlHostRunId: string | null;
-  launchToken: string | null;
-  statePath: string | null;
-}
+type ProviderLinearWorkerStartGuardContext = {
+  issueId: string; issueIdentifier: string | null; taskId: string | null; launchSource: string | null;
+  controlHostTaskId: string | null; controlHostRunId: string | null; launchToken: string | null; statePath: string | null;
+};
 
 interface StartCliRequestShellDependencies {
   runStartCliShell: typeof runStartCliShell;
@@ -98,6 +94,7 @@ export async function runStartCliRequestShell(
 
   assertProviderLinearWorkerStartAllowed({
     pipelineId,
+    taskId: taskIdOverride,
     issueId,
     issueIdentifier,
     env: process.env
@@ -148,10 +145,12 @@ export function assertProviderLinearWorkerStartAllowed(
   const launchToken = normalizeEnvValue(env[PROVIDER_LAUNCH_TOKEN_ENV]);
   const issueId = normalizeOptionalString(input.issueId);
   const issueIdentifier = normalizeOptionalString(input.issueIdentifier);
+  const taskId = normalizeOptionalString(input.taskId) ?? normalizeEnvValue(env.MCP_RUNNER_TASK_ID);
   const statePath = resolveProviderIntakeStatePath(env, controlHostTaskId, controlHostRunId);
   const guardContext: ProviderLinearWorkerStartGuardContext = {
     issueId: issueId ?? '<linear-issue-id>',
     issueIdentifier,
+    taskId,
     launchSource,
     controlHostTaskId,
     controlHostRunId,
@@ -159,20 +158,14 @@ export function assertProviderLinearWorkerStartAllowed(
     statePath
   };
 
-  if (
-    launchSource !== PROVIDER_LAUNCH_SOURCE_CONTROL_HOST ||
-    !controlHostTaskId ||
-    !controlHostRunId ||
-    !launchToken ||
-    !issueId ||
-    !statePath
-  ) {
+  if (launchSource !== PROVIDER_LAUNCH_SOURCE_CONTROL_HOST || !controlHostTaskId || !controlHostRunId || !launchToken || !issueId || !taskId || !statePath) {
     throwProviderLinearWorkerStartGuardError(guardContext, buildMissingProviderWorkerStartGuardFields({
       launchSource,
       controlHostTaskId,
       controlHostRunId,
       launchToken,
       issueId,
+      taskId,
       statePath
     }));
   }
@@ -181,6 +174,7 @@ export function assertProviderLinearWorkerStartAllowed(
     statePath,
     issueId,
     issueIdentifier,
+    taskId,
     launchToken
   });
 }
@@ -189,12 +183,8 @@ function throwProviderLinearWorkerStartGuardError(
   context: ProviderLinearWorkerStartGuardContext,
   reasons: string[]
 ): never {
-  const issueHint = context.issueId !== '<linear-issue-id>'
-    ? context.issueId
-    : context.issueIdentifier ?? '<linear-issue-id>';
-  const stateNote = context.statePath
-    ? ` Checked control-host provider-intake state: ${context.statePath}.`
-    : '';
+  const issueHint = context.issueId !== '<linear-issue-id>' ? context.issueId : context.issueIdentifier ?? '<linear-issue-id>';
+  const stateNote = context.statePath ? ` Checked control-host provider-intake state: ${context.statePath}.` : '';
 
   throw new Error(
     [
@@ -207,7 +197,7 @@ function throwProviderLinearWorkerStartGuardError(
 
 function buildMissingProviderWorkerStartGuardFields(input: {
   launchSource: string | null; controlHostTaskId: string | null; controlHostRunId: string | null;
-  launchToken: string | null; issueId: string | null; statePath: string | null;
+  launchToken: string | null; issueId: string | null; taskId: string | null; statePath: string | null;
 }): string[] {
   return [
     input.launchSource === PROVIDER_LAUNCH_SOURCE_CONTROL_HOST
@@ -217,6 +207,7 @@ function buildMissingProviderWorkerStartGuardFields(input: {
     input.controlHostRunId ? null : PROVIDER_CONTROL_HOST_RUN_ID_ENV,
     input.launchToken ? null : PROVIDER_LAUNCH_TOKEN_ENV,
     input.issueId ? null : '--issue-id',
+    input.taskId ? null : '--task or MCP_RUNNER_TASK_ID',
     input.statePath ? null : 'control-host provider-intake state locator'
   ].filter((value): value is string => value !== null);
 }
@@ -242,18 +233,11 @@ function resolveProviderIntakeStatePath(
 
 function readMatchingControlHostProviderIntakeClaim(
   context: ProviderLinearWorkerStartGuardContext,
-  input: {
-    statePath: string;
-    issueId: string;
-    issueIdentifier: string | null;
-    launchToken: string;
-  }
+  input: { statePath: string; issueId: string; issueIdentifier: string | null; taskId: string; launchToken: string }
 ): ProviderIntakeClaimRecord {
   const raw = readProviderIntakeJson(context, input.statePath);
   if (!isRecord(raw)) {
-    throwProviderLinearWorkerStartGuardError(context, [
-      'control-host provider-intake state is malformed'
-    ]);
+    throwProviderLinearWorkerStartGuardError(context, ['control-host provider-intake state is malformed']);
   }
   const state = normalizeProviderIntakeState(raw as unknown as ProviderIntakeState);
   const claim = state.claims.find(
@@ -262,14 +246,13 @@ function readMatchingControlHostProviderIntakeClaim(
       candidate.issue_id === input.issueId
   );
   if (!claim) {
-    throwProviderLinearWorkerStartGuardError(context, [
-      'provider-intake reservation for requested issue is missing'
-    ]);
+    throwProviderLinearWorkerStartGuardError(context, ['provider-intake reservation for requested issue is missing']);
   }
   if (input.issueIdentifier && claim.issue_identifier !== input.issueIdentifier) {
-    throwProviderLinearWorkerStartGuardError(context, [
-      'provider-intake reservation issue identifier mismatch'
-    ]);
+    throwProviderLinearWorkerStartGuardError(context, ['provider-intake reservation issue identifier mismatch']);
+  }
+  if (claim.task_id !== input.taskId) {
+    throwProviderLinearWorkerStartGuardError(context, ['provider-intake reservation task id mismatch']);
   }
   if (
     claim.launch_source !== PROVIDER_LAUNCH_SOURCE_CONTROL_HOST ||
@@ -279,6 +262,9 @@ function readMatchingControlHostProviderIntakeClaim(
       ...context,
       launchSource: claim.launch_source
     }, ['provider-intake reservation launch provenance mismatch']);
+  }
+  if (claim.state !== 'starting' || claim.run_id !== null || claim.run_manifest_path !== null) {
+    throwProviderLinearWorkerStartGuardError(context, ['provider-intake reservation was already consumed']);
   }
   return claim;
 }

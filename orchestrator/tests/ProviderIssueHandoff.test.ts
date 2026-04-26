@@ -655,7 +655,7 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
-  it('releases an existing claim when control-host recovery resolves the issue as gone', async () => {
+  it('releases an existing claim when identifier-based recovery resolves the issue as gone', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
     state.claims.push(
@@ -677,13 +677,14 @@ describe('createProviderIssueHandoffService', () => {
     const service = createProviderIssueHandoffService({
       paths, state, persist, launcher, startPipelineId: 'provider-linear-worker', resolveTrackedIssue
     });
-    const result = await service.recoverIssue({ provider: 'linear', issueId: 'lin-issue-gone', action: 'recover' });
+    const result = await service.recoverIssue({ provider: 'linear', issueId: 'CO-393', action: 'recover' });
 
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       kind: 'released',
       reason: 'dispatch_source_issue_not_found',
+      issue_id: 'lin-issue-gone',
       claim: {
         state: 'released',
         reason: 'provider_issue_released:dispatch_source_issue_not_found'

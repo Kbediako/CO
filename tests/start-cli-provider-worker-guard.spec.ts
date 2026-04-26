@@ -16,14 +16,13 @@ import {
 const cleanupRoots: string[] = [];
 const ISSUE_ID = '0b2377a2-366f-4309-a508-610e524c9d94';
 const ISSUE_IDENTIFIER = 'CO-393';
+const TASK_ID = `linear-${ISSUE_ID}`;
 const CONTROL_HOST_TASK_ID = 'local-mcp';
 const CONTROL_HOST_RUN_ID = 'control-host';
 const LAUNCH_TOKEN = 'launch-token';
 
 afterEach(async () => {
-  await Promise.all(cleanupRoots.splice(0).map((root) =>
-    rm(root, { recursive: true, force: true })
-  ));
+  await Promise.all(cleanupRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
 describe('provider-linear-worker direct-start guard', () => {
@@ -37,20 +36,27 @@ describe('provider-linear-worker direct-start guard', () => {
     expectGuard({ env: createGuardEnv(runsRoot) }).not.toThrow();
   });
 
-  const copiedProvenanceCases = [
+  const copiedProvenanceCases: Array<[
+    string,
+    { issueId?: string; issueIdentifier?: string; taskId?: string; env?: Record<string, string | undefined>; claim?: Record<string, unknown> },
+    RegExp
+  ]> = [
     ['a different requested issue', { issueId: 'different-linear-issue' }, /reservation for requested issue is missing/u],
     ['a different requested identifier', { issueIdentifier: 'CO-999' }, /issue identifier mismatch/u],
+    ['a different requested task', { taskId: 'linear-other-issue' }, /task id mismatch/u],
     ['a mismatched launch token', { env: { [PROVIDER_LAUNCH_TOKEN_ENV]: 'copied-wrong-token' } }, /launch provenance mismatch/u],
+    ['a consumed reservation', { claim: { state: 'running', run_id: 'run-1' } }, /already consumed/u],
     ['a different control-host task or run', { env: { [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: 'other-control-host' } }, /provider-intake state could not be read/u]
-  ] as const;
+  ];
 
   for (const [name, input, message] of copiedProvenanceCases) {
     it(`rejects copied provenance for ${name}`, async () => {
-      const runsRoot = await createRunsRoot(providerIntakeState());
+      const runsRoot = await createRunsRoot(providerIntakeState(input.claim));
 
       expectGuard({
         issueId: input.issueId,
         issueIdentifier: input.issueIdentifier,
+        taskId: input.taskId,
         env: createGuardEnv(runsRoot, input.env)
       }).toThrow(message);
     });
@@ -58,25 +64,18 @@ describe('provider-linear-worker direct-start guard', () => {
 
   it('rejects missing or malformed control-host intake state', async () => {
     const missingRoot = await createRunsRoot();
-    expectGuard({ env: createGuardEnv(missingRoot) }).toThrow(
-      /provider-intake state could not be read/u
-    );
+    expectGuard({ env: createGuardEnv(missingRoot) }).toThrow(/provider-intake state could not be read/u);
 
     const malformedRoot = await createRunsRoot('{not-json');
-    expectGuard({ env: createGuardEnv(malformedRoot) }).toThrow(
-      /provider-intake state could not be read/u
-    );
+    expectGuard({ env: createGuardEnv(malformedRoot) }).toThrow(/provider-intake state could not be read/u);
   });
 });
 
-function expectGuard(input: {
-  issueId?: string;
-  issueIdentifier?: string;
-  env: Record<string, string | undefined>;
-}) {
+function expectGuard(input: { issueId?: string; issueIdentifier?: string; taskId?: string; env: Record<string, string | undefined> }) {
   return expect(() =>
     assertProviderLinearWorkerStartAllowed({
       pipelineId: 'provider-linear-worker',
+      taskId: input.taskId ?? TASK_ID,
       issueId: input.issueId ?? ISSUE_ID,
       issueIdentifier: input.issueIdentifier ?? ISSUE_IDENTIFIER,
       env: input.env
@@ -90,11 +89,7 @@ async function createRunsRoot(state?: unknown): Promise<string> {
   const stateDir = join(runsRoot, CONTROL_HOST_TASK_ID, 'cli', CONTROL_HOST_RUN_ID);
   await mkdir(stateDir, { recursive: true });
   if (state !== undefined) {
-    await writeFile(
-      join(stateDir, 'provider-intake-state.json'),
-      typeof state === 'string' ? state : JSON.stringify(state),
-      'utf8'
-    );
+    await writeFile(join(stateDir, 'provider-intake-state.json'), typeof state === 'string' ? state : JSON.stringify(state), 'utf8');
   }
   return runsRoot;
 }
@@ -104,21 +99,12 @@ function providerIntakeState(overrides: Record<string, unknown> = {}): unknown {
     schema_version: 1,
     updated_at: '2026-04-26T18:00:00.000Z',
     claims: [
-      {
-        provider: 'linear', provider_key: `linear:${ISSUE_ID}`, issue_id: ISSUE_ID,
-        issue_identifier: ISSUE_IDENTIFIER, issue_title: 'Control host provider recovery',
-        task_id: `linear-${ISSUE_ID}`, state: 'starting', launch_source: 'control-host',
-        launch_token: LAUNCH_TOKEN,
-        ...overrides
-      }
+      { provider: 'linear', provider_key: `linear:${ISSUE_ID}`, issue_id: ISSUE_ID, issue_identifier: ISSUE_IDENTIFIER, issue_title: 'Control host provider recovery', task_id: TASK_ID, state: 'starting', launch_source: 'control-host', launch_token: LAUNCH_TOKEN, ...overrides }
     ]
   };
 }
 
-function createGuardEnv(
-  runsRoot: string,
-  overrides: Record<string, string | undefined> = {}
-): Record<string, string | undefined> {
+function createGuardEnv(runsRoot: string, overrides: Record<string, string | undefined> = {}): Record<string, string | undefined> {
   return {
     CODEX_ORCHESTRATOR_RUNS_DIR: runsRoot, [PROVIDER_LAUNCH_SOURCE_ENV]: PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
     [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: CONTROL_HOST_TASK_ID, [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: CONTROL_HOST_RUN_ID,

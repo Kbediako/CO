@@ -6227,7 +6227,8 @@ export function createProviderIssueHandoffService(
 
   providerIssueHandoffService = {
     async recoverIssue(input): Promise<ProviderIssueHandoffRecoveryResult> {
-      const providerKey = buildProviderIssueKey(input.provider, input.issueId);
+      const readRecoveryClaim = (): ProviderIntakeClaimRecord | null =>
+        readProviderIntakeClaimByIssueRef(options.state, input.provider, input.issueId);
       return await runWithConfiguredWorkerHostsCache(async () =>
         await runWithProviderIssueRunDiscoveryCache(async () =>
           await runWithRefreshLifecycleLock(async () => {
@@ -6238,7 +6239,7 @@ export function createProviderIssueHandoffService(
                 action: input.action,
                 kind: 'skipped',
                 reason: 'provider_issue_recover_resolution_unavailable',
-                claim: readProviderIntakeClaim(options.state, providerKey)
+                claim: readRecoveryClaim()
               });
             }
 
@@ -6247,11 +6248,11 @@ export function createProviderIssueHandoffService(
               issueId: input.issueId
             });
             if (resolution.kind === 'release') {
-              const existingClaim = readProviderIntakeClaim(options.state, providerKey);
+              const existingClaim = readRecoveryClaim();
               if (existingClaim) {
                 const claimRuns = await discoverProviderIssueRunsForCurrentOperation({
                   provider: input.provider,
-                  issueId: input.issueId
+                  issueId: existingClaim.issue_id
                 });
                 const attachableClaimRuns = filterProviderIssueRunsForStartPipeline(
                   claimRuns,
@@ -6265,21 +6266,22 @@ export function createProviderIssueHandoffService(
               }
               return buildProviderIssueRecoveryResult({
                 provider: input.provider,
-                issueId: input.issueId,
+                issueId: existingClaim?.issue_id ?? input.issueId,
                 action: input.action,
                 kind: 'released',
                 reason: resolution.reason,
-                claim: readProviderIntakeClaim(options.state, providerKey)
+                claim: readRecoveryClaim()
               });
             }
             if (resolution.kind === 'skip') {
+              const existingClaim = readRecoveryClaim();
               return buildProviderIssueRecoveryResult({
                 provider: input.provider,
-                issueId: input.issueId,
+                issueId: existingClaim?.issue_id ?? input.issueId,
                 action: input.action,
                 kind: 'skipped',
                 reason: resolution.reason,
-                claim: readProviderIntakeClaim(options.state, providerKey)
+                claim: existingClaim
               });
             }
 
@@ -6982,6 +6984,18 @@ function buildProviderIssueRecoveryResult(input: {
     reason: input.reason,
     claim: input.claim ? summarizeProviderIssueRecoveryClaim(input.claim) : null
   };
+}
+
+function readProviderIntakeClaimByIssueRef(
+  state: ProviderIntakeState,
+  provider: 'linear',
+  issueRef: string
+): ProviderIntakeClaimRecord | null {
+  return readProviderIntakeClaim(state, buildProviderIssueKey(provider, issueRef)) ??
+    state.claims.find((claim) =>
+      claim.provider === provider &&
+      (claim.issue_id === issueRef || claim.issue_identifier === issueRef)
+    ) ?? null;
 }
 
 function summarizeProviderIssueRecoveryClaim(
