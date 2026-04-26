@@ -37,7 +37,7 @@
             "CO-397",
             "CO-398"
           ],
-          "summary": "Added fallback-expiry and large-refactor policy, docs-first prompts, micro-task guardrail, and follow-up ownership for five fallback-heavy areas; validation gates passed, the standalone-review P2 findings were addressed, and final bounded review found no actionable regressions."
+          "summary": "Added fallback-expiry and large-refactor policy, docs-first prompts, micro-task guardrail, and follow-up ownership for five fallback-heavy areas; validation gates passed, standalone-review P2 findings were addressed, and expiring follow-up rows now carry concrete oldest-known introduced dates."
         },
         "standalone_review": {
           "reviewer": "codex-orchestrator review",
