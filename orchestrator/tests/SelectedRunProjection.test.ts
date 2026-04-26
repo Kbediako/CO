@@ -6638,7 +6638,8 @@ describe('SelectedRunProjection', () => {
       createProjectionContext(paths, providerIntakeState)
     );
 
-    expect(discovery.running.map((entry) => entry.runId)).toEqual(
+    const runningRunIds = discovery.running.map((entry) => entry.runId ?? '');
+    expect(runningRunIds).toEqual(
       expect.arrayContaining([
         syntheticLocalRunId,
         syntheticUnrelatedLocalRunId,
@@ -6646,7 +6647,9 @@ describe('SelectedRunProjection', () => {
         'run-active'
       ])
     );
-    expect(discovery.all.map((entry) => entry.runId)).not.toContain('run-released-active-looking');
+    const allRunIds = discovery.all.map((entry) => entry.runId ?? '');
+    expect(allRunIds).not.toContain('run-released-active-looking');
+    expect(allRunIds.filter((runId) => runId.startsWith('run-zreleased-'))).toEqual([]);
   });
 
   it('reconciles orphaned active provider manifests with released claim and newer terminal run truth', async () => {

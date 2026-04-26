@@ -14,6 +14,15 @@
         "task": "tasks/tasks-linear-1383a1c1-3937-4eb9-b205-050d299e85d5.md",
         "agent_task": ".agent/task/linear-1383a1c1-3937-4eb9-b205-050d299e85d5.md",
         "docs": "docs/TECH_SPEC-linear-1383a1c1-3937-4eb9-b205-050d299e85d5.md"
+      },
+      "approvals": {
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-26",
+          "status": "succeeded",
+          "manifest": ".runs/linear-1383a1c1-3937-4eb9-b205-050d299e85d5-docs-review/cli/2026-04-26T07-42-56-811Z-2ac17e2e/manifest.json",
+          "summary": "Docs-review child stream passed for the CO-391 docs-first packet before implementation."
+        }
       }
     },
     {
