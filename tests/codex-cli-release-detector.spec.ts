@@ -795,7 +795,7 @@ describe('codex CLI release detector', () => {
 
     expect(exitCode).toBe(0);
     expect(artifact.decision_state).toBe('new_audit_required');
-    expect(artifact.last_audited_version).toBe('0.125.0');
+    expect(artifact.current_co.policy.last_audited_version).toBe('0.125.0');
     expect(artifact.mutation_result.action).toBe('dry_run');
   });
 
@@ -820,7 +820,7 @@ describe('codex CLI release detector', () => {
 
     expect(exitCode).toBe(0);
     expect(artifact.decision_state).toBe('new_audit_required');
-    expect(artifact.last_audited_version).toBe('0.125.0');
+    expect(artifact.current_co.policy.last_audited_version).toBe('0.125.0');
     expect(artifact.mutation_result.action).toBe('dry_run');
   });
 
@@ -941,7 +941,7 @@ describe('codex CLI release detector', () => {
     expect(artifact).toMatchObject({
       schema_version: 1,
       decision_state: 'no_new_audit_required',
-      last_audited_version: '0.125.0',
+      current_co: { policy: { last_audited_version: '0.125.0' } },
       mutation_result: { action: 'skipped' }
     });
   });
