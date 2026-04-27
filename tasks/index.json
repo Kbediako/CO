@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260427-linear-c8e3a464-ec50-4fa4-aff5-d8a780626600",
+      "title": "CO-403 provider-worker retry recovery for completed child lanes and stale proof locks",
+      "relates_to": "tasks/tasks-linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-27",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-27",
+          "status": "produced",
+          "source_anchor": "ctx:sha256:2891fad4a006dbd008954246bf08d58e33dc4da0c33723f4e2d3006f7d4bbbc3#chunk:c000001",
+          "summary": "Docs-first packet created for CO-403 from embedded issue text only. The packet preserves parallelize_now enforcement, shapes retry recovery for lineage-bound completed same-issue child lanes pending parent acceptance, requires stale orphaned provider-linear-worker-proof.json.lock recovery through explicit stale timeout and live-lock keepalive, and keeps proof/co-status recovered state truthful without folding in unrelated CO-400 current-state authority work.",
+          "evidence": ".runs/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600-co403-docs-review-rerun/cli/2026-04-27T16-13-51-159Z-7639081b/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",
+        "task": "tasks/tasks-linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",
+        "agent_task": ".agent/task/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",
+        "docs": "tasks/specs/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md"
+      }
+    },
+    {
       "id": "20260427-linear-f04ab1c2-79e6-4a98-84e1-85efb6583116",
       "title": "CO-398 control-host status fallback projection expiry",
       "relates_to": "tasks/tasks-linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md",
