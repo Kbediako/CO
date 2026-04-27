@@ -156,19 +156,38 @@ export async function resolveAttachTarget(flags: ArgMap): Promise<CoStatusAttach
     taskId: manifest.taskId ?? locator.taskId,
     runId: manifest.runId ?? locator.runId,
     runDir,
-    workspaceRoot: resolveAttachWorkspaceRoot(),
+    workspaceRoot: resolveAttachWorkspaceRoot({
+      manifestPath: resolvedManifestPath,
+      manifestWorkspacePath: manifest.workspacePath,
+      runDir
+    }),
     baseUrl,
     token
   };
 }
 
-function resolveAttachWorkspaceRoot(): string {
-  let workspaceRoot: string;
-  try {
-    workspaceRoot = resolveEnvironmentPaths().repoRoot;
-  } catch {
-    workspaceRoot = process.cwd();
+function resolveAttachWorkspaceRoot(input: {
+  manifestPath: string;
+  manifestWorkspacePath: string | null;
+  runDir: string;
+}): string {
+  const workspaceRoot =
+    input.manifestWorkspacePath !== null
+      ? resolve(dirname(input.manifestPath), input.manifestWorkspacePath)
+      : deriveWorkspaceRootFromRunDir(input.runDir);
+  return canonicalizeAttachWorkspaceRoot(workspaceRoot);
+}
+
+function deriveWorkspaceRootFromRunDir(runDir: string): string {
+  const resolvedRunDir = resolve(runDir);
+  const derived = deriveTaskRunFromRunDir(resolvedRunDir);
+  if (derived.taskId !== null && derived.runId !== null) {
+    return dirname(dirname(dirname(dirname(resolvedRunDir))));
   }
+  return dirname(resolvedRunDir);
+}
+
+function canonicalizeAttachWorkspaceRoot(workspaceRoot: string): string {
   try {
     return realpathSync(workspaceRoot);
   } catch {
@@ -212,16 +231,21 @@ function resolveAttachLocator(input: {
 
 async function readAttachManifest(
   manifestPath: string
-): Promise<{ taskId: string | null; runId: string | null }> {
+): Promise<{ taskId: string | null; runId: string | null; workspacePath: string | null }> {
   try {
     const raw = await readFile(manifestPath, 'utf8');
-    const parsed = JSON.parse(raw) as { task_id?: unknown; run_id?: unknown };
+    const parsed = JSON.parse(raw) as {
+      run_id?: unknown;
+      task_id?: unknown;
+      workspace_path?: unknown;
+    };
     return {
       taskId: normalizeOptionalString(parsed.task_id),
-      runId: normalizeOptionalString(parsed.run_id)
+      runId: normalizeOptionalString(parsed.run_id),
+      workspacePath: normalizeOptionalString(parsed.workspace_path)
     };
   } catch {
-    return { taskId: null, runId: null };
+    return { taskId: null, runId: null, workspacePath: null };
   }
 }
 
