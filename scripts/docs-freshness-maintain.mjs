@@ -995,8 +995,10 @@ async function verifyOwnerIssueContext(repoRoot, ownerIssue, ownerConfig = null)
         workflowState?.is_terminal ?? workflowState?.isTerminal ?? issueContext?.is_terminal ?? issueContext?.isTerminal
       )
     });
+    const configuredScopeMismatch = workspaceMatches === false || teamMatches === false || projectMatches === false;
+    // same_project is deliberately project-scoped; workspace/team matches alone are not project proof.
     const sameProject =
-      projectMatches === false || teamMatches === false || workspaceMatches === false
+      configuredScopeMismatch
         ? false
         : expectedProjectId
           ? projectMatches
