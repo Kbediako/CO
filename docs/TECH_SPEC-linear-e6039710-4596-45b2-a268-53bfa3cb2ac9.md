@@ -16,12 +16,13 @@ This mirror points to the canonical task spec at `tasks/specs/linear-e6039710-45
 - Preserve CO-401 as a docs freshness maintenance lane covering both `docs:freshness` and `docs:freshness:maintain`.
 - Keep the protected evidence intact: `last_review=2026-03-27`, `30 stale docs`, `blocking_changed_paths=[]`, `CO-343 owner verification failed`, and `docs:freshness:maintain canonical owner key`.
 - Child-lane output was bounded to docs-first packet and task registration mirrors; parent rejected the stale-base patch and adapted the packet on current `origin/main`.
-- Parent implementation owns reproducing the stale Mar 27 cohort, verifying the owner failure, reviewing the five affected packets, updating freshness metadata, and running validation.
+- Parent implementation owns reproducing the stale Mar 27 cohort, verifying the owner failure, re-homing the live `docs/docs-catalog.json` owner issue to CO-401, reviewing the five affected packets, updating freshness metadata, and running validation.
 - Do not weaken freshness policy, rename the canonical owner key, or broaden into CO-390 release-detector surfaces.
 
 ## Parent-Owned Implementation Boundaries
 - Review and refresh the exact stale Mar 27 cohort only after evidence supports the refresh.
 - Record owner verification for `docs:freshness:maintain` without changing the canonical owner key.
+- Re-home `docs/docs-catalog.json` `rolling_freshness_cohorts.owner_issue` to live same-project `CO-401` after verifying `CO-343` is invalid.
 - Update `docs/docs-freshness-registry.json` only after the affected packet/mirror contents are reviewed.
 - Keep scripts, tests, package files, and release-detector surfaces out of this lane.
 

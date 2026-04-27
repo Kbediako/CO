@@ -40,8 +40,8 @@
 1. Parent reproduces the baseline with `npm run docs:freshness`.
 2. Parent reproduces or verifies maintenance owner state with `npm run docs:freshness:maintain`.
 3. Parent classifies the exact `30 stale docs` at `last_review=2026-03-27`.
-4. Parent repairs the stale cohort and records the invalid `CO-343` owner evidence while preserving the `docs:freshness:maintain canonical owner key`.
-5. Parent updates required `docs/docs-freshness-registry.json` rows and stale TECH_SPEC/task-spec frontmatter after review.
+4. Parent repairs the stale cohort, records the invalid `CO-343` owner evidence, and re-homes the live `docs/docs-catalog.json` owner issue to same-project `CO-401` while preserving the `docs:freshness:maintain canonical owner key`.
+5. Parent updates required `docs/docs-freshness-registry.json` rows, the freshness cohort guide, and stale TECH_SPEC/task-spec frontmatter after review.
 6. Parent reruns validation and owns PR/review lifecycle.
 
 ## Dependencies

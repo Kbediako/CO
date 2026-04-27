@@ -10,9 +10,9 @@ The machine-readable policy lives in `docs/docs-catalog.json` under `policies.ro
 
 Current CO policy:
 
-- Owner issue: `CO-343`
+- Owner issue: `CO-401`
 - Exact canonical owner overrides: `canonical_owner_issues[]` may map one `canonical_owner_key` to one live owner issue, such as `CO-320` for `docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30`
-- Historical owner lineage: `CO-175` established the Apr 14 baseline, `CO-267` owned the Apr 20/21 maintenance refreshes, `CO-300` owned the Apr 22 reset, and `CO-324` owned the Apr 23 reset; these are now terminal evidence only and must not remain the live maintenance owner after they reach terminal states.
+- Historical owner lineage: `CO-175` established the Apr 14 baseline, `CO-267` owned the Apr 20/21 maintenance refreshes, `CO-300` owned the Apr 22 reset, `CO-324` owned the Apr 23 reset, and `CO-343` owned the Apr 24/25 reset before later owner verification failed; these are now terminal or invalid evidence only and must not remain the live maintenance owner after they reach terminal or unverifiable states.
 - Window: `7` days after the normal freshness cadence expires
 - Maximum active rolling cohorts: `2`
 - Maximum rolling rows: `300`
@@ -291,3 +291,16 @@ CO-378 reproduced the remaining Apr 26 blocker while unblocking CO-375:
 
 ### Post-refresh Disposition
 CO-378 reviews the CO-21 terminal packet directly instead of changing rolling policy, increasing caps, or hiding the debt under terminal `CO-343`. The exact CO-21 registry rows plus matching spec/task-index review dates are refreshed to `last_review=2026-04-26`; stale specs `0955` and `0956` are also refreshed as the hard spec-guard tail for this branch.
+
+## Apr 27 Mar 27 Reviewed Refresh and Owner Re-home
+
+### Reproduction / Baseline Findings
+CO-401 reproduced the Apr 27 current-main blocker while unblocking unrelated clean feature diffs:
+
+- `npm run docs:freshness` reported `30` stale task packet/mirror rows at `last_review=2026-03-27`, `cadence_days=30`, `age_days=31`, and `overdue_days=1`.
+- `docs:freshness:maintain` reported `freshness_decision=block_diff_local`, `blocking_changed_paths=[]`, and owner verification failure for configured owner `CO-343`.
+- Direct Linear verification showed `CO-343` was not a valid same-project live owner for the current maintenance scope.
+- Parent review classified the five affected Mar 27 task packets before refreshing any metadata: CO-8 runtime proof, CO-23 DNS-aware runtime proof, CO-13 child-stream support, CO-7 operator observability, and CO-5 terminal cleanup.
+
+### Post-refresh Disposition
+CO-401 re-homes the live rolling-freshness owner metadata to same-project issue `CO-401`, preserves the canonical owner key `docs:freshness:maintain`, and keeps `CO-343` only as historical invalid-owner evidence. The exact reviewed Mar 27 registry rows plus matching spec/task-index review dates are refreshed to `last_review=2026-04-27`; post-fix `docs:freshness` and `docs:freshness:maintain` return clean with `0` stale rows, no candidate cohorts, and `blocking_changed_paths=[]`.

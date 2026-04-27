@@ -19,6 +19,13 @@
           "source_anchor": "ctx:sha256:59e2417b10419f81edc5b5394c8ed53b584f71012609edf951815cfd26cdea85#chunk:c000001",
           "summary": "Child lane completed successfully and produced the CO-401 docs-first packet, but its patch was generated from stale parent_snapshot base 54c1d433 and did not apply cleanly to refreshed origin/main ccce44862. Parent adapted the packet to current origin/main and retained the protected docs:freshness/docs:freshness:maintain issue contract."
         },
+        "docs_review_child_stream": {
+          "reviewer": "bounded same-issue docs-review child stream",
+          "date": "2026-04-27",
+          "status": "succeeded-parent-addressed-p2",
+          "manifest": ".runs/linear-e6039710-4596-45b2-a268-53bfa3cb2ac9-docs-review/cli/2026-04-27T01-28-33-274Z-5a9dc298/manifest.json",
+          "summary": "Docs-review reran delegation guard, spec guard, docs:check, docs:freshness:maintain, and forced review; parent addressed the P2 by re-homing rolling_freshness_cohorts.owner_issue from invalid CO-343 to live same-project CO-401 while preserving the docs:freshness:maintain canonical owner key."
+        },
         "issue_quality": {
           "reviewer": "parent provider worker",
           "date": "2026-04-27",
@@ -7332,7 +7339,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-27",
+      "last_review": "2026-04-27",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
@@ -7355,7 +7362,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-27",
+      "last_review": "2026-04-27",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
@@ -7378,7 +7385,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-27",
+      "last_review": "2026-04-27",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
@@ -7402,7 +7409,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-27",
+      "last_review": "2026-04-27",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
@@ -7425,7 +7432,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-27",
+      "last_review": "2026-04-27",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
