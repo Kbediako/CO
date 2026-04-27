@@ -3,7 +3,7 @@
 ## Added by Docs Packet 2026-04-27
 
 ## Summary
-- Goal: Shape CO-403 so the parent implementation can recover already-completed same-issue child lanes during provider-worker retries and reclaim stale orphaned proof locks without weakening fail-closed enforcement.
+- Goal: Shape CO-403, so the parent implementation can recover already-completed same-issue child lanes during provider-worker retries and reclaim stale orphaned proof locks without weakening fail-closed enforcement.
 - Scope: Docs-first packet only in this child lane; parent lane owns source/test edits, Linear/workpad/PR lifecycle, review, and validation.
 - Assumptions: The embedded issue text is authoritative; the source payload path referenced by the parent run is absent in this child checkout; `tasks/specs/...` is the scoped TECH_SPEC path for this packet.
 

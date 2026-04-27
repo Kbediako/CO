@@ -5870,6 +5870,7 @@ function deriveProviderLinearWorkerParallelizationRecord(input: {
     ...snapshot,
     child_lane_count: selectEffectiveParallelizationChildLanes({
       childLanes: input.childLanes,
+      attemptStartedAt: input.attemptStartedAt,
       currentTurnStartedAt: boundary,
       issueId: input.issueId,
       currentParallelization: snapshot,
@@ -5961,11 +5962,13 @@ function readProviderLinearParallelizationSnapshotsBefore(
 
 function selectRecoverablePriorAttemptSuccessfulChildLanes(input: {
   childLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined;
+  attemptStartedAt: string | null | undefined;
   currentTurnStartedAt: string | null | undefined;
   issueId: string | null | undefined;
   currentParallelization: ProviderLinearParallelizationSnapshot | null | undefined;
   priorParallelizations: ProviderLinearParallelizationSnapshot[] | null | undefined;
 }): ProviderLinearWorkerChildLaneRecord[] {
+  const attemptStartedAt = normalizeOptionalString(input.attemptStartedAt);
   const currentTurnStartedAt = normalizeOptionalString(input.currentTurnStartedAt);
   const issueId = normalizeOptionalString(input.issueId);
   const currentParallelization = input.currentParallelization ?? null;
@@ -5974,6 +5977,7 @@ function selectRecoverablePriorAttemptSuccessfulChildLanes(input: {
     : [];
   if (
     !Array.isArray(input.childLanes) ||
+    !attemptStartedAt ||
     !currentTurnStartedAt ||
     !issueId ||
     priorParallelizations.length === 0 ||
@@ -5999,6 +6003,7 @@ function selectRecoverablePriorAttemptSuccessfulChildLanes(input: {
           snapshot.decision === 'parallelize_now' &&
           compareIsoTimestamp(snapshot.recorded_at, childLane.launched_at) <= 0
       ) &&
+      compareIsoTimestamp(childLane.launched_at, attemptStartedAt) < 0 &&
       compareIsoTimestamp(childLane.launched_at, currentTurnStartedAt) < 0
     );
   });
@@ -6008,21 +6013,37 @@ function parallelizationSummaryNamesRecoveredChildLane(
   summary: string | null | undefined,
   childLane: ProviderLinearWorkerChildLaneRecord
 ): boolean {
-  const markerTokens = new Set(
-    (normalizeOptionalString(summary)?.toLowerCase() ?? '').split(/\s+/).filter(Boolean)
-  );
+  const normalizedSummary = normalizeOptionalString(summary)?.toLowerCase() ?? '';
   const stream = normalizeOptionalString(childLane.stream)?.toLowerCase() ?? '';
   const runId = normalizeOptionalString(childLane.run_id)?.toLowerCase() ?? '';
   if (!stream || !runId) {
     return false;
   }
   return (
-    markerTokens.has(`recover_child_lane:${stream}`) && markerTokens.has(`recover_run:${runId}`)
+    parallelizationSummaryContainsRecoveryMarker(normalizedSummary, 'recover_child_lane', stream) &&
+    parallelizationSummaryContainsRecoveryMarker(normalizedSummary, 'recover_run', runId)
   );
+}
+
+function parallelizationSummaryContainsRecoveryMarker(
+  normalizedSummary: string,
+  markerName: string,
+  markerValue: string
+): boolean {
+  const pattern = new RegExp(
+    `(?:^|[^a-z0-9_:-])${escapeRegExp(markerName)}:${escapeRegExp(markerValue)}(?=$|[^a-z0-9_:-])`,
+    'u'
+  );
+  return pattern.test(normalizedSummary);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 }
 
 function selectEffectiveParallelizationChildLanes(input: {
   childLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined;
+  attemptStartedAt: string | null | undefined;
   currentTurnStartedAt: string | null | undefined;
   issueId: string | null | undefined;
   currentParallelization: ProviderLinearParallelizationSnapshot | null | undefined;
@@ -6051,6 +6072,7 @@ function selectEffectiveParallelizationChildLanes(input: {
 
 function hasRecoverablePriorAttemptSuccessfulChildLaneLaunch(input: {
   childLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined;
+  attemptStartedAt: string | null | undefined;
   currentTurnStartedAt: string | null | undefined;
   issueId: string | null | undefined;
   currentParallelization: ProviderLinearParallelizationSnapshot | null | undefined;
@@ -6144,6 +6166,7 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
     hasCurrentTurnSuccessfulChildLaneLaunch(input.proof.child_lanes, currentTurnBoundary) ||
     hasRecoverablePriorAttemptSuccessfulChildLaneLaunch({
       childLanes: input.proof.child_lanes,
+      attemptStartedAt: input.proof.attempt_started_at,
       currentTurnStartedAt: currentTurnBoundary,
       issueId: input.proof.issue_id,
       currentParallelization: parallelization,

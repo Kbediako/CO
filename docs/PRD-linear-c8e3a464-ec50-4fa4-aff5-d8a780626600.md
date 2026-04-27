@@ -40,22 +40,9 @@
 - Broaden into unrelated CO-400 current-state authority repairs.
 - Change Linear state, workpads, PR lifecycle, source code, or tests in this docs-packet child lane.
 
-## Stakeholders
-- Product: CO provider-worker operators relying on accurate retry and status behavior.
-- Engineering: Codex Orchestrator maintainers responsible for provider-worker child lanes, proof sidecars, locking, and status projection.
-- Design: Not applicable.
-
-## Metrics & Guardrails
-- Primary Success Metrics: CO-400-shaped retry fixture proceeds to parent patch acceptance after prior child-lane success; stale lock recovery fixture reclaims dead-owner locks while concurrent writers remain serialized; `co-status` and proof assertions show recovered truth.
-- Guardrails / Error Budgets: Zero tolerance for unrelated child-lane attribution, hidden stale snapshots, proof JSON corruption, manual recovery requirements, or weakened missing-child fail-closed errors.
-
-## User Experience
-- Personas: Provider-worker operator, parent-lane orchestrator, and reviewer validating proof/status evidence.
-- User Journeys: A provider-worker attempt launches a same-issue child lane, fails or restarts before parent acceptance, resumes, recognizes the completed child lane as pending parent acceptance, reclaims only stale orphaned proof locks, and continues without hiding recovery behind stale state.
-
 ## Technical Considerations
-- Architectural Notes: Implementation should focus on `providerLinearWorkerRunner.ts`, `withProviderLinearWorkerProofLock`, and `orchestrator/src/persistence/lockFile.ts`; proof/status projection must report the recovered child-lane and lock state rather than relying only on stale attempt-local snapshots.
-- Dependencies / Integrations: Existing same-issue child-lane proof artifacts, provider-worker proof sidecar, lock-file persistence, and `co-status` projection. This docs packet does not inspect or mutate Linear/GitHub lifecycle surfaces.
+- Primary guardrail: CO-400-shaped retry succeeds only for lineage-matched prior-attempt child lanes pending acceptance; stale lock recovery remains timeout-gated and serialized; proof/status surfaces show recovered truth.
+- Dependencies: Existing same-issue child-lane proof artifacts, provider-worker proof sidecar, lock-file persistence, and `co-status` projection.
 
 ## Fallback / Refactor Decision
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `Yes`.
@@ -69,12 +56,3 @@
 
 - Durable retention evidence: The stale-lock recovery path is retained as a durable lock-file safety contract, not a temporary bypass. It must prove stale-timeout recovery, live-lock keepalive, and exclusive writer behavior before reclaiming a lock.
 - Large-refactor check: A large provider-worker current-state authority refactor is explicitly out of scope for CO-403. A narrow fix is acceptable only because CO-403 is limited to active-decision child-lane retry recovery, stale proof-lock recovery, and truthful proof/status projection; broader CO-400 authority work must remain separate.
-
-## Open Questions
-- Does `orchestrator/src/persistence/lockFile.ts` need any additional shared stale-lock diagnostics beyond the provider-worker-specific stale timeout and keepalive policy?
-- Which proof field should mark a recovered completed child lane as pending parent acceptance without making it look accepted before the parent applies the patch?
-
-## Approvals
-- Product: Pending parent lane review.
-- Engineering: Pending parent lane review.
-- Design: Not applicable.

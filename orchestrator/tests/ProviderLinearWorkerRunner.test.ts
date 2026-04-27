@@ -9421,13 +9421,14 @@ for await (const line of rl) {
     const lockPath = join(runDir, `${PROVIDER_LINEAR_WORKER_PROOF_FILENAME}.lock`);
     await writeFile(proofPath, JSON.stringify(buildInProgressProof()), 'utf8');
     await writeFile(lockPath, 'orphan-owner', 'utf8');
-    const staleMtime = new Date(Date.now() - 10 * 60 * 1000);
+    const refreshNow = new Date('2026-03-21T09:10:00.000Z');
+    const staleMtime = new Date(refreshNow.getTime() - 10 * 60 * 1000);
     await utimes(lockPath, staleMtime, staleMtime);
 
     const refreshed = await refreshProviderLinearWorkerProofSnapshot(
       runDir,
       null,
-      () => '2026-03-21T09:10:00.000Z',
+      () => refreshNow.toISOString(),
       undefined,
       {},
       { skipSessionLogHydration: true }
@@ -14746,7 +14747,7 @@ for await (const line of rl) {
     );
   });
 
-  it('fails closed when retry recovery markers only prefix-match a prior child lane', async () => {
+  it('fails closed when retry recovery markers only extend a prior child lane', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
 
     await appendParallelizationDecisionAudit(runDir, {
@@ -14814,7 +14815,100 @@ for await (const line of rl) {
               decision: 'parallelize_now',
               reason: 'independent_scope_available',
               summary:
-                'Recover the longer prior pending child lane. recover_child_lane:impl-a recover_run:child-run-10',
+                'Recover the colon-suffixed prior pending child lane. recover_child_lane:impl recover_run:child-run-1:retry',
+              recordedAt: '2026-03-21T09:00:03.100Z'
+            });
+            return {
+              exitCode: 0,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+                '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:00:04.000Z"}}'
+              ].join('\n'),
+              stderr: ''
+            };
+          }),
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+            .mockReturnValue('2026-03-21T09:00:03.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      )
+    ).rejects.toThrow(
+      'provider-linear-worker recorded `parallelize_now` for the current turn, but no same-issue child lane launched during that turn completed successfully.'
+    );
+  });
+
+  it('fails closed when retry recovery markers name a same-attempt earlier-turn child lane', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+
+    await appendParallelizationDecisionAudit(runDir, {
+      decision: 'parallelize_now',
+      reason: 'independent_scope_available',
+      summary: 'Launch a bounded implementation child lane in this attempt.',
+      recordedAt: '2026-03-21T09:00:00.500Z'
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, {
+      stream: 'impl-a',
+      pipeline_id: 'provider-linear-child-lane',
+      task_id: 'linear-lin-issue-1-impl-a',
+      run_id: 'child-run-1',
+      status: 'succeeded',
+      manifest_path: join(
+        tempRoot ?? '',
+        '.runs',
+        'linear-lin-issue-1-impl-a',
+        'cli',
+        'child-run-1',
+        'manifest.json'
+      ),
+      artifact_root: '.runs/linear-lin-issue-1-impl-a/cli/child-run-1',
+      log_path: '.runs/linear-lin-issue-1-impl-a/cli/child-run-1/run.log',
+      summary: 'same-attempt earlier-turn child lane completed successfully',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2',
+      workspace_path: tempRoot,
+      source_setup: null,
+      launched_at: '2026-03-21T09:00:01.000Z',
+      purpose: 'Implement bounded same-issue child lanes',
+      instructions: null,
+      scope: {
+        files: ['orchestrator/src/cli/providerLinearWorkerRunner.ts'],
+        phases: []
+      },
+      parent_snapshot: {
+        base_sha: 'parent-base-sha',
+        issue_updated_at: '2026-03-21T09:00:01.000Z',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        captured_at: '2026-03-21T09:00:01.000Z'
+      },
+      lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'impl-a-child-run-1'),
+      patch_artifact_path: join(tempRoot ?? '', '.child-lanes', 'impl-a-child-run-1.patch'),
+      patch_bytes: 42,
+      decision: 'pending',
+      decision_at: null,
+      decision_reason: null
+    });
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner: vi.fn(async (request) => {
+            await appendParallelizationDecisionAuditForRequest(request, {
+              decision: 'parallelize_now',
+              reason: 'independent_scope_available',
+              summary:
+                'Recover markers are present, but this lane belongs to the same attempt. recover_child_lane:impl-a recover_run:child-run-1',
               recordedAt: '2026-03-21T09:00:03.100Z'
             });
             return {
@@ -14906,7 +15000,7 @@ for await (const line of rl) {
             decision: 'parallelize_now',
             reason: 'independent_scope_available',
             summary:
-              'Recover the prior pending child lane instead of launching a duplicate. recover_child_lane:impl-a recover_run:child-run-1',
+              'Recover the prior pending child lane instead of launching a duplicate. `recover_child_lane:impl-a`, `recover_run:child-run-1`.',
             recordedAt: '2026-03-21T09:00:03.100Z'
           });
           await transactProviderLinearWorkerChildLanes(runDir, async (records) => ({

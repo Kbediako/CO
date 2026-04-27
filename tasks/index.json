@@ -15,17 +15,15 @@
           "date": "2026-04-27",
           "status": "produced",
           "source_anchor": "ctx:sha256:2891fad4a006dbd008954246bf08d58e33dc4da0c33723f4e2d3006f7d4bbbc3#chunk:c000001",
-          "summary": "Docs-first packet created for CO-403 from embedded issue text only. The packet preserves parallelize_now enforcement, shapes retry recovery for lineage-bound completed same-issue child lanes pending parent acceptance, requires stale orphaned provider-linear-worker-proof.json.lock recovery through explicit stale timeout and live-lock keepalive, and keeps proof/co-status recovered state truthful without folding in unrelated CO-400 current-state authority work."
+          "summary": "Docs-first packet created for CO-403 from embedded issue text only. The packet preserves parallelize_now enforcement, shapes retry recovery for lineage-bound completed same-issue child lanes pending parent acceptance, requires stale orphaned provider-linear-worker-proof.json.lock recovery through explicit stale timeout and live-lock keepalive, and keeps proof/co-status recovered state truthful without folding in unrelated CO-400 current-state authority work.",
+          "evidence": ".runs/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600-co403-docs-review-rerun/cli/2026-04-27T16-13-51-159Z-7639081b/manifest.json"
         }
       },
       "paths": {
         "spec": "tasks/specs/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",
         "task": "tasks/tasks-linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",
         "agent_task": ".agent/task/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md"
-        }
+        "docs": "tasks/specs/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md"
       }
     },
     {
