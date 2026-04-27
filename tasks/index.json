@@ -17,7 +17,7 @@
           "status": "rejected-stale-base-parent-adapted",
           "manifest": ".runs/linear-e6039710-4596-45b2-a268-53bfa3cb2ac9-docs-packet/cli/2026-04-27T00-34-40-497Z-9d0e9a29/manifest.json",
           "source_anchor": "ctx:sha256:59e2417b10419f81edc5b5394c8ed53b584f71012609edf951815cfd26cdea85#chunk:c000001",
-          "summary": "Child lane completed successfully and produced the CO-401 docs-first packet, but its patch was generated from stale parent_snapshot base 54c1d433 and did not apply cleanly to refreshed origin/main ccce44862. Parent adapted the packet on current main and retained the protected docs:freshness/docs:freshness:maintain issue contract."
+          "summary": "Child lane completed successfully and produced the CO-401 docs-first packet, but its patch was generated from stale parent_snapshot base 54c1d433 and did not apply cleanly to refreshed origin/main ccce44862. Parent adapted the packet to current origin/main and retained the protected docs:freshness/docs:freshness:maintain issue contract."
         },
         "issue_quality": {
           "reviewer": "parent provider worker",
@@ -30,11 +30,7 @@
         "spec": "tasks/specs/linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md",
         "task": "tasks/tasks-linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md",
         "agent_task": ".agent/task/linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md"
       }
     },
     {
