@@ -135,7 +135,7 @@
     },
     "rolling_freshness_cohorts": {
       "enabled": true,
-      "owner_issue": "CO-343",
+      "owner_issue": "CO-401",
       "policy_doc": "docs/guides/docs-freshness-cohorts.md",
       "window_days": 7,
       "max_cohorts": 2,

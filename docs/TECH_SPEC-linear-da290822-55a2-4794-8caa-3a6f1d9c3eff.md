@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md
 risk: high
 owners:
   - Codex
-last_review: 2026-03-27
+last_review: 2026-04-27
 ---
 
 ## Canonical Reference
