@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { load } from 'js-yaml';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { runCodexCliReleaseDetector } from '../scripts/codex-cli-release-detector.mjs';
+import { parseArgs, runCodexCliReleaseDetector } from '../scripts/codex-cli-release-detector.mjs';
 
 const createdDirs: string[] = [];
 
@@ -668,6 +668,75 @@ describe('codex CLI release detector', () => {
       path: 'tests/pack-smoke.spec.ts',
       error: 'found unversioned @openai/codex install pin'
     });
+  });
+
+  it('fails closed when a required pin surface uses an unversioned npm install alias', async () => {
+    const repo = await writeFixtureRepo();
+    await writeFile(
+      join(repo, 'tests', 'pack-smoke.spec.ts'),
+      [
+        "const marketplaceCodexInstallCommand = 'npm i -g @openai/codex@0.125.0';",
+        "const driftProneCodexInstallCommand = 'npm i -g @openai/codex';"
+      ].join('\n'),
+      'utf8'
+    );
+
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: repo,
+      artifactPath: 'out/detection.json',
+      fetchImpl: mockFetch({ stable: '0.125.0' }),
+      env: {}
+    });
+
+    expect(exitCode).toBe(2);
+    expect(artifact.decision_state).toBe('blocked_current_truth_unavailable');
+    expect(artifact.current_co.missing_surfaces).toContainEqual({
+      path: 'tests/pack-smoke.spec.ts',
+      error: 'found unversioned @openai/codex install pin'
+    });
+  });
+
+  it('accepts versioned npm install aliases as required pins', async () => {
+    const repo = await writeFixtureRepo();
+    await writeFile(
+      join(repo, 'tests', 'pack-smoke.spec.ts'),
+      [
+        "const marketplaceCodexInstallCommand = 'npm i -g @openai/codex@0.125.0';",
+        "const cloudCanaryCodexInstallCommand = 'npm add --global @openai/codex@0.124.0';"
+      ].join('\n'),
+      'utf8'
+    );
+
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: repo,
+      artifactPath: 'out/detection.json',
+      fetchImpl: mockFetch({ stable: '0.125.0' }),
+      env: {}
+    });
+
+    expect(exitCode).toBe(0);
+    expect(artifact.current_co.missing_surfaces).toEqual([]);
+    expect(artifact.current_co.install_pins).toEqual(
+      expect.arrayContaining([
+        { path: 'tests/pack-smoke.spec.ts', version: '0.125.0' },
+        { path: 'tests/pack-smoke.spec.ts', version: '0.124.0' }
+      ])
+    );
+  });
+
+  it('defaults the Linear helper script to the inspected repo root', () => {
+    const priorLinearScript = process.env.CODEX_ORCHESTRATOR_LINEAR_SCRIPT;
+    delete process.env.CODEX_ORCHESTRATOR_LINEAR_SCRIPT;
+    try {
+      const args = parseArgs(['--repo-root', '/tmp/co-release-detector']);
+      expect(args.linearScript).toBe('/tmp/co-release-detector/dist/bin/codex-orchestrator.js');
+    } finally {
+      if (priorLinearScript === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_LINEAR_SCRIPT;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_LINEAR_SCRIPT = priorLinearScript;
+      }
+    }
   });
 
   it('accepts complete GitHub truth when the successful response consumes the last rate-limit quota', async () => {

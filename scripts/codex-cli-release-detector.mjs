@@ -281,6 +281,24 @@ function extractAuditedVersions(content) {
   return [...versions];
 }
 
+function extractCodexInstallTruth(content) {
+  const installPins = [];
+  let hasUnversionedInstall = false;
+  const installCommandPattern = /\bnpm\s+(?:install|i|add)\b([^\n\r;&|]*)/g;
+  for (const commandMatch of content.matchAll(installCommandPattern)) {
+    const commandArgs = commandMatch[1] ?? '';
+    for (const packageMatch of commandArgs.matchAll(/@openai\/codex(?:@(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?))?(?=$|[\s'",);\\])/g)) {
+      const version = packageMatch[1] ?? null;
+      if (version && parseSemver(version)) {
+        installPins.push(version);
+      } else {
+        hasUnversionedInstall = true;
+      }
+    }
+  }
+  return { installPins, hasUnversionedInstall };
+}
+
 export async function collectCurrentCoPins({ repoRoot = process.cwd(), readFileImpl = readFile } = {}) {
   const surfaces = [];
   const surfaceContents = new Map();
@@ -288,10 +306,7 @@ export async function collectCurrentCoPins({ repoRoot = process.cwd(), readFileI
   for (const surface of PIN_SURFACES) {
     try {
       const content = await readFileImpl(join(repoRoot, surface), 'utf8');
-      const installPins = [
-        ...content.matchAll(/npm install --global @openai\/codex@(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/g)
-      ].map((match) => match[1]);
-      const hasUnversionedInstall = /npm install --global @openai\/codex(?!@\d)/.test(content);
+      const { installPins, hasUnversionedInstall } = extractCodexInstallTruth(content);
       surfaceContents.set(surface, content);
       surfaces.push({
         path: surface,
@@ -806,7 +821,7 @@ export async function runCodexCliReleaseDetector({
   return { artifact, exitCode };
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const parsed = {
     repoRoot: process.cwd(),
     artifactPath: 'out/codex-cli-release-detection/detection.json',
@@ -815,7 +830,7 @@ function parseArgs(argv) {
     githubRepo: DEFAULT_GITHUB_REPO,
     npmPackage: DEFAULT_NPM_PACKAGE,
     linearNode: process.execPath,
-    linearScript: process.env.CODEX_ORCHESTRATOR_LINEAR_SCRIPT ?? join(process.cwd(), 'dist/bin/codex-orchestrator.js')
+    linearScript: process.env.CODEX_ORCHESTRATOR_LINEAR_SCRIPT ?? null
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -840,6 +855,7 @@ function parseArgs(argv) {
       throw new Error(`Unknown argument: ${arg}`);
     }
   }
+  parsed.linearScript ??= join(parsed.repoRoot, 'dist/bin/codex-orchestrator.js');
   return parsed;
 }
 
