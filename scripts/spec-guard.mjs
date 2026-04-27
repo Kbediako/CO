@@ -62,6 +62,22 @@ const REQUIRED_TEMPORARY_FALLBACK_COLUMNS = [
 ];
 const REQUIRED_FALLBACK_SEAM_COLUMNS = ['fallback / seam', 'fallback/seam', 'fallback'];
 const REQUIRED_OWNER_REFERENCES = ['CO-394', 'CO-395', 'CO-396', 'CO-397', 'CO-398'];
+const PLACEHOLDER_FALLBACK_VALUES = new Set([
+  'tbd',
+  'to be determined',
+  'pending',
+  'unknown',
+  'todo',
+  'later',
+  'not recorded',
+  'not available',
+  'unavailable',
+  'future cleanup',
+  'future follow up',
+  'future followup',
+  'future issue',
+  'future owner'
+]);
 const HIGH_CHURN_FALLBACK_SURFACES = [
   'provider workflow',
   'review wrapper',
@@ -370,7 +386,7 @@ function normalizeDecisionText(value) {
 function normalizePolicyEvidenceText(value) {
   return String(value)
     .replace(/[`*]/g, '')
-    .replace(/[-_]+/g, ' ')
+    .replace(/[-_:]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
@@ -470,6 +486,9 @@ function hasPlaceholderValue(value) {
     normalized === 'na' ||
     normalized === 'not applicable' ||
     normalized === '-' ||
+    PLACEHOLDER_FALLBACK_VALUES.has(normalized) ||
+    /^future (?:cleanup|follow ?up|issue|owner)\b/.test(normalized) ||
+    /^cleanup later\b/.test(normalized) ||
     /^<.*>$/.test(normalized)
   );
 }

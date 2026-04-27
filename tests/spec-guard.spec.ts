@@ -1293,6 +1293,32 @@ describe('spec-guard script', () => {
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
 
+  it('rejects placeholder metadata in expire fallback rows', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        owner: 'TBD',
+        trigger: 'pending',
+        removalCondition: 'future cleanup',
+        validation: 'unknown'
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback decision requires non-empty owner');
+    expect(stdout).toContain('expire fallback decision requires non-empty trigger');
+    expect(stdout).toContain('expire fallback decision requires non-empty removal condition');
+    expect(stdout).toContain('expire fallback decision requires non-empty validation');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
   it('rejects unparseable expire fallback maximum lifetime values', async () => {
     const repo = await initRepository();
     const decisionBody = fallbackDecisionTable([
@@ -1317,6 +1343,32 @@ describe('spec-guard script', () => {
     const repo = await initRepository();
     const decisionBody = fallbackDecisionTable([
       completeExpireFallbackRow({
+        reviewDate: reviewDateDaysFromNow(15),
+        maximumLifetime: reviewDateDaysFromNow(31)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback review date');
+    expect(stdout).toContain('high-churn control surface fallback cap');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('applies the high-churn cap to colon-delimited docs freshness surface names', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`docs:freshness:maintain`',
+        fallback: 'Owned rolling debt fallback retained for docs:freshness maintenance.',
+        trigger: 'docs:freshness:maintain owner verification keeps a temporary fallback active.',
         reviewDate: reviewDateDaysFromNow(15),
         maximumLifetime: reviewDateDaysFromNow(31)
       })
