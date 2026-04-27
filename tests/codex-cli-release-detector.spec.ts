@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { load } from 'js-yaml';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -782,6 +782,22 @@ describe('codex CLI release detector', () => {
     try {
       const args = parseArgs(['--repo-root', '/tmp/co-release-detector']);
       expect(args.linearScript).toBe('/tmp/co-release-detector/dist/bin/codex-orchestrator.js');
+    } finally {
+      if (priorLinearScript === undefined) {
+        delete process.env.CODEX_ORCHESTRATOR_LINEAR_SCRIPT;
+      } else {
+        process.env.CODEX_ORCHESTRATOR_LINEAR_SCRIPT = priorLinearScript;
+      }
+    }
+  });
+
+  it('normalizes the default Linear helper script when the inspected repo root is relative', () => {
+    const priorLinearScript = process.env.CODEX_ORCHESTRATOR_LINEAR_SCRIPT;
+    delete process.env.CODEX_ORCHESTRATOR_LINEAR_SCRIPT;
+    try {
+      const relativeRepoRoot = 'tmp/co-release-detector';
+      const args = parseArgs(['--repo-root', relativeRepoRoot]);
+      expect(args.linearScript).toBe(resolve(relativeRepoRoot, 'dist/bin/codex-orchestrator.js'));
     } finally {
       if (priorLinearScript === undefined) {
         delete process.env.CODEX_ORCHESTRATOR_LINEAR_SCRIPT;

@@ -857,7 +857,7 @@ export function parseArgs(argv) {
       throw new Error(`Unknown argument: ${arg}`);
     }
   }
-  parsed.linearScript ??= join(parsed.repoRoot, 'dist/bin/codex-orchestrator.js');
+  parsed.linearScript ??= resolve(parsed.repoRoot, 'dist/bin/codex-orchestrator.js');
   return parsed;
 }
 
