@@ -329,8 +329,12 @@ describe('CodexOrchestrator cloud auto scout', () => {
     expect(result.manifest.runtime_mode).toBe('cli');
     expect(result.manifest.runtime_fallback?.expiry).toMatchObject({
       owner: 'CO-396',
+      trigger: expect.stringMatching(/\S/),
+      introduced_date: '2026-04-26',
       review_date: '2026-05-10',
-      maximum_lifetime: '2026-05-26'
+      maximum_lifetime: '2026-05-26',
+      removal_condition: expect.stringMatching(/\S/),
+      validation: expect.stringMatching(/\S/)
     });
     expect(result.manifest.status).toBe('succeeded');
   });

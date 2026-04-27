@@ -330,12 +330,34 @@ function createChecks(expectedDefaultMode) {
         reason: `expected runtime_fallback.expiry.owner=CO-396, received ${manifest?.runtime_fallback?.expiry?.owner ?? '<missing>'}`
       }),
       ({ manifest }) => ({
+        ok:
+          typeof manifest?.runtime_fallback?.expiry?.trigger === 'string' &&
+          manifest.runtime_fallback.expiry.trigger.trim().length > 0,
+        reason: 'expected runtime_fallback.expiry.trigger'
+      }),
+      ({ manifest }) => ({
+        ok: manifest?.runtime_fallback?.expiry?.introduced_date === '2026-02-27',
+        reason: `expected runtime_fallback.expiry.introduced_date=2026-02-27, received ${manifest?.runtime_fallback?.expiry?.introduced_date ?? '<missing>'}`
+      }),
+      ({ manifest }) => ({
         ok: manifest?.runtime_fallback?.expiry?.review_date === '2026-05-10',
         reason: `expected runtime_fallback.expiry.review_date=2026-05-10, received ${manifest?.runtime_fallback?.expiry?.review_date ?? '<missing>'}`
       }),
       ({ manifest }) => ({
         ok: manifest?.runtime_fallback?.expiry?.maximum_lifetime === '2026-05-26',
         reason: `expected runtime_fallback.expiry.maximum_lifetime=2026-05-26, received ${manifest?.runtime_fallback?.expiry?.maximum_lifetime ?? '<missing>'}`
+      }),
+      ({ manifest }) => ({
+        ok:
+          typeof manifest?.runtime_fallback?.expiry?.removal_condition === 'string' &&
+          manifest.runtime_fallback.expiry.removal_condition.trim().length > 0,
+        reason: 'expected runtime_fallback.expiry.removal_condition'
+      }),
+      ({ manifest }) => ({
+        ok:
+          typeof manifest?.runtime_fallback?.expiry?.validation === 'string' &&
+          manifest.runtime_fallback.expiry.validation.trim().length > 0,
+        reason: 'expected runtime_fallback.expiry.validation'
       })
     ],
     unsupportedCombo: [

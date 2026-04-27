@@ -15,9 +15,12 @@ Runtime compatibility:
 - `--execution-mode cloud --runtime-mode appserver` is unsupported and fails fast.
 - Non-explicit cloud runs that inherit the local `appserver` default may still auto-reroute to
   `runtimeMode=cli` under the runtime fallback policy. That bridge is an expiring CO-396
-  compatibility path: manifests must keep `runtime_fallback.expiry.owner=CO-396`,
-  `review_date=2026-05-10`, and `maximum_lifetime=2026-05-26` until the cloud route selects
-  `cli` before runtime selection or fails fast with equivalent metadata.
+  compatibility path: manifests must keep the full `runtime_fallback.expiry` contract
+  (`owner`, `trigger`, `introduced_date`, `review_date`, `maximum_lifetime`,
+  `removal_condition`, and `validation`) with `owner=CO-396`, `review_date=2026-05-10`,
+  and `maximum_lifetime=2026-05-26` until the cloud route selects `cli` before runtime
+  selection or fails fast with equivalent metadata. See
+  `docs/guides/fallback-expiry-and-refactor-policy.md` before changing the contract.
 - Cloud lanes should request `--runtime-mode cli` explicitly when deterministic contract testing is required.
 - `js_repl` is enabled by default globally; for cloud edge-case testing, set explicit feature toggles (`CODEX_CLOUD_ENABLE_FEATURES=js_repl` or `CODEX_CLOUD_DISABLE_FEATURES=js_repl`) instead of relying on implicit defaults.
 - Keep enabled/disabled lanes separate (do not set the same feature in both lists for one run).
