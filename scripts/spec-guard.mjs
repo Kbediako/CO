@@ -27,14 +27,14 @@ const FALLBACK_TOUCH_PATTERNS = [
   /\bfall back\b/i,
   /legacy/i,
   /\bcached\b/i,
-  /\bbreak[-_\s]?glass\b/i,
+  /\bbreak[-_\s]?glass(?=\b|[A-Z_])/i,
   /\bcompat(?:ibility)?\b/i,
   /\b[Cc]ompat(?:ibility)?(?=[A-Z_])/,
-  /\bminor[-_\s]?seam\b/i,
-  /\bseam\b/i,
+  /\bminor[-_\s]?seam(?=\b|[A-Z_])/i,
+  /\bseam(?=\b|[A-Z_])/i,
   /\bstale\b/i,
-  /\blast[-_\s]?known[-_\s]?good\b/i,
-  /\blast[-_\s]?known\b/i
+  /\blast[-_\s]?known[-_\s]?good(?=\b|[A-Z_])/i,
+  /\blast[-_\s]?known(?=\b|[A-Z_])/i
 ];
 const GOVERNED_FALLBACK_SURFACE_PATHS = [
   'orchestrator/src/cli/control/providerIssueHandoff.ts',
@@ -184,7 +184,7 @@ function hasAffirmativeReviewerApprovalEvidenceInCells(cells) {
 }
 
 function hasExternalMigrationApprovalEvidence(row) {
-  const cells = Object.values(row).map((cell) => normalizePolicyEvidenceText(cell));
+  const cells = Object.values(row).map((cell) => normalizePolicyEvidenceCell(cell));
   const content = cells.join(' ');
   const ownerCell = normalizePolicyEvidenceText(row.owner ?? '');
   return (
@@ -387,6 +387,15 @@ function normalizePolicyEvidenceText(value) {
   return String(value)
     .replace(/[`*]/g, '')
     .replace(/[-_:]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function normalizePolicyEvidenceCell(value) {
+  return String(value)
+    .replace(/[`*]/g, '')
+    .replace(/[-_]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();

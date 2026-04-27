@@ -1202,6 +1202,36 @@ describe('spec-guard script', () => {
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
 
+  it('detects camelCase fallback-sensitive identifiers without explicit fallback wording', async () => {
+    const repo = await initRepository();
+    const today = new Date().toISOString().slice(0, 10);
+
+    await writeFile(
+      join(repo, 'src/index.ts'),
+      [
+        'export const breakGlassMode = true;',
+        'export const minorSeamDecision = true;',
+        'export const lastKnownGoodRun = true;',
+        ''
+      ].join('\n')
+    );
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      `last_review: ${today}\n\nGeneric spec update without fallback decision metadata.\n`
+    );
+    await execFileAsync('git', ['add', '.'], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'camelcase fallback-sensitive identifiers'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('fallback/seam-touching changes require updated PRD decision evidence (src/index.ts)');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
   it('rejects Not applicable when fallback-sensitive paths changed', async () => {
     const repo = await initRepository();
     const decisionBody = [
@@ -1598,6 +1628,8 @@ describe('spec-guard script', () => {
 
   it('does not grant the external migration cap for false reviewer-approval labels', async () => {
     for (const trigger of [
+      'External ecosystem migration bridge has a deprecation plan and reviewer approved:',
+      'External ecosystem migration bridge has a deprecation plan and approved-by-reviewer:',
       'External ecosystem migration bridge has a deprecation plan and reviewer approved: no.',
       'External ecosystem migration bridge has a deprecation plan and approved-by-reviewer: false.',
       'External ecosystem migration bridge has a deprecation plan and reviewer approved: not available.',
