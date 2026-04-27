@@ -462,23 +462,30 @@ function isDegradedMetadataPayloadMatchingClaim(
   if (!existing || existing.issue_identifier !== claim.issue_identifier) {
     return false;
   }
-  if (!existingMetadataIdentifierMatchesClaim(existing.issue_id, claim.issue_id)) {
+  if (!requiredMetadataIdentifierMatchesClaim(existing.issue_id, claim.issue_id)) {
     return false;
   }
-  if (!existingMetadataIdentifierMatchesClaim(existing.task_id, claim.task_id)) {
+  if (!requiredMetadataIdentifierMatchesClaim(existing.task_id, claim.task_id)) {
     return false;
   }
-  if (!existingMetadataIdentifierMatchesClaim(existing.run_id, claim.run_id)) {
+  if (!optionalMetadataIdentifierMatchesClaim(existing.run_id, claim.run_id)) {
     return false;
   }
   return true;
 }
 
-function existingMetadataIdentifierMatchesClaim(
+function requiredMetadataIdentifierMatchesClaim(
   existingValue: string | null,
   claimValue: string | null
 ): boolean {
   return existingValue !== null && claimValue !== null && existingValue === claimValue;
+}
+
+function optionalMetadataIdentifierMatchesClaim(
+  existingValue: string | null,
+  claimValue: string | null
+): boolean {
+  return existingValue === claimValue;
 }
 
 function buildDegradedIssuePayload(
@@ -764,3 +771,7 @@ function findRunsRoot(runDir: string): string {
   }
   return parts.slice(0, runsIndex + 1).join(sep) || sep;
 }
+
+export const __test__ = {
+  isDegradedMetadataPayloadMatchingClaim
+};

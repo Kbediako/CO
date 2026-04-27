@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { runCoStatusCliShell } from '../src/cli/coStatusCliShell.js';
+import { __test__ as coStatusCliShellTest, runCoStatusCliShell } from '../src/cli/coStatusCliShell.js';
 import { runCoStatusOperatorAutopilotCliShell } from '../src/cli/coStatusOperatorAutopilotCliShell.js';
 import { appendProviderOperatorAutopilotLifecycleRecord } from '../src/cli/control/providerOperatorAutopilotLifecycle.js';
 
@@ -443,6 +443,56 @@ describe('runCoStatusCliShell', () => {
     expect(payload.issues?.[0]?.fallback_expiry?.map((entry) => entry.fallback)).not.toContain(
       syntheticIdentityFallback
     );
+  });
+
+  it('matches degraded metadata identity when both run ids are null before worker launch', () => {
+    const acceptedClaim = {
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-1',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-296',
+      issue_title: 'Accepted operator issue',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-27T13:45:00.000Z',
+      task_id: 'local-mcp',
+      mapping_source: 'provider_id_fallback',
+      state: 'accepted',
+      reason: 'provider accepted before worker launch',
+      accepted_at: '2026-04-27T13:44:00.000Z',
+      updated_at: '2026-04-27T13:45:00.000Z',
+      last_delivery_id: 'delivery-1',
+      last_event: 'provider_intake_refresh',
+      last_action: 'poll',
+      last_webhook_timestamp: null,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: 'control-host',
+      launch_token: null
+    } satisfies Parameters<typeof coStatusCliShellTest.isDegradedMetadataPayloadMatchingClaim>[1];
+
+    expect(
+      coStatusCliShellTest.isDegradedMetadataPayloadMatchingClaim(
+        {
+          issue_identifier: 'CO-296',
+          issue_id: 'lin-issue-1',
+          task_id: 'local-mcp',
+          run_id: null
+        },
+        acceptedClaim
+      )
+    ).toBe(true);
+    expect(
+      coStatusCliShellTest.isDegradedMetadataPayloadMatchingClaim(
+        {
+          issue_identifier: 'CO-296',
+          issue_id: 'lin-issue-1',
+          task_id: 'local-mcp',
+          run_id: 'stale-run'
+        },
+        acceptedClaim
+      )
+    ).toBe(false);
   });
 
   it('does not reuse stale degraded item fallback metadata across provider-intake run changes', async () => {
