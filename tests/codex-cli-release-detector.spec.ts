@@ -971,6 +971,39 @@ describe('codex CLI release detector', () => {
     expect(artifact.mutation_result.action).toBe('skipped');
   });
 
+  it('fails closed when the explicit release-intake marker is ahead of upstream stable', async () => {
+    const repo = await writeFixtureRepo({
+      releasePin: '0.126.0',
+      cloudPin: '0.126.0',
+      policyStable: '0.130.0',
+      auditedStable: '0.130.0'
+    });
+
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: repo,
+      artifactPath: 'out/detection.json',
+      fetchImpl: mockFetch({ stable: '0.126.0' }),
+      env: { LINEAR_API_KEY: 'test-token' }
+    });
+    const writtenArtifact = JSON.parse(await readFile(join(repo, 'out', 'detection.json'), 'utf8'));
+
+    expect(exitCode).toBe(2);
+    expect(artifact.decision_state).toBe('blocked_current_audit_ahead_of_upstream');
+    expect(artifact.candidate.version).toBe('0.126.0');
+    expect(artifact.current_co.policy.last_audited_version).toBe('0.130.0');
+    expect(artifact.selected_issue).toBeNull();
+    expect(artifact.blocker_reason).toContain('0.130.0');
+    expect(artifact.blocker_reason).toContain('0.126.0');
+    expect(artifact.mutation_result.action).toBe('skipped');
+    expect(writtenArtifact).toMatchObject({
+      decision_state: 'blocked_current_audit_ahead_of_upstream',
+      candidate: { version: '0.126.0' },
+      last_audited_version: '0.130.0',
+      selected_issue: null,
+      mutation_result: { action: 'skipped' }
+    });
+  });
+
   it('ignores non-intake model/control audits when deriving release-intake coverage', async () => {
     const repo = await writeFixtureRepo({
       releasePin: '0.126.0',
