@@ -1630,6 +1630,8 @@ describe('spec-guard script', () => {
     for (const trigger of [
       'External ecosystem migration bridge has a deprecation plan and reviewer approved:',
       'External ecosystem migration bridge has a deprecation plan and approved-by-reviewer:',
+      'External ecosystem migration bridge has a deprecation plan and reviewer approval granted: no.',
+      'External ecosystem migration bridge has a deprecation plan and reviewer approval recorded=false.',
       'External ecosystem migration bridge has a deprecation plan and reviewer approved: no.',
       'External ecosystem migration bridge has a deprecation plan and approved-by-reviewer: false.',
       'External ecosystem migration bridge has a deprecation plan and reviewer approved: not available.',
@@ -1882,6 +1884,7 @@ describe('spec-guard script', () => {
   it('does not grant the external migration cap for empty deprecation-plan labels', async () => {
     for (const trigger of [
       'External ecosystem migration bridge lists Deprecation plan:',
+      'External ecosystem migration bridge lists Deprecation plan: false while reviewer approval granted.',
       'External ecosystem migration bridge lists Deprecation plan: none while reviewer approval granted.',
       'External ecosystem migration bridge lists Deprecation plan: not applicable while reviewer approval granted.'
     ]) {
