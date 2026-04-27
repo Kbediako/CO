@@ -5998,15 +5998,36 @@ function selectRecoverablePriorAttemptSuccessfulChildLanes(input: {
       return false;
     }
     return (
-      priorParallelizations.some(
-        (snapshot) =>
-          snapshot.decision === 'parallelize_now' &&
-          compareIsoTimestamp(snapshot.recorded_at, childLane.launched_at) <= 0
-      ) &&
+      latestPriorParallelizationSupportsRecoveredChildLane(priorParallelizations, childLane) &&
       compareIsoTimestamp(childLane.launched_at, attemptStartedAt) < 0 &&
       compareIsoTimestamp(childLane.launched_at, currentTurnStartedAt) < 0
     );
   });
+}
+
+function latestPriorParallelizationSupportsRecoveredChildLane(
+  priorParallelizations: ProviderLinearParallelizationSnapshot[],
+  childLane: ProviderLinearWorkerChildLaneRecord
+): boolean {
+  const priorParallelizeNowSnapshots = priorParallelizations.filter((snapshot) => snapshot.decision === 'parallelize_now');
+  const latestPriorParallelization = priorParallelizeNowSnapshots.at(-1);
+  if (!latestPriorParallelization) return false;
+  const latestSummary = normalizeOptionalString(latestPriorParallelization.summary)?.toLowerCase() ?? '';
+  if (/(?:^|[^a-z0-9_:-])(?:recover_child_lane|recover_run):[a-z0-9_:-]+(?=$|[^a-z0-9_:-])/u.test(latestSummary)) {
+    return latestPriorParallelizationSupportsRecoveredChildLane(priorParallelizeNowSnapshots.slice(0, -1), childLane);
+  }
+  const childLaunchedAfterLatest = compareIsoTimestamp(childLane.launched_at, latestPriorParallelization.recorded_at) >= 0;
+  const launchedAtMs = Date.parse(childLane.launched_at);
+  const latestRecordedAtMs = Date.parse(latestPriorParallelization.recorded_at);
+  const latestSupportsChildLane =
+    childLaunchedAfterLatest ||
+    (Number.isFinite(launchedAtMs) && Number.isFinite(latestRecordedAtMs) && latestRecordedAtMs - launchedAtMs <= 1_000);
+  const previousPriorRecordedAt = priorParallelizeNowSnapshots.at(-2)?.recorded_at ?? null;
+  if (!previousPriorRecordedAt) return latestSupportsChildLane;
+  return (
+    latestSupportsChildLane &&
+    (childLaunchedAfterLatest || compareIsoTimestamp(childLane.launched_at, previousPriorRecordedAt) > 0)
+  );
 }
 
 function parallelizationSummaryNamesRecoveredChildLane(
@@ -6019,27 +6040,20 @@ function parallelizationSummaryNamesRecoveredChildLane(
   if (!stream || !runId) {
     return false;
   }
-  return (
-    parallelizationSummaryContainsRecoveryMarker(normalizedSummary, 'recover_child_lane', stream) &&
-    parallelizationSummaryContainsRecoveryMarker(normalizedSummary, 'recover_run', runId)
-  );
+  return parallelizationSummaryContainsRecoveryMarkerPair(normalizedSummary, stream, runId);
 }
 
-function parallelizationSummaryContainsRecoveryMarker(
-  normalizedSummary: string,
-  markerName: string,
-  markerValue: string
-): boolean {
-  const pattern = new RegExp(
-    `(?:^|[^a-z0-9_:-])${escapeRegExp(markerName)}:${escapeRegExp(markerValue)}(?=$|[^a-z0-9_:-])`,
+function parallelizationSummaryContainsRecoveryMarkerPair(normalizedSummary: string, stream: string, runId: string): boolean {
+  const recoveryMarker = '(?:recover_child_lane|recover_run):[a-z0-9_:-]+';
+  return new RegExp(
+    `(?:^|[^a-z0-9_:-])recover_child_lane:${escapeRegExp(stream)}(?=$|[^a-z0-9_:-])` +
+      `(?:(?!(?:^|[^a-z0-9_:-])${recoveryMarker}(?=$|[^a-z0-9_:-]))[\\s\\S])*?` +
+      `(?:^|[^a-z0-9_:-])recover_run:${escapeRegExp(runId)}(?=$|[^a-z0-9_:-])`,
     'u'
-  );
-  return pattern.test(normalizedSummary);
+  ).test(normalizedSummary);
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
-}
+function escapeRegExp(value: string): string { return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'); }
 
 function selectEffectiveParallelizationChildLanes(input: {
   childLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined;

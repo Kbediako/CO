@@ -121,16 +121,14 @@ async function acquireStaleAwareAcquisitionLock(params: LockRetryParams): Promis
         }
       }
       if (attempt >= maxAttempts) {
-        throw new Error(
-          `Failed to acquire lock acquisition guard for ${params.taskId} after ${attempt} attempts.`
-        );
+        throw params.createError(params.taskId, attempt);
       }
       await delay(Math.min(delayMs, maxDelayMs));
       delayMs = Math.min(delayMs * backoffFactor, maxDelayMs);
     }
   }
 
-  throw new Error(`Failed to acquire lock acquisition guard for ${params.taskId} after ${attempt} attempts.`);
+  throw params.createError(params.taskId, attempt);
 }
 
 async function releaseLockIfPresent(lock: AcquiredLock | null): Promise<void> {

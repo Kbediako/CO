@@ -144,6 +144,39 @@ describe('acquireLockWithRetry', () => {
     await expect(stat(lockPath)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
+  it('uses the caller error when acquisition guard retry is exhausted', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'lock-file-'));
+    tempDirs.push(root);
+    const lockPath = join(root, 'shared.lock');
+    const acquisitionGuardPath = `${lockPath}.acquire`;
+    const retry = {
+      maxAttempts: 2,
+      initialDelayMs: 1,
+      backoffFactor: 1,
+      maxDelayMs: 1,
+      staleMs: 60_000
+    };
+
+    const guard = await open(acquisitionGuardPath, 'wx');
+    await guard.writeFile('live-guard-owner', 'utf8');
+    try {
+      await expect(
+        acquireLockWithRetry({
+          taskId: 'proof-lock',
+          lockPath,
+          retry,
+          ensureDirectory: async () => {
+            await mkdir(root, { recursive: true });
+          },
+          createError: (taskId, attempts) =>
+            new Error(`custom ${taskId} lock failure after ${attempts} attempts`)
+        })
+      ).rejects.toThrow('custom proof-lock lock failure after 2 attempts');
+    } finally {
+      await guard.close();
+    }
+  });
+
   it('keeps a live lock fresh so waiting writers do not stale-take it over', async () => {
     const root = await mkdtemp(join(tmpdir(), 'lock-file-'));
     tempDirs.push(root);
