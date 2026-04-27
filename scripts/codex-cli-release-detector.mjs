@@ -438,6 +438,17 @@ export function buildReleaseDecision({ upstreamTruth, currentCo }) {
 
   const stableCandidate = upstreamTruth.github.stable;
   const lastAudited = currentCo.policy.last_audited_version;
+  if (lastAudited && compareSemver(lastAudited, stableCandidate.version) > 0) {
+    return {
+      decision_state: 'blocked_current_audit_ahead_of_upstream',
+      candidate: stableCandidate,
+      selected_issue: null,
+      no_op_reason: null,
+      blocker_reason: `Current CO release-intake marker ${lastAudited} is ahead of upstream stable ${stableCandidate.version}.`,
+      mutation_required: false
+    };
+  }
+
   if (!lastAudited || compareSemver(stableCandidate.version, lastAudited) > 0) {
     return {
       decision_state: 'new_audit_required',
