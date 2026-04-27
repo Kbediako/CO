@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, relative, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import { load } from 'js-yaml';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -858,6 +858,35 @@ describe('codex CLI release detector', () => {
     expect(entries.map((entry) => entry.argv[1])).toEqual(['create-follow-up', 'upsert-workpad']);
     expect(entries.every((entry) => entry.script === helperPath)).toBe(true);
     expect(entries.every((entry) => entry.cwd === helperCwd)).toBe(true);
+  });
+
+  it('writes the programmatic default artifact under the normalized repo root', async () => {
+    const repo = await writeFixtureRepo();
+    const relativeRepoRoot = relative(process.cwd(), repo);
+    const repoArtifactPath = join(repo, 'out', 'codex-cli-release-detection', 'detection.json');
+    const callerArtifactPath = join(process.cwd(), 'out', 'codex-cli-release-detection', 'detection.json');
+    const writePaths: string[] = [];
+    let writtenArtifactRaw = '';
+
+    expect(isAbsolute(relativeRepoRoot)).toBe(false);
+    expect(repoArtifactPath).not.toBe(callerArtifactPath);
+
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: relativeRepoRoot,
+      fetchImpl: mockFetch({ stable: '0.125.0' }),
+      env: {},
+      mkdirImpl: async () => {},
+      writeFileImpl: async (path: string, content: string) => {
+        writePaths.push(path);
+        writtenArtifactRaw = content;
+      }
+    });
+
+    const writtenArtifact = JSON.parse(writtenArtifactRaw);
+    expect(exitCode).toBe(0);
+    expect(writePaths).toEqual([repoArtifactPath]);
+    expect(writePaths[0]).not.toBe(callerArtifactPath);
+    expect(writtenArtifact.decision_state).toBe(artifact.decision_state);
   });
 
   it('accepts complete GitHub truth when the successful response consumes the last rate-limit quota', async () => {

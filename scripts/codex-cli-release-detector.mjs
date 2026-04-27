@@ -14,6 +14,7 @@ export const DEFAULT_SOURCE_ISSUE_ID = 'b7074b86-3d38-4dfe-baa9-73b2cc8d686f';
 export const RELEASE_INTAKE_OWNER_PREFIX = 'codex-cli-release-intake:stable:';
 export const RELEASE_INTAKE_COMPLETION_MARKER_PREFIX =
   'codex-orchestrator:release-intake-complete=codex-cli-release-intake:stable:';
+const DEFAULT_RELEASE_DETECTION_ARTIFACT_PATH = 'out/codex-cli-release-detection/detection.json';
 
 const PIN_SURFACES = [
   'docs/guides/codex-version-policy.md',
@@ -722,7 +723,7 @@ export async function runLinearMutation({
 
 export async function runCodexCliReleaseDetector({
   repoRoot = process.cwd(),
-  artifactPath = join(process.cwd(), 'out/codex-cli-release-detection/detection.json'),
+  artifactPath,
   dryRun = false,
   sourceIssueId = DEFAULT_SOURCE_ISSUE_ID,
   githubRepo = DEFAULT_GITHUB_REPO,
@@ -736,6 +737,7 @@ export async function runCodexCliReleaseDetector({
   linearRunner
 } = {}) {
   repoRoot = resolve(repoRoot);
+  artifactPath = artifactPath === undefined ? DEFAULT_RELEASE_DETECTION_ARTIFACT_PATH : artifactPath;
   const effectiveLinearRunner =
     linearRunner ?? defaultLinearRunner({ scriptPath: resolve(repoRoot, 'dist/bin/codex-orchestrator.js') });
   let upstreamTruth;
@@ -817,8 +819,9 @@ export async function runCodexCliReleaseDetector({
   };
 
   if (artifactPath) {
-    await mkdirImpl(dirname(resolve(repoRoot, artifactPath)), { recursive: true });
-    await writeFileImpl(resolve(repoRoot, artifactPath), `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
+    const resolvedArtifactPath = resolve(repoRoot, artifactPath);
+    await mkdirImpl(dirname(resolvedArtifactPath), { recursive: true });
+    await writeFileImpl(resolvedArtifactPath, `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
   }
 
   return { artifact, exitCode };
@@ -827,7 +830,7 @@ export async function runCodexCliReleaseDetector({
 export function parseArgs(argv) {
   const parsed = {
     repoRoot: process.cwd(),
-    artifactPath: 'out/codex-cli-release-detection/detection.json',
+    artifactPath: DEFAULT_RELEASE_DETECTION_ARTIFACT_PATH,
     dryRun: false,
     sourceIssueId: DEFAULT_SOURCE_ISSUE_ID,
     githubRepo: DEFAULT_GITHUB_REPO,
