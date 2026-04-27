@@ -42,6 +42,16 @@
   3) Run a lightweight smoke suite.
   4) Open a sync PR if clean; otherwise open a conflict PR with notes.
 
+## Release detector
+- `.github/workflows/codex-cli-release-detector.yml` runs on schedule and through `workflow_dispatch`.
+- Manual dry-run:
+  - `npm run codex:release-detect -- --dry-run --artifact out/codex-cli-release-detection/detection.json`
+- The detector reads GitHub `openai/codex` release truth and npm `@openai/codex` dist-tags/time, compares the latest stable candidate against `docs/guides/codex-version-policy.md`, release-facing workflow pins, `cloud-canary`, and `tests/pack-smoke.spec.ts`, then emits `out/codex-cli-release-detection/detection.json`.
+- When a new stable candidate is unrepresented, the detector uses the Linear `create-follow-up` helper with canonical owner key `codex-cli-release-intake:stable:<version>` and refreshes that issue's workpad with the CO-386 release-intake checklist. Existing canonical owners are reused; duplicates are not created.
+- Prerelease-only movement is recorded in the artifact without opening release-intake work.
+- Fail-closed states are intentional: missing Linear auth for a required mutation, ambiguous GitHub/npm truth, GitHub/npm mismatch, rate-limit uncertainty, or missing local policy/pin surfaces exits non-zero instead of reporting success.
+- Retry behavior is operator-owned: rerun the workflow after restoring GitHub/Linear credentials or rate-limit headroom. Use `workflow_dispatch` with `dry_run=true` to verify the artifact before allowing mutation.
+
 ## Release labeling
 - Tag CO releases with upstream anchors (e.g., `co-vX.Y.Z+upstream-vA.B.C`).
 - Changelog sections:
