@@ -1,6 +1,30 @@
 {
   "items": [
     {
+      "id": "20260427-linear-f04ab1c2-79e6-4a98-84e1-85efb6583116",
+      "title": "CO-398 control-host status fallback projection expiry",
+      "relates_to": "tasks/tasks-linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-27",
+      "approvals": {
+        "docs_packet": {
+          "reviewer": "parent orchestrator with read-only packet scouts",
+          "date": "2026-04-27",
+          "status": "produced",
+          "summary": "Docs-first packet created for CO-398 while the issue remains in Backlog. The packet applies CO-382 fallback-expiry discipline to control-host status surfaces, requires the parent lane to inventory legacy proof fields, selected-run projection fallback, compatibility issue projection fallback, and CLI/API/UI status source authority, and forces each retained path to choose remove fallback, expire fallback, or justify retaining fallback before implementation."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md",
+        "task": "tasks/tasks-linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md",
+        "agent_task": ".agent/task/linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md",
+        "docs": "docs/TECH_SPEC-linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md"
+      }
+    },
+    {
       "id": "20260427-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba",
       "title": "CO-397 docs freshness owned fallback expiry",
       "relates_to": "tasks/tasks-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
