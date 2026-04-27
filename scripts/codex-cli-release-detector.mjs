@@ -12,6 +12,8 @@ export const DEFAULT_GITHUB_REPO = 'openai/codex';
 export const DEFAULT_NPM_PACKAGE = '@openai/codex';
 export const DEFAULT_SOURCE_ISSUE_ID = 'b7074b86-3d38-4dfe-baa9-73b2cc8d686f';
 export const RELEASE_INTAKE_OWNER_PREFIX = 'codex-cli-release-intake:stable:';
+export const RELEASE_INTAKE_COMPLETION_MARKER_PREFIX =
+  'codex-orchestrator:release-intake-complete=codex-cli-release-intake:stable:';
 
 const PIN_SURFACES = [
   'docs/guides/codex-version-policy.md',
@@ -27,6 +29,8 @@ const RELEASE_INTAKE_TEMPLATE_PATH = '.agent/task/templates/codex-cli-release-in
 const PRIMARY_PRERELEASE_DIST_TAGS = new Set(['alpha', 'beta', 'next', 'rc', 'canary', 'experimental', 'dev']);
 const CODEX_INSTALL_PACKAGE_PATTERN = /(^|[\s'"`(,=:{\[])@openai\/codex(?:@([^\s'"`,);\\\]}]+))?(?=$|[\s'"`,);\\\]}])/g;
 const EXACT_CODEX_INSTALL_SPECIFIER_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+const RELEASE_INTAKE_COMPLETION_MARKER_PATTERN =
+  /codex-orchestrator:release-intake-complete=codex-cli-release-intake:stable:(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/g;
 
 export function parseSemver(version) {
   const match = String(version ?? '').match(/^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/);
@@ -265,19 +269,11 @@ function matchPolicyVersion(content, pattern) {
   return match?.[1] ?? null;
 }
 
-function extractAuditedVersions(content) {
+function extractReleaseIntakeCompletionVersions(content) {
   const versions = new Set();
-  // Only release-truth audit markers count here. Control-seam-only entries can say
-  // "audited Codex CLI <version>" without completing release intake.
-  const patterns = [
-    /\baudited(?: official)? `rust-v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)`/gi,
-    /\baudited[^.\n]*npm `@openai\/codex@(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)`/gi
-  ];
-  for (const pattern of patterns) {
-    for (const match of content.matchAll(pattern)) {
-      if (parseSemver(match[1])) {
-        versions.add(match[1]);
-      }
+  for (const match of content.matchAll(RELEASE_INTAKE_COMPLETION_MARKER_PATTERN)) {
+    if (parseSemver(match[1])) {
+      versions.add(match[1]);
     }
   }
   return [...versions];
@@ -336,7 +332,9 @@ export async function collectCurrentCoPins({ repoRoot = process.cwd(), readFileI
 
   const policy = surfaces.find((surface) => surface.path === 'docs/guides/codex-version-policy.md');
   const policyContent = policy ? (surfaceContents.get(policy.path) ?? '') : '';
-  const policyVersions = extractAuditedVersions(policyContent).filter((version) => !parseSemver(version)?.prerelease);
+  const policyVersions = extractReleaseIntakeCompletionVersions(policyContent).filter(
+    (version) => !parseSemver(version)?.prerelease
+  );
   const lastAuditedVersion = sortVersionsDescending(policyVersions.map((version) => ({ version })))[0]?.version ?? null;
   const installPins = surfaces.flatMap((surface) =>
     surface.install_pins.map((version) => ({ path: surface.path, version }))
@@ -735,8 +733,11 @@ export async function runCodexCliReleaseDetector({
   mkdirImpl = mkdir,
   env = process.env,
   now = () => new Date().toISOString(),
-  linearRunner = defaultLinearRunner()
+  linearRunner
 } = {}) {
+  repoRoot = resolve(repoRoot);
+  const effectiveLinearRunner =
+    linearRunner ?? defaultLinearRunner({ scriptPath: resolve(repoRoot, 'dist/bin/codex-orchestrator.js') });
   let upstreamTruth;
   let currentCo;
   let decision;
@@ -775,7 +776,7 @@ export async function runCodexCliReleaseDetector({
           sourceIssueId,
           repoRoot,
           env,
-          linearRunner
+          linearRunner: effectiveLinearRunner
         });
       }
     } else if (decision.decision_state.startsWith('blocked_')) {

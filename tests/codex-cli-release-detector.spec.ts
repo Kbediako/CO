@@ -1,6 +1,6 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 
 import { load } from 'js-yaml';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -50,7 +50,8 @@ async function writeFixtureRepo({
       `- Current CO-local ChatGPT-auth/appserver model posture is \`gpt-5.5\` / \`xhigh\` on Codex CLI \`${policyStable}\` when live access smoke passes.`,
       `- Current release-facing package/downstream-smoke compatibility target is Codex CLI \`${releasePin}\`.`,
       `- Current cloud execution candidate remains Codex CLI \`${cloudPin}\`.`,
-      `- 2026-04-24: CO-355 audited \`rust-v${auditedStable}\` and npm \`@openai/codex@${auditedStable}\`.`,
+      `- 2026-04-24: CO-355 completed Codex CLI release-intake for stable \`${auditedStable}\`.`,
+      `- Release-intake completion marker: \`codex-orchestrator:release-intake-complete=codex-cli-release-intake:stable:${auditedStable}\`.`,
       ...extraPolicyLines
     ].join('\n'),
     'utf8'
@@ -807,6 +808,58 @@ describe('codex CLI release detector', () => {
     }
   });
 
+  it('binds the programmatic default Linear helper to the normalized repo root', async () => {
+    const repo = await writeFixtureRepo();
+    await mkdir(join(repo, 'dist', 'bin'), { recursive: true });
+    const logPath = join(repo, 'linear-runner.log');
+    await writeFile(
+      join(repo, 'dist', 'bin', 'codex-orchestrator.js'),
+      [
+        '#!/usr/bin/env node',
+        "import { appendFileSync } from 'node:fs';",
+        'const logPath = process.env.TEST_LINEAR_RUNNER_LOG;',
+        "if (logPath) appendFileSync(logPath, `${JSON.stringify({ script: process.argv[1], cwd: process.cwd(), argv: process.argv.slice(2) })}\\n`);",
+        'const command = process.argv[2];',
+        'const subcommand = process.argv[3];',
+        "if (command !== 'linear') {",
+        "  console.error(`unexpected command: ${command}`);",
+        '  process.exit(2);',
+        '}',
+        "if (subcommand === 'create-follow-up') {",
+        "  console.log(JSON.stringify({ ok: true, action: 'created', follow_up_issue: { id: 'default-runner-issue', identifier: 'CO-400', url: 'https://linear.app/asabeko/issue/CO-400' } }));",
+        "} else if (subcommand === 'upsert-workpad') {",
+        "  console.log(JSON.stringify({ ok: true, action: 'updated' }));",
+        '} else {',
+        "  console.error(`unexpected subcommand: ${subcommand}`);",
+        '  process.exit(2);',
+        '}',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const relativeRepoRoot = relative(process.cwd(), repo);
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: relativeRepoRoot,
+      artifactPath: 'out/detection.json',
+      fetchImpl: mockFetch({ stable: '0.126.0' }),
+      env: { LINEAR_API_KEY: 'test-token', TEST_LINEAR_RUNNER_LOG: logPath }
+    });
+
+    const helperPath = resolve(relativeRepoRoot, 'dist/bin/codex-orchestrator.js');
+    const helperCwd = await realpath(resolve(relativeRepoRoot));
+    const entries = (await readFile(logPath, 'utf8'))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+
+    expect(exitCode).toBe(0);
+    expect(artifact.mutation_result.selected_issue.id).toBe('default-runner-issue');
+    expect(entries.map((entry) => entry.argv[1])).toEqual(['create-follow-up', 'upsert-workpad']);
+    expect(entries.every((entry) => entry.script === helperPath)).toBe(true);
+    expect(entries.every((entry) => entry.cwd === helperCwd)).toBe(true);
+  });
+
   it('accepts complete GitHub truth when the successful response consumes the last rate-limit quota', async () => {
     const repo = await writeFixtureRepo({ auditedStable: '0.125.0' });
     const baseFetch = mockFetch({ stable: '0.126.0' });
@@ -845,7 +898,7 @@ describe('codex CLI release detector', () => {
     });
   });
 
-  it('derives the last audited version from explicit audit evidence only', async () => {
+  it('derives the last audited version from explicit release-intake completion markers only', async () => {
     const repo = await writeFixtureRepo({
       releasePin: '0.126.0',
       cloudPin: '0.126.0',
@@ -867,14 +920,36 @@ describe('codex CLI release detector', () => {
     expect(artifact.mutation_result.action).toBe('dry_run');
   });
 
-  it('ignores control-seam-only Codex CLI audits when deriving release-intake coverage', async () => {
+  it('treats an explicit release-intake completion marker as completed intake', async () => {
+    const repo = await writeFixtureRepo({
+      releasePin: '0.126.0',
+      cloudPin: '0.126.0',
+      policyStable: '0.126.0',
+      auditedStable: '0.126.0'
+    });
+
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: repo,
+      artifactPath: 'out/detection.json',
+      fetchImpl: mockFetch({ stable: '0.126.0' }),
+      dryRun: true,
+      env: {}
+    });
+
+    expect(exitCode).toBe(0);
+    expect(artifact.decision_state).toBe('no_new_audit_required');
+    expect(artifact.current_co.policy.last_audited_version).toBe('0.126.0');
+    expect(artifact.mutation_result.action).toBe('skipped');
+  });
+
+  it('ignores non-intake model/control audits when deriving release-intake coverage', async () => {
     const repo = await writeFixtureRepo({
       releasePin: '0.126.0',
       cloudPin: '0.126.0',
       policyStable: '0.126.0',
       auditedStable: '0.125.0',
       extraPolicyLines: [
-        '- 2026-04-24: CO-351 audited Codex CLI `0.126.0` app-server control-seam surfaces without release-intake closeout.'
+        '- 2026-04-24: CO-351 audited official `rust-v0.126.0` and npm `@openai/codex@0.126.0` for model/control posture without release-intake closeout.'
       ]
     });
 
