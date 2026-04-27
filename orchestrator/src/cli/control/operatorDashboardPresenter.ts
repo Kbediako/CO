@@ -12,6 +12,7 @@ import type {
   ControlRetryPayload,
   ControlRunningPayload,
   ControlSelectedRunPayload,
+  ControlStatusFallbackExpiryMetadata,
   ControlTrackedPayload,
   ControlProviderWorkflowPayload
 } from './observabilityReadModel.js';
@@ -51,6 +52,7 @@ export interface OperatorDashboardSessionPayload {
   started_at: string | null;
   last_event_at: string | null;
   tokens: ControlRunningPayload['tokens'];
+  fallback_expiry?: ControlStatusFallbackExpiryMetadata[];
 }
 
 export interface OperatorDashboardRetryPayload {
@@ -79,6 +81,7 @@ export interface OperatorDashboardRetryPayload {
   last_message: string | null;
   started_at: string | null;
   last_event_at: string | null;
+  fallback_expiry?: ControlStatusFallbackExpiryMetadata[];
 }
 
 export interface OperatorDashboardIssuePayload {
@@ -120,6 +123,7 @@ export interface OperatorDashboardIssuePayload {
   tracked: ControlIssuePayload['tracked'];
   provider_linear_worker_proof: ControlIssuePayload['provider_linear_worker_proof'] | null;
   provider_debug_snapshot?: ControlIssuePayload['provider_debug_snapshot'] | null;
+  fallback_expiry?: ControlStatusFallbackExpiryMetadata[];
   is_selected: boolean;
 }
 
@@ -146,6 +150,7 @@ export interface OperatorDashboardDataset {
   provider_intake?: ProviderIntakeSummaryPayload;
   dispatch_pilot?: ControlDispatchPilotPayload;
   tracked?: ControlTrackedPayload | null;
+  fallback_expiry?: ControlStatusFallbackExpiryMetadata[];
 }
 
 export interface CompatibilityIssueRecordLookups {
@@ -187,6 +192,7 @@ export function buildUiDataset(input: {
       buildRetryQueuePayload(entry, resolveRetryIssueRecord(entry, issueRecordLookups))
     ),
     issues: issuePayloads.map((issue) => buildIssuePayload(issue, issue.issue_identifier === selectedIssueIdentifier)),
+    ...(input.projection.fallbackExpiry ? { fallback_expiry: input.projection.fallbackExpiry } : {}),
     ...(input.projection.providerWorkflow ? { provider_workflow: input.projection.providerWorkflow } : {}),
     ...(input.projection.providerIntake ? { provider_intake: input.projection.providerIntake } : {}),
     ...(input.projection.dispatchPilot ? { dispatch_pilot: input.projection.dispatchPilot } : {}),
@@ -283,6 +289,7 @@ function buildIssuePayload(
     tracked: issue.tracked,
     provider_linear_worker_proof: proof,
     provider_debug_snapshot: issue.provider_debug_snapshot ?? null,
+    ...(issue.fallback_expiry ? { fallback_expiry: issue.fallback_expiry } : {}),
     is_selected: isSelected
   };
 }
@@ -337,7 +344,8 @@ function buildRunningSessionPayload(
     display_event: entry.display_event ?? null,
     started_at: entry.started_at,
     last_event_at: entry.last_event_at,
-    tokens: proof?.tokens ?? entry.tokens
+    tokens: proof?.tokens ?? entry.tokens,
+    ...(entry.fallback_expiry ? { fallback_expiry: entry.fallback_expiry } : {})
   };
 }
 
@@ -390,7 +398,8 @@ function buildRetryQueuePayload(
     last_event: entry.last_event,
     last_message: entry.last_message,
     started_at: entry.started_at,
-    last_event_at: entry.last_event_at
+    last_event_at: entry.last_event_at,
+    ...(entry.fallback_expiry ? { fallback_expiry: entry.fallback_expiry } : {})
   };
 }
 

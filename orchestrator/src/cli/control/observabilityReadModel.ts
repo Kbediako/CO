@@ -404,6 +404,24 @@ export interface ControlLatestEventPayload {
   reason?: string | null;
 }
 
+export type ControlStatusFallbackDecision =
+  | 'remove fallback'
+  | 'expire fallback'
+  | 'justify retaining fallback';
+
+export interface ControlStatusFallbackExpiryMetadata {
+  surface: string;
+  fallback: string;
+  decision: ControlStatusFallbackDecision;
+  owner: string;
+  trigger: string;
+  introduced_date: string;
+  review_date: string | null;
+  maximum_lifetime: string | null;
+  removal_condition: string;
+  validation: string;
+}
+
 export interface ControlSelectedRunPayload {
   issue_id: string | null;
   issue_identifier: string;
@@ -425,6 +443,7 @@ export interface ControlSelectedRunPayload {
   worker_host?: string | null;
   question_summary: ControlQuestionSummaryPayload;
   tracked: ControlTrackedPayload;
+  fallback_expiry?: ControlStatusFallbackExpiryMetadata[];
   provider_linear_worker_proof?: ProviderLinearWorkerProof;
   provider_debug_snapshot?: ControlProviderDebugSnapshot | null;
 }
@@ -464,6 +483,7 @@ export interface ControlRunningPayload {
   message_recorded_at?: string | null;
   source_updated_at?: string | null;
   event_candidates?: ProviderLinearWorkerProgressCandidate[];
+  fallback_expiry?: ControlStatusFallbackExpiryMetadata[];
   started_at: string | null;
   last_event_at: string | null;
   tokens: ControlTokenUsagePayload;
@@ -487,6 +507,7 @@ export interface ControlRetryPayload {
   error: string | null;
   last_event: string | null;
   last_message: string | null;
+  fallback_expiry?: ControlStatusFallbackExpiryMetadata[];
   started_at: string | null;
   last_event_at: string | null;
 }
@@ -534,6 +555,7 @@ export interface ControlStatePayload {
   provider_intake?: ControlProviderIntakePayload;
   provider_workflow?: ControlProviderWorkflowPayload;
   polling?: ControlPollingHealthPayload | null;
+  fallback_expiry?: ControlStatusFallbackExpiryMetadata[];
 }
 
 export interface ControlSelectedRunRuntimeSnapshot {
@@ -580,6 +602,7 @@ export interface ControlCompatibilityProjectionSnapshot {
   providerIntake?: ProviderIntakeSummaryPayload | null;
   providerWorkflow?: ControlProviderWorkflowPayload | null;
   polling?: ControlPollingHealthPayload | null;
+  fallbackExpiry?: ControlStatusFallbackExpiryMetadata[];
 }
 
 export interface ControlIssuePayload {
@@ -613,6 +636,7 @@ export interface ControlIssuePayload {
   provider_linear_worker_proof?: ProviderLinearWorkerProof | null;
   provider_debug_snapshot?: ControlProviderDebugSnapshot | null;
   dispatch_pilot?: ControlDispatchPilotPayload;
+  fallback_expiry?: ControlStatusFallbackExpiryMetadata[];
 }
 
 export function buildTrackedPayloadEnvelope(

@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { mkdtemp, mkdir, readFile, rm, utimes, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -330,6 +330,7 @@ describe('runCoStatusCliShell', () => {
         raw_status?: unknown;
         display_status?: unknown;
         status_reason?: unknown;
+        fallback_expiry?: Array<Record<string, unknown>>;
       };
       counts?: {
         running?: unknown;
@@ -340,12 +341,14 @@ describe('runCoStatusCliShell', () => {
         task_id?: unknown;
         run_id?: unknown;
         last_event?: unknown;
+        fallback_expiry?: Array<Record<string, unknown>>;
       }>;
       issues?: Array<{
         issue_identifier?: unknown;
         status?: unknown;
         display_status?: unknown;
         is_selected?: unknown;
+        fallback_expiry?: Array<Record<string, unknown>>;
       }>;
       degraded_read?: {
         reason?: unknown;
@@ -360,6 +363,7 @@ describe('runCoStatusCliShell', () => {
           freshness?: unknown;
         };
       };
+      fallback_expiry?: Array<Record<string, unknown>>;
     };
     expect(payload.degraded_read).toMatchObject({
       reason: 'ui_request_timeout',
@@ -401,6 +405,298 @@ describe('runCoStatusCliShell', () => {
       issue_identifier: 'CO-296',
       freshness: 'fresh'
     });
+    const selectedRunExpiry = expect.objectContaining({
+      fallback: 'selected-run projection fallback',
+      decision: 'expire fallback',
+      owner: 'CO-398'
+    });
+    const legacyProofFallback = 'legacy proof fields projected into status output';
+    const syntheticIdentityFallback =
+      'synthetic identity/status fallback that hides CLI/API/UI disagreement';
+    expect(payload.fallback_expiry).toEqual(expect.arrayContaining([selectedRunExpiry]));
+    expect(payload.selected?.fallback_expiry).toEqual(expect.arrayContaining([selectedRunExpiry]));
+    expect(payload.selected?.fallback_expiry?.map((entry) => entry.fallback)).not.toContain(
+      legacyProofFallback
+    );
+    expect(payload.selected?.fallback_expiry?.map((entry) => entry.fallback)).not.toContain(
+      syntheticIdentityFallback
+    );
+    expect(payload.running?.[0]?.fallback_expiry).toEqual(expect.arrayContaining([selectedRunExpiry]));
+    expect(payload.running?.[0]?.fallback_expiry?.map((entry) => entry.fallback)).not.toContain(
+      legacyProofFallback
+    );
+    expect(payload.running?.[0]?.fallback_expiry?.map((entry) => entry.fallback)).not.toContain(
+      syntheticIdentityFallback
+    );
+    expect(payload.issues?.[0]?.fallback_expiry).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fallback: 'compatibility issue projection fallback',
+          decision: 'expire fallback',
+          owner: 'CO-398'
+        })
+      ])
+    );
+    expect(payload.issues?.[0]?.fallback_expiry?.map((entry) => entry.fallback)).not.toContain(
+      legacyProofFallback
+    );
+    expect(payload.issues?.[0]?.fallback_expiry?.map((entry) => entry.fallback)).not.toContain(
+      syntheticIdentityFallback
+    );
+  });
+
+  it('does not reuse stale degraded item fallback metadata across provider-intake run changes', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+    process.env.CODEX_ORCHESTRATOR_RUNS_DIR = join(root, 'custom-runs-root');
+
+    const runDir = await writeCoStatusRunDir(root, {
+      runsRoot: process.env.CODEX_ORCHESTRATOR_RUNS_DIR
+    });
+    const startedAt = new Date(Date.now() - 5_000).toISOString();
+    const updatedAt = new Date(Date.now() - 1_000).toISOString();
+    await writeFile(
+      join(runDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        status: 'in_progress',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-stale',
+        issue_identifier: 'CO-296',
+        started_at: startedAt,
+        updated_at: updatedAt,
+        summary: 'retained provider run with legacy proof',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeProviderLinearWorkerProof(runDir, {
+      issue_id: 'lin-issue-stale',
+      issue_identifier: 'CO-296',
+      last_event_at: updatedAt,
+      updated_at: updatedAt,
+      workspace_path: '/tmp/stale-co-workspace'
+    });
+    const staleServer = await startUiServer();
+    await closeServer(staleServer.instance);
+    await writeControlEndpointArtifacts(runDir, staleServer.baseUrl);
+    await writeProviderIntakeState(runDir, {
+      claims: [
+        {
+          issueIdentifier: 'CO-296',
+          issueId: 'lin-issue-current',
+          issueTitle: 'Current operator issue',
+          runId: 'provider-run-current',
+          updatedAtMsAgo: 1_000
+        }
+      ]
+    });
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await runCoStatusCliShell({
+      flags: {
+        format: 'json',
+        'run-dir': runDir
+      },
+      printHelp: vi.fn()
+    });
+
+    const payload = JSON.parse(String(log.mock.calls[0]?.[0])) as {
+      selected?: {
+        run_id?: unknown;
+        started_at?: unknown;
+        latest_action?: unknown;
+        workspace?: {
+          path?: unknown;
+        };
+        question_summary?: unknown;
+        tracked?: {
+          linear?: unknown;
+        };
+        fallback_expiry?: Array<Record<string, unknown>>;
+      };
+      running?: Array<{
+        run_id?: unknown;
+        fallback_expiry?: Array<Record<string, unknown>>;
+      }>;
+      issues?: Array<{
+        issue_id?: unknown;
+        run_id?: unknown;
+        url?: unknown;
+        workspace?: {
+          path?: unknown;
+        };
+        session?: {
+          session_id?: unknown;
+          thread_id?: unknown;
+          turn_count?: unknown;
+        };
+        owner?: {
+          phase?: unknown;
+          status?: unknown;
+        };
+        tokens?: unknown;
+        rate_limits?: unknown;
+        recent_agent_activity?: unknown[];
+        linear_activity?: unknown[];
+        retry?: unknown;
+        tracked?: {
+          linear?: unknown;
+        };
+        provider_linear_worker_proof?: unknown;
+        provider_debug_snapshot?: unknown;
+        running?: {
+          run_id?: unknown;
+          fallback_expiry?: Array<Record<string, unknown>>;
+        } | null;
+        fallback_expiry?: Array<Record<string, unknown>>;
+      }>;
+    };
+    const fallbackNames = (entries: Array<Record<string, unknown>> | undefined): unknown[] =>
+      entries?.map((entry) => entry.fallback) ?? [];
+    const legacyProofFallback = 'legacy proof fields projected into status output';
+
+    expect(payload.selected?.run_id).toBe('provider-run-current');
+    expect(payload.running?.[0]?.run_id).toBe('provider-run-current');
+    expect(payload.issues?.[0]?.run_id).toBe('provider-run-current');
+    expect(payload.issues?.[0]).toMatchObject({
+      issue_id: 'lin-issue-current',
+      url: null,
+      session: {
+        session_id: null,
+        thread_id: null,
+        turn_count: null
+      },
+      owner: {
+        phase: null,
+        status: null
+      },
+      tokens: null,
+      rate_limits: null,
+      recent_agent_activity: [],
+      linear_activity: [],
+      retry: null,
+      tracked: {
+        linear: null
+      },
+      provider_linear_worker_proof: null,
+      provider_debug_snapshot: null
+    });
+    const expectedWorkspacePath = await realpath(root);
+    expect(payload.selected?.workspace?.path).not.toBe('/tmp/stale-co-workspace');
+    expect(payload.selected?.workspace?.path).toBe(expectedWorkspacePath);
+    expect(payload.selected?.started_at).toBeNull();
+    expect(payload.selected?.latest_action).toBeNull();
+    expect(payload.selected?.question_summary).toEqual({
+      queued_count: 0,
+      latest_question: null
+    });
+    expect(payload.selected?.tracked).toEqual({ linear: null });
+    expect(payload.issues?.[0]?.workspace?.path).not.toBe('/tmp/stale-co-workspace');
+    expect(fallbackNames(payload.selected?.fallback_expiry)).not.toContain(legacyProofFallback);
+    expect(fallbackNames(payload.running?.[0]?.fallback_expiry)).not.toContain(legacyProofFallback);
+    expect(fallbackNames(payload.issues?.[0]?.running?.fallback_expiry)).not.toContain(legacyProofFallback);
+    expect(fallbackNames(payload.issues?.[0]?.fallback_expiry)).not.toContain(legacyProofFallback);
+    expect(JSON.stringify(payload.issues?.[0])).not.toContain('thread-old');
+    expect(JSON.stringify(payload.issues?.[0])).not.toContain('legacy proof message');
+  });
+
+  it('scopes selected fallback metadata by full degraded claim identity', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    const startedAt = new Date(Date.now() - 30_000).toISOString();
+    const updatedAt = new Date(Date.now() - 5_000).toISOString();
+    await writeFile(
+      join(runDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'provider-run-selected',
+        task_id: 'local-mcp',
+        status: 'in_progress',
+        pipeline_id: 'provider-linear-worker',
+        pipeline_title: 'Provider Linear Worker',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-selected',
+        issue_identifier: 'CO-296',
+        started_at: startedAt,
+        updated_at: updatedAt,
+        summary: 'selected provider run with legacy proof',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeProviderLinearWorkerProof(runDir, {
+      issue_id: 'lin-issue-selected',
+      issue_identifier: 'CO-296',
+      run_id: 'provider-run-selected',
+      last_event_at: updatedAt,
+      updated_at: updatedAt
+    });
+    const staleServer = await startUiServer();
+    await closeServer(staleServer.instance);
+    await writeControlEndpointArtifacts(runDir, staleServer.baseUrl);
+    await writeProviderIntakeState(runDir, {
+      claims: [
+        {
+          issueIdentifier: 'CO-296',
+          issueId: 'lin-issue-selected',
+          issueTitle: 'Selected operator issue',
+          runId: 'provider-run-selected',
+          updatedAtMsAgo: 1_000
+        },
+        {
+          issueIdentifier: 'CO-296',
+          issueId: 'lin-issue-sibling',
+          issueTitle: 'Sibling operator issue',
+          runId: 'provider-run-sibling',
+          updatedAtMsAgo: 2_000
+        }
+      ]
+    });
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await runCoStatusCliShell({
+      flags: {
+        format: 'json',
+        'run-dir': runDir
+      },
+      printHelp: vi.fn()
+    });
+
+    const payload = JSON.parse(String(log.mock.calls[0]?.[0])) as {
+      selected?: {
+        fallback_expiry?: Array<Record<string, unknown>>;
+      };
+      running?: Array<{
+        run_id?: unknown;
+        fallback_expiry?: Array<Record<string, unknown>>;
+      }>;
+      issues?: Array<{
+        run_id?: unknown;
+        running?: {
+          fallback_expiry?: Array<Record<string, unknown>>;
+        } | null;
+        fallback_expiry?: Array<Record<string, unknown>>;
+      }>;
+    };
+    const fallbackNames = (entries: Array<Record<string, unknown>> | undefined): unknown[] =>
+      entries?.map((entry) => entry.fallback) ?? [];
+    const legacyProofFallback = 'legacy proof fields projected into status output';
+    const siblingRunning = payload.running?.find((entry) => entry.run_id === 'provider-run-sibling');
+    const siblingIssue = payload.issues?.find((entry) => entry.run_id === 'provider-run-sibling');
+
+    expect(fallbackNames(payload.selected?.fallback_expiry)).toContain(legacyProofFallback);
+    expect(fallbackNames(siblingRunning?.fallback_expiry)).not.toContain(legacyProofFallback);
+    expect(fallbackNames(siblingIssue?.running?.fallback_expiry)).not.toContain(legacyProofFallback);
+    expect(fallbackNames(siblingIssue?.fallback_expiry)).not.toContain(legacyProofFallback);
   });
 
   it('uses degraded json fallback for current attach-shell unhealthy wording without the canonical token', async () => {
@@ -1131,8 +1427,11 @@ async function startFailingUiServer(
   };
 }
 
-async function writeCoStatusRunDir(root: string): Promise<string> {
-  const runDir = join(root, '.runs', 'local-mcp', 'cli', 'control-host');
+async function writeCoStatusRunDir(
+  root: string,
+  options: { runsRoot?: string } = {}
+): Promise<string> {
+  const runDir = join(options.runsRoot ?? join(root, '.runs'), 'local-mcp', 'cli', 'control-host');
   await mkdir(runDir, { recursive: true });
   await writeFile(
     join(runDir, 'manifest.json'),
@@ -1169,6 +1468,42 @@ async function writeProviderIntakeState(
   await writeFile(
     join(runDir, 'provider-intake-state.json'),
     JSON.stringify(buildProviderIntakeState(options)),
+    'utf8'
+  );
+}
+
+async function writeProviderLinearWorkerProof(
+  runDir: string,
+  overrides: Record<string, unknown> = {}
+): Promise<void> {
+  await writeFile(
+    join(runDir, 'provider-linear-worker-proof.json'),
+    JSON.stringify({
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-296',
+      pid: null,
+      thread_id: 'thread-old',
+      latest_turn_id: 'turn-old',
+      latest_session_id: 'thread-old-turn-old',
+      latest_session_id_source: 'derived_from_thread_and_turn',
+      turn_count: 2,
+      last_event: 'provider_worker_started',
+      last_message: 'legacy proof message',
+      last_event_at: '2026-04-03T08:10:00.000Z',
+      tokens: {
+        input_tokens: 12,
+        output_tokens: 8,
+        total_tokens: 20
+      },
+      rate_limits: null,
+      owner_phase: 'implementation',
+      owner_status: 'in_progress',
+      workspace_path: null,
+      linear_audit: null,
+      end_reason: null,
+      updated_at: '2026-04-03T08:10:00.000Z',
+      ...overrides
+    }),
     'utf8'
   );
 }

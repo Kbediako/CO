@@ -1,5 +1,6 @@
 /* eslint-disable patterns/prefer-logger-over-console */
 
+import { realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import process from 'node:process';
@@ -36,6 +37,7 @@ export interface CoStatusAttachTarget {
   taskId: string | null;
   runId: string | null;
   runDir: string;
+  workspaceRoot: string;
   baseUrl: URL;
   token: string;
 }
@@ -154,9 +156,24 @@ export async function resolveAttachTarget(flags: ArgMap): Promise<CoStatusAttach
     taskId: manifest.taskId ?? locator.taskId,
     runId: manifest.runId ?? locator.runId,
     runDir,
+    workspaceRoot: resolveAttachWorkspaceRoot(),
     baseUrl,
     token
   };
+}
+
+function resolveAttachWorkspaceRoot(): string {
+  let workspaceRoot: string;
+  try {
+    workspaceRoot = resolveEnvironmentPaths().repoRoot;
+  } catch {
+    workspaceRoot = process.cwd();
+  }
+  try {
+    return realpathSync(workspaceRoot);
+  } catch {
+    return resolve(workspaceRoot);
+  }
 }
 
 function resolveAttachLocator(input: {

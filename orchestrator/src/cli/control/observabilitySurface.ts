@@ -339,6 +339,7 @@ export async function readCompatibilityState(
     codex_totals: projection.codexTotals,
     rate_limits: projection.rateLimits,
     selected: projection.selected,
+    ...(projection.fallbackExpiry ? { fallback_expiry: projection.fallbackExpiry } : {}),
     ...(projection.providerIntake
       ? { provider_intake: serializeProviderIntakeSummary(projection.providerIntake) }
       : {}),
