@@ -25,6 +25,8 @@ const PIN_SURFACES = [
 const VERSIONED_PIN_REQUIRED_SURFACES = new Set(PIN_SURFACES.filter((surface) => !surface.endsWith('codex-version-policy.md')));
 const RELEASE_INTAKE_TEMPLATE_PATH = '.agent/task/templates/codex-cli-release-intake-template.md';
 const PRIMARY_PRERELEASE_DIST_TAGS = new Set(['alpha', 'beta', 'next', 'rc', 'canary', 'experimental', 'dev']);
+const CODEX_INSTALL_PACKAGE_PATTERN = /(^|[\s'"`(,=:{\[])@openai\/codex(?:@([^\s'"`,);\\\]}]+))?(?=$|[\s'"`,);\\\]}])/g;
+const EXACT_CODEX_INSTALL_SPECIFIER_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 
 export function parseSemver(version) {
   const match = String(version ?? '').match(/^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/);
@@ -287,10 +289,10 @@ function extractCodexInstallTruth(content) {
   const installCommandPattern = /\bnpm\s+(?:install|i|add)\b([^\n\r;&|]*)/g;
   for (const commandMatch of content.matchAll(installCommandPattern)) {
     const commandArgs = commandMatch[1] ?? '';
-    for (const packageMatch of commandArgs.matchAll(/@openai\/codex(?:@(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?))?(?=$|[\s'",);\\])/g)) {
-      const version = packageMatch[1] ?? null;
-      if (version && parseSemver(version)) {
-        installPins.push(version);
+    for (const packageMatch of commandArgs.matchAll(CODEX_INSTALL_PACKAGE_PATTERN)) {
+      const specifier = packageMatch[2] ?? null;
+      if (specifier && EXACT_CODEX_INSTALL_SPECIFIER_PATTERN.test(specifier) && parseSemver(specifier)) {
+        installPins.push(specifier);
       } else {
         hasUnversionedInstall = true;
       }

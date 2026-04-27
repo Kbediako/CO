@@ -670,6 +670,58 @@ describe('codex CLI release detector', () => {
     });
   });
 
+  it('fails closed when a required pin surface mixes a versioned pin with a floating dist tag', async () => {
+    const repo = await writeFixtureRepo();
+    await writeFile(
+      join(repo, 'tests', 'pack-smoke.spec.ts'),
+      [
+        "const marketplaceCodexInstallCommand = 'npm install --global @openai/codex@0.125.0';",
+        "const driftProneCodexInstallCommand = 'npm install --global @openai/codex@latest';"
+      ].join('\n'),
+      'utf8'
+    );
+
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: repo,
+      artifactPath: 'out/detection.json',
+      fetchImpl: mockFetch({ stable: '0.125.0' }),
+      env: {}
+    });
+
+    expect(exitCode).toBe(2);
+    expect(artifact.decision_state).toBe('blocked_current_truth_unavailable');
+    expect(artifact.current_co.missing_surfaces).toContainEqual({
+      path: 'tests/pack-smoke.spec.ts',
+      error: 'found unversioned @openai/codex install pin'
+    });
+  });
+
+  it('fails closed when a required pin surface uses a floating range with an npm install alias', async () => {
+    const repo = await writeFixtureRepo();
+    await writeFile(
+      join(repo, 'tests', 'pack-smoke.spec.ts'),
+      [
+        "const marketplaceCodexInstallCommand = 'npm i -g @openai/codex@0.125.0';",
+        "const driftProneCodexInstallCommand = 'npm add --global @openai/codex@^0.125.0';"
+      ].join('\n'),
+      'utf8'
+    );
+
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: repo,
+      artifactPath: 'out/detection.json',
+      fetchImpl: mockFetch({ stable: '0.125.0' }),
+      env: {}
+    });
+
+    expect(exitCode).toBe(2);
+    expect(artifact.decision_state).toBe('blocked_current_truth_unavailable');
+    expect(artifact.current_co.missing_surfaces).toContainEqual({
+      path: 'tests/pack-smoke.spec.ts',
+      error: 'found unversioned @openai/codex install pin'
+    });
+  });
+
   it('fails closed when a required pin surface uses an unversioned npm install alias', async () => {
     const repo = await writeFixtureRepo();
     await writeFile(
