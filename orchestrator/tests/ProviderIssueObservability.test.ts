@@ -1503,6 +1503,44 @@ describe('provider issue observability', () => {
     });
   });
 
+  it('preserves hydrated recovered child-lane counts in the status projection', () => {
+    const snapshot = buildProviderIssueDebugSnapshot({
+      proof: {
+        issue_id: 'lin-issue-101',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        current_turn_started_at: '2026-04-08T07:00:00.000Z',
+        updated_at: '2026-04-08T07:00:05.000Z',
+        parallelization: {
+          decision: 'parallelize_now',
+          reason: 'independent_scope_available',
+          summary: 'Recover prior-attempt child lane.',
+          recorded_at: '2026-04-08T07:00:02.000Z',
+          child_lane_count: 1
+        },
+        child_lanes: [
+          {
+            stream: 'impl-a',
+            task_id: 'linear-lin-issue-101-impl-a',
+            run_id: 'child-run-1',
+            status: 'succeeded',
+            launched_at: '2026-04-08T06:59:58.000Z',
+            summary: 'prior-attempt child lane completed'
+          }
+        ],
+        linear_audit: null
+      }
+    });
+
+    expect(snapshot?.parallelization).toMatchObject({
+      decision: 'parallelize_now',
+      reason: 'independent_scope_available',
+      summary: 'Recover prior-attempt child lane.',
+      recorded_at: '2026-04-08T07:00:02.000Z',
+      child_lane_count: 1
+    });
+  });
+
   it('leaves child_lane_count unknown when audit fallback lacks current-turn child lane data', () => {
     const snapshot = buildProviderIssueDebugSnapshot({
       proof: {

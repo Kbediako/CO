@@ -612,10 +612,10 @@ function resolveProviderParallelizationSnapshot(
     ) {
       return {
         ...hydrated,
-        child_lane_count:
-          currentTurnChildLanes !== null
-            ? currentTurnChildLanes.length
-            : normalizeOptionalInteger(hydrated.child_lane_count)
+        child_lane_count: resolveProviderParallelizationChildLaneCount(
+          currentTurnChildLanes,
+          normalizeOptionalInteger(hydrated.child_lane_count)
+        )
       };
     }
   }
@@ -630,6 +630,19 @@ function resolveProviderParallelizationSnapshot(
     ...fromAudit,
     child_lane_count: currentTurnChildLanes !== null ? currentTurnChildLanes.length : null
   };
+}
+
+function resolveProviderParallelizationChildLaneCount(
+  currentTurnChildLanes: ProviderIssueChildLaneLike[] | null,
+  hydratedChildLaneCount: number | null
+): number | null {
+  if (currentTurnChildLanes === null) {
+    return hydratedChildLaneCount;
+  }
+  if (hydratedChildLaneCount === null) {
+    return currentTurnChildLanes.length;
+  }
+  return Math.max(currentTurnChildLanes.length, hydratedChildLaneCount);
 }
 
 export function deriveProviderLinearWorkerProgressSnapshot(input: {
