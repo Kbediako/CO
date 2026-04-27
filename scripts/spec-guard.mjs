@@ -487,6 +487,7 @@ function hasPlaceholderValue(value) {
     normalized === 'not applicable' ||
     normalized === '-' ||
     PLACEHOLDER_FALLBACK_VALUES.has(normalized) ||
+    /^(?:tbd|to be determined|pending|unknown|todo|later|not recorded|not available|unavailable)\b/.test(normalized) ||
     /^future (?:cleanup|follow ?up|issue|owner)\b/.test(normalized) ||
     /^cleanup later\b/.test(normalized) ||
     /^<.*>$/.test(normalized)
@@ -513,10 +514,14 @@ function formatIsoDate(date) {
 
 function resolveFallbackExpiryCap(row) {
   const normalizedRowContent = normalizePolicyEvidenceText(Object.values(row).join(' '));
-  return (
-    FALLBACK_EXPIRY_CAPS.find((cap) => cap.matches(normalizedRowContent, row)) ??
-    FALLBACK_EXPIRY_CAPS[FALLBACK_EXPIRY_CAPS.length - 1]
+  const matchingCaps = FALLBACK_EXPIRY_CAPS.filter((cap) => cap.matches(normalizedRowContent, row));
+  const specificCaps = matchingCaps.filter((cap) => cap.label !== 'general repo fallback');
+  const rankedCaps = specificCaps.length > 0 ? specificCaps : matchingCaps;
+  rankedCaps.sort(
+    (left, right) =>
+      left.maximumLifetimeDays - right.maximumLifetimeDays || left.reviewDays - right.reviewDays
   );
+  return rankedCaps[0] ?? FALLBACK_EXPIRY_CAPS[FALLBACK_EXPIRY_CAPS.length - 1];
 }
 
 function escapeRegExp(value) {

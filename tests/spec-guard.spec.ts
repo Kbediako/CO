@@ -1297,10 +1297,10 @@ describe('spec-guard script', () => {
     const repo = await initRepository();
     const decisionBody = fallbackDecisionTable([
       completeExpireFallbackRow({
-        owner: 'TBD',
-        trigger: 'pending',
-        removalCondition: 'future cleanup',
-        validation: 'unknown'
+        owner: 'TBD until CO-410 is assigned',
+        trigger: 'unknown until owner assigned',
+        removalCondition: 'pending until migration completes',
+        validation: 'later after tests land'
       })
     ]);
 
@@ -1371,6 +1371,33 @@ describe('spec-guard script', () => {
         trigger: 'docs:freshness:maintain owner verification keeps a temporary fallback active.',
         reviewDate: reviewDateDaysFromNow(15),
         maximumLifetime: reviewDateDaysFromNow(31)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback review date');
+    expect(stdout).toContain('high-churn control surface fallback cap');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('keeps high-churn caps stricter than external migration caps when both match', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`runtime routing`',
+        fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
+        owner: 'CO-410',
+        trigger: 'Runtime routing release compatibility bridge has a deprecation plan and reviewer approval granted.',
+        reviewDate: reviewDateDaysFromNow(30),
+        maximumLifetime: reviewDateDaysFromNow(89)
       })
     ]);
 
