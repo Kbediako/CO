@@ -21,6 +21,7 @@ export function applyRequestedRuntimeModeToManifest(
     original_target: null,
     fallback_target: null,
     blocking_reason: null,
+    expiry: null,
     checked_at: isoTimestampImpl()
   };
 }

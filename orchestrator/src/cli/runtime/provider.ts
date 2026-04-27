@@ -10,6 +10,7 @@ import {
   type RuntimeFallbackPolicyResolution
 } from './fallbackPolicy.js';
 import type {
+  RuntimeFallbackExpiryMetadata,
   RuntimeFallbackMetadata,
   RuntimeMode,
   RuntimeSelection,
@@ -20,6 +21,27 @@ const execFileAsync = promisify(execFile);
 const APP_SERVER_HELP_TIMEOUT_MS = 8000;
 const LOGIN_STATUS_TIMEOUT_MS = 8000;
 const RUNTIME_FALLBACK_ENV_KEY = 'CODEX_ORCHESTRATOR_RUNTIME_FALLBACK';
+const APPSERVER_PREFLIGHT_RUNTIME_FALLBACK_EXPIRY: RuntimeFallbackExpiryMetadata = {
+  owner: 'CO-396',
+  trigger: 'Requested or default runtimeMode=appserver cannot pass appserver preflight and runtime fallback policy is auto.',
+  introduced_date: '2026-02-27',
+  review_date: '2026-05-10',
+  maximum_lifetime: '2026-05-26',
+  removal_condition:
+    'Appserver default/runtime contract succeeds directly, or callers choose explicit runtimeMode=cli or strict policy before launch.',
+  validation: 'orchestrator/tests/RuntimeProvider.test.ts and scripts/runtime-mode-canary.mjs forced fallback checks.'
+};
+const CLOUD_DEFAULT_APPSERVER_RUNTIME_FALLBACK_EXPIRY: RuntimeFallbackExpiryMetadata = {
+  owner: 'CO-396',
+  trigger:
+    'executionMode=cloud receives default or manifest-derived runtimeMode=appserver while cloud appserver runtime remains unsupported and runtime fallback policy is auto.',
+  introduced_date: '2026-04-26',
+  review_date: '2026-05-10',
+  maximum_lifetime: '2026-05-26',
+  removal_condition:
+    'Cloud route selects runtimeMode=cli before runtime selection, or fails fast with equivalent actionable metadata instead of relying on implicit runtime fallback.',
+  validation: 'orchestrator/tests/RuntimeProvider.test.ts cloud default/manifest fallback coverage and cloud-mode docs checks.'
+};
 
 function envFlagEnabled(value: string | undefined): boolean {
   if (!value) {
@@ -44,6 +66,7 @@ function createNoFallback(
     original_target: null,
     fallback_target: null,
     blocking_reason: null,
+    expiry: null,
     checked_at: now()
   };
 }
@@ -56,6 +79,7 @@ function createFallback(params: {
   originalTarget: string;
   fallbackTarget: string;
   policyResolution: RuntimeFallbackPolicyResolution;
+  expiry: RuntimeFallbackExpiryMetadata;
   now: () => string;
 }): RuntimeFallbackMetadata {
   return {
@@ -69,6 +93,7 @@ function createFallback(params: {
     original_target: params.originalTarget,
     fallback_target: params.fallbackTarget,
     blocking_reason: params.reason,
+    expiry: params.expiry,
     checked_at: params.now()
   };
 }
@@ -94,6 +119,7 @@ function createBlockedFallback(params: {
     original_target: params.originalTarget,
     fallback_target: params.fallbackTarget,
     blocking_reason: params.reason,
+    expiry: null,
     checked_at: params.now()
   };
 }
@@ -351,6 +377,7 @@ export async function resolveRuntimeSelection(
         originalTarget: 'execution:cloud/runtime:appserver',
         fallbackTarget: 'execution:cloud/runtime:cli',
         policyResolution,
+        expiry: CLOUD_DEFAULT_APPSERVER_RUNTIME_FALLBACK_EXPIRY,
         now
       })
     };
@@ -439,6 +466,7 @@ export async function resolveRuntimeSelection(
       originalTarget: 'runtime:appserver',
       fallbackTarget: 'runtime:cli',
       policyResolution,
+      expiry: APPSERVER_PREFLIGHT_RUNTIME_FALLBACK_EXPIRY,
       now
     })
   };

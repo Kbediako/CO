@@ -9,6 +9,19 @@ import {
   resolveRuntimeSelection
 } from '../src/cli/runtime/provider.js';
 
+const APPSERVER_PREFLIGHT_EXPIRY = {
+  owner: 'CO-396',
+  introduced_date: '2026-02-27',
+  review_date: '2026-05-10',
+  maximum_lifetime: '2026-05-26'
+};
+const CLOUD_DEFAULT_APPSERVER_EXPIRY = {
+  owner: 'CO-396',
+  introduced_date: '2026-04-26',
+  review_date: '2026-05-10',
+  maximum_lifetime: '2026-05-26'
+};
+
 describe('runtime mode resolution', () => {
   it('resolves precedence as flag > env > config > manifest > default', () => {
     const env = { CODEX_ORCHESTRATOR_RUNTIME_MODE: 'appserver' } as NodeJS.ProcessEnv;
@@ -125,6 +138,9 @@ describe('runtime provider selection', () => {
     expect(selection.fallback.original_target).toBe('runtime:appserver');
     expect(selection.fallback.fallback_target).toBe('runtime:cli');
     expect(selection.fallback.blocking_reason).toContain('Forced appserver preflight failure');
+    expect(selection.fallback.expiry).toMatchObject(APPSERVER_PREFLIGHT_EXPIRY);
+    expect(selection.fallback.expiry?.trigger).toContain('runtimeMode=appserver');
+    expect(selection.fallback.expiry?.removal_condition).toContain('runtimeMode=cli');
   });
 
   it('strict mode fails closed when appserver preflight fails', async () => {
@@ -156,6 +172,7 @@ describe('runtime provider selection', () => {
         original_target: 'runtime:appserver',
         fallback_target: 'runtime:cli'
       });
+      expect((error as RuntimeSelectionFailure).runtimeFallback.expiry).toBeNull();
       expect((error as RuntimeSelectionFailure).runtimeFallback.blocking_reason).toContain(
         'Forced appserver preflight failure'
       );
@@ -183,6 +200,7 @@ describe('runtime provider selection', () => {
       expect(selection.fallback.policy).toBe('auto');
       expect(selection.fallback.code).toBe('codex-command-unavailable');
       expect(selection.fallback.reason).toContain('Codex CLI executable');
+      expect(selection.fallback.expiry).toMatchObject(APPSERVER_PREFLIGHT_EXPIRY);
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }
@@ -212,6 +230,7 @@ describe('runtime provider selection', () => {
       expect(selection.fallback.policy).toBe('auto');
       expect(selection.fallback.code).toBe('runtime-workspace-unavailable');
       expect(selection.fallback.reason).toContain('repo root is unavailable');
+      expect(selection.fallback.expiry).toMatchObject(APPSERVER_PREFLIGHT_EXPIRY);
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }
@@ -240,6 +259,7 @@ describe('runtime provider selection', () => {
         original_target: 'execution:cloud/runtime:appserver',
         fallback_target: 'execution:cloud/runtime:cli'
       });
+      expect((error as RuntimeSelectionFailure).runtimeFallback.expiry).toBeNull();
     }
   });
 
@@ -263,6 +283,8 @@ describe('runtime provider selection', () => {
       original_target: 'execution:cloud/runtime:appserver',
       fallback_target: 'execution:cloud/runtime:cli'
     });
+    expect(selection.fallback.expiry).toMatchObject(CLOUD_DEFAULT_APPSERVER_EXPIRY);
+    expect(selection.fallback.expiry?.removal_condition).toContain('runtimeMode=cli');
   });
 
   it('strict mode fails closed for implicit default cloud appserver mode', async () => {
@@ -293,6 +315,7 @@ describe('runtime provider selection', () => {
         original_target: 'execution:cloud/runtime:appserver',
         fallback_target: 'execution:cloud/runtime:cli'
       });
+      expect((error as RuntimeSelectionFailure).runtimeFallback.expiry).toBeNull();
     }
   });
 
@@ -313,5 +336,6 @@ describe('runtime provider selection', () => {
     expect(selection.fallback.policy).toBe('auto');
     expect(selection.fallback.original_target).toBe('execution:cloud/runtime:appserver');
     expect(selection.fallback.fallback_target).toBe('execution:cloud/runtime:cli');
+    expect(selection.fallback.expiry).toMatchObject(CLOUD_DEFAULT_APPSERVER_EXPIRY);
   });
 });

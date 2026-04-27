@@ -109,6 +109,7 @@ function createDefaultRuntimeFallback(): NonNullable<CliManifest['runtime_fallba
     original_target: null,
     fallback_target: null,
     blocking_reason: null,
+    expiry: null,
     checked_at: isoTimestamp()
   };
 }

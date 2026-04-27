@@ -69,6 +69,12 @@ export function renderOrchestratorStatus(
         `fallback_target=${describeFallbackTarget(fallback.fallback_target ?? null)} ` +
         `blocking_reason=${fallback.blocking_reason ?? fallback.reason ?? 'n/a'}`
     );
+    if (fallback.expiry) {
+      logger.info(
+        `Runtime fallback expiry: owner=${fallback.expiry.owner} review=${fallback.expiry.review_date} ` +
+          `max=${fallback.expiry.maximum_lifetime}`
+      );
+    }
   }
   if (manifest.config_resolution) {
     logger.info(

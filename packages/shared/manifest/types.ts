@@ -137,6 +137,15 @@ export interface CodexOrchestratorCLIManifest {
     original_target?: string | null;
     fallback_target?: string | null;
     blocking_reason?: string | null;
+    expiry?: {
+      owner: string;
+      trigger: string;
+      introduced_date: string;
+      review_date: string;
+      maximum_lifetime: string;
+      removal_condition: string;
+      validation: string;
+    } | null;
     checked_at: string | null;
   } | null;
   scheduler?: {

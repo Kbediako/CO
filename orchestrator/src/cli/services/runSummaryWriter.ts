@@ -50,6 +50,17 @@ export function applyRuntimeToRunSummary(runSummary: RunSummary, manifest: CliMa
     originalTarget: fallback?.original_target ?? null,
     fallbackTarget: fallback?.fallback_target ?? null,
     blockingReason: fallback?.blocking_reason ?? null,
+    fallbackExpiry: fallback?.expiry
+      ? {
+          owner: fallback.expiry.owner,
+          trigger: fallback.expiry.trigger,
+          introducedDate: fallback.expiry.introduced_date,
+          reviewDate: fallback.expiry.review_date,
+          maximumLifetime: fallback.expiry.maximum_lifetime,
+          removalCondition: fallback.expiry.removal_condition,
+          validation: fallback.expiry.validation
+        }
+      : null,
     checkedAt: fallback?.checked_at ?? null
   };
 }

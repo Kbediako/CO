@@ -13,6 +13,11 @@ Runtime compatibility:
 - `executionMode` and `runtimeMode` are orthogonal controls.
 - Local default runtime is `appserver`; `--runtime-mode cli` remains break-glass.
 - `--execution-mode cloud --runtime-mode appserver` is unsupported and fails fast.
+- Non-explicit cloud runs that inherit the local `appserver` default may still auto-reroute to
+  `runtimeMode=cli` under the runtime fallback policy. That bridge is an expiring CO-396
+  compatibility path: manifests must keep `runtime_fallback.expiry.owner=CO-396`,
+  `review_date=2026-05-10`, and `maximum_lifetime=2026-05-26` until the cloud route selects
+  `cli` before runtime selection or fails fast with equivalent metadata.
 - Cloud lanes should request `--runtime-mode cli` explicitly when deterministic contract testing is required.
 - `js_repl` is enabled by default globally; for cloud edge-case testing, set explicit feature toggles (`CODEX_CLOUD_ENABLE_FEATURES=js_repl` or `CODEX_CLOUD_DISABLE_FEATURES=js_repl`) instead of relying on implicit defaults.
 - Keep enabled/disabled lanes separate (do not set the same feature in both lists for one run).
@@ -75,6 +80,11 @@ Cloud fallback is explicit. With the default `CODEX_ORCHESTRATOR_CLOUD_FALLBACK=
 5. Surfaces current fallback policy in `doctor` output (`fallback policy: auto|strict`)
 
 This means repos without cloud setup can still run the same pipelines without extra configuration when auto policy is selected, while still leaving machine-readable evidence of the reroute.
+
+Cloud fallback evidence is not required-cloud evidence. The fallback contract writes
+`manifest.cloud_fallback` and proves the local MCP fallback path only; it does not satisfy a
+required cloud execution gate. Runtime routing fallback evidence remains separate in
+`manifest.runtime_fallback`, including CO-396 expiry metadata for retained temporary runtime reroutes.
 
 ## Fail-Fast Cloud Mode (Strict)
 

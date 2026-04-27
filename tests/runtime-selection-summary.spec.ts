@@ -51,6 +51,15 @@ describe('formatRuntimeSelectionSummary', () => {
           original_target: 'runtime:appserver',
           fallback_target: 'runtime:cli',
           blocking_reason: 'Appserver preflight failed.',
+          expiry: {
+            owner: 'CO-396',
+            trigger: 'runtimeMode=appserver preflight failure',
+            introduced_date: '2026-02-27',
+            review_date: '2026-05-10',
+            maximum_lifetime: '2026-05-26',
+            removal_condition: 'Use cli or strict before launch.',
+            validation: 'runtime provider tests'
+          },
           checked_at: '2026-04-26T00:00:00.000Z'
         }
       })
@@ -58,5 +67,6 @@ describe('formatRuntimeSelectionSummary', () => {
 
     expect(summary).toContain('fallback_policy=strict fallback_policy_source=env');
     expect(summary).toContain('fallback=appserver-preflight-failed');
+    expect(summary).toContain('expiry_owner=CO-396 expiry_review=2026-05-10 expiry_max=2026-05-26');
   });
 });

@@ -43,6 +43,7 @@ describe('orchestrator runtime manifest mutation', () => {
       original_target: null,
       fallback_target: null,
       blocking_reason: null,
+      expiry: null,
       checked_at: '2026-03-15T00:00:00.000Z'
     });
   });
