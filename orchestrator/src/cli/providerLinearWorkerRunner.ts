@@ -5940,7 +5940,7 @@ function hasCurrentTurnSuccessfulChildLaneLaunch(
   currentTurnStartedAt: string | null | undefined
 ): boolean {
   return selectCurrentTurnChildLanes(childLanes, currentTurnStartedAt).some(
-    (childLane) => childLane.status === 'succeeded'
+    (childLane) => isSuccessfulProviderLinearWorkerChildLaneStatus(childLane.status)
   );
 }
 
@@ -5990,7 +5990,7 @@ function selectRecoverablePriorAttemptSuccessfulChildLanes(input: {
     if (
       childLane.pipeline_id !== PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID ||
       childLane.issue_id !== issueId ||
-      childLane.status !== 'succeeded' ||
+      !isSuccessfulProviderLinearWorkerChildLaneStatus(childLane.status) ||
       childLane.decision !== 'pending' ||
       normalizeOptionalString(childLane.decision_at) ||
       !parallelizationSummaryNamesRecoveredChildLane(currentParallelization.summary, childLane)

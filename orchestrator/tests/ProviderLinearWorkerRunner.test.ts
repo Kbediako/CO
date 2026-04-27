@@ -14933,7 +14933,7 @@ for await (const line of rl) {
     );
   });
 
-  it('recovers a prior-attempt successful pending child lane for retry parallelize_now', async () => {
+  it('recovers a prior-attempt completed pending child lane for retry parallelize_now', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
 
     await appendParallelizationDecisionAudit(runDir, {
@@ -15008,8 +15008,8 @@ for await (const line of rl) {
               record.stream === 'impl-a'
                 ? {
                     ...record,
-                    status: 'succeeded',
-                    summary: 'prior-attempt child lane completed successfully'
+                    status: 'completed',
+                    summary: 'prior-attempt child lane reported completed'
                   }
                 : record
             ),
@@ -15045,7 +15045,7 @@ for await (const line of rl) {
       child_lanes: expect.arrayContaining([
         expect.objectContaining({
           stream: 'impl-a',
-          status: 'succeeded',
+          status: 'completed',
           launched_at: '2026-03-21T08:59:59.000Z',
           decision: 'pending'
         })
