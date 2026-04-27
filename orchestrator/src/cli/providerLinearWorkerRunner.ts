@@ -160,7 +160,8 @@ const PROVIDER_LINEAR_WORKER_PROOF_LOCK_RETRY: LockRetryOptions = {
   backoffFactor: 1.5,
   // The proof sidecar is shared by the parent worker and child refresh paths;
   // prefer a short wait over allowing stale snapshots to overwrite newer state.
-  maxDelayMs: 250
+  maxDelayMs: 250,
+  staleMs: 5 * 60 * 1000
 };
 export const PROVIDER_LINEAR_RESIDENT_SESSION_CONTINUITY_END_REASONS = new Set<string>([
   'max_turns_reached_issue_still_active'
@@ -2649,6 +2650,7 @@ function buildParallelizationGuidance(helperCommand: string, issueId: string): s
     '- Parent ownership discipline: while a child lane is active, avoid editing its delegated files or phases. If parent edits collide with delegated scope, invalidate/reject the child lane or record explicit rebase/collision reasoning before accepting any child patch.',
     `- Allowed decision and reason-code pairs: ${buildParallelizationReasonCodesSummary()}.`,
     `- If you record \`parallelize_now\`, you must actually launch at least one same-issue child lane in that turn with \`${helperCommand} child-lane --action launch ...\`, and at least one of those lanes must complete successfully before the turn ends; otherwise the provider worker fails closed.`,
+    '- Retry recovery exception: when a prior-attempt same-issue child lane already completed successfully and is still pending parent acceptance, the current `parallelize_now` summary must explicitly name the recovered lane with `recover_child_lane:<stream>` and `recover_run:<run_id>` before that prior lane can satisfy the launch proof.',
     '- If you record `stay_serial` or `forbid_parallel`, choose the bounded reason code that truthfully explains why `child_lanes: []` is acceptable for this turn so the proof and debug surfaces are explicit rather than silent.',
     '- For forced child-lane validation follow-ups, if fresh current-main evidence shows the originally named `clean-main-baseline-failures` and `cli-orchestrator-cleanup-fallout` clusters are both clean non-repros and no independent live cluster remains, do not invent child lanes or finish as `stay_serial`; record `forbid_parallel` with the bounded reason that matches the remaining work: use `parent_only_mutation` and close the issue directly when no live dependent work remains, and use `blocked_by_dependency` only when a real remaining dependency still exists and the issue should move to `Blocked`.'
   ];
@@ -5857,9 +5859,22 @@ function deriveProviderLinearWorkerParallelizationRecord(input: {
   if (!snapshot) {
     return null;
   }
+  const priorParallelizations = readProviderLinearParallelizationSnapshotsBefore(
+    input.linearAudit,
+    {
+      issueId: input.issueId,
+      recordedBefore: boundary
+    }
+  );
   return {
     ...snapshot,
-    child_lane_count: selectCurrentTurnChildLanes(input.childLanes, boundary).length
+    child_lane_count: selectEffectiveParallelizationChildLanes({
+      childLanes: input.childLanes,
+      currentTurnStartedAt: boundary,
+      issueId: input.issueId,
+      currentParallelization: snapshot,
+      priorParallelizations
+    }).length
   };
 }
 
@@ -5928,6 +5943,122 @@ function hasCurrentTurnSuccessfulChildLaneLaunch(
   );
 }
 
+function readProviderLinearParallelizationSnapshotsBefore(
+  linearAudit: ProviderLinearAuditSummary | null | undefined,
+  options: {
+    issueId?: string | null;
+    recordedBefore?: string | null;
+  }
+): ProviderLinearParallelizationSnapshot[] {
+  const recordedBefore = normalizeOptionalString(options.recordedBefore);
+  if (!recordedBefore) {
+    return [];
+  }
+  return readProviderLinearParallelizationSnapshots(linearAudit, {
+    issueId: options.issueId
+  }).filter((snapshot) => compareIsoTimestamp(snapshot.recorded_at, recordedBefore) < 0);
+}
+
+function selectRecoverablePriorAttemptSuccessfulChildLanes(input: {
+  childLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined;
+  currentTurnStartedAt: string | null | undefined;
+  issueId: string | null | undefined;
+  currentParallelization: ProviderLinearParallelizationSnapshot | null | undefined;
+  priorParallelizations: ProviderLinearParallelizationSnapshot[] | null | undefined;
+}): ProviderLinearWorkerChildLaneRecord[] {
+  const currentTurnStartedAt = normalizeOptionalString(input.currentTurnStartedAt);
+  const issueId = normalizeOptionalString(input.issueId);
+  const currentParallelization = input.currentParallelization ?? null;
+  const priorParallelizations = Array.isArray(input.priorParallelizations)
+    ? input.priorParallelizations
+    : [];
+  if (
+    !Array.isArray(input.childLanes) ||
+    !currentTurnStartedAt ||
+    !issueId ||
+    priorParallelizations.length === 0 ||
+    currentParallelization?.decision !== 'parallelize_now' ||
+    !priorParallelizations.some((snapshot) => snapshot.decision === 'parallelize_now')
+  ) {
+    return [];
+  }
+  return input.childLanes.filter((childLane) => {
+    if (
+      childLane.pipeline_id !== PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID ||
+      childLane.issue_id !== issueId ||
+      childLane.status !== 'succeeded' ||
+      childLane.decision !== 'pending' ||
+      normalizeOptionalString(childLane.decision_at) ||
+      !parallelizationSummaryNamesRecoveredChildLane(currentParallelization.summary, childLane)
+    ) {
+      return false;
+    }
+    return (
+      priorParallelizations.some(
+        (snapshot) =>
+          snapshot.decision === 'parallelize_now' &&
+          compareIsoTimestamp(snapshot.recorded_at, childLane.launched_at) <= 0
+      ) &&
+      compareIsoTimestamp(childLane.launched_at, currentTurnStartedAt) < 0
+    );
+  });
+}
+
+function parallelizationSummaryNamesRecoveredChildLane(
+  summary: string | null | undefined,
+  childLane: ProviderLinearWorkerChildLaneRecord
+): boolean {
+  const markerTokens = new Set(
+    (normalizeOptionalString(summary)?.toLowerCase() ?? '').split(/\s+/).filter(Boolean)
+  );
+  const stream = normalizeOptionalString(childLane.stream)?.toLowerCase() ?? '';
+  const runId = normalizeOptionalString(childLane.run_id)?.toLowerCase() ?? '';
+  if (!stream || !runId) {
+    return false;
+  }
+  return (
+    markerTokens.has(`recover_child_lane:${stream}`) && markerTokens.has(`recover_run:${runId}`)
+  );
+}
+
+function selectEffectiveParallelizationChildLanes(input: {
+  childLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined;
+  currentTurnStartedAt: string | null | undefined;
+  issueId: string | null | undefined;
+  currentParallelization: ProviderLinearParallelizationSnapshot | null | undefined;
+  priorParallelizations: ProviderLinearParallelizationSnapshot[] | null | undefined;
+}): ProviderLinearWorkerChildLaneRecord[] {
+  const currentTurnChildLanes = selectCurrentTurnChildLanes(
+    input.childLanes,
+    input.currentTurnStartedAt
+  );
+  const recoveredChildLanes = selectRecoverablePriorAttemptSuccessfulChildLanes(input);
+  if (currentTurnChildLanes.length === 0) {
+    return recoveredChildLanes;
+  }
+  const currentKeys = new Set(
+    currentTurnChildLanes.map(
+      (childLane) => `${childLane.task_id}\0${childLane.run_id}\0${childLane.stream}`
+    )
+  );
+  return [
+    ...currentTurnChildLanes,
+    ...recoveredChildLanes.filter(
+      (childLane) => !currentKeys.has(`${childLane.task_id}\0${childLane.run_id}\0${childLane.stream}`)
+    )
+  ];
+}
+
+function hasRecoverablePriorAttemptSuccessfulChildLaneLaunch(input: {
+  childLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined;
+  currentTurnStartedAt: string | null | undefined;
+  issueId: string | null | undefined;
+  currentParallelization: ProviderLinearParallelizationSnapshot | null | undefined;
+  priorParallelizations: ProviderLinearParallelizationSnapshot[] | null | undefined;
+}): boolean {
+  return selectRecoverablePriorAttemptSuccessfulChildLanes(input).length > 0;
+}
+
 function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {
   const leftValue = normalizeOptionalString(left);
   const rightValue = normalizeOptionalString(right);
@@ -5965,12 +6096,19 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
     | 'parallelization_serial_conflict';
   message: string;
 } | null {
-  const currentTurnParallelizationDecisions = readProviderLinearParallelizationSnapshots(
+  const parallelizationSnapshots = readProviderLinearParallelizationSnapshots(
     input.proof.linear_audit,
     {
       issueId: input.proof.issue_id
     }
-  ).slice(input.parallelizationDecisionCountBeforeTurn);
+  );
+  const currentTurnParallelizationDecisions = parallelizationSnapshots.slice(
+    input.parallelizationDecisionCountBeforeTurn
+  );
+  const priorParallelizations = parallelizationSnapshots.slice(
+    0,
+    input.parallelizationDecisionCountBeforeTurn
+  );
   const currentTurnBoundary =
     normalizeOptionalString(input.proof.current_turn_started_at) ??
     normalizeOptionalString(input.proof.attempt_started_at);
@@ -6002,10 +6140,16 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
         `provider-linear-worker recorded \`${parallelization.decision}\` for the current turn, but same-issue child lanes were still launched during that turn.`
     };
   }
-  if (hasCurrentTurnSuccessfulChildLaneLaunch(
-    input.proof.child_lanes,
-    currentTurnBoundary
-  )) {
+  if (
+    hasCurrentTurnSuccessfulChildLaneLaunch(input.proof.child_lanes, currentTurnBoundary) ||
+    hasRecoverablePriorAttemptSuccessfulChildLaneLaunch({
+      childLanes: input.proof.child_lanes,
+      currentTurnStartedAt: currentTurnBoundary,
+      issueId: input.proof.issue_id,
+      currentParallelization: parallelization,
+      priorParallelizations
+    })
+  ) {
     return null;
   }
   return {

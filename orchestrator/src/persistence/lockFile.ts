@@ -25,6 +25,8 @@ export interface AcquiredLock {
   release(): Promise<void>;
 }
 
+const STALE_AWARE_ACQUISITION_LOCK_SUFFIX = '.acquire';
+
 export async function acquireLockWithRetry(params: LockRetryParams): Promise<AcquiredLock> {
   await params.ensureDirectory();
   const { maxAttempts, initialDelayMs, backoffFactor, maxDelayMs } = params.retry;
@@ -34,7 +36,11 @@ export async function acquireLockWithRetry(params: LockRetryParams): Promise<Acq
 
   while (attempt < maxAttempts) {
     attempt += 1;
+    let acquisitionLock: AcquiredLock | null = null;
     try {
+      if (staleMs > 0) {
+        acquisitionLock = await acquireStaleAwareAcquisitionLock(params);
+      }
       const ownerToken = randomUUID();
       const handle = await open(params.lockPath, 'wx+');
       try {
@@ -44,17 +50,33 @@ export async function acquireLockWithRetry(params: LockRetryParams): Promise<Acq
         await rm(params.lockPath, { force: true });
         throw error;
       }
-      return createAcquiredLock(params.lockPath, ownerToken, handle, staleMs);
+      const lock = createAcquiredLock(params.lockPath, ownerToken, handle, staleMs);
+      if (acquisitionLock) {
+        try {
+          await acquisitionLock.release();
+          acquisitionLock = null;
+        } catch (error) {
+          await lock.release();
+          throw error;
+        }
+      }
+      return lock;
     } catch (error: unknown) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+        await releaseLockIfPresent(acquisitionLock);
         throw error;
       }
       if (staleMs > 0) {
         const cleared = await clearStaleLock(params.lockPath, staleMs);
+        await releaseLockIfPresent(acquisitionLock);
+        acquisitionLock = null;
         if (cleared) {
           attempt -= 1;
           continue;
         }
+      } else {
+        await releaseLockIfPresent(acquisitionLock);
+        acquisitionLock = null;
       }
       if (attempt >= maxAttempts) {
         throw params.createError(params.taskId, attempt);
@@ -65,6 +87,57 @@ export async function acquireLockWithRetry(params: LockRetryParams): Promise<Acq
   }
 
   throw params.createError(params.taskId, attempt);
+}
+
+async function acquireStaleAwareAcquisitionLock(params: LockRetryParams): Promise<AcquiredLock> {
+  const lockPath = `${params.lockPath}${STALE_AWARE_ACQUISITION_LOCK_SUFFIX}`;
+  const { maxAttempts, initialDelayMs, backoffFactor, maxDelayMs } = params.retry;
+  let attempt = 0;
+  let delayMs = initialDelayMs;
+
+  while (attempt < maxAttempts) {
+    attempt += 1;
+    try {
+      const ownerToken = randomUUID();
+      const handle = await open(lockPath, 'wx+');
+      try {
+        await handle.writeFile(ownerToken, 'utf8');
+      } catch (error) {
+        await handle.close();
+        await rm(lockPath, { force: true });
+        throw error;
+      }
+      return createAcquiredLock(lockPath, ownerToken, handle, params.retry.staleMs ?? 0);
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+        throw error;
+      }
+      const staleMs = params.retry.staleMs ?? 0;
+      if (staleMs > 0) {
+        const cleared = await clearStaleLock(lockPath, staleMs);
+        if (cleared) {
+          attempt -= 1;
+          continue;
+        }
+      }
+      if (attempt >= maxAttempts) {
+        throw new Error(
+          `Failed to acquire lock acquisition guard for ${params.taskId} after ${attempt} attempts.`
+        );
+      }
+      await delay(Math.min(delayMs, maxDelayMs));
+      delayMs = Math.min(delayMs * backoffFactor, maxDelayMs);
+    }
+  }
+
+  throw new Error(`Failed to acquire lock acquisition guard for ${params.taskId} after ${attempt} attempts.`);
+}
+
+async function releaseLockIfPresent(lock: AcquiredLock | null): Promise<void> {
+  if (!lock) {
+    return;
+  }
+  await lock.release();
 }
 
 function createAcquiredLock(

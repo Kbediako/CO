@@ -48,6 +48,102 @@ describe('acquireLockWithRetry', () => {
     await expect(stat(lockPath)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
+  it('serializes stale reclaimers so a recovered live lock is not removed', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'lock-file-'));
+    tempDirs.push(root);
+    const lockPath = join(root, 'shared.lock');
+    const staleMs = 200;
+    const retry = {
+      maxAttempts: 200,
+      initialDelayMs: 10,
+      backoffFactor: 1,
+      maxDelayMs: 10,
+      staleMs
+    };
+
+    const orphan = await open(lockPath, 'wx');
+    await orphan.writeFile('orphan-owner', 'utf8');
+    await orphan.close();
+    const past = new Date(Date.now() - 60_000);
+    await utimes(lockPath, past, past);
+
+    const acquireA = acquireLockWithRetry({
+      taskId: 'task-a',
+      lockPath,
+      retry,
+      ensureDirectory: async () => {
+        await mkdir(root, { recursive: true });
+      },
+      createError: (taskId, attempts) => new Error(`Failed to acquire ${taskId} after ${attempts} attempts`)
+    }).then((lock) => ({ name: 'task-a', lock }));
+    let secondSettled = false;
+    const acquireB = acquireLockWithRetry({
+      taskId: 'task-b',
+      lockPath,
+      retry,
+      ensureDirectory: async () => {
+        await mkdir(root, { recursive: true });
+      },
+      createError: (taskId, attempts) => new Error(`Failed to acquire ${taskId} after ${attempts} attempts`)
+    }).then((lock) => {
+      return { name: 'task-b', lock };
+    });
+
+    const first = await Promise.race([acquireA, acquireB]);
+    const second = first.name === 'task-a' ? acquireB : acquireA;
+    const secondSettledPromise = second.then((value) => {
+      secondSettled = true;
+      return value;
+    });
+    await delay(staleMs * 2 + 100);
+    expect(secondSettled).toBe(false);
+    await expect(readFile(lockPath, 'utf8')).resolves.toBe(first.lock.ownerToken);
+
+    await first.lock.release();
+    const next = await secondSettledPromise;
+    await expect(readFile(lockPath, 'utf8')).resolves.toBe(next.lock.ownerToken);
+
+    await next.lock.release();
+    await expect(stat(lockPath)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(stat(`${lockPath}.acquire`)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('recovers an orphaned stale acquisition guard before taking the main lock', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'lock-file-'));
+    tempDirs.push(root);
+    const lockPath = join(root, 'shared.lock');
+    const acquisitionGuardPath = `${lockPath}.acquire`;
+    const retry = {
+      maxAttempts: 4,
+      initialDelayMs: 1,
+      backoffFactor: 1,
+      maxDelayMs: 1,
+      staleMs: 1
+    };
+
+    const orphan = await open(acquisitionGuardPath, 'wx');
+    await orphan.writeFile('orphan-guard-owner', 'utf8');
+    await orphan.close();
+    const past = new Date(Date.now() - 60_000);
+    await utimes(acquisitionGuardPath, past, past);
+
+    const lock = await acquireLockWithRetry({
+      taskId: 'task-after-orphan-guard',
+      lockPath,
+      retry,
+      ensureDirectory: async () => {
+        await mkdir(root, { recursive: true });
+      },
+      createError: (taskId, attempts) => new Error(`Failed to acquire ${taskId} after ${attempts} attempts`)
+    });
+
+    await expect(readFile(lockPath, 'utf8')).resolves.toBe(lock.ownerToken);
+    await expect(stat(acquisitionGuardPath)).rejects.toMatchObject({ code: 'ENOENT' });
+
+    await lock.release();
+    await expect(stat(lockPath)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
   it('keeps a live lock fresh so waiting writers do not stale-take it over', async () => {
     const root = await mkdtemp(join(tmpdir(), 'lock-file-'));
     tempDirs.push(root);
