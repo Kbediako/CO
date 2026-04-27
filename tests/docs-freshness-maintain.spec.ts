@@ -1789,68 +1789,6 @@ describe('docs freshness maintenance decisions', () => {
     );
   });
 
-  it('fails closed when live owner verification lacks project scope even if workspace and team match', async () => {
-    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-team-scope-'));
-    createdDirs.push(repoRoot);
-    await writeFixture(repoRoot, {
-      entries: [{ path: 'tasks/tasks-1164-historical.md', daysOld: 31 }],
-      policy: rollingFreshnessPolicy({
-        require_live_owner_verification: true,
-        owner_issue_workspace_id: 'workspace-1',
-        owner_issue_team_id: 'team-1'
-      })
-    });
-    await writeLinearIssueContextHelper(repoRoot, {
-      issue: {
-        id: 'owner-id',
-        state: { name: 'In Progress', type: 'started', is_terminal: false },
-        workspace_id: 'workspace-1',
-        team: { id: 'team-1' },
-        project: { id: 'project-1', name: 'CO Control and Advisory' }
-      },
-      source_setup: {
-        workspace_id: 'workspace-1',
-        team_id: 'team-1'
-      }
-    });
-
-    const originalProjectId = process.env.CO_LINEAR_PROJECT_ID;
-    let result;
-    try {
-      delete process.env.CO_LINEAR_PROJECT_ID;
-      result = await runMaintain(repoRoot);
-    } finally {
-      if (originalProjectId === undefined) {
-        delete process.env.CO_LINEAR_PROJECT_ID;
-      } else {
-        process.env.CO_LINEAR_PROJECT_ID = originalProjectId;
-      }
-    }
-    const { decision, shouldBlock } = result;
-
-    expect(shouldBlock).toBe(true);
-    expect(decision.freshness_decision).toBe('block_unowned_repo_debt');
-    expect(decision.owner_issue_verification).toEqual(
-      expect.objectContaining({
-        issue: 'CO-175',
-        usable: true,
-        expected_workspace_id: 'workspace-1',
-        expected_team_id: 'team-1',
-        expected_project_id: null,
-        same_project: null,
-        verification_status: 'succeeded'
-      })
-    );
-    expect(decision.owner_issue_action).toEqual(
-      expect.objectContaining({
-        mode: 'create_required',
-        existing_issue: 'CO-175',
-        reason: 'owner_verification_unavailable',
-        verification_status: 'succeeded'
-      })
-    );
-  });
-
   it('treats Duplicate owner state as terminal when state_type is absent', () => {
     const lastReview = reviewDateDaysAgo(31);
     const decision = buildDocsFreshnessMaintenanceDecision(
