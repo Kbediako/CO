@@ -238,11 +238,13 @@ async function readAttachManifest(
       run_id?: unknown;
       task_id?: unknown;
       workspace_path?: unknown;
+      workspacePath?: unknown;
     };
     return {
       taskId: normalizeOptionalString(parsed.task_id),
       runId: normalizeOptionalString(parsed.run_id),
-      workspacePath: normalizeOptionalString(parsed.workspace_path)
+      workspacePath:
+        normalizeOptionalString(parsed.workspace_path) ?? normalizeOptionalString(parsed.workspacePath)
     };
   } catch {
     return { taskId: null, runId: null, workspacePath: null };

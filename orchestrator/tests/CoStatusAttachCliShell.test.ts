@@ -201,6 +201,44 @@ describe('runCoStatusAttachCliShell', () => {
     expect(target.workspaceRoot).toBe(await realpath(attachedRoot));
   });
 
+  it('prefers manifest workspacePath when the run directory is outside the workspace', async () => {
+    const callerRoot = await mkdtemp(join(tmpdir(), 'co-status-attach-caller-'));
+    const attachedRoot = await mkdtemp(join(tmpdir(), 'co-status-attach-target-'));
+    const externalRunsRoot = await mkdtemp(join(tmpdir(), 'co-status-attach-runs-'));
+    tempDirs.push(callerRoot, attachedRoot, externalRunsRoot);
+    process.env.CODEX_ORCHESTRATOR_ROOT = callerRoot;
+
+    const runDir = join(externalRunsRoot, 'deep', 'local-mcp', 'cli', 'control-host');
+    await mkdir(runDir, { recursive: true });
+
+    const server = await startUiServer();
+    servers.add(server.instance);
+
+    await writeFile(
+      join(runDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        status: 'in_progress',
+        workspacePath: attachedRoot
+      }),
+      'utf8'
+    );
+    await writeFile(join(runDir, 'control_auth.json'), JSON.stringify({ token: 'attach-token' }), 'utf8');
+    await writeFile(
+      join(runDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: server.baseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+
+    const target = await resolveAttachTarget({ 'run-dir': runDir });
+
+    expect(target.workspaceRoot).toBe(await realpath(attachedRoot));
+  });
+
   it('rejects malformed refresh interval flags before resolving the attach target', async () => {
     await expect(
       runCoStatusAttachCliShell({
