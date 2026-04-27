@@ -18,6 +18,13 @@ function reviewDateDaysAgo(daysOld: number) {
   return date.toISOString().slice(0, 10);
 }
 
+function reviewDateDaysFromNow(daysFromNow: number) {
+  const date = new Date();
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() + daysFromNow);
+  return date.toISOString().slice(0, 10);
+}
+
 async function initRepository(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'spec-guard-'));
   createdDirs.push(dir);
@@ -66,6 +73,15 @@ function rollingFreshnessPolicy(overrides: Record<string, unknown> = {}) {
   };
 }
 
+type FallbackPacketOptions = {
+  decisionBody: string;
+  policyBody?: string;
+  phraseStyle?: 'space' | 'hyphen';
+  sourceDecisionBodies?: Partial<
+    Record<'prd' | 'taskSpec' | 'techSpecMirror' | 'actionPlan' | 'taskChecklist' | 'agentTask', string>
+  >;
+};
+
 async function writeDocsCatalog(repo: string, policy: Record<string, unknown> = rollingFreshnessPolicy()) {
   await mkdir(join(repo, 'docs'), { recursive: true });
   await writeFile(
@@ -92,6 +108,204 @@ async function writeDocsCatalog(repo: string, policy: Record<string, unknown> = 
     ),
     'utf8'
   );
+}
+
+function fallbackDecisionTable(rows: string[]) {
+  return [
+    '| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+    ...rows
+  ].join('\n');
+}
+
+function completeExpireFallbackRow(overrides: Record<string, string> = {}) {
+  const row = {
+    surface: '`provider workflow`',
+    fallback: 'Provider id mapping fallback retained for provider drift',
+    decision: 'expire fallback',
+    owner: 'CO-399 parent lane',
+    trigger: 'Provider claim payload omits providerIssueId while providerId remains present.',
+    introducedDate: reviewDateDaysAgo(1),
+    reviewDate: reviewDateDaysFromNow(14),
+    maximumLifetime: reviewDateDaysFromNow(28),
+    removalCondition: 'Provider claim payload always includes providerIssueId in focused fixture evidence.',
+    validation: 'Focused spec-guard fallback expiry regression test.',
+    ...overrides
+  };
+
+  return `| ${row.surface} | ${row.fallback} | ${row.decision} | ${row.owner} | ${row.trigger} | ${row.introducedDate} | ${row.reviewDate} | ${row.maximumLifetime} | ${row.removalCondition} | ${row.validation} |`;
+}
+
+function durableRetentionRow(overrides: Record<string, string> = {}) {
+  const row = {
+    surface: '`repo guards`',
+    fallback: 'Fallback-expiry owner routing and durable guard compatibility',
+    decision: 'justify retaining fallback',
+    owner: 'CO-399 parent lane',
+    trigger: 'Guard routes existing surface-specific cleanup to owner references without absorbing scope.',
+    introducedDate: reviewDateDaysAgo(1),
+    reviewDate: reviewDateDaysFromNow(28),
+    maximumLifetime: 'Non-expiring durable retention only with rationale',
+    removalCondition: 'Remove only if CO-382 policy supersedes owner routing or cleanup scope changes.',
+    validation: 'Focused durable-retention spec-guard regression test.',
+    ...overrides
+  };
+
+  return `| ${row.surface} | ${row.fallback} | ${row.decision} | ${row.owner} | ${row.trigger} | ${row.introducedDate} | ${row.reviewDate} | ${row.maximumLifetime} | ${row.removalCondition} | ${row.validation} |`;
+}
+
+function fallbackPolicyGuide(includeAllOwnerReferences = true) {
+  const docsFreshnessOwner = includeAllOwnerReferences ? 'Owner follow-up: `CO-397`.' : 'Owner follow-up: pending.';
+  return [
+    '# Fallback Expiry and Refactor Policy',
+    '',
+    'Last reviewed: 2026-04-27',
+    '',
+    'Every touched fallback or seam must choose `remove fallback`, `expire fallback`, or `justify retaining fallback`.',
+    '',
+    '## Existing Fallback-Heavy Areas',
+    '',
+    '- Provider workflow: provider-id mapping fallbacks. Owner follow-up: `CO-394`.',
+    '- Review wrapper: scoped prompt retry and generated fallback notes. Owner follow-up: `CO-395`.',
+    '- Runtime routing: appserver-to-CLI and cloud fallback contracts. Owner follow-up: `CO-396`.',
+    `- Docs freshness ownership: owned rolling debt and canonical owner reuse. ${docsFreshnessOwner}`,
+    '- Control-host status surfaces: legacy proof/status fallback projection paths. Owner follow-up: `CO-398`.',
+    ''
+  ].join('\n');
+}
+
+async function writeFallbackPacket(
+  repo: string,
+  { decisionBody, policyBody, phraseStyle = 'space', sourceDecisionBodies }: FallbackPacketOptions
+) {
+  const today = new Date().toISOString().slice(0, 10);
+  const sourceDecision = (source: keyof NonNullable<FallbackPacketOptions['sourceDecisionBodies']>) =>
+    sourceDecisionBodies?.[source] ?? decisionBody;
+  const largeRefactorTerm = phraseStyle === 'hyphen' ? 'large-refactor' : 'large refactor';
+  const minorSeamTerm = phraseStyle === 'hyphen' ? 'minor-seam' : 'minor seam';
+  await mkdir(join(repo, 'docs/guides'), { recursive: true });
+  await mkdir(join(repo, '.agent/task'), { recursive: true });
+  await mkdir(join(repo, 'tasks'), { recursive: true });
+
+  await writeFile(join(repo, 'docs/guides/fallback-expiry-and-refactor-policy.md'), policyBody ?? fallbackPolicyGuide());
+  await writeFile(
+    join(repo, 'docs/PRD-linear-fallback-fixture.md'),
+    [
+      '# PRD - fallback-expiry guard fixture',
+      '',
+      '## User Intent',
+      `- Enforce CO-382 fallback expiry and ${largeRefactorTerm} decisions in repo guards.`,
+      '',
+      '## CO-382 Fallback Metadata',
+      sourceDecision('prd'),
+      ''
+    ].join('\n')
+  );
+  await writeFile(
+    join(repo, 'tasks/specs/linear-fallback-fixture.md'),
+    [
+      '---',
+      'id: fallback-fixture',
+      'title: "fallback-expiry guard fixture"',
+      `last_review: ${today}`,
+      '---',
+      '',
+      '# TECH_SPEC - fallback-expiry guard fixture',
+      '',
+      '## Fallback Expiry / Refactor Decision',
+      sourceDecision('taskSpec'),
+      '',
+      '## Large-Refactor Check',
+      `- ${minorSeamTerm} behavior is acceptable only when one bounded fallback decision exists.`,
+      ''
+    ].join('\n')
+  );
+  await writeFile(
+    join(repo, 'docs/TECH_SPEC-linear-fallback-fixture.md'),
+    [
+      '# TECH_SPEC mirror - fallback-expiry guard fixture',
+      '',
+      '## Parseable Contract',
+      '- PRD, TECH_SPEC, ACTION_PLAN, and task checklist surfaces carry the same decision contract.',
+      '',
+      '## Fallback Expiry / Refactor Decision',
+      sourceDecision('techSpecMirror'),
+      ''
+    ].join('\n')
+  );
+  await writeFile(
+    join(repo, 'docs/ACTION_PLAN-linear-fallback-fixture.md'),
+    [
+      '# ACTION_PLAN - fallback-expiry guard fixture',
+      '',
+      '## Issue Readiness Gate',
+      '- Fallback / refactor decision:',
+      sourceDecision('actionPlan'),
+      '',
+      `- ${largeRefactorTerm} check: keep the fixture scoped to one governed surface and one lifecycle phase.`,
+      ''
+    ].join('\n')
+  );
+  await writeFile(
+    join(repo, 'tasks/tasks-linear-fallback-fixture.md'),
+    [
+      '# Task Checklist - fallback-expiry guard fixture',
+      '',
+      '## Parent-Owned Implementation',
+      '- [x] Fallback / refactor decision captured.',
+      sourceDecision('taskChecklist'),
+      '',
+      '- [x] Focused guard validation evidence recorded.',
+      ''
+    ].join('\n')
+  );
+  await writeFile(
+    join(repo, '.agent/task/linear-fallback-fixture.md'),
+    [
+      '# Task Checklist Mirror - fallback-expiry guard fixture',
+      '',
+      '## Decision Evidence',
+      sourceDecision('agentTask'),
+      ''
+    ].join('\n')
+  );
+  await writeFile(
+    join(repo, 'tasks/index.json'),
+    JSON.stringify(
+      {
+        items: [
+          {
+            id: 'fallback-fixture',
+            title: 'fallback-expiry guard fixture',
+            canonical_owner_key: 'fallback-expiry:large-refactor:repo-guards',
+            paths: {
+              docs: 'tasks/specs/linear-fallback-fixture.md'
+            },
+            summary:
+              'Fixture preserves CO-394, CO-395, CO-396, CO-397, and CO-398 as owner references for fallback-expiry guard enforcement.'
+          }
+        ]
+      },
+      null,
+      2
+    )
+  );
+}
+
+async function commitFallbackGuardChange(repo: string, options: FallbackPacketOptions) {
+  await mkdir(join(repo, 'orchestrator/src/cli/control'), { recursive: true });
+  await writeFile(
+    join(repo, 'orchestrator/src/cli/control/providerIssueHandoff.ts'),
+    [
+      'export function selectProviderIssueId(input: { providerIssueId?: string; legacyProviderId?: string }) {',
+      "  return input.providerIssueId ?? input.legacyProviderId ?? 'legacy_provider_id_fallback';",
+      '}',
+      ''
+    ].join('\n')
+  );
+  await writeFallbackPacket(repo, options);
+  await execFileAsync('git', ['add', '.'], { cwd: repo });
+  await execFileAsync('git', ['commit', '-m', 'fallback guard fixture'], { cwd: repo });
 }
 
 afterEach(async () => {
@@ -535,5 +749,1392 @@ describe('spec-guard script', () => {
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
     expect(stdout).toContain("tasks/specs/0001-initial.md: last_review 2000-01-01");
+  });
+
+  it('passes fallback-sensitive changes with complete temporary expiry metadata', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([completeExpireFallbackRow()]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('rejects blank fallback decisions even when a sibling row is valid', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow(),
+      completeExpireFallbackRow({
+        fallback: 'Provider workflow fallback retained for an undecided compatibility seam.',
+        decision: ''
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain(
+      'fallback decision must be exactly one of remove fallback, expire fallback, or justify retaining fallback'
+    );
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects remove fallback rows without removal evidence', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      '|  |  | remove fallback |  |  |  |  |  |  |  |'
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('remove fallback decision requires non-empty surface');
+    expect(stdout).toContain('remove fallback decision requires non-empty fallback/seam');
+    expect(stdout).toContain('remove fallback decision requires non-empty removal condition');
+    expect(stdout).toContain('remove fallback decision requires non-empty validation');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('reports fallback-sensitive changes when the guard uses the HEAD~1 fallback diff range', async () => {
+    const repo = await initRepository();
+
+    await writeFile(
+      join(repo, 'src/index.ts'),
+      "export const value = 'legacy_provider_fallback_without_packet';\n"
+    );
+    await execFileAsync('git', ['commit', '-am', 'fallback code without packet'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env, BASE_SHA: 'HEAD' }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain(
+      'fallback/seam-touching changes require updated PRD decision evidence (src/index.ts)'
+    );
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('reports fallback-sensitive renames from the old path even when the new path is neutral', async () => {
+    const repo = await initRepository();
+    const today = new Date().toISOString().slice(0, 10);
+
+    await writeFile(join(repo, 'src/legacyFallback.ts'), 'export const value = 1;\n');
+    await execFileAsync('git', ['add', 'src/legacyFallback.ts'], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'add legacy fallback file'], { cwd: repo });
+
+    await execFileAsync('git', ['mv', 'src/legacyFallback.ts', 'src/current.ts'], { cwd: repo });
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      `last_review: ${today}\n\nGeneric spec update without fallback decision evidence.\n`
+    );
+    await execFileAsync('git', ['add', 'src/current.ts', 'tasks/specs/0001-initial.md'], {
+      cwd: repo
+    });
+    await execFileAsync('git', ['commit', '-m', 'rename fallback path with generic spec'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env, BASE_SHA: 'HEAD~1' }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain(
+      'fallback/seam-touching changes require updated PRD decision evidence (src/legacyFallback.ts)'
+    );
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('requires decision evidence for governed fallback surfaces even without literal fallback wording', async () => {
+    const repo = await initRepository();
+    await mkdir(join(repo, 'scripts'), { recursive: true });
+    await writeFile(
+      join(repo, 'scripts/run-review.ts'),
+      "export const reviewTransportMode = 'scoped-title-retry';\n"
+    );
+    await execFileAsync('git', ['add', 'scripts/run-review.ts'], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'touch governed review wrapper surface'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain(
+      'fallback/seam-touching changes require updated PRD decision evidence (scripts/run-review.ts)'
+    );
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not treat ordinary cache identifiers as fallback behavior', async () => {
+    const repo = await initRepository();
+    const today = new Date().toISOString().slice(0, 10);
+
+    await writeFile(
+      join(repo, 'src/cache.ts'),
+      "export const cacheKey = 'cacheDir';\nexport const cachedValue = cacheKey;\n"
+    );
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      `last_review: ${today}\n\nSpec update for an ordinary cache module.\n`
+    );
+    await execFileAsync('git', ['add', 'src/cache.ts', 'tasks/specs/0001-initial.md'], {
+      cwd: repo
+    });
+    await execFileAsync('git', ['commit', '-m', 'ordinary cache module'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('requires decision evidence for camelCase compatibility seams', async () => {
+    const repo = await initRepository();
+    const today = new Date().toISOString().slice(0, 10);
+
+    await writeFile(
+      join(repo, 'src/adapter.ts'),
+      "export const compatibilityMode = 'compatShim';\n"
+    );
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      `last_review: ${today}\n\nSpec update intentionally omits fallback decision evidence.\n`
+    );
+    await execFileAsync('git', ['add', 'src/adapter.ts', 'tasks/specs/0001-initial.md'], {
+      cwd: repo
+    });
+    await execFileAsync('git', ['commit', '-m', 'compatibility seam without decision'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain(
+      'fallback/seam-touching changes require updated PRD decision evidence (src/adapter.ts)'
+    );
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('preserves fallback scanning for large diffs', async () => {
+    const repo = await initRepository();
+    const today = new Date().toISOString().slice(0, 10);
+    const filler = '// ordinary filler line that makes the diff exceed the default exec buffer\n'.repeat(20_000);
+
+    await writeFile(join(repo, 'src/big.ts'), `export const marker = 'legacy provider fallback';\n${filler}`);
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      `last_review: ${today}\n\nSpec update intentionally omits fallback decision evidence.\n`
+    );
+    await execFileAsync('git', ['add', '.'], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'large fallback-sensitive diff'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('fallback/seam-touching changes require updated PRD decision evidence (src/big.ts');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('accepts docs/design specs as TECH_SPEC fallback decision evidence', async () => {
+    const repo = await initRepository();
+    const today = new Date().toISOString().slice(0, 10);
+    const decisionBody = fallbackDecisionTable([completeExpireFallbackRow()]);
+    const sourceBody = [
+      'large refactor and minor seam decision evidence.',
+      '',
+      decisionBody
+    ].join('\n');
+
+    await mkdir(join(repo, 'docs/design/specs'), { recursive: true });
+    await mkdir(join(repo, 'docs'), { recursive: true });
+    await mkdir(join(repo, 'tasks'), { recursive: true });
+    await writeFile(
+      join(repo, 'src/index.ts'),
+      "export const fallbackMode = 'legacy provider fallback retained for compatibility';\n"
+    );
+    await writeFile(join(repo, 'docs/PRD-design-spec-fixture.md'), sourceBody);
+    await writeFile(
+      join(repo, 'docs/design/specs/design-spec-fixture.md'),
+      `last_review: ${today}\n\n${sourceBody}\n`
+    );
+    await writeFile(join(repo, 'docs/ACTION_PLAN-design-spec-fixture.md'), sourceBody);
+    await writeFile(join(repo, 'tasks/tasks-design-spec-fixture.md'), sourceBody);
+    await execFileAsync('git', ['add', '.'], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'fallback evidence in design spec'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('ignores unrelated Not applicable decision tables when fallback evidence is complete', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      fallbackDecisionTable([completeExpireFallbackRow()]),
+      '',
+      '| Surface | Decision | Rationale |',
+      '| --- | --- | --- |',
+      '| Parity matrix | Not applicable | This unrelated table is not fallback metadata. |'
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('requires parseable fallback decision rows in every changed packet source', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([completeExpireFallbackRow()]);
+
+    await commitFallbackGuardChange(repo, {
+      decisionBody,
+      sourceDecisionBodies: {
+        actionPlan: [
+          'Fallback / refactor decision evidence is intentionally missing from this source.',
+          '',
+          'Large-refactor check: minor-seam behavior still requires source-local metadata.'
+        ].join('\n')
+      }
+    });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain(
+      'docs/ACTION_PLAN-linear-fallback-fixture.md: fallback/seam-touching changes require a parseable CO-382 fallback decision table'
+    );
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not accept unrelated decision tables as fallback decision evidence', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([completeExpireFallbackRow()]);
+
+    await commitFallbackGuardChange(repo, {
+      decisionBody,
+      sourceDecisionBodies: {
+        actionPlan: [
+          '| Area | Decision |',
+          '| --- | --- |',
+          '| Unrelated cleanup | remove fallback |',
+          '',
+          'Large-refactor check: minor-seam behavior still requires source-local metadata.'
+        ].join('\n')
+      }
+    });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain(
+      'docs/ACTION_PLAN-linear-fallback-fixture.md: fallback/seam-touching changes require a parseable CO-382 fallback decision table'
+    );
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects partial fallback decision table shapes', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      '| Surface | Fallback / seam | Decision | Owner |',
+      '| --- | --- | --- | --- |',
+      '| `provider workflow` | Provider id mapping fallback retained for provider drift | remove fallback | CO-399 parent lane |'
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('fallback/seam-touching changes require a parseable CO-382 fallback decision table');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('accepts hyphenated large-refactor and minor-seam policy wording', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([completeExpireFallbackRow()]);
+
+    await commitFallbackGuardChange(repo, {
+      decisionBody,
+      phraseStyle: 'hyphen'
+    });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('requires tests/docs evidence for durable fallback retention', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      fallbackDecisionTable([durableRetentionRow()]),
+      '',
+      '- Contract name: fallback-expiry owner routing and durable guard compatibility.',
+      '- Owning surface: repo guards.',
+      '- Steady-state proof: guard rejects missing and stale decisions while accepting durable metadata.',
+      '- Non-expiring rationale: owner routing is a supported guard contract, not temporary fallback debt.'
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('justify retaining fallback evidence requires tests/docs');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not let owner references elsewhere exempt unrelated durable retention rows', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      fallbackDecisionTable([
+        durableRetentionRow({
+          fallback: 'Unrelated durable compatibility fallback retained for repo guard fixtures'
+        })
+      ]),
+      '',
+      '- Owner references: CO-394, CO-395, CO-396, CO-397, CO-398.'
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('justify retaining fallback evidence requires contract name');
+    expect(stdout).toContain('justify retaining fallback evidence requires tests/docs');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not let all owner references inside an unrelated durable row bypass rationale checks', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      durableRetentionRow({
+        fallback: 'Durable compatibility fallback listing CO-394, CO-395, CO-396, CO-397, and CO-398 as historical context',
+        trigger: 'Legacy fixture keeps a compatible parser branch during docs migration.',
+        removalCondition:
+          'Remove only if historical context CO-394, CO-395, CO-396, CO-397, and CO-398 is superseded by a new canonical issue.'
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('justify retaining fallback evidence requires contract name');
+    expect(stdout).toContain('justify retaining fallback evidence requires tests/docs');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('reports missing fallback-expiry decisions for fallback-sensitive changes', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      'Fallback / refactor decision will be captured later.',
+      '',
+      'Large-refactor check: pending.'
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain(
+      'fallback/seam-touching changes require exactly one decision: remove fallback, expire fallback, or justify retaining fallback'
+    );
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects Not applicable when fallback-sensitive paths changed', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      'Fallback / refactor decision: Not applicable.',
+      '',
+      'This fixture claims no fallback, compatibility, legacy, cached, break-glass, or minor-seam behavior is touched.'
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('Not applicable is only valid when no fallback/seam behavior changed');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not treat docs-only Not applicable decision text as fallback behavior', async () => {
+    const repo = await initRepository();
+
+    await mkdir(join(repo, 'docs'), { recursive: true });
+    await writeFile(
+      join(repo, 'docs/ACTION_PLAN-linear-docs-only.md'),
+      [
+        '# Docs-only fixture',
+        '',
+        '- Fallback / refactor decision: Not applicable.',
+        '- This task does not add, retain, or touch fallback/seam behavior; the wording is policy evidence only.',
+        ''
+      ].join('\n')
+    );
+    await execFileAsync('git', ['add', 'docs/ACTION_PLAN-linear-docs-only.md'], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'docs-only fallback decision evidence'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('reports expired retained fallback metadata', async () => {
+    const repo = await initRepository();
+    const expiredMaximumLifetime = reviewDateDaysAgo(1);
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        introducedDate: reviewDateDaysAgo(45),
+        reviewDate: expiredMaximumLifetime,
+        maximumLifetime: expiredMaximumLifetime
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('fallback expiry metadata is stale');
+    expect(stdout).toContain(expiredMaximumLifetime);
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects expire fallback rows without a target surface and fallback seam', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '-',
+        fallback: '-'
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback decision requires non-empty surface');
+    expect(stdout).toContain('expire fallback decision requires non-empty fallback/seam');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects unparseable expire fallback maximum lifetime values', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        maximumLifetime: '30 days'
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback decision requires parseable maximum lifetime');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects expire fallback dates beyond the high-churn surface cap', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        reviewDate: reviewDateDaysFromNow(15),
+        maximumLifetime: reviewDateDaysFromNow(31)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback review date');
+    expect(stdout).toContain('high-churn control surface fallback cap');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('applies the safety cap to customer-impacting fallbacks', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'Customer-impacting fallback retained during a staged rollout.',
+        trigger: 'Customer-impacting rollout protection still routes through a temporary fallback.',
+        reviewDate: reviewDateDaysFromNow(8),
+        maximumLifetime: reviewDateDaysFromNow(15)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('security/auth/PII/customer-impact fallback cap');
+    expect(stdout).toContain('expire fallback review date');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('applies the safety cap to snake_case safety-impacting fallbacks', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'customer_impacting fallback retained during a staged production_impact rollout.',
+        trigger: 'customer_impacting rollout protection still routes through a temporary fallback.',
+        reviewDate: reviewDateDaysFromNow(8),
+        maximumLifetime: reviewDateDaysFromNow(15)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('security/auth/PII/customer-impact fallback cap');
+    expect(stdout).toContain('expire fallback review date');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('preserves snake_case safety terms before safety-cap matching', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'auth_boundary fallback retained for pii_data and financial_impact handling.',
+        trigger: 'auth_boundary protection still routes through a temporary fallback.',
+        reviewDate: reviewDateDaysFromNow(8),
+        maximumLifetime: reviewDateDaysFromNow(15)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('security/auth/PII/customer-impact fallback cap');
+    expect(stdout).toContain('expire fallback review date');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not grant the external migration cap without reviewer approval evidence', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
+        trigger: 'Release compatibility bridge mentions a deprecation plan but has no reviewer approval.',
+        reviewDate: reviewDateDaysFromNow(30),
+        maximumLifetime: reviewDateDaysFromNow(90)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('general repo fallback cap');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not grant the external migration cap when approval evidence is negated', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
+        owner: 'CO-410',
+        trigger: 'Release compatibility bridge has a deprecation plan but no reviewer approval granted.',
+        reviewDate: reviewDateDaysFromNow(30),
+        maximumLifetime: reviewDateDaysFromNow(90)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('general repo fallback cap');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not grant the external migration cap when reviewer-approved evidence is negated', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
+        owner: 'CO-410',
+        trigger: 'Release compatibility bridge has a deprecation plan but no reviewer-approved evidence.',
+        reviewDate: reviewDateDaysFromNow(30),
+        maximumLifetime: reviewDateDaysFromNow(90)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('general repo fallback cap');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not grant the external migration cap when approved-by-reviewer evidence is negated', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
+        owner: 'CO-410',
+        trigger: 'External ecosystem migration bridge has a deprecation plan but not approved by reviewer.',
+        reviewDate: reviewDateDaysFromNow(30),
+        maximumLifetime: reviewDateDaysFromNow(90)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('general repo fallback cap');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not grant the external migration cap for false reviewer-approval labels', async () => {
+    for (const trigger of [
+      'External ecosystem migration bridge has a deprecation plan and reviewer approved: no.',
+      'External ecosystem migration bridge has a deprecation plan and approved-by-reviewer: false.',
+      'External ecosystem migration bridge has a deprecation plan and reviewer approved: not available.',
+      'External ecosystem migration bridge has a deprecation plan and approved-by-reviewer: not applicable.'
+    ]) {
+      const repo = await initRepository();
+      const decisionBody = fallbackDecisionTable([
+        completeExpireFallbackRow({
+          surface: '`repo guards`',
+          fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
+          owner: 'CO-410',
+          trigger,
+          reviewDate: reviewDateDaysFromNow(30),
+          maximumLifetime: reviewDateDaysFromNow(90)
+        })
+      ]);
+
+      await commitFallbackGuardChange(repo, { decisionBody });
+
+      const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+        cwd: repo,
+        env: { ...process.env }
+      });
+
+      expect(stdout).toContain('❌ Spec guard: issues detected');
+      expect(stdout).toContain('expire fallback maximum lifetime');
+      expect(stdout).toContain('general repo fallback cap');
+      expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+    }
+  });
+
+  it('does not grant the external migration cap when the owner issue is outside the owner cell', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
+        owner: 'Migration team',
+        trigger: 'External ecosystem migration bridge has a deprecation plan and reviewer approval granted for CO-410.',
+        reviewDate: reviewDateDaysFromNow(30),
+        maximumLifetime: reviewDateDaysFromNow(90)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('general repo fallback cap');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not grant the external migration cap for non-external deprecation-plan evidence', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'General repo fallback retained during a cleanup migration.',
+        owner: 'CO-410',
+        trigger: 'Deprecation plan and reviewer approval granted for local cleanup.',
+        reviewDate: reviewDateDaysFromNow(30),
+        maximumLifetime: reviewDateDaysFromNow(90)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('general repo fallback cap');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not grant the external migration cap for negated external signals', async () => {
+    for (const trigger of [
+      'Local cleanup is not an external migration; it has a deprecation plan and reviewer approval granted.',
+      'Local cleanup is not a release compatibility bridge; it has a deprecation plan and reviewer approval granted.'
+    ]) {
+      const repo = await initRepository();
+      const decisionBody = fallbackDecisionTable([
+        completeExpireFallbackRow({
+          surface: '`repo guards`',
+          fallback: 'General repo fallback retained during local cleanup.',
+          owner: 'CO-410',
+          trigger,
+          reviewDate: reviewDateDaysFromNow(30),
+          maximumLifetime: reviewDateDaysFromNow(90)
+        })
+      ]);
+
+      await commitFallbackGuardChange(repo, { decisionBody });
+
+      const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+        cwd: repo,
+        env: { ...process.env }
+      });
+
+      expect(stdout).toContain('❌ Spec guard: issues detected');
+      expect(stdout).toContain('expire fallback maximum lifetime');
+      expect(stdout).toContain('general repo fallback cap');
+      expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+    }
+  });
+
+  it('does not grant the external migration cap when deprecation-plan evidence is negated', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
+        owner: 'CO-410',
+        trigger: 'External ecosystem migration bridge runs without a deprecation plan but reviewer approval granted.',
+        reviewDate: reviewDateDaysFromNow(30),
+        maximumLifetime: reviewDateDaysFromNow(90)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('general repo fallback cap');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not grant the external migration cap for labeled absent deprecation plans', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
+        owner: 'CO-410',
+        trigger: 'External ecosystem migration bridge lists Deprecation plan: absent, but reviewer approval granted.',
+        reviewDate: reviewDateDaysFromNow(30),
+        maximumLifetime: reviewDateDaysFromNow(90)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('general repo fallback cap');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not grant the external migration cap for labeled unapproved deprecation plans', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
+        owner: 'CO-410',
+        trigger: 'External ecosystem migration bridge lists Deprecation plan: not approved while reviewer approval granted.',
+        reviewDate: reviewDateDaysFromNow(30),
+        maximumLifetime: reviewDateDaysFromNow(90)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('general repo fallback cap');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not grant the external migration cap for deprecation plans labeled not recorded', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
+        owner: 'CO-410',
+        trigger: 'External ecosystem migration bridge lists Deprecation plan: not recorded while reviewer approval granted.',
+        reviewDate: reviewDateDaysFromNow(30),
+        maximumLifetime: reviewDateDaysFromNow(90)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('general repo fallback cap');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not grant the external migration cap for unavailable deprecation-plan labels', async () => {
+    for (const trigger of [
+      'External ecosystem migration bridge lists Deprecation plan: not available while reviewer approval granted.',
+      'External ecosystem migration bridge lists Deprecation plan: not yet ready while reviewer approval granted.'
+    ]) {
+      const repo = await initRepository();
+      const decisionBody = fallbackDecisionTable([
+        completeExpireFallbackRow({
+          surface: '`repo guards`',
+          fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
+          owner: 'CO-410',
+          trigger,
+          reviewDate: reviewDateDaysFromNow(30),
+          maximumLifetime: reviewDateDaysFromNow(90)
+        })
+      ]);
+
+      await commitFallbackGuardChange(repo, { decisionBody });
+
+      const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+        cwd: repo,
+        env: { ...process.env }
+      });
+
+      expect(stdout).toContain('❌ Spec guard: issues detected');
+      expect(stdout).toContain('expire fallback maximum lifetime');
+      expect(stdout).toContain('general repo fallback cap');
+      expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+    }
+  });
+
+  it('does not grant the external migration cap for empty deprecation-plan labels', async () => {
+    for (const trigger of [
+      'External ecosystem migration bridge lists Deprecation plan:',
+      'External ecosystem migration bridge lists Deprecation plan: none while reviewer approval granted.',
+      'External ecosystem migration bridge lists Deprecation plan: not applicable while reviewer approval granted.'
+    ]) {
+      const repo = await initRepository();
+      const decisionBody = fallbackDecisionTable([
+        completeExpireFallbackRow({
+          surface: '`repo guards`',
+          fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
+          owner: 'CO-410',
+          trigger,
+          reviewDate: reviewDateDaysFromNow(30),
+          maximumLifetime: reviewDateDaysFromNow(90)
+        })
+      ]);
+
+      await commitFallbackGuardChange(repo, { decisionBody });
+
+      const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+        cwd: repo,
+        env: { ...process.env }
+      });
+
+      expect(stdout).toContain('❌ Spec guard: issues detected');
+      expect(stdout).toContain('expire fallback maximum lifetime');
+      expect(stdout).toContain('general repo fallback cap');
+      expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+    }
+  });
+
+  it('does not grant the external migration cap for weak deprecation-plan placeholders', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
+        owner: 'CO-410',
+        trigger: 'External ecosystem migration bridge lists Deprecation plan: TBD while reviewer approval granted.',
+        reviewDate: reviewDateDaysFromNow(30),
+        maximumLifetime: reviewDateDaysFromNow(90)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('general repo fallback cap');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('allows the external migration cap with owner issue, deprecation plan, and reviewer approval', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
+        owner: 'CO-410',
+        trigger: 'External ecosystem migration bridge has a deprecation plan and reviewer approval granted.',
+        reviewDate: reviewDateDaysFromNow(30),
+        maximumLifetime: reviewDateDaysFromNow(89)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('allows the external migration cap with reviewer-approved wording', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
+        owner: 'CO-410',
+        trigger: 'External ecosystem migration bridge has a deprecation plan and reviewer-approved evidence.',
+        reviewDate: reviewDateDaysFromNow(30),
+        maximumLifetime: reviewDateDaysFromNow(89)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('parses escaped pipes in fallback decision table cells', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        trigger: 'Runtime routing bridge keeps executionMode=mcp\\|cloud while provider migration completes.',
+        removalCondition: 'Remove when the executionMode=mcp\\|cloud compatibility fixture is retired.'
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('caps expire fallback maximum lifetime from the introduced date', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        introducedDate: reviewDateDaysAgo(45),
+        reviewDate: reviewDateDaysFromNow(1),
+        maximumLifetime: reviewDateDaysFromNow(1)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('high-churn control surface fallback cap');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects expire fallback review dates after the maximum lifetime', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`unclassified adapter`',
+        fallback: 'General repo fallback retained during adapter cleanup.',
+        trigger: 'Adapter cleanup keeps a general fallback until the removal fixture lands.',
+        reviewDate: reviewDateDaysFromNow(10),
+        maximumLifetime: reviewDateDaysFromNow(5)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback review date');
+    expect(stdout).toContain('cannot be after maximum lifetime');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects future expire fallback introduced dates before lifetime cap checks', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        introducedDate: reviewDateDaysFromNow(10),
+        reviewDate: reviewDateDaysFromNow(1),
+        maximumLifetime: reviewDateDaysFromNow(40)
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback introduced date');
+    expect(stdout).toContain('cannot be in the future');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('passes durable fallback retention with complete rationale metadata', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      fallbackDecisionTable([durableRetentionRow()]),
+      '',
+      '- Contract name: fallback-expiry owner routing and durable guard compatibility.',
+      '- Owning surface: repo guards.',
+      '- Steady-state proof: guard rejects missing and stale decisions while accepting complete durable metadata.',
+      '- Tests/docs: focused durable-retention spec-guard regression test.',
+      '- Non-expiring rationale: owner routing is a supported guard contract, not temporary fallback debt.'
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('rejects label-only durable fallback rationale evidence', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      fallbackDecisionTable([
+        durableRetentionRow({
+          trigger: '-',
+          maximumLifetime: '-',
+          validation: '-'
+        })
+      ]),
+      '',
+      '- Contract name:',
+      '- Owning surface:',
+      '- Steady-state proof:',
+      '- Tests/docs:',
+      '- Non-expiring rationale:'
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('justify retaining fallback evidence requires contract name');
+    expect(stdout).toContain('justify retaining fallback evidence requires tests/docs');
+    expect(stdout).toContain('justify retaining fallback evidence requires non-expiring rationale');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('allows scoped fallback decisions with a single canonical owner reference', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        fallback: 'Provider workflow fallback retained for one scoped owner lane',
+        owner: 'CO-394',
+        trigger: 'Provider workflow cleanup remains owned by CO-394 without routing all cleanup lanes.'
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('allows single-owner surface-specific cleanup rows without aggregate owner routing', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        fallback: 'CO-394 provider workflow surface-specific cleanup fallback',
+        owner: 'CO-394',
+        trigger: 'Provider workflow surface-specific cleanup remains scoped to CO-394 only.'
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('allows scoped durable fallback decisions that mention owner routing for one owner', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      fallbackDecisionTable([
+        durableRetentionRow({
+          fallback: 'Provider workflow owner routing retained only for one scoped cleanup lane',
+          owner: 'CO-394',
+          trigger: 'Provider workflow cleanup remains scoped to CO-394 without aggregate cleanup routing.'
+        })
+      ]),
+      '',
+      '- Contract name: provider workflow scoped durable compatibility.',
+      '- Owning surface: provider workflow repo guard evidence.',
+      '- Steady-state proof: guard accepts the scoped durable row through rationale checks, not aggregate owner routing.',
+      '- Tests/docs: focused durable single-owner owner-routing regression test.',
+      '- Non-expiring rationale: this scoped compatibility label is not governed as an expiring fallback.'
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('rejects incomplete aggregate owner-routing rows even with durable rationale', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      fallbackDecisionTable([
+        durableRetentionRow({
+          fallback: 'CO-394, CO-395, CO-396, and CO-397 owner references for surface-specific cleanup routing',
+          trigger: 'Guard needs to recognize aggregate owner lanes without absorbing implementation scope.'
+        })
+      ]),
+      '',
+      '- Contract name: fallback-expiry owner routing and durable guard compatibility.',
+      '- Owning surface: repo guards.',
+      '- Steady-state proof: guard rejects incomplete aggregate owner routing rows.',
+      '- Tests/docs: focused incomplete owner-routing regression test.',
+      '- Non-expiring rationale: owner routing is a supported guard contract, not temporary fallback debt.'
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('fallback owner routing evidence must preserve CO-398');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('accepts CO-394 through CO-398 owner references as owner-routing evidence', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      fallbackDecisionTable([
+        durableRetentionRow({
+          fallback: 'CO-394, CO-395, CO-396, CO-397, and CO-398 owner references for surface-specific cleanup routing',
+          trigger: 'Guard needs to recognize owner lanes without absorbing their implementation scope.',
+          validation: 'Focused owner-reference spec-guard regression test.'
+        })
+      ]),
+      '',
+      '- Owner references: CO-394, CO-395, CO-396, CO-397, CO-398.',
+      '- Non-goal: do not absorb provider workflow, review-wrapper, runtime routing, docs freshness, or control-host cleanup scope.'
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
   });
 });

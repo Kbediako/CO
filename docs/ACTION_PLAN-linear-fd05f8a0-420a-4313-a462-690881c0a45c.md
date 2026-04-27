@@ -38,13 +38,18 @@
   - 2026-04-27: micro-task path is unavailable because correctness depends on exact protected wording, owner references, and guard enforcement semantics.
   - 2026-04-27: the packet keeps CO-399 narrower than surface-specific cleanup and broader than checklist-only documentation.
 - Fallback / refactor decision:
-  - `remove fallback`: fallback/seam-touching changes with no parseable CO-382 decision; bad `Not applicable` claims.
-  - `expire fallback`: retained temporary fallback metadata that must carry owner, trigger, introduced date, review date, maximum lifetime, removal condition, and validation.
-  - `justify retaining fallback`: durable retention contracts and CO-394 through CO-398 owner-routing references.
+  | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+  | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+  | `repo guards` | Fallback/seam-touching changes with no parseable CO-382 decision | remove fallback | CO-399 parent lane | A diff touches fallback, legacy, cached, break-glass, or minor-seam patterns without a recorded decision. | current review 2026-04-27 | N/A after removal | N/A after removal | Guard fails until the issue packet records `remove fallback`, `expire fallback`, or `justify retaining fallback`. | Focused missing-decision and bad `Not applicable` tests. |
+  | `repo guards` | Temporary fallback retained without complete expiry metadata | expire fallback | CO-399 parent lane | A retained temporary fallback lacks owner, trigger, introduced date, review date, maximum lifetime, removal condition, or validation. | current review 2026-04-27 | 2026-05-12 | 2026-05-26 | Guard requires complete metadata and fails stale expiry dates unless issue-quality evidence is refreshed. | Focused expired-fallback and pass tests. |
+  | `repo guards` | Durable fallback or audit compatibility retained indefinitely | justify retaining fallback | CO-399 parent lane | A fallback-like contract is durable and not intended to expire. | current review 2026-04-27 | 2026-05-26 | Non-expiring durable retention only with rationale | Guard accepts only when contract name, owning surface, steady-state proof, tests/docs, and non-expiring rationale are present. | Focused durable-retention tests. |
+  | `repo guards` | CO-394 through CO-398 owner references used to route surface-specific cleanup | justify retaining fallback | CO-399 parent lane | Guard needs to recognize existing owner lanes without absorbing their implementation scope. | current review 2026-04-27 | 2026-05-12 | Non-expiring owner routing contract | Remove only if CO-382 policy changes the owner mapping or those issues are superseded by a new canonical owner. | Focused tests proving CO-394, CO-395, CO-396, CO-397, and CO-398 references remain valid. |
 - Durable retention evidence:
   - contract name: fallback-expiry owner routing and durable guard compatibility
   - owning surface: `repo guards`
-  - steady-state proof expected from parent: missing/stale fallback decisions fail, complete temporary metadata passes until expiry, durable retention passes only with rationale
+  - steady-state proof: missing/stale fallback decisions fail, complete temporary metadata passes until expiry, durable retention passes only with rationale
+  - tests/docs: focused durable-retention, single-owner cleanup, and owner-reference spec-guard tests
+  - non-expiring rationale: owner routing is a supported guard contract, not temporary fallback debt
 - Large-refactor check:
   - no large refactor in this packet lane
   - parent must enforce a `large refactor` decision when new seams touch governed surfaces or fallback, legacy, cached, break-glass, or minor-seam patterns without one bounded fallback decision
