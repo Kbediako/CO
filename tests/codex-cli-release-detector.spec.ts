@@ -524,6 +524,45 @@ describe('codex CLI release detector', () => {
     expect(artifact.upstream_truth.github.prerelease.version).toBe('0.126.0-alpha.2');
   });
 
+  it('ignores draft GitHub releases when classifying stable truth', async () => {
+    const repo = await writeFixtureRepo({ auditedStable: '0.125.0' });
+    const baseFetch = mockFetch({ stable: '0.125.0' });
+    const draftFetch = async (url: string) => {
+      const response = await baseFetch(url);
+      if (!url.includes('api.github.com')) {
+        return response;
+      }
+      return {
+        ...response,
+        async json() {
+          const releases = await response.json();
+          return [
+            {
+              tag_name: 'rust-v0.126.0',
+              draft: true,
+              prerelease: false,
+              published_at: '2026-04-26T02:00:00Z',
+              html_url: 'https://github.com/openai/codex/releases/tag/rust-v0.126.0'
+            },
+            ...releases
+          ];
+        }
+      };
+    };
+
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: repo,
+      artifactPath: 'out/detection.json',
+      fetchImpl: draftFetch,
+      env: {}
+    });
+
+    expect(exitCode).toBe(0);
+    expect(artifact.decision_state).toBe('no_new_audit_required');
+    expect(artifact.upstream_truth.github.stable.version).toBe('0.125.0');
+    expect(artifact.upstream_truth.github.releases.some((release: { version: string }) => release.version === '0.126.0')).toBe(false);
+  });
+
   it('ignores stale historical prerelease mismatches when stable truth agrees', async () => {
     const repo = await writeFixtureRepo({
       releasePin: '0.126.0',
@@ -585,7 +624,7 @@ describe('codex CLI release detector', () => {
     const repo = await writeFixtureRepo();
     await writeFile(
       join(repo, 'tests', 'pack-smoke.spec.ts'),
-      "const marketplaceCodexInstallCommand = 'npm install --global @openai/codex';\n",
+      "const marketplaceCodexInstallCommand = 'npm install --global other-package';\n",
       'utf8'
     );
 
@@ -602,6 +641,32 @@ describe('codex CLI release detector', () => {
     expect(artifact.current_co.missing_surfaces).toContainEqual({
       path: 'tests/pack-smoke.spec.ts',
       error: 'missing versioned @openai/codex install pin'
+    });
+  });
+
+  it('fails closed when a required pin surface also has an unversioned install', async () => {
+    const repo = await writeFixtureRepo();
+    await writeFile(
+      join(repo, 'tests', 'pack-smoke.spec.ts'),
+      [
+        "const marketplaceCodexInstallCommand = 'npm install --global @openai/codex@0.125.0';",
+        "const driftProneCodexInstallCommand = 'npm install --global @openai/codex';"
+      ].join('\n'),
+      'utf8'
+    );
+
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: repo,
+      artifactPath: 'out/detection.json',
+      fetchImpl: mockFetch({ stable: '0.125.0' }),
+      env: {}
+    });
+
+    expect(exitCode).toBe(2);
+    expect(artifact.decision_state).toBe('blocked_current_truth_unavailable');
+    expect(artifact.current_co.missing_surfaces).toContainEqual({
+      path: 'tests/pack-smoke.spec.ts',
+      error: 'found unversioned @openai/codex install pin'
     });
   });
 

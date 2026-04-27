@@ -75,6 +75,9 @@ function releaseVersionFromTag(tagName) {
 export function classifyGithubReleases(releases) {
   const normalized = [];
   for (const release of releases ?? []) {
+    if (release.draft === true || release.isDraft === true) {
+      continue;
+    }
     const tagName = release.tag_name ?? release.tagName;
     const version = releaseVersionFromTag(tagName);
     const parsed = parseSemver(version);
@@ -288,14 +291,19 @@ export async function collectCurrentCoPins({ repoRoot = process.cwd(), readFileI
       const installPins = [
         ...content.matchAll(/npm install --global @openai\/codex@(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/g)
       ].map((match) => match[1]);
+      const hasUnversionedInstall = /npm install --global @openai\/codex(?!@\d)/.test(content);
       surfaceContents.set(surface, content);
       surfaces.push({
         path: surface,
         versions: extractVersions(content),
         install_pins: installPins
       });
-      if (VERSIONED_PIN_REQUIRED_SURFACES.has(surface) && installPins.length === 0) {
-        missing.push({ path: surface, error: 'missing versioned @openai/codex install pin' });
+      if (VERSIONED_PIN_REQUIRED_SURFACES.has(surface)) {
+        if (hasUnversionedInstall) {
+          missing.push({ path: surface, error: 'found unversioned @openai/codex install pin' });
+        } else if (installPins.length === 0) {
+          missing.push({ path: surface, error: 'missing versioned @openai/codex install pin' });
+        }
       }
     } catch (error) {
       missing.push({ path: surface, error: error instanceof Error ? error.message : String(error) });
