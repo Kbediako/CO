@@ -125,6 +125,17 @@ async function writeFixture(
   );
 }
 
+async function writeLinearIssueContextHelper(repoRoot: string, output: Record<string, unknown>) {
+  await mkdir(join(repoRoot, 'bin'), { recursive: true });
+  await writeFile(
+    join(repoRoot, 'bin/codex-orchestrator.js'),
+    `#!/usr/bin/env node
+process.stdout.write(${JSON.stringify(JSON.stringify(output))});
+`,
+    'utf8'
+  );
+}
+
 async function runMaintain(
   repoRoot: string,
   {
@@ -309,6 +320,327 @@ describe('docs freshness maintenance decisions', () => {
     expect(decision.recommended_action).not.toContain('update_existing');
   });
 
+  it('fails closed when required live owner verification is unavailable', () => {
+    const policy = rollingFreshnessPolicy({
+      canonical_owner_key: 'docs:freshness:maintain',
+      require_live_owner_verification: true,
+      owner_issue_project_id: 'project-1'
+    });
+    const baseline = policy.baseline_cohorts[0];
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: policy,
+        stale_entries: [],
+        rolling_cohort_entries: [
+          {
+            path: 'tasks/tasks-1164-historical.md',
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'tasks/tasks-*',
+            task_number: '1164',
+            last_review: baseline.last_review,
+            cadence_days: baseline.cadence_days,
+            age_days: 31,
+            overdue_days: 1,
+            baseline_cohort_id: baseline.id
+          }
+        ],
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 0,
+          rolling_cohort_entries: 1,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: { status: 'succeeded' },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main',
+        ownerIssueVerification: {
+          issue: 'CO-175',
+          issue_id: null,
+          state: null,
+          state_type: null,
+          is_terminal: null,
+          usable: null,
+          workspace_id: null,
+          team_id: null,
+          project_id: null,
+          project_name: null,
+          expected_project_id: 'project-1',
+          same_project: null,
+          verification_status: 'unavailable',
+          checked_at: null,
+          source: 'linear issue-context',
+          error: 'helper_missing'
+        }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_unowned_repo_debt');
+    expect(decision.owner_issue_action).toEqual(
+      expect.objectContaining({
+        mode: 'create_required',
+        existing_issue: 'CO-175',
+        duplicate_policy: 'one_owner_issue_per_canonical_owner_key',
+        canonical_owner_key: 'docs:freshness:maintain',
+        reason: 'owner_verification_unavailable'
+      })
+    );
+    expect(decision.recommended_action).toContain('not proven as a live same-project owner');
+  });
+
+  it('fails closed when required owner verification finds a project mismatch', () => {
+    const policy = rollingFreshnessPolicy({
+      canonical_owner_key: 'docs:freshness:maintain',
+      require_live_owner_verification: true,
+      owner_issue_project_id: 'project-1'
+    });
+    const baseline = policy.baseline_cohorts[0];
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: policy,
+        stale_entries: [],
+        rolling_cohort_entries: [
+          {
+            path: 'tasks/tasks-1164-historical.md',
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'tasks/tasks-*',
+            task_number: '1164',
+            last_review: baseline.last_review,
+            cadence_days: baseline.cadence_days,
+            age_days: 31,
+            overdue_days: 1,
+            baseline_cohort_id: baseline.id
+          }
+        ],
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 0,
+          rolling_cohort_entries: 1,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: { status: 'succeeded' },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main',
+        ownerIssueVerification: {
+          issue: 'CO-175',
+          issue_id: 'owner-id',
+          state: 'In Progress',
+          state_type: 'started',
+          is_terminal: false,
+          usable: false,
+          workspace_id: 'workspace-1',
+          team_id: 'team-1',
+          project_id: 'project-2',
+          project_name: 'Other project',
+          expected_project_id: 'project-1',
+          same_project: false,
+          verification_status: 'succeeded',
+          checked_at: null,
+          source: 'linear issue-context',
+          error: null
+        }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_unowned_repo_debt');
+    expect(decision.owner_issue_action).toEqual(
+      expect.objectContaining({
+        mode: 'create_required',
+        existing_issue: 'CO-175',
+        duplicate_policy: 'one_owner_issue_per_canonical_owner_key',
+        canonical_owner_key: 'docs:freshness:maintain',
+        reason: 'configured_owner_project_mismatch',
+        expected_project_id: 'project-1',
+        actual_project_id: 'project-2'
+      })
+    );
+    expect(decision.recommended_action).toContain('canonical docs:freshness:maintain owner');
+    expect(decision.recommended_action).toContain('same-project live owner path');
+  });
+
+  it.each([
+    ['null', { same_project: null }],
+    ['omitted', {}]
+  ])(
+    'fails closed when required live owner verification has %s same_project',
+    (_label, sameProjectFields) => {
+      const policy = rollingFreshnessPolicy({
+        canonical_owner_key: 'docs:freshness:maintain',
+        require_live_owner_verification: true,
+        owner_issue_project_id: 'project-1'
+      });
+      const baseline = policy.baseline_cohorts[0];
+      const decision = buildDocsFreshnessMaintenanceDecision(
+        {
+          rolling_freshness_policy: policy,
+          stale_entries: [],
+          rolling_cohort_entries: [
+            {
+              path: 'tasks/tasks-1164-historical.md',
+              doc_class: 'task_packet',
+              doc_class_label: 'Task Packet',
+              path_family: 'tasks/tasks-*',
+              task_number: '1164',
+              last_review: baseline.last_review,
+              cadence_days: baseline.cadence_days,
+              age_days: 31,
+              overdue_days: 1,
+              baseline_cohort_id: baseline.id
+            }
+          ],
+          totals: {
+            docs_scanned: 1,
+            registry_entries: 1,
+            missing_in_registry: 0,
+            missing_on_disk: 0,
+            invalid_entries: 0,
+            stale_entries: 0,
+            rolling_cohort_entries: 1,
+            uncatalogued_docs: 0
+          }
+        },
+        {
+          changedPaths: [],
+          taskId: 'fixture',
+          specGuard: { status: 'succeeded' },
+          diffStatus: 'ok',
+          diffBaseRef: 'origin/main',
+          ownerIssueVerification: {
+            issue: 'CO-175',
+            issue_id: 'owner-id',
+            state: 'In Progress',
+            state_type: 'started',
+            is_terminal: false,
+            usable: true,
+            workspace_id: 'workspace-1',
+            team_id: 'team-1',
+            project_id: 'project-1',
+            project_name: 'CO Control and Advisory',
+            expected_project_id: 'project-1',
+            verification_status: 'succeeded',
+            checked_at: null,
+            source: 'linear issue-context',
+            error: null,
+            ...sameProjectFields
+          }
+        }
+      );
+
+      expect(decision.freshness_decision).toBe('block_unowned_repo_debt');
+      expect(decision.owner_issue_action).toEqual(
+        expect.objectContaining({
+          mode: 'create_required',
+          existing_issue: 'CO-175',
+          duplicate_policy: 'one_owner_issue_per_canonical_owner_key',
+          canonical_owner_key: 'docs:freshness:maintain',
+          reason: 'owner_verification_unavailable',
+          verification_status: 'succeeded'
+        })
+      );
+      expect(decision.recommended_action).toContain('not proven as a live same-project owner');
+    }
+  );
+
+  it('emits fallback expiry metadata when live same-project owner verification passes', () => {
+    const policy = rollingFreshnessPolicy({
+      canonical_owner_key: 'docs:freshness:maintain',
+      require_live_owner_verification: true,
+      owner_issue_project_id: 'project-1'
+    });
+    const baseline = policy.baseline_cohorts[0];
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: policy,
+        stale_entries: [],
+        rolling_cohort_entries: [
+          {
+            path: 'tasks/tasks-1164-historical.md',
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'tasks/tasks-*',
+            task_number: '1164',
+            last_review: baseline.last_review,
+            cadence_days: baseline.cadence_days,
+            age_days: 31,
+            overdue_days: 1,
+            baseline_cohort_id: baseline.id
+          }
+        ],
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 0,
+          rolling_cohort_entries: 1,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: { status: 'succeeded' },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main',
+        generatedAt: '2026-04-27T00:00:00.000Z',
+        ownerIssueVerification: {
+          issue: 'CO-175',
+          issue_id: 'owner-id',
+          state: 'In Progress',
+          state_type: 'started',
+          is_terminal: false,
+          usable: true,
+          workspace_id: 'workspace-1',
+          team_id: 'team-1',
+          project_id: 'project-1',
+          project_name: 'CO Control and Advisory',
+          expected_project_id: 'project-1',
+          same_project: true,
+          verification_status: 'succeeded',
+          checked_at: null,
+          source: 'linear issue-context',
+          error: null
+        }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('pass_with_owned_rolling_debt');
+    expect(decision.fallback_expiry).toEqual(
+      expect.objectContaining({
+        decision: 'expire fallback',
+        canonical_owner_key: 'docs:freshness:maintain',
+        review_date: '2026-04-27',
+        maximum_lifetime_days: 7
+      })
+    );
+    expect(decision.candidate_cohorts[0].fallback_expiry).toEqual(
+      expect.objectContaining({
+        decision: 'expire fallback',
+        owner_issue: 'CO-175',
+        maximum_lifetime_days: 7,
+        removal_condition: expect.stringContaining('re-home docs/docs-catalog.json intentionally')
+      })
+    );
+  });
+
   it('reuses an exact canonical owner without repointing the global terminal owner', () => {
     const lastReview = '2026-03-23';
     const canonicalOwnerKey =
@@ -403,6 +735,288 @@ describe('docs freshness maintenance decisions', () => {
       })
     );
     expect(decision.recommended_action).toContain('owner issue CO-320');
+  });
+
+  it('does not reuse canonical owner verification across different scoped configs for the same issue', () => {
+    const lastReview = '2026-03-23';
+    const tasksCanonicalOwnerKey =
+      'docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30';
+    const prdCanonicalOwnerKey =
+      'docs_freshness_candidate|doc_class:task_packet|path_family:docs/PRD-*|last_review:2026-03-23|cadence_days:30';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          owner_issue: 'CO-300',
+          owner_issue_state: 'Done',
+          owner_issue_state_type: 'completed',
+          owner_issue_is_terminal: true,
+          canonical_owner_issues: [
+            {
+              canonical_owner_key: tasksCanonicalOwnerKey,
+              owner_issue: 'CO-320',
+              owner_issue_project_id: 'project-1'
+            },
+            {
+              canonical_owner_key: prdCanonicalOwnerKey,
+              owner_issue: 'CO-320',
+              owner_issue_project_id: 'project-2'
+            }
+          ]
+        }),
+        stale_entries: [
+          {
+            path: 'docs/PRD-co397.md',
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'docs/PRD-*',
+            task_number: null,
+            last_review: lastReview,
+            cadence_days: 30,
+            age_days: 31,
+            overdue_days: 1
+          }
+        ],
+        rolling_cohort_entries: [],
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 1,
+          rolling_cohort_entries: 0,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: { status: 'succeeded' },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main',
+        canonicalOwnerIssueVerifications: [
+          {
+            issue: 'CO-320',
+            canonical_owner_key: tasksCanonicalOwnerKey,
+            issue_id: 'owner-id',
+            state: 'In Progress',
+            state_type: 'started',
+            is_terminal: false,
+            usable: true,
+            project_id: 'project-1',
+            expected_project_id: 'project-1',
+            same_project: true,
+            verification_status: 'succeeded',
+            checked_at: null,
+            source: 'linear issue-context',
+            error: null
+          },
+          {
+            issue: 'CO-320',
+            canonical_owner_key: prdCanonicalOwnerKey,
+            issue_id: 'owner-id',
+            state: 'In Progress',
+            state_type: 'started',
+            is_terminal: false,
+            usable: false,
+            project_id: 'project-1',
+            expected_project_id: 'project-2',
+            same_project: false,
+            verification_status: 'succeeded',
+            checked_at: null,
+            source: 'linear issue-context',
+            error: null
+          }
+        ]
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_unowned_repo_debt');
+    expect(decision.candidate_cohorts[0]).toEqual(
+      expect.objectContaining({
+        canonical_owner_key: prdCanonicalOwnerKey,
+        owner_issue_action: expect.objectContaining({
+          mode: 'create_required',
+          existing_issue: 'CO-320',
+          reason: 'configured_owner_project_mismatch',
+          expected_project_id: 'project-2',
+          actual_project_id: 'project-1'
+        })
+      })
+    );
+  });
+
+  it('does not accept stale same-key canonical owner verification from another scope', () => {
+    const canonicalOwnerKey =
+      'docs_freshness_candidate|doc_class:task_packet|path_family:docs/PRD-*|last_review:2026-03-23|cadence_days:30';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          owner_issue: 'CO-300',
+          owner_issue_state: 'Done',
+          owner_issue_state_type: 'completed',
+          owner_issue_is_terminal: true,
+          require_live_owner_verification: true,
+          canonical_owner_issues: [
+            {
+              canonical_owner_key: canonicalOwnerKey,
+              owner_issue: 'CO-320',
+              owner_issue_project_id: 'project-2'
+            }
+          ]
+        }),
+        stale_entries: [
+          {
+            path: 'docs/PRD-co397.md',
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'docs/PRD-*',
+            task_number: null,
+            last_review: '2026-03-23',
+            cadence_days: 30,
+            age_days: 31,
+            overdue_days: 1
+          }
+        ],
+        rolling_cohort_entries: [],
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 1,
+          rolling_cohort_entries: 0,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: { status: 'succeeded' },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main',
+        canonicalOwnerIssueVerifications: [
+          {
+            issue: 'CO-320',
+            canonical_owner_key: canonicalOwnerKey,
+            issue_id: 'owner-id',
+            state: 'In Progress',
+            state_type: 'started',
+            is_terminal: false,
+            usable: true,
+            project_id: 'project-1',
+            expected_project_id: 'project-1',
+            same_project: true,
+            verification_status: 'succeeded',
+            checked_at: null,
+            source: 'linear issue-context',
+            error: null
+          }
+        ]
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_unowned_repo_debt');
+    expect(decision.candidate_cohorts[0]).toEqual(
+      expect.objectContaining({
+        canonical_owner_key: canonicalOwnerKey,
+        owner_issue_action: expect.objectContaining({
+          mode: 'create_required',
+          existing_issue: 'CO-320',
+          reason: 'owner_verification_unavailable',
+          canonical_owner_key: canonicalOwnerKey
+        })
+      })
+    );
+  });
+
+  it('accepts env-derived extra canonical owner scope when explicit catalog scope matches', () => {
+    const canonicalOwnerKey =
+      'docs_freshness_candidate|doc_class:task_packet|path_family:docs/PRD-*|last_review:2026-03-23|cadence_days:30';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          owner_issue: 'CO-300',
+          owner_issue_state: 'Done',
+          owner_issue_state_type: 'completed',
+          owner_issue_is_terminal: true,
+          require_live_owner_verification: true,
+          canonical_owner_issues: [
+            {
+              canonical_owner_key: canonicalOwnerKey,
+              owner_issue: 'CO-320',
+              owner_issue_team_id: 'team-1',
+              owner_issue_project_id: 'project-1'
+            }
+          ]
+        }),
+        stale_entries: [
+          {
+            path: 'docs/PRD-co397.md',
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'docs/PRD-*',
+            task_number: null,
+            last_review: '2026-03-23',
+            cadence_days: 30,
+            age_days: 31,
+            overdue_days: 1
+          }
+        ],
+        rolling_cohort_entries: [],
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 1,
+          rolling_cohort_entries: 0,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: { status: 'succeeded' },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main',
+        canonicalOwnerIssueVerifications: [
+          {
+            issue: 'CO-320',
+            canonical_owner_key: canonicalOwnerKey,
+            issue_id: 'owner-id',
+            state: 'In Progress',
+            state_type: 'started',
+            is_terminal: false,
+            usable: true,
+            project_id: 'project-1',
+            expected_workspace_id: 'workspace-from-env',
+            expected_team_id: 'team-1',
+            expected_project_id: 'project-1',
+            same_project: true,
+            verification_status: 'succeeded',
+            checked_at: null,
+            source: 'linear issue-context',
+            error: null
+          }
+        ]
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('pass_with_owned_rolling_debt');
+    expect(decision.candidate_cohorts[0]).toEqual(
+      expect.objectContaining({
+        canonical_owner_key: canonicalOwnerKey,
+        owner_issue_action: expect.objectContaining({
+          mode: 'update_existing',
+          issue: 'CO-320',
+          reason: 'succeeded',
+          canonical_owner_key: canonicalOwnerKey
+        })
+      })
+    );
   });
 
   it('skips canonical owner verification when the rolling policy is invalid', async () => {
@@ -1120,6 +1734,57 @@ describe('docs freshness maintenance decisions', () => {
         verification_status: 'unavailable',
         source: 'rolling_freshness_policy',
         error: 'helper_missing'
+      })
+    );
+  });
+
+  it('fails closed when linear issue-context falls back to cached output', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-cache-fallback-'));
+    createdDirs.push(repoRoot);
+    await writeFixture(repoRoot, {
+      entries: [{ path: 'tasks/tasks-1164-historical.md', daysOld: 31 }],
+      policy: rollingFreshnessPolicy({
+        require_live_owner_verification: true,
+        owner_issue_project_id: 'project-1'
+      })
+    });
+    await writeLinearIssueContextHelper(repoRoot, {
+      issue: {
+        id: 'owner-id',
+        state: { name: 'In Progress', type: 'started', is_terminal: false },
+        workspace_id: 'workspace-1',
+        team: { id: 'team-1' },
+        project: { id: 'project-1', name: 'CO Control and Advisory' }
+      },
+      source_setup: {
+        workspace_id: 'workspace-1',
+        team_id: 'team-1',
+        project_id: 'project-1',
+        cache_fallback_used: true
+      }
+    });
+
+    const { decision, shouldBlock } = await runMaintain(repoRoot);
+
+    expect(shouldBlock).toBe(true);
+    expect(decision.freshness_decision).toBe('block_unowned_repo_debt');
+    expect(decision.owner_issue_verification).toEqual(
+      expect.objectContaining({
+        issue: 'CO-175',
+        usable: false,
+        expected_project_id: 'project-1',
+        same_project: null,
+        verification_status: 'failed',
+        source: 'linear issue-context',
+        error: expect.stringContaining('cache_fallback_used')
+      })
+    );
+    expect(decision.owner_issue_action).toEqual(
+      expect.objectContaining({
+        mode: 'create_required',
+        existing_issue: 'CO-175',
+        reason: 'owner_verification_failed',
+        verification_status: 'failed'
       })
     );
   });

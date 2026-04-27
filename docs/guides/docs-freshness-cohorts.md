@@ -11,6 +11,8 @@ The machine-readable policy lives in `docs/docs-catalog.json` under `policies.ro
 Current CO policy:
 
 - Owner issue: `CO-401`
+- Canonical recurring owner key: `docs:freshness:maintain`
+- Live-owner verification: `docs:freshness:maintain` must verify the configured owner issue as a non-terminal issue in the configured Linear project before owned rolling debt can pass. Terminal, canceled, duplicate, out-of-project, or unverifiable owners are evidence only and must route to canonical owner reuse/re-home action instead of remaining live owner metadata.
 - Exact canonical owner overrides: `canonical_owner_issues[]` may map one `canonical_owner_key` to one live owner issue, such as `CO-320` for `docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30`
 - Historical owner lineage: `CO-175` established the Apr 14 baseline, `CO-267` owned the Apr 20/21 maintenance refreshes, `CO-300` owned the Apr 22 reset, `CO-324` owned the Apr 23 reset, and `CO-343` owned the Apr 24/25 reset before later owner verification failed; these are now terminal or invalid evidence only and must not remain the live maintenance owner after they reach terminal or unverifiable states.
 - Window: `7` days after the normal freshness cadence expires
@@ -40,6 +42,8 @@ The maintenance report is the machine-readable decision future workers should ci
 - `freshness_decision`
 - `owner_issue`
 - `owner_issue_action`
+- `owner_issue_verification`
+- `fallback_expiry`
 - `candidate_cohorts`
 - `blocking_changed_paths`
 - `diff_status`
@@ -50,9 +54,11 @@ The maintenance report is the machine-readable decision future workers should ci
 
 Provider-worker gates use this decision in `docs-review` and `implementation-gate`. They may pass with `pass_with_owned_rolling_debt` only when the debt is in an eligible historical class, the policy owner issue is present, the rows are still inside the rolling window and caps, `spec-guard` is clean, and the current diff/task packet has no blocking freshness paths. The underlying `docs:freshness` JSON still preserves the raw stale and rolling row evidence.
 
-When the configured owner issue is terminal, `docs:freshness:maintain` must fail closed. Terminal owner metadata is evidence only; the helper must require a new live same-project owner issue instead of reusing a `Done`, `Duplicate`, or `Canceled` owner path.
+When the configured owner issue is terminal, canceled, duplicate, out-of-project, or unverifiable, `docs:freshness:maintain` must fail closed. Terminal or mismatched owner metadata is evidence only; the helper must require canonical `docs:freshness:maintain` owner reuse or a new live same-project owner issue instead of reusing a stale `Done`, `Duplicate`, `Canceled`, or project-mismatched owner path. The maintenance output must keep the owner action machine-readable so follow-up creation can pass `--canonical-owner-key docs:freshness:maintain` instead of creating duplicate recurring baseline owners.
 
 Exact canonical owner overrides are narrower than the global owner issue. `docs:freshness:maintain` may surface a mapped live owner only when a candidate cohort's `canonical_owner_key` exactly matches an entry in `canonical_owner_issues[]`; unrelated candidate cohorts must keep the configured global owner evidence and remain blocked or independently owned. This keeps duplicate prevention keyed to `codex-orchestrator:canonical-owner-key=...` without broadening a cohort-specific owner into a repo-wide freshness owner.
+
+Owned rolling debt is an `expire fallback`, not an indefinite exception. Every retained cohort emitted by `docs:freshness:maintain` carries `fallback_expiry` metadata with the owner, trigger, review date, maximum lifetime, `expires_after`, removal condition, and validation evidence. The maximum lifetime is the configured rolling window after normal cadence expiry, so the fallback must be removed by refreshing, archiving, reclassifying, or re-homing to a verified live same-project owner before that date.
 
 ## Preserved Historical Stub Status
 Some historical task-key stubs remain authoritative because current repo tooling still resolves their canonical task key from that path even after the rest of the historical packet is gone. Those rows should use docs-freshness registry status `preserved_historical_stub`.
