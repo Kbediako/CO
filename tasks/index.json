@@ -1,6 +1,31 @@
 {
   "items": [
     {
+      "id": "20260427-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba",
+      "title": "CO-397 docs freshness owned fallback expiry",
+      "relates_to": "tasks/tasks-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-27",
+      "approvals": {
+        "docs_packet_worker": {
+          "reviewer": "bounded CO-397 packet worker",
+          "date": "2026-04-27",
+          "status": "produced",
+          "summary": "Docs-first packet created for CO-397 while the issue remains in Backlog. The packet applies CO-382 fallback-expiry discipline to docs freshness ownership, requires rolling_freshness_cohorts.owner_issue to resolve to a live same-project non-terminal owner before owned rolling debt is usable, removes the unsafe configured-owner-only fallback, and preserves docs:freshness:maintain as the canonical owner recovery key for intentional docs/docs-catalog.json re-home guidance.",
+          "evidence": ".runs/linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba-docs-review/cli/2026-04-27T05-57-23-653Z-e3863a70/manifest.json"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
+        "task": "tasks/tasks-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
+        "agent_task": ".agent/task/linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
+        "docs": "docs/TECH_SPEC-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md"
+      }
+    },
+    {
       "id": "20260427-linear-5ef45396-4546-4699-9d4a-c69fb9179868",
       "title": "CO-396 runtime-routing fallback expiry",
       "relates_to": "tasks/tasks-linear-5ef45396-4546-4699-9d4a-c69fb9179868.md",
