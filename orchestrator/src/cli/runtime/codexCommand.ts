@@ -64,8 +64,11 @@ export function formatRuntimeSelectionSummary(selection: RuntimeSelection): stri
   }
   const code = selection.fallback.code ?? 'unknown';
   const reason = selection.fallback.reason ?? 'fallback occurred';
+  const expiry = selection.fallback.expiry
+    ? ` expiry_owner=${selection.fallback.expiry.owner} expiry_review=${selection.fallback.expiry.review_date} expiry_max=${selection.fallback.expiry.maximum_lifetime}`
+    : '';
   return (
-    `${base} fallback=${code} ` +
+    `${base} fallback=${code}${expiry} ` +
     `original_target=${describeFallbackTarget(selection.fallback.original_target)} ` +
     `fallback_target=${describeFallbackTarget(selection.fallback.fallback_target)} ` +
     `blocking_reason=${selection.fallback.blocking_reason ?? reason}`

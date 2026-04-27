@@ -12,6 +12,16 @@ export interface RuntimeModeResolution {
   source: RuntimeModeSource;
 }
 
+export interface RuntimeFallbackExpiryMetadata {
+  owner: string;
+  trigger: string;
+  introduced_date: string;
+  review_date: string;
+  maximum_lifetime: string;
+  removal_condition: string;
+  validation: string;
+}
+
 export interface RuntimeFallbackMetadata {
   occurred: boolean;
   policy: RuntimeFallbackPolicy;
@@ -23,6 +33,7 @@ export interface RuntimeFallbackMetadata {
   original_target: string | null;
   fallback_target: string | null;
   blocking_reason: string | null;
+  expiry?: RuntimeFallbackExpiryMetadata | null;
   checked_at: string | null;
 }
 

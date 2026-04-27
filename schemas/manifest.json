@@ -298,6 +298,28 @@
         "original_target": { "type": ["string", "null"] },
         "fallback_target": { "type": ["string", "null"] },
         "blocking_reason": { "type": ["string", "null"] },
+        "expiry": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": [
+            "owner",
+            "trigger",
+            "introduced_date",
+            "review_date",
+            "maximum_lifetime",
+            "removal_condition",
+            "validation"
+          ],
+          "properties": {
+            "owner": { "type": "string", "minLength": 1 },
+            "trigger": { "type": "string", "minLength": 1 },
+            "introduced_date": { "type": "string", "minLength": 1 },
+            "review_date": { "type": "string", "minLength": 1 },
+            "maximum_lifetime": { "type": "string", "minLength": 1 },
+            "removal_condition": { "type": "string", "minLength": 1 },
+            "validation": { "type": "string", "minLength": 1 }
+          }
+        },
         "checked_at": { "type": ["string", "null"] }
       }
     },

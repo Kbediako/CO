@@ -95,6 +95,31 @@ function createResult(options: OrchestratorExecutionRouteOptions, notes: string[
   };
 }
 
+function createCloudRuntimeFallback(): RuntimeFallbackMetadata {
+  return {
+    occurred: true,
+    policy: 'auto',
+    policy_source: 'default',
+    code: 'cloud-appserver-unsupported',
+    reason: 'Unsupported mode combination: executionMode=cloud does not support runtimeMode=appserver.',
+    from_mode: 'appserver',
+    to_mode: 'cli',
+    original_target: 'execution:cloud/runtime:appserver',
+    fallback_target: 'execution:cloud/runtime:cli',
+    blocking_reason: 'Unsupported mode combination: executionMode=cloud does not support runtimeMode=appserver.',
+    expiry: {
+      owner: 'CO-396',
+      trigger: 'cloud default appserver unsupported',
+      introduced_date: '2026-04-26',
+      review_date: '2026-05-10',
+      maximum_lifetime: '2026-05-26',
+      removal_condition: 'cloud route selects cli before runtime selection',
+      validation: 'route decision shell regression'
+    },
+    checked_at: '2026-04-27T00:00:00.000Z'
+  };
+}
+
 function createOptions(
   overrides: Partial<OrchestratorExecutionRouteOptions> = {}
 ): OrchestratorExecutionRouteOptions {
@@ -285,5 +310,78 @@ describe('routeOrchestratorExecution', () => {
       envOverrides: { REROUTED_FLAG: '1' },
       state: reroutedState
     });
+  });
+
+  it('preserves cloud runtime fallback expiry only for the cloud preflight reroute', async () => {
+    const cloudFallback = createCloudRuntimeFallback();
+    const initialSelection = createRuntimeSelection({
+      requested_mode: 'appserver',
+      selected_mode: 'cli',
+      provider: 'CliRuntimeProvider',
+      fallback: cloudFallback
+    });
+    const reroutedSelection = createRuntimeSelection({
+      requested_mode: 'cli',
+      selected_mode: 'cli',
+      provider: 'CliRuntimeProvider'
+    });
+    const initialState = createRouteState({ runtimeSelection: initialSelection });
+    const reroutedState = createRouteState({ runtimeSelection: reroutedSelection });
+    mockState.resolveRouteState
+      .mockImplementationOnce(async (input) => {
+        input.applyRuntimeSelection(input.manifest, initialSelection);
+        return initialState;
+      })
+      .mockImplementationOnce(async (input) => {
+        input.applyRuntimeSelection(input.manifest, reroutedSelection);
+        return reroutedState;
+      });
+
+    const options = createOptions({ mode: 'cloud' });
+    mockState.cloudRouteShell.mockImplementation(async (input) =>
+      input.reroute({
+        mode: 'mcp',
+        executionModeOverride: 'mcp',
+        runtimeModeRequested: 'cli',
+        runtimeModeSource: 'default',
+        envOverrides: {}
+      })
+    );
+    const expected = createResult(
+      {
+        ...options,
+        mode: 'mcp',
+        executionModeOverride: 'mcp',
+        runtimeModeRequested: 'cli',
+        envOverrides: {}
+      } as OrchestratorExecutionRouteOptions,
+      ['local-reroute']
+    );
+    mockState.localRouteShell.mockResolvedValue(expected);
+
+    await routeOrchestratorExecution(options);
+
+    expect(options.manifest.runtime_fallback).toBe(cloudFallback);
+  });
+
+  it('does not restore stale fallback evidence after a later clean local selection', async () => {
+    const previousFallback = createCloudRuntimeFallback();
+    const cleanSelection = createRuntimeSelection({
+      requested_mode: 'appserver',
+      selected_mode: 'appserver',
+      provider: 'AppServerRuntimeProvider'
+    });
+    mockState.resolveRouteState.mockImplementationOnce(async (input) => {
+      input.manifest.runtime_fallback = previousFallback;
+      input.applyRuntimeSelection(input.manifest, cleanSelection);
+      return createRouteState({ runtimeSelection: cleanSelection });
+    });
+
+    const options = createOptions({ mode: 'mcp' });
+    mockState.localRouteShell.mockResolvedValue(createResult(options, ['local']));
+
+    await routeOrchestratorExecution(options);
+
+    expect(options.manifest.runtime_fallback).toBe(cleanSelection.fallback);
   });
 });

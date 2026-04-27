@@ -292,6 +292,13 @@ describe('CodexOrchestrator cloud auto scout', () => {
             status?: string;
             runtime_mode?: string;
             runtime_mode_requested?: string;
+            runtime_fallback?: {
+              expiry?: {
+                owner?: string;
+                review_date?: string;
+                maximum_lifetime?: string;
+              } | null;
+            } | null;
             cloud_fallback?: { mode_used?: string };
           };
         }>;
@@ -320,6 +327,15 @@ describe('CodexOrchestrator cloud auto scout', () => {
     expect(result.manifest.cloud_fallback?.mode_used).toBe('mcp');
     expect(result.manifest.runtime_mode_requested).toBe('cli');
     expect(result.manifest.runtime_mode).toBe('cli');
+    expect(result.manifest.runtime_fallback?.expiry).toMatchObject({
+      owner: 'CO-396',
+      trigger: expect.stringMatching(/\S/),
+      introduced_date: '2026-04-26',
+      review_date: '2026-05-10',
+      maximum_lifetime: '2026-05-26',
+      removal_condition: expect.stringMatching(/\S/),
+      validation: expect.stringMatching(/\S/)
+    });
     expect(result.manifest.status).toBe('succeeded');
   });
 

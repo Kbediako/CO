@@ -18,7 +18,7 @@ describe('resolveManifestSchemaPath', () => {
   it('keeps newly emitted fallback evidence optional for old v1 manifests', () => {
     const schema = getManifestSchema() as {
       properties?: {
-        runtime_fallback?: { required?: string[] };
+        runtime_fallback?: { required?: string[]; properties?: { expiry?: unknown } };
         cloud_fallback?: { required?: string[] };
       };
     };
@@ -31,6 +31,18 @@ describe('resolveManifestSchemaPath', () => {
       'to_mode',
       'checked_at'
     ]);
+    expect(schema.properties?.runtime_fallback?.properties?.expiry).toMatchObject({
+      type: ['object', 'null'],
+      required: [
+        'owner',
+        'trigger',
+        'introduced_date',
+        'review_date',
+        'maximum_lifetime',
+        'removal_condition',
+        'validation'
+      ]
+    });
     expect(schema.properties?.cloud_fallback?.required).toEqual([
       'mode_requested',
       'mode_used',

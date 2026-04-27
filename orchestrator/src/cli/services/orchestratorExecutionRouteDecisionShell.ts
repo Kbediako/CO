@@ -10,6 +10,41 @@ import {
 import { executeOrchestratorLocalRouteShell } from './orchestratorLocalRouteShell.js';
 import type { OrchestratorExecutionRouteOptions } from './orchestratorExecutionRouter.js';
 
+function restorePreviousRuntimeFallback(
+  previousRuntimeFallback: OrchestratorExecutionRouteOptions['manifest']['runtime_fallback'],
+  options: OrchestratorExecutionRouteOptions,
+  state: OrchestratorExecutionRouteState
+): typeof previousRuntimeFallback {
+  if (!previousRuntimeFallback?.expiry || !previousRuntimeFallback.occurred) {
+    return null;
+  }
+  if (
+    previousRuntimeFallback.code !== 'cloud-appserver-unsupported' ||
+    previousRuntimeFallback.original_target !== 'execution:cloud/runtime:appserver' ||
+    previousRuntimeFallback.fallback_target !== 'execution:cloud/runtime:cli'
+  ) {
+    return null;
+  }
+  if (
+    options.mode !== 'mcp' ||
+    options.executionModeOverride !== 'mcp' ||
+    options.runtimeModeRequested !== previousRuntimeFallback.to_mode
+  ) {
+    return null;
+  }
+  const current = state.runtimeSelection.fallback;
+  if (
+    state.runtimeSelection.requested_mode !== previousRuntimeFallback.to_mode ||
+    state.runtimeSelection.selected_mode !== previousRuntimeFallback.to_mode ||
+    current.occurred ||
+    current.blocking_reason ||
+    current.expiry
+  ) {
+    return null;
+  }
+  return previousRuntimeFallback;
+}
+
 function failExecutionRoute(
   options: OrchestratorExecutionRouteOptions,
   statusDetail: string,
@@ -59,6 +94,7 @@ export async function routeOrchestratorExecution(
   options: OrchestratorExecutionRouteOptions
 ): Promise<PipelineRunExecutionResult> {
   let state: OrchestratorExecutionRouteState;
+  const previousRuntimeFallback = options.manifest.runtime_fallback ?? null;
   try {
     state = await resolveOrchestratorExecutionRouteState({
       repoRoot: options.env.repoRoot,
@@ -69,6 +105,10 @@ export async function routeOrchestratorExecution(
       envOverrides: options.envOverrides,
       applyRuntimeSelection: options.applyRuntimeSelection
     });
+    const restoredRuntimeFallback = restorePreviousRuntimeFallback(previousRuntimeFallback, options, state);
+    if (restoredRuntimeFallback) {
+      options.manifest.runtime_fallback = restoredRuntimeFallback;
+    }
   } catch (error) {
     const runtimeFallback = getRuntimeSelectionFailureMetadata(error);
     if (runtimeFallback) {

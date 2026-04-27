@@ -164,7 +164,18 @@ export interface RuntimeSummary {
   originalTarget: string | null;
   fallbackTarget: string | null;
   blockingReason: string | null;
+  fallbackExpiry: RuntimeFallbackExpirySummary | null;
   checkedAt: string | null;
+}
+
+export interface RuntimeFallbackExpirySummary {
+  owner: string;
+  trigger: string;
+  introducedDate: string;
+  reviewDate: string;
+  maximumLifetime: string;
+  removalCondition: string;
+  validation: string;
 }
 
 export interface CloudExecutionSummary {
