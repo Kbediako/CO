@@ -499,7 +499,8 @@ describe('runCoStatusCliShell', () => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
     tempDirs.push(root);
     process.env.CODEX_ORCHESTRATOR_ROOT = root;
-    process.env.CODEX_ORCHESTRATOR_RUNS_DIR = join(root, 'custom-runs-root');
+    const customRunsRoot = join(root, 'custom-runs-root');
+    process.env.CODEX_ORCHESTRATOR_RUNS_DIR = customRunsRoot;
 
     const runDir = await writeCoStatusRunDir(root, {
       runsRoot: process.env.CODEX_ORCHESTRATOR_RUNS_DIR
@@ -637,7 +638,7 @@ describe('runCoStatusCliShell', () => {
       provider_linear_worker_proof: null,
       provider_debug_snapshot: null
     });
-    const expectedWorkspacePath = await realpath(root);
+    const expectedWorkspacePath = await realpath(customRunsRoot);
     expect(payload.selected?.workspace?.path).not.toBe('/tmp/stale-co-workspace');
     expect(payload.selected?.workspace?.path).toBe(expectedWorkspacePath);
     expect(payload.selected?.started_at).toBeNull();

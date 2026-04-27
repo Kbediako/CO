@@ -1,6 +1,6 @@
 /* eslint-disable patterns/prefer-logger-over-console */
 
-import { realpathSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import process from 'node:process';
@@ -182,9 +182,22 @@ function deriveWorkspaceRootFromRunDir(runDir: string): string {
   const resolvedRunDir = resolve(runDir);
   const derived = deriveTaskRunFromRunDir(resolvedRunDir);
   if (derived.taskId !== null && derived.runId !== null) {
-    return dirname(dirname(dirname(dirname(resolvedRunDir))));
+    const parts = resolvedRunDir.split(/[\\/]+/u).filter((part) => part.length > 0);
+    const runsRoot = dirname(dirname(dirname(resolvedRunDir)));
+    const runsRootName = parts.at(-4);
+    if (
+      (runsRootName === '.runs' || runsRootName === 'runs') &&
+      looksLikeRepoRoot(dirname(runsRoot))
+    ) {
+      return dirname(dirname(dirname(dirname(resolvedRunDir))));
+    }
+    return runsRoot;
   }
   return dirname(resolvedRunDir);
+}
+
+function looksLikeRepoRoot(pathname: string): boolean {
+  return ['.git', 'codex.orchestrator.json'].some((entry) => existsSync(resolve(pathname, entry)));
 }
 
 function canonicalizeAttachWorkspaceRoot(workspaceRoot: string): string {

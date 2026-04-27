@@ -132,8 +132,122 @@ describe('runCoStatusAttachCliShell', () => {
     const attachedRoot = await mkdtemp(join(tmpdir(), 'co-status-attach-target-'));
     tempDirs.push(callerRoot, attachedRoot);
     process.env.CODEX_ORCHESTRATOR_ROOT = callerRoot;
+    await writeFile(join(attachedRoot, 'codex.orchestrator.json'), JSON.stringify({}), 'utf8');
 
     const runDir = join(attachedRoot, '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(runDir, { recursive: true });
+
+    const server = await startUiServer();
+    servers.add(server.instance);
+
+    await writeFile(
+      join(runDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+    await writeFile(join(runDir, 'control_auth.json'), JSON.stringify({ token: 'attach-token' }), 'utf8');
+    await writeFile(
+      join(runDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: server.baseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+
+    const target = await resolveAttachTarget({ 'run-dir': runDir });
+
+    expect(target.workspaceRoot).toBe(await realpath(attachedRoot));
+  });
+
+  it('derives workspace root from a custom run root when no manifest workspace path exists', async () => {
+    const callerRoot = await mkdtemp(join(tmpdir(), 'co-status-attach-caller-'));
+    const customRootParent = await mkdtemp(join(tmpdir(), 'co-status-attach-custom-parent-'));
+    const customRunsRoot = join(customRootParent, 'runs');
+    tempDirs.push(callerRoot, customRootParent);
+    process.env.CODEX_ORCHESTRATOR_ROOT = callerRoot;
+    await writeFile(join(customRootParent, 'package.json'), JSON.stringify({ private: true }), 'utf8');
+
+    const runDir = join(customRunsRoot, 'local-mcp', 'cli', 'control-host');
+    await mkdir(runDir, { recursive: true });
+
+    const server = await startUiServer();
+    servers.add(server.instance);
+
+    await writeFile(
+      join(runDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+    await writeFile(join(runDir, 'control_auth.json'), JSON.stringify({ token: 'attach-token' }), 'utf8');
+    await writeFile(
+      join(runDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: server.baseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+
+    const target = await resolveAttachTarget({ 'run-dir': runDir });
+
+    expect(target.workspaceRoot).toBe(await realpath(customRunsRoot));
+  });
+
+  it('derives workspace root from a custom .runs root when no manifest workspace path exists', async () => {
+    const callerRoot = await mkdtemp(join(tmpdir(), 'co-status-attach-caller-'));
+    const customRootParent = await mkdtemp(join(tmpdir(), 'co-status-attach-custom-parent-'));
+    const customRunsRoot = join(customRootParent, '.runs');
+    tempDirs.push(callerRoot, customRootParent);
+    process.env.CODEX_ORCHESTRATOR_ROOT = callerRoot;
+    await writeFile(join(customRootParent, 'package.json'), JSON.stringify({ private: true }), 'utf8');
+
+    const runDir = join(customRunsRoot, 'local-mcp', 'cli', 'control-host');
+    await mkdir(runDir, { recursive: true });
+
+    const server = await startUiServer();
+    servers.add(server.instance);
+
+    await writeFile(
+      join(runDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+    await writeFile(join(runDir, 'control_auth.json'), JSON.stringify({ token: 'attach-token' }), 'utf8');
+    await writeFile(
+      join(runDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: server.baseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+
+    const target = await resolveAttachTarget({ 'run-dir': runDir });
+
+    expect(target.workspaceRoot).toBe(await realpath(customRunsRoot));
+  });
+
+  it('derives workspace root from a repo-local runs directory when no manifest workspace path exists', async () => {
+    const callerRoot = await mkdtemp(join(tmpdir(), 'co-status-attach-caller-'));
+    const attachedRoot = await mkdtemp(join(tmpdir(), 'co-status-attach-target-'));
+    tempDirs.push(callerRoot, attachedRoot);
+    process.env.CODEX_ORCHESTRATOR_ROOT = callerRoot;
+    await writeFile(join(attachedRoot, 'codex.orchestrator.json'), JSON.stringify({}), 'utf8');
+
+    const runDir = join(attachedRoot, 'runs', 'local-mcp', 'cli', 'control-host');
     await mkdir(runDir, { recursive: true });
 
     const server = await startUiServer();
