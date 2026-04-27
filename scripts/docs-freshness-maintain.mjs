@@ -112,6 +112,36 @@ function normalizeOptionalBoolean(value) {
   return typeof value === 'boolean' ? value : null;
 }
 
+function normalizeOwnerIssueScope(config, env = process.env) {
+  return {
+    workspace_id:
+      normalizeOptionalString(config?.owner_issue_workspace_id) ??
+      normalizeOptionalString(env.CO_LINEAR_WORKSPACE_ID),
+    team_id:
+      normalizeOptionalString(config?.owner_issue_team_id) ??
+      normalizeOptionalString(env.CO_LINEAR_TEAM_ID),
+    project_id:
+      normalizeOptionalString(config?.owner_issue_project_id) ??
+      normalizeOptionalString(env.CO_LINEAR_PROJECT_ID)
+  };
+}
+
+function hasOwnerIssueScope(scope) {
+  return Boolean(scope?.workspace_id || scope?.team_id || scope?.project_id);
+}
+
+function appendOwnerIssueScopeArgs(args, scope) {
+  if (scope?.workspace_id) {
+    args.push('--workspace-id', scope.workspace_id);
+  }
+  if (scope?.team_id) {
+    args.push('--team-id', scope.team_id);
+  }
+  if (scope?.project_id) {
+    args.push('--project-id', scope.project_id);
+  }
+}
+
 function isTerminalWorkflowState({ state = null, stateType = null, isTerminal = null } = {}) {
   if (typeof isTerminal === 'boolean') {
     return isTerminal;
@@ -129,7 +159,8 @@ function deriveOwnerIssueVerificationFromPolicy(policy) {
   const state = normalizeOptionalString(policy?.owner_issue_state);
   const stateType = normalizeOptionalString(policy?.owner_issue_state_type);
   const isTerminal = normalizeOptionalBoolean(policy?.owner_issue_is_terminal);
-  if (!issue || (!state && !stateType && isTerminal === null)) {
+  const scope = normalizeOwnerIssueScope(policy, {});
+  if (!issue || (!state && !stateType && isTerminal === null && !hasOwnerIssueScope(scope))) {
     return null;
   }
   const terminal = isTerminalWorkflowState({ state, stateType, isTerminal });
@@ -140,6 +171,14 @@ function deriveOwnerIssueVerificationFromPolicy(policy) {
     state_type: stateType,
     is_terminal: terminal,
     usable: !terminal,
+    workspace_id: null,
+    team_id: null,
+    project_id: null,
+    project_name: null,
+    expected_workspace_id: scope.workspace_id ?? null,
+    expected_team_id: scope.team_id ?? null,
+    expected_project_id: scope.project_id ?? null,
+    same_project: null,
     verification_status: 'policy_metadata',
     checked_at: null,
     source: 'rolling_freshness_policy',
@@ -159,6 +198,19 @@ function deriveOwnerIssueVerification(policy, explicitVerification = null) {
         is_terminal:
           normalizeOptionalBoolean(explicitVerification.is_terminal) ?? policyVerification.is_terminal,
         usable: normalizeOptionalBoolean(explicitVerification.usable) ?? policyVerification.usable,
+        workspace_id: normalizeOptionalString(explicitVerification.workspace_id) ?? policyVerification.workspace_id,
+        team_id: normalizeOptionalString(explicitVerification.team_id) ?? policyVerification.team_id,
+        project_id: normalizeOptionalString(explicitVerification.project_id) ?? policyVerification.project_id,
+        project_name: normalizeOptionalString(explicitVerification.project_name) ?? policyVerification.project_name,
+        expected_workspace_id:
+          normalizeOptionalString(explicitVerification.expected_workspace_id) ??
+          policyVerification.expected_workspace_id,
+        expected_team_id:
+          normalizeOptionalString(explicitVerification.expected_team_id) ?? policyVerification.expected_team_id,
+        expected_project_id:
+          normalizeOptionalString(explicitVerification.expected_project_id) ?? policyVerification.expected_project_id,
+        same_project:
+          normalizeOptionalBoolean(explicitVerification.same_project) ?? policyVerification.same_project,
         source: policyVerification.source
       };
     }
@@ -167,51 +219,94 @@ function deriveOwnerIssueVerification(policy, explicitVerification = null) {
   return policyVerification;
 }
 
+function ownerActionDuplicatePolicy(config) {
+  return normalizeOptionalString(config?.canonical_owner_key)
+    ? 'one_owner_issue_per_canonical_owner_key'
+    : 'one_owner_issue_per_historical_batch';
+}
+
+function isLiveOwnerVerificationRequired(config) {
+  return normalizeOptionalBoolean(config?.require_live_owner_verification) === true;
+}
+
+function verificationConfirmsLiveSameProject(verification) {
+  return (
+    normalizeOptionalString(verification?.verification_status) === 'succeeded' &&
+    normalizeOptionalBoolean(verification?.usable) === true &&
+    normalizeOptionalBoolean(verification?.same_project) === true
+  );
+}
+
+function buildOwnerIssueActionBase(config, overrides = {}) {
+  const canonicalOwnerKey = normalizeOptionalString(config?.canonical_owner_key);
+  return {
+    duplicate_policy: ownerActionDuplicatePolicy(config),
+    policy_doc: config?.policy_doc ?? null,
+    ...(canonicalOwnerKey ? { canonical_owner_key: canonicalOwnerKey } : {}),
+    ...overrides
+  };
+}
+
 function buildOwnerIssueAction(policy, ownerIssueVerification = null) {
   const configuredIssue = normalizeOptionalString(policy?.owner_issue);
   const verification = deriveOwnerIssueVerification(policy, ownerIssueVerification);
   if (!configuredIssue) {
-    return {
+    return buildOwnerIssueActionBase(policy, {
       mode: 'create_required',
       issue: null,
       existing_issue: null,
-      duplicate_policy: 'one_owner_issue_per_historical_batch',
-      policy_doc: policy?.policy_doc ?? null,
       reason: 'missing_owner_issue'
-    };
+    });
   }
-  if (verification?.usable === false) {
-    return {
+  if (verification?.usable === false && verification?.is_terminal === true) {
+    return buildOwnerIssueActionBase(policy, {
       mode: 'create_required',
       issue: null,
       existing_issue: configuredIssue,
-      duplicate_policy: 'one_owner_issue_per_historical_batch',
-      policy_doc: policy?.policy_doc ?? null,
       reason: 'configured_owner_terminal',
       issue_state: verification.state ?? null,
       issue_state_type: verification.state_type ?? null
-    };
+    });
   }
-  if (verification?.verification_status === 'failed' && verification.usable !== true) {
-    return {
+  if (normalizeOptionalBoolean(verification?.same_project) === false) {
+    return buildOwnerIssueActionBase(policy, {
       mode: 'create_required',
       issue: null,
       existing_issue: configuredIssue,
-      duplicate_policy: 'one_owner_issue_per_historical_batch',
-      policy_doc: policy?.policy_doc ?? null,
+      reason: 'configured_owner_project_mismatch',
+      verification_status: verification?.verification_status ?? null,
+      expected_project_id: verification?.expected_project_id ?? null,
+      actual_project_id: verification?.project_id ?? null
+    });
+  }
+  if (verification?.verification_status === 'failed' && verification.usable !== true) {
+    return buildOwnerIssueActionBase(policy, {
+      mode: 'create_required',
+      issue: null,
+      existing_issue: configuredIssue,
       reason: 'owner_verification_failed',
       verification_status: verification.verification_status ?? null,
       verification_error: verification.error ?? null
-    };
+    });
   }
-  return {
+  if (isLiveOwnerVerificationRequired(policy) && !verificationConfirmsLiveSameProject(verification)) {
+    return buildOwnerIssueActionBase(policy, {
+      mode: 'create_required',
+      issue: null,
+      existing_issue: configuredIssue,
+      reason: verification?.verification_status === 'failed'
+        ? 'owner_verification_failed'
+        : 'owner_verification_unavailable',
+      verification_status: verification?.verification_status ?? null,
+      verification_error: verification?.error ?? null
+    });
+  }
+  return buildOwnerIssueActionBase(policy, {
     mode: 'update_existing',
     issue: configuredIssue,
     existing_issue: null,
-    duplicate_policy: 'one_owner_issue_per_historical_batch',
-    policy_doc: policy?.policy_doc ?? null,
     reason: verification?.verification_status ?? null
-  };
+  });
 }
 
 function doesVerificationConfirmLiveOwner(verification) {
@@ -223,6 +318,14 @@ function doesVerificationConfirmLiveOwner(verification) {
 
 function buildUnresolvedCanonicalOwnerAction(ownerConfig, verification) {
   const verificationStatus = normalizeOptionalString(verification?.verification_status);
+  const projectMismatch = normalizeOptionalBoolean(verification?.same_project) === false;
+  let reason = verificationStatus === 'failed' ? 'owner_verification_failed' : 'owner_verification_unavailable';
+  if (verification?.is_terminal === true) {
+    reason = 'configured_owner_terminal';
+  }
+  if (projectMismatch) {
+    reason = 'configured_owner_project_mismatch';
+  }
   return {
     mode: 'create_required',
     issue: null,
@@ -230,12 +333,11 @@ function buildUnresolvedCanonicalOwnerAction(ownerConfig, verification) {
     duplicate_policy: 'one_owner_issue_per_canonical_owner_key',
     canonical_owner_key: ownerConfig?.canonical_owner_key ?? null,
     policy_doc: ownerConfig?.policy_doc ?? null,
-    reason:
-      verificationStatus === 'failed'
-        ? 'owner_verification_failed'
-        : 'owner_verification_unavailable',
+    reason,
     verification_status: verificationStatus,
-    verification_error: verification?.error ?? null
+    verification_error: verification?.error ?? null,
+    expected_project_id: verification?.expected_project_id ?? null,
+    actual_project_id: verification?.project_id ?? null
   };
 }
 
@@ -256,24 +358,80 @@ function normalizeCanonicalOwnerIssues(policy) {
       return {
         canonical_owner_key: canonicalOwnerKey,
         owner_issue: ownerIssue,
+        owner_issue_workspace_id:
+          normalizeOptionalString(entry.owner_issue_workspace_id) ??
+          normalizeOptionalString(policy?.owner_issue_workspace_id),
+        owner_issue_team_id:
+          normalizeOptionalString(entry.owner_issue_team_id) ??
+          normalizeOptionalString(policy?.owner_issue_team_id),
+        owner_issue_project_id:
+          normalizeOptionalString(entry.owner_issue_project_id) ??
+          normalizeOptionalString(policy?.owner_issue_project_id),
         owner_issue_state: normalizeOptionalString(entry.owner_issue_state),
         owner_issue_state_type: normalizeOptionalString(entry.owner_issue_state_type),
         owner_issue_is_terminal: normalizeOptionalBoolean(entry.owner_issue_is_terminal),
+        require_live_owner_verification:
+          normalizeOptionalBoolean(entry.require_live_owner_verification) ??
+          normalizeOptionalBoolean(policy?.require_live_owner_verification),
         policy_doc: policy?.policy_doc ?? null
       };
     })
     .filter(Boolean);
 }
 
-function canonicalOwnerVerificationLookup(verifications) {
-  const lookup = new Map();
-  for (const verification of Array.isArray(verifications) ? verifications : []) {
-    const issue = normalizeOptionalString(verification?.issue);
-    if (issue && !lookup.has(issue)) {
-      lookup.set(issue, verification);
-    }
+function hasExplicitOwnerIssueScope(config) {
+  return hasOwnerIssueScope(normalizeOwnerIssueScope(config, {}));
+}
+
+function verificationMatchesExplicitOwnerIssueScope(verification, config) {
+  const scope = normalizeOwnerIssueScope(config, {});
+  return (
+    (!scope.workspace_id || normalizeOptionalString(verification?.expected_workspace_id) === scope.workspace_id) &&
+    (!scope.team_id || normalizeOptionalString(verification?.expected_team_id) === scope.team_id) &&
+    (!scope.project_id || normalizeOptionalString(verification?.expected_project_id) === scope.project_id)
+  );
+}
+
+function attachCanonicalOwnerVerificationContext(verification, ownerConfig) {
+  if (!verification || typeof verification !== 'object') {
+    return verification;
   }
-  return lookup;
+  const scope = normalizeOwnerIssueScope(ownerConfig, {});
+  return {
+    ...verification,
+    canonical_owner_key: normalizeOptionalString(ownerConfig?.canonical_owner_key),
+    expected_workspace_id: normalizeOptionalString(verification.expected_workspace_id) ?? scope.workspace_id ?? null,
+    expected_team_id: normalizeOptionalString(verification.expected_team_id) ?? scope.team_id ?? null,
+    expected_project_id: normalizeOptionalString(verification.expected_project_id) ?? scope.project_id ?? null
+  };
+}
+
+function findCanonicalOwnerVerification(verifications, ownerConfig) {
+  const issue = normalizeOptionalString(ownerConfig?.owner_issue);
+  if (!issue) {
+    return null;
+  }
+  const canonicalOwnerKey = normalizeOptionalString(ownerConfig?.canonical_owner_key);
+  const compatible = (Array.isArray(verifications) ? verifications : []).filter((verification) => {
+    if (normalizeOptionalString(verification?.issue) !== issue) {
+      return false;
+    }
+    const verificationOwnerKey = normalizeOptionalString(verification?.canonical_owner_key);
+    return !verificationOwnerKey || !canonicalOwnerKey || verificationOwnerKey === canonicalOwnerKey;
+  });
+  const matchingScope = hasExplicitOwnerIssueScope(ownerConfig)
+    ? compatible.filter((verification) => verificationMatchesExplicitOwnerIssueScope(verification, ownerConfig))
+    : compatible;
+  const matchingKey = matchingScope.filter(
+    (verification) => normalizeOptionalString(verification?.canonical_owner_key) === canonicalOwnerKey
+  );
+  if (matchingKey.length === 1) {
+    return matchingKey[0];
+  }
+  if (matchingScope.length === 1) {
+    return matchingScope[0];
+  }
+  return null;
 }
 
 function buildCanonicalOwnerIssueAction(ownerConfig, ownerIssueVerification = null) {
@@ -316,7 +474,7 @@ function resolveCandidateOwner(policy, cohortKey, globalOwnerIssueAction, canoni
   const canonicalOwners = normalizeCanonicalOwnerIssues(policy);
   const matchedOwner = canonicalOwners.find((entry) => entry.canonical_owner_key === cohortKey) ?? null;
   if (matchedOwner) {
-    const verification = canonicalOwnerVerificationLookup(canonicalOwnerVerifications).get(matchedOwner.owner_issue) ?? null;
+    const verification = findCanonicalOwnerVerification(canonicalOwnerVerifications, matchedOwner);
     const action = buildCanonicalOwnerIssueAction(matchedOwner, verification);
     return {
       owner_issue: action.issue ?? action.existing_issue ?? matchedOwner.owner_issue,
@@ -479,7 +637,46 @@ function canonicalOwnerMarkerForKey(key) {
   return `${CANONICAL_OWNER_MARKER_PREFIX}${key}`;
 }
 
-function summarizeCandidateCohorts(entries, policy, ownerIssueAction, canonicalOwnerIssueVerifications = []) {
+function isoDateFromTimestamp(value) {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return null;
+  }
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) {
+    return normalized.slice(0, 10);
+  }
+  return parsed.toISOString().slice(0, 10);
+}
+
+function buildCohortFallbackExpiry({ firstEntry, policy, ownerResolution, expiresAfter, generatedAt }) {
+  const maximumLifetimeDays = Number.isInteger(policy?.window_days) ? policy.window_days : null;
+  return {
+    decision: 'expire fallback',
+    owner_issue: ownerResolution.owner_issue ?? null,
+    configured_owner_issue: ownerResolution.configured_owner_issue ?? null,
+    canonical_owner_key: ownerResolution.owner_issue_resolution?.canonical_owner_key ?? null,
+    trigger: 'eligible historical docs freshness rolling-debt cohort',
+    introduced_date: addDaysToIsoDate(firstEntry.last_review, firstEntry.cadence_days),
+    review_date: isoDateFromTimestamp(generatedAt),
+    maximum_lifetime_days: maximumLifetimeDays,
+    expires_after: expiresAfter,
+    removal_condition:
+      'Refresh, archive, or reclassify the cohort before expires_after; if owner verification stops confirming a live same-project owner, reuse or create the canonical docs:freshness:maintain owner and re-home docs/docs-catalog.json intentionally.',
+    validation: [
+      'docs:freshness keeps stale and rolling cohort rows machine-visible',
+      'docs:freshness:maintain verifies diff status, spec-guard, owner liveness, and same-project ownership before pass_with_owned_rolling_debt'
+    ]
+  };
+}
+
+function summarizeCandidateCohorts(
+  entries,
+  policy,
+  ownerIssueAction,
+  canonicalOwnerIssueVerifications = [],
+  { generatedAt = new Date().toISOString() } = {}
+) {
   const byKey = new Map();
   for (const entry of entries) {
     const key = candidateCohortKey(entry);
@@ -520,6 +717,13 @@ function summarizeCandidateCohorts(entries, policy, ownerIssueAction, canonicalO
         configured_owner_issue: ownerResolution.configured_owner_issue,
         owner_issue_action: ownerResolution.owner_issue_action,
         owner_issue_resolution: ownerResolution.owner_issue_resolution,
+        fallback_expiry: buildCohortFallbackExpiry({
+          firstEntry: first,
+          policy,
+          ownerResolution,
+          expiresAfter,
+          generatedAt
+        }),
         status: cohortEntries.some((entry) => entry.overdue_days > policy.window_days)
           ? 'expired_candidate'
           : 'eligible_historical_candidate',
@@ -650,8 +854,14 @@ function buildRecommendedAction(decision, { policy, expiresAfter, diffStatus, ow
   if (ownerIssueAction?.reason === 'configured_owner_terminal' && ownerIssueAction.existing_issue) {
     return `Open a new live same-project owner issue for the historical batch; configured owner ${ownerIssueAction.existing_issue} is terminal, so do not reuse it as the live owner path.`;
   }
+  if (ownerIssueAction?.reason === 'configured_owner_project_mismatch' && ownerIssueAction.existing_issue) {
+    return `Reuse or create the canonical docs:freshness:maintain owner in the configured Linear project; current owner ${ownerIssueAction.existing_issue} is not a same-project live owner path.`;
+  }
   if (ownerIssueAction?.reason === 'owner_verification_failed' && ownerIssueAction.existing_issue) {
     return `Verify or replace the owner issue for the historical batch; current owner ${ownerIssueAction.existing_issue} could not be verified, so do not reuse it blindly.`;
+  }
+  if (ownerIssueAction?.reason === 'owner_verification_unavailable' && ownerIssueAction.existing_issue) {
+    return `Verify or replace the owner issue for the historical batch; current owner ${ownerIssueAction.existing_issue} was not proven as a live same-project owner, so do not reuse it blindly.`;
   }
   return `Open or update one baseline owner issue for the historical batch, or fix stale public/active guidance directly before gates pass.`;
 }
@@ -694,11 +904,12 @@ function selectRecommendedOwnerIssueAction(ownerIssueAction, candidateCohorts) {
   };
 }
 
-async function verifyOwnerIssueContext(repoRoot, ownerIssue) {
+async function verifyOwnerIssueContext(repoRoot, ownerIssue, ownerConfig = null) {
   const issue = normalizeOptionalString(ownerIssue);
   if (!issue) {
     return null;
   }
+  const scope = normalizeOwnerIssueScope(ownerConfig);
 
   const helperPath = path.join(repoRoot, 'bin', 'codex-orchestrator.js');
   try {
@@ -711,6 +922,14 @@ async function verifyOwnerIssueContext(repoRoot, ownerIssue) {
       state_type: null,
       is_terminal: null,
       usable: null,
+      workspace_id: null,
+      team_id: null,
+      project_id: null,
+      project_name: null,
+      expected_workspace_id: scope.workspace_id ?? null,
+      expected_team_id: scope.team_id ?? null,
+      expected_project_id: scope.project_id ?? null,
+      same_project: scope.project_id ? null : null,
       verification_status: 'unavailable',
       checked_at: new Date().toISOString(),
       source: 'linear issue-context',
@@ -719,9 +938,11 @@ async function verifyOwnerIssueContext(repoRoot, ownerIssue) {
   }
 
   try {
+    const args = [helperPath, 'linear', 'issue-context', '--issue-id', issue, '--format', 'json'];
+    appendOwnerIssueScopeArgs(args, scope);
     const { stdout } = await execFileAsync(
       process.execPath,
-      [helperPath, 'linear', 'issue-context', '--issue-id', issue, '--format', 'json'],
+      args,
       {
         cwd: repoRoot,
         maxBuffer: 64 * 1024 * 1024,
@@ -729,8 +950,42 @@ async function verifyOwnerIssueContext(repoRoot, ownerIssue) {
       }
     );
     const parsed = JSON.parse(stdout);
+    const cacheFallbackMarker = detectLinearIssueContextCacheFallback(parsed);
+    if (cacheFallbackMarker) {
+      return {
+        issue,
+        issue_id: null,
+        state: null,
+        state_type: null,
+        is_terminal: null,
+        usable: false,
+        workspace_id: null,
+        team_id: null,
+        project_id: null,
+        project_name: null,
+        expected_workspace_id: scope.workspace_id ?? normalizeOptionalString(parsed?.source_setup?.workspace_id) ?? null,
+        expected_team_id: scope.team_id ?? normalizeOptionalString(parsed?.source_setup?.team_id) ?? null,
+        expected_project_id: scope.project_id ?? normalizeOptionalString(parsed?.source_setup?.project_id) ?? null,
+        same_project: null,
+        verification_status: 'failed',
+        checked_at: new Date().toISOString(),
+        source: 'linear issue-context',
+        error: `live owner verification requires non-cached linear issue-context output (${cacheFallbackMarker})`
+      };
+    }
     const issueContext = parsed?.issue ?? {};
     const workflowState = issueContext?.state && typeof issueContext.state === 'object' ? issueContext.state : null;
+    const team = issueContext?.team && typeof issueContext.team === 'object' ? issueContext.team : null;
+    const project = issueContext?.project && typeof issueContext.project === 'object' ? issueContext.project : null;
+    const workspaceId = normalizeOptionalString(issueContext?.workspace_id ?? parsed?.source_setup?.workspace_id);
+    const teamId = normalizeOptionalString(team?.id);
+    const projectId = normalizeOptionalString(project?.id);
+    const expectedWorkspaceId = scope.workspace_id ?? normalizeOptionalString(parsed?.source_setup?.workspace_id);
+    const expectedTeamId = scope.team_id ?? normalizeOptionalString(parsed?.source_setup?.team_id);
+    const expectedProjectId = scope.project_id ?? normalizeOptionalString(parsed?.source_setup?.project_id);
+    const workspaceMatches = expectedWorkspaceId ? workspaceId === expectedWorkspaceId : null;
+    const teamMatches = expectedTeamId ? teamId === expectedTeamId : null;
+    const projectMatches = expectedProjectId ? projectId === expectedProjectId : null;
     const state = normalizeOptionalString(workflowState?.name ?? issueContext?.state);
     const stateType = normalizeOptionalString(workflowState?.type ?? issueContext?.state_type ?? issueContext?.stateType);
     const isTerminal = isTerminalWorkflowState({
@@ -740,19 +995,56 @@ async function verifyOwnerIssueContext(repoRoot, ownerIssue) {
         workflowState?.is_terminal ?? workflowState?.isTerminal ?? issueContext?.is_terminal ?? issueContext?.isTerminal
       )
     });
+    const sameProject =
+      projectMatches === false || teamMatches === false || workspaceMatches === false
+        ? false
+        : expectedProjectId
+          ? projectMatches
+          : null;
     return {
       issue,
       issue_id: normalizeOptionalString(issueContext?.id),
       state,
       state_type: stateType,
       is_terminal: isTerminal,
-      usable: !isTerminal,
+      usable: !isTerminal && sameProject !== false,
+      workspace_id: workspaceId,
+      team_id: teamId,
+      project_id: projectId,
+      project_name: normalizeOptionalString(project?.name),
+      expected_workspace_id: expectedWorkspaceId ?? null,
+      expected_team_id: expectedTeamId ?? null,
+      expected_project_id: expectedProjectId ?? null,
+      same_project: sameProject,
       verification_status: 'succeeded',
       checked_at: new Date().toISOString(),
       source: 'linear issue-context',
       error: null
     };
   } catch (error) {
+    const parsedFailure = parseLinearIssueContextFailure(error);
+    if (parsedFailure) {
+      return {
+        issue,
+        issue_id: null,
+        state: null,
+        state_type: null,
+        is_terminal: null,
+        usable: false,
+        workspace_id: null,
+        team_id: null,
+        project_id: normalizeOptionalString(parsedFailure.actualProjectId),
+        project_name: null,
+        expected_workspace_id: scope.workspace_id ?? null,
+        expected_team_id: scope.team_id ?? null,
+        expected_project_id: scope.project_id ?? normalizeOptionalString(parsedFailure.expectedProjectId),
+        same_project: parsedFailure.scope === 'project' ? false : null,
+        verification_status: 'failed',
+        checked_at: new Date().toISOString(),
+        source: 'linear issue-context',
+        error: parsedFailure.message
+      };
+    }
     const detail =
       sampleLines(
         [error?.stdout, error?.stderr, error instanceof Error ? error.message : String(error)].filter(Boolean).join('\n')
@@ -764,6 +1056,14 @@ async function verifyOwnerIssueContext(repoRoot, ownerIssue) {
       state_type: null,
       is_terminal: null,
       usable: null,
+      workspace_id: null,
+      team_id: null,
+      project_id: null,
+      project_name: null,
+      expected_workspace_id: scope.workspace_id ?? null,
+      expected_team_id: scope.team_id ?? null,
+      expected_project_id: scope.project_id ?? null,
+      same_project: scope.project_id ? null : null,
       verification_status: 'failed',
       checked_at: new Date().toISOString(),
       source: 'linear issue-context',
@@ -772,12 +1072,94 @@ async function verifyOwnerIssueContext(repoRoot, ownerIssue) {
   }
 }
 
+function detectLinearIssueContextCacheFallback(payload) {
+  for (const pathKeys of [
+    ['cache_fallback_used'],
+    ['cacheFallbackUsed'],
+    ['cache', 'fallback_used'],
+    ['cache', 'fallbackUsed'],
+    ['source_setup', 'cache_fallback_used'],
+    ['source_setup', 'cacheFallbackUsed'],
+    ['sourceSetup', 'cache_fallback_used'],
+    ['sourceSetup', 'cacheFallbackUsed']
+  ]) {
+    if (normalizeOptionalBoolean(readNestedValue(payload, pathKeys)) === true) {
+      return `${pathKeys.join('.')}=true`;
+    }
+  }
+  for (const pathKeys of [
+    ['cache_status'],
+    ['cacheStatus'],
+    ['cache', 'status'],
+    ['source_setup', 'cache_status'],
+    ['source_setup', 'cacheStatus'],
+    ['sourceSetup', 'cache_status'],
+    ['sourceSetup', 'cacheStatus']
+  ]) {
+    if (normalizeOptionalString(readNestedValue(payload, pathKeys)) === 'fallback') {
+      return `${pathKeys.join('.')}=fallback`;
+    }
+  }
+  return null;
+}
+
+function readNestedValue(value, pathKeys) {
+  let current = value;
+  for (const key of pathKeys) {
+    if (!current || typeof current !== 'object') {
+      return undefined;
+    }
+    current = current[key];
+  }
+  return current;
+}
+
+function parseLinearIssueContextFailure(error) {
+  const stdout = typeof error?.stdout === 'string' ? error.stdout.trim() : '';
+  if (!stdout) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(stdout);
+    const code = normalizeOptionalString(parsed?.error?.code);
+    const message = normalizeOptionalString(parsed?.error?.message);
+    if (!code) {
+      return null;
+    }
+    const scope = code === 'linear_project_mismatch'
+      ? 'project'
+      : code === 'linear_team_mismatch'
+        ? 'team'
+        : code === 'linear_workspace_mismatch'
+          ? 'workspace'
+          : null;
+    if (!scope) {
+      return null;
+    }
+    return {
+      scope,
+      message: message ?? code,
+      expectedProjectId: parsed?.error?.details?.expected,
+      actualProjectId: parsed?.error?.details?.actual
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function verifyCanonicalOwnerIssues(repoRoot, policy) {
-  const ownerIssues = uniqueSorted(normalizeCanonicalOwnerIssues(policy).map((entry) => entry.owner_issue));
-  if (ownerIssues.length === 0) {
+  const ownerConfigs = normalizeCanonicalOwnerIssues(policy);
+  if (ownerConfigs.length === 0) {
     return [];
   }
-  return Promise.all(ownerIssues.map((ownerIssue) => verifyOwnerIssueContext(repoRoot, ownerIssue)));
+  return Promise.all(
+    ownerConfigs.map(async (ownerConfig) =>
+      attachCanonicalOwnerVerificationContext(
+        await verifyOwnerIssueContext(repoRoot, ownerConfig.owner_issue, ownerConfig),
+        ownerConfig
+      )
+    )
+  );
 }
 
 export function buildDocsFreshnessMaintenanceDecision(
@@ -794,10 +1176,16 @@ export function buildDocsFreshnessMaintenanceDecision(
   } = {}
 ) {
   const policy = report.rolling_freshness_policy ?? {};
-  const resolvedOwnerIssueVerification = deriveOwnerIssueVerification(policy, ownerIssueVerification);
-  const ownerIssueAction = buildOwnerIssueAction(policy, resolvedOwnerIssueVerification);
   const staleEntries = Array.isArray(report.stale_entries) ? report.stale_entries : [];
   const rollingEntries = Array.isArray(report.rolling_cohort_entries) ? report.rolling_cohort_entries : [];
+  const hasOwnerRelevantDebtForAction = staleEntries.length > 0 || rollingEntries.length > 0;
+  const resolvedOwnerIssueVerification = hasOwnerRelevantDebtForAction
+    ? deriveOwnerIssueVerification(policy, ownerIssueVerification)
+    : null;
+  const ownerIssueAction = buildOwnerIssueAction(
+    hasOwnerRelevantDebtForAction ? policy : { ...policy, require_live_owner_verification: false },
+    resolvedOwnerIssueVerification
+  );
   const blockingCandidateEntries = staleEntries
     .filter((entry) => isEligibleHistoricalEntry(entry, policy))
     .map((entry) => normalizeCandidateEntry(entry, policy, 'blocking_candidate'));
@@ -814,7 +1202,8 @@ export function buildDocsFreshnessMaintenanceDecision(
     candidateEntries,
     policy,
     ownerIssueAction,
-    canonicalOwnerIssueVerifications
+    canonicalOwnerIssueVerifications,
+    { generatedAt }
   );
   const unownedCandidateCohorts = candidateCohorts.filter(
     (cohort) => !isCohortOwnerResolved(cohort)
@@ -879,6 +1268,29 @@ export function buildDocsFreshnessMaintenanceDecision(
     diff_base_ref: diffBaseRef,
     policy_capacity_status: policyCapacityStatus,
     expires_after: expiresAfter,
+    fallback_expiry:
+      candidateCohorts.length > 0
+        ? {
+            decision: 'expire fallback',
+            canonical_owner_key: normalizeOptionalString(policy?.canonical_owner_key) ?? 'docs:freshness:maintain',
+            owner_issue_action: selectRecommendedOwnerIssueAction(ownerIssueAction, candidateCohorts),
+            review_date: isoDateFromTimestamp(generatedAt),
+            maximum_lifetime_days: Number.isInteger(policy?.window_days) ? policy.window_days : null,
+            expires_after: expiresAfter,
+            retained_exceptions: candidateCohorts.map((cohort) => ({
+              id: cohort.id,
+              canonical_owner_key: cohort.canonical_owner_key,
+              owner_issue: cohort.owner_issue,
+              decision: cohort.fallback_expiry.decision,
+              expires_after: cohort.fallback_expiry.expires_after,
+              removal_condition: cohort.fallback_expiry.removal_condition
+            })),
+            validation: [
+              'docs:freshness reports retained rolling debt instead of hiding it',
+              'docs:freshness:maintain fails closed unless owner verification confirms a live same-project owner when required'
+            ]
+          }
+        : null,
     recommended_action: buildRecommendedAction(freshnessDecision, {
       policy,
       expiresAfter,
@@ -1058,7 +1470,11 @@ export async function runDocsFreshnessMaintain(
       : collectChangedPaths(repoRoot, { baseRef }),
     runSpecGuard(repoRoot, { skip: skipSpecGuard }),
     hasOwnerRelevantDebt
-      ? verifyOwnerIssueContext(repoRoot, freshnessResult.report?.rolling_freshness_policy?.owner_issue ?? null)
+      ? verifyOwnerIssueContext(
+          repoRoot,
+          freshnessResult.report?.rolling_freshness_policy?.owner_issue ?? null,
+          freshnessResult.report?.rolling_freshness_policy ?? null
+        )
       : Promise.resolve(null),
     shouldVerifyCanonicalOwners
       ? verifyCanonicalOwnerIssues(repoRoot, freshnessResult.report?.rolling_freshness_policy ?? {})

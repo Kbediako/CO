@@ -241,9 +241,13 @@ function normalizeCanonicalOwnerIssues(value) {
     return {
       canonical_owner_key: canonicalOwnerKey,
       owner_issue: ownerIssue,
+      owner_issue_workspace_id: normalizeOptionalString(item.owner_issue_workspace_id),
+      owner_issue_team_id: normalizeOptionalString(item.owner_issue_team_id),
+      owner_issue_project_id: normalizeOptionalString(item.owner_issue_project_id),
       owner_issue_state: normalizeOptionalString(item.owner_issue_state),
       owner_issue_state_type: normalizeOptionalString(item.owner_issue_state_type),
-      owner_issue_is_terminal: normalizeOptionalBoolean(item.owner_issue_is_terminal)
+      owner_issue_is_terminal: normalizeOptionalBoolean(item.owner_issue_is_terminal),
+      require_live_owner_verification: normalizeOptionalBoolean(item.require_live_owner_verification)
     };
   });
 
@@ -260,10 +264,15 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
     return {
       enabled: false,
       is_valid: false,
+      canonical_owner_key: null,
       owner_issue: null,
+      owner_issue_workspace_id: null,
+      owner_issue_team_id: null,
+      owner_issue_project_id: null,
       owner_issue_state: null,
       owner_issue_state_type: null,
       owner_issue_is_terminal: null,
+      require_live_owner_verification: false,
       policy_doc: null,
       window_days: 0,
       max_cohorts: 0,
@@ -296,10 +305,15 @@ function normalizeRollingFreshnessPolicy(rawPolicy) {
         baselineCohorts.isValid &&
         canonicalOwnerIssues.isValid
     ),
+    canonical_owner_key: normalizeOptionalString(rawPolicy.canonical_owner_key),
     owner_issue: ownerIssue,
+    owner_issue_workspace_id: normalizeOptionalString(rawPolicy.owner_issue_workspace_id),
+    owner_issue_team_id: normalizeOptionalString(rawPolicy.owner_issue_team_id),
+    owner_issue_project_id: normalizeOptionalString(rawPolicy.owner_issue_project_id),
     owner_issue_state: normalizeOptionalString(rawPolicy.owner_issue_state),
     owner_issue_state_type: normalizeOptionalString(rawPolicy.owner_issue_state_type),
     owner_issue_is_terminal: normalizeOptionalBoolean(rawPolicy.owner_issue_is_terminal),
+    require_live_owner_verification: normalizeOptionalBoolean(rawPolicy.require_live_owner_verification) === true,
     policy_doc: policyDoc,
     window_days: normalizeNonNegativeInteger(rawPolicy.window_days, 0),
     max_cohorts: normalizePositiveInteger(rawPolicy.max_cohorts, 0),

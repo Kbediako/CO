@@ -502,7 +502,7 @@ describe('docs freshness reporting', () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-rolling-cohort-'));
     createdDirs.push(repoRoot);
 
-    await writeRollingDocsFixture(repoRoot);
+    await writeRollingDocsFixture(repoRoot, { policy: rollingFreshnessPolicy({ canonical_owner_issues: [{ canonical_owner_key: 'fixture-owner', owner_issue: 'CO-320', require_live_owner_verification: true }] }) });
 
     const { report, hasFailures } = await runDocsFreshness(repoRoot, {
       outRoot: join(repoRoot, 'out'),
@@ -512,6 +512,7 @@ describe('docs freshness reporting', () => {
     expect(hasFailures).toBe(false);
     expect(report.totals.stale_entries).toBe(0);
     expect(report.totals.rolling_cohort_entries).toBe(1);
+    expect(report.rolling_freshness_policy.canonical_owner_issues[0]).toEqual(expect.objectContaining({ canonical_owner_key: 'fixture-owner', owner_issue: 'CO-320', require_live_owner_verification: true }));
     expect(report.rolling_cohort_entries).toEqual([
       expect.objectContaining({
         path: 'tasks/tasks-1234-example.md',
