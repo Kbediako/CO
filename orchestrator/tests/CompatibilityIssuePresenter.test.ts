@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildCompatibilityProjectionSnapshot,
+  buildCompatibilityRetryEntry,
   buildCompatibilityRunningEntry
 } from '../src/cli/control/compatibilityIssuePresenter.js';
 import type {
@@ -620,6 +621,33 @@ describe('CompatibilityIssuePresenter', () => {
     expect(projection.running).toEqual([]);
     expect(projection.retrying).toEqual([]);
     expect(projection.issues).toEqual([]);
+  });
+
+  it('marks synthetic fallback-only retry entries with fallback metadata', () => {
+    const taskId = 'linear-lin-issue-2';
+    const retry = buildCompatibilityRetryEntry(
+      buildCompatibilitySource({
+        issueProvider: 'linear',
+        issueIdentifier: taskId,
+        issueId: taskId,
+        taskId,
+        pipelineId: 'provider-linear-worker',
+        rawStatus: 'failed',
+        displayStatus: 'retrying',
+        completedAt: null,
+        summary: 'fallback-only retry source using slug fallback task id'
+      })
+    );
+
+    expect(retry.fallback_expiry).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fallback: 'synthetic identity/status fallback that hides CLI/API/UI disagreement',
+          decision: 'remove fallback',
+          owner: 'CO-398'
+        })
+      ])
+    );
   });
 
   it('does not surface child-shaped parent fallback aliases from running or retry registration', () => {

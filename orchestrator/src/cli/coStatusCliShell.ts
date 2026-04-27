@@ -31,7 +31,8 @@ import {
 import type {
   ControlLatestEventPayload,
   ControlRunningPayload,
-  ControlSelectedRunPayload
+  ControlSelectedRunPayload,
+  ControlStatusFallbackExpiryMetadata
 } from './control/observabilityReadModel.js';
 import type { RunPaths } from './run/runPaths.js';
 
@@ -50,8 +51,19 @@ const LEGACY_CURRENT_HOST_UNHEALTHY_STALE_ENDPOINT_FALLBACK =
   'control-host unavailable; control_endpoint.json has not rotated to a reachable host';
 const CURRENT_HOST_UNHEALTHY_ROTATED_ENDPOINT_FALLBACK =
   'refreshed control-host endpoint is still unreachable';
+const SELECTED_RUN_PROJECTION_FALLBACK = 'selected-run projection fallback';
+const COMPATIBILITY_ISSUE_PROJECTION_FALLBACK = 'compatibility issue projection fallback';
+const SOURCE_AUTHORITY_LABELS_FALLBACK =
+  'CLI/API/UI /ui/data.json source labels and authority/proof split';
 
 type CoStatusDegradedReadReason = 'ui_request_timeout' | 'current_host_unhealthy';
+
+type DegradedMetadataPayloadIdentity = {
+  issue_identifier: string;
+  issue_id: string | null;
+  task_id: string | null;
+  run_id: string | null;
+};
 
 export interface CoStatusDegradedReadPayload {
   reason: CoStatusDegradedReadReason;
@@ -239,21 +251,64 @@ function applyProviderIntakeTruthOverlay(
     .filter(isDegradedActiveClaim);
   const runningClaims = activeClaims.filter((claim) => resolveDegradedClaimState(claim) === 'running');
   const status = resolveDegradedClaimStatus(resolveDegradedClaimState(selectedClaim));
-  const selected = buildDegradedSelectedPayload(dataset.selected, selectedClaim, target, status);
-  const runningEntries = runningClaims.map((claim) =>
-    buildDegradedRunningSessionPayload(claim, selected, dataset.host)
+  const selectedFallbackExpiry = selectControlHostFallbackExpiry(dataset.fallback_expiry, [
+    SELECTED_RUN_PROJECTION_FALLBACK,
+    SOURCE_AUTHORITY_LABELS_FALLBACK
+  ]);
+  const runningFallbackExpiry = selectControlHostFallbackExpiry(dataset.fallback_expiry, [
+    SELECTED_RUN_PROJECTION_FALLBACK,
+    SOURCE_AUTHORITY_LABELS_FALLBACK
+  ]);
+  const issueFallbackExpiry = selectControlHostFallbackExpiry(dataset.fallback_expiry, [
+    COMPATIBILITY_ISSUE_PROJECTION_FALLBACK,
+    SOURCE_AUTHORITY_LABELS_FALLBACK
+  ]);
+  const selectedExisting = selectMatchingDegradedMetadataPayload(
+    dataset.selected,
+    selectedClaim
   );
+  const selected = buildDegradedSelectedPayload(
+    selectedExisting,
+    selectedExisting,
+    selectedClaim,
+    target,
+    status,
+    selectedFallbackExpiry
+  );
+  const runningEntries = runningClaims.map((claim) => {
+    const existingRunning =
+      dataset.running.find((entry) => isDegradedMetadataPayloadMatchingClaim(entry, claim)) ?? null;
+    const selectedClaimFallbackExpiry =
+      isDegradedMetadataPayloadMatchingClaim(selected, claim) ? selected.fallback_expiry : undefined;
+    const fallbackExpiry = mergeDegradedFallbackExpiry(
+      existingRunning?.fallback_expiry,
+      selectedClaimFallbackExpiry,
+      runningFallbackExpiry
+    );
+    return buildDegradedRunningSessionPayload(
+      claim,
+      selected,
+      dataset.host,
+      fallbackExpiry
+    );
+  });
   const synthesizedIssues = activeClaims.length > 0 ? activeClaims : [selectedClaim];
   const issues = [
-    ...synthesizedIssues.map((claim) =>
-      buildDegradedIssuePayload(
-        dataset.issues.find((entry) => entry.issue_identifier === claim.issue_identifier) ?? null,
+    ...synthesizedIssues.map((claim) => {
+      const existingIssue =
+        dataset.issues.find((entry) => isDegradedMetadataPayloadMatchingClaim(entry, claim)) ?? null;
+      const existingIssueMetadata = selectMatchingDegradedMetadataPayload(existingIssue, claim);
+      return buildDegradedIssuePayload(
+        existingIssue,
+        existingIssueMetadata,
         claim,
         selected,
         dataset.host,
-        resolveDegradedClaimStatus(resolveDegradedClaimState(claim))
-      )
-    ),
+        resolveDegradedClaimStatus(resolveDegradedClaimState(claim)),
+        issueFallbackExpiry,
+        runningFallbackExpiry
+      );
+    }),
     ...dataset.issues.filter(
       (entry) =>
         entry.issue_identifier !== selected.issue_identifier &&
@@ -358,9 +413,11 @@ function isDegradedPlaceholderIssue(
 
 function buildDegradedSelectedPayload(
   existing: ControlSelectedRunPayload | null,
+  existingMetadata: ControlSelectedRunPayload | null,
   claim: ProviderIntakeClaimRecord,
   target: CoStatusAttachTarget,
-  status: { raw_status: string; display_status: string; issue_status: string }
+  status: { raw_status: string; display_status: string; issue_status: string },
+  datasetFallbackExpiry: ControlStatusFallbackExpiryMetadata[] | undefined
 ): ControlSelectedRunPayload {
   const latestEvent = buildDegradedLatestEvent(claim);
   return {
@@ -379,25 +436,80 @@ function buildDegradedSelectedPayload(
     latest_action: existing?.latest_action ?? null,
     latest_event: latestEvent,
     workspace: {
-      path: existing?.workspace.path ?? resolve(target.runDir, '..', '..', '..')
+      path: existing?.workspace.path ?? target.workspaceRoot
     },
     ...(claim.worker_host !== undefined ? { worker_host: claim.worker_host ?? null } : {}),
     question_summary: existing?.question_summary ?? {
       queued_count: 0,
       latest_question: null
     },
-    tracked: existing?.tracked ?? { linear: null }
+    tracked: existing?.tracked ?? { linear: null },
+    ...resolveDegradedFallbackExpiry(existingMetadata?.fallback_expiry, datasetFallbackExpiry)
   };
+}
+
+function selectMatchingDegradedMetadataPayload<TPayload extends DegradedMetadataPayloadIdentity>(
+  existing: TPayload | null | undefined,
+  claim: ProviderIntakeClaimRecord
+): TPayload | null {
+  return isDegradedMetadataPayloadMatchingClaim(existing, claim) ? existing ?? null : null;
+}
+
+function isDegradedMetadataPayloadMatchingClaim(
+  existing: DegradedMetadataPayloadIdentity | null | undefined,
+  claim: ProviderIntakeClaimRecord
+): boolean {
+  if (!existing || existing.issue_identifier !== claim.issue_identifier) {
+    return false;
+  }
+  if (!requiredMetadataIdentifierMatchesClaim(existing.issue_id, claim.issue_id)) {
+    return false;
+  }
+  if (!requiredMetadataIdentifierMatchesClaim(existing.task_id, claim.task_id)) {
+    return false;
+  }
+  if (!optionalMetadataIdentifierMatchesClaim(existing.run_id, claim.run_id)) {
+    return false;
+  }
+  return true;
+}
+
+function requiredMetadataIdentifierMatchesClaim(
+  existingValue: string | null,
+  claimValue: string | null
+): boolean {
+  return existingValue !== null && claimValue !== null && existingValue === claimValue;
+}
+
+function optionalMetadataIdentifierMatchesClaim(
+  existingValue: string | null,
+  claimValue: string | null
+): boolean {
+  return existingValue === claimValue;
 }
 
 function buildDegradedIssuePayload(
   existing: OperatorDashboardIssuePayload | null,
+  existingMetadata: OperatorDashboardIssuePayload | null,
   claim: ProviderIntakeClaimRecord,
   selected: ControlSelectedRunPayload,
   host: string,
-  status: { raw_status: string; display_status: string; issue_status: string }
+  status: { raw_status: string; display_status: string; issue_status: string },
+  issueFallbackExpiry: ControlStatusFallbackExpiryMetadata[] | undefined,
+  runningFallbackExpiry: ControlStatusFallbackExpiryMetadata[] | undefined
 ): OperatorDashboardIssuePayload {
-  const running = resolveDegradedClaimState(claim) === 'running' ? buildDegradedRunningPayload(claim) : null;
+  const selectedClaimFallbackExpiry =
+    isDegradedMetadataPayloadMatchingClaim(selected, claim) ? selected.fallback_expiry : undefined;
+  const running = resolveDegradedClaimState(claim) === 'running'
+    ? buildDegradedRunningPayload(
+        claim,
+        mergeDegradedFallbackExpiry(
+          existingMetadata?.running?.fallback_expiry,
+          selectedClaimFallbackExpiry,
+          runningFallbackExpiry
+        )
+      )
+    : null;
   return {
     issue_identifier: claim.issue_identifier,
     issue_id: claim.issue_id,
@@ -439,11 +551,18 @@ function buildDegradedIssuePayload(
     tracked: existing?.tracked ?? selected.tracked,
     provider_linear_worker_proof: existing?.provider_linear_worker_proof ?? null,
     provider_debug_snapshot: existing?.provider_debug_snapshot ?? null,
+    ...resolveDegradedFallbackExpiry(
+      existingMetadata?.fallback_expiry,
+      issueFallbackExpiry
+    ),
     is_selected: true
   };
 }
 
-function buildDegradedRunningPayload(claim: ProviderIntakeClaimRecord): ControlRunningPayload {
+function buildDegradedRunningPayload(
+  claim: ProviderIntakeClaimRecord,
+  fallbackExpiry: ControlStatusFallbackExpiryMetadata[] | undefined
+): ControlRunningPayload {
   return {
     issue_id: claim.issue_id,
     issue_identifier: claim.issue_identifier,
@@ -466,14 +585,16 @@ function buildDegradedRunningPayload(claim: ProviderIntakeClaimRecord): ControlR
       input_tokens: null,
       output_tokens: null,
       total_tokens: null
-    }
+    },
+    ...resolveDegradedFallbackExpiry(fallbackExpiry)
   };
 }
 
 function buildDegradedRunningSessionPayload(
   claim: ProviderIntakeClaimRecord,
   selected: ControlSelectedRunPayload,
-  host: string
+  host: string,
+  fallbackExpiry: ControlStatusFallbackExpiryMetadata[] | undefined
 ): OperatorDashboardSessionPayload {
   return {
     issue_identifier: claim.issue_identifier,
@@ -504,8 +625,50 @@ function buildDegradedRunningSessionPayload(
       input_tokens: null,
       output_tokens: null,
       total_tokens: null
-    }
+    },
+    ...resolveDegradedFallbackExpiry(fallbackExpiry)
   };
+}
+
+function resolveDegradedFallbackExpiry(
+  ...sources: Array<ControlStatusFallbackExpiryMetadata[] | undefined>
+): { fallback_expiry: ControlStatusFallbackExpiryMetadata[] } | Record<string, never> {
+  const fallbackExpiry = mergeDegradedFallbackExpiry(...sources);
+  return fallbackExpiry
+    ? {
+        fallback_expiry: fallbackExpiry
+      }
+    : {};
+}
+
+function mergeDegradedFallbackExpiry(
+  ...sources: Array<ControlStatusFallbackExpiryMetadata[] | undefined>
+): ControlStatusFallbackExpiryMetadata[] | undefined {
+  const merged: ControlStatusFallbackExpiryMetadata[] = [];
+  const seen = new Set<string>();
+  for (const source of sources) {
+    for (const entry of source ?? []) {
+      const key = `${entry.fallback}\u0000${entry.decision}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      merged.push({ ...entry });
+    }
+  }
+  return merged.length > 0 ? merged : undefined;
+}
+
+function selectControlHostFallbackExpiry(
+  fallbackExpiry: ControlStatusFallbackExpiryMetadata[] | undefined,
+  fallbacks: string[]
+): ControlStatusFallbackExpiryMetadata[] | undefined {
+  if (!fallbackExpiry) {
+    return undefined;
+  }
+  const fallbackSet = new Set(fallbacks);
+  const selected = fallbackExpiry.filter((entry) => fallbackSet.has(entry.fallback));
+  return selected.length > 0 ? selected : undefined;
 }
 
 function buildDegradedLatestEvent(
@@ -608,3 +771,7 @@ function findRunsRoot(runDir: string): string {
   }
   return parts.slice(0, runsIndex + 1).join(sep) || sep;
 }
+
+export const __test__ = {
+  isDegradedMetadataPayloadMatchingClaim
+};

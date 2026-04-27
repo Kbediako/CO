@@ -6,6 +6,7 @@ import type {
   ControlDispatchPilotPayload,
   ControlIssuePayload,
   ControlPollingHealthPayload,
+  ControlStatusFallbackExpiryMetadata,
   ControlRetryPayload,
   ControlRunningPayload
 } from './observabilityReadModel.js';
@@ -25,6 +26,94 @@ const PROVIDER_LINEAR_WORKER_PIPELINE_TITLE = 'Provider Linear Worker';
 const PROVIDER_LINEAR_WORKER_PIPELINE_ID = 'provider-linear-worker';
 const SYNTHETIC_LINEAR_TASK_ID_PATTERN =
   /^linear-[a-z0-9]+(?:-[a-z0-9]+)*$/i;
+type ControlHostStatusFallbackDecisionKey =
+  | 'legacyProofFields'
+  | 'selectedRunProjection'
+  | 'compatibilityIssueProjection'
+  | 'syntheticIdentityProjection'
+  | 'sourceAuthorityLabels';
+
+const CONTROL_HOST_STATUS_FALLBACK_DECISIONS: Record<
+  ControlHostStatusFallbackDecisionKey,
+  ControlStatusFallbackExpiryMetadata
+> = {
+  legacyProofFields: {
+    surface: 'control-host status surfaces',
+    fallback: 'legacy proof fields projected into status output',
+    decision: 'justify retaining fallback',
+    owner: 'CO-398',
+    trigger:
+      'Retained manifests/proofs or cached provider-intake records are available while live state is missing or incomplete.',
+    introduced_date: 'oldest known 2026-04-23; current review 2026-04-27',
+    review_date: '2026-05-10',
+    maximum_lifetime: 'Non-expiring only for audit-visible proof fields with source labels',
+    removal_condition:
+      'Remove or narrow once current-state authority preserves equivalent audit evidence without proof-as-status ambiguity.',
+    validation: 'Focused compatibility/presenter/status tests plus CLI/API/UI projection checks.'
+  },
+  selectedRunProjection: {
+    surface: 'control-host status surfaces',
+    fallback: 'selected-run projection fallback',
+    decision: 'expire fallback',
+    owner: 'CO-398',
+    trigger:
+      'co-status or control-host output lacks a live selected claim/run and falls back to retained projection data.',
+    introduced_date: 'oldest known 2026-04-23; current review 2026-04-27',
+    review_date: '2026-05-10',
+    maximum_lifetime: '2026-05-26',
+    removal_condition:
+      'Live selected claim/run state or explicit degraded-read status replaces retained selected-run fallback.',
+    validation: 'selectedRunProjection tests and co-status --format json fixture coverage.'
+  },
+  compatibilityIssueProjection: {
+    surface: 'control-host status surfaces',
+    fallback: 'compatibility issue projection fallback',
+    decision: 'expire fallback',
+    owner: 'CO-398',
+    trigger: 'Legacy provider proof/status payload shape is present and compatibility projection fills missing fields.',
+    introduced_date: 'oldest known 2026-04-23; current review 2026-04-27',
+    review_date: '2026-05-10',
+    maximum_lifetime: '2026-05-26',
+    removal_condition:
+      'Consumers read the canonical issue/status shape directly or the compatibility bridge emits explicit expired/degraded metadata.',
+    validation: 'compatibilityIssuePresenter and provider observability tests.'
+  },
+  syntheticIdentityProjection: {
+    surface: 'control-host status surfaces',
+    fallback: 'synthetic identity/status fallback that hides CLI/API/UI disagreement',
+    decision: 'remove fallback',
+    owner: 'CO-398',
+    trigger:
+      'CLI, API, UI, Linear, provider-intake, or retained proof disagree and projection fabricates one coherent status.',
+    introduced_date: 'current review 2026-04-27',
+    review_date: null,
+    maximum_lifetime: null,
+    removal_condition:
+      'Disagreement is surfaced with source labels, degraded reason, and current-state authority evidence.',
+    validation: 'Control runtime tests plus CLI/API/UI status projection regression coverage.'
+  },
+  sourceAuthorityLabels: {
+    surface: 'control-host status surfaces',
+    fallback: 'CLI/API/UI /ui/data.json source labels and authority/proof split',
+    decision: 'justify retaining fallback',
+    owner: 'CO-398',
+    trigger: 'Any status projection includes both live authority and retained proof/audit evidence.',
+    introduced_date: 'current review 2026-04-27',
+    review_date: '2026-05-26',
+    maximum_lifetime: 'Non-expiring durable audit contract',
+    removal_condition:
+      'Remove only with a replacement schema preserving live authority, retained proof, source label, and degraded reason.',
+    validation: 'Control runtime, provider observability, and status presenter tests.'
+  }
+};
+
+const CONTROL_HOST_STATUS_FALLBACK_DECISION_KEYS: ControlHostStatusFallbackDecisionKey[] = [
+  'legacyProofFields',
+  'selectedRunProjection',
+  'compatibilityIssueProjection',
+  'syntheticIdentityProjection',
+  'sourceAuthorityLabels'
+];
 
 export interface CompatibilityIssueSourceRecord {
   issueProvider: string | null;
@@ -107,7 +196,10 @@ export function buildCompatibilityProjectionSnapshot(
   const selectedPayload =
     selectedSource &&
     (selectedSourceIsPreferredActiveSource || !shouldSuppressInactiveSelectedPayload(selectedSource))
-      ? buildProjectionSelectedPayload(selectedSource, snapshot.providerIntake ?? null)
+      ? withControlHostFallbackExpiry(
+          buildProjectionSelectedPayload(selectedSource, snapshot.providerIntake ?? null),
+          buildSelectedRunFallbackExpiry(selectedSource)
+        )
       : null;
   const issues = index.issues
     .map((issue) => {
@@ -144,8 +236,96 @@ export function buildCompatibilityProjectionSnapshot(
     tracked: snapshot.tracked,
     providerIntake: snapshot.providerIntake,
     providerWorkflow: snapshot.providerWorkflow,
-    polling: snapshot.polling
+    polling: snapshot.polling,
+    fallbackExpiry: buildControlHostStatusFallbackDecisionSet(
+      CONTROL_HOST_STATUS_FALLBACK_DECISION_KEYS
+    )
   };
+}
+
+function buildControlHostStatusFallbackDecisionSet(
+  keys: ControlHostStatusFallbackDecisionKey[]
+): ControlStatusFallbackExpiryMetadata[] {
+  return keys.map((key) => ({ ...CONTROL_HOST_STATUS_FALLBACK_DECISIONS[key] }));
+}
+
+function withControlHostFallbackExpiry<TPayload extends {
+  fallback_expiry?: ControlStatusFallbackExpiryMetadata[];
+}>(
+  payload: TPayload,
+  fallbackExpiry: ControlStatusFallbackExpiryMetadata[]
+): TPayload {
+  return fallbackExpiry.length > 0
+    ? {
+        ...payload,
+        fallback_expiry: fallbackExpiry
+      }
+    : payload;
+}
+
+function buildSelectedRunFallbackExpiry(
+  source: ControlCompatibilitySourceContext
+): ControlStatusFallbackExpiryMetadata[] {
+  const keys: ControlHostStatusFallbackDecisionKey[] = [
+    'selectedRunProjection',
+    'sourceAuthorityLabels'
+  ];
+  if (source.providerLinearWorkerProof) {
+    keys.unshift('legacyProofFields');
+  }
+  if (isSyntheticLinearFallbackOnlyIssueSource(source)) {
+    keys.push('syntheticIdentityProjection');
+  }
+  return buildControlHostStatusFallbackDecisionSet(keys);
+}
+
+function buildRunningFallbackExpiry(
+  source: ControlCompatibilitySourceContext,
+  runningEventSource: 'proof' | 'latest' | 'fallback'
+): ControlStatusFallbackExpiryMetadata[] {
+  const keys: ControlHostStatusFallbackDecisionKey[] = [
+    'selectedRunProjection',
+    'sourceAuthorityLabels'
+  ];
+  if (source.providerLinearWorkerProof || runningEventSource === 'proof') {
+    keys.unshift('legacyProofFields');
+  }
+  if (isSyntheticLinearFallbackOnlyIssueSource(source)) {
+    keys.push('syntheticIdentityProjection');
+  }
+  return buildControlHostStatusFallbackDecisionSet(keys);
+}
+
+function buildRetryFallbackExpiry(
+  source: ControlCompatibilitySourceContext
+): ControlStatusFallbackExpiryMetadata[] {
+  const keys: ControlHostStatusFallbackDecisionKey[] = [
+    'compatibilityIssueProjection',
+    'sourceAuthorityLabels'
+  ];
+  if (source.providerLinearWorkerProof) {
+    keys.unshift('legacyProofFields');
+  }
+  if (isSyntheticLinearFallbackOnlyIssueSource(source)) {
+    keys.push('syntheticIdentityProjection');
+  }
+  return buildControlHostStatusFallbackDecisionSet(keys);
+}
+
+function buildCompatibilityIssueFallbackExpiry(
+  source: ControlCompatibilitySourceContext
+): ControlStatusFallbackExpiryMetadata[] {
+  const keys: ControlHostStatusFallbackDecisionKey[] = [
+    'compatibilityIssueProjection',
+    'sourceAuthorityLabels'
+  ];
+  if (source.providerLinearWorkerProof) {
+    keys.unshift('legacyProofFields');
+  }
+  if (isSyntheticLinearFallbackOnlyIssueSource(source)) {
+    keys.push('syntheticIdentityProjection');
+  }
+  return buildControlHostStatusFallbackDecisionSet(keys);
 }
 
 function shouldPruneTerminalSelectedCompatibilityIssue(
@@ -634,6 +814,7 @@ export function buildCompatibilityRunningEntry(
     message_recorded_at: messageRecordedAt,
     source_updated_at: sourceUpdatedAt,
     event_candidates: eventCandidates,
+    fallback_expiry: buildRunningFallbackExpiry(selected, runningEvent.source),
     started_at: selected.startedAt,
     last_event_at: runningEventAt,
     tokens: proof?.tokens ?? buildEmptyTokenUsage()
@@ -666,6 +847,7 @@ export function buildCompatibilityRetryEntry(selected: ControlCompatibilitySourc
     error: retryState?.error ?? selected.lastError,
     last_event: selected.latestEvent?.event ?? selected.latestAction ?? selected.rawStatus,
     last_message: selected.latestEvent?.message ?? selected.summary,
+    fallback_expiry: buildRetryFallbackExpiry(selected),
     started_at: selected.startedAt,
     last_event_at: selected.latestEvent?.at ?? selected.updatedAt
   };
@@ -721,6 +903,7 @@ export function buildCompatibilityIssuePayload(input: {
     recent_events: recentEvents,
     last_error: input.source.lastError,
     tracked: buildTrackedPayloadEnvelope(input.source.tracked),
+    fallback_expiry: buildCompatibilityIssueFallbackExpiry(input.source),
     ...(input.source.providerLinearWorkerProof
       ? { provider_linear_worker_proof: input.source.providerLinearWorkerProof }
       : {}),

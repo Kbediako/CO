@@ -1,5 +1,6 @@
 /* eslint-disable patterns/prefer-logger-over-console */
 
+import { existsSync, realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import process from 'node:process';
@@ -36,6 +37,7 @@ export interface CoStatusAttachTarget {
   taskId: string | null;
   runId: string | null;
   runDir: string;
+  workspaceRoot: string;
   baseUrl: URL;
   token: string;
 }
@@ -154,9 +156,56 @@ export async function resolveAttachTarget(flags: ArgMap): Promise<CoStatusAttach
     taskId: manifest.taskId ?? locator.taskId,
     runId: manifest.runId ?? locator.runId,
     runDir,
+    workspaceRoot: resolveAttachWorkspaceRoot({
+      manifestPath: resolvedManifestPath,
+      manifestWorkspacePath: manifest.workspacePath,
+      runDir
+    }),
     baseUrl,
     token
   };
+}
+
+function resolveAttachWorkspaceRoot(input: {
+  manifestPath: string;
+  manifestWorkspacePath: string | null;
+  runDir: string;
+}): string {
+  const workspaceRoot =
+    input.manifestWorkspacePath !== null
+      ? resolve(dirname(input.manifestPath), input.manifestWorkspacePath)
+      : deriveWorkspaceRootFromRunDir(input.runDir);
+  return canonicalizeAttachWorkspaceRoot(workspaceRoot);
+}
+
+function deriveWorkspaceRootFromRunDir(runDir: string): string {
+  const resolvedRunDir = resolve(runDir);
+  const derived = deriveTaskRunFromRunDir(resolvedRunDir);
+  if (derived.taskId !== null && derived.runId !== null) {
+    const parts = resolvedRunDir.split(/[\\/]+/u).filter((part) => part.length > 0);
+    const runsRoot = dirname(dirname(dirname(resolvedRunDir)));
+    const runsRootName = parts.at(-4);
+    if (
+      (runsRootName === '.runs' || runsRootName === 'runs') &&
+      looksLikeRepoRoot(dirname(runsRoot))
+    ) {
+      return dirname(dirname(dirname(dirname(resolvedRunDir))));
+    }
+    return runsRoot;
+  }
+  return dirname(resolvedRunDir);
+}
+
+function looksLikeRepoRoot(pathname: string): boolean {
+  return ['.git', 'codex.orchestrator.json'].some((entry) => existsSync(resolve(pathname, entry)));
+}
+
+function canonicalizeAttachWorkspaceRoot(workspaceRoot: string): string {
+  try {
+    return realpathSync(workspaceRoot);
+  } catch {
+    return resolve(workspaceRoot);
+  }
 }
 
 function resolveAttachLocator(input: {
@@ -195,16 +244,23 @@ function resolveAttachLocator(input: {
 
 async function readAttachManifest(
   manifestPath: string
-): Promise<{ taskId: string | null; runId: string | null }> {
+): Promise<{ taskId: string | null; runId: string | null; workspacePath: string | null }> {
   try {
     const raw = await readFile(manifestPath, 'utf8');
-    const parsed = JSON.parse(raw) as { task_id?: unknown; run_id?: unknown };
+    const parsed = JSON.parse(raw) as {
+      run_id?: unknown;
+      task_id?: unknown;
+      workspace_path?: unknown;
+      workspacePath?: unknown;
+    };
     return {
       taskId: normalizeOptionalString(parsed.task_id),
-      runId: normalizeOptionalString(parsed.run_id)
+      runId: normalizeOptionalString(parsed.run_id),
+      workspacePath:
+        normalizeOptionalString(parsed.workspace_path) ?? normalizeOptionalString(parsed.workspacePath)
     };
   } catch {
-    return { taskId: null, runId: null };
+    return { taskId: null, runId: null, workspacePath: null };
   }
 }
 
