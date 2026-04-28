@@ -1,6 +1,39 @@
 {
   "items": [
     {
+      "id": "20260428-linear-f14ac3d6-cf71-4f9a-8172-b71370a480e1",
+      "title": "CO-420 re-home March 28 docs freshness cohort after terminal owner",
+      "relates_to": "tasks/tasks-linear-f14ac3d6-cf71-4f9a-8172-b71370a480e1.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-28",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-28",
+          "status": "accepted",
+          "manifest": ".runs/linear-f14ac3d6-cf71-4f9a-8172-b71370a480e1-docs-packet/cli/2026-04-28T21-22-21-862Z-b5aa551f/manifest.json",
+          "source_anchor": "ctx:sha256:6d4d5e3d19965f60dc9e00809159fdd254719ca5621a2feb717e04808157390e#chunk:c000001",
+          "summary": "Docs child lane scaffolded the CO-420 packet; parent accepted the patch after scope review and git apply --check."
+        },
+        "baseline_reproduction": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-28",
+          "status": "reproduced",
+          "evidence": "out/linear-f14ac3d6-cf71-4f9a-8172-b71370a480e1/before/docs-freshness-maintenance.json",
+          "summary": "Reproduced docs:freshness:maintain block_unowned_repo_debt with owner_issue=CO-401, configured_owner_terminal, and blocking_changed_paths=[]."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-f14ac3d6-cf71-4f9a-8172-b71370a480e1.md",
+        "task": "tasks/tasks-linear-f14ac3d6-cf71-4f9a-8172-b71370a480e1.md",
+        "agent_task": ".agent/task/linear-f14ac3d6-cf71-4f9a-8172-b71370a480e1.md",
+        "docs": "docs/TECH_SPEC-linear-f14ac3d6-cf71-4f9a-8172-b71370a480e1.md"
+      }
+    },
+    {
       "id": "20260428-linear-9f955ebd-e00b-46ad-b25c-280029328841",
       "title": "CO-417 recover stale provider-worker proof locks during active appserver runs",
       "relates_to": "tasks/tasks-linear-9f955ebd-e00b-46ad-b25c-280029328841.md",

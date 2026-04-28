@@ -10,16 +10,16 @@ The machine-readable policy lives in `docs/docs-catalog.json` under `policies.ro
 
 Current CO policy:
 
-- Owner issue: `CO-401`
+- Owner issue: `CO-420`
 - Canonical recurring owner key: `docs:freshness:maintain`
 - Live-owner verification: `docs:freshness:maintain` must verify the configured owner issue as a non-terminal issue in the configured Linear project before owned rolling debt can pass. Terminal, canceled, duplicate, out-of-project, or unverifiable owners are evidence only and must route to canonical owner reuse/re-home action instead of remaining live owner metadata.
 - Exact canonical owner overrides: `canonical_owner_issues[]` may map one `canonical_owner_key` to one live owner issue, such as `CO-320` for `docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30`
-- Historical owner lineage: `CO-175` established the Apr 14 baseline, `CO-267` owned the Apr 20/21 maintenance refreshes, `CO-300` owned the Apr 22 reset, `CO-324` owned the Apr 23 reset, and `CO-343` owned the Apr 24/25 reset before later owner verification failed; these are now terminal or invalid evidence only and must not remain the live maintenance owner after they reach terminal or unverifiable states.
+- Historical owner lineage: `CO-175` established the Apr 14 baseline, `CO-267` owned the Apr 20/21 maintenance refreshes, `CO-300` owned the Apr 22 reset, `CO-324` owned the Apr 23 reset, `CO-343` owned the Apr 24/25 reset, and `CO-401` owned the Apr 27 reset before later owner verification reached terminal state; these are now terminal or invalid evidence only and must not remain the live maintenance owner after they reach terminal or unverifiable states.
 - Window: `7` days after the normal freshness cadence expires
 - Maximum active rolling cohorts: `2`
 - Maximum rolling rows: `300`
 - Eligible doc classes: `Task Packet`, `Task Mirror`, and `Report Only`
-- Declared baseline cohorts: `co-175-apr-14-march-14-tasks-1164-1195`, `co-343-apr-25-march-25-task-packets-1311-1318`
+- Declared baseline cohorts: `co-175-apr-14-march-14-tasks-1164-1195`, `co-343-apr-25-march-25-task-packets-1311-1318`, `co-420-apr-28-march-28-task-packet-mirror`
 - Ineligible docs: Front Door, Public Guide, Repository Guide, Agent Policy, Active Guide, shipped skills, companions, templates, and uncatalogued docs
 
 Eligibility is not class-only. A stale row must match a declared baseline cohort by `last_review`, `cadence_days`, path family, and either task-number range or declared path prefix before it can move from blocking stale failures into rolling debt. This prevents a newly stale feature-lane packet from being hidden just because it is in an eligible doc class and still inside the rolling window.
@@ -310,3 +310,16 @@ CO-401 reproduced the Apr 27 current-main blocker while unblocking unrelated cle
 
 ### Post-refresh Disposition
 CO-401 re-homes the live rolling-freshness owner metadata to same-project issue `CO-401`, preserves the canonical owner key `docs:freshness:maintain`, and keeps `CO-343` only as historical invalid-owner evidence. The exact reviewed Mar 27 registry rows plus matching spec/task-index review dates are refreshed to `last_review=2026-04-27`; post-fix `docs:freshness` and `docs:freshness:maintain` return clean with `0` stale rows, no candidate cohorts, and `blocking_changed_paths=[]`.
+
+## Apr 28 Mar 28 Rolling Owner Re-home
+
+### Reproduction / Baseline Findings
+CO-420 reproduced the Apr 28 current-main blocker while keeping CO-415 timeout/core validation repair out of scope:
+
+- `npm run docs:freshness` reported `33` stale rows: `28` Task Packet rows and `5` Task Mirror rows.
+- `docs:freshness:maintain` reported `freshness_decision=block_unowned_repo_debt`, `owner_issue=CO-401`, `owner_issue_action.reason=configured_owner_terminal`, `issue_state=Done`, `issue_state_type=completed`, and `blocking_changed_paths=[]`.
+- The candidate cohort date is `2026-03-28`, cadence `30`, age `31`, overdue `1`; affected path families are `.agent/task`, `docs/ACTION_PLAN-*`, `docs/PRD-*`, `docs/TECH_SPEC-*`, `tasks/specs`, and `tasks/tasks-*`.
+- The preserved baseline reports are `out/linear-f14ac3d6-cf71-4f9a-8172-b71370a480e1/before/docs-freshness.json` and `out/linear-f14ac3d6-cf71-4f9a-8172-b71370a480e1/before/docs-freshness-maintenance.json`.
+
+### Rolling Disposition
+CO-420 re-homes the live rolling-freshness owner metadata to same-project issue `CO-420`, preserves the canonical owner key `docs:freshness:maintain`, and keeps terminal `CO-401` only as historical owner evidence. The exact March 28 Task Packet / Task Mirror rows remain machine-visible as declared rolling debt under `co-420-apr-28-march-28-task-packet-mirror`; this does not refresh `last_review` dates, delete rows, or weaken freshness policy.
