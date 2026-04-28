@@ -12,7 +12,7 @@
 
 ## Summary
 - Problem Statement: a `control-host recover` request can leave a provider issue in `state=accepted` with `reason=provider_issue_rehydration_pending_revalidation` but no `run_id`, no `run_manifest_path`, no `launch_started_at`, and no `launch_token`. A later recover/relaunch/nudge can then count that no-run accepted claim as capacity and return `provider_issue_start_blocked:max_concurrency` even when live worker truth is below the WIP cap.
-- Desired Outcome: no-run accepted pending-revalidation claims remain auditable provider-intake state but no longer consume running/launching capacity. A retry for that same issue either launches, queues truthfully, or returns an actionable no-op, while real running or launching claims still prevent duplicate provider-worker launches.
+- Desired Outcome: no-run accepted pending-revalidation claims remain auditable provider-intake state, but they no longer consume running/launching capacity. A retry for that same issue either launches, queues truthfully, or returns an actionable no-op, while real running or launching claims still prevent duplicate provider-worker launches.
 
 ## User Request Translation
 - User intent / needs: fix the CO-405 admission failure shape without reopening CO-404 acknowledgement-timeout behavior. The implementation must repair admission/capacity accounting for accepted pending-revalidation claims with `run_id=null`, `run_manifest_path=null`, `launch_started_at=null`, and `launch_token=null`.
