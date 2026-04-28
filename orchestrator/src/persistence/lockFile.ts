@@ -402,6 +402,16 @@ function isProcessAlive(pid: number): boolean {
 }
 
 async function readLocalProcessStartedAtMs(pid: number): Promise<number | null> {
+  if (pid === process.pid) {
+    return Date.now() - process.uptime() * 1_000;
+  }
+  if (process.platform === 'win32') {
+    return readWindowsProcessStartedAtMs(pid);
+  }
+  return readUnixProcessStartedAtMs(pid);
+}
+
+async function readUnixProcessStartedAtMs(pid: number): Promise<number | null> {
   try {
     const { stdout } = await execFileAsync('ps', ['-p', String(pid), '-o', 'lstart='], {
       timeout: 1_000,
@@ -416,6 +426,56 @@ async function readLocalProcessStartedAtMs(pid: number): Promise<number | null> 
   } catch {
     return null;
   }
+}
+
+async function readWindowsProcessStartedAtMs(pid: number): Promise<number | null> {
+  try {
+    const { stdout } = await execFileAsync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `$process = Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}"; if ($process) { $process.CreationDate }`
+      ],
+      {
+        timeout: 1_000,
+        windowsHide: true
+      }
+    );
+    const firstLine = stdout.trim().split('\n')[0]?.trim();
+    if (!firstLine) {
+      return null;
+    }
+    const parsedDmtf = parseWindowsProcessCreationDate(firstLine);
+    if (parsedDmtf !== null) {
+      return parsedDmtf;
+    }
+    const parsed = Date.parse(firstLine);
+    return Number.isFinite(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseWindowsProcessCreationDate(value: string): number | null {
+  const match = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(?:\.\d+)?([+-])(\d{3})$/.exec(
+    value.trim()
+  );
+  if (!match) {
+    return null;
+  }
+  const [, year, month, day, hour, minute, second, offsetSign, offsetMinutesRaw] = match;
+  const localAsUtcMs = Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second)
+  );
+  const offsetMinutes = Number(offsetMinutesRaw) * (offsetSign === '+' ? 1 : -1);
+  return localAsUtcMs - offsetMinutes * 60_000;
 }
 
 function appendLockRetryDiagnostics(
