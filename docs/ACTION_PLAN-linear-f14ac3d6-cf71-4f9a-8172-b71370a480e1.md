@@ -17,6 +17,14 @@
 4. Register the CO-420 packet in `docs/docs-freshness-registry.json`, `tasks/index.json`, and `docs/TASKS.md`.
 5. Run freshness, docs, review, and handoff gates.
 
+## Parity Matrix (Current / Reference / Target)
+
+| Surface | Current | Reference | Target |
+| --- | --- | --- | --- |
+| Rolling owner issue | `CO-401` is terminal and makes owner verification fail closed as `configured_owner_terminal` / `block_unowned_repo_debt`. | `docs:freshness:maintain` needs a live same-project owner for the canonical owner key before owned rolling debt can pass. | `CO-420` is the live same-project owner for `docs:freshness:maintain`. |
+| March 28 cohort visibility | The March 28 Task Packet / Task Mirror rows are stale and must not be hidden or deleted. | Rolling debt must remain machine-visible until a reviewed refresh, archive, reclassify, or new same-project owner action. | The exact cohort remains visible under `co-420-apr-28-march-28-task-packet-mirror`. |
+| Fail-closed semantics | Terminal owner evidence blocks handoff even when `blocking_changed_paths=[]`. | Freshness maintenance must keep terminal-owner and unowned-debt blockers fail-closed. | Only the owner identity changes; `configured_owner_terminal`, `block_unowned_repo_debt`, and `blocking_changed_paths=[]` semantics remain intact. |
+
 ## Implementation
 - Re-home the March 28 Task Packet / Task Mirror cohort under live `CO-420`.
 - Update `docs/docs-catalog.json` for the `docs:freshness:maintain canonical owner key` without changing freshness caps or eligible classes.
