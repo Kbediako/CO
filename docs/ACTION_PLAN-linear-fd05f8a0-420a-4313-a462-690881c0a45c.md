@@ -52,8 +52,8 @@
   - steady-state proof: missing/stale fallback decisions fail, complete temporary metadata passes until expiry, durable retention passes only with rationale
   - tests/docs: focused durable-retention, single-owner cleanup, and owner-reference spec-guard tests
   - non-expiring rationale: owner routing is a supported guard contract, not temporary fallback debt
-- Large-refactor check:
-  - no large refactor in this CO-399 guard lane
+- Large-refactor check: no large refactor in this CO-399 guard lane; the change stays bounded to repo guard enforcement and focused regression coverage.
+  - parent keeps CO-394 through CO-398 cleanup work out of scope
   - parent must enforce a `large refactor` decision when new seams touch governed surfaces or fallback, legacy, cached, break-glass, or minor-seam patterns without one bounded fallback decision
 
 ## Milestones & Sequencing

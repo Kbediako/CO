@@ -434,6 +434,12 @@ function cleanTableCell(value) {
     .trim();
 }
 
+function stripMarkdownListPrefix(value) {
+  return String(value)
+    .replace(/^\s*(?:(?:[-*+]|\d+[.)])\s*)?(?:\[[ xX]\]\s*)?/, '')
+    .trim();
+}
+
 function splitMarkdownTableRow(line) {
   const trimmed = line.trim();
   if (!trimmed.startsWith('|') || !trimmed.endsWith('|')) {
@@ -530,6 +536,10 @@ function hasPlaceholderValue(value) {
   );
 }
 
+function cleanPolicyDecisionLabelValue(value) {
+  return String(value).replace(/[.,;:]+$/, '').trim();
+}
+
 function extractIsoDate(value) {
   const match = String(value).match(/\b\d{4}-\d{2}-\d{2}\b/);
   if (!match) {
@@ -589,6 +599,33 @@ function resolveFallbackGuardToday() {
 function findAllowedDecisions(value) {
   const normalized = normalizeDecisionText(value);
   return [...ALLOWED_FALLBACK_DECISIONS].filter((decision) => normalized.includes(decision));
+}
+
+function isExplanatoryNotApplicableFallbackPolicy(value) {
+  const normalized = normalizeDecisionText(value).replace(/[.;:]+$/, '').trim();
+  if (!normalized.startsWith('not applicable only when ')) {
+    return false;
+  }
+  return (
+    /\bno\b.*\b(?:fallback|seam)\b.*\b(?:changed|changes|touched|touches|modified|added|retained)\b/.test(
+      normalized
+    ) ||
+    /\bdoes not\b.*\b(?:add|retain|touch|change|modify)\b.*\b(?:fallback|compatibility|legacy|cached|break[-\s]glass|seam)\b/.test(
+      normalized
+    )
+  );
+}
+
+function hasNotApplicableFallbackDecisionLabel(content) {
+  for (const rawLine of String(content).split(/\r?\n/)) {
+    const line = stripMarkdownListPrefix(cleanTableCell(rawLine));
+    const match = line.match(/^fallback\s*\/\s*refactor decision\s*:\s*(.+)$/i);
+    const normalizedDecision = match ? normalizeDecisionText(match[1]).replace(/[.;:]+$/, '').trim() : '';
+    if (/^not applicable\b/.test(normalizedDecision) && !isExplanatoryNotApplicableFallbackPolicy(normalizedDecision)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function isOwnerRoutingReferenceRow(row) {
@@ -858,16 +895,32 @@ function validateFallbackDecisionRows(rows, today) {
 function parsePolicyDecisionEvidence(content) {
   const result = {
     largeRefactor: false,
-    minorSeam: false
+    minorSeam: false,
+    placeholderLabels: []
   };
   for (const rawLine of String(content).split(/\r?\n/)) {
-    const line = normalizePolicyDecisionLine(cleanTableCell(rawLine).replace(/^\s*[-*]\s*/, ''));
-    if (/^large[-\s]refactor(?:\s+(?:check|decision|threshold))?\s*:\s*\S/.test(line)) {
-      result.largeRefactor = true;
+    const cleanedLine = stripMarkdownListPrefix(cleanTableCell(rawLine)).replace(/[`*]/g, '').trim();
+    const normalizedLine = normalizePolicyDecisionLine(cleanedLine);
+    const largeRefactorLabel = cleanedLine.match(
+      /^large[-_\s]refactor(?:\s+(?:check|decision|threshold))?\s*:\s*(.*)$/i
+    );
+    const minorSeamLabel = cleanedLine.match(
+      /^minor[-_\s]seam(?:\s+(?:behavior|check|decision|threshold))?\s*:\s*(.*)$/i
+    );
+    if (largeRefactorLabel) {
+      if (hasPlaceholderValue(cleanPolicyDecisionLabelValue(largeRefactorLabel[1]))) {
+        result.placeholderLabels.push('large refactor');
+      } else {
+        result.largeRefactor = true;
+      }
     }
-    if (
-      /^minor[-\s]seam(?:\s+(?:behavior|check|decision|threshold))?\s*:\s*\S/.test(line) ||
-      /^minor[-\s]seam\b.*\b(?:acceptable|required|requires|bounded|decision|choice)\b/.test(line)
+    if (minorSeamLabel && !hasPlaceholderValue(cleanPolicyDecisionLabelValue(minorSeamLabel[1]))) {
+      result.minorSeam = true;
+    } else if (minorSeamLabel) {
+      result.placeholderLabels.push('minor seam');
+    } else if (
+      !minorSeamLabel &&
+      /^minor[-\s]seam\b.*\b(?:acceptable|required|requires|bounded|decision|choice)\b/.test(normalizedLine)
     ) {
       result.minorSeam = true;
     }
@@ -893,11 +946,15 @@ async function checkFallbackDecisionEvidence(baseRef, changedFiles) {
   }
 
   const combinedEvidence = sourceEntries.map((entry) => entry.content).join('\n');
-  if (/fallback\s*\/\s*refactor decision\s*:\s*`?not applicable`?/i.test(combinedEvidence)) {
+  if (hasNotApplicableFallbackDecisionLabel(combinedEvidence)) {
     failures.push('Not applicable is only valid when no fallback/seam behavior changed');
   }
   const policyDecisions = parsePolicyDecisionEvidence(combinedEvidence);
-  if (!policyDecisions.largeRefactor || !policyDecisions.minorSeam) {
+  if (
+    policyDecisions.placeholderLabels.length > 0 ||
+    !policyDecisions.largeRefactor ||
+    !policyDecisions.minorSeam
+  ) {
     failures.push('fallback/seam-touching changes require large refactor and minor seam decision evidence');
   }
 

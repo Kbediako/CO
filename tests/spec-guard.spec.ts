@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -785,6 +785,74 @@ describe('spec-guard script', () => {
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
   });
 
+  it('accepts URL autolinks as large-refactor and minor-seam decision evidence', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([completeExpireFallbackRow()]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+    const actionPlanPath = join(repo, 'docs/ACTION_PLAN-linear-fallback-fixture.md');
+    const taskSpecPath = join(repo, 'tasks/specs/linear-fallback-fixture.md');
+    const actionPlan = await readFile(actionPlanPath, 'utf8');
+    const taskSpec = await readFile(taskSpecPath, 'utf8');
+    await writeFile(
+      actionPlanPath,
+      actionPlan.replace(
+        /- large refactor check: .+\n/,
+        '- Large-refactor check: <https://example.com/large-refactor-proof>\n'
+      )
+    );
+    await writeFile(
+      taskSpecPath,
+      taskSpec.replace(
+        /- minor seam behavior is acceptable .+\n/,
+        '- Minor-seam decision: <https://example.com/minor-seam-proof>\n'
+      )
+    );
+    await execFileAsync('git', ['add', actionPlanPath, taskSpecPath], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'autolink refactor decision evidence'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('accepts underscore large-refactor and minor-seam decision labels', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([completeExpireFallbackRow()]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+    const actionPlanPath = join(repo, 'docs/ACTION_PLAN-linear-fallback-fixture.md');
+    const taskSpecPath = join(repo, 'tasks/specs/linear-fallback-fixture.md');
+    const actionPlan = await readFile(actionPlanPath, 'utf8');
+    const taskSpec = await readFile(taskSpecPath, 'utf8');
+    await writeFile(
+      actionPlanPath,
+      actionPlan.replace(
+        /- large refactor check: .+\n/,
+        '- large_refactor decision: keep this fixture scoped to one governed surface.\n'
+      )
+    );
+    await writeFile(
+      taskSpecPath,
+      taskSpec.replace(
+        /- minor seam behavior is acceptable .+\n/,
+        '- minor_seam decision: acceptable with one bounded fallback decision.\n'
+      )
+    );
+    await execFileAsync('git', ['add', actionPlanPath, taskSpecPath], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'underscore refactor decision evidence'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
   it('rejects blank fallback decisions even when a sibling row is valid', async () => {
     const repo = await initRepository();
     const decisionBody = fallbackDecisionTable([
@@ -1257,6 +1325,244 @@ describe('spec-guard script', () => {
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
 
+  it('rejects placeholder large-refactor and minor-seam decision values', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([completeExpireFallbackRow()]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+    const actionPlanPath = join(repo, 'docs/ACTION_PLAN-linear-fallback-fixture.md');
+    const taskSpecPath = join(repo, 'tasks/specs/linear-fallback-fixture.md');
+    const actionPlan = await readFile(actionPlanPath, 'utf8');
+    const taskSpec = await readFile(taskSpecPath, 'utf8');
+    await writeFile(
+      actionPlanPath,
+      actionPlan.replace(/- large refactor check: .+\n/, '- Large-refactor check: TBD\n')
+    );
+    await writeFile(
+      taskSpecPath,
+      taskSpec.replace(/- minor seam behavior is acceptable .+\n/, '- Minor-seam decision: pending\n')
+    );
+    await execFileAsync('git', ['add', actionPlanPath, taskSpecPath], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'placeholder refactor decision evidence'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('fallback/seam-touching changes require large refactor and minor seam decision evidence');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects placeholder minor-seam labels with valid large-refactor evidence', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([completeExpireFallbackRow()]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+    const taskSpecPath = join(repo, 'tasks/specs/linear-fallback-fixture.md');
+    const taskSpec = await readFile(taskSpecPath, 'utf8');
+    await writeFile(
+      taskSpecPath,
+      taskSpec.replace(/- minor seam behavior is acceptable .+\n/, '- Minor-seam decision: pending\n')
+    );
+    await execFileAsync('git', ['add', taskSpecPath], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'placeholder minor seam decision evidence'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('fallback/seam-touching changes require large refactor and minor seam decision evidence');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects placeholder refactor labels even when other concrete evidence exists', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      'Large-refactor check: keep the fixture scoped to one governed surface and one lifecycle phase.',
+      'Minor-seam behavior is acceptable only when one bounded fallback decision exists.',
+      'Large-refactor decision: TBD',
+      'Minor-seam decision: pending',
+      '',
+      fallbackDecisionTable([completeExpireFallbackRow()])
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('fallback/seam-touching changes require large refactor and minor seam decision evidence');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects blank refactor labels even when other concrete evidence exists', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      'Large-refactor check: keep the fixture scoped to one governed surface and one lifecycle phase.',
+      'Minor-seam behavior is acceptable only when one bounded fallback decision exists.',
+      'Large-refactor decision:',
+      'Minor-seam decision:',
+      '',
+      fallbackDecisionTable([completeExpireFallbackRow()])
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('fallback/seam-touching changes require large refactor and minor seam decision evidence');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects punctuated placeholder refactor labels', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      'Large-refactor decision: Not applicable.',
+      'Minor-seam decision: N/A.',
+      '',
+      fallbackDecisionTable([completeExpireFallbackRow()])
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('fallback/seam-touching changes require large refactor and minor seam decision evidence');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects underscore placeholder refactor labels', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      'large_refactor decision: TBD',
+      'minor_seam decision: pending',
+      '',
+      fallbackDecisionTable([completeExpireFallbackRow()])
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('fallback/seam-touching changes require large refactor and minor seam decision evidence');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('ignores explanatory Not applicable fallback labels when the decision table is complete', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      'Fallback / refactor decision: Not applicable only when no fallback or seam behavior changed.',
+      '',
+      fallbackDecisionTable([completeExpireFallbackRow()])
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('ignores policy-form Not applicable fallback labels when the decision table is complete', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      'Fallback / refactor decision: Not applicable only when the task does not add, retain, or touch any fallback, compatibility branch, legacy projection, cached proof path, break-glass route, or minor seam.',
+      '',
+      fallbackDecisionTable([completeExpireFallbackRow()])
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('rejects qualified Not applicable assertions when fallback-sensitive paths changed', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      'Fallback / refactor decision: Not applicable (docs-only change).',
+      '',
+      fallbackDecisionTable([completeExpireFallbackRow()])
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('Not applicable is only valid when no fallback/seam behavior changed');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects generic Not applicable if labels when fallback-sensitive paths changed', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      'Fallback / refactor decision: Not applicable if docs-only change.',
+      '',
+      fallbackDecisionTable([completeExpireFallbackRow()])
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('Not applicable is only valid when no fallback/seam behavior changed');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects punctuated Not applicable assertions when fallback-sensitive paths changed', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      'Fallback / refactor decision: Not applicable, docs-only change.',
+      '',
+      fallbackDecisionTable([completeExpireFallbackRow()])
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('Not applicable is only valid when no fallback/seam behavior changed');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
   it('requires tests/docs evidence for durable fallback retention', async () => {
     const repo = await initRepository();
     const decisionBody = [
@@ -1387,6 +1693,26 @@ describe('spec-guard script', () => {
       'Fallback / refactor decision: Not applicable.',
       '',
       'This fixture claims no fallback, compatibility, legacy, cached, break-glass, or minor-seam behavior is touched.'
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('Not applicable is only valid when no fallback/seam behavior changed');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects checkbox Not applicable labels when fallback-sensitive paths changed', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      '- [x] Fallback / refactor decision: Not applicable.',
+      '',
+      fallbackDecisionTable([completeExpireFallbackRow()])
     ].join('\n');
 
     await commitFallbackGuardChange(repo, { decisionBody });
