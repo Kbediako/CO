@@ -1,6 +1,35 @@
 {
   "items": [
     {
+      "id": "20260428-linear-9f955ebd-e00b-46ad-b25c-280029328841",
+      "title": "CO-417 recover stale provider-worker proof locks during active appserver runs",
+      "relates_to": "tasks/tasks-linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-28",
+      "approvals": {
+        "docs_packet": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-28",
+          "status": "produced",
+          "source_anchor": "ctx:sha256:2d26fce555bf759a27c7753e24345fa231740ddc7a5e5d77be755815109d8413#chunk:c000001",
+          "summary": "Docs-first packet created for CO-417 after live Linear context and branch normalization. The packet preserves the active appserver stale provider proof-lock shape, requires owner/age diagnostics or equivalent metadata, safe stale recovery or fail-closed classification, visible proof persistence failures, concurrent-writer safety, and focused CO-415/CO-400-style validation."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
+        "task": "tasks/tasks-linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
+        "agent_task": ".agent/task/linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-9f955ebd-e00b-46ad-b25c-280029328841.md"
+        }
+      }
+    },
+    {
       "id": "20260427-linear-0354e9d0-84ee-4340-b098-a9c685c191b5",
       "title": "CO-404 control-host provider-worker acknowledgement timeouts",
       "relates_to": "tasks/tasks-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
