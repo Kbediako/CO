@@ -30,7 +30,7 @@
 - Not done if:
   - agents can still touch fallback/seam behavior without a recorded decision
   - `Not applicable` can pass while fallback-like paths are changed
-  - expired fallback metadata does not fail or force refreshed issue-quality evidence
+  - expired fallback metadata does not fail
   - guard only documents policy but does not gate handoff
   - issue absorbs provider/review/runtime/docs/control-host cleanup scope from CO-394 through CO-398
   - the packet lane edits implementation files
@@ -41,7 +41,7 @@
   | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
   | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
   | `repo guards` | Fallback/seam-touching changes with no parseable CO-382 decision | remove fallback | CO-399 parent lane | A diff touches fallback, legacy, cached, break-glass, or minor-seam patterns without a recorded decision. | current review 2026-04-27 | N/A after removal | N/A after removal | Guard fails until the issue packet records `remove fallback`, `expire fallback`, or `justify retaining fallback`. | Focused missing-decision and bad `Not applicable` tests. |
-  | `repo guards` | Temporary fallback retained without complete expiry metadata | expire fallback | CO-399 parent lane | A retained temporary fallback lacks owner, trigger, introduced date, review date, maximum lifetime, removal condition, or validation. | current review 2026-04-27 | 2026-05-12 | 2026-05-26 | Guard requires complete metadata and fails stale expiry dates unless issue-quality evidence is refreshed. | Focused expired-fallback and pass tests. |
+  | `repo guards` | Temporary fallback retained without complete expiry metadata | expire fallback | CO-399 parent lane | A retained temporary fallback lacks owner, trigger, introduced date, review date, maximum lifetime, removal condition, or validation. | current review 2026-04-27 | 2026-05-12 | 2026-05-26 | Guard requires complete metadata and always fails stale expiry dates; CO-399 has no implicit refresh allowance. | Focused expired-fallback and pass tests. |
   | `repo guards` | Durable fallback or audit compatibility retained indefinitely | justify retaining fallback | CO-399 parent lane | A fallback-like contract is durable and not intended to expire. | current review 2026-04-27 | 2026-05-26 | Non-expiring durable retention only with rationale | Guard accepts only when contract name, owning surface, steady-state proof, tests/docs, and non-expiring rationale are present. | Focused durable-retention tests. |
   | `repo guards` | CO-394 through CO-398 owner references used to route surface-specific cleanup | justify retaining fallback | CO-399 parent lane | Guard needs to recognize existing owner lanes without absorbing their implementation scope. | current review 2026-04-27 | 2026-05-12 | Non-expiring owner routing contract | Remove only if CO-382 policy changes the owner mapping or those issues are superseded by a new canonical owner. | Focused tests proving CO-394, CO-395, CO-396, CO-397, and CO-398 references remain valid. |
 - Durable retention evidence:
@@ -68,7 +68,7 @@
 3. Parent chooses the narrow guard integration point across `spec-guard`, `docs:check`, `docs:freshness`, and `diff-budget`.
 4. Parent implements fallback/seam-touching detection for governed surfaces and fallback, legacy, cached, break-glass, or minor-seam patterns.
 5. Parent requires exactly one of `remove fallback`, `expire fallback`, or `justify retaining fallback`.
-6. Parent fails stale fallback expiry dates or requires refreshed issue-quality evidence.
+6. Parent fails stale fallback expiry dates unconditionally; no implicit issue-quality refresh exception is part of CO-399.
 7. Parent adds focused tests for pass, missing decision, bad `Not applicable`, expired fallback, durable retention, and CO-394 through CO-398 owner references.
 8. Parent reruns focused guard tests, normal validation, review, Linear workpad, PR lifecycle, and merge gates.
 
@@ -109,7 +109,7 @@
 - Risk: existing repo guards are weakened.
   - Mitigation: packet explicitly preserves `spec-guard`, `docs:check`, `docs:freshness`, and `diff-budget` behavior.
 - Risk: stale expiry metadata becomes normalized.
-  - Mitigation: packet requires failing or refreshed issue-quality evidence for stale fallback expiry dates.
+  - Mitigation: packet and implementation require stale fallback expiry dates to fail unconditionally; any future issue-quality refresh exception must be shaped separately before guards honor it.
 
 ## Approvals
 - Docs-first packet: CO-399 packet worker, 2026-04-27
