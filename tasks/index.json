@@ -1,6 +1,42 @@
 {
   "items": [
     {
+      "id": "20260428-linear-9f955ebd-e00b-46ad-b25c-280029328841",
+      "title": "CO-417 recover stale provider-worker proof locks during active appserver runs",
+      "relates_to": "tasks/tasks-linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-28",
+      "approvals": {
+        "docs_packet": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-28",
+          "status": "produced",
+          "source_anchor": "ctx:sha256:2d26fce555bf759a27c7753e24345fa231740ddc7a5e5d77be755815109d8413#chunk:c000001",
+          "summary": "Docs-first packet created for CO-417 after live Linear context and branch normalization. The packet preserves the active appserver stale provider proof-lock shape, requires owner/age diagnostics or equivalent metadata, safe stale recovery or fail-closed classification, visible proof persistence failures, concurrent-writer safety, and focused CO-415/CO-400-style validation."
+        },
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-04-28",
+          "status": "failed_external_blocker_classified",
+          "manifest": ".runs/linear-9f955ebd-e00b-46ad-b25c-280029328841-docs-review-late/cli/2026-04-28T09-59-19-147Z-34cd1a71/manifest.json",
+          "summary": "Late docs-review passed docs:check and failed at docs:freshness:maintain on external rolling freshness owner verification with blocking_changed_paths=[]; hold/retry decision is to keep that blocker with the docs freshness owner and not widen CO-417."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
+        "task": "tasks/tasks-linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
+        "agent_task": ".agent/task/linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-9f955ebd-e00b-46ad-b25c-280029328841.md"
+        }
+      }
+    },
+    {
       "id": "20260427-linear-0354e9d0-84ee-4340-b098-a9c685c191b5",
       "title": "CO-404 control-host provider-worker acknowledgement timeouts",
       "relates_to": "tasks/tasks-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",

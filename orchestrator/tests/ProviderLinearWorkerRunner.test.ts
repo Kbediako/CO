@@ -5604,6 +5604,105 @@ for await (const line of rl) {
     });
   });
 
+  it('recovers a stale proof lock before classifying active appserver proof telemetry', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const proofLockPath = `${proofPath}.lock`;
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-app.jsonl');
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(
+      sessionLogPath,
+      [
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.000Z',
+          type: 'session_meta',
+          payload: {
+            id: 'thread-app',
+            cwd: tempRoot,
+            initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.050Z',
+          type: 'turn_context',
+          payload: { turn_id: 'turn-app-1' }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:01.000Z',
+          type: 'event_msg',
+          payload: {
+            type: 'agent_message',
+            message: 'active appserver proof update'
+          }
+        })
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          thread_id: 'thread-app',
+          runtime: {
+            requested_mode: 'appserver',
+            selected_mode: 'appserver',
+            provider: 'AppServerRuntimeProvider',
+            runtime_session_id: 'appserver-run-child',
+            fallback: {
+              occurred: false,
+              code: null,
+              reason: null,
+              from_mode: null,
+              to_mode: null,
+              checked_at: '2026-03-21T09:00:00.000Z'
+            }
+          } as never,
+          workspace_path: tempRoot
+        })
+      ),
+      'utf8'
+    );
+    await writeFile(proofLockPath, 'orphaned-proof-lock', 'utf8');
+    const stalePast = new Date('2020-01-01T00:00:00.000Z');
+    await utimes(proofLockPath, stalePast, stalePast);
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:10.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+
+    await expect(readFile(proofLockPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(refreshed).toMatchObject({
+      thread_id: 'thread-app',
+      latest_turn_id: 'turn-app-1',
+      latest_session_id: 'thread-app-turn-app-1',
+      latest_session_id_source: 'derived_from_thread_and_turn',
+      last_event: 'agent_message',
+      last_message: 'active appserver proof update',
+      session_log_thread_id: 'thread-app',
+      session_log_turn_id: 'turn-app-1',
+      session_log_session_id: 'thread-app-turn-app-1',
+      appserver_supervision: {
+        supervision_command: 'appserver_thread_start',
+        turn_persistence_status: 'proven',
+        turn_persistence_source: 'session_log_hydration',
+        turn_persistence_blocker: null
+      },
+      progress: {
+        phase: 'turn_running',
+        kind: 'worker',
+        status: 'progressing',
+        summary: 'active appserver proof update',
+        stall_classification: 'progressing',
+        recovery_recommendation: 'continue_waiting'
+      }
+    });
+  });
+
   it('hydrates shared Linear budget metadata into refreshed provider proofs', async () => {
     const { runDir } = await createManifestRoot();
     const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
