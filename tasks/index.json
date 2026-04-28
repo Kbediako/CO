@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260427-linear-0354e9d0-84ee-4340-b098-a9c685c191b5",
+      "title": "CO-404 control-host provider-worker acknowledgement timeouts",
+      "relates_to": "tasks/tasks-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-27",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-27",
+          "status": "produced",
+          "manifest": ".runs/linear-0354e9d0-84ee-4340-b098-a9c685c191b5-docs-packet/cli/2026-04-27T22-50-44-356Z-a52c0442/manifest.json",
+          "source_anchor": "ctx:sha256:8a1f02bd0b920d84556735df068c45fe3589da12378e6e372eb5e56aa7ae2b12#chunk:c000001",
+          "summary": "Docs-first packet created for CO-404 from parent-provided issue context only. The referenced source payload path was absent in this child checkout. The packet preserves timeout-after-launch and accepted-without-run variants, requires prompt acknowledged queued/starting metadata after accepted recover/relaunch/nudge actions, preserves retry idempotency, and requires accepted pending-revalidation rows without run or launch token to stay out of running/starting capacity."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
+        "task": "tasks/tasks-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
+        "agent_task": ".agent/task/linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
+        "docs": "docs/TECH_SPEC-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md"
+      }
+    },
+    {
       "id": "20260427-linear-c8e3a464-ec50-4fa4-aff5-d8a780626600",
       "title": "CO-403 provider-worker retry recovery for completed child lanes and stale proof locks",
       "relates_to": "tasks/tasks-linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",

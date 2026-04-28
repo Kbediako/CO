@@ -38,6 +38,18 @@ function createInput() {
   const eventTransport = {
     emitControlEvent: vi.fn(async () => undefined)
   };
+  const providerIntakeState = {
+    schema_version: 1,
+    updated_at: '2026-04-27T20:00:00.000Z',
+    rehydrated_at: null,
+    latest_provider_key: null,
+    latest_reason: null,
+    claims: [] as Array<Record<string, unknown>>
+  };
+  const persistedProviderIntakeState = {
+    ...providerIntakeState,
+    claims: [] as Array<Record<string, unknown>>
+  };
   const context = {
     clients: new Set<http.ServerResponse>(),
     config: {
@@ -53,8 +65,18 @@ function createInput() {
     persist: {},
     runtime: {},
     eventTransport,
+    providerIntakeState,
+    readPersistedProviderIntakeState: vi.fn(() => persistedProviderIntakeState),
     providerIssueHandoff: {
       handleAcceptedTrackedIssue: vi.fn(),
+      recoverIssue: vi.fn(async (recoverInput) => ({
+        provider: recoverInput.provider,
+        issue_id: recoverInput.issueId,
+        action: recoverInput.action,
+        kind: 'skipped',
+        reason: 'provider_issue_recover_resolution_unavailable',
+        claim: null
+      })),
       rehydrate: vi.fn(async () => undefined),
       refresh: vi.fn(async () => ({
         queued: true,
@@ -97,6 +119,8 @@ function createInput() {
     req,
     res,
     context,
+    providerIntakeState,
+    persistedProviderIntakeState,
     runtimeSnapshot,
     presenterContext,
     adapter,
@@ -110,8 +134,17 @@ describe('ControlAuthenticatedRouteHandoff', () => {
   });
 
   it('assembles the authenticated route context from the control request state', async () => {
-    const { input, req, res, context, runtimeSnapshot, presenterContext, adapter, eventTransport } =
-      createInput();
+    const {
+      input,
+      req,
+      res,
+      context,
+      persistedProviderIntakeState,
+      runtimeSnapshot,
+      presenterContext,
+      adapter,
+      eventTransport
+    } = createInput();
     const auditRecord = {
       surface: 'api_v1_dispatch' as const,
       issueIdentifier: 'ISSUE-1',
@@ -189,6 +222,75 @@ describe('ControlAuthenticatedRouteHandoff', () => {
       acknowledgeAccepted: true,
       allowIdleRestartRequiredRetry: true
     });
+    await expect(assembled.requestProviderWorkerRecover?.({
+      provider: 'linear',
+      issueId: 'CO-404',
+      action: 'nudge'
+    })).resolves.toMatchObject({
+      provider: 'linear',
+      issue_id: 'CO-404',
+      action: 'nudge',
+      kind: 'skipped',
+      reason: 'provider_issue_recover_resolution_unavailable'
+    });
+    expect(context.providerIssueHandoff.recoverIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'CO-404',
+      action: 'nudge'
+    });
+    expect(assembled.readProviderWorkerRecoverAccepted?.({
+      provider: 'linear',
+      issueId: 'CO-404',
+      action: 'nudge',
+      requestedAt: '2026-04-27T20:00:00.000Z'
+    })).toBeNull();
+    const acceptedClaim = {
+      provider: 'linear',
+      provider_key: 'linear:co-404-id',
+      issue_id: 'co-404-id',
+      issue_identifier: 'CO-404',
+      issue_title: 'Recover issue',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-27T20:00:00.000Z',
+      issue_archived_at: null,
+      issue_trashed: false,
+      task_id: 'linear-co-404-id',
+      mapping_source: 'provider_id_fallback',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      accepted_at: '2026-04-27T20:00:00.000Z',
+      updated_at: '2026-04-27T20:00:01.000Z',
+      last_delivery_id: null,
+      last_event: 'control_host_provider_worker_recover',
+      last_action: 'nudge',
+      last_webhook_timestamp: null,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: 'control-host',
+      launch_token: 'launch-token',
+      launch_started_at: null
+    };
+    context.providerIntakeState.claims.push(acceptedClaim);
+    expect(assembled.readProviderWorkerRecoverAccepted?.({
+      provider: 'linear',
+      issueId: 'CO-404',
+      action: 'nudge',
+      requestedAt: '2026-04-27T20:00:00.000Z'
+    })).toBeNull();
+    persistedProviderIntakeState.claims.push(acceptedClaim);
+    expect(assembled.readProviderWorkerRecoverAccepted?.({
+      provider: 'linear',
+      issueId: 'CO-404',
+      action: 'nudge',
+      requestedAt: '2026-04-27T20:00:00.000Z'
+    })).toMatchObject({
+      issue_id: 'co-404-id',
+      issue_identifier: 'CO-404',
+      state: 'starting',
+      launch_source: 'control-host',
+      launch_token_present: true
+    });
   });
 
   it('returns a null task id when the manifest path does not live under a cli task root', () => {
@@ -228,6 +330,8 @@ describe('ControlAuthenticatedRouteHandoff', () => {
     const assembled = createControlAuthenticatedRouteContext(input);
 
     await expect(assembled.refreshProviderIssues?.()).resolves.toBeNull();
+    expect(assembled.requestProviderWorkerRecover).toBeUndefined();
+    expect(assembled.readProviderWorkerRecoverAccepted).toBeUndefined();
     expect(runProviderIssueHandoffRefresh).not.toHaveBeenCalled();
   });
 });

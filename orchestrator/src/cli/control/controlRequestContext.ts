@@ -49,6 +49,7 @@ export interface ControlRequestSharedContext {
   paths: RunPaths;
   linearAdvisoryState: LinearAdvisoryState;
   providerIntakeState?: ProviderIntakeState;
+  readPersistedProviderIntakeState?: () => ProviderIntakeState | null;
   providerIssueHandoff?: ProviderIssueHandoffService | null;
   runtime: ControlRuntime;
 }
@@ -93,6 +94,7 @@ export function buildControlRequestContext(
     paths: input.paths,
     linearAdvisoryState: input.linearAdvisoryState,
     providerIntakeState: input.providerIntakeState,
+    readPersistedProviderIntakeState: input.readPersistedProviderIntakeState,
     providerIssueHandoff: input.providerIssueHandoff,
     runtime: input.runtime,
     expiryLifecycle: input.expiryLifecycle
