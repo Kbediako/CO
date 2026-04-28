@@ -481,10 +481,10 @@ describe('ObservabilityApiController', () => {
       issue_id: 'CO-404',
       action: 'recover',
       kind: 'queued',
-      reason: 'provider_worker_recover_already_in_progress',
+      reason: 'provider_worker_recover_queued',
       queued: true,
-      coalesced: true,
-      in_flight_action: 'nudge',
+      coalesced: false,
+      in_flight_action: 'recover',
       accepted: { state: 'starting', issue_identifier: 'CO-404' }
     });
     expect(second.state.body).not.toHaveProperty('accepted.launch_token');
@@ -513,7 +513,7 @@ describe('ObservabilityApiController', () => {
       queued: true,
       coalesced: false
     });
-    expect(requestProviderWorkerRecover).toHaveBeenCalledTimes(2);
+    expect(requestProviderWorkerRecover).toHaveBeenCalledTimes(3);
     recovery.resolve();
     await recovery.promise;
     await Promise.resolve();

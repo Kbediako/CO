@@ -381,7 +381,7 @@ function queueProviderWorkerRecover(input: {
   readAccepted?: (() => ProviderWorkerRecoverAcceptedState | null) | null;
   run: () => Promise<ProviderIssueHandoffRecoveryResult>;
 }): Promise<ProviderWorkerRecoverRouteResult> {
-  const key = buildProviderWorkerRecoverInFlightKey(input.runtimeKey, input.provider, input.issueId);
+  const key = buildProviderWorkerRecoverInFlightKey(input.runtimeKey, input.provider, input.issueId, input.action);
   const existing = providerWorkerRecoverInFlight.get(key);
   if (existing) {
     if (existing.accepted) {
@@ -581,9 +581,10 @@ function resolveProviderWorkerRecoverRuntimeKey(context: ObservabilityPresenterC
 function buildProviderWorkerRecoverInFlightKey(
   runtimeKey: string,
   provider: 'linear',
-  issueId: string
+  issueId: string,
+  action: ProviderIssueRecoveryAction
 ): string {
-  return `${runtimeKey}:${provider}:${issueId.trim().toLowerCase()}`;
+  return `${runtimeKey}:${provider}:${issueId.trim().toLowerCase()}:${action}`;
 }
 
 function registerProviderWorkerRecoverInFlightAliases(input: {
@@ -600,7 +601,7 @@ function registerProviderWorkerRecoverInFlightAliases(input: {
     if (!alias) {
       continue;
     }
-    const key = buildProviderWorkerRecoverInFlightKey(input.runtimeKey, input.provider, alias);
+    const key = buildProviderWorkerRecoverInFlightKey(input.runtimeKey, input.provider, alias, input.inFlight.action);
     const existing = providerWorkerRecoverInFlight.get(key);
     if (existing && existing !== input.inFlight) {
       continue;
