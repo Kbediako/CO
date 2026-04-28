@@ -265,7 +265,7 @@ describe('acquireLockWithRetry', () => {
         task_id: 'live-owner-task',
         pid: process.pid,
         host: hostname(),
-        acquired_at: '2026-04-28T08:25:57.000Z',
+        acquired_at: new Date().toISOString(),
         stale_ms: retry.staleMs
       })}\n`,
       'utf8'
@@ -284,7 +284,7 @@ describe('acquireLockWithRetry', () => {
         createError: (taskId, attempts) =>
           new Error(`Failed to acquire ${taskId} after ${attempts} attempts`)
       })
-    ).rejects.toThrow(/owner_status=same_host_process_alive/);
+    ).rejects.toThrow(/owner_status=same_host_process_(alive|identity_unverified)/);
 
     const owner = await readLockOwner(lockPath);
     expect(owner).toMatchObject({
@@ -293,5 +293,56 @@ describe('acquireLockWithRetry', () => {
       pid: process.pid,
       host: hostname()
     });
+  });
+
+  it('recovers stale metadata when the same-host pid was reused after acquisition', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'lock-file-'));
+    tempDirs.push(root);
+    const lockPath = join(root, 'shared.lock');
+    const retry = {
+      maxAttempts: 2,
+      initialDelayMs: 1,
+      backoffFactor: 1,
+      maxDelayMs: 1,
+      staleMs: 1
+    };
+    await writeFile(
+      lockPath,
+      `${JSON.stringify({
+        schema_version: 1,
+        kind: 'codex-lock-owner',
+        token: 'reused-owner-token',
+        task_id: 'dead-owner-task',
+        pid: process.pid,
+        host: hostname(),
+        acquired_at: '2020-01-01T00:00:00.000Z',
+        stale_ms: retry.staleMs
+      })}\n`,
+      'utf8'
+    );
+    const past = new Date('2020-01-01T00:00:01.000Z');
+    await utimes(lockPath, past, past);
+
+    const lock = await acquireLockWithRetry({
+      taskId: 'replacement-proof-writer',
+      lockPath,
+      retry,
+      ensureDirectory: async () => {
+        await mkdir(root, { recursive: true });
+      },
+      createError: (taskId, attempts) =>
+        new Error(`Failed to acquire ${taskId} after ${attempts} attempts`)
+    });
+
+    const owner = await readLockOwner(lockPath);
+    expect(owner).toMatchObject({
+      token: lock.ownerToken,
+      task_id: 'replacement-proof-writer',
+      pid: process.pid,
+      host: hostname()
+    });
+
+    await lock.release();
+    await expect(stat(lockPath)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 });

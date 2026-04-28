@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
+import { execFile } from 'node:child_process';
 import type { FileHandle } from 'node:fs/promises';
 import { open, readFile, rm, stat } from 'node:fs/promises';
 import { hostname } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
+import { promisify } from 'node:util';
 
 export interface LockRetryOptions {
   maxAttempts: number;
@@ -29,6 +31,8 @@ export interface AcquiredLock {
 const STALE_AWARE_ACQUISITION_LOCK_SUFFIX = '.acquire';
 const LOCK_OWNER_PAYLOAD_KIND = 'codex-lock-owner';
 const LOCK_OWNER_PAYLOAD_SCHEMA_VERSION = 1;
+const PROCESS_START_AFTER_LOCK_TOLERANCE_MS = 2_000;
+const execFileAsync = promisify(execFile);
 
 export interface LockOwnerMetadata {
   format: 'metadata' | 'legacy';
@@ -53,6 +57,8 @@ export interface LockRetryFailureDiagnostics {
     | 'legacy_or_unknown'
     | 'same_host_process_alive'
     | 'same_host_process_not_live'
+    | 'same_host_process_reused_pid'
+    | 'same_host_process_identity_unverified'
     | 'remote_host'
     | 'metadata_without_pid';
   recoverable: boolean;
@@ -333,10 +339,12 @@ async function inspectLockForRecovery(
   const owner = parseLockOwnerMetadata(raw);
   const ageMs = Date.now() - stats.mtimeMs;
   const isStale = Number.isFinite(ageMs) && staleMs > 0 && ageMs > staleMs;
-  const ownerStatus = classifyLockOwnerStatus(owner, inspectedHost);
+  const ownerStatus = await classifyLockOwnerStatus(owner, inspectedHost);
   const recoverable =
     isStale
     && ownerStatus !== 'same_host_process_alive'
+    && ownerStatus !== 'same_host_process_identity_unverified'
+    && ownerStatus !== 'metadata_without_pid'
     && ownerStatus !== 'remote_host';
 
   return {
@@ -352,10 +360,10 @@ async function inspectLockForRecovery(
   };
 }
 
-function classifyLockOwnerStatus(
+async function classifyLockOwnerStatus(
   owner: LockOwnerMetadata | null,
   inspectedHost: string
-): LockRetryFailureDiagnostics['ownerStatus'] {
+): Promise<LockRetryFailureDiagnostics['ownerStatus']> {
   if (!owner) {
     return 'missing';
   }
@@ -368,7 +376,20 @@ function classifyLockOwnerStatus(
   if (!owner.pid) {
     return 'metadata_without_pid';
   }
-  return isProcessAlive(owner.pid) ? 'same_host_process_alive' : 'same_host_process_not_live';
+  if (!isProcessAlive(owner.pid)) {
+    return 'same_host_process_not_live';
+  }
+  const ownerAcquiredAtMs = owner.acquiredAt ? Date.parse(owner.acquiredAt) : NaN;
+  if (!Number.isFinite(ownerAcquiredAtMs)) {
+    return 'same_host_process_identity_unverified';
+  }
+  const processStartedAtMs = await readLocalProcessStartedAtMs(owner.pid);
+  if (processStartedAtMs === null) {
+    return 'same_host_process_identity_unverified';
+  }
+  return processStartedAtMs > ownerAcquiredAtMs + PROCESS_START_AFTER_LOCK_TOLERANCE_MS
+    ? 'same_host_process_reused_pid'
+    : 'same_host_process_alive';
 }
 
 function isProcessAlive(pid: number): boolean {
@@ -377,6 +398,23 @@ function isProcessAlive(pid: number): boolean {
     return true;
   } catch (error: unknown) {
     return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+async function readLocalProcessStartedAtMs(pid: number): Promise<number | null> {
+  try {
+    const { stdout } = await execFileAsync('ps', ['-p', String(pid), '-o', 'lstart='], {
+      timeout: 1_000,
+      windowsHide: true
+    });
+    const firstLine = stdout.trim().split('\n')[0]?.trim();
+    if (!firstLine) {
+      return null;
+    }
+    const parsed = Date.parse(firstLine);
+    return Number.isFinite(parsed) ? parsed : null;
+  } catch {
+    return null;
   }
 }
 
@@ -405,6 +443,8 @@ export function formatLockRetryFailureDiagnostics(
     `owner_task=${owner?.taskId ?? 'unknown'}`,
     `owner_pid=${owner?.pid ?? 'unknown'}`,
     `owner_host=${owner?.host ?? 'unknown'}`,
+    `owner_acquired_at=${owner?.acquiredAt ?? 'unknown'}`,
+    `owner_stale_ms=${owner?.staleMs ?? 'unknown'}`,
     `inspected_host=${diagnostics.inspectedHost}`,
     `owner_status=${diagnostics.ownerStatus}`,
     `age_ms=${diagnostics.ageMs === null ? 'unknown' : Math.max(0, Math.round(diagnostics.ageMs))}`,
