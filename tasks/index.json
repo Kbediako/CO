@@ -1,6 +1,31 @@
 {
   "items": [
     {
+      "id": "20260428-linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86",
+      "title": "CO-407 co-status healthy control-host UI timeout classification",
+      "relates_to": "tasks/tasks-linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-28",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-28",
+          "status": "produced",
+          "source_anchor": "ctx:sha256:0469f0fce87dca2b1ef6b83b99569cf3463b6cf58d7dabd117e4d82cec619071#chunk:c000001",
+          "summary": "Docs-first packet created for CO-407 from child prompt protected terms after the provided source payload resolved to run metadata only. The packet preserves co-status --format json, healthy control host, provider intake fresh, slow /ui/data.json, control-host ui request timeout after 15000ms, stale endpoint/dead-port recovery, CO-246, CO-404, and CO-406; it scopes parent implementation to distinguishing slow current-endpoint UI reads from stale/dead endpoint recovery while keeping healthy-host and provider-intake truth visible."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86-co-status-healthy-ui-timeout.md",
+        "task": "tasks/tasks-linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86.md",
+        "agent_task": ".agent/task/linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86.md",
+        "docs": "tasks/specs/linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86-co-status-healthy-ui-timeout.md"
+      }
+    },
+    {
       "id": "20260427-linear-c8e3a464-ec50-4fa4-aff5-d8a780626600",
       "title": "CO-403 provider-worker retry recovery for completed child lanes and stale proof locks",
       "relates_to": "tasks/tasks-linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",

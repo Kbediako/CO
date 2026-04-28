@@ -5,7 +5,12 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { __test__ as coStatusCliShellTest, runCoStatusCliShell } from '../src/cli/coStatusCliShell.js';
+import { DEFAULT_ATTACH_REQUEST_TIMEOUT_MS } from '../src/cli/coStatusAttachCliShell.js';
+import {
+  __test__ as coStatusCliShellTest,
+  readCoStatusJsonDataset,
+  runCoStatusCliShell
+} from '../src/cli/coStatusCliShell.js';
 import { runCoStatusOperatorAutopilotCliShell } from '../src/cli/coStatusOperatorAutopilotCliShell.js';
 import { appendProviderOperatorAutopilotLifecycleRecord } from '../src/cli/control/providerOperatorAutopilotLifecycle.js';
 
@@ -443,6 +448,94 @@ describe('runCoStatusCliShell', () => {
     expect(payload.issues?.[0]?.fallback_expiry?.map((entry) => entry.fallback)).not.toContain(
       syntheticIdentityFallback
     );
+  });
+
+  it('uses a direct json timeout budget that leaves room for degraded fallback before 15s monitors expire', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    await writeProviderIntakeState(runDir, {
+      claimState: 'running',
+      updatedAtMsAgo: 1_000
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(buildAbortError())
+      .mockRejectedValueOnce(buildAbortError());
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await runCoStatusCliShell({
+      flags: {
+        format: 'json',
+        'run-dir': runDir
+      },
+      printHelp: vi.fn()
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    const requestTimeouts = timeoutSpy.mock.calls
+      .map((call) => Number(call[1]))
+      .filter((delay) => Number.isFinite(delay));
+    expect(
+      requestTimeouts.filter(
+        (delay) => delay === coStatusCliShellTest.DEFAULT_CO_STATUS_JSON_REQUEST_TIMEOUT_MS
+      )
+    ).toHaveLength(2);
+    expect(requestTimeouts).not.toContain(DEFAULT_ATTACH_REQUEST_TIMEOUT_MS);
+    const payload = JSON.parse(String(log.mock.calls[0]?.[0])) as {
+      degraded_read?: {
+        reason?: unknown;
+        source?: unknown;
+      };
+    };
+    expect(payload.degraded_read).toMatchObject({
+      reason: 'ui_request_timeout',
+      source: 'local_seeded_runtime'
+    });
+  });
+
+  it('falls back for a slow live current /ui/data.json response without stale endpoint recovery', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeProviderIntakeState(runDir, {
+      claimState: 'running',
+      updatedAtMsAgo: 1_000
+    });
+    const slowServer = await startUiServer(buildUiPayload(), { responseDelayMs: 75 });
+    servers.add(slowServer.instance);
+    await writeControlEndpointArtifacts(runDir, slowServer.baseUrl);
+
+    const payload = await readCoStatusJsonDataset({
+      flags: {
+        format: 'json',
+        'run-dir': runDir
+      },
+      requestTimeoutMs: 10
+    });
+
+    expect(slowServer.requests).toEqual([
+      {
+        authorization: 'Bearer snapshot-token',
+        csrfToken: 'snapshot-token'
+      },
+      {
+        authorization: 'Bearer snapshot-token',
+        csrfToken: 'snapshot-token'
+      }
+    ]);
+    expect(payload.degraded_read).toMatchObject({
+      reason: 'ui_request_timeout',
+      source: 'local_seeded_runtime'
+    });
+    expect(payload.selected_issue_identifier).toBe('CO-296');
+    expect(JSON.stringify(payload)).not.toMatch(/control_endpoint\.json has not rotated/u);
   });
 
   it('matches degraded metadata identity when both run ids are null before worker launch', () => {
@@ -1398,13 +1491,16 @@ describe('runCoStatusCliShell', () => {
   });
 });
 
-async function startUiServer(payload: Record<string, unknown> = buildUiPayload()): Promise<{
+async function startUiServer(
+  payload: Record<string, unknown> = buildUiPayload(),
+  options: { responseDelayMs?: number } = {}
+): Promise<{
   instance: http.Server;
   baseUrl: string;
   requests: Array<{ authorization: string | null; csrfToken: string | null }>;
 }> {
   const requests: Array<{ authorization: string | null; csrfToken: string | null }> = [];
-  const server = http.createServer((req, res) => {
+  const server = http.createServer(async (req, res) => {
     if (req.url === '/ui/data.json') {
       requests.push({
         authorization: typeof req.headers.authorization === 'string' ? req.headers.authorization : null,
@@ -1418,6 +1514,12 @@ async function startUiServer(payload: Record<string, unknown> = buildUiPayload()
       if (req.headers['x-csrf-token'] !== 'snapshot-token') {
         res.writeHead(403, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'csrf required' }));
+        return;
+      }
+      if (options.responseDelayMs && options.responseDelayMs > 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, options.responseDelayMs));
+      }
+      if (res.destroyed) {
         return;
       }
       res.writeHead(200, {
