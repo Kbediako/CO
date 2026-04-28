@@ -1,5 +1,5 @@
-import { mkdtemp, mkdir, open, readFile, rm, stat, utimes } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { mkdtemp, mkdir, open, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
+import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
@@ -8,6 +8,15 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { acquireLockWithRetry } from '../src/persistence/lockFile.js';
 
 const tempDirs: string[] = [];
+
+async function readLockOwner(lockPath: string): Promise<Record<string, unknown>> {
+  return JSON.parse(await readFile(lockPath, 'utf8')) as Record<string, unknown>;
+}
+
+async function readLockOwnerToken(lockPath: string): Promise<string> {
+  const owner = await readLockOwner(lockPath);
+  return String(owner.token);
+}
 
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
@@ -42,7 +51,17 @@ describe('acquireLockWithRetry', () => {
       createError: (taskId, attempts) => new Error(`Failed to acquire ${taskId} after ${attempts} attempts`)
     });
 
-    await expect(readFile(lockPath, 'utf8')).resolves.toBe(lockB.ownerToken);
+    const lockBOwner = await readLockOwner(lockPath);
+    expect(lockBOwner).toMatchObject({
+      kind: 'codex-lock-owner',
+      schema_version: 1,
+      token: lockB.ownerToken,
+      task_id: 'task-b',
+      pid: process.pid,
+      host: hostname(),
+      stale_ms: retry.staleMs
+    });
+    expect(typeof lockBOwner.acquired_at).toBe('string');
 
     await lockB.release();
     await expect(stat(lockPath)).rejects.toMatchObject({ code: 'ENOENT' });
@@ -97,11 +116,11 @@ describe('acquireLockWithRetry', () => {
     });
     await delay(staleMs * 2 + 100);
     expect(secondSettled).toBe(false);
-    await expect(readFile(lockPath, 'utf8')).resolves.toBe(first.lock.ownerToken);
+    await expect(readLockOwnerToken(lockPath)).resolves.toBe(first.lock.ownerToken);
 
     await first.lock.release();
     const next = await secondSettledPromise;
-    await expect(readFile(lockPath, 'utf8')).resolves.toBe(next.lock.ownerToken);
+    await expect(readLockOwnerToken(lockPath)).resolves.toBe(next.lock.ownerToken);
 
     await next.lock.release();
     await expect(stat(lockPath)).rejects.toMatchObject({ code: 'ENOENT' });
@@ -137,7 +156,7 @@ describe('acquireLockWithRetry', () => {
       createError: (taskId, attempts) => new Error(`Failed to acquire ${taskId} after ${attempts} attempts`)
     });
 
-    await expect(readFile(lockPath, 'utf8')).resolves.toBe(lock.ownerToken);
+    await expect(readLockOwnerToken(lockPath)).resolves.toBe(lock.ownerToken);
     await expect(stat(acquisitionGuardPath)).rejects.toMatchObject({ code: 'ENOENT' });
 
     await lock.release();
@@ -199,6 +218,7 @@ describe('acquireLockWithRetry', () => {
       },
       createError: (taskId, attempts) => new Error(`Failed to acquire ${taskId} after ${attempts} attempts`)
     });
+    const initialLockMtimeMs = (await stat(lockPath)).mtimeMs;
 
     const acquireB = acquireLockWithRetry({
       taskId: 'task-b',
@@ -213,13 +233,65 @@ describe('acquireLockWithRetry', () => {
     // Keep the hold longer than staleMs so the test still proves keepalive
     // freshness, while leaving margin for full-suite scheduler jitter.
     await delay(staleMs * 2 + 100);
-    await expect(readFile(lockPath, 'utf8')).resolves.toBe(lockA.ownerToken);
+    const refreshedLockMtimeMs = (await stat(lockPath)).mtimeMs;
+    expect(refreshedLockMtimeMs).toBeGreaterThan(initialLockMtimeMs);
+    await expect(readLockOwnerToken(lockPath)).resolves.toBe(lockA.ownerToken);
 
     await lockA.release();
     const lockB = await acquireB;
-    await expect(readFile(lockPath, 'utf8')).resolves.toBe(lockB.ownerToken);
+    await expect(readLockOwnerToken(lockPath)).resolves.toBe(lockB.ownerToken);
 
     await lockB.release();
     await expect(stat(lockPath)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('fails closed with owner diagnostics when stale metadata still points at a live writer', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'lock-file-'));
+    tempDirs.push(root);
+    const lockPath = join(root, 'shared.lock');
+    const retry = {
+      maxAttempts: 2,
+      initialDelayMs: 1,
+      backoffFactor: 1,
+      maxDelayMs: 1,
+      staleMs: 1
+    };
+    await writeFile(
+      lockPath,
+      `${JSON.stringify({
+        schema_version: 1,
+        kind: 'codex-lock-owner',
+        token: 'live-owner-token',
+        task_id: 'live-owner-task',
+        pid: process.pid,
+        host: hostname(),
+        acquired_at: '2026-04-28T08:25:57.000Z',
+        stale_ms: retry.staleMs
+      })}\n`,
+      'utf8'
+    );
+    const past = new Date(Date.now() - 60_000);
+    await utimes(lockPath, past, past);
+
+    await expect(
+      acquireLockWithRetry({
+        taskId: 'waiting-proof-writer',
+        lockPath,
+        retry,
+        ensureDirectory: async () => {
+          await mkdir(root, { recursive: true });
+        },
+        createError: (taskId, attempts) =>
+          new Error(`Failed to acquire ${taskId} after ${attempts} attempts`)
+      })
+    ).rejects.toThrow(/owner_status=same_host_process_alive/);
+
+    const owner = await readLockOwner(lockPath);
+    expect(owner).toMatchObject({
+      token: 'live-owner-token',
+      task_id: 'live-owner-task',
+      pid: process.pid,
+      host: hostname()
+    });
   });
 });
