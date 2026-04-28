@@ -379,11 +379,16 @@ describe('ObservabilityApiController', () => {
     expect(recovered).toBe(true);
   });
 
-  it('does not report queued recovery when the handoff fails before accepting work', async () => {
+  it('preserves completed recovery identity before accepting work', async () => {
     const { res, state } = createResponseRecorder();
-    const requestProviderWorkerRecover = vi.fn(async () => {
-      throw new Error('resolver unavailable');
-    });
+    const requestProviderWorkerRecover = vi.fn(async (input: { provider: 'linear'; action: 'nudge' }) => ({
+      provider: input.provider,
+      issue_id: '0b2377a2-366f-4309-a508-610e524c9d94',
+      action: input.action,
+      kind: 'skipped' as const,
+      reason: 'provider_issue_recover_resolution_unavailable',
+      claim: null
+    }));
 
     const handled = await handleObservabilityApiRequest({
       authKind: 'control',
@@ -400,10 +405,10 @@ describe('ObservabilityApiController', () => {
     expect(state.statusCode).toBe(202);
     expect(state.body).toMatchObject({
       mode: 'provider_worker_recover',
-      issue_id: 'CO-404',
+      issue_id: '0b2377a2-366f-4309-a508-610e524c9d94',
       action: 'nudge',
       kind: 'skipped',
-      reason: 'provider_worker_recover_failed',
+      reason: 'provider_issue_recover_resolution_unavailable',
       queued: false,
       coalesced: false,
       async: false,

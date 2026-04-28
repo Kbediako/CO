@@ -492,7 +492,6 @@ async function resolveProviderWorkerRecoverRouteResult(input: {
   if (completion.kind === 'completed') {
     return {
       ...completion.result,
-      issue_id: input.issueId,
       action: input.action,
       queued: false,
       coalesced: input.coalesced,
