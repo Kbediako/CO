@@ -1532,13 +1532,13 @@
     },
     {
       "id": "20260425-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c",
-      "title": "CO-330 reopened stale-owner/provider-refresh recurrence after PR #624",
+      "title": "CO-330 stale-owner/provider-refresh recurrence after PR #624 and PR #658",
       "relates_to": "tasks/tasks-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
       "risk": "high",
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-25",
+      "last_review": "2026-04-28",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -1555,6 +1555,14 @@
           "manifest": ".runs/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c-co330-recurrence-docs/cli/2026-04-25T12-07-04-429Z-22659fae/manifest.json",
           "source_anchor": "ctx:sha256:d14a6cd66c90db64bf91248f6f68d329bf0b540a68b4243aec21a6770b4dce3b#chunk:c000001",
           "summary": "Docs packet refreshed for the reopened CO-330 recurrence after PR #624. The packet preserves stale_control_host_owner, stale_reclaimed, control-host, fetch failed, refresh request timeout, owner pid/host/task/run, attempted pid/host, co-status freshness, CO-351, CO-352, and CO-355; parent reviewed and applied the child patch after helper acceptance invalidated on Linear updated_at staleness."
+        },
+        "post_pr_658_recovery_docs_refresh": {
+          "reviewer": "parent provider worker",
+          "date": "2026-04-28",
+          "status": "approved_for_implementation",
+          "manifest": ".runs/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c/cli/2026-04-28T04-50-04-951Z-a8df80f3/manifest.json",
+          "source_anchor": "ctx:sha256:71b3705dcb95cb3d85f4202978c8c661ce6ca70898a38c2971762666659af3f2#chunk:c000001",
+          "summary": "Docs packet refreshed for the post-PR #658 explicit recovery recurrence. It preserves provider_refresh_lifecycle_stuck, control-host recover, /api/v1/provider-worker/recover, stale_control_host_owner, fetch failed, refresh request timeout, CO-403, and CO-399; implementation target is recovery-path stale lifecycle reset without weakening normal refresh/rehydrate stuck-lifecycle diagnostics."
         }
       },
       "paths": {

@@ -10,11 +10,11 @@ The machine-readable policy lives in `docs/docs-catalog.json` under `policies.ro
 
 Current CO policy:
 
-- Owner issue: `CO-401`
+- Owner issue: `CO-409`
 - Canonical recurring owner key: `docs:freshness:maintain`
 - Live-owner verification: `docs:freshness:maintain` must verify the configured owner issue as a non-terminal issue in the configured Linear project before owned rolling debt can pass. Terminal, canceled, duplicate, out-of-project, or unverifiable owners are evidence only and must route to canonical owner reuse/re-home action instead of remaining live owner metadata.
 - Exact canonical owner overrides: `canonical_owner_issues[]` may map one `canonical_owner_key` to one live owner issue, such as `CO-320` for `docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30`
-- Historical owner lineage: `CO-175` established the Apr 14 baseline, `CO-267` owned the Apr 20/21 maintenance refreshes, `CO-300` owned the Apr 22 reset, `CO-324` owned the Apr 23 reset, and `CO-343` owned the Apr 24/25 reset before later owner verification failed; these are now terminal or invalid evidence only and must not remain the live maintenance owner after they reach terminal or unverifiable states.
+- Historical owner lineage: `CO-175` established the Apr 14 baseline, `CO-267` owned the Apr 20/21 maintenance refreshes, `CO-300` owned the Apr 22 reset, `CO-324` owned the Apr 23 reset, `CO-343` owned the Apr 24/25 reset before later owner verification failed, and `CO-401` owned the Apr 27 reset before completing; these are now terminal or invalid evidence only and must not remain the live maintenance owner after they reach terminal or unverifiable states.
 - Window: `7` days after the normal freshness cadence expires
 - Maximum active rolling cohorts: `2`
 - Maximum rolling rows: `300`
@@ -310,3 +310,7 @@ CO-401 reproduced the Apr 27 current-main blocker while unblocking unrelated cle
 
 ### Post-refresh Disposition
 CO-401 re-homes the live rolling-freshness owner metadata to same-project issue `CO-401`, preserves the canonical owner key `docs:freshness:maintain`, and keeps `CO-343` only as historical invalid-owner evidence. The exact reviewed Mar 27 registry rows plus matching spec/task-index review dates are refreshed to `last_review=2026-04-27`; post-fix `docs:freshness` and `docs:freshness:maintain` return clean with `0` stale rows, no candidate cohorts, and `blocking_changed_paths=[]`.
+
+## Apr 28 Terminal CO-401 Owner Re-home
+
+CO-330 docs-review on Apr 28 found the next date-boundary maintenance blocker after `CO-401` reached `Done`: `docs:freshness:maintain` reported `freshness_decision=block_unowned_repo_debt`, `reason=configured_owner_terminal`, and candidate Mar 28 task packet/mirror cohorts while `blocking_changed_paths=[]`. The canonical live owner is `CO-409`; `CO-409` owns refresh, archive, or reclassification of the Mar 28 candidate cohorts before the rolling window expires and is currently blocked by `CO-415`. `CO-414` is duplicate/historical residue from the first re-home attempt and must not remain current owner metadata. CO-330 remains scoped to provider stale-owner recovery.
