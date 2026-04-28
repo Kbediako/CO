@@ -13,8 +13,8 @@
 ## Milestones & Sequencing
 1. Accept the bounded docs child-lane packet after scope review.
 2. Preserve baseline `docs:freshness` and `docs:freshness:maintain` machine output.
-3. Re-home `docs/docs-catalog.json` rolling owner metadata to `CO-420` and declare the exact March 28 Task Packet / Task Mirror baseline cohort.
-4. Register the CO-420 packet in `docs/docs-freshness-registry.json`, `tasks/index.json`, and `docs/TASKS.md`.
+3. Re-home `docs/docs-catalog.json` rolling owner metadata to `CO-420` by updating `policies.rolling_freshness_cohorts.owner_issue`, record the re-home in `docs/guides/docs-freshness-cohorts.md`, and declare the exact March 28 Task Packet / Task Mirror baseline cohort.
+4. Register the CO-420 packet in `docs/docs-freshness-registry.json`, `tasks/index.json`, and `docs/TASKS.md`; keep the accepted docs-packet manifest path `.runs/linear-f14ac3d6-cf71-4f9a-8172-b71370a480e1-docs-packet/cli/2026-04-28T21-22-21-862Z-b5aa551f/manifest.json` visible in task index and task snapshot evidence.
 5. Run freshness, docs, review, and handoff gates.
 
 ## Parity Matrix (Current / Reference / Target)
@@ -30,6 +30,7 @@
 - Update `docs/docs-catalog.json` for the `docs:freshness:maintain canonical owner key` without changing freshness caps or eligible classes.
 - Keep the March 28 stale rows machine-visible as rolling debt under the declared baseline cohort unless a direct reviewed refresh is recorded.
 - Update `docs/docs-freshness-registry.json`, `tasks/index.json`, `docs/TASKS.md`, Linear workpad, PR lifecycle, and validation evidence.
+- Preserve task-list reserve headroom by archiving the old completed `Slimdown Audit (0101)` snapshot into `docs/TASKS-archive-2026.md` as part of the task snapshot update.
 
 ## Dependencies
 - Parent-provided shared source anchor: `ctx:sha256:6d4d5e3d19965f60dc9e00809159fdd254719ca5621a2feb717e04808157390e#chunk:c000001`.
@@ -49,7 +50,7 @@
 
 ## Risks & Mitigations
 - Risk: catalog or registry edits accidentally hide stale rows. Mitigation: validation must show rolling cohort entries or clean reviewed rows, never silent deletion.
-- Risk: `CO-401` terminal evidence is treated as reusable owner truth. Mitigation: packet states terminal owner evidence is historical context only and live owner alignment targets CO-420.
+- Risk: `CO-401` terminal evidence is treated as reusable owner truth. Mitigation: packet states terminal owner evidence is historical context only, and live owner alignment targets CO-420.
 - Risk: the lane drifts into `CO-415` timeout logic. Mitigation: explicit non-goal and `Not Done If` entries keep timeout/core validation repair out of scope.
 - Risk: freshness gates are weakened to get green output. Mitigation: validation plan requires preserving `docs:freshness` and `docs:freshness:maintain` fail-closed behavior.
 
