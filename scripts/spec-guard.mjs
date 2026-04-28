@@ -27,14 +27,14 @@ const FALLBACK_TOUCH_PATTERNS = [
   /\bfall back\b/i,
   /legacy/i,
   /\bcached\b/i,
-  /\bbreak[-_\s]?glass(?=\b|[A-Z_])/i,
+  /\b(?:break[-_\s]glass|[Bb]reakGlass|BREAK_GLASS)(?=\b|[A-Z_])/,
   /\bcompat(?:ibility)?\b/i,
   /\b[Cc]ompat(?:ibility)?(?=[A-Z_])/,
-  /\bminor[-_\s]?seam(?=\b|[A-Z_])/i,
-  /\bseam(?=\b|[A-Z_])/i,
+  /\b(?:minor[-_\s]seam|[Mm]inorSeam|MINOR_SEAM)(?=\b|[A-Z_])/,
+  /\b[Ss]eam(?=\b|[A-Z_])/,
   /\bstale\b/i,
-  /\blast[-_\s]?known[-_\s]?good(?=\b|[A-Z_])/i,
-  /\blast[-_\s]?known(?=\b|[A-Z_])/i
+  /\b(?:last[-_\s]known[-_\s]good|[Ll]astKnownGood|LAST_KNOWN_GOOD)(?=\b|[A-Z_])/,
+  /\b(?:last[-_\s]known|[Ll]astKnown|LAST_KNOWN)(?=\b|[A-Z_])/
 ];
 const GOVERNED_FALLBACK_SURFACE_PATHS = [
   'orchestrator/src/cli/control/providerIssueHandoff.ts',
@@ -308,12 +308,17 @@ async function listChangedFiles(baseRef) {
 async function runGitDiffText(args) {
   try {
     const { stdout } = await execFileAsync('git', ['diff', '--unified=0', '--no-ext-diff', ...args], {
-      maxBuffer: GIT_DIFF_TEXT_MAX_BUFFER
+      maxBuffer: resolveGitDiffTextMaxBuffer()
     });
-    return stdout;
+    return { failed: false, stdout };
   } catch {
-    return '';
+    return { failed: true, stdout: '' };
   }
+}
+
+function resolveGitDiffTextMaxBuffer() {
+  const configured = Number(process.env.SPEC_GUARD_DIFF_TEXT_MAX_BUFFER);
+  return Number.isInteger(configured) && configured > 0 ? configured : GIT_DIFF_TEXT_MAX_BUFFER;
 }
 
 const CODE_PATH_PREFIXES = [
@@ -634,15 +639,25 @@ async function detectFallbackTouchingChanges(baseRef, changedFiles) {
   if (normalizedChangedFiles.length === 0) {
     return [];
   }
-  const symmetricDiffText = await runGitDiffText([`${baseRef}...HEAD`]);
-  const diffText =
-    symmetricDiffText.trim().length > 0
-      ? symmetricDiffText
-      : await runGitDiffText(['HEAD~1..HEAD']);
+  const symmetricDiff = await runGitDiffText([`${baseRef}...HEAD`]);
+  let diffText = symmetricDiff.stdout;
+  let diffScanFailed = symmetricDiff.failed;
+  if (diffText.trim().length === 0) {
+    const fallbackDiff = await runGitDiffText(['HEAD~1..HEAD']);
+    diffText = fallbackDiff.stdout;
+    diffScanFailed = diffScanFailed || fallbackDiff.failed;
+  }
   const touched = new Set(detectFallbackTouchesFromDiff(diffText));
   for (const file of normalizedChangedFiles) {
     if (isFallbackBehaviorScanCandidate(file) && (containsFallbackTouchPattern(file) || isGovernedFallbackSurface(file))) {
       touched.add(file);
+    }
+  }
+  if (diffScanFailed) {
+    for (const file of normalizedChangedFiles) {
+      if (isFallbackBehaviorScanCandidate(file)) {
+        touched.add(file);
+      }
     }
   }
   return [...touched].sort();

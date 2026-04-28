@@ -908,6 +908,36 @@ describe('spec-guard script', () => {
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
   });
 
+  it('does not treat lowercase fallback-sensitive prefixes as camelCase seams', async () => {
+    const repo = await initRepository();
+    const today = new Date().toISOString().slice(0, 10);
+
+    await writeFile(
+      join(repo, 'src/names.ts'),
+      [
+        "export const seamless = 'ordinary adjective';",
+        "export const breakglasshouse = 'ordinary lowercase word';",
+        "export const minorseamless = 'ordinary lowercase continuation';",
+        ''
+      ].join('\n')
+    );
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      `last_review: ${today}\n\nSpec update for ordinary lowercase identifiers.\n`
+    );
+    await execFileAsync('git', ['add', 'src/names.ts', 'tasks/specs/0001-initial.md'], {
+      cwd: repo
+    });
+    await execFileAsync('git', ['commit', '-m', 'ordinary lowercase identifiers'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
   it('requires decision evidence for camelCase compatibility seams', async () => {
     const repo = await initRepository();
     const today = new Date().toISOString().slice(0, 10);
@@ -957,6 +987,33 @@ describe('spec-guard script', () => {
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
     expect(stdout).toContain('fallback/seam-touching changes require updated PRD decision evidence (src/big.ts');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('fails closed when fallback diff text cannot be scanned', async () => {
+    const repo = await initRepository();
+    const today = new Date().toISOString().slice(0, 10);
+    const filler = '// ordinary filler line that forces the configured diff buffer to overflow\n'.repeat(50);
+
+    await writeFile(join(repo, 'src/big.ts'), `export const value = 2;\n${filler}`);
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      `last_review: ${today}\n\nGeneric spec update without fallback decision metadata.\n`
+    );
+    await execFileAsync('git', ['add', 'src/big.ts', 'tasks/specs/0001-initial.md'], {
+      cwd: repo
+    });
+    await execFileAsync('git', ['commit', '-m', 'large code diff with unreadable text scan'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env, BASE_SHA: 'HEAD~1', SPEC_GUARD_DIFF_TEXT_MAX_BUFFER: '16' }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain(
+      'fallback/seam-touching changes require updated PRD decision evidence (src/big.ts)'
+    );
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
 
