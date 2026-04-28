@@ -66,6 +66,23 @@
       }
     },
     {
+      "id": "20260428-linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306",
+      "title": "CO-409 March 28 docs freshness cohort maintenance",
+      "relates_to": "tasks/tasks-linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-28",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "paths": {
+        "spec": "tasks/specs/linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306.md",
+        "task": "tasks/tasks-linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306.md",
+        "agent_task": ".agent/task/linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306.md",
+        "docs": "docs/TECH_SPEC-linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306.md"
+      }
+    },
+    {
       "id": "20260428-linear-9f955ebd-e00b-46ad-b25c-280029328841",
       "title": "CO-417 recover stale provider-worker proof locks during active appserver runs",
       "relates_to": "tasks/tasks-linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
