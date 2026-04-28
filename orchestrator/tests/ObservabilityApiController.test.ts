@@ -369,6 +369,8 @@ describe('ObservabilityApiController', () => {
         issue_identifier: 'CO-393'
       }
     });
+    expect(state.body).not.toHaveProperty('accepted.launch_token');
+    expect(state.body).not.toHaveProperty('claim.launch_token');
     expect(requestProviderWorkerRecover).toHaveBeenCalledTimes(1);
     expect(recovered).toBe(false);
     recovery.resolve();
@@ -473,6 +475,8 @@ describe('ObservabilityApiController', () => {
         issue_identifier: 'CO-404'
       }
     });
+    expect(first.state.body).not.toHaveProperty('accepted.launch_token');
+    expect(first.state.body).not.toHaveProperty('claim.launch_token');
     expect(second.state.body).toMatchObject({
       issue_id: 'CO-404',
       action: 'recover',
@@ -483,7 +487,33 @@ describe('ObservabilityApiController', () => {
       in_flight_action: 'nudge',
       accepted: { state: 'starting', issue_identifier: 'CO-404' }
     });
-    expect(requestProviderWorkerRecover).toHaveBeenCalledTimes(1);
+    expect(second.state.body).not.toHaveProperty('accepted.launch_token');
+    expect(second.state.body).not.toHaveProperty('claim.launch_token');
+    accepted = null;
+    const third = createResponseRecorder();
+    await handleObservabilityApiRequest({
+      ...baseContext,
+      presenterContext: {
+        ...buildControlHostPresenterContext(),
+        paths: {
+          manifestPath: '/repo/.runs/other-runtime/cli/control-host/manifest.json',
+          runDir: '/repo/.runs/other-runtime/cli/control-host',
+          logPath: '/repo/.runs/other-runtime/cli/control-host/log.txt'
+        }
+      },
+      req: { method: 'POST', url: '/api/v1/provider-worker/recover' } as Pick<http.IncomingMessage, 'method' | 'url'>,
+      res: third.res,
+      readRequestBody: async () => ({ issue_id: 'CO-404', action: 'recover' })
+    });
+    expect(third.state.body).toMatchObject({
+      issue_id: 'CO-404',
+      action: 'recover',
+      kind: 'queued',
+      reason: 'provider_worker_recover_queued',
+      queued: true,
+      coalesced: false
+    });
+    expect(requestProviderWorkerRecover).toHaveBeenCalledTimes(2);
     recovery.resolve();
     await recovery.promise;
     await Promise.resolve();

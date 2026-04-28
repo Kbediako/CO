@@ -131,12 +131,19 @@ function readProviderWorkerRecoverAcceptedClaim(
   if (!state) {
     return null;
   }
+  const normalizedProvider = input.provider.trim().toLowerCase();
+  const normalizedIssueId = input.issueId.trim().toLowerCase();
   const providerKey = buildProviderIssueKey(input.provider, input.issueId);
+  const normalizedProviderKey = buildProviderIssueKey(input.provider, normalizedIssueId);
   const claim =
     readProviderIntakeClaim(state, providerKey) ??
+    readProviderIntakeClaim(state, normalizedProviderKey) ??
     state.claims.find((candidate) =>
-      candidate.provider === input.provider &&
-      (candidate.issue_id === input.issueId || candidate.issue_identifier === input.issueId)
+      candidate.provider.trim().toLowerCase() === normalizedProvider &&
+      (
+        normalizeOptionalString(candidate.issue_id)?.toLowerCase() === normalizedIssueId ||
+        normalizeOptionalString(candidate.issue_identifier)?.toLowerCase() === normalizedIssueId
+      )
     ) ??
     null;
   if (!claim || !isFreshControlHostProviderWorkerRecoverClaim(claim, input)) {

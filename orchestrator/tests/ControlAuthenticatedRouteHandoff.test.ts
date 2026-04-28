@@ -281,7 +281,7 @@ describe('ControlAuthenticatedRouteHandoff', () => {
     persistedProviderIntakeState.claims.push(acceptedClaim);
     expect(assembled.readProviderWorkerRecoverAccepted?.({
       provider: 'linear',
-      issueId: 'CO-404',
+      issueId: 'co-404',
       action: 'nudge',
       requestedAt: '2026-04-27T20:00:00.000Z'
     })).toMatchObject({

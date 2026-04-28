@@ -32,6 +32,7 @@ const CO_COMPATIBILITY_EXTENSION_SEGMENTS = new Set(['dispatch', 'provider-worke
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 const JSON_NO_STORE_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
 const PROVIDER_WORKER_RECOVER_ACCEPTANCE_POLL_MS = 25;
+// Module-level so concurrent requests in one control runtime can coalesce; keys include runtime scope.
 const providerWorkerRecoverInFlight = new Map<string, ProviderWorkerRecoverInFlight>();
 
 interface ProviderWorkerRecoverInFlight {
@@ -280,6 +281,7 @@ export async function handleObservabilityApiRequest(
       const requestProviderWorkerRecover = context.requestProviderWorkerRecover;
       const result = requestProviderWorkerRecover
         ? await queueProviderWorkerRecover({
+            runtimeKey: resolveProviderWorkerRecoverRuntimeKey(context.presenterContext),
             provider: 'linear',
             issueId: request.issueId,
             action: request.action,
@@ -371,6 +373,7 @@ function resolveProviderWorkerRecoverTraceabilityIssueIdentifier(
 }
 
 function queueProviderWorkerRecover(input: {
+  runtimeKey: string;
   provider: 'linear';
   issueId: string;
   action: ProviderIssueRecoveryAction;
@@ -378,7 +381,7 @@ function queueProviderWorkerRecover(input: {
   readAccepted?: (() => ProviderWorkerRecoverAcceptedState | null) | null;
   run: () => Promise<ProviderIssueHandoffRecoveryResult>;
 }): Promise<ProviderWorkerRecoverRouteResult> {
-  const key = buildProviderWorkerRecoverInFlightKey(input.provider, input.issueId);
+  const key = buildProviderWorkerRecoverInFlightKey(input.runtimeKey, input.provider, input.issueId);
   const existing = providerWorkerRecoverInFlight.get(key);
   if (existing) {
     if (existing.accepted) {
@@ -438,6 +441,7 @@ function queueProviderWorkerRecover(input: {
     if (inFlight?.promise === trackedPromise) {
       inFlight.accepted = accepted;
       registerProviderWorkerRecoverInFlightAliases({
+        runtimeKey: input.runtimeKey,
         provider: input.provider,
         inFlight,
         accepted
@@ -570,11 +574,20 @@ function createProviderWorkerRecoverAcceptanceObserver(input: {
   return { promise, stop };
 }
 
-function buildProviderWorkerRecoverInFlightKey(provider: 'linear', issueId: string): string {
-  return `${provider}:${issueId.trim().toLowerCase()}`;
+function resolveProviderWorkerRecoverRuntimeKey(context: ObservabilityPresenterContext): string {
+  return context.paths.runDir || context.paths.manifestPath;
+}
+
+function buildProviderWorkerRecoverInFlightKey(
+  runtimeKey: string,
+  provider: 'linear',
+  issueId: string
+): string {
+  return `${runtimeKey}:${provider}:${issueId.trim().toLowerCase()}`;
 }
 
 function registerProviderWorkerRecoverInFlightAliases(input: {
+  runtimeKey: string;
   provider: 'linear';
   inFlight: ProviderWorkerRecoverInFlight;
   accepted: ProviderWorkerRecoverAcceptedState;
@@ -587,7 +600,7 @@ function registerProviderWorkerRecoverInFlightAliases(input: {
     if (!alias) {
       continue;
     }
-    const key = buildProviderWorkerRecoverInFlightKey(input.provider, alias);
+    const key = buildProviderWorkerRecoverInFlightKey(input.runtimeKey, input.provider, alias);
     const existing = providerWorkerRecoverInFlight.get(key);
     if (existing && existing !== input.inFlight) {
       continue;
