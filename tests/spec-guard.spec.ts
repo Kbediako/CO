@@ -11,6 +11,14 @@ const scriptPath = join(process.cwd(), 'scripts', 'spec-guard.mjs');
 
 const createdDirs: string[] = [];
 
+function specGuardEnv(overrides: NodeJS.ProcessEnv = {}) {
+  const env = { ...process.env, ...overrides };
+  if (!Object.prototype.hasOwnProperty.call(overrides, 'BASE_SHA')) {
+    delete env.BASE_SHA;
+  }
+  return env;
+}
+
 function reviewDateDaysAgo(daysOld: number) {
   const date = new Date();
   date.setUTCHours(0, 0, 0, 0);
@@ -326,7 +334,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -353,7 +361,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -367,7 +375,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -398,7 +406,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -414,7 +422,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -441,7 +449,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -468,7 +476,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -496,7 +504,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -532,7 +540,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -551,7 +559,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('Spec guard rolling freshness cohort entries: 1');
@@ -584,7 +592,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -617,7 +625,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -655,7 +663,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -676,7 +684,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -703,7 +711,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -719,7 +727,7 @@ describe('spec-guard script', () => {
     await expect(
       execFileAsync('node', [scriptPath], {
         cwd: repo,
-        env: { ...process.env }
+        env: specGuardEnv()
       })
     ).rejects.toMatchObject({
       code: 1,
@@ -744,7 +752,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -759,7 +767,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -779,7 +787,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -813,7 +821,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -847,7 +855,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -867,7 +875,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -887,7 +895,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -909,7 +917,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env, BASE_SHA: 'HEAD' }
+      env: specGuardEnv({ BASE_SHA: 'HEAD' })
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -939,7 +947,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env, BASE_SHA: 'HEAD~1' }
+      env: specGuardEnv({ BASE_SHA: 'HEAD~1' })
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -961,7 +969,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -990,7 +998,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -1020,7 +1028,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -1045,7 +1053,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1070,7 +1078,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1095,7 +1103,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env, BASE_SHA: 'HEAD~1', SPEC_GUARD_DIFF_TEXT_MAX_BUFFER: '16' }
+      env: specGuardEnv({ BASE_SHA: 'HEAD~1', SPEC_GUARD_DIFF_TEXT_MAX_BUFFER: '16' })
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1135,7 +1143,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -1155,7 +1163,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -1178,7 +1186,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1207,7 +1215,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1229,7 +1237,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1248,7 +1256,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -1317,7 +1325,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1347,7 +1355,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1371,7 +1379,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1394,7 +1402,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1417,7 +1425,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1438,7 +1446,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1459,7 +1467,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1479,7 +1487,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -1497,7 +1505,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -1515,7 +1523,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1535,7 +1543,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1555,7 +1563,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1578,7 +1586,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1602,7 +1610,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1626,7 +1634,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1647,7 +1655,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1679,7 +1687,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1699,7 +1707,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1719,7 +1727,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1746,7 +1754,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -1767,7 +1775,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1789,7 +1797,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1819,7 +1827,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1843,7 +1851,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1867,7 +1875,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1888,7 +1896,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1909,7 +1917,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1935,7 +1943,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -1962,7 +1970,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -1985,7 +1993,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2011,7 +2019,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2037,7 +2045,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2063,7 +2071,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2089,7 +2097,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2115,7 +2123,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2141,7 +2149,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2167,7 +2175,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2203,7 +2211,7 @@ describe('spec-guard script', () => {
 
       const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
         cwd: repo,
-        env: { ...process.env }
+        env: specGuardEnv()
       });
 
       expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2230,7 +2238,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2256,7 +2264,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2286,7 +2294,7 @@ describe('spec-guard script', () => {
 
       const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
         cwd: repo,
-        env: { ...process.env }
+        env: specGuardEnv()
       });
 
       expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2313,7 +2321,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2339,7 +2347,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2365,7 +2373,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2391,7 +2399,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2421,7 +2429,7 @@ describe('spec-guard script', () => {
 
       const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
         cwd: repo,
-        env: { ...process.env }
+        env: specGuardEnv()
       });
 
       expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2454,7 +2462,7 @@ describe('spec-guard script', () => {
 
       const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
         cwd: repo,
-        env: { ...process.env }
+        env: specGuardEnv()
       });
 
       expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2481,7 +2489,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2507,7 +2515,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -2530,7 +2538,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -2549,7 +2557,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -2569,7 +2577,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2594,7 +2602,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2617,7 +2625,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2642,7 +2650,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -2671,7 +2679,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2702,7 +2710,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2726,7 +2734,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -2746,7 +2754,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -2774,7 +2782,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
@@ -2801,7 +2809,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
@@ -2828,7 +2836,7 @@ describe('spec-guard script', () => {
 
     const { stdout } = await execFileAsync('node', [scriptPath], {
       cwd: repo,
-      env: { ...process.env }
+      env: specGuardEnv()
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
