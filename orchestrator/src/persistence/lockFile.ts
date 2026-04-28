@@ -64,6 +64,7 @@ export interface LockRetryFailureDiagnostics {
     | 'same_host_process_reused_pid'
     | 'same_host_process_identity_unverified'
     | 'remote_host'
+    | 'metadata_without_host'
     | 'metadata_without_pid';
   recoverable: boolean;
 }
@@ -266,6 +267,10 @@ async function clearStaleLock(
     if (!lockFileIdentityMatchesDiagnostics(currentStats, diagnostics)) {
       return { cleared: false, diagnostics };
     }
+    await clearStaleLockTestHooks.beforeOwnerTokenCheck?.(lockPath, diagnostics);
+    if (!(await currentLockOwnerTokenMatchesDiagnostics(lockPath, diagnostics))) {
+      return { cleared: false, diagnostics };
+    }
     await rm(lockPath);
     return { cleared: true, diagnostics };
   } catch (error: unknown) {
@@ -356,6 +361,7 @@ async function inspectLockForRecovery(
     isStale
     && ownerStatus !== 'same_host_process_alive'
     && ownerStatus !== 'same_host_process_identity_unverified'
+    && ownerStatus !== 'metadata_without_host'
     && ownerStatus !== 'metadata_without_pid'
     && ownerStatus !== 'remote_host';
 
@@ -387,6 +393,14 @@ function lockFileIdentityMatchesDiagnostics(stats: Stats, diagnostics: LockRetry
   );
 }
 
+async function currentLockOwnerTokenMatchesDiagnostics(
+  lockPath: string,
+  diagnostics: LockRetryFailureDiagnostics
+): Promise<boolean> {
+  const currentOwner = parseLockOwnerMetadata(await readFile(lockPath, 'utf8'));
+  return currentOwner?.token === diagnostics.owner?.token;
+}
+
 async function classifyLockOwnerStatus(
   owner: LockOwnerMetadata | null,
   inspectedHost: string
@@ -397,7 +411,10 @@ async function classifyLockOwnerStatus(
   if (owner.format === 'legacy') {
     return 'legacy_or_unknown';
   }
-  if (owner.host && owner.host !== inspectedHost) {
+  if (!owner.host) {
+    return 'metadata_without_host';
+  }
+  if (owner.host !== inspectedHost) {
     return 'remote_host';
   }
   if (!owner.pid) {
@@ -549,3 +566,20 @@ export function formatLockRetryFailureDiagnostics(
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
+
+const clearStaleLockTestHooks: {
+  beforeOwnerTokenCheck:
+    | ((lockPath: string, diagnostics: LockRetryFailureDiagnostics) => Promise<void> | void)
+    | null;
+} = {
+  beforeOwnerTokenCheck: null
+};
+
+export const __test__ = {
+  currentLockOwnerTokenMatchesDiagnostics,
+  setBeforeClearStaleLockOwnerTokenCheck(
+    hook: ((lockPath: string, diagnostics: LockRetryFailureDiagnostics) => Promise<void> | void) | null
+  ): void {
+    clearStaleLockTestHooks.beforeOwnerTokenCheck = hook;
+  }
+};
