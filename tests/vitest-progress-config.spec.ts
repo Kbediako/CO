@@ -85,13 +85,13 @@ describe('vitest progress reporter config', () => {
 describe('vitest worker-cap config', () => {
   it('caps workers for CI broad-lane runs', async () => {
     const config = await loadConfig({ CI: '1' });
-    expect(config.test?.maxWorkers).toBe(4);
+    expect(config.test?.maxWorkers).toBe(2);
     expect(config.test?.minWorkers).toBe(1);
   });
 
   it('caps workers for explicit stage-owned Vitest progress runs', async () => {
     const config = await loadConfig({ CODEX_VITEST_PROGRESS: '1' });
-    expect(config.test?.maxWorkers).toBe(4);
+    expect(config.test?.maxWorkers).toBe(2);
     expect(config.test?.minWorkers).toBe(1);
   });
 
@@ -101,7 +101,7 @@ describe('vitest worker-cap config', () => {
     { label: 'CODEX_NONINTERACTIVE', env: { CODEX_NONINTERACTIVE: 'yes' } }
   ])('caps workers for $label worker runs', async ({ env }) => {
     const config = await loadConfig(env);
-    expect(config.test?.maxWorkers).toBe(4);
+    expect(config.test?.maxWorkers).toBe(2);
     expect(config.test?.minWorkers).toBe(1);
   });
 
