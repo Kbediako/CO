@@ -1,11 +1,12 @@
 import http from 'node:http';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { buildCompatibilityProjectionSnapshot } from '../src/cli/control/compatibilityIssuePresenter.js';
 import {
   handleObservabilityApiRequest,
-  resolveObservabilityApiRoute
+  resolveObservabilityApiRoute,
+  type ProviderWorkerRecoverAcceptedState
 } from '../src/cli/control/observabilityApiController.js';
 import type { ControlState } from '../src/cli/control/controlState.js';
 import type { ControlCompatibilitySourceContext } from '../src/cli/control/observabilityReadModel.js';
@@ -48,6 +49,31 @@ function createResponseRecorder() {
   } as unknown as http.ServerResponse;
 
   return { res, state };
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((innerResolve, innerReject) => {
+    resolve = innerResolve;
+    reject = innerReject;
+  });
+  return { promise, resolve, reject };
+}
+
+function buildProviderWorkerRecoverAcceptedState(
+  overrides: Partial<ProviderWorkerRecoverAcceptedState> = {}
+): ProviderWorkerRecoverAcceptedState {
+  return {
+    issue_id: 'CO-404-id',
+    issue_identifier: 'CO-404',
+    state: 'starting',
+    reason: 'provider_issue_start_launched',
+    launch_source: 'control-host',
+    launch_token_present: true,
+    updated_at: '2026-04-26T17:44:00.000Z',
+    ...overrides
+  };
 }
 
 function buildCompatibilitySource(
@@ -273,8 +299,38 @@ describe('ObservabilityApiController', () => {
     expect((state.body as { requested_at?: string }).requested_at).toBeTruthy();
   });
 
-  it('accepts provider-worker recover requests through the control-host API', async () => {
+  it('acknowledges provider-worker recover requests before the background launch settles', async () => {
     const { res, state } = createResponseRecorder();
+    const recovery = createDeferred<void>();
+    let recovered = false;
+    let accepted: ProviderWorkerRecoverAcceptedState | null = null;
+    const requestProviderWorkerRecover = vi.fn(async (input: {
+      provider: 'linear';
+      issueId: string;
+      action: 'recover' | 'relaunch' | 'nudge';
+    }) => {
+      accepted = buildProviderWorkerRecoverAcceptedState({
+        issue_id: input.issueId,
+        issue_identifier: 'CO-393'
+      });
+      await recovery.promise;
+      recovered = true;
+      return {
+        provider: input.provider,
+        issue_id: input.issueId,
+        action: input.action,
+        kind: 'start' as const,
+        reason: 'provider_issue_start_launched',
+        claim: {
+          provider: input.provider, issue_id: input.issueId, issue_identifier: 'CO-393',
+          issue_state: 'In Progress', issue_state_type: 'started', state: 'starting' as const,
+          reason: 'provider_issue_start_launched', task_id: 'linear-0b2377a2-366f-4309-a508-610e524c9d94',
+          run_id: 'run-1', worker_host: null, launch_source: 'control-host' as const,
+          launch_token_present: true, updated_at: '2026-04-26T17:44:00.000Z',
+          run_manifest_path: '/repo/.runs/linear-issue/cli/run-1/manifest.json',
+        }
+      };
+    });
     const handled = await handleObservabilityApiRequest({
       authKind: 'control',
       req: {
@@ -288,21 +344,8 @@ describe('ObservabilityApiController', () => {
         action: 'relaunch'
       }),
       requestRefresh: async () => { throw new Error('unused'); },
-      requestProviderWorkerRecover: async (input) => ({
-        provider: input.provider,
-        issue_id: input.issueId,
-        action: input.action,
-        kind: 'start',
-        reason: 'provider_issue_start_launched',
-        claim: {
-          provider: input.provider, issue_id: input.issueId, issue_identifier: 'CO-393',
-          issue_state: 'In Progress', issue_state_type: 'started', state: 'starting',
-          reason: 'provider_issue_start_launched', task_id: 'linear-0b2377a2-366f-4309-a508-610e524c9d94',
-          run_id: 'run-1', worker_host: null, launch_source: 'control-host',
-          launch_token_present: true, updated_at: '2026-04-26T17:44:00.000Z',
-          run_manifest_path: '/repo/.runs/linear-issue/cli/run-1/manifest.json',
-        }
-      }),
+      requestProviderWorkerRecover,
+      readProviderWorkerRecoverAccepted: () => accepted,
       readDispatchEvaluation: readDisabledDispatchEvaluation
     });
 
@@ -311,10 +354,169 @@ describe('ObservabilityApiController', () => {
     expect(state.body).toMatchObject({
       mode: 'provider_worker_recover', provider: 'linear',
       issue_id: '0b2377a2-366f-4309-a508-610e524c9d94', action: 'relaunch',
-      kind: 'start', reason: 'provider_issue_start_launched',
-      claim: { launch_source: 'control-host', launch_token_present: true },
-      traceability: { decision: 'acknowledged', reason: 'provider_issue_start_launched', issue_identifier: 'CO-393' }
+      kind: 'queued', reason: 'provider_worker_recover_queued',
+      queued: true, coalesced: false, async: true,
+      in_flight_action: 'relaunch',
+      accepted: {
+        state: 'starting',
+        launch_source: 'control-host',
+        launch_token_present: true
+      },
+      claim: null,
+      traceability: {
+        decision: 'acknowledged',
+        reason: 'provider_worker_recover_queued',
+        issue_identifier: 'CO-393'
+      }
     });
+    expect(state.body).not.toHaveProperty('accepted.launch_token');
+    expect(state.body).not.toHaveProperty('claim.launch_token');
+    expect(requestProviderWorkerRecover).toHaveBeenCalledTimes(1);
+    expect(recovered).toBe(false);
+    recovery.resolve();
+    await recovery.promise;
+    await Promise.resolve();
+    expect(recovered).toBe(true);
+  });
+
+  it('preserves completed recovery identity before accepting work', async () => {
+    const { res, state } = createResponseRecorder();
+    const requestProviderWorkerRecover = vi.fn(async (input: { provider: 'linear'; action: 'nudge' }) => ({
+      provider: input.provider,
+      issue_id: '0b2377a2-366f-4309-a508-610e524c9d94',
+      action: input.action,
+      kind: 'skipped' as const,
+      reason: 'provider_issue_recover_resolution_unavailable',
+      claim: null
+    }));
+
+    const handled = await handleObservabilityApiRequest({
+      authKind: 'control',
+      req: { method: 'POST', url: '/api/v1/provider-worker/recover' } as Pick<http.IncomingMessage, 'method' | 'url'>,
+      res,
+      presenterContext: buildControlHostPresenterContext(),
+      readRequestBody: async () => ({ issue_id: 'CO-404', action: 'nudge' }),
+      requestRefresh: async () => { throw new Error('unused'); },
+      requestProviderWorkerRecover,
+      readDispatchEvaluation: readDisabledDispatchEvaluation
+    });
+
+    expect(handled).toBe(true);
+    expect(state.statusCode).toBe(202);
+    expect(state.body).toMatchObject({
+      mode: 'provider_worker_recover',
+      issue_id: '0b2377a2-366f-4309-a508-610e524c9d94',
+      action: 'nudge',
+      kind: 'skipped',
+      reason: 'provider_issue_recover_resolution_unavailable',
+      queued: false,
+      coalesced: false,
+      async: false,
+      claim: null
+    });
+    expect(requestProviderWorkerRecover).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps provider-worker recover API retries action-scoped while launch is in flight', async () => {
+    const recovery = createDeferred<void>();
+    let accepted: ProviderWorkerRecoverAcceptedState | null = null;
+    const requestProviderWorkerRecover = vi.fn(async (input: {
+      provider: 'linear';
+      issueId: string;
+      action: 'recover' | 'relaunch' | 'nudge';
+    }) => {
+      accepted = buildProviderWorkerRecoverAcceptedState({
+        issue_id: '0b2377a2-366f-4309-a508-610e524c9d94',
+        issue_identifier: 'CO-404'
+      });
+      await recovery.promise;
+      return {
+        provider: input.provider,
+        issue_id: input.issueId,
+        action: input.action,
+        kind: 'start' as const,
+        reason: 'provider_issue_start_launched',
+        claim: null
+      };
+    });
+    const first = createResponseRecorder();
+    const second = createResponseRecorder();
+    const baseContext = {
+      authKind: 'control' as const,
+      presenterContext: buildControlHostPresenterContext(),
+      requestRefresh: async () => { throw new Error('unused'); },
+      requestProviderWorkerRecover,
+      readProviderWorkerRecoverAccepted: () => accepted,
+      readDispatchEvaluation: readDisabledDispatchEvaluation
+    };
+
+    await handleObservabilityApiRequest({
+      ...baseContext,
+      req: { method: 'POST', url: '/api/v1/provider-worker/recover' } as Pick<http.IncomingMessage, 'method' | 'url'>,
+      res: first.res,
+      readRequestBody: async () => ({
+        issue_id: '0b2377a2-366f-4309-a508-610e524c9d94',
+        action: 'nudge'
+      })
+    });
+    await handleObservabilityApiRequest({
+      ...baseContext,
+      req: { method: 'POST', url: '/api/v1/provider-worker/recover' } as Pick<http.IncomingMessage, 'method' | 'url'>,
+      res: second.res,
+      readRequestBody: async () => ({ issue_id: 'CO-404', action: 'recover' })
+    });
+
+    expect(first.state.body).toMatchObject({
+      issue_id: '0b2377a2-366f-4309-a508-610e524c9d94',
+      action: 'nudge',
+      kind: 'queued',
+      reason: 'provider_worker_recover_queued',
+      queued: true,
+      coalesced: false,
+      in_flight_action: 'nudge',
+      accepted: {
+        issue_id: '0b2377a2-366f-4309-a508-610e524c9d94',
+        state: 'starting',
+        issue_identifier: 'CO-404'
+      }
+    });
+    expect(first.state.body).not.toHaveProperty('accepted.launch_token');
+    expect(first.state.body).not.toHaveProperty('claim.launch_token');
+    expect(second.state.body).toMatchObject({
+      issue_id: 'CO-404',
+      action: 'recover',
+      kind: 'queued',
+      reason: 'provider_worker_recover_queued',
+      queued: true,
+      coalesced: false,
+      in_flight_action: 'recover',
+      accepted: { state: 'starting', issue_identifier: 'CO-404' }
+    });
+    expect(second.state.body).not.toHaveProperty('accepted.launch_token');
+    expect(second.state.body).not.toHaveProperty('claim.launch_token');
+    const third = createResponseRecorder();
+    await handleObservabilityApiRequest({
+      ...baseContext,
+      req: { method: 'POST', url: '/api/v1/provider-worker/recover' } as Pick<http.IncomingMessage, 'method' | 'url'>,
+      res: third.res,
+      readRequestBody: async () => ({
+        issue_id: '0b2377a2-366f-4309-a508-610e524c9d94',
+        action: 'recover'
+      })
+    });
+    expect(third.state.body).toMatchObject({
+      issue_id: '0b2377a2-366f-4309-a508-610e524c9d94',
+      action: 'recover',
+      kind: 'queued',
+      reason: 'provider_worker_recover_already_in_progress',
+      queued: true,
+      coalesced: true,
+      in_flight_action: 'recover'
+    });
+    expect(requestProviderWorkerRecover).toHaveBeenCalledTimes(2);
+    recovery.resolve();
+    await recovery.promise;
+    await Promise.resolve();
   });
 
   it('rejects provider-worker recover requests without control auth', async () => {

@@ -5,7 +5,7 @@ relates_to: tasks/tasks-0979-standalone-review-runtime-telemetry.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-03-28
+last_review: 2026-04-28
 ---
 
 ## Summary
