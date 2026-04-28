@@ -1,7 +1,7 @@
 # ACTION_PLAN - CO-406 no-run accepted recover capacity accounting
 
 ## Summary
-- Goal: make accepted pending-revalidation recover claims with no run or launch token non-occupancy state for provider-worker capacity, while preserving real duplicate launch protection.
+- Goal: make accepted pending-revalidation recover claims with `run_id=null`, `run_manifest_path=null`, `launch_started_at=null`, and `launch_token=null` non-occupancy state for provider-worker capacity, while preserving real duplicate launch protection.
 - Scope: docs packet, capacity/read-model implementation, focused regressions, validation/review, PR handoff, and Linear lifecycle for CO-406.
 - Assumptions:
   - the observed CO-405 shape is representative: `state=accepted`, `reason=provider_issue_rehydration_pending_revalidation`, `run_id=null`, `run_manifest_path=null`, `launch_started_at=null`, and `launch_token=null`
@@ -13,6 +13,7 @@
   - `accepted pending-revalidation claims`
   - `run_id=null`
   - `run_manifest_path=null`
+  - `launch_started_at=null`
   - `launch_token=null`
   - `provider_issue_start_blocked:max_concurrency`
   - `provider_issue_rehydration_pending_revalidation`
@@ -32,7 +33,7 @@
 - Pre-implementation issue-quality review:
   - 2026-04-28: micro-task path is unavailable because this touches admission safety and status truth.
   - 2026-04-28: the issue is bounded to admission/capacity accounting, not broad control-host authority or acknowledgement timeout.
-- Fallback / refactor decision:
+- Fallback and refactor decision:
   - `remove fallback`: accepted pending-revalidation no-run claims counting as active capacity.
   - `justify retaining fallback`: provider-intake pending-revalidation audit state as visible non-occupancy state.
   - `justify retaining fallback`: duplicate-launch protection for real running or launching claims.

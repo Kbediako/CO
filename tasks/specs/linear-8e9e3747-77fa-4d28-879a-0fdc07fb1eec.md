@@ -32,11 +32,12 @@ task_checklists:
   - exclude CO-404 acknowledgement-timeout behavior
 
 ## Issue-Shaping Contract
-- User-request translation carried forward: CO-406 fixes admission/capacity accounting for a retained `accepted` / `provider_issue_rehydration_pending_revalidation` claim that has no run and no launch token. That retained claim may remain visible, but it must not count as a running worker slot or block its own retry as max concurrency.
+- User-request translation carried forward: CO-406 fixes admission/capacity accounting for a retained `accepted` / `provider_issue_rehydration_pending_revalidation` claim with `run_id=null`, `run_manifest_path=null`, `launch_started_at=null`, and `launch_token=null`. That retained claim may remain visible, but it must not count as a running worker slot or block its own retry as max concurrency.
 - Protected terms / exact artifact and surface names:
   - `accepted pending-revalidation claims`
   - `run_id=null`
   - `run_manifest_path=null`
+  - `launch_started_at=null`
   - `launch_token=null`
   - `provider_issue_start_blocked:max_concurrency`
   - `provider_issue_rehydration_pending_revalidation`

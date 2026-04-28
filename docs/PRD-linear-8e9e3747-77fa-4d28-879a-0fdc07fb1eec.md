@@ -15,9 +15,9 @@
 - Desired Outcome: no-run accepted pending-revalidation claims remain auditable provider-intake state but no longer consume running/launching capacity. A retry for that same issue either launches, queues truthfully, or returns an actionable no-op, while real running or launching claims still prevent duplicate provider-worker launches.
 
 ## User Request Translation
-- User intent / needs: fix the CO-405 admission failure shape without reopening CO-404 acknowledgement-timeout behavior. The implementation must repair admission/capacity accounting for accepted pending-revalidation claims that have no run or launch token.
+- User intent / needs: fix the CO-405 admission failure shape without reopening CO-404 acknowledgement-timeout behavior. The implementation must repair admission/capacity accounting for accepted pending-revalidation claims with `run_id=null`, `run_manifest_path=null`, `launch_started_at=null`, and `launch_token=null`.
 - Success criteria / acceptance:
-  - accepted pending-revalidation claims with `run_id=null`, `run_manifest_path=null`, and no launch token do not count as running or launching capacity
+  - accepted pending-revalidation claims with `run_id=null`, `run_manifest_path=null`, `launch_started_at=null`, and `launch_token=null` do not count as running or launching capacity
   - recover/relaunch/nudge retries for the same no-run accepted claim do not self-block as `provider_issue_start_blocked:max_concurrency`
   - `co-status --format json`, `/ui/data.json`, and `provider-intake-state.json` agree on active accepted/no-run versus running worker claims
   - regression coverage proves `running=2`, `max_allowed=3`, plus one accepted no-run recover claim does not block the next recover for that same issue
@@ -33,6 +33,7 @@
   - `accepted pending-revalidation claims`
   - `run_id=null`
   - `run_manifest_path=null`
+  - `launch_started_at=null`
   - `launch_token=null`
   - `provider_issue_start_blocked:max_concurrency`
   - `provider_issue_rehydration_pending_revalidation`
