@@ -8009,6 +8009,210 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('does not let a no-run pending-revalidation claim self-count against remaining admission capacity', async () => {
+    const { root, paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    await seedOccupiedRunningProviderWorkers(root, state, DEFAULT_LOCAL_PROVIDER_OCCUPIED_DESCRIPTORS.slice(0, 2));
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-recover',
+      issue_identifier: 'CO-406',
+      issue_title: 'Pending revalidation recover claim',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-28T03:29:00.000Z',
+      task_id: 'linear-lin-issue-recover',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      accepted_at: '2026-04-28T03:29:00.000Z',
+      updated_at: '2026-04-28T03:29:10.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async ({ issueId }: { issueId: string }) => ({
+        runId: `run-${issueId}`,
+        manifestPath: `/tmp/provider-run/${issueId}.json`
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 3
+        }
+      })
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-recover',
+        identifier: 'CO-406',
+        updated_at: '2026-04-28T03:30:00.000Z'
+      }),
+      deliveryId: 'delivery-pending-revalidation-recover',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_745_811_000_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'start',
+      claim: {
+        provider_key: 'linear:lin-issue-recover',
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        task_id: 'linear-lin-issue-recover',
+        run_id: 'run-lin-issue-recover',
+        run_manifest_path: '/tmp/provider-run/lin-issue-recover.json'
+      }
+    });
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'lin-issue-recover',
+      issueIdentifier: 'CO-406',
+      launchToken: expect.any(String)
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims.filter((claim) => claim.state === 'running')).toHaveLength(2);
+    expect(getPersistedState().claims.find((claim) => claim.provider_key === 'linear:lin-issue-recover')).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched'
+    });
+  });
+
+  it.each([
+    ['running', 'provider_issue_rehydrated_active_run'],
+    ['starting', 'provider_issue_start_launched']
+  ] as const)('does not relaunch a same-issue %s claim while unrelated capacity remains', async (claimState, reason) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-28T03:30:30.000Z'));
+    const { root, paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    await seedOccupiedRunningProviderWorkers(root, state, DEFAULT_LOCAL_PROVIDER_OCCUPIED_DESCRIPTORS.slice(0, 2));
+    const activePaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'linear-lin-issue-recover'
+      },
+      'run-existing-recover'
+    );
+    if (claimState === 'running') {
+      await mkdir(activePaths.runDir, { recursive: true });
+      await writeFile(
+        activePaths.manifestPath,
+        JSON.stringify({
+          run_id: 'run-existing-recover',
+          task_id: 'linear-lin-issue-recover',
+          pipeline_id: 'provider-linear-worker',
+          status: 'in_progress',
+          issue_provider: 'linear',
+          issue_id: 'lin-issue-recover',
+          issue_identifier: 'CO-406',
+          issue_updated_at: '2026-04-28T03:29:00.000Z',
+          provider_launch_source: 'control-host',
+          provider_control_host_task_id: 'local-mcp',
+          provider_control_host_run_id: 'control-host',
+          started_at: '2026-04-28T03:29:00.000Z',
+          updated_at: '2026-04-28T03:30:00.000Z'
+        }),
+        'utf8'
+      );
+      await writeFile(
+        join(activePaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+        JSON.stringify({
+          issue_id: 'lin-issue-recover',
+          issue_identifier: 'CO-406',
+          owner_phase: 'turn_running',
+          owner_status: 'in_progress',
+          attempt_started_at: '2026-04-28T03:29:00.000Z',
+          updated_at: '2026-04-28T03:30:00.000Z'
+        }),
+        'utf8'
+      );
+      await expect(
+        discoverProviderIssueRuns(paths.runDir, { provider: 'linear', issueId: 'lin-issue-recover' })
+      ).resolves.toEqual([
+        expect.objectContaining({
+          runId: 'run-existing-recover',
+          taskId: 'linear-lin-issue-recover',
+          status: 'in_progress'
+        })
+      ]);
+    }
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-recover',
+      issue_identifier: 'CO-406',
+      issue_title: 'Active recover claim',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-04-28T03:29:00.000Z',
+      task_id: 'linear-lin-issue-recover',
+      state: claimState,
+      reason,
+      accepted_at: '2026-04-28T03:29:00.000Z',
+      updated_at: '2026-04-28T03:29:10.000Z',
+      run_id: claimState === 'running' ? 'run-existing-recover' : null,
+      run_manifest_path: claimState === 'running' ? activePaths.manifestPath : null,
+      launch_source: 'control-host',
+      launch_token: 'launch-existing-recover',
+      launch_started_at: '2026-04-28T03:29:10.000Z'
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-duplicate-recover',
+        manifestPath: '/tmp/provider-run/duplicate-recover.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 4
+        }
+      })
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-recover',
+        identifier: 'CO-406',
+        updated_at: '2026-04-28T03:30:00.000Z'
+      }),
+      deliveryId: `delivery-${claimState}-recover`,
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_745_811_000_000
+    });
+
+    expect(result.kind).toBe('ignored');
+    expect(result.reason).not.toBe('provider_issue_start_blocked:max_concurrency');
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(getPersistedState().claims.find((claim) => claim.provider_key === 'linear:lin-issue-recover')).toMatchObject({
+      state: claimState
+    });
+  });
+
   it('excludes only the candidate occupancy identity when same-issue unreadable work still consumes capacity', async () => {
     vi.useFakeTimers();
     const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});

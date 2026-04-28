@@ -7025,6 +7025,136 @@ describe('ControlRuntime', () => {
     });
   });
 
+  it('keeps accepted no-run pending-revalidation claims active but not running in status and UI payloads', async () => {
+    const providerIntakeState = createProviderIntakeState([
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-399',
+        issue_id: 'lin-issue-399',
+        issue_identifier: 'CO-399',
+        issue_title: 'Running claim one',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-28T03:20:00.000Z',
+        task_id: 'linear-co-399',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-04-28T03:20:05.000Z',
+        updated_at: '2026-04-28T03:20:30.000Z',
+        last_delivery_id: 'delivery-399',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_745_810_400_000,
+        run_id: 'run-399',
+        run_manifest_path: '/tmp/run-399/manifest.json',
+        launch_source: 'control-host',
+        launch_token: 'launch-399'
+      },
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-403',
+        issue_id: 'lin-issue-403',
+        issue_identifier: 'CO-403',
+        issue_title: 'Running claim two',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-28T03:21:00.000Z',
+        task_id: 'linear-co-403',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-04-28T03:21:05.000Z',
+        updated_at: '2026-04-28T03:21:30.000Z',
+        last_delivery_id: 'delivery-403',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_745_810_460_000,
+        run_id: 'run-403',
+        run_manifest_path: '/tmp/run-403/manifest.json',
+        launch_source: 'control-host',
+        launch_token: 'launch-403'
+      },
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-406',
+        issue_id: 'lin-issue-406',
+        issue_identifier: 'CO-406',
+        issue_title: 'Accepted no-run recover claim',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-28T03:29:00.000Z',
+        task_id: 'linear-co-406',
+        mapping_source: 'provider_id_fallback',
+        state: 'accepted',
+        reason: 'provider_issue_rehydration_pending_revalidation',
+        accepted_at: '2026-04-28T03:29:05.000Z',
+        updated_at: '2026-04-28T03:29:30.000Z',
+        last_delivery_id: 'delivery-406',
+        last_event: 'Issue',
+        last_action: 'recover',
+        last_webhook_timestamp: 1_745_810_940_000,
+        run_id: null,
+        run_manifest_path: null,
+        launch_source: null,
+        launch_token: null
+      }
+    ]);
+    providerIntakeState.updated_at = '2026-04-28T03:30:00.000Z';
+    providerIntakeState.rehydrated_at = null;
+    providerIntakeState.latest_provider_key = 'linear:lin-issue-406';
+    providerIntakeState.latest_reason = 'provider_issue_rehydration_pending_revalidation';
+
+    const fixture = await createFixture({
+      taskId: 'local-mcp',
+      featureToggles: {
+        coordinator: {
+          agent: {
+            max_concurrent_agents: 3
+          }
+        }
+      },
+      providerIntakeState
+    });
+
+    const projection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const statePayload = await readCompatibilityState({
+      readCompatibilityProjection: async () => projection
+    });
+    const uiDataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-04-28T03:30:00.000Z'
+    });
+
+    expect(projection.providerIntake).toMatchObject({
+      claim_count: 3,
+      active_claim_count: 3,
+      running_claim_count: 2,
+      active_issue_identifiers: ['CO-403', 'CO-399', 'CO-406'],
+      running_issue_identifiers: ['CO-403', 'CO-399'],
+      selected_claim: {
+        issue_identifier: 'CO-403',
+        state: 'running'
+      }
+    });
+    expect(projection.running.map((entry) => entry.issue_identifier)).not.toContain('CO-406');
+    expect(projection.providerIntake?.active_issue_identifiers).toContain('CO-406');
+    expect(statePayload.provider_intake).toMatchObject({
+      active_claim_count: 3,
+      running_claim_count: 2,
+      active_issue_identifiers: ['CO-403', 'CO-399', 'CO-406'],
+      running_issue_identifiers: ['CO-403', 'CO-399']
+    });
+    expect(uiDataset.provider_intake).toMatchObject({
+      active_claim_count: 3,
+      running_claim_count: 2,
+      active_issue_identifiers: ['CO-403', 'CO-399', 'CO-406'],
+      running_issue_identifiers: ['CO-403', 'CO-399']
+    });
+    expect(uiDataset.counts.max_allowed).toBe(3);
+    expect(uiDataset.running.map((entry) => entry.issue_identifier)).not.toContain('CO-406');
+  });
+
   it('surfaces provider polling health through compatibility projections when a provider handoff is registered', async () => {
     const fixture = await createFixture();
     const providerIssueHandoff = {

@@ -15861,6 +15861,27 @@
           "ACTION_PLAN": "docs/ACTION_PLAN-linear-b131706d-e40f-42db-8f29-9f1ddd636187.md"
         }
       }
+    },
+    {
+      "id": "20260428-linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec",
+      "title": "CO-406 no-run accepted recover capacity accounting",
+      "relates_to": "tasks/tasks-linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-28",
+      "approvals": {},
+      "paths": {
+        "spec": "tasks/specs/linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md",
+        "task": "tasks/tasks-linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md",
+        "agent_task": ".agent/task/linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md"
+        }
+      }
     }
   ]
 }
