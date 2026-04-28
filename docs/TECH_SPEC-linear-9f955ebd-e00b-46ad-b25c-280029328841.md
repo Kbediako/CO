@@ -13,7 +13,7 @@ This mirror tracks `tasks/specs/linear-9f955ebd-e00b-46ad-b25c-280029328841.md`.
 ## Summary
 - Objective: Keep active appserver provider-worker proof/read-model updates from freezing behind stale `provider-linear-worker-proof.json.lock` files while preserving lock safety.
 - Scope: Provider proof lock acquisition, lock metadata/diagnostics, stale recovery or fail-closed classification, live proof update persistence, focused tests, and CO-415/CO-400-style replay/fixture evidence.
-- Constraints: Preserve visible proof persistence failures, avoid manual lock deletion as the fix, preserve concurrent-writer safety, and keep unrelated provider-intake/control-host UI timeout work out of scope.
+- Constraints: Preserve visible proof persistence failures, avoid manual lock deletion as a fix, preserve concurrent-writer safety, and keep unrelated provider-intake/control-host UI timeout work out of scope.
 
 ## Issue-Shaping Contract
 - User-request translation carried forward: A live appserver worker can continue heartbeating while proof writes freeze behind a stale proof lock. The fix must make that lock lifecycle recoverable or explicitly classified without hiding the error or weakening provider proof requirements.

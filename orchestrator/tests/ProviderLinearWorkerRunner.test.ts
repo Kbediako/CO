@@ -5664,7 +5664,7 @@ for await (const line of rl) {
       'utf8'
     );
     await writeFile(proofLockPath, 'orphaned-proof-lock', 'utf8');
-    const stalePast = new Date(Date.now() - 10 * 60 * 1000);
+    const stalePast = new Date('2020-01-01T00:00:00.000Z');
     await utimes(proofLockPath, stalePast, stalePast);
 
     const refreshed = await refreshProviderLinearWorkerProofSnapshot(
