@@ -254,7 +254,7 @@ async function clearStaleLock(
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return { cleared: false, diagnostics: null };
     }
-    return { cleared: false, diagnostics: null };
+    throw error;
   }
 }
 
@@ -279,7 +279,11 @@ function parseLockOwnerMetadata(raw: string): LockOwnerMetadata | null {
   }
   try {
     const parsed = JSON.parse(trimmed) as unknown;
-    if (!isRecord(parsed) || parsed.kind !== LOCK_OWNER_PAYLOAD_KIND) {
+    if (
+      !isRecord(parsed)
+      || parsed.kind !== LOCK_OWNER_PAYLOAD_KIND
+      || parsed.schema_version !== LOCK_OWNER_PAYLOAD_SCHEMA_VERSION
+    ) {
       return buildLegacyLockOwner(trimmed);
     }
     const token = typeof parsed.token === 'string' ? parsed.token.trim() : '';
