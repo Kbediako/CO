@@ -2,11 +2,11 @@
 
 ## Summary
 - Goal: create the CO-399 docs-first packet and registry mirrors for the `fallback-expiry:large-refactor:repo-guards` lane.
-- Scope: packet files, task checklist mirrors, `tasks/index.json`, `docs/TASKS.md`, and docs freshness registry rows only.
+- Scope: packet files, task checklist mirrors, `tasks/index.json`, `docs/TASKS.md`, docs freshness registry rows, `scripts/spec-guard.mjs`, and focused `tests/spec-guard.spec.ts` coverage.
 - Assumptions:
   - Linear issue CO-399 is the source of truth for protected wording and packet prefix.
   - CO-382 fallback-expiry policy applies because repo guards are the enforcement point for fallback and large-refactor decisions.
-  - Parent owns all guard implementation, focused tests, Linear lifecycle, PR, and review work after the packet exists.
+  - Guard implementation and focused tests land in this PR; parent retains Linear lifecycle, PR, review, and merge ownership after validation.
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward:
@@ -33,17 +33,19 @@
   - expired fallback metadata does not fail
   - guard only documents policy but does not gate handoff
   - issue absorbs provider/review/runtime/docs/control-host cleanup scope from CO-394 through CO-398
-  - the packet lane edits implementation files
+  - guard implementation expands beyond repo-guard enforcement into CO-394 through CO-398 cleanup work
 - Pre-implementation issue-quality review:
   - 2026-04-27: micro-task path is unavailable because correctness depends on exact protected wording, owner references, and guard enforcement semantics.
   - 2026-04-27: the packet keeps CO-399 narrower than surface-specific cleanup and broader than checklist-only documentation.
 - Fallback / refactor decision:
+
   | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
   | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-  | `repo guards` | Fallback/seam-touching changes with no parseable CO-382 decision | remove fallback | CO-399 parent lane | A diff touches fallback, legacy, cached, break-glass, or minor-seam patterns without a recorded decision. | current review 2026-04-27 | N/A after removal | N/A after removal | Guard fails until the issue packet records `remove fallback`, `expire fallback`, or `justify retaining fallback`. | Focused missing-decision and bad `Not applicable` tests. |
-  | `repo guards` | Temporary fallback retained without complete expiry metadata | expire fallback | CO-399 parent lane | A retained temporary fallback lacks owner, trigger, introduced date, review date, maximum lifetime, removal condition, or validation. | current review 2026-04-27 | 2026-05-12 | 2026-05-26 | Guard requires complete metadata and always fails stale expiry dates; CO-399 has no implicit refresh allowance. | Focused expired-fallback and pass tests. |
-  | `repo guards` | Durable fallback or audit compatibility retained indefinitely | justify retaining fallback | CO-399 parent lane | A fallback-like contract is durable and not intended to expire. | current review 2026-04-27 | 2026-05-26 | Non-expiring durable retention only with rationale | Guard accepts only when contract name, owning surface, steady-state proof, tests/docs, and non-expiring rationale are present. | Focused durable-retention tests. |
-  | `repo guards` | CO-394 through CO-398 owner references used to route surface-specific cleanup | justify retaining fallback | CO-399 parent lane | Guard needs to recognize existing owner lanes without absorbing their implementation scope. | current review 2026-04-27 | 2026-05-12 | Non-expiring owner routing contract | Remove only if CO-382 policy changes the owner mapping or those issues are superseded by a new canonical owner. | Focused tests proving CO-394, CO-395, CO-396, CO-397, and CO-398 references remain valid. |
+  | `repo guards` | Fallback/seam-touching changes with no parseable CO-382 decision | remove fallback | CO-399 parent lane | A diff touches fallback, legacy, cached, break-glass, or minor-seam patterns without a recorded decision. | 2026-04-27 | N/A after removal | N/A after removal | Guard fails until the issue packet records `remove fallback`, `expire fallback`, or `justify retaining fallback`. | Focused missing-decision and bad `Not applicable` tests. |
+  | `repo guards` | Temporary fallback retained without complete expiry metadata | expire fallback | CO-399 parent lane | A retained temporary fallback lacks owner, trigger, introduced date, review date, maximum lifetime, removal condition, or validation. | 2026-04-27 | 2026-05-12 | 2026-05-26 | Guard requires complete metadata and always fails stale expiry dates; CO-399 has no implicit refresh allowance. | Focused expired-fallback and pass tests. |
+  | `repo guards` | Durable fallback or audit compatibility retained indefinitely | justify retaining fallback | CO-399 parent lane | A fallback-like contract is durable and not intended to expire. | 2026-04-27 | 2026-05-26 | Non-expiring durable retention only with rationale | Guard accepts only when contract name, owning surface, steady-state proof, tests/docs, and non-expiring rationale are present. | Focused durable-retention tests. |
+  | `repo guards` | CO-394 through CO-398 owner references used to route surface-specific cleanup | justify retaining fallback | CO-399 parent lane | Guard needs to recognize existing owner lanes without absorbing their implementation scope. | 2026-04-27 | 2026-05-12 | Non-expiring owner routing contract | Remove only if CO-382 policy changes the owner mapping or those issues are superseded by a new canonical owner. | Focused tests proving CO-394, CO-395, CO-396, CO-397, and CO-398 references remain valid. |
+
 - Durable retention evidence:
   - contract name: fallback-expiry owner routing and durable guard compatibility
   - owning surface: `repo guards`
@@ -51,7 +53,7 @@
   - tests/docs: focused durable-retention, single-owner cleanup, and owner-reference spec-guard tests
   - non-expiring rationale: owner routing is a supported guard contract, not temporary fallback debt
 - Large-refactor check:
-  - no large refactor in this packet lane
+  - no large refactor in this CO-399 guard lane
   - parent must enforce a `large refactor` decision when new seams touch governed surfaces or fallback, legacy, cached, break-glass, or minor-seam patterns without one bounded fallback decision
 
 ## Milestones & Sequencing
@@ -99,7 +101,7 @@
   - focused guard pass/missing-decision/bad-Not-applicable/expired-fallback/durable-retention/owner-reference tests
   - normal validation floor and review loop
 - Rollback plan:
-  - revert only the CO-399 packet and registry mirror rows if packet validation fails; implementation remains untouched in this packet lane
+  - revert the CO-399 packet, registry mirror rows, guard implementation, and focused guard tests together if validation fails
 
 ## Risks & Mitigations
 - Risk: CO-399 becomes checklist-only documentation.
