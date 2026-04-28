@@ -1022,7 +1022,8 @@ describe('spec-guard script', () => {
     const today = new Date().toISOString().slice(0, 10);
     const decisionBody = fallbackDecisionTable([completeExpireFallbackRow()]);
     const sourceBody = [
-      'large refactor and minor seam decision evidence.',
+      'Large-refactor check: keep the fixture scoped to one governed surface and one lifecycle phase.',
+      'Minor-seam behavior is acceptable only when one bounded fallback decision exists.',
       '',
       decisionBody
     ].join('\n');
@@ -1163,6 +1164,77 @@ describe('spec-guard script', () => {
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('does not accept protected-term boilerplate as large-refactor decision evidence', async () => {
+    const repo = await initRepository();
+    const today = new Date().toISOString().slice(0, 10);
+    const decisionBody = fallbackDecisionTable([completeExpireFallbackRow()]);
+    const boilerplate = [
+      '- Protected term: `large refactor`.',
+      '- Protected term: `minor seam`.',
+      decisionBody
+    ].join('\n');
+
+    await writeFallbackPacket(repo, {
+      decisionBody: boilerplate,
+      sourceDecisionBodies: {
+        taskSpec: boilerplate,
+        actionPlan: boilerplate
+      }
+    });
+    await writeFile(
+      join(repo, 'tasks/specs/linear-fallback-fixture.md'),
+      [
+        '---',
+        'id: fallback-fixture',
+        'title: "fallback-expiry guard fixture"',
+        `last_review: ${today}`,
+        '---',
+        '',
+        '# TECH_SPEC - fallback-expiry guard fixture',
+        '',
+        '## Fallback Expiry / Refactor Decision',
+        boilerplate,
+        ''
+      ].join('\n')
+    );
+    await writeFile(
+      join(repo, 'docs/ACTION_PLAN-linear-fallback-fixture.md'),
+      [
+        '# ACTION_PLAN - fallback-expiry guard fixture',
+        '',
+        '## Issue Readiness Gate',
+        '- Fallback / refactor decision:',
+        boilerplate,
+        ''
+      ].join('\n')
+    );
+    await mkdir(join(repo, 'orchestrator/src/cli/control'), { recursive: true });
+    await writeFile(
+      join(repo, 'orchestrator/src/cli/control/providerIssueHandoff.ts'),
+      [
+        'export function selectProviderIssueId(input: { providerIssueId?: string; legacyProviderId?: string }) {',
+        '  return input.providerIssueId ?? input.legacyProviderId ?? "legacy-provider";',
+        '}',
+        ''
+      ].join('\n')
+    );
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      `last_review: ${today}\n\nSpec update for fallback-sensitive implementation.\n`
+    );
+    await execFileAsync('git', ['add', '.'], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'fallback guard without structured refactor decisions'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('fallback/seam-touching changes require large refactor and minor seam decision evidence');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
 
   it('requires tests/docs evidence for durable fallback retention', async () => {
@@ -1380,6 +1452,36 @@ describe('spec-guard script', () => {
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
 
+  it('rejects durable fallback rows without a target surface and fallback seam', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      fallbackDecisionTable([
+        durableRetentionRow({
+          surface: '-',
+          fallback: '-'
+        })
+      ]),
+      '',
+      '- Contract name: fallback-expiry owner routing and durable guard compatibility.',
+      '- Owning surface: repo guards.',
+      '- Steady-state proof: guard rejects missing and stale decisions while accepting durable metadata.',
+      '- Tests/docs: focused durable-retention spec-guard regression test.',
+      '- Non-expiring rationale: owner routing is a supported guard contract, not temporary fallback debt.'
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('justify retaining fallback decision requires non-empty surface');
+    expect(stdout).toContain('justify retaining fallback decision requires non-empty fallback/seam');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
   it('rejects placeholder metadata in expire fallback rows', async () => {
     const repo = await initRepository();
     const decisionBody = fallbackDecisionTable([
@@ -1473,6 +1575,29 @@ describe('spec-guard script', () => {
     expect(stdout).toContain('high-churn control surface fallback cap');
     expect(stdout).toContain('expire fallback maximum lifetime');
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not apply high-churn caps from validation-only wording', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`unclassified adapter`',
+        fallback: 'General repo fallback retained during adapter cleanup.',
+        trigger: 'Adapter cleanup keeps a general fallback until the removal fixture lands.',
+        reviewDate: reviewDateDaysFromNow(30),
+        maximumLifetime: reviewDateDaysFromNow(59),
+        validation: 'Run docs:freshness and runtime routing checks after adapter cleanup.'
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
   });
 
   it('keeps high-churn caps stricter than external migration caps when both match', async () => {
@@ -2153,6 +2278,38 @@ describe('spec-guard script', () => {
     });
 
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('does not reuse one durable rationale block across multiple durable rows', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      fallbackDecisionTable([
+        durableRetentionRow({
+          fallback: 'First durable compatibility fallback retained for repo guards.'
+        }),
+        durableRetentionRow({
+          fallback: 'Second durable compatibility fallback retained for review wrapper compatibility.'
+        })
+      ]),
+      '',
+      '- Contract name: fallback-expiry owner routing and durable guard compatibility.',
+      '- Owning surface: repo guards.',
+      '- Steady-state proof: guard rejects missing and stale decisions while accepting complete durable metadata.',
+      '- Tests/docs: focused durable-retention spec-guard regression test.',
+      '- Non-expiring rationale: owner routing is a supported guard contract, not temporary fallback debt.'
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('justify retaining fallback evidence requires contract name');
+    expect(stdout).toContain('justify retaining fallback evidence requires tests/docs');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
 
   it('rejects label-only durable fallback rationale evidence', async () => {

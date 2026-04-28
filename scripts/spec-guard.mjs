@@ -185,8 +185,17 @@ function hasAffirmativeReviewerApprovalEvidenceInCells(cells) {
   return cells.some(hasAffirmativeReviewerApprovalEvidence);
 }
 
+function getFallbackSeamValue(row) {
+  const column = REQUIRED_FALLBACK_SEAM_COLUMNS.find((candidate) => candidate in row);
+  return column ? row[column] : '';
+}
+
+function getFallbackScopeCells(row) {
+  return [row.surface, getFallbackSeamValue(row), row.owner, row.trigger].filter((cell) => String(cell ?? '').trim().length > 0);
+}
+
 function hasExternalMigrationApprovalEvidence(row) {
-  const cells = Object.values(row).map((cell) => normalizePolicyEvidenceCell(cell));
+  const cells = getFallbackScopeCells(row).map((cell) => normalizePolicyEvidenceCell(cell));
   const content = cells.join(' ');
   const ownerCell = normalizePolicyEvidenceText(row.owner ?? '');
   return (
@@ -408,6 +417,15 @@ function normalizePolicyEvidenceCell(value) {
     .toLowerCase();
 }
 
+function normalizePolicyDecisionLine(value) {
+  return String(value)
+    .replace(/[`*]/g, '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
 function cleanTableCell(value) {
   return String(value)
     .replace(/<br\s*\/?>/gi, ' ')
@@ -529,7 +547,7 @@ function formatIsoDate(date) {
 }
 
 function resolveFallbackExpiryCap(row) {
-  const normalizedRowContent = normalizePolicyEvidenceText(Object.values(row).join(' '));
+  const normalizedRowContent = normalizePolicyEvidenceText(getFallbackScopeCells(row).join(' '));
   const matchingCaps = FALLBACK_EXPIRY_CAPS.filter((cap) => cap.matches(normalizedRowContent, row));
   const specificCaps = matchingCaps.filter((cap) => cap.label !== 'general repo fallback');
   const rankedCaps = specificCaps.length > 0 ? specificCaps : matchingCaps;
@@ -583,8 +601,12 @@ function isOwnerRoutingReferenceRow(row) {
   );
 }
 
+function getFallbackDecisionRowContent(row) {
+  return Object.values(row).join('\n');
+}
+
 function hasCompleteOwnerRoutingReferences(row) {
-  const rowContent = Object.values(row).join(' ');
+  const rowContent = getFallbackDecisionRowContent(row);
   return REQUIRED_OWNER_REFERENCES.every((owner) => rowContent.includes(owner));
 }
 
@@ -686,11 +708,6 @@ async function readChangedFallbackDecisionSources(changedFiles) {
   return sourceEntries;
 }
 
-function getFallbackSeamValue(row) {
-  const column = REQUIRED_FALLBACK_SEAM_COLUMNS.find((candidate) => candidate in row);
-  return column ? row[column] : '';
-}
-
 function validateFallbackDecisionRows(rows, today) {
   const failures = [];
   if (rows.length === 0) {
@@ -788,9 +805,25 @@ function validateFallbackDecisionRows(rows, today) {
     findAllowedDecisions(row.decision ?? '').includes('justify retaining fallback')
   );
   for (const { file, row, sourceContent = '' } of durableRows) {
+    const requiredDurableFields = [
+      ['surface', row.surface],
+      ['fallback/seam', getFallbackSeamValue(row)]
+    ];
+    for (const [name, value] of requiredDurableFields) {
+      if (hasPlaceholderValue(value)) {
+        failures.push(`${file}: justify retaining fallback decision requires non-empty ${name}`);
+      }
+    }
     if (isOwnerRoutingReferenceRow(row) && hasCompleteOwnerRoutingReferences(row)) {
       continue;
     }
+    const nonRoutingDurableRowsInSource = durableRows.filter(
+      (candidate) =>
+        candidate.file === file &&
+        !(isOwnerRoutingReferenceRow(candidate.row) && hasCompleteOwnerRoutingReferences(candidate.row))
+    );
+    const durableEvidenceContent =
+      nonRoutingDurableRowsInSource.length > 1 ? getFallbackDecisionRowContent(row) : sourceContent;
     const durableEvidence = [
       { labels: ['contract name'], name: 'contract name' },
       { labels: ['owning surface'], name: 'owning surface' },
@@ -799,7 +832,7 @@ function validateFallbackDecisionRows(rows, today) {
       { labels: ['non-expiring rationale', 'not governed as an expiring fallback'], name: 'non-expiring rationale' }
     ];
     for (const evidence of durableEvidence) {
-      if (!findLabeledValue(sourceContent, evidence.labels)) {
+      if (!findLabeledValue(durableEvidenceContent, evidence.labels)) {
         failures.push(`${file}: justify retaining fallback evidence requires ${evidence.name} with a non-empty value`);
       }
     }
@@ -820,6 +853,26 @@ function validateFallbackDecisionRows(rows, today) {
   return failures;
 }
 
+function parsePolicyDecisionEvidence(content) {
+  const result = {
+    largeRefactor: false,
+    minorSeam: false
+  };
+  for (const rawLine of String(content).split(/\r?\n/)) {
+    const line = normalizePolicyDecisionLine(cleanTableCell(rawLine).replace(/^\s*[-*]\s*/, ''));
+    if (/^large[-\s]refactor(?:\s+(?:check|decision|threshold))?\s*:\s*\S/.test(line)) {
+      result.largeRefactor = true;
+    }
+    if (
+      /^minor[-\s]seam(?:\s+(?:behavior|check|decision|threshold))?\s*:\s*\S/.test(line) ||
+      /^minor[-\s]seam\b.*\b(?:acceptable|required|requires|bounded|decision|choice)\b/.test(line)
+    ) {
+      result.minorSeam = true;
+    }
+  }
+  return result;
+}
+
 async function checkFallbackDecisionEvidence(baseRef, changedFiles) {
   const touchedFiles = await detectFallbackTouchingChanges(baseRef, changedFiles);
   if (touchedFiles.length === 0) {
@@ -838,11 +891,11 @@ async function checkFallbackDecisionEvidence(baseRef, changedFiles) {
   }
 
   const combinedEvidence = sourceEntries.map((entry) => entry.content).join('\n');
-  const normalizedPolicyEvidence = normalizePolicyEvidenceText(combinedEvidence);
   if (/fallback\s*\/\s*refactor decision\s*:\s*`?not applicable`?/i.test(combinedEvidence)) {
     failures.push('Not applicable is only valid when no fallback/seam behavior changed');
   }
-  if (!normalizedPolicyEvidence.includes('large refactor') || !normalizedPolicyEvidence.includes('minor seam')) {
+  const policyDecisions = parsePolicyDecisionEvidence(combinedEvidence);
+  if (!policyDecisions.largeRefactor || !policyDecisions.minorSeam) {
     failures.push('fallback/seam-touching changes require large refactor and minor seam decision evidence');
   }
 
