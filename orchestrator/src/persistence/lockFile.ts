@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
+import type { Stats } from 'node:fs';
 import type { FileHandle } from 'node:fs/promises';
 import { open, readFile, rm, stat } from 'node:fs/promises';
 import { hostname } from 'node:os';
@@ -48,6 +49,9 @@ export interface LockRetryFailureDiagnostics {
   lockPath: string;
   inspectedHost: string;
   owner: LockOwnerMetadata | null;
+  dev: number | null;
+  ino: number | null;
+  size: number | null;
   mtimeMs: number | null;
   ageMs: number | null;
   staleMs: number;
@@ -105,11 +109,15 @@ export async function acquireLockWithRetry(params: LockRetryParams): Promise<Acq
         throw error;
       }
       if (staleMs > 0) {
-        const staleResult = await clearStaleLock(params.lockPath, staleMs);
-        lastDiagnostics = staleResult.diagnostics;
+        let staleResult: { cleared: boolean; diagnostics: LockRetryFailureDiagnostics | null };
+        try {
+          staleResult = await clearStaleLock(params.lockPath, staleMs);
+          lastDiagnostics = staleResult.diagnostics;
+        } finally {
+          await releaseLockIfPresent(acquisitionLock);
+          acquisitionLock = null;
+        }
         const cleared = staleResult.cleared;
-        await releaseLockIfPresent(acquisitionLock);
-        acquisitionLock = null;
         if (cleared) {
           attempt -= 1;
           continue;
@@ -254,7 +262,11 @@ async function clearStaleLock(
     if (!diagnostics?.recoverable) {
       return { cleared: false, diagnostics };
     }
-    await rm(lockPath, { force: true });
+    const currentStats = await stat(lockPath);
+    if (!lockFileIdentityMatchesDiagnostics(currentStats, diagnostics)) {
+      return { cleared: false, diagnostics };
+    }
+    await rm(lockPath);
     return { cleared: true, diagnostics };
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -351,6 +363,9 @@ async function inspectLockForRecovery(
     lockPath,
     inspectedHost,
     owner,
+    dev: Number.isFinite(stats.dev) ? stats.dev : null,
+    ino: Number.isFinite(stats.ino) ? stats.ino : null,
+    size: Number.isFinite(stats.size) ? stats.size : null,
     mtimeMs: stats.mtimeMs,
     ageMs: Number.isFinite(ageMs) ? ageMs : null,
     staleMs,
@@ -358,6 +373,18 @@ async function inspectLockForRecovery(
     ownerStatus,
     recoverable
   };
+}
+
+function lockFileIdentityMatchesDiagnostics(stats: Stats, diagnostics: LockRetryFailureDiagnostics): boolean {
+  if (diagnostics.dev !== null && diagnostics.ino !== null) {
+    return stats.dev === diagnostics.dev && stats.ino === diagnostics.ino;
+  }
+  return (
+    diagnostics.mtimeMs !== null
+    && diagnostics.size !== null
+    && stats.mtimeMs === diagnostics.mtimeMs
+    && stats.size === diagnostics.size
+  );
 }
 
 async function classifyLockOwnerStatus(
@@ -415,7 +442,12 @@ async function readUnixProcessStartedAtMs(pid: number): Promise<number | null> {
   try {
     const { stdout } = await execFileAsync('ps', ['-p', String(pid), '-o', 'lstart='], {
       timeout: 1_000,
-      windowsHide: true
+      windowsHide: true,
+      env: {
+        ...process.env,
+        LANG: 'C',
+        LC_ALL: 'C'
+      }
     });
     const firstLine = stdout.trim().split('\n')[0]?.trim();
     if (!firstLine) {
