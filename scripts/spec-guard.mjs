@@ -514,6 +514,8 @@ function parseFallbackDecisionRows(content) {
 
 function hasPlaceholderValue(value) {
   const normalized = normalizeDecisionText(value);
+  const isAnglePlaceholder =
+    /^<.*>$/.test(normalized) && !/^<https?:\/\/[^>\s]+>$/.test(normalized);
   return (
     normalized.length === 0 ||
     normalized === 'n/a' ||
@@ -524,7 +526,7 @@ function hasPlaceholderValue(value) {
     /^(?:tbd|to be determined|pending|unknown|todo|later|not recorded|not available|unavailable)\b/.test(normalized) ||
     /^future (?:cleanup|follow ?up|issue|owner)\b/.test(normalized) ||
     /^cleanup later\b/.test(normalized) ||
-    /^<.*>$/.test(normalized)
+    isAnglePlaceholder
   );
 }
 

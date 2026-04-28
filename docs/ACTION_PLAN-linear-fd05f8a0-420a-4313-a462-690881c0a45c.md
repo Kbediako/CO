@@ -91,7 +91,7 @@
 - Checks / tests:
   - `node -e "JSON.parse(require('fs').readFileSync('tasks/index.json','utf8')); console.log('tasks/index ok')"`
   - `node -e "JSON.parse(require('fs').readFileSync('docs/docs-freshness-registry.json','utf8')); console.log('docs freshness registry ok')"`
-  - `rg -n "fallback expiry|large refactor|minor seam|repo guards|spec-guard|docs:check|docs:freshness|diff-budget|remove fallback|expire fallback|justify retaining fallback|CO-382|CO-394|CO-395|CO-396|CO-397|CO-398" ...`
+  - `rg -n "fallback expiry|large refactor|minor seam|repo guards|spec-guard|docs:check|docs:freshness|diff-budget|remove fallback|expire fallback|justify retaining fallback|CO-382|CO-394|CO-395|CO-396|CO-397|CO-398" docs/PRD-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md docs/TECH_SPEC-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md docs/ACTION_PLAN-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md tasks/specs/linear-fd05f8a0-420a-4313-a462-690881c0a45c.md tasks/tasks-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md .agent/task/linear-fd05f8a0-420a-4313-a462-690881c0a45c.md docs/TASKS.md`
   - `node scripts/spec-guard.mjs --dry-run`
   - `npm run docs:check`
   - `npm run docs:freshness`

@@ -765,6 +765,26 @@ describe('spec-guard script', () => {
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
   });
 
+  it('accepts URL autolinks as concrete fallback decision evidence', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      `| \`repo guards\` | Legacy provider fallback removal proof | remove fallback | CO-399 parent lane | Provider fallback removed from guard fixture. | ${reviewDateDaysAgo(1)} | N/A after removal | N/A after removal | <https://example.com/remove-fallback-proof> | <https://example.com/remove-validation-proof> |`,
+      completeExpireFallbackRow({
+        removalCondition: '<https://example.com/expire-removal-proof>',
+        validation: '<https://example.com/expire-validation-proof>'
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
   it('rejects blank fallback decisions even when a sibling row is valid', async () => {
     const repo = await initRepository();
     const decisionBody = fallbackDecisionTable([
@@ -1504,6 +1524,28 @@ describe('spec-guard script', () => {
     expect(stdout).toContain('expire fallback decision requires non-empty owner');
     expect(stdout).toContain('expire fallback decision requires non-empty trigger');
     expect(stdout).toContain('expire fallback decision requires non-empty removal condition');
+    expect(stdout).toContain('expire fallback decision requires non-empty validation');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects angle-bracket placeholders that are not URL autolinks', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        owner: '<owner>',
+        validation: '<validation proof>'
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: { ...process.env }
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback decision requires non-empty owner');
     expect(stdout).toContain('expire fallback decision requires non-empty validation');
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
