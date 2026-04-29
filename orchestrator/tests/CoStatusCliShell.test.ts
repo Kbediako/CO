@@ -508,7 +508,7 @@ describe('runCoStatusCliShell', () => {
       claimState: 'running',
       updatedAtMsAgo: 1_000
     });
-    const slowServer = await startUiServer(buildUiPayload(), { responseDelayMs: 75 });
+    const slowServer = await startUiServer(buildUiPayload(), { responseDelayMs: 1_000 });
     servers.add(slowServer.instance);
     await writeControlEndpointArtifacts(runDir, slowServer.baseUrl);
 
@@ -517,7 +517,7 @@ describe('runCoStatusCliShell', () => {
         format: 'json',
         'run-dir': runDir
       },
-      requestTimeoutMs: 10
+      requestTimeoutMs: 250
     });
 
     expect(slowServer.requests).toEqual([
