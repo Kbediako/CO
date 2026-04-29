@@ -1,5 +1,8 @@
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import {
+  isProviderLinearParallelizationDecision,
+  isProviderLinearParallelizationReason,
+  isProviderLinearParallelizationReasonAllowed,
   readProviderLinearParallelizationSnapshot,
   type ProviderLinearParallelizationSnapshot,
   ProviderLinearAuditEntry,
@@ -2215,18 +2218,28 @@ function normalizeProviderIssueDecisionLineage(
   if (record.schema_version !== 1) {
     return null;
   }
-  return {
+  const decision = normalizeOptionalString(record.decision);
+  const reason = normalizeOptionalString(record.reason);
+  if (
+    !isProviderLinearParallelizationDecision(decision) ||
+    !isProviderLinearParallelizationReason(reason) ||
+    !isProviderLinearParallelizationReasonAllowed(decision, reason)
+  ) {
+    return null;
+  }
+  const normalized: ProviderIssueDecisionLineageLike = {
     schema_version: 1,
     parent_task_id: normalizeOptionalString(record.parent_task_id),
     parent_run_id: normalizeOptionalString(record.parent_run_id),
     parent_turn_started_at: normalizeOptionalString(record.parent_turn_started_at),
     parent_turn_id: normalizeOptionalString(record.parent_turn_id),
-    parent_turn_count: normalizeOptionalInteger(record.parent_turn_count),
+    parent_turn_count: normalizeOptionalNonNegativeInteger(record.parent_turn_count),
     decision_id: normalizeOptionalString(record.decision_id),
     decision_recorded_at: normalizeOptionalString(record.decision_recorded_at),
-    decision: normalizeOptionalString(record.decision),
-    reason: normalizeOptionalString(record.reason)
+    decision,
+    reason
   };
+  return hasProviderIssueDecisionLineageIdentity(normalized) ? normalized : null;
 }
 
 function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {
@@ -2257,6 +2270,18 @@ function normalizeOptionalInteger(value: unknown): number | null {
     return Math.trunc(value);
   }
   return null;
+}
+
+function normalizeOptionalNonNegativeInteger(value: unknown): number | null {
+  const normalized = normalizeOptionalInteger(value);
+  return normalized !== null && normalized >= 0 ? normalized : null;
+}
+
+function hasProviderIssueDecisionLineageIdentity(lineage: ProviderIssueDecisionLineageLike): boolean {
+  return Boolean(
+    lineage.parent_run_id &&
+    (lineage.parent_turn_started_at || lineage.parent_turn_id || lineage.parent_turn_count !== null)
+  );
 }
 
 function normalizeGuardrailsRequiredSource(value: unknown): string | null {

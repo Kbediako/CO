@@ -12,6 +12,7 @@ import {
 } from '../../../scripts/lib/provider-run-contract.js';
 import {
   PROVIDER_LINEAR_AUDIT_ENV_VAR,
+  readProviderLinearParallelizationSnapshot,
   resolveProviderLinearAuditPath,
   summarizeProviderLinearAuditPath,
   type ProviderLinearDecisionLineage
@@ -492,7 +493,7 @@ async function launchChildLane(
 
   const parentSnapshot = await resolveParentSnapshot(context, params.env, deps);
   const baseSha = await deps.readParentHeadSha(context.repoRoot);
-  const decisionLineage = await resolveChildLaneParentDecisionLineage(context);
+  const decisionLineage = await resolveChildLaneParentDecisionLineage(context, params.env);
   const childTaskId = `${context.taskId}-${stream}`;
   const childRunsRoot = resolveWorkspaceScopedArtifactDir(
     context.repoRoot,
@@ -2732,30 +2733,50 @@ async function resolveParentSnapshot(
 }
 
 async function resolveChildLaneParentDecisionLineage(
-  context: Pick<Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>, 'runDir' | 'taskId' | 'runId'>
-): Promise<ProviderLinearDecisionLineage> {
-  let proof: Record<string, unknown> | null = null;
-  try {
-    proof = JSON.parse(
-      await readFile(join(context.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
-    ) as Record<string, unknown>;
-  } catch {
-    proof = null;
+  context: Pick<
+    Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>,
+    'issueId' | 'runDir'
+  >,
+  env: NodeJS.ProcessEnv
+): Promise<ProviderLinearDecisionLineage | null> {
+  const auditPath = resolveProviderLinearAuditPath(env);
+  if (!auditPath) {
+    return null;
   }
-  return {
-    schema_version: 1,
-    parent_task_id: context.taskId,
-    parent_run_id: context.runId,
-    parent_turn_started_at: normalizeOptionalString(proof?.current_turn_started_at),
-    parent_turn_id:
-      normalizeOptionalString(proof?.latest_turn_id) ??
-      normalizeOptionalString(proof?.session_log_turn_id),
-    parent_turn_count: normalizeOptionalInteger(proof?.turn_count),
-    decision_id: null,
-    decision_recorded_at: null,
-    decision: null,
-    reason: null
-  };
+  const recordedAtNotBefore = await resolveCurrentChildLaneDecisionLineageBoundary(context.runDir);
+  if (!recordedAtNotBefore) {
+    return null;
+  }
+  try {
+    const audit = await summarizeProviderLinearAuditPath(auditPath);
+    const snapshot = readProviderLinearParallelizationSnapshot(audit, {
+      issueId: context.issueId,
+      recordedAtNotBefore
+    });
+    if (snapshot?.decision !== 'parallelize_now') {
+      return null;
+    }
+    return snapshot.decision_lineage ?? null;
+  } catch (error) {
+    logger.warn(
+      `provider linear child-lane warning: failed to summarize provider-linear audit at ${auditPath}; proceeding without decision lineage. error=${error instanceof Error ? error.message : String(error)}`
+    );
+    return null;
+  }
+}
+
+async function resolveCurrentChildLaneDecisionLineageBoundary(runDir: string): Promise<string | null> {
+  try {
+    const proof = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    return (
+      normalizeOptionalString(proof.current_turn_started_at) ??
+      normalizeOptionalString(proof.attempt_started_at)
+    );
+  } catch {
+    return null;
+  }
 }
 
 function resolveChildLaneStaleReason(
@@ -3275,8 +3296,4 @@ function normalizeOptionalString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
-}
-
-function normalizeOptionalInteger(value: unknown): number | null {
-  return typeof value === 'number' && Number.isInteger(value) ? value : null;
 }

@@ -1872,7 +1872,9 @@ describe('runLinearCliShell', () => {
           pipelineId: 'provider-linear-worker',
           issueId: 'lin-issue-1',
           issueIdentifier: 'CO-101',
-          runDir: '/tmp/provider-run'
+          runDir: '/tmp/provider-run',
+          taskId: 'linear-lin-issue-1',
+          runId: 'provider-run-1'
         } as never);
     const refreshProviderLinearWorkerProofSnapshotMock =
       vi.fn<typeof import('../src/cli/providerLinearWorkerRunner.js').refreshProviderLinearWorkerProofSnapshot>()
@@ -1897,6 +1899,11 @@ describe('runLinearCliShell', () => {
           CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
         }),
         now: () => '2026-04-08T07:10:00.000Z',
+        readTextFile: vi.fn(async () => JSON.stringify({
+          current_turn_started_at: '2026-04-08T07:09:45.000Z',
+          latest_turn_id: 'turn-4',
+          turn_count: 4
+        })),
         appendAuditEntry,
         loadProviderLinearWorkerContext: loadProviderLinearWorkerContextMock,
         refreshProviderLinearWorkerProofSnapshot: refreshProviderLinearWorkerProofSnapshotMock,
@@ -1919,12 +1926,12 @@ describe('runLinearCliShell', () => {
       state: 'single_bounded_change',
       decision_lineage: {
         schema_version: 1,
-        parent_task_id: null,
-        parent_run_id: null,
-        parent_turn_started_at: null,
-        parent_turn_id: null,
-        parent_turn_count: null,
-        decision_id: null,
+        parent_task_id: 'linear-lin-issue-1',
+        parent_run_id: 'provider-run-1',
+        parent_turn_started_at: '2026-04-08T07:09:45.000Z',
+        parent_turn_id: 'turn-4',
+        parent_turn_count: 4,
+        decision_id: 'provider-linear-parallelization:provider-run-1:turn-4:2026-04-08T07_10_00.000Z',
         decision_recorded_at: '2026-04-08T07:10:00.000Z',
         decision: 'stay_serial',
         reason: 'single_bounded_change'

@@ -90,6 +90,7 @@
   - lineage mismatch and missing-lineage-without-safe-fallback rejection
   - safe legacy timestamp fallback classification
   - proof/status lineage visibility
+  - `codex-orchestrator review` / `npm run review` as the final pre-handoff review command, preserving task/PRD context and manifest evidence in the saved review prompt artifact
   - standalone review, elegance pass, PR checks, and ready-review drain
 - Rollback plan:
   - revert lineage-first retry recovery and packet updates together if tests show stale older child lanes can satisfy newer decisions or pending parent acceptance checks are weakened

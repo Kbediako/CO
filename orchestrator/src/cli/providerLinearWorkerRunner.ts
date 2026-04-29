@@ -45,6 +45,7 @@ import {
   PROVIDER_LINEAR_PARALLELIZATION_REASONS,
   isProviderLinearParallelizationDecision,
   isProviderLinearParallelizationReason,
+  isProviderLinearParallelizationReasonAllowed,
   readProviderLinearParallelizationSnapshot,
   readProviderLinearParallelizationSnapshots,
   summarizeProviderLinearAuditPath,
@@ -6048,7 +6049,10 @@ function resolveLatestPriorParallelizationChildLaneSupport(
   const latestPriorParallelization = priorParallelizeNowSnapshots.at(-1);
   if (!latestPriorParallelization) return null;
   const latestSummary = normalizeOptionalString(latestPriorParallelization.summary)?.toLowerCase() ?? '';
-  if (/(?:^|[^a-z0-9_:-])(?:recover_child_lane|recover_run):[a-z0-9_:-]+(?=$|[^a-z0-9_:-])/u.test(latestSummary)) {
+  if (
+    /(?:^|[^a-z0-9_:-])(?:recover_child_lane|recover_run):[a-z0-9_:-]+(?=$|[^a-z0-9_:-])/u.test(latestSummary) &&
+    !parallelizationSummaryNamesRecoveredChildLane(latestPriorParallelization.summary, childLane)
+  ) {
     return resolveLatestPriorParallelizationChildLaneSupport(priorParallelizeNowSnapshots.slice(0, -1), childLane);
   }
   const lineageSupport = resolveChildLaneDecisionLineageSupport(
@@ -8995,18 +8999,33 @@ function normalizeProviderLinearDecisionLineage(value: unknown): ProviderLinearD
   }
   const decision = normalizeOptionalString(value.decision);
   const reason = normalizeOptionalString(value.reason);
-  return {
+  if (
+    !isProviderLinearParallelizationDecision(decision) ||
+    !isProviderLinearParallelizationReason(reason) ||
+    !isProviderLinearParallelizationReasonAllowed(decision, reason)
+  ) {
+    return null;
+  }
+  const normalized: ProviderLinearDecisionLineage = {
     schema_version: 1,
     parent_task_id: normalizeOptionalString(value.parent_task_id),
     parent_run_id: normalizeOptionalString(value.parent_run_id),
     parent_turn_started_at: normalizeOptionalString(value.parent_turn_started_at),
     parent_turn_id: normalizeOptionalString(value.parent_turn_id),
-    parent_turn_count: normalizeOptionalInteger(value.parent_turn_count),
+    parent_turn_count: normalizeNonNegativeInteger(value.parent_turn_count),
     decision_id: normalizeOptionalString(value.decision_id),
     decision_recorded_at: normalizeOptionalString(value.decision_recorded_at),
-    decision: isProviderLinearParallelizationDecision(decision) ? decision : null,
-    reason: isProviderLinearParallelizationReason(reason) ? reason : null
+    decision,
+    reason
   };
+  return hasProviderLinearDecisionLineageIdentity(normalized) ? normalized : null;
+}
+
+function hasProviderLinearDecisionLineageIdentity(lineage: ProviderLinearDecisionLineage): boolean {
+  return Boolean(
+    lineage.parent_run_id &&
+    (lineage.parent_turn_started_at || lineage.parent_turn_id || lineage.parent_turn_count !== null)
+  );
 }
 
 function normalizeChildLaneDecision(

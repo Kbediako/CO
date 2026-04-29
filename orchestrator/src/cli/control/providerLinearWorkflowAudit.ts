@@ -381,18 +381,26 @@ function normalizeProviderLinearDecisionLineage(value: unknown): ProviderLinearD
   }
   const decision = normalizeOptionalString(record.decision);
   const reason = normalizeOptionalString(record.reason);
-  return {
+  if (
+    !isProviderLinearParallelizationDecision(decision) ||
+    !isProviderLinearParallelizationReason(reason) ||
+    !isProviderLinearParallelizationReasonAllowed(decision, reason)
+  ) {
+    return null;
+  }
+  const normalized: ProviderLinearDecisionLineage = {
     schema_version: 1,
     parent_task_id: normalizeOptionalString(record.parent_task_id),
     parent_run_id: normalizeOptionalString(record.parent_run_id),
     parent_turn_started_at: normalizeOptionalString(record.parent_turn_started_at),
     parent_turn_id: normalizeOptionalString(record.parent_turn_id),
-    parent_turn_count: normalizeOptionalInteger(record.parent_turn_count),
+    parent_turn_count: normalizeOptionalNonNegativeInteger(record.parent_turn_count),
     decision_id: normalizeOptionalString(record.decision_id),
     decision_recorded_at: normalizeOptionalString(record.decision_recorded_at),
-    decision: isProviderLinearParallelizationDecision(decision) ? decision : null,
-    reason: isProviderLinearParallelizationReason(reason) ? reason : null
+    decision,
+    reason
   };
+  return hasProviderLinearDecisionLineageIdentity(normalized) ? normalized : null;
 }
 
 function normalizeOptionalString(value: unknown): string | null {
@@ -408,6 +416,18 @@ function normalizeOptionalInteger(value: unknown): number | null {
     return null;
   }
   return value;
+}
+
+function normalizeOptionalNonNegativeInteger(value: unknown): number | null {
+  const normalized = normalizeOptionalInteger(value);
+  return normalized !== null && normalized >= 0 ? normalized : null;
+}
+
+function hasProviderLinearDecisionLineageIdentity(lineage: ProviderLinearDecisionLineage): boolean {
+  return Boolean(
+    lineage.parent_run_id &&
+    (lineage.parent_turn_started_at || lineage.parent_turn_id || lineage.parent_turn_count !== null)
+  );
 }
 
 function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {

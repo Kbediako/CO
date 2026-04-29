@@ -25,7 +25,11 @@ import {
   type ProviderLinearWorkerChildLaneRecord
 } from '../src/cli/providerLinearWorkerRunner.js';
 import { resolveProviderLinearChildLaneScopeContract } from '../src/cli/providerLinearChildLanePhaseContract.js';
-import type { ProviderLinearDecisionLineage } from '../src/cli/control/providerLinearWorkflowAudit.js';
+import {
+  appendProviderLinearAuditEntry,
+  PROVIDER_LINEAR_AUDIT_ENV_VAR,
+  type ProviderLinearDecisionLineage
+} from '../src/cli/control/providerLinearWorkflowAudit.js';
 
 let tempRoot: string | null = null;
 let externalRoot: string | null = null;
@@ -293,12 +297,63 @@ describe('runProviderLinearChildLaneShell', () => {
   it('launches a same-issue child lane and records parent-owned lineage', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-impl-a`, 'cli', 'child-run-1');
+    const auditPath = join(tempRoot ?? '', 'provider-linear-audit.jsonl');
+    await writeFile(
+      join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify({
+        attempt_started_at: '2026-03-30T07:10:45.000Z',
+        current_turn_started_at: '2026-03-30T07:11:00.000Z',
+        latest_turn_id: 'parent-turn-1',
+        turn_count: 1
+      }),
+      'utf8'
+    );
+    await appendProviderLinearAuditEntry(auditPath, {
+      recorded_at: '2026-03-30T07:10:30.000Z',
+      operation: 'parallelization',
+      ok: true,
+      issue_id: ISSUE.issue_id,
+      issue_identifier: ISSUE.issue_identifier,
+      source_setup: null,
+      action: 'parallelize_now',
+      via: 'Launch stale previous-turn lane.',
+      state: 'independent_scope_available',
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
+      comment_id: null,
+      attachment_id: null,
+      decision_lineage: buildDecisionLineage('stale-parent-run'),
+      error_code: null,
+      error_message: null
+    });
+    const parentDecisionLineage = buildDecisionLineage(RUN_ID);
+    await appendProviderLinearAuditEntry(auditPath, {
+      recorded_at: '2026-03-30T07:11:30.000Z',
+      operation: 'parallelization',
+      ok: true,
+      issue_id: ISSUE.issue_id,
+      issue_identifier: ISSUE.issue_identifier,
+      source_setup: null,
+      action: 'parallelize_now',
+      via: 'Launch impl-a.',
+      state: 'independent_scope_available',
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
+      comment_id: null,
+      attachment_id: null,
+      decision_lineage: parentDecisionLineage,
+      error_code: null,
+      error_message: null
+    });
     const env = buildProviderWorkerEnv(manifestPath, {
       CODEX_ORCHESTRATOR_RUNS_DIR: join('/tmp', 'shared-runs'),
       CODEX_ORCHESTRATOR_OUT_DIR: join('/tmp', 'shared-out'),
       CODEX_THREAD_ID: 'parent-thread-1',
       CODEX_HOME: join(tempRoot ?? '', 'codex-home'),
-      CO_LINEAR_API_TOKEN: 'lin-api-token'
+      CO_LINEAR_API_TOKEN: 'lin-api-token',
+      [PROVIDER_LINEAR_AUDIT_ENV_VAR]: auditPath
     });
     const childProof: ProviderLinearChildLaneProof = {
       issue_id: ISSUE.issue_id,
@@ -402,6 +457,11 @@ describe('runProviderLinearChildLaneShell', () => {
       child_lane: {
         decision: 'pending',
         patch_artifact_path: join(childRunDir, 'provider-linear-child-lane.patch'),
+        decision_lineage: expect.objectContaining({
+          parent_run_id: RUN_ID,
+          decision: 'parallelize_now',
+          reason: 'independent_scope_available'
+        }),
         parent_snapshot: {
           base_sha: 'parent-base-sha'
         }
@@ -421,12 +481,17 @@ describe('runProviderLinearChildLaneShell', () => {
     expect(request?.env.CODEX_ORCHESTRATOR_RUNS_DIR).toBe(join(tempRoot ?? '', '.runs'));
     expect(request?.env.CODEX_ORCHESTRATOR_OUT_DIR).toBe(join(tempRoot ?? '', 'out'));
     expect(request?.env.CODEX_THREAD_ID).toBeUndefined();
-    expect(refreshProofSnapshot).toHaveBeenCalledWith(runDir, null, env);
+    expect(refreshProofSnapshot).toHaveBeenCalledWith(runDir, auditPath, env);
     expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
       expect.objectContaining({
         stream: 'impl-a',
         run_id: 'child-run-1',
-        decision: 'pending'
+        decision: 'pending',
+        decision_lineage: expect.objectContaining({
+          parent_run_id: RUN_ID,
+          decision: 'parallelize_now',
+          reason: 'independent_scope_available'
+        })
       })
     ]);
   });

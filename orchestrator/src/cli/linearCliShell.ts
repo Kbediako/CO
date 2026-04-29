@@ -692,15 +692,27 @@ async function resolveParallelizationDecisionLineage(
   } catch {
     proof = null;
   }
+  const parentTaskId = normalizeOptionalAuditString(context.taskId);
+  const parentRunId = normalizeOptionalAuditString(context.runId);
+  const parentTurnStartedAt = readUnknownString(proof?.current_turn_started_at);
+  const parentTurnId =
+    readUnknownString(proof?.latest_turn_id) ??
+    readUnknownString(proof?.session_log_turn_id);
+  const parentTurnCount = readUnknownNonNegativeInteger(proof?.turn_count);
+  if (
+    !parentTaskId ||
+    !parentRunId ||
+    (!parentTurnStartedAt && !parentTurnId && parentTurnCount === null)
+  ) {
+    return null;
+  }
   return {
     schema_version: 1,
-    parent_task_id: normalizeOptionalAuditString(context.taskId),
-    parent_run_id: normalizeOptionalAuditString(context.runId),
-    parent_turn_started_at: readUnknownString(proof?.current_turn_started_at),
-    parent_turn_id:
-      readUnknownString(proof?.latest_turn_id) ??
-      readUnknownString(proof?.session_log_turn_id),
-    parent_turn_count: readUnknownInteger(proof?.turn_count),
+    parent_task_id: parentTaskId,
+    parent_run_id: parentRunId,
+    parent_turn_started_at: parentTurnStartedAt,
+    parent_turn_id: parentTurnId,
+    parent_turn_count: parentTurnCount,
     decision_id: null,
     decision_recorded_at: null,
     decision,
@@ -1683,6 +1695,11 @@ function readUnknownString(value: unknown): string | null {
 
 function readUnknownInteger(value: unknown): number | null {
   return typeof value === 'number' && Number.isInteger(value) ? value : null;
+}
+
+function readUnknownNonNegativeInteger(value: unknown): number | null {
+  const normalized = readUnknownInteger(value);
+  return normalized !== null && normalized >= 0 ? normalized : null;
 }
 
 function resolveAuditSourceSetup(flags: ArgMap, env: NodeJS.ProcessEnv): DispatchPilotSourceSetup | null {
