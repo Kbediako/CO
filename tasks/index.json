@@ -1,6 +1,22 @@
 {
   "items": [
     {
+      "id": "20260429-linear-69a0e91c-0b3c-4be9-8cf0-d0ead9f1df3a",
+      "title": "CO-422 refresh Mar 29 active spec-guard cohort",
+      "relates_to": "tasks/tasks-linear-69a0e91c-0b3c-4be9-8cf0-d0ead9f1df3a.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-29",
+      "paths": {
+        "spec": "tasks/specs/linear-69a0e91c-0b3c-4be9-8cf0-d0ead9f1df3a.md",
+        "task": "tasks/tasks-linear-69a0e91c-0b3c-4be9-8cf0-d0ead9f1df3a.md",
+        "agent_task": ".agent/task/linear-69a0e91c-0b3c-4be9-8cf0-d0ead9f1df3a.md",
+        "docs": "docs/TECH_SPEC-linear-69a0e91c-0b3c-4be9-8cf0-d0ead9f1df3a.md"
+      }
+    },
+    {
       "id": "20260428-linear-67a294b8-748d-4b8d-92ae-a884b2be7d63",
       "title": "CO-415 repair current-main core validation timeout cluster",
       "relates_to": "tasks/tasks-linear-67a294b8-748d-4b8d-92ae-a884b2be7d63.md",
@@ -7490,7 +7506,8 @@
         "task": "tasks/tasks-linear-ebb62cc0-77d0-41e4-8640-abbd5126cced.md",
         "agent_task": ".agent/task/linear-ebb62cc0-77d0-41e4-8640-abbd5126cced.md",
         "docs": "docs/TECH_SPEC-linear-ebb62cc0-77d0-41e4-8640-abbd5126cced.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260329-linear-f6e514fa-352e-4d82-97e2-08667e32e586",
@@ -7506,7 +7523,8 @@
         "task": "tasks/tasks-linear-f6e514fa-352e-4d82-97e2-08667e32e586.md",
         "agent_task": ".agent/task/linear-f6e514fa-352e-4d82-97e2-08667e32e586.md",
         "docs": "docs/TECH_SPEC-linear-f6e514fa-352e-4d82-97e2-08667e32e586.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260328-linear-62527426-2f74-4134-98e0-bb50c3da7913",
@@ -7530,7 +7548,8 @@
         "task": "tasks/tasks-linear-62527426-2f74-4134-98e0-bb50c3da7913.md",
         "agent_task": ".agent/task/linear-62527426-2f74-4134-98e0-bb50c3da7913.md",
         "docs": "docs/TECH_SPEC-linear-62527426-2f74-4134-98e0-bb50c3da7913.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260328-linear-9b2a195b-4603-4ed4-98c6-20eff87049e4",
