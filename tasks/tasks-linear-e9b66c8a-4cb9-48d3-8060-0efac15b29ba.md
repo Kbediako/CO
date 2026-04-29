@@ -31,14 +31,18 @@
 ## Parent-Owned Follow-On
 - [x] Parent reconciles live Linear issue context before implementation. Evidence: `linear issue-context --issue-id e9b66c8a-4cb9-48d3-8060-0efac15b29ba --format json` showed `In Progress` and no attached PR.
 - [x] Parent runs docs-review or equivalent packet review before implementation. Evidence: recovered docs-packet child lane `.runs/linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba-docs-packet/cli/2026-04-28T12-03-31-458Z-f7277f31/manifest.json`.
-- [x] Parent implements classifier/telemetry/retry changes and focused regressions. Evidence: `scripts/lib/review-command-probe-classification.ts`, `scripts/lib/review-command-intent-classification.ts`, and focused tests; `npm run test:core -- tests/review-command-intent-classification.spec.ts tests/review-command-probe-classification.spec.ts tests/review-execution-state.spec.ts` passed with 191 tests.
-- [ ] Parent runs normal validation, standalone review, elegance pass, PR lifecycle, and Linear handoff. Evidence: blocked before review/PR handoff because required gates are not green; `npm run test` failed on broad unrelated timeout/baseline clusters, and `npm run docs:freshness` / `docs:freshness:maintain` fail on out-of-scope Mar 28 stale docs now filed as `CO-419`.
+- [x] Parent implements classifier/telemetry/retry changes and focused regressions. Evidence: `scripts/lib/review-command-probe-classification.ts`, `scripts/lib/review-command-intent-classification.ts`, and focused tests; `npm run test:core -- tests/review-command-intent-classification.spec.ts tests/review-command-probe-classification.spec.ts tests/review-execution-state.spec.ts` passed after the final help-only/heavy-blocker fix.
+- [x] Parent runs normal validation, standalone review, elegance pass, opens PR, and attaches it to Linear. Evidence: full validation floor passed, standalone review completed with `review_outcome=bounded-success`, and PR #723 is attached to CO-405.
+- [ ] Parent drains PR feedback and transitions Linear handoff. Evidence: PR #723 feedback fixes are ready to commit/push; CodeRabbit inline replies and the final `ready-review` drain remain pending.
 
 ## Progress Log
 - 2026-04-28: bounded same-issue child lane created the docs-first packet and `tasks/index.json` entry only.
 - 2026-04-28: parent implemented command-intent classification for `test:*` package scripts and repo-local guard scripts, fixed this packet's docs-freshness registry rows, and stopped before review handoff because repo gates are red on out-of-scope baseline debt.
+- 2026-04-29: parent recovered after the out-of-scope blockers were closed, completed the validation floor, standalone review, elegance pass, and opened PR #723.
+- 2026-04-29: parent addressed PR review feedback for help-only guard lookups, canonical `tasks/index.json` docs registration, expanded validation-command inventory, and packet/checklist wording; final push/reply/drain remains parent-owned.
 
 ## Notes
+- The Docs-First and Validation sections above preserve the bounded same-issue docs child-lane evidence; parent-owned implementation and PR lifecycle evidence is tracked separately under Parent-Owned Follow-On.
 - Do not run Linear, GitHub, PR, workpad, issue-context, or lifecycle commands from this child lane.
 - Do not edit implementation or test files from this child lane.
 - Do not run full repo validation suites from this child lane.

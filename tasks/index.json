@@ -16145,10 +16145,7 @@
         "spec": "tasks/specs/linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba.md",
         "task": "tasks/tasks-linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba.md",
         "agent_task": ".agent/task/linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba.md"
-        }
+        "docs": "tasks/specs/linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba.md"
       }
     }
   ]

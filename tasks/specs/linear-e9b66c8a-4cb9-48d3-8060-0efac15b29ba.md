@@ -39,6 +39,7 @@ CO-405 hardens bounded standalone review by treating repo-local validation comma
 - Nearby wrong interpretations to reject:
   - bounded review may execute validation commands to gather review evidence
   - validation-command attempts are ordinary shell probes
+  - help-only repo guard lookups are validation executions
   - telemetry can hide or flatten blocked validation attempts
   - retry can drop scope or run a smaller validation command
   - CO-405 should become a broad review-wrapper redesign
@@ -51,7 +52,7 @@ CO-405 hardens bounded standalone review by treating repo-local validation comma
 | Surface | Current truth | Reference truth | Target truth | Explicitly out-of-scope differences |
 | --- | --- | --- | --- | --- |
 | Validation command ownership | CO validation commands run outside bounded review. | Parent/provider worker owns validation and closeout. | Reviewer attempts to run repo-local validation are blocked as command intent. | Running validation inside review, even read-only. |
-| Command-intent classification | Existing command-intent boundaries protect review from orchestration and validation drift. | Repo-local validation commands are validation intent, not product findings. | Commands such as `npm run test`, focused `npx vitest`, `npm run docs:check`, `node scripts/spec-guard.mjs --dry-run`, and `node scripts/diff-budget.mjs` classify as `command-intent` with validation provenance. | Generic shell-probe extraction or unrelated command parser refactors. |
+| Command-intent classification | Existing command-intent boundaries protect review from orchestration and validation drift. | Repo-local validation commands are validation intent, not product findings. | Validation suites, focused runners, and repo guard scripts classify as `command-intent` with validation provenance; help-only lookups stay read-only. | Generic shell-probe extraction or unrelated command parser refactors. |
 | Telemetry and summary | Review closeout must explain whether a verdict, boundary, retry, or failure occurred. | Boundary diagnostics must remain separate from product findings. | Telemetry retains command text, `termination_boundary.kind=command-intent`, `validation-suite` or `validation-runner` provenance, retry count, and final `review_outcome`. | Flattening into `clean-success` or hiding boundary history. |
 | Retry | One bounded retry can recover from command-intent drift. | Retry is read-only, scope-preserving, and fail-closed. | First validation boundary may retry once; repeated validation intent is `failed-boundary`; read-only verdict after retry is `bounded-success`. | Adding new fallback paths or changing unrelated retry behavior. |
 
@@ -72,7 +73,7 @@ CO-405 hardens bounded standalone review by treating repo-local validation comma
 - Functional requirements:
   1. Classify repo-local validation command attempts made by bounded review as `command-intent` violations.
   2. Preserve validation provenance as `validation-suite` or `validation-runner` based on the detected command family.
-  3. Include CO handoff and focused validation commands in the target classification surface, including `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, `npm run pack:smoke`, `node scripts/spec-guard.mjs --dry-run`, `node scripts/diff-budget.mjs`, and focused `npx vitest` runs.
+  3. Include the validation-command surface inventory below, including focused package-script aliases, direct runners, repo-local guard scripts, and temp-repo absolute guard script repro commands.
   4. Preserve telemetry fields that let the parent distinguish product findings from blocked validation-command attempts.
   5. Preserve bounded retry behavior: one scope-preserving read-only retry after the first validation-command boundary; fail closed on repeated validation intent; report `bounded-success` only when the retry yields a read-only verdict.
 - Non-functional requirements:
@@ -85,6 +86,13 @@ CO-405 hardens bounded standalone review by treating repo-local validation comma
   - review execution telemetry / manifest summary
   - review retry policy for command-intent boundaries
   - focused parent-owned tests for classifier, telemetry, and retry behavior
+
+## Validation-Command Surface Inventory
+- Package-manager validation suites: `npm run build`, `npm run lint`, `npm run test`, `npm run test:*`, `npm run eval:test`, `npm run docs:check`, `npm run docs:freshness`, `npm run docs:freshness:maintain`, `npm run repo:stewardship`, and `npm run pack:smoke`.
+- Node package-script validation suites: `node --run test:*`, including focused file selectors passed after `--`.
+- Repo-local guard and closeout scripts: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, temp-repo absolute `node /path/to/CO/scripts/spec-guard.mjs --dry-run`, `node scripts/diff-budget.mjs`, and `scripts/run-test-all.mjs`.
+- Direct validation runners: focused `npx vitest`, `npm exec -- vitest`, `bunx jest`, `python -m pytest`, and launcher/path variants that resolve to `vitest`, `jest`, or `pytest`.
+- Help-only guard/script lookups such as `node scripts/spec-guard.mjs --help`, `scripts/spec-guard.mjs -h`, and `node --run docs:freshness -- --help` are not validation execution and must stay outside the command-intent boundary.
 
 ## Fallback Expiry / Refactor Decision
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |

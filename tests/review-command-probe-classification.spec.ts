@@ -63,6 +63,50 @@ describe('review command probe classification', () => {
     ).toBeNull();
   });
 
+  it('keeps help-only repo-local validation lookups out of the heavy blocker', () => {
+    for (const commandLine of [
+      `node scripts/spec-guard.mjs --help`,
+      `node scripts/spec-guard.mjs -h`,
+      `node scripts/spec-guard.mjs help`,
+      `node scripts/spec-guard.mjs -- --help`,
+      `node scripts/diff-budget.mjs --help`,
+      `node scripts/delegation-guard.mjs --help`,
+      `node scripts/docs-freshness.mjs --check --help`,
+      `node scripts/docs-freshness-maintain.mjs --check --help`,
+      `node scripts/repo-stewardship-audit.mjs --check --help`,
+      `node scripts/spec-guard.mjs --help=false --help`,
+      `scripts/spec-guard.mjs --help`,
+      `scripts/spec-guard.mjs -h`,
+      `scripts/spec-guard.mjs help`,
+      `node --run docs:freshness -- --help`,
+      `node --run docs:freshness -- --help=false --help`,
+      `node --run=docs:freshness -- --help`,
+      `node --run docs:freshness:maintain -- --help`,
+      `node --run repo:stewardship -- --help`
+    ]) {
+      expect(detectHeavyReviewCommand(commandLine)).toBeNull();
+    }
+  });
+
+  it('keeps disabled help flags on repo-local validation lookups inside the heavy blocker', () => {
+    for (const commandLine of [
+      `node scripts/spec-guard.mjs --help=false`,
+      `node scripts/spec-guard.mjs --help=false=1`,
+      `node scripts/spec-guard.mjs --help=0`,
+      `node scripts/spec-guard.mjs --help=0=1`,
+      `node scripts/spec-guard.mjs -h=false`,
+      `node scripts/spec-guard.mjs -h=false=1`,
+      `node scripts/docs-freshness.mjs --check --help=false`,
+      `node scripts/docs-freshness.mjs --check --help=false=1`,
+      `node --run docs:freshness -- --help=false`,
+      `node --run docs:freshness -- --help=false=1`,
+      `node --run docs:freshness:maintain -- --help=0`,
+      `node --run docs:freshness:maintain -- --help=0=1`
+    ]) {
+      expect(detectHeavyReviewCommand(commandLine)).toBe(commandLine);
+    }
+  });
+
   it('tracks shell-probe env-var references without matching literal hints', () => {
     expect(tokenReferencesReviewShellProbeEnvVar('$MANIFEST')).toBe(true);
     expect(tokenReferencesReviewShellProbeEnvVar('${RUN_LOG:-fallback}')).toBe(true);
