@@ -1,6 +1,34 @@
 {
   "items": [
     {
+      "id": "20260430-linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9",
+      "title": "CO-408 durable child-lane decision lineage for provider-worker retry recovery",
+      "relates_to": "tasks/tasks-linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-30",
+      "approvals": {
+        "traceability_packet": {
+          "reviewer": "write-enabled docs-only packet worker",
+          "date": "2026-04-30",
+          "status": "prepared",
+          "summary": "Docs-only traceability packet created for CO-408 while the issue remains in Backlog. The packet preserves provider-worker retry recovery, same-issue child lane, parallelize_now, recover_child_lane:<stream>, recover_run:<run_id>, latest prior decision lineage, stale older child lane, fail closed, and pending parent acceptance checks; it keeps implementation gated until the packet lands and rejects stream-only matching, duplicate relaunches, timestamp tolerance expansion without durable lineage, and unrelated provider current-state or PR handoff work."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
+        "task": "tasks/tasks-linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
+        "agent_task": ".agent/task/linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md"
+        }
+      }
+    },
+    {
       "id": "20260429-linear-9becd8cd-7fe2-477e-bc59-816154364f90",
       "title": "CO-423 restore live docs freshness maintenance owner after terminal CO-420",
       "relates_to": "tasks/tasks-linear-9becd8cd-7fe2-477e-bc59-816154364f90.md",
