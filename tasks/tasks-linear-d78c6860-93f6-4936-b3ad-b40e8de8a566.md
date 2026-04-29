@@ -33,9 +33,10 @@
 - [x] `npm run docs:freshness:maintain -- --format json` baseline owner check. Evidence: `out/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/post-packet-docs-freshness-maintenance.json` still reports `freshness_decision=block_unowned_repo_debt`, `owner_issue=CO-425`, `reason=configured_owner_terminal`, `state=Done`, `state_type=completed`, `usable=false`, and `blocking_changed_paths=[]` as expected until implementation.
 
 ## Handoff
-- [ ] Draft PR opened from `kb/co-427-docs-freshness-owner-packet`.
-- [ ] PR attached to Linear issue if helper/API permits.
-- [ ] Linear issue remains in `Backlog`; parent/provider workflow owns future transition.
+- [x] Draft PR opened from `kb/co-427-docs-freshness-owner-packet`. Evidence: https://github.com/Kbediako/CO/pull/727.
+- [x] PR attached to Linear issue if helper/API permits. Evidence: `codex-orchestrator linear attach-pr` returned `ok=true` with attachment `3dba6d71-71c9-44b9-a0fb-5d8871d841c0`.
+- [x] Linear workpad created with branch, commit, PR, and validation evidence. Evidence: Linear workpad comment `6aad5861-3130-4fbe-bdea-db847d13ea96` / https://linear.app/asabeko/issue/CO-427/re-home-live-docs-freshness-maintenance-owner-after-terminal-co-425#comment-6aad5861.
+- [x] Linear issue remains in `Backlog`; parent/provider workflow owns future transition. Evidence: final `linear issue-context` read showed state `Backlog`.
 
 ## Notes
 - This packet intentionally does not fix `docs:freshness:maintain`; it creates the prerequisite issue packet and mirrors before active owner work.
