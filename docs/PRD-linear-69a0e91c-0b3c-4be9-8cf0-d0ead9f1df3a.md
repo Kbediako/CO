@@ -9,7 +9,7 @@
 - Canonical owner key: `spec-guard:active-spec-last-review:2026-03-29`
 
 ## Summary
-- Problem Statement: PR #719 for CO-409 is blocked by `spec-guard` because three task specs still present completed Linear lanes as active specs with `last_review: 2026-03-29`.
+- Problem Statement: PR #719 for CO-409 was blocked by `spec-guard` because three task specs still presented completed Linear lanes as active specs with `last_review: 2026-03-29`; after CO-409 refreshed freshness metadata, the remaining CO-422 value is the terminal-lane reclassification that keeps those specs out of active-spec freshness.
 - Desired Outcome: reproduce the current-main failure, verify CO-14, CO-30, and CO-34 live Linear truth, then reclassify the completed-lane specs and Mar 29 registry rows without weakening `scripts/spec-guard.mjs` or touching CO-409's Mar 28 docs-freshness cohort.
 
 ## User Request Translation
@@ -55,7 +55,7 @@
 
 | Surface | Current Truth | Reference Truth | Target Truth | Explicitly Out Of Scope |
 | --- | --- | --- | --- | --- |
-| `spec-guard` active-spec freshness | Current main fails on three specs with `status: in_progress` and `last_review: 2026-03-29`. | `spec-guard` skips inactive spec statuses such as `done` and `completed`; active specs must stay fresh. | Completed Linear lanes are reclassified inactive so `spec-guard` no longer treats them as active. | Enforcement weakening, dry-run waivers, or date-only refresh. |
+| `spec-guard` active-spec freshness | Initial CO-422 baseline failed on three specs with `status: in_progress` and `last_review: 2026-03-29`; merged CO-409 later refreshed the dates but still left the completed-lane classification question. | `spec-guard` skips inactive spec statuses such as `done` and `completed`; active specs must stay fresh. | Completed Linear lanes are reclassified inactive so `spec-guard` no longer treats them as active. | Enforcement weakening, dry-run waivers, or date-only refresh. |
 | Live Linear truth | CO-14, CO-30, and CO-34 are live `Done`. | Linear terminal state is the authoritative issue lifecycle signal for completed provider lanes. | Repo metadata mirrors live completed-lane truth. | Reopening terminal issue scope. |
 | Registry mirrors | Mar 29 packet and mirror rows are still `active`, causing freshness debt for completed lanes. | Registry status must distinguish active docs from historical or archive-eligible implementation docs. | Only the Mar 29 completed-lane rows are marked inactive/archive-status. | CO-420 / Mar 28 rolling cohort rows. |
 | CO-409 / PR #719 | CO-409 is blocked by this separate Core Lane failure. | Blocker notes should describe external-owner gate truthfully. | Notes are updated after local validation proves this owner clears the gate. | CO-409 implementation or CodeRabbit response changes. |

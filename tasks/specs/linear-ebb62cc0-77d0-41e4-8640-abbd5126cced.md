@@ -4,7 +4,7 @@ title: CO: Surface and handle Linear rate limits in provider tracked-issue rerea
 status: done
 owner: Codex
 created: 2026-03-29
-last_review: 2026-03-29
+last_review: 2026-04-29
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-ebb62cc0-77d0-41e4-8640-abbd5126cced.md
@@ -12,7 +12,8 @@ related_action_plan: docs/ACTION_PLAN-linear-ebb62cc0-77d0-41e4-8640-abbd5126cce
 related_tasks:
   - tasks/tasks-linear-ebb62cc0-77d0-41e4-8640-abbd5126cced.md
 review_notes:
-  - 2026-04-29: CO-422 live Linear audit confirmed CO-34 is `Done`; this spec is reclassified from active `in_progress` to inactive `done` without changing `last_review`, preserving completed implementation evidence while keeping terminal lanes out of active-spec freshness.
+  - 2026-04-29: CO-409 PR #719 freshness review reread this historical task packet/mirror after the Mar 29 cadence crossed the gate; content remains valid for its original issue scope, so only freshness metadata was refreshed under live docs:freshness:maintain owner CO-409.
+  - 2026-04-29: CO-422 live Linear audit confirmed CO-34 is `Done`; this spec is reclassified to inactive `done` after the CO-409 freshness review so completed implementation evidence remains preserved without staying in active-spec freshness.
   - 2026-03-29: Opened from Linear issue `CO-34` after rechecking the live workflow states with `linear issue-context`; the CO team exposes `In Progress`, `In Review`, `Merging`, and `Rework`, and the issue started this lane in `Ready` with no attached PR or workpad comment.
   - 2026-03-29: The workspace started detached at `c7f3b2134d71f323fe874734510e8f324b96f661` and moved onto branch `co-34-surface-tracked-issue-rate-limits` before repo edits.
   - 2026-03-29: Pre-implementation review approves the narrow path: preserve explicit Linear rate-limit metadata in tracked-issue rereads, add bounded short-window wait only where safe, widen worker proof truthfully, and avoid reopening the broader `CO-33` mutation seam.

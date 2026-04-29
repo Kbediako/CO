@@ -18,7 +18,7 @@ review_notes:
 # TECH_SPEC - CO-422 refresh Mar 29 active spec-guard cohort
 
 ## Summary
-- Objective: repair the Mar 29 active-spec metadata cohort blocking CO-409 / PR #719 Core Lane.
+- Objective: repair the Mar 29 active-spec metadata cohort that blocked CO-409 / PR #719 Core Lane and still needs terminal-lane classification after CO-409's freshness refresh.
 - Scope: CO-422 docs-first packet, the three completed-lane task specs, `tasks/index.json`, `docs/docs-freshness-registry.json`, workpad/Linear state, validation, review, PR, and blocker-note follow-through.
 - Constraints:
   - no `scripts/spec-guard.mjs` weakening
@@ -57,7 +57,7 @@ review_notes:
 
 | Surface | Current Truth | Reference Truth | Target Truth | Explicitly Out Of Scope |
 | --- | --- | --- | --- | --- |
-| `spec-guard` | Fails on three Mar 29 specs whose frontmatter still says `status: in_progress`. | Inactive statuses are skipped; active specs must be within 30 days. | Terminal lanes use an inactive status and stop failing active-spec freshness. | Guard weakening or date-only refresh. |
+| `spec-guard` | Initial CO-422 baseline failed on three Mar 29 specs whose frontmatter still said `status: in_progress`; merged CO-409 then refreshed their dates as active historical docs. | Inactive statuses are skipped; active specs must be within 30 days. | Terminal lanes use an inactive status and stop failing active-spec freshness. | Guard weakening or date-only refresh. |
 | Linear lifecycle | CO-14, CO-30, and CO-34 live reads return `Done`. | Linear terminal state is the lifecycle authority for issue-lane completion. | Repo mirrors classify those issue docs as completed/historical. | Reopening finished work. |
 | Registry freshness | Fifteen Mar 29 registry rows remain `active` for completed-lane packet/mirror docs. | Docs freshness applies to active or deprecated docs, not archive-status historical rows. | Only those Mar 29 completed-lane rows move to archive-status freshness metadata. | Mar 28 rolling rows and unrelated stale docs. |
 | Handoff blocker | CO-409 / PR #719 Core Lane is blocked by this external owner. | Blocker notes must reflect actual validation state. | Update blocker notes after green local proof and PR handoff. | CO-409 content changes. |
@@ -79,7 +79,7 @@ review_notes:
 - Functional requirements:
   - Add the CO-422 docs-first packet and task mirrors.
   - Change the three task spec frontmatter statuses from `in_progress` to an inactive status aligned with live Linear `Done`.
-  - Add per-spec review notes documenting the 2026-04-29 live Linear audit and no-date-bump rationale.
+  - Add per-spec review notes documenting the 2026-04-29 live Linear audit, preserving upstream CO-409 freshness review evidence where present.
   - Mark the exact Mar 29 completed-lane registry rows as archive-status so docs freshness no longer reports them as active blockers.
   - Add completed status to the three `tasks/index.json` entries and register CO-422.
 - Non-functional requirements:

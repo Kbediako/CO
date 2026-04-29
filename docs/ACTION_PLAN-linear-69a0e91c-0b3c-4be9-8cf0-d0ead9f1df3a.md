@@ -68,7 +68,7 @@
 - Risk: accidentally widening into the Mar 28 rolling freshness cohort.
   - Mitigation: update only the Mar 29 stale rows and leave CO-420 / Mar 28 cohort metadata unchanged.
 - Risk: hiding stale specs by changing dates.
-  - Mitigation: do not bump `last_review` on the completed source specs; use inactive spec status with review notes.
+  - Mitigation: do not introduce a CO-422 date-only refresh; preserve upstream CO-409 freshness review evidence where present, and use inactive spec status with review notes.
 - Risk: historical docs are deleted or prematurely stubbed.
   - Mitigation: preserve all files and use registry status only.
 
