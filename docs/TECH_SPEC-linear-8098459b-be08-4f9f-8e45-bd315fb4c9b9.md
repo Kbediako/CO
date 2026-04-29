@@ -18,7 +18,7 @@ This mirror points to the canonical task spec at `tasks/specs/linear-8098459b-be
 - Preserve CO-403's fail-closed behavior for stale older child lanes, missing launches, failed children, ambiguous records, and stream-only matches.
 - Permit bounded timestamp inference only for legacy records where lineage is absent and the existing narrow timestamp-skew check still proves the recovery is explicitly safe.
 - Surface accepted/rejected lineage truth in `provider-linear-worker-proof.json` and `co-status` for reviewer diagnosis.
-- Packet note: this PR only creates traceability packet/mirrors; CO-408 implementation remains Backlog/Ready-gated until this packet lands.
+- Implementation note: this PR now carries the CO-408 durable lineage implementation on top of the original traceability packet.
 
 ## Protected Surfaces
 - `orchestrator/src/cli/providerLinearWorkerRunner.ts`
@@ -51,7 +51,7 @@ This mirror points to the canonical task spec at `tasks/specs/linear-8098459b-be
 
 ## Technical Requirements
 1. Add first-class lineage or equivalent companion audit proof linking same-issue child-lane records to parent turn and parallelization decision lineage.
-2. Keep `parallelize_now` enforcement fail-closed when lineage is missing, ambiguous, stale, older than the latest prior decision, or only stream-matched.
+2. Keep `parallelize_now` enforcement fail-closed when lineage mismatches, is ambiguous, is stale, is older than the latest prior decision, or only stream-matched; missing lineage can recover only through the existing safe legacy timestamp fallback.
 3. Let retry recovery accept a child lane launched before the decision audit row only when durable lineage proves it satisfies that decision.
 4. Retain bounded timestamp inference only for legacy records where lineage is absent and explicitly safe under the existing narrow skew policy.
 5. Preserve pending parent acceptance checks before a recovered child lane satisfies enforcement.
@@ -70,23 +70,25 @@ This mirror points to the canonical task spec at `tasks/specs/linear-8098459b-be
   - legacy timestamp fallback stays bounded and visible.
   - proof/status explain whether recovery used durable lineage, safe legacy timestamp inference, or fail-closed rejection.
 - Explicitly out-of-scope differences:
-  - changing CO-403 behavior in this packet lane
+  - changing CO-403 behavior
   - relaunching duplicate child lanes to paper over missing lineage
   - unrelated provider current-state authority
   - PR review handoff behavior
   - Linear state or provider WIP-slot mutation
 
 ## Validation Contract
-- Packet lane:
+- Current implementation lane:
   - `git diff --check`
   - `node scripts/spec-guard.mjs --dry-run`
+  - `npm run build`
+  - `npm run lint`
+  - `npm run test`
   - `npm run docs:check`
   - `npm run docs:freshness`
+  - `npm run repo:stewardship`
   - `node scripts/diff-budget.mjs`
-  - scoped diff/status review for packet-only changes
-- Parent lane:
   - provider-worker retry recovery tests for durable launch-before-decision lineage
-  - negative tests for stale older unrelated child lanes, stream-only matches, missing lineage, and unsafe timestamp inference
+  - negative tests for stale older unrelated child lanes, stream-only matches, lineage mismatches, missing lineage without safe fallback, and unsafe timestamp inference
   - proof/status tests for lineage and fail-closed diagnostics
   - normal review/elegance/PR/Linear handoff gates after implementation
 
@@ -97,4 +99,4 @@ This mirror points to the canonical task spec at `tasks/specs/linear-8098459b-be
 - Pending parent acceptance checks are weakened.
 - `recover_child_lane:<stream>` or `recover_run:<run_id>` is treated as sufficient proof without latest prior decision lineage.
 - `co-status` or proof surfaces hide lineage/fallback/rejection truth.
-- This packet PR includes provider-worker implementation edits.
+- Implementation leaves provider-worker source, tests, proof/status projection, or packet mirrors inconsistent with this lineage contract.
