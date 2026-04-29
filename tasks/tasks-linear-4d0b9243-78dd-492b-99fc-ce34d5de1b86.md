@@ -28,9 +28,9 @@
 - [x] Issue-quality review captured - Evidence: scoped TECH_SPEC carries user-request translation, protected terms, wrong interpretations, non-goals, parity matrix, and `Not done if` clauses.
 - [x] Fallback / refactor decision captured - Evidence: scoped TECH_SPEC removes same-endpoint slow-read-as-dead-endpoint behavior and justifies retaining stale/dead endpoint recovery only for stale/dead endpoints.
 - [x] Durable retention evidence captured - Evidence: scoped TECH_SPEC records `stale endpoint/dead-port recovery` as a durable recovery contract with a CO-407 negative boundary.
-- [x] Standalone review approval captured - Evidence: `FORCE_CODEX_REVIEW=1 CODEX_REVIEW_NON_INTERACTIVE=1 npm run review -- --uncommitted` produced `review_outcome=bounded-success` in `../../.runs/linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86/cli/2026-04-28T03-36-30-568Z-9921d792/review/telemetry.json` with no actionable findings.
+- [x] Standalone review approval captured - Evidence: `FORCE_CODEX_REVIEW=1 CODEX_REVIEW_NON_INTERACTIVE=1 npm run review -- --uncommitted` produced `review_outcome=bounded-success` in `.runs/linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86/cli/2026-04-28T03-36-30-568Z-9921d792/review/telemetry.json` with no actionable findings.
 - [x] Docs-review manifest captured - Evidence: `.runs/linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86-docs-review/cli/2026-04-28T04-00-54-422Z-c41e56c9/manifest.json`; `delegation-guard` and `docs:check` passed, packet-local missing registry rows were fixed in `docs/docs-freshness-registry.json`, and out-of-scope terminal owner debt was filed as CO-413.
-- [x] Implementation review manifest captured - Evidence: `../../.runs/linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86/cli/2026-04-28T03-36-30-568Z-9921d792/manifest.json` and review telemetry above.
+- [x] Implementation review manifest captured - Evidence: `.runs/linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86/cli/2026-04-28T03-36-30-568Z-9921d792/manifest.json` and review telemetry above.
 
 ## Parent-Owned Implementation
 1. [x] Verify live CO-407 issue text and related `CO-246`, `CO-404`, and `CO-406` boundaries. Evidence: live `issue-context` read before transition plus scoped packet preserved related boundaries.
@@ -52,7 +52,7 @@
 - [x] Parent-owned review and PR handoff gates. Evidence: manifest-backed review `.runs/linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86/cli/2026-04-29T16-05-52-615Z-c1d6a099/review/telemetry.json` reported clean success after the earlier P2 test-timing finding was fixed; PR attachment and ready-review drain are tracked in the Linear workpad.
 
 ## Progress Log
-- 2026-04-28: Created docs-first packet from child prompt protected terms. The exact source payload at `../../.runs/linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86-docs-packet-v2/cli/2026-04-28T03-51-01-395Z-61ba3248/memory/source-0/source.txt` existed but contained run metadata rather than the full CO-407 issue body.
+- 2026-04-28: Created docs-first packet from child prompt protected terms. The exact source payload at `.runs/linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86-docs-packet-v2/cli/2026-04-28T03-51-01-395Z-61ba3248/memory/source-0/source.txt` existed but contained run metadata rather than the full CO-407 issue body.
 - 2026-04-28: Registered scoped TECH_SPEC path, task checklist, `.agent` mirror, `tasks/index.json`, and `docs/TASKS.md` snapshot. No Linear/GitHub/PR lifecycle surfaces were mutated.
 - 2026-04-29: Parent lane merged current `origin/main`, revalidated the implementation after external docs-freshness owner debt was cleared, fixed the standalone-review P2 test timing concern, and recorded clean post-fix review evidence.
 
