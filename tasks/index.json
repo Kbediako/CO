@@ -1,6 +1,58 @@
 {
   "items": [
     {
+      "id": "20260429-linear-9becd8cd-7fe2-477e-bc59-816154364f90",
+      "title": "CO-423 restore live docs freshness maintenance owner after terminal CO-420",
+      "relates_to": "tasks/tasks-linear-9becd8cd-7fe2-477e-bc59-816154364f90.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-29",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-29",
+          "status": "accepted",
+          "manifest": ".runs/linear-9becd8cd-7fe2-477e-bc59-816154364f90-docs-packet/cli/2026-04-29T13-26-35-576Z-37f0d4ba/manifest.json",
+          "summary": "Docs child lane created the CO-423 packet with current owner_issue=CO-409 evidence and historical CO-420 context; parent accepted the patch after completion."
+        },
+        "baseline_reproduction": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-29",
+          "status": "reproduced-current-owner-blocker",
+          "evidence": "out/linear-9becd8cd-7fe2-477e-bc59-816154364f90/before/docs-freshness-maintenance.json",
+          "summary": "Reproduced docs:freshness:maintain block_unowned_repo_debt with configured_owner_terminal, owner_issue=CO-409, and blocking_changed_paths=[]; CO-420 remains historical cohort context."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-29",
+          "status": "clean-success",
+          "telemetry": "../../.runs/linear-9becd8cd-7fe2-477e-bc59-816154364f90/cli/2026-04-29T13-11-39-282Z-352d6793/review/telemetry.json",
+          "summary": "Diff-focused review found the owner metadata, registry additions, and cohort documentation aligned with the CO-423 re-home scope; no concrete regressions were identified."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-29",
+          "status": "clean",
+          "evidence": "out/linear-9becd8cd-7fe2-477e-bc59-816154364f90/manual/elegance-review.md",
+          "summary": "Explicit minimality pass found no extra abstraction, fallback seam, source-code change, or broad registry churn beyond the required docs freshness owner re-home."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9becd8cd-7fe2-477e-bc59-816154364f90.md",
+        "task": "tasks/tasks-linear-9becd8cd-7fe2-477e-bc59-816154364f90.md",
+        "agent_task": ".agent/task/linear-9becd8cd-7fe2-477e-bc59-816154364f90.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-9becd8cd-7fe2-477e-bc59-816154364f90.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-9becd8cd-7fe2-477e-bc59-816154364f90.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-9becd8cd-7fe2-477e-bc59-816154364f90.md"
+        },
+        "docs_review_manifest": ".runs/linear-9becd8cd-7fe2-477e-bc59-816154364f90-docs-packet/cli/2026-04-29T13-26-35-576Z-37f0d4ba/manifest.json"
+      }
+    },
+    {
       "id": "20260429-linear-69a0e91c-0b3c-4be9-8cf0-d0ead9f1df3a",
       "title": "CO-422 refresh Mar 29 active spec-guard cohort",
       "relates_to": "tasks/tasks-linear-69a0e91c-0b3c-4be9-8cf0-d0ead9f1df3a.md",
