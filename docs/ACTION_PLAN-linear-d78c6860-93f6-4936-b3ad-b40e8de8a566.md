@@ -1,12 +1,12 @@
 # ACTION_PLAN - CO-427 re-home docs:freshness:maintain owner after terminal CO-425
 
 ## Summary
-- Goal: create the prerequisite CO-427 docs-first packet and mirrors so the issue can later leave Backlog with a preserved owner-rehome contract.
-- Scope: packet docs, task mirrors, `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json`.
+- Goal: re-home the live `docs:freshness:maintain` owner from terminal CO-425 to active same-project CO-427 while preserving the retained March 28 rolling cohort.
+- Scope: packet docs, task mirrors, `docs/docs-catalog.json`, `docs/guides/docs-freshness-cohorts.md`, `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json`.
 - Assumptions:
   - CO-427 is the intended live same-project owner follow-up for canonical owner key `docs:freshness:maintain`.
   - Terminal owner metadata must remain fail-closed evidence, not a usable live owner.
-  - This packet worker does not implement owner re-home, stale-row review, archive, or policy reclassification.
+  - This implementation re-homes owner metadata only; stale-row review, archive, or policy reclassification remains future owner work before `expires_after`.
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward:
@@ -24,23 +24,23 @@
 - Not done if:
   - the packet hides the terminal `CO-425` owner blocker
   - protected terms or exact file surfaces are missing
-  - catalog owner metadata, cohort-guide content, source code, package files, validation scripts, or CO-330 behavior are changed
+  - source code, package files, validation scripts, or CO-330 behavior are changed
   - stale packet/mirror rows are deleted, hidden, or blindly refreshed
 - Pre-implementation issue-quality review:
-  - 2026-04-29: CO-427 is an owner-rehome prerequisite packet lane, not the owner-rehome implementation.
+  - 2026-04-29: CO-427 is the active owner-rehome implementation lane for terminal CO-425 owner metadata.
   - 2026-04-29: the micro-task path is unavailable because correctness depends on exact protected terms, exact surfaces, canonical owner marker compatibility, and Not Done If guardrails.
-  - 2026-04-29: the packet worker owns branch/PR setup only; parent/provider workflow owns Linear transition and future implementation.
-- Fallback / refactor decision: record the stale terminal-owner recovery path without adding a fallback seam or extending rolling cohort lifetime.
+  - 2026-04-29: the worker owns owner metadata, policy guide, task mirrors, validation, PR update, and review handoff gates.
+- Fallback / refactor decision: re-home live owner metadata without adding a fallback seam or extending rolling cohort lifetime.
 
 ## Milestones & Sequencing
-1. Create an isolated worktree from current `origin/main`.
-2. Read live Linear context for CO-427 and nearby CO-425 / CO-421 issue patterns.
-3. Reproduce or record current `docs:freshness:maintain` terminal-owner baseline where feasible.
-4. Add the six CO-427 packet/mirror files.
-5. Register CO-427 in `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json`.
-6. Run focused packet validation and report any baseline failures accurately.
-7. Commit, push, and open a draft PR attached to CO-427 if feasible.
-8. Leave Linear state transition to the parent/provider workflow.
+1. Read live Linear context for CO-427 and move the issue to the team started state.
+2. Sweep attached PR #727 feedback before implementation.
+3. Reproduce current `docs:freshness:maintain` terminal-owner baseline for CO-425.
+4. Re-home `docs/docs-catalog.json` owner metadata to CO-427 and update the cohort guide lineage.
+5. Update `tasks/index.json`, `docs/TASKS.md`, and CO-427 packet/mirrors with the active owner-rehome evidence.
+6. Run focused docs freshness and maintenance validation.
+7. Run required review/elegance gates for the non-trivial docs/config diff.
+8. Push the existing attached PR branch, run `pr ready-review`, and hand off only after checks and feedback drain are clean.
 
 ## Dependencies
 - Linear issue `CO-427` / `d78c6860-93f6-4936-b3ad-b40e8de8a566`.
@@ -53,24 +53,22 @@
 
 ## Validation
 - Required focused validation:
-  - JSON parse for `tasks/index.json`
-  - JSON parse for `docs/docs-freshness-registry.json`
-  - targeted packet path scan
-  - targeted protected-term scan
+  - JSON parse for `tasks/index.json`, `docs/docs-catalog.json`, and `docs/docs-freshness-registry.json`
+  - targeted owner/path/protected-term scan
   - `npm run docs:check`
   - `npm run docs:freshness`
-  - `npm run docs:freshness:maintain -- --format json` for baseline owner evidence if feasible
+  - `npm run docs:freshness:maintain -- --format json`
 - Rollback plan:
-  - revert only the CO-427 packet files and their three registry/task metadata entries if the packet scope changes before active work.
+  - revert only the CO-427 owner metadata, policy-guide, packet/mirror, and registry/task metadata edits if the owner re-home path changes before handoff.
 
 ## Risks & Mitigations
-- Risk: packet accidentally claims owner re-home is complete.
-  - Mitigation: keep implementation checkboxes open and explicitly record terminal `CO-425` as baseline debt.
-- Risk: packet widens into catalog or cohort-guide changes.
-  - Mitigation: keep this branch limited to packet/mirror metadata and defer owner mutation to the future active lane.
+- Risk: owner re-home hides terminal `CO-425` evidence.
+  - Mitigation: keep terminal `CO-425`, `configured_owner_terminal`, and `blocking_changed_paths=[]` in the packet, guide, workpad, and validation notes.
+- Risk: owner re-home is mistaken for stale-row review.
+  - Mitigation: preserve the March 28 row dates and cohort identity, and describe this as owner metadata only.
 - Risk: helper label projection is stale.
   - Mitigation: treat live issue title/body/state as authoritative for packet setup and record that label absence from older helper output is not scope evidence.
 
 ## Approvals
-- Docs-first packet worker: 2026-04-29
-- Parent owner re-home / implementation approval: pending future CO-427 active lane
+- Docs-first packet and owner-rehome worker: 2026-04-29
+- Parent owner re-home / implementation approval: active provider-worker lane
