@@ -22,7 +22,7 @@
           "reviewer": "provider worker parent lane",
           "date": "2026-04-29",
           "status": "reproduced-current-owner-blocker",
-          "evidence": "out/linear-9becd8cd-7fe2-477e-bc59-816154364f90/before/docs-freshness-maintenance.json",
+          "evidence": ".runs/linear-9becd8cd-7fe2-477e-bc59-816154364f90/cli/2026-04-29T13-11-39-282Z-352d6793/evidence/baseline-docs-freshness-maintenance.json",
           "summary": "Reproduced docs:freshness:maintain block_unowned_repo_debt with configured_owner_terminal, owner_issue=CO-409, and blocking_changed_paths=[]; CO-420 remains historical cohort context."
         },
         "standalone_review": {
@@ -37,7 +37,7 @@
           "reviewer": "provider worker parent lane",
           "date": "2026-04-29",
           "status": "clean",
-          "evidence": "out/linear-9becd8cd-7fe2-477e-bc59-816154364f90/manual/elegance-review.md",
+          "evidence": ".runs/linear-9becd8cd-7fe2-477e-bc59-816154364f90/cli/2026-04-29T13-11-39-282Z-352d6793/evidence/elegance-review.md",
           "summary": "Explicit minimality pass found no extra abstraction, fallback seam, source-code change, or broad registry churn beyond the required docs freshness owner re-home."
         }
       },
