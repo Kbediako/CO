@@ -29,6 +29,63 @@
       }
     },
     {
+      "id": "20260429-linear-9c70572b-31a3-4789-a73c-d18c28d59d72",
+      "title": "CO-425 re-home docs:freshness:maintain owner after terminal CO-423",
+      "relates_to": "tasks/tasks-linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-29",
+      "evidence": [
+        "docs/PRD-linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md",
+        "docs/TECH_SPEC-linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md",
+        "docs/ACTION_PLAN-linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md",
+        "tasks/specs/linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md",
+        "tasks/tasks-linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md",
+        ".agent/task/linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md",
+        ".runs/linear-9c70572b-31a3-4789-a73c-d18c28d59d72-implementation-gate/cli/2026-04-29T18-30-25-478Z-7eb4a3d7/manifest.json",
+        "out/linear-9c70572b-31a3-4789-a73c-d18c28d59d72/docs-freshness-maintenance.json"
+      ],
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "approvals": {
+        "docs_packet_worker": {
+          "reviewer": "write-enabled CO-425 packet worker",
+          "date": "2026-04-29",
+          "status": "owner-rehome-implemented",
+          "summary": "Created the CO-425 docs-first packet, reproduced docs:freshness:maintain block_unowned_repo_debt for terminal CO-423 with blocking_changed_paths=[], re-homed rolling_freshness_cohorts.owner_issue to live same-project CO-425, and validated docs:freshness plus docs:freshness:maintain with the retained March 28 cohort still visible."
+        },
+        "validation_gate": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-29",
+          "status": "passed-with-diff-budget-override",
+          "manifest": ".runs/linear-9c70572b-31a3-4789-a73c-d18c28d59d72-implementation-gate/cli/2026-04-29T18-30-25-478Z-7eb4a3d7/manifest.json",
+          "summary": "Implementation-gate child stream passed delegation guard, spec guard, build, lint, test, docs:check, and docs:freshness:maintain; parent reran delegation guard, spec guard, repo stewardship, and diff-budget with the recorded packet/owner-rehome synchronization override."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-29",
+          "status": "bounded-success-wrapper-complete",
+          "manifest": ".runs/linear-9c70572b-31a3-4789-a73c-d18c28d59d72-implementation-gate/cli/2026-04-29T18-30-25-478Z-7eb4a3d7/manifest.json",
+          "telemetry": ".runs/linear-9c70572b-31a3-4789-a73c-d18c28d59d72-implementation-gate/cli/2026-04-29T18-30-25-478Z-7eb4a3d7/review/telemetry.json",
+          "summary": "Manifest-backed forced standalone review executed under FORCE_CODEX_REVIEW=1. The wrapper classified the command-intent retry as review_outcome=bounded-success; this entry records wrapper-complete evidence and intentionally does not certify the run as a clean review verdict."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-29",
+          "status": "clean",
+          "evidence": "out/linear-9c70572b-31a3-4789-a73c-d18c28d59d72/manual/elegance-review.md",
+          "summary": "Explicit minimality pass kept the repair scoped to owner metadata, cohort-guide evidence, and required task mirrors; no simplification patch was warranted."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md",
+        "task": "tasks/tasks-linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md",
+        "agent_task": ".agent/task/linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md",
+        "docs": "docs/TECH_SPEC-linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md"
+      }
+    },
+    {
       "id": "20260429-linear-9becd8cd-7fe2-477e-bc59-816154364f90",
       "title": "CO-423 restore live docs freshness maintenance owner after terminal CO-420",
       "relates_to": "tasks/tasks-linear-9becd8cd-7fe2-477e-bc59-816154364f90.md",
