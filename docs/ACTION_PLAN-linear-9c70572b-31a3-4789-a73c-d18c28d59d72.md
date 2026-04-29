@@ -4,7 +4,7 @@
 - Goal: re-home the `docs:freshness:maintain` rolling-freshness owner from terminal `CO-423` to live same-project issue `CO-425`.
 - Scope: docs-first packet, `docs/docs-catalog.json`, `docs/guides/docs-freshness-cohorts.md`, task mirrors, and validation evidence.
 - Assumptions:
-  - CO-425 is the open stamped owner for canonical owner key `docs:freshness:maintain`.
+  - CO-425 is the open, stamped owner for canonical owner key `docs:freshness:maintain`.
   - Terminal owner metadata must remain fail-closed evidence, not a usable live owner.
   - The retained March 28 cohort stays intact: `co-420-apr-28-march-28-task-packet-mirror`, 33 rows, 28 Task Packet and 5 Task Mirror, expires after `2026-05-04`.
 
@@ -25,9 +25,9 @@
   - retained cohort rows are deleted, hidden, reclassified, or blindly refreshed
   - freshness policy, caps, scripts, or registry validation are weakened
 - Pre-implementation issue-quality review:
-  - 2026-04-30: CO-425 is an owner re-home lane, not a stale-doc cleanup lane.
-  - 2026-04-30: the micro-task path is unavailable because correctness depends on exact protected terms, exact surfaces, canonical owner marker compatibility, and retained fallback metadata.
-  - 2026-04-30: parent owns the live reproduction, owner metadata mutation, validation, PR lifecycle, and Linear handoff.
+  - 2026-04-29: CO-425 is an owner re-home lane, not a stale-doc cleanup lane.
+  - 2026-04-29: the micro-task path is unavailable because correctness depends on exact protected terms, exact surfaces, canonical owner marker compatibility, and retained fallback metadata.
+  - 2026-04-29: parent owns the live reproduction, owner metadata mutation, validation, PR lifecycle, and Linear handoff.
 - Fallback / refactor decision: retain the existing rolling cohort as an `expire fallback` under live owner `CO-425`; do not extend expiry or add a new fallback seam.
 
 ## Milestones & Sequencing
@@ -75,8 +75,8 @@
 - Risk: row churn hides the March 28 cohort.
   - Mitigation: keep the existing cohort id, `last_review`, row count, class split, and expiry unchanged.
 - Risk: duplicate owner issue.
-  - Mitigation: reuse the current open stamped issue `CO-425`.
+  - Mitigation: reuse the current open, stamped issue `CO-425`.
 
 ## Approvals
-- Docs-first packet worker: 2026-04-30
+- Docs-first packet worker: 2026-04-29
 - Parent owner re-home / implementation approval: in progress

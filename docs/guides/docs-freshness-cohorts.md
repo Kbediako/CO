@@ -322,7 +322,7 @@ CO-420 reproduced the Apr 28 current-main blocker while keeping CO-415 timeout/c
 - The preserved baseline reports are `out/linear-f14ac3d6-cf71-4f9a-8172-b71370a480e1/before/docs-freshness.json` and `out/linear-f14ac3d6-cf71-4f9a-8172-b71370a480e1/before/docs-freshness-maintenance.json`.
 
 ### Rolling Disposition
-CO-420 re-homed the March 28 Task Packet / Task Mirror rows as declared rolling debt under `co-420-apr-28-march-28-task-packet-mirror`; this did not refresh `last_review` dates, delete rows, or weaken freshness policy. After CO-420 reached terminal `Done`, CO-409 became the live same-project `docs:freshness:maintain` owner for that retained rolling cohort. After CO-409 also reached terminal `Done`, CO-423 became the live same-project owner, preserving the canonical owner key while keeping terminal `CO-401`, terminal `CO-420`, and terminal `CO-409` as historical owner evidence only. After CO-423 reached terminal `Done`, CO-425 became the live same-project owner.
+CO-420 re-homed the March 28 Task Packet / Task Mirror rows as declared rolling debt under `co-420-apr-28-march-28-task-packet-mirror`; this did not refresh `last_review` dates, delete rows, or weaken freshness policy. When CO-420 reached terminal `Done`, CO-409 became the live same-project `docs:freshness:maintain` owner for that retained rolling cohort. After CO-409 also reached terminal `Done`, CO-423 became the live same-project owner, preserving the canonical owner key while keeping terminal `CO-401`, terminal `CO-420`, and terminal `CO-409` as historical owner evidence only. Following CO-423 terminal `Done`, CO-425 became the live same-project owner.
 
 ## Apr 29 Terminal CO-409 Owner Re-home
 
