@@ -66,6 +66,24 @@
       }
     },
     {
+      "id": "20260428-linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306",
+      "title": "CO-409 March 28 docs freshness cohort maintenance",
+      "relates_to": "tasks/tasks-linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-28",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "paths": {
+        "spec": "tasks/specs/linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306.md",
+        "task": "tasks/tasks-linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306.md",
+        "agent_task": ".agent/task/linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306.md",
+        "docs": "docs/TECH_SPEC-linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306.md",
+        "docs_review_manifest": ".runs/linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306/cli/2026-04-28T23-35-34-002Z-debc0887/manifest.json"
+      }
+    },
+    {
       "id": "20260428-linear-9f955ebd-e00b-46ad-b25c-280029328841",
       "title": "CO-417 recover stale provider-worker proof locks during active appserver runs",
       "relates_to": "tasks/tasks-linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
@@ -7476,13 +7494,19 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-29",
+      "last_review": "2026-04-29",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-03-29",
           "manifest": ".runs/linear-ebb62cc0-77d0-41e4-8640-abbd5126cced-docs-review/cli/2026-03-29T11-31-24-681Z-749a0ed3/manifest.json",
           "override_reason": "child-stream wrapper returned output-invalid after prepended logs, but the underlying docs-review manifest succeeded and is recorded directly"
+        },
+        "freshness_maintenance": {
+          "reviewer": "Codex provider worker for CO-409",
+          "date": "2026-04-29",
+          "status": "reviewed_refreshed",
+          "summary": "Reread during PR #719 Core Lane spec-guard/docs:freshness triage; preserved original task scope and refreshed cadence metadata only under live docs:freshness:maintain owner CO-409."
         }
       },
       "paths": {
@@ -7500,12 +7524,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-29",
+      "last_review": "2026-04-29",
       "paths": {
         "spec": "tasks/specs/linear-f6e514fa-352e-4d82-97e2-08667e32e586.md",
         "task": "tasks/tasks-linear-f6e514fa-352e-4d82-97e2-08667e32e586.md",
         "agent_task": ".agent/task/linear-f6e514fa-352e-4d82-97e2-08667e32e586.md",
         "docs": "docs/TECH_SPEC-linear-f6e514fa-352e-4d82-97e2-08667e32e586.md"
+      },
+      "approvals": {
+        "freshness_maintenance": {
+          "reviewer": "Codex provider worker for CO-409",
+          "date": "2026-04-29",
+          "status": "reviewed_refreshed",
+          "summary": "Reread during PR #719 Core Lane spec-guard/docs:freshness triage; preserved original task scope and refreshed cadence metadata only under live docs:freshness:maintain owner CO-409."
+        }
       }
     },
     {
@@ -7516,13 +7548,19 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-29",
+      "last_review": "2026-04-29",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "override_reason": "guard stages passed; earlier concrete packet issues were fixed; final forced review re-entered low-signal docs reinspection without a new defect",
           "date": "2026-03-28",
           "manifest": ".runs/linear-62527426-2f74-4134-98e0-bb50c3da7913/cli/2026-03-28T02-25-01-848Z-cbb7ed48/manifest.json"
+        },
+        "freshness_maintenance": {
+          "reviewer": "Codex provider worker for CO-409",
+          "date": "2026-04-29",
+          "status": "reviewed_refreshed",
+          "summary": "Reread during PR #719 Core Lane spec-guard/docs:freshness triage; preserved original task scope and refreshed cadence metadata only under live docs:freshness:maintain owner CO-409."
         }
       },
       "paths": {
