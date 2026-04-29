@@ -7,7 +7,7 @@ const reporters = shouldEnableVitestProgressReporter(process.env)
   : null;
 const workerLimits = shouldCapVitestWorkers(process.env)
   ? {
-      maxWorkers: 4,
+      maxWorkers: 2,
       minWorkers: 1
     }
   : null;
