@@ -21,6 +21,18 @@ const DEFAULT_PARITY_FOLLOW_UP_FLAGS = {
   'acceptance-criteria': '- [ ] Captured',
   'parity-lane': true
 } as const;
+const ISSUE_LABEL_NODES = [
+  {
+    id: 'label-bug',
+    name: 'Bug',
+    color: '#d73a49'
+  },
+  {
+    id: 'label-provider-workflow',
+    name: 'Area: Provider Workflow',
+    color: '#5319e7'
+  }
+];
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -96,7 +108,7 @@ async function createSameAttemptFollowUpFixture(prefix: string, auditEntries: Re
 }
 
 describe('runLinearCliShell', () => {
-  it('routes issue-context into the facade and emits json', async () => {
+  it('routes issue-context labels into the facade and emits json', async () => {
     const printHelp = vi.fn();
     const log = vi.fn();
     const appendAuditEntry = vi.fn();
@@ -116,6 +128,7 @@ describe('runLinearCliShell', () => {
             state: null,
             team: null,
             project: null,
+            labels: ISSUE_LABEL_NODES,
             comments: [],
             attachments: [],
             workpad_comment: null
@@ -170,7 +183,8 @@ describe('runLinearCliShell', () => {
       ok: true,
       operation: 'issue-context',
       issue: {
-        identifier: 'CO-1'
+        identifier: 'CO-1',
+        labels: ISSUE_LABEL_NODES
       }
     });
     expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', {
