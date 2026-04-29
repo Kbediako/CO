@@ -19,7 +19,7 @@
         "tasks/specs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
         "tasks/tasks-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
         "out/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/docs-freshness-maintenance.json",
-        ".runs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/cli/2026-04-29T21-46-42-048Z-f1f28317/review/telemetry.json",
+        ".runs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/cli/2026-04-29T21-28-23-361Z-7f1ccdf1/review/telemetry.json",
         "out/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/manual/elegance-review.md"
       ],
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
@@ -48,15 +48,15 @@
           "reviewer": "provider worker parent lane",
           "date": "2026-04-29",
           "status": "passed",
-          "summary": "Delegation guard passed with a recorded single-bounded-change override; spec guard, build, lint, test, docs:check, docs:freshness, docs:freshness:maintain, repo stewardship, and diff budget passed."
+          "summary": "After merging current origin/main, delegation guard passed with a recorded single-bounded-change override; spec guard, build, lint, test (357 files / 5049 tests), docs:check, docs:freshness, docs:freshness:maintain, repo stewardship, and diff budget passed."
         },
         "standalone_review": {
           "reviewer": "codex-orchestrator review",
           "date": "2026-04-29",
-          "status": "clean-success",
-          "manifest": ".runs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/cli/2026-04-29T21-46-42-048Z-f1f28317/manifest.json",
-          "telemetry": ".runs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/cli/2026-04-29T21-46-42-048Z-f1f28317/review/telemetry.json",
-          "summary": "Manifest-backed forced standalone review executed under FORCE_CODEX_REVIEW=1 and reported review_outcome=clean-success with zero command-intent violations."
+          "status": "bounded-success",
+          "manifest": ".runs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/cli/2026-04-29T21-28-23-361Z-7f1ccdf1/manifest.json",
+          "telemetry": ".runs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/cli/2026-04-29T21-28-23-361Z-7f1ccdf1/review/telemetry.json",
+          "summary": "Manifest-backed forced standalone review executed under FORCE_CODEX_REVIEW=1 after merging origin/main. The first attempt hit the bounded validation-command boundary, then the read-only retry found no actionable issues; telemetry records review_outcome=bounded-success via command-intent retry."
         },
         "elegance_review": {
           "reviewer": "provider worker parent lane",
@@ -71,6 +71,30 @@
         "task": "tasks/tasks-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
         "agent_task": ".agent/task/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
         "docs": "docs/TECH_SPEC-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md"
+      }
+    },
+    {
+      "id": "20260430-linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9",
+      "title": "CO-408 durable child-lane decision lineage for provider-worker retry recovery",
+      "relates_to": "tasks/tasks-linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-30",
+      "approvals": {
+        "traceability_packet": {
+          "reviewer": "write-enabled docs-only packet worker",
+          "date": "2026-04-30",
+          "status": "prepared",
+          "summary": "Traceability packet preserved and implementation active for CO-408. The branch adds durable parent turn and parallelization decision lineage for same-issue child-lane recovery, keeps provider-worker retry recovery lineage-first with only bounded legacy timestamp fallback, exposes recovered lineage truth in proof/status surfaces, and preserves provider-worker retry recovery, same-issue child lane, parallelize_now, recover_child_lane:<stream>, recover_run:<run_id>, latest prior decision lineage, stale older child lane, fail closed, and pending parent acceptance checks. It rejects stream-only matching, duplicate relaunches, timestamp tolerance expansion without durable lineage, and unrelated provider current-state or PR handoff work."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
+        "task": "tasks/tasks-linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
+        "agent_task": ".agent/task/linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md",
+        "docs": "docs/TECH_SPEC-linear-8098459b-be08-4f9f-8e45-bd315fb4c9b9.md"
       }
     },
     {

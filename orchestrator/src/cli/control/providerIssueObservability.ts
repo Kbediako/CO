@@ -1,5 +1,8 @@
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import {
+  isProviderLinearParallelizationDecision,
+  isProviderLinearParallelizationReason,
+  isProviderLinearParallelizationReasonAllowed,
   readProviderLinearParallelizationSnapshot,
   type ProviderLinearParallelizationSnapshot,
   ProviderLinearAuditEntry,
@@ -244,6 +247,29 @@ interface ProviderIssueChildLaneLike {
   in_flight_action?: string | null;
   decision_at?: string | null;
   decision_reason?: string | null;
+  decision_lineage?: ProviderIssueDecisionLineageLike | null;
+}
+
+interface ProviderIssueDecisionLineageLike {
+  schema_version?: number | null;
+  parent_task_id?: string | null;
+  parent_run_id?: string | null;
+  parent_turn_started_at?: string | null;
+  parent_turn_id?: string | null;
+  parent_turn_count?: number | null;
+  decision_id?: string | null;
+  decision_recorded_at?: string | null;
+  decision?: string | null;
+  reason?: string | null;
+}
+
+interface ProviderIssueRecoveredChildLaneLike {
+  stream?: string | null;
+  task_id?: string | null;
+  run_id?: string | null;
+  recovery_source?: string | null;
+  child_decision_lineage?: ProviderIssueDecisionLineageLike | null;
+  parallelization_decision_lineage?: ProviderIssueDecisionLineageLike | null;
 }
 
 interface ProviderIssueProofLike {
@@ -267,6 +293,7 @@ interface ProviderIssueProofLike {
   child_lanes?: ProviderIssueChildLaneLike[] | null;
   parallelization?: (ProviderLinearParallelizationSnapshot & {
     child_lane_count?: number | null;
+    recovered_child_lanes?: ProviderIssueRecoveredChildLaneLike[] | null;
   }) | null;
   resident_session?: {
     logical_session_id?: string | null;
@@ -339,6 +366,8 @@ export interface ControlProviderDebugSnapshot {
     summary: string | null;
     recorded_at: string | null;
     child_lane_count: number | null;
+    decision_lineage: ProviderIssueDecisionLineageLike | null;
+    recovered_child_lanes: ProviderIssueRecoveredChildLaneLike[];
   } | null;
   pull_request: {
     review_promotion_status: string | null;
@@ -543,7 +572,11 @@ export function buildProviderIssueDebugSnapshot(input: {
           reason: parallelization.reason,
           summary: parallelization.summary,
           recorded_at: parallelization.recorded_at,
-          child_lane_count: parallelization.child_lane_count
+          child_lane_count: parallelization.child_lane_count,
+          decision_lineage: normalizeProviderIssueDecisionLineage(parallelization.decision_lineage),
+          recovered_child_lanes: normalizeProviderIssueRecoveredChildLanes(
+            parallelization.recovered_child_lanes
+          )
         }
       : null,
     pull_request: pullRequest,
@@ -595,7 +628,10 @@ function buildProviderClaimRetrySnapshot(
 
 function resolveProviderParallelizationSnapshot(
   proof: ProviderIssueProofLike | null
-): (ProviderLinearParallelizationSnapshot & { child_lane_count: number | null }) | null {
+): (ProviderLinearParallelizationSnapshot & {
+  child_lane_count: number | null;
+  recovered_child_lanes?: ProviderIssueRecoveredChildLaneLike[] | null;
+}) | null {
   const currentTurnStartedAt = normalizeOptionalString(proof?.current_turn_started_at);
   const currentTurnChildLanes = Array.isArray(proof?.child_lanes)
     ? !currentTurnStartedAt
@@ -2146,6 +2182,66 @@ function latestIsoTimestamp(...values: Array<string | null | undefined>): string
   return normalized[normalized.length - 1] ?? null;
 }
 
+function normalizeProviderIssueRecoveredChildLanes(
+  value: unknown
+): ProviderIssueRecoveredChildLaneLike[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      return [];
+    }
+    const record = entry as ProviderIssueRecoveredChildLaneLike;
+    return [{
+      stream: normalizeOptionalString(record.stream),
+      task_id: normalizeOptionalString(record.task_id),
+      run_id: normalizeOptionalString(record.run_id),
+      recovery_source: normalizeOptionalString(record.recovery_source),
+      child_decision_lineage: normalizeProviderIssueDecisionLineage(
+        record.child_decision_lineage
+      ),
+      parallelization_decision_lineage: normalizeProviderIssueDecisionLineage(
+        record.parallelization_decision_lineage
+      )
+    }];
+  });
+}
+
+function normalizeProviderIssueDecisionLineage(
+  value: unknown
+): ProviderIssueDecisionLineageLike | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as ProviderIssueDecisionLineageLike;
+  if (record.schema_version !== 1) {
+    return null;
+  }
+  const decision = normalizeOptionalString(record.decision);
+  const reason = normalizeOptionalString(record.reason);
+  if (
+    !isProviderLinearParallelizationDecision(decision) ||
+    !isProviderLinearParallelizationReason(reason) ||
+    !isProviderLinearParallelizationReasonAllowed(decision, reason)
+  ) {
+    return null;
+  }
+  const normalized: ProviderIssueDecisionLineageLike = {
+    schema_version: 1,
+    parent_task_id: normalizeOptionalString(record.parent_task_id),
+    parent_run_id: normalizeOptionalString(record.parent_run_id),
+    parent_turn_started_at: normalizeOptionalString(record.parent_turn_started_at),
+    parent_turn_id: normalizeOptionalString(record.parent_turn_id),
+    parent_turn_count: normalizeOptionalNonNegativeInteger(record.parent_turn_count),
+    decision_id: normalizeOptionalString(record.decision_id),
+    decision_recorded_at: normalizeOptionalString(record.decision_recorded_at),
+    decision,
+    reason
+  };
+  return hasProviderIssueDecisionLineageIdentity(normalized) ? normalized : null;
+}
+
 function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {
   const leftMs = safeParseTimestamp(left);
   const rightMs = safeParseTimestamp(right);
@@ -2174,6 +2270,18 @@ function normalizeOptionalInteger(value: unknown): number | null {
     return Math.trunc(value);
   }
   return null;
+}
+
+function normalizeOptionalNonNegativeInteger(value: unknown): number | null {
+  const normalized = normalizeOptionalInteger(value);
+  return normalized !== null && normalized >= 0 ? normalized : null;
+}
+
+function hasProviderIssueDecisionLineageIdentity(lineage: ProviderIssueDecisionLineageLike): boolean {
+  return Boolean(
+    lineage.parent_run_id &&
+    (lineage.parent_turn_started_at || lineage.parent_turn_id || lineage.parent_turn_count !== null)
+  );
 }
 
 function normalizeGuardrailsRequiredSource(value: unknown): string | null {
