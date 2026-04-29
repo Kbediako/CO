@@ -136,7 +136,7 @@
     "rolling_freshness_cohorts": {
       "enabled": true,
       "canonical_owner_key": "docs:freshness:maintain",
-      "owner_issue": "CO-409",
+      "owner_issue": "CO-423",
       "owner_issue_team_id": "d4eca09e-973f-4975-92b1-22fa2e914b33",
       "owner_issue_project_id": "f8543cb9-8bc9-4a85-bfde-45b270bcb48c",
       "require_live_owner_verification": true,
@@ -229,6 +229,54 @@
             "start": "1311",
             "end": "1318"
           }
+        },
+        {
+          "id": "co-420-apr-28-march-28-task-packet-mirror",
+          "last_review": "2026-03-28",
+          "cadence_days": 30,
+          "path_families": [
+            ".agent/task",
+            "docs/ACTION_PLAN-*",
+            "docs/PRD-*",
+            "docs/TECH_SPEC-*",
+            "tasks/specs",
+            "tasks/tasks-*"
+          ],
+          "path_prefixes": [
+            ".agent/task/linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",
+            ".agent/task/linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
+            ".agent/task/linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
+            ".agent/task/linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md",
+            ".agent/task/linear-b8a32c11-cfc6-4556-b783-f59b290fe67d.md",
+            "docs/ACTION_PLAN-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",
+            "docs/ACTION_PLAN-linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
+            "docs/ACTION_PLAN-linear-62527426-2f74-4134-98e0-bb50c3da7913.md",
+            "docs/ACTION_PLAN-linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
+            "docs/ACTION_PLAN-linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md",
+            "docs/ACTION_PLAN-linear-b8a32c11-cfc6-4556-b783-f59b290fe67d.md",
+            "docs/PRD-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",
+            "docs/PRD-linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
+            "docs/PRD-linear-62527426-2f74-4134-98e0-bb50c3da7913.md",
+            "docs/PRD-linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
+            "docs/PRD-linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md",
+            "docs/PRD-linear-b8a32c11-cfc6-4556-b783-f59b290fe67d.md",
+            "docs/TECH_SPEC-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",
+            "docs/TECH_SPEC-linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
+            "docs/TECH_SPEC-linear-62527426-2f74-4134-98e0-bb50c3da7913.md",
+            "docs/TECH_SPEC-linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
+            "docs/TECH_SPEC-linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md",
+            "docs/TECH_SPEC-linear-b8a32c11-cfc6-4556-b783-f59b290fe67d.md",
+            "tasks/specs/linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",
+            "tasks/specs/linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
+            "tasks/specs/linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
+            "tasks/specs/linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md",
+            "tasks/specs/linear-b8a32c11-cfc6-4556-b783-f59b290fe67d.md",
+            "tasks/tasks-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",
+            "tasks/tasks-linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
+            "tasks/tasks-linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
+            "tasks/tasks-linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md",
+            "tasks/tasks-linear-b8a32c11-cfc6-4556-b783-f59b290fe67d.md"
+          ]
         }
       ],
       "canonical_owner_issues": [
