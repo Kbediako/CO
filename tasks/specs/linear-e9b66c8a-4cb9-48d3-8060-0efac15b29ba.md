@@ -49,6 +49,7 @@ CO-405 hardens bounded standalone review by treating repo-local validation comma
   - no command-probe, meta-surface, startup-anchor, or broad outcome-taxonomy refactor
 
 ## Parity / Alignment Matrix
+
 | Surface | Current truth | Reference truth | Target truth | Explicitly out-of-scope differences |
 | --- | --- | --- | --- | --- |
 | Validation command ownership | CO validation commands run outside bounded review. | Parent/provider worker owns validation and closeout. | Reviewer attempts to run repo-local validation are blocked as command intent. | Running validation inside review, even read-only. |
@@ -95,6 +96,7 @@ CO-405 hardens bounded standalone review by treating repo-local validation comma
 - Help-only guard/script lookups such as `node scripts/spec-guard.mjs --help`, `scripts/spec-guard.mjs -h`, and `node --run docs:freshness -- --help` are not validation execution and must stay outside the command-intent boundary.
 
 ## Fallback Expiry / Refactor Decision
+
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Standalone review execution boundary | Bounded command-intent retry after validation-command boundary | `justify retaining fallback` | CO-405 parent implementation lane | Bounded reviewer attempts a repo-local validation command | Existing safety contract before 2026-04-28 | 2026-04-28 | Non-expiring durable safety contract | Remove only when a replacement closeout contract preserves no-validation guidance, scope preservation, fail-closed repeated boundary handling, and telemetry truth | Focused tests cover first-boundary retry, repeated-boundary failure, and `bounded-success` read-only retry outcome. |
