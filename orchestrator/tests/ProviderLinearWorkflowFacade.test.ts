@@ -10715,7 +10715,7 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('fails closed when a live issue summary omits or paginates labels before transition', async () => {
+  it('fails closed when a live issue summary omits, contains malformed label nodes, or paginates labels before transition', async () => {
     const cases: Array<{
       label: string;
       labels: unknown;
@@ -10723,6 +10723,21 @@ describe('providerLinearWorkflowFacade', () => {
       {
         label: 'omitted labels',
         labels: undefined
+      },
+      {
+        label: 'malformed label node',
+        labels: {
+          nodes: [
+            {
+              id: 'label-bug',
+              color: '#d73a49'
+            }
+          ],
+          pageInfo: {
+            hasNextPage: false,
+            endCursor: null
+          }
+        }
       },
       {
         label: 'paginated labels',
@@ -10737,11 +10752,13 @@ describe('providerLinearWorkflowFacade', () => {
     ];
 
     for (const testCase of cases) {
+      let summaryQuery = '';
       const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
         const body = JSON.parse(String(init?.body ?? '{}')) as {
           query?: string;
         };
         if (body.query?.includes('ProviderLinearIssueSummary')) {
+          summaryQuery = body.query;
           return jsonResponse(
             buildIssueContextBody({
               labels: testCase.labels
@@ -10764,6 +10781,8 @@ describe('providerLinearWorkflowFacade', () => {
       });
 
       expect(fetchImpl, testCase.label).toHaveBeenCalledTimes(1);
+      expect(summaryQuery, testCase.label).toMatch(/labels\s*(?:\([^)]*\))?\s*\{/u);
+      expect(summaryQuery, testCase.label).toContain('hasNextPage');
       expect(result, testCase.label).toMatchObject({
         ok: false,
         operation: 'transition',
