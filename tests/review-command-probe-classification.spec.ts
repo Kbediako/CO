@@ -41,6 +41,28 @@ describe('review command probe classification', () => {
     ).toBe(`npm run test`);
   });
 
+  it('detects CO validation aliases and guard scripts as heavy commands', () => {
+    expect(detectHeavyReviewCommand(`npm run test:core -- tests/spec-guard.spec.ts`)).toBe(
+      `npm run test:core -- tests/spec-guard.spec.ts`
+    );
+    expect(detectHeavyReviewCommand(`npm run eval:test -- evaluation/tests/sample.spec.ts`)).toBe(
+      `npm run eval:test -- evaluation/tests/sample.spec.ts`
+    );
+    expect(detectHeavyReviewCommand(`node scripts/run-test-all.mjs -- tests/spec-guard.spec.ts`)).toBe(
+      `node scripts/run-test-all.mjs -- tests/spec-guard.spec.ts`
+    );
+    expect(
+      detectHeavyReviewCommand(
+        `/bin/zsh -lc 'tmp="$(mktemp -d)" && cd "$tmp" && node /Users/kbediako/Code/CO/scripts/spec-guard.mjs --dry-run'`
+      )
+    ).toBe(`node /Users/kbediako/Code/CO/scripts/spec-guard.mjs --dry-run`);
+    expect(
+      classifyShellProbeCommandLine(
+        `/bin/zsh -lc 'node scripts/spec-guard.mjs --dry-run && printenv MANIFEST'`
+      )
+    ).toBeNull();
+  });
+
   it('tracks shell-probe env-var references without matching literal hints', () => {
     expect(tokenReferencesReviewShellProbeEnvVar('$MANIFEST')).toBe(true);
     expect(tokenReferencesReviewShellProbeEnvVar('${RUN_LOG:-fallback}')).toBe(true);

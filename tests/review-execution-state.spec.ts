@@ -604,6 +604,56 @@ describe('ReviewExecutionState', () => {
     });
   });
 
+  it('records CO-399 repo-local validation commands as command-intent telemetry', () => {
+    const state = new ReviewExecutionState({ startedAtMs: 0 });
+    const commands = [
+      `/bin/zsh -lc 'npm run test:core -- tests/spec-guard.spec.ts'`,
+      `/bin/zsh -lc 'node scripts/spec-guard.mjs --dry-run'`,
+      `/bin/zsh -lc 'tmp="$(mktemp -d)" && cd "$tmp" && node /Users/kbediako/Code/CO/scripts/spec-guard.mjs --dry-run'`
+    ];
+
+    let nowMs = 100;
+    for (const command of commands) {
+      state.observeChunk('thinking\nexec\n', 'stdout', nowMs);
+      state.observeChunk(`${command}\n`, 'stdout', nowMs + 10);
+      nowMs += 100;
+    }
+
+    const summary = state.buildOutputSummary();
+    expect(summary.commandIntentViolationCount).toBe(3);
+    expect(summary.commandIntentViolationKinds).toEqual(['validation-suite']);
+    expect(summary.commandIntentViolationSamples).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('npm run test:core -- tests/spec-guard.spec.ts'),
+        expect.stringContaining('node scripts/spec-guard.mjs --dry-run'),
+        expect.stringContaining('node /Users/kbediako/Code/CO/scripts/spec-guard.mjs --dry-run')
+      ])
+    );
+
+    const boundary = state.getTerminationBoundaryRecordForKind('command-intent', 2_000);
+    expect(boundary).toEqual(
+      expect.objectContaining({
+        kind: 'command-intent',
+        provenance: 'validation-suite',
+        sample: 'npm run test:core -- tests/spec-guard.spec.ts'
+      })
+    );
+
+    const payload = state.buildTelemetryPayload({
+      status: 'failed',
+      error: 'codex review crossed the bounded command-intent boundary (validation suite launch).',
+      terminationBoundary: boundary,
+      outputLogPath: '/repo/.runs/sample/review/output.log',
+      repoRoot: '/repo',
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+    });
+
+    expect(payload.review_outcome).toBe('failed-boundary');
+    expect(payload.summary.commandIntentViolationCount).toBe(3);
+    expect(payload.summary.commandIntentViolationKinds).toEqual(['validation-suite']);
+  });
+
   it('infers command-intent termination boundaries only when failed telemetry callers omit the field', () => {
     const state = new ReviewExecutionState({ startedAtMs: 0 });
 

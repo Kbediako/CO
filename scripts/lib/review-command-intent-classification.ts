@@ -8,16 +8,13 @@ import {
   unwrapEnvCommandTokens
 } from './review-shell-command-parser.js';
 import {
-  REVIEW_HEAVY_SCRIPT_TARGETS,
+  isReviewHeavyScriptTarget,
+  isReviewRepoLocalValidationScriptTarget,
+  resolveNodeRuntimeScriptTarget,
   resolvePackageScriptTarget
 } from './review-command-probe-classification.js';
 
 const REVIEW_NON_BOUNDARY_HEAVY_SCRIPT_TARGETS = new Set(['typecheck', 'check']);
-const REVIEW_VALIDATION_SUITE_SCRIPT_TARGETS = new Set(
-  [...REVIEW_HEAVY_SCRIPT_TARGETS].filter(
-    (target) => !REVIEW_NON_BOUNDARY_HEAVY_SCRIPT_TARGETS.has(target)
-  )
-);
 const REVIEW_COMMAND_INTENT_DELEGATION_TOOL_LINE_RE =
   /^tool\s+delegation\.delegate\.(?:spawn|pause|cancel)\(/iu;
 const REVIEW_DIRECT_VALIDATION_RUNNERS = new Set(['vitest', 'jest', 'pytest']);
@@ -158,6 +155,16 @@ function classifyCommandIntentSegment(
   if (
     !options.allowValidationCommandIntents &&
     isPackageManagerValidationSuiteCommand(command, args)
+  ) {
+    return {
+      kind: 'validation-suite',
+      sample: segment.trim()
+    };
+  }
+
+  if (
+    !options.allowValidationCommandIntents &&
+    isRepoLocalValidationSuiteCommand(command, args)
   ) {
     return {
       kind: 'validation-suite',
@@ -374,32 +381,6 @@ function resolveNodeEntryScriptToken(args: string[]): string | null {
   return null;
 }
 
-function resolveNodeRuntimeScriptTarget(args: string[]): string | null {
-  for (let index = 0; index < args.length; index += 1) {
-    const token = args[index] ?? '';
-    const optionName = normalizeCliOptionName(token);
-    if (optionName === '--') {
-      return null;
-    }
-    if (NODE_NON_SCRIPT_EXECUTION_FLAGS.has(optionName)) {
-      return null;
-    }
-    if (NODE_RUNTIME_SCRIPT_FLAGS.has(optionName)) {
-      if (hasInlineOptionValue(token)) {
-        return normalizeCommandToken(extractInlineOptionValue(token));
-      }
-      const scriptTarget = args[index + 1] ?? '';
-      return scriptTarget ? normalizeCommandToken(scriptTarget) : null;
-    }
-    if (token.startsWith('-')) {
-      index += advancePastNodeOption(args, index) - 1;
-      continue;
-    }
-    return null;
-  }
-  return null;
-}
-
 function advancePastNodeOption(args: string[], index: number): number {
   const token = args[index] ?? '';
   if (hasInlineOptionValue(token)) {
@@ -498,7 +479,30 @@ function isPackageManagerValidationSuiteCommand(command: string, args: string[])
   // Keep package-manager `test` launches inside the validation-suite boundary even
   // when they pass file selectors: repo-defined scripts can still expand them into
   // broader suites or chained wrappers.
-  return REVIEW_VALIDATION_SUITE_SCRIPT_TARGETS.has(scriptTarget);
+  return isReviewValidationSuiteScriptTarget(scriptTarget);
+}
+
+function isRepoLocalValidationSuiteCommand(command: string, args: string[]): boolean {
+  if (command === 'node') {
+    const runtimeScriptTarget = resolveNodeRuntimeScriptTarget(args);
+    if (
+      runtimeScriptTarget !== null &&
+      isReviewValidationSuiteScriptTarget(runtimeScriptTarget)
+    ) {
+      return true;
+    }
+    const entryScript = resolveNodeEntryScriptToken(args);
+    return entryScript !== null && isReviewRepoLocalValidationScriptTarget(entryScript);
+  }
+  return isReviewRepoLocalValidationScriptTarget(command);
+}
+
+function isReviewValidationSuiteScriptTarget(target: string): boolean {
+  const normalized = target.toLowerCase();
+  return (
+    !REVIEW_NON_BOUNDARY_HEAVY_SCRIPT_TARGETS.has(normalized) &&
+    isReviewHeavyScriptTarget(normalized)
+  );
 }
 
 function pythonOptionConsumesValue(token: string): boolean {

@@ -98,6 +98,41 @@ describe('review command intent classification', () => {
     });
   });
 
+  it('classifies CO repo-local validation aliases and guard scripts as validation suites', () => {
+    for (const commandLine of [
+      `npm run test:core -- tests/spec-guard.spec.ts`,
+      `npm run test:orchestrator -- orchestrator/tests/ProviderLinearWorkerRunner.test.ts --runInBand`,
+      `pnpm run test:adapters -- --passWithNoTests`,
+      `npm run eval:test -- evaluation/tests/sample.spec.ts`,
+      `node --run test:core -- tests/spec-guard.spec.ts`,
+      `node scripts/run-test-all.mjs -- tests/spec-guard.spec.ts`,
+      `node scripts/spec-guard.mjs --dry-run`,
+      `node scripts/diff-budget.mjs`,
+      `scripts/spec-guard.mjs --dry-run`
+    ]) {
+      expect(
+        classifyCommandIntentCommandLine(commandLine, {
+          allowValidationCommandIntents: false
+        })
+      ).toEqual({
+        kind: 'validation-suite',
+        sample: commandLine
+      });
+    }
+
+    expect(
+      classifyCommandIntentCommandLine(
+        `/bin/zsh -lc 'tmp="$(mktemp -d)" && cd "$tmp" && node /Users/kbediako/Code/CO/scripts/spec-guard.mjs --dry-run'`,
+        {
+          allowValidationCommandIntents: false
+        }
+      )
+    ).toEqual({
+      kind: 'validation-suite',
+      sample: `node /Users/kbediako/Code/CO/scripts/spec-guard.mjs --dry-run`
+    });
+  });
+
   it('resolves launcher variants and nested review-orchestration commands', () => {
     expect(
       classifyCommandIntentCommandLine(
