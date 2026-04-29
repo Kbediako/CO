@@ -16232,6 +16232,32 @@
           "ACTION_PLAN": "docs/ACTION_PLAN-linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md"
         }
       }
+    },
+    {
+      "id": "linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba",
+      "title": "CO-405 bounded-review validation command-intent classification",
+      "relates_to": "tasks/tasks-linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-28",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-04-28",
+          "status": "produced",
+          "manifest": ".runs/linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba-docs-packet/cli/2026-04-28T12-03-31-458Z-f7277f31/manifest.json",
+          "source_anchor": "ctx:sha256:abfa2d4776ef4351126ffc600e3e5d6a6fd85919935405d0589023547317c6a5#chunk:c000001",
+          "summary": "Docs-first packet created for CO-405 from parent-provided issue context only. The referenced source payload path was absent in this child checkout. The packet preserves the narrow command-intent contract: repo-local validation commands attempted by bounded review must terminate as command-intent violations with validation-suite or validation-runner provenance, telemetry must separate boundary diagnostics from product findings, and retry behavior must stay scope-preserving, read-only, and fail-closed on repeated validation intent."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba.md",
+        "task": "tasks/tasks-linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba.md",
+        "agent_task": ".agent/task/linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba.md",
+        "docs": "tasks/specs/linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba.md"
+      }
     }
   ]
 }

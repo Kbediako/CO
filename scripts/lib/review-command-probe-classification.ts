@@ -18,9 +18,56 @@ export const REVIEW_HEAVY_SCRIPT_TARGETS = new Set([
   'check',
   'docs:check',
   'docs:freshness',
-  'docs:freshness:maintain'
+  'docs:freshness:maintain',
+  'eval:test',
+  'repo:stewardship',
+  'pack:smoke'
 ]);
 
+const REVIEW_HEAVY_SCRIPT_TARGET_PREFIXES = ['test:'];
+const REVIEW_REPO_LOCAL_VALIDATION_SCRIPT_TARGETS = new Set([
+  'delegation-guard.mjs',
+  'diff-budget.mjs',
+  'docs-freshness-maintain.mjs',
+  'docs-freshness.mjs',
+  'docs-hygiene.ts',
+  'pack-smoke.mjs',
+  'repo-stewardship-audit.mjs',
+  'run-test-all.mjs',
+  'spec-guard.mjs'
+]);
+const REVIEW_HELP_ONLY_NODE_RUN_VALIDATION_TARGETS = new Set([
+  'docs:freshness',
+  'docs:freshness:maintain',
+  'repo:stewardship'
+]);
+const REVIEW_HELP_ONLY_REPO_LOCAL_VALIDATION_SCRIPT_TARGETS = new Set([
+  'delegation-guard.mjs',
+  'diff-budget.mjs',
+  'docs-freshness-maintain.mjs',
+  'docs-freshness.mjs',
+  'repo-stewardship-audit.mjs',
+  'spec-guard.mjs'
+]);
+const NODE_OPTION_VALUE_FLAGS = new Set([
+  '-C',
+  '-r',
+  '--conditions',
+  '--debug-port',
+  '--inspect-port',
+  '--require',
+  '--import',
+  '--loader',
+  '--experimental-loader',
+  '--input-type',
+  '--env-file',
+  '--env-file-if-exists',
+  '--title',
+  '--watch-kill-signal',
+  '--watch-path'
+]);
+const NODE_NON_SCRIPT_EXECUTION_FLAGS = new Set(['-e', '--eval', '-p', '--print', '-c', '--check']);
+const NODE_RUNTIME_SCRIPT_FLAGS = new Set(['--run']);
 const REVIEW_PACKAGE_RUN_SUBCOMMAND_ALIASES = new Set(['run', 'run-script', 'rum', 'urn']);
 const REVIEW_PACKAGE_TEST_SUBCOMMAND_ALIASES = new Set(['test', 't', 'tst']);
 const REVIEW_SHELL_PROBE_ENV_VARS = new Set(['MANIFEST', 'RUNNER_LOG', 'RUN_LOG']);
@@ -135,6 +182,18 @@ export function resolvePackageScriptTarget(args: string[]): string | null {
   return null;
 }
 
+export function isReviewHeavyScriptTarget(target: string): boolean {
+  const normalized = target.toLowerCase();
+  return (
+    REVIEW_HEAVY_SCRIPT_TARGETS.has(normalized) ||
+    REVIEW_HEAVY_SCRIPT_TARGET_PREFIXES.some((prefix) => normalized.startsWith(prefix))
+  );
+}
+
+export function isReviewRepoLocalValidationScriptTarget(target: string): boolean {
+  return REVIEW_REPO_LOCAL_VALIDATION_SCRIPT_TARGETS.has(normalizeCommandToken(target));
+}
+
 function hasHeavyCommandTokens(tokens: string[]): boolean {
   if (tokens.length === 0) {
     return false;
@@ -157,7 +216,27 @@ function hasHeavyCommandTokens(tokens: string[]): boolean {
 
   if (command === 'npm' || command === 'pnpm' || command === 'yarn' || command === 'bun') {
     const scriptTarget = resolvePackageScriptTarget(args);
-    return scriptTarget !== null && REVIEW_HEAVY_SCRIPT_TARGETS.has(scriptTarget);
+    return scriptTarget !== null && isReviewHeavyScriptTarget(scriptTarget);
+  }
+
+  if (command === 'node') {
+    const runtimeScriptTarget = resolveNodeRuntimeScriptTarget(args);
+    if (runtimeScriptTarget !== null && isReviewHeavyScriptTarget(runtimeScriptTarget)) {
+      return !isReviewHelpOnlyNodeRunValidationLookup(
+        runtimeScriptTarget,
+        resolveNodeRuntimeScriptArgs(args) ?? []
+      );
+    }
+    const entryScript = resolveNodeEntryScriptInvocation(args);
+    return (
+      entryScript !== null &&
+      isReviewRepoLocalValidationScriptTarget(entryScript.script) &&
+      !isReviewHelpOnlyRepoLocalValidationScriptLookup(entryScript.script, entryScript.args)
+    );
+  }
+
+  if (isReviewRepoLocalValidationScriptTarget(command)) {
+    return !isReviewHelpOnlyRepoLocalValidationScriptLookup(command, args);
   }
 
   const launcherTarget = resolveValidationLauncherTarget(command, args);
@@ -191,6 +270,210 @@ function hasHeavyCommandTokens(tokens: string[]): boolean {
   }
 
   return false;
+}
+
+function resolveNodeEntryScriptToken(args: string[]): string | null {
+  return resolveNodeEntryScriptInvocation(args)?.script ?? null;
+}
+
+interface NodeEntryScriptInvocation {
+  script: string;
+  args: string[];
+}
+
+function resolveNodeEntryScriptInvocation(args: string[]): NodeEntryScriptInvocation | null {
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index] ?? '';
+    const optionName = normalizeCliOptionName(token);
+    if (optionName === '--') {
+      const explicitScript = args[index + 1] ?? '';
+      return explicitScript
+        ? {
+            script: explicitScript,
+            args: args.slice(index + 2)
+          }
+        : null;
+    }
+    if (
+      NODE_NON_SCRIPT_EXECUTION_FLAGS.has(optionName) ||
+      NODE_RUNTIME_SCRIPT_FLAGS.has(optionName)
+    ) {
+      return null;
+    }
+    if (token.startsWith('-')) {
+      index += advancePastNodeOption(args, index) - 1;
+      continue;
+    }
+    return {
+      script: token,
+      args: args.slice(index + 1)
+    };
+  }
+  return null;
+}
+
+export function resolveNodeRuntimeScriptTarget(args: string[]): string | null {
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index] ?? '';
+    const optionName = normalizeCliOptionName(token);
+    if (optionName === '--') {
+      return null;
+    }
+    if (NODE_NON_SCRIPT_EXECUTION_FLAGS.has(optionName)) {
+      return null;
+    }
+    if (NODE_RUNTIME_SCRIPT_FLAGS.has(optionName)) {
+      if (hasInlineOptionValue(token)) {
+        return normalizeCommandToken(extractInlineOptionValue(token));
+      }
+      const scriptTarget = args[index + 1] ?? '';
+      return scriptTarget ? normalizeCommandToken(scriptTarget) : null;
+    }
+    if (token.startsWith('-')) {
+      index += advancePastNodeOption(args, index) - 1;
+      continue;
+    }
+    return null;
+  }
+  return null;
+}
+
+function resolveNodeRuntimeScriptArgs(args: string[]): string[] | null {
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index] ?? '';
+    const optionName = normalizeCliOptionName(token);
+    if (optionName === '--') {
+      return null;
+    }
+    if (NODE_NON_SCRIPT_EXECUTION_FLAGS.has(optionName)) {
+      return null;
+    }
+    if (NODE_RUNTIME_SCRIPT_FLAGS.has(optionName)) {
+      return hasInlineOptionValue(token) ? args.slice(index + 1) : args.slice(index + 2);
+    }
+    if (token.startsWith('-')) {
+      index += advancePastNodeOption(args, index) - 1;
+      continue;
+    }
+    return null;
+  }
+  return null;
+}
+
+function advancePastNodeOption(args: string[], index: number): number {
+  const token = args[index] ?? '';
+  if (hasInlineOptionValue(token)) {
+    return 1;
+  }
+  const optionName = normalizeCliOptionName(token);
+  if (NODE_OPTION_VALUE_FLAGS.has(optionName)) {
+    return args[index + 1] ? 2 : 1;
+  }
+  return 1;
+}
+
+function normalizeCliOptionName(token: string): string {
+  const equalsIndex = token.indexOf('=');
+  const optionName = equalsIndex >= 0 ? token.slice(0, equalsIndex) : token;
+  return optionName.startsWith('--') ? optionName.toLowerCase() : optionName;
+}
+
+function hasInlineOptionValue(token: string): boolean {
+  return token.includes('=');
+}
+
+function hasForwardedScriptHelpRequest(
+  args: string[],
+  options: { allowBareHelp?: boolean } = {}
+): boolean {
+  return hasCliHelpRequest(stripPackageRunSeparator(args), {
+    allowBareHelp: options.allowBareHelp ?? true
+  });
+}
+
+function stripPackageRunSeparator(args: string[]): string[] {
+  return normalizeCommandToken(args[0] ?? '') === '--' ? args.slice(1) : args;
+}
+
+function hasCliHelpRequest(
+  tokens: string[],
+  options: { allowBareHelp?: boolean } = {}
+): boolean {
+  const positionals: string[] = [];
+  const helpFlags = new Map<string, boolean>();
+  let sawNonBareHelpToken = false;
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index] ?? '';
+    const optionName = normalizeCliOptionName(token);
+    if (optionName === '--') {
+      break;
+    }
+    if (optionName === '--help' || optionName === '-h') {
+      const helpKey = optionName === '--help' ? 'help' : 'h';
+      let enabled = true;
+      if (hasInlineOptionValue(token)) {
+        if (isDisabledCliHelpValue(extractCliInlineOptionValue(token))) {
+          enabled = false;
+        }
+      } else {
+        const nextToken = tokens[index + 1] ?? '';
+        if (nextToken && !nextToken.startsWith('-')) {
+          enabled = !isDisabledCliHelpValue(nextToken);
+          index += 1;
+        }
+      }
+      helpFlags.set(helpKey, enabled);
+      sawNonBareHelpToken = true;
+      continue;
+    }
+    if (token.startsWith('-')) {
+      sawNonBareHelpToken = true;
+      continue;
+    }
+    const positional = normalizeCommandToken(token);
+    positionals.push(positional);
+    if (positional !== 'help') {
+      sawNonBareHelpToken = true;
+    }
+  }
+  if ([...helpFlags.values()].some(Boolean)) {
+    return true;
+  }
+  return Boolean(options.allowBareHelp && !sawNonBareHelpToken && positionals.length === 1 && positionals[0] === 'help');
+}
+
+function isDisabledCliHelpValue(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return normalized === 'false' || normalized === '0';
+}
+
+function extractCliInlineOptionValue(token: string): string {
+  const equalsIndex = token.indexOf('=');
+  if (equalsIndex < 0) {
+    return '';
+  }
+  const value = token.slice(equalsIndex + 1);
+  const nextEqualsIndex = value.indexOf('=');
+  return nextEqualsIndex >= 0 ? value.slice(0, nextEqualsIndex) : value;
+}
+
+function extractInlineOptionValue(token: string): string {
+  const equalsIndex = token.indexOf('=');
+  return equalsIndex >= 0 ? token.slice(equalsIndex + 1) : '';
+}
+
+export function isReviewHelpOnlyNodeRunValidationLookup(target: string, args: string[]): boolean {
+  return (
+    REVIEW_HELP_ONLY_NODE_RUN_VALIDATION_TARGETS.has(target.toLowerCase()) &&
+    hasForwardedScriptHelpRequest(args, { allowBareHelp: false })
+  );
+}
+
+export function isReviewHelpOnlyRepoLocalValidationScriptLookup(script: string, args: string[]): boolean {
+  return (
+    REVIEW_HELP_ONLY_REPO_LOCAL_VALIDATION_SCRIPT_TARGETS.has(normalizeCommandToken(script)) &&
+    hasForwardedScriptHelpRequest(args)
+  );
 }
 
 function resolveValidationLauncherTarget(command: string, args: string[]): string | null {

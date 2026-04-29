@@ -8,16 +8,15 @@ import {
   unwrapEnvCommandTokens
 } from './review-shell-command-parser.js';
 import {
-  REVIEW_HEAVY_SCRIPT_TARGETS,
+  isReviewHeavyScriptTarget,
+  isReviewHelpOnlyNodeRunValidationLookup,
+  isReviewHelpOnlyRepoLocalValidationScriptLookup,
+  isReviewRepoLocalValidationScriptTarget,
+  resolveNodeRuntimeScriptTarget,
   resolvePackageScriptTarget
 } from './review-command-probe-classification.js';
 
 const REVIEW_NON_BOUNDARY_HEAVY_SCRIPT_TARGETS = new Set(['typecheck', 'check']);
-const REVIEW_VALIDATION_SUITE_SCRIPT_TARGETS = new Set(
-  [...REVIEW_HEAVY_SCRIPT_TARGETS].filter(
-    (target) => !REVIEW_NON_BOUNDARY_HEAVY_SCRIPT_TARGETS.has(target)
-  )
-);
 const REVIEW_COMMAND_INTENT_DELEGATION_TOOL_LINE_RE =
   /^tool\s+delegation\.delegate\.(?:spawn|pause|cancel)\(/iu;
 const REVIEW_DIRECT_VALIDATION_RUNNERS = new Set(['vitest', 'jest', 'pytest']);
@@ -165,6 +164,16 @@ function classifyCommandIntentSegment(
     };
   }
 
+  if (
+    !options.allowValidationCommandIntents &&
+    isRepoLocalValidationSuiteCommand(command, args)
+  ) {
+    return {
+      kind: 'validation-suite',
+      sample: segment.trim()
+    };
+  }
+
   if (!options.allowValidationCommandIntents && isDirectValidationRunnerCommand(command, args)) {
     return {
       kind: 'validation-runner',
@@ -268,6 +277,7 @@ function hasCliHelpRequest(
   options: { allowBareHelp?: boolean } = {}
 ): boolean {
   const positionals: string[] = [];
+  const helpFlags = new Map<string, boolean>();
   let sawNonBareHelpToken = false;
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index] ?? '';
@@ -276,7 +286,22 @@ function hasCliHelpRequest(
       break;
     }
     if (optionName === '--help' || optionName === '-h') {
-      return true;
+      const helpKey = optionName === '--help' ? 'help' : 'h';
+      let enabled = true;
+      if (hasInlineOptionValue(token)) {
+        if (isDisabledCliHelpValue(extractInlineOptionValue(token))) {
+          enabled = false;
+        }
+      } else {
+        const nextToken = tokens[index + 1] ?? '';
+        if (nextToken && !nextToken.startsWith('-')) {
+          enabled = !isDisabledCliHelpValue(nextToken);
+          index += 1;
+        }
+      }
+      helpFlags.set(helpKey, enabled);
+      sawNonBareHelpToken = true;
+      continue;
     }
     if (token.startsWith('-')) {
       if (
@@ -295,7 +320,15 @@ function hasCliHelpRequest(
       sawNonBareHelpToken = true;
     }
   }
+  if ([...helpFlags.values()].some(Boolean)) {
+    return true;
+  }
   return Boolean(options.allowBareHelp && !sawNonBareHelpToken && positionals.length === 1 && positionals[0] === 'help');
+}
+
+function isDisabledCliHelpValue(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return normalized === 'false' || normalized === '0';
 }
 
 function resolvePackageReviewScriptArgs(args: string[]): string[] | null {
@@ -351,13 +384,27 @@ function isReviewRunnerScriptToken(token: string): boolean {
   return /^(?:.*\/)?run-review\.(?:js|ts|mjs|cjs|mts|cts|\{js,ts\})$/iu.test(token);
 }
 
+interface NodeEntryScriptInvocation {
+  script: string;
+  args: string[];
+}
+
 function resolveNodeEntryScriptToken(args: string[]): string | null {
+  return resolveNodeEntryScriptInvocation(args)?.script ?? null;
+}
+
+function resolveNodeEntryScriptInvocation(args: string[]): NodeEntryScriptInvocation | null {
   for (let index = 0; index < args.length; index += 1) {
     const token = args[index] ?? '';
     const optionName = normalizeCliOptionName(token);
     if (optionName === '--') {
       const explicitScript = args[index + 1] ?? '';
-      return explicitScript ? normalizeCommandToken(explicitScript) : null;
+      return explicitScript
+        ? {
+            script: normalizeCommandToken(explicitScript),
+            args: args.slice(index + 2)
+          }
+        : null;
     }
     if (
       NODE_NON_SCRIPT_EXECUTION_FLAGS.has(optionName) ||
@@ -369,12 +416,15 @@ function resolveNodeEntryScriptToken(args: string[]): string | null {
       index += advancePastNodeOption(args, index) - 1;
       continue;
     }
-    return normalizeCommandToken(token);
+    return {
+      script: normalizeCommandToken(token),
+      args: args.slice(index + 1)
+    };
   }
   return null;
 }
 
-function resolveNodeRuntimeScriptTarget(args: string[]): string | null {
+function resolveNodeRuntimeScriptArgs(args: string[]): string[] | null {
   for (let index = 0; index < args.length; index += 1) {
     const token = args[index] ?? '';
     const optionName = normalizeCliOptionName(token);
@@ -385,11 +435,7 @@ function resolveNodeRuntimeScriptTarget(args: string[]): string | null {
       return null;
     }
     if (NODE_RUNTIME_SCRIPT_FLAGS.has(optionName)) {
-      if (hasInlineOptionValue(token)) {
-        return normalizeCommandToken(extractInlineOptionValue(token));
-      }
-      const scriptTarget = args[index + 1] ?? '';
-      return scriptTarget ? normalizeCommandToken(scriptTarget) : null;
+      return hasInlineOptionValue(token) ? args.slice(index + 1) : args.slice(index + 2);
     }
     if (token.startsWith('-')) {
       index += advancePastNodeOption(args, index) - 1;
@@ -455,7 +501,12 @@ function hasInlineOptionValue(token: string): boolean {
 
 function extractInlineOptionValue(token: string): string {
   const equalsIndex = token.indexOf('=');
-  return equalsIndex >= 0 ? token.slice(equalsIndex + 1) : '';
+  if (equalsIndex < 0) {
+    return '';
+  }
+  const value = token.slice(equalsIndex + 1);
+  const nextEqualsIndex = value.indexOf('=');
+  return nextEqualsIndex >= 0 ? value.slice(0, nextEqualsIndex) : value;
 }
 
 function isDirectValidationRunnerCommand(command: string, args: string[]): boolean {
@@ -498,7 +549,40 @@ function isPackageManagerValidationSuiteCommand(command: string, args: string[])
   // Keep package-manager `test` launches inside the validation-suite boundary even
   // when they pass file selectors: repo-defined scripts can still expand them into
   // broader suites or chained wrappers.
-  return REVIEW_VALIDATION_SUITE_SCRIPT_TARGETS.has(scriptTarget);
+  return isReviewValidationSuiteScriptTarget(scriptTarget);
+}
+
+function isRepoLocalValidationSuiteCommand(command: string, args: string[]): boolean {
+  if (command === 'node') {
+    const runtimeScriptTarget = resolveNodeRuntimeScriptTarget(args);
+    if (
+      runtimeScriptTarget !== null &&
+      isReviewValidationSuiteScriptTarget(runtimeScriptTarget)
+    ) {
+      return !isReviewHelpOnlyNodeRunValidationLookup(
+        runtimeScriptTarget,
+        resolveNodeRuntimeScriptArgs(args) ?? []
+      );
+    }
+    const entryScript = resolveNodeEntryScriptInvocation(args);
+    return (
+      entryScript !== null &&
+      isReviewRepoLocalValidationScriptTarget(entryScript.script) &&
+      !isReviewHelpOnlyRepoLocalValidationScriptLookup(entryScript.script, entryScript.args)
+    );
+  }
+  return (
+    isReviewRepoLocalValidationScriptTarget(command) &&
+    !isReviewHelpOnlyRepoLocalValidationScriptLookup(command, args)
+  );
+}
+
+function isReviewValidationSuiteScriptTarget(target: string): boolean {
+  const normalized = target.toLowerCase();
+  return (
+    !REVIEW_NON_BOUNDARY_HEAVY_SCRIPT_TARGETS.has(normalized) &&
+    isReviewHeavyScriptTarget(normalized)
+  );
 }
 
 function pythonOptionConsumesValue(token: string): boolean {
