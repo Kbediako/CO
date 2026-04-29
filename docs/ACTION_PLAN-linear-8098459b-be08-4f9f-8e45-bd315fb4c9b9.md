@@ -26,7 +26,7 @@
   - pending parent acceptance checks are weakened
   - implementation edits unrelated provider current-state authority, broadens timestamp tolerance, or changes PR handoff behavior
 - Pre-implementation issue-quality review:
-  - 2026-04-30: approved for provider-worker implementation. The issue is not merely a timestamp-tolerance tweak; it requires durable parent turn and parallelization decision lineage plus lineage-first retry recovery. CO-403's narrow fail-closed behavior remains the reference safety posture.
+  - 2026-04-30 Australia/Sydney worker date (2026-04-29 UTC): approved for provider-worker implementation. The issue is not merely a timestamp-tolerance tweak; it requires durable parent turn and parallelization decision lineage plus lineage-first retry recovery. CO-403's narrow fail-closed behavior remains the reference safety posture.
 - Immediate Traceability:
   - The original packet unblocked `backlog_head_follow_up_traceability_pending`; this worker now completes the implementation on the same PR branch.
   - The active provider-worker lane owns workpad refreshes, validation, PR updates, and review handoff.
