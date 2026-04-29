@@ -1,6 +1,46 @@
 {
   "items": [
     {
+      "id": "20260429-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566",
+      "title": "CO-427 prerequisite packet for docs:freshness:maintain owner re-home after terminal CO-425",
+      "relates_to": "tasks/tasks-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-29",
+      "evidence": [
+        ".agent/task/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
+        "docs/ACTION_PLAN-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
+        "docs/PRD-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
+        "docs/TECH_SPEC-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
+        "tasks/specs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
+        "tasks/tasks-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md"
+      ],
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "approvals": {
+        "docs_packet_worker": {
+          "reviewer": "write-enabled CO-427 packet worker",
+          "date": "2026-04-29",
+          "status": "packet-created",
+          "summary": "Created the prerequisite CO-427 docs-first packet and mirrors while leaving owner re-home implementation, Linear transition, and docs catalog/cohort-guide mutation to the future active lane."
+        },
+        "baseline_owner_check": {
+          "reviewer": "write-enabled CO-427 packet worker",
+          "date": "2026-04-29",
+          "status": "baseline-blocked-terminal-owner",
+          "evidence": "out/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/pre-packet-docs-freshness-maintenance.json",
+          "summary": "Pre-packet maintenance check reproduced block_unowned_repo_debt for owner_issue=CO-425 with configured_owner_terminal, state=Done, state_type=completed, usable=false, and blocking_changed_paths=[]."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
+        "task": "tasks/tasks-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
+        "agent_task": ".agent/task/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
+        "docs": "docs/TECH_SPEC-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md"
+      }
+    },
+    {
       "id": "20260429-linear-9c70572b-31a3-4789-a73c-d18c28d59d72",
       "title": "CO-425 re-home docs:freshness:maintain owner after terminal CO-423",
       "relates_to": "tasks/tasks-linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md",
