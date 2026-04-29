@@ -239,6 +239,7 @@ const LINEAR_ISSUE_LOWERCASE_SETEXT_AMBIGUOUS_COMMAND_SUBCOMMANDS = new Set([
 const LINEAR_WORKFLOW_COMMENT_LIMIT = 50;
 const LINEAR_WORKFLOW_STATE_LIMIT = 50;
 const LINEAR_WORKFLOW_ATTACHMENT_LIMIT = 20;
+const LINEAR_WORKFLOW_LABEL_LIMIT = 50;
 const ISSUE_CONTEXT_PULL_REQUEST_HYDRATION_CONCURRENCY = 4;
 const PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME_STEM = 'provider-linear-issue-context-cache';
 const PROVIDER_LINEAR_ISSUE_CONTEXT_CACHE_FILENAME = 'provider-linear-issue-context-cache.json';
@@ -298,6 +299,12 @@ export interface ProviderLinearWorkflowAttachment {
   title: string | null;
   url: string | null;
   source_type: string | null;
+}
+
+export interface ProviderLinearIssueLabel {
+  id: string;
+  name: string;
+  color: string | null;
 }
 
 export interface ProviderLinearIssuePullRequestAttachments {
@@ -370,6 +377,7 @@ export interface ProviderLinearIssueContext {
     id: string | null;
     name: string | null;
   } | null;
+  labels: ProviderLinearIssueLabel[];
   comments: ProviderLinearWorkflowComment[];
   attachments: ProviderLinearWorkflowAttachment[];
   pull_request_attachments: ProviderLinearIssuePullRequestAttachments;
@@ -379,6 +387,7 @@ export interface ProviderLinearIssueContext {
 type ProviderLinearIssueSummary = Pick<
   ProviderLinearIssueContext,
   'id' | 'identifier' | 'url' | 'updated_at' | 'archived_at' | 'trashed' | 'workspace_id' | 'state' | 'team' | 'project'
+  | 'labels'
 >;
 
 export type ProviderLinearIssueContextResult =
@@ -550,6 +559,14 @@ interface LinearIssueContextQueryResponse {
       id?: string | null;
       name?: string | null;
     } | null;
+    labels?: {
+      nodes?: Array<{
+        id?: string | null;
+        name?: string | null;
+        color?: string | null;
+      }> | null;
+      pageInfo?: LinearConnectionPageInfo | null;
+    } | null;
     comments?: {
       nodes?: Array<{
         id?: string | null;
@@ -622,6 +639,14 @@ interface LinearIssueSummaryQueryResponse {
     project?: {
       id?: string | null;
       name?: string | null;
+    } | null;
+    labels?: {
+      nodes?: Array<{
+        id?: string | null;
+        name?: string | null;
+        color?: string | null;
+      }> | null;
+      pageInfo?: LinearConnectionPageInfo | null;
     } | null;
   } | null;
 }
@@ -4452,7 +4477,8 @@ function summarizeIssueContext(issue: ProviderLinearIssueContext): ProviderLinea
     workspace_id: issue.workspace_id,
     state: issue.state,
     team: issue.team,
-    project: issue.project
+    project: issue.project,
+    labels: issue.labels
   };
 }
 
@@ -4469,7 +4495,8 @@ function mergeCachedIssueContextSummary(
     workspace_id: summary.workspace_id,
     state: summary.state,
     team: summary.team,
-    project: summary.project
+    project: summary.project,
+    labels: summary.labels
   };
 }
 
@@ -4885,12 +4912,13 @@ function parseCachedIssueContext(value: unknown): ProviderLinearIssueContext | n
   const state = parseCachedWorkflowState(issue.state);
   const team = parseCachedIssueTeam(issue.team);
   const project = parseCachedIssueProject(issue.project);
+  const labels = parseCachedIssueLabels(issue.labels);
   const comments = parseCachedIssueComments(issue.comments);
   const attachments = parseCachedIssueAttachments(issue.attachments);
   const pullRequestAttachments = parseCachedIssuePullRequestAttachments(
     issue.pull_request_attachments
   );
-  if (!id || !identifier || !title || comments === null || attachments === null) {
+  if (!id || !identifier || !title || labels === null || comments === null || attachments === null) {
     return null;
   }
   if (issue.state !== undefined && issue.state !== null && state === null) {
@@ -4930,6 +4958,7 @@ function parseCachedIssueContext(value: unknown): ProviderLinearIssueContext | n
     state,
     team,
     project,
+    labels,
     comments,
     attachments,
     pull_request_attachments: cachedPullRequestAttachments,
@@ -4984,6 +5013,33 @@ function parseCachedIssueProject(value: unknown): ProviderLinearIssueContext['pr
   return {
     id: normalizeOptionalString(record.id as string | null | undefined),
     name: normalizeOptionalString(record.name as string | null | undefined)
+  };
+}
+
+function parseCachedIssueLabels(value: unknown): ProviderLinearIssueLabel[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const labels = value
+    .map((entry) => parseCachedIssueLabel(entry))
+    .filter((entry): entry is ProviderLinearIssueLabel => entry !== null);
+  return labels.length === value.length ? labels : null;
+}
+
+function parseCachedIssueLabel(value: unknown): ProviderLinearIssueLabel | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const id = normalizeRequiredString(record.id as string | null | undefined);
+  const name = normalizeRequiredString(record.name as string | null | undefined);
+  if (!id || !name) {
+    return null;
+  }
+  return {
+    id,
+    name,
+    color: normalizeOptionalString(record.color as string | null | undefined)
   };
 }
 
@@ -5440,6 +5496,17 @@ function parseIssueSummary(
   if (sourceSetup?.project_id && sourceSetup.project_id !== projectId) {
     return scopeMismatchError('project', sourceSetup.project_id, projectId);
   }
+  const labels = parseIssueLabelConnection(issueNode.labels);
+  if (labels === null) {
+    return {
+      ok: false,
+      error: {
+        code: 'linear_response_invalid',
+        message: 'Linear issue response was missing required label fields.',
+        status: 503
+      }
+    };
+  }
 
   return {
     ok: true,
@@ -5469,7 +5536,8 @@ function parseIssueSummary(
             id: projectId,
             name: normalizeOptionalString(issueNode.project.name)
           }
-        : null
+        : null,
+      labels
     }
   };
 }
@@ -5516,6 +5584,17 @@ function parseIssueContext(
   if (sourceSetup?.project_id && sourceSetup.project_id !== projectId) {
     return scopeMismatchError('project', sourceSetup.project_id, projectId);
   }
+  const labels = parseIssueLabelConnection(issueNode.labels);
+  if (labels === null) {
+    return {
+      ok: false,
+      error: {
+        code: 'linear_response_invalid',
+        message: 'Linear issue response was missing required label fields.',
+        status: 503
+      }
+    };
+  }
 
   const comments =
     commentsOverride !== undefined && commentsOverride !== null
@@ -5558,6 +5637,7 @@ function parseIssueContext(
             name: normalizeOptionalString(issueNode.project.name)
           }
         : null,
+      labels,
       comments,
       attachments:
         attachmentsOverride !== undefined && attachmentsOverride !== null
@@ -5648,6 +5728,17 @@ function buildIssueContextQuery(options: {
         id
         name
       }
+      labels(first: ${LINEAR_WORKFLOW_LABEL_LIMIT}) {
+        nodes {
+          id
+          name
+          color
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
 ${commentsSection}
 ${attachmentsSection}
     }
@@ -5689,6 +5780,17 @@ function buildIssueSummaryQuery(): string {
       project {
         id
         name
+      }
+      labels(first: ${LINEAR_WORKFLOW_LABEL_LIMIT}) {
+        nodes {
+          id
+          name
+          color
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
       }
     }
   }`;
@@ -5967,6 +6069,65 @@ function parseWorkflowState(
     id,
     name,
     type: normalizeOptionalString(value?.type)
+  };
+}
+
+function parseIssueLabelConnection(
+  value:
+    | {
+        nodes?: Array<{
+          id?: string | null;
+          name?: string | null;
+          color?: string | null;
+        }> | null;
+        pageInfo?: LinearConnectionPageInfo | null;
+      }
+    | null
+    | undefined
+): ProviderLinearIssueLabel[] | null {
+  if (!Array.isArray(value?.nodes) || value.pageInfo?.hasNextPage !== false) {
+    return null;
+  }
+  return parseIssueLabels(value.nodes);
+}
+
+function parseIssueLabels(
+  value:
+    | Array<{
+        id?: string | null;
+        name?: string | null;
+        color?: string | null;
+      }>
+    | null
+    | undefined
+): ProviderLinearIssueLabel[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const labels = value
+    .map((entry) => parseIssueLabel(entry))
+    .filter((entry): entry is ProviderLinearIssueLabel => entry !== null);
+  return labels.length === value.length ? labels : null;
+}
+
+function parseIssueLabel(
+  value:
+    | {
+        id?: string | null;
+        name?: string | null;
+        color?: string | null;
+      }
+    | null
+): ProviderLinearIssueLabel | null {
+  const id = normalizeRequiredString(value?.id);
+  const name = normalizeRequiredString(value?.name);
+  if (!id || !name) {
+    return null;
+  }
+  return {
+    id,
+    name,
+    color: normalizeOptionalString(value?.color)
   };
 }
 
