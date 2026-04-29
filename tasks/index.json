@@ -1,6 +1,31 @@
 {
   "items": [
     {
+      "id": "20260430-linear-9c70572b-31a3-4789-a73c-d18c28d59d72",
+      "title": "CO-425 re-home docs:freshness:maintain owner after terminal CO-423",
+      "relates_to": "tasks/tasks-linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-30",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "approvals": {
+        "docs_packet_worker": {
+          "reviewer": "write-enabled CO-425 packet worker",
+          "date": "2026-04-30",
+          "status": "traceability-packet-created",
+          "summary": "Created the CO-425 docs-first packet and registration rows only. Actual docs:freshness:maintain owner re-home in docs/docs-catalog.json remains parent-owned pending live CO-423 terminal verification and current maintenance evidence."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md",
+        "task": "tasks/tasks-linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md",
+        "agent_task": ".agent/task/linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md",
+        "docs": "docs/TECH_SPEC-linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md"
+      }
+    },
+    {
       "id": "20260429-linear-9becd8cd-7fe2-477e-bc59-816154364f90",
       "title": "CO-423 restore live docs freshness maintenance owner after terminal CO-420",
       "relates_to": "tasks/tasks-linear-9becd8cd-7fe2-477e-bc59-816154364f90.md",
