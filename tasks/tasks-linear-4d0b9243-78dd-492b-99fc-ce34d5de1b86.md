@@ -45,15 +45,16 @@
 - [x] Protected-term coverage check over touched docs. Evidence: fixed-string check for `co-status --format json`, `healthy control host`, `provider intake fresh`, `slow /ui/data.json`, `control-host ui request timeout after 15000ms`, `stale endpoint/dead-port recovery`, `CO-246`, `CO-404`, and `CO-406` returned `protected terms ok`.
 - [x] `git diff --check` over touched files. Evidence: temporary-index `git add -N` plus `git diff --check -- <touched files>` exited 0, covering new untracked packet files without staging them in the real index.
 - [x] Parent-owned focused implementation tests. Evidence: `npx vitest run --config vitest.config.core.ts orchestrator/tests/CoStatusCliShell.test.ts` passed 24 tests; `npx vitest run --config vitest.config.core.ts orchestrator/tests/CoStatusAttachCliShell.test.ts` passed 17 tests.
-- [x] Required build/lint/test gates. Evidence: `node scripts/delegation-guard.mjs` passed; `node scripts/spec-guard.mjs --dry-run` exited 0 while reporting pre-existing March 28 stale specs; `npm run build` passed; `npm run lint` exited 0 with three unrelated `DelegationMcpHealth.test.ts` warnings; `npm run test` passed 357 files / 5016 tests.
-- [x] Docs/stewardship/diff gates recorded. Evidence: `npm run docs:check` passed; `npm run docs:freshness` failed on 33 pre-existing stale task-packet/task-mirror docs with no missing registry rows and was filed as CO-413; `npm run repo:stewardship` passed with 0 action-required; `node scripts/diff-budget.mjs` passed.
+- [x] Required build/lint/test gates. Evidence: `node scripts/delegation-guard.mjs` passed; `node scripts/spec-guard.mjs --dry-run` passed; `npm run build` passed; `npm run lint` exited 0 with three unrelated `DelegationMcpHealth.test.ts` warnings; `npm run test` passed 357 files / 5028 tests.
+- [x] Docs/stewardship/diff gates recorded. Evidence: `npm run docs:check` passed; `npm run docs:freshness` passed after the external freshness owner repair landed on `origin/main`; `npm run repo:stewardship` passed with 0 action-required; `node scripts/diff-budget.mjs` passed.
 - [x] Pack smoke completed for CLI surface. Evidence: `npm run pack:smoke` exited 0.
-- [x] Elegance/minimality pass completed. Evidence: post-review cleanup kept the new 5000ms direct-json timeout behind the existing `__test__` surface instead of exporting it as public module API; focused co-status tests, build, and lint passed after the cleanup.
-- [ ] Parent-owned review and PR handoff gates.
+- [x] Elegance/minimality pass completed. Evidence: explicit post-review pass kept the solution to one direct JSON timeout constant plus focused tests and avoided a broader status payload/cache refactor.
+- [x] Parent-owned review and PR handoff gates. Evidence: manifest-backed review `.runs/linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86/cli/2026-04-29T16-05-52-615Z-c1d6a099/review/telemetry.json` reported clean success after the earlier P2 test-timing finding was fixed; PR attachment and ready-review drain are tracked in the Linear workpad.
 
 ## Progress Log
 - 2026-04-28: Created docs-first packet from child prompt protected terms. The exact source payload at `../../.runs/linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86-docs-packet-v2/cli/2026-04-28T03-51-01-395Z-61ba3248/memory/source-0/source.txt` existed but contained run metadata rather than the full CO-407 issue body.
 - 2026-04-28: Registered scoped TECH_SPEC path, task checklist, `.agent` mirror, `tasks/index.json`, and `docs/TASKS.md` snapshot. No Linear/GitHub/PR lifecycle surfaces were mutated.
+- 2026-04-29: Parent lane merged current `origin/main`, revalidated the implementation after external docs-freshness owner debt was cleared, fixed the standalone-review P2 test timing concern, and recorded clean post-fix review evidence.
 
 ## Relevant Files
 - docs/PRD-linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86.md
