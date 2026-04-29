@@ -29,7 +29,7 @@
 - [x] Parent `npm run docs:freshness`. Evidence: `docs:freshness OK - 4935 docs, 4938 registry entries`; rolling cohort `CO-423` has `33` docs.
 - [x] Parent `npm run docs:freshness:maintain`. Evidence: `freshness_decision=pass_with_owned_rolling_debt`, `owner_issue=CO-423`, live owner verification succeeded, and `blocking_changed_paths=[]`.
 - [x] Parent repo validation gates before review. Evidence: delegation guard OK, spec guard OK, build OK, lint OK with three existing warnings, focused metadata check OK, `docs:check` OK, `repo:stewardship` OK, diff budget OK, and `npm run test` retry passed `357` files / `5026` tests after the exact initial timing failure passed in isolation.
-- [x] Parent standalone review and elegance pass. Evidence: review telemetry `../../.runs/linear-9becd8cd-7fe2-477e-bc59-816154364f90/cli/2026-04-29T13-11-39-282Z-352d6793/review/telemetry.json` reported `status=succeeded`, `review_outcome=clean-success`; elegance pass recorded `out/linear-9becd8cd-7fe2-477e-bc59-816154364f90/manual/elegance-review.md`.
+- [x] Parent standalone review and elegance pass. Evidence: review telemetry `.runs/linear-9becd8cd-7fe2-477e-bc59-816154364f90/cli/2026-04-29T13-11-39-282Z-352d6793/review/telemetry.json` reported `status=succeeded`, `review_outcome=clean-success`; elegance pass recorded `out/linear-9becd8cd-7fe2-477e-bc59-816154364f90/manual/elegance-review.md`.
 
 ## Handoff
 - [x] Parent imports child patch artifact. Evidence: accepted `.runs/linear-9becd8cd-7fe2-477e-bc59-816154364f90-docs-packet/cli/2026-04-29T13-26-35-576Z-37f0d4ba/manifest.json`.

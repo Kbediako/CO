@@ -29,7 +29,8 @@
           "reviewer": "codex-orchestrator review",
           "date": "2026-04-29",
           "status": "clean-success",
-          "telemetry": "../../.runs/linear-9becd8cd-7fe2-477e-bc59-816154364f90/cli/2026-04-29T13-11-39-282Z-352d6793/review/telemetry.json",
+          "manifest": ".runs/linear-9becd8cd-7fe2-477e-bc59-816154364f90/cli/2026-04-29T13-11-39-282Z-352d6793/manifest.json",
+          "telemetry": ".runs/linear-9becd8cd-7fe2-477e-bc59-816154364f90/cli/2026-04-29T13-11-39-282Z-352d6793/review/telemetry.json",
           "summary": "Diff-focused review found the owner metadata, registry additions, and cohort documentation aligned with the CO-423 re-home scope; no concrete regressions were identified."
         },
         "elegance_review": {
@@ -44,12 +45,8 @@
         "spec": "tasks/specs/linear-9becd8cd-7fe2-477e-bc59-816154364f90.md",
         "task": "tasks/tasks-linear-9becd8cd-7fe2-477e-bc59-816154364f90.md",
         "agent_task": ".agent/task/linear-9becd8cd-7fe2-477e-bc59-816154364f90.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-9becd8cd-7fe2-477e-bc59-816154364f90.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-9becd8cd-7fe2-477e-bc59-816154364f90.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-9becd8cd-7fe2-477e-bc59-816154364f90.md"
-        },
-        "docs_review_manifest": ".runs/linear-9becd8cd-7fe2-477e-bc59-816154364f90-docs-packet/cli/2026-04-29T13-26-35-576Z-37f0d4ba/manifest.json"
+        "docs": "docs/TECH_SPEC-linear-9becd8cd-7fe2-477e-bc59-816154364f90.md",
+        "docs_review_manifest": ".runs/linear-9becd8cd-7fe2-477e-bc59-816154364f90/cli/2026-04-29T13-11-39-282Z-352d6793/manifest.json"
       }
     },
     {
