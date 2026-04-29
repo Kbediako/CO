@@ -79,7 +79,8 @@
         "spec": "tasks/specs/linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306.md",
         "task": "tasks/tasks-linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306.md",
         "agent_task": ".agent/task/linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306.md",
-        "docs": "docs/TECH_SPEC-linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306.md"
+        "docs": "docs/TECH_SPEC-linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306.md",
+        "docs_review_manifest": ".runs/linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306/cli/2026-04-28T23-35-34-002Z-debc0887/manifest.json"
       }
     },
     {
