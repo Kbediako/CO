@@ -113,6 +113,9 @@
       ],
       "last_review": "2026-04-30",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "evidence": [
+        ".runs/linear-b78c98eb-8ed4-4e19-9099-81d5e34bb33c/cli/2026-04-30T01-53-05-383Z-0772e9d7/manifest.json"
+      ],
       "approvals": {
         "traceability_packet": {
           "reviewer": "parent orchestrator",
