@@ -145,6 +145,7 @@ export function createControlServerSeededRuntimeAssembly(
   const sessionTokens = new SessionTokenStore(options.sessionTtlMs);
   const linearAdvisoryState = normalizeLinearAdvisoryState(options.linearAdvisorySeed);
   const providerIntakeState = normalizeProviderIntakeState(options.providerIntakeSeed);
+  let persistedProviderIntakeState = cloneProviderIntakeState(providerIntakeState);
   let linearAdvisoryStaleWritePending = markLinearAdvisoryStateStaleFromProviderIntake(
     linearAdvisoryState,
     providerIntakeState
@@ -202,6 +203,7 @@ export function createControlServerSeededRuntimeAssembly(
     providerIntake: async () =>
       await queueProviderIntakePersist(async () => {
         await writeJsonAtomic(providerIntakeStatePath, providerIntakeState);
+        persistedProviderIntakeState = cloneProviderIntakeState(providerIntakeState);
         const linearAdvisoryMarkedStale = markLinearAdvisoryStateStaleFromProviderIntake(
           linearAdvisoryState,
           providerIntakeState
@@ -225,6 +227,7 @@ export function createControlServerSeededRuntimeAssembly(
           typeof updatedAt === 'string' && updatedAt.trim().length > 0 ? updatedAt : nextPollingUpdatedAt;
         nextState.updated_at = pickLatestTimestamp(nextState.updated_at, nextStateUpdatedAt);
         await writeJsonAtomic(providerIntakeStatePath, nextState);
+        persistedProviderIntakeState = cloneProviderIntakeState(nextState);
         const linearAdvisoryMarkedStale = markLinearAdvisoryStateStaleFromProviderIntake(
           linearAdvisoryState,
           nextState
@@ -257,6 +260,7 @@ export function createControlServerSeededRuntimeAssembly(
     paths: options.paths,
     linearAdvisoryState,
     providerIntakeState,
+    readPersistedProviderIntakeState: () => cloneProviderIntakeState(persistedProviderIntakeState),
     providerIssueHandoff,
     runtime: controlRuntime
   } satisfies ControlRequestSharedContext;
@@ -264,6 +268,12 @@ export function createControlServerSeededRuntimeAssembly(
   return {
     requestContextShared
   };
+}
+
+function cloneProviderIntakeState(state: ProviderIntakeState): ProviderIntakeState {
+  return normalizeProviderIntakeState(
+    JSON.parse(JSON.stringify(state)) as ProviderIntakeState
+  );
 }
 
 function pickLatestTimestamp(currentIso: string | null | undefined, candidateIso: string): string {

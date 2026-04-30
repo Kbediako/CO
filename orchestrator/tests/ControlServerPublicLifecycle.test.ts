@@ -17,6 +17,7 @@ import {
   closeControlServerPublicLifecycle,
   runProviderIssueHandoffPoll,
   runProviderIssueHandoffRefresh,
+  runProviderIssueHandoffRecover,
   runProviderIssueHandoffRehydrate,
   startControlServerPublicLifecycle,
   type ControlServerPublicLifecycleState,
@@ -1003,6 +1004,284 @@ describe('startControlServerPublicLifecycle', () => {
       restart_required: false,
       last_error: null
     });
+  });
+
+  it('lets explicit recovery replace an active stuck refresh operation before later refreshes', async () => {
+    let resolveFirstRefresh: (() => void) | null = null;
+    const firstRefresh = new Promise<void>((resolve) => {
+      resolveFirstRefresh = resolve;
+    });
+    const refresh = vi
+      .fn<() => Promise<void>>()
+      .mockImplementationOnce(async () => {
+        await firstRefresh;
+        const error = new Error('provider_refresh_lifecycle_stuck');
+        error.name = 'ProviderRefreshLifecycleStuckError';
+        throw error;
+      })
+      .mockImplementationOnce(async () => undefined);
+    const resetStuckRefreshLifecycle = vi.fn();
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh,
+      resetStuckRefreshLifecycle,
+      recoverIssue: vi.fn(async (input: {
+        provider: 'linear';
+        issueId: string;
+        action: 'recover' | 'relaunch' | 'nudge';
+      }) => {
+        return {
+          provider: input.provider,
+          issue_id: input.issueId,
+          action: input.action,
+          kind: 'start' as const,
+          reason: 'provider_issue_start_launched',
+          claim: null
+        };
+      })
+    };
+    resetStuckRefreshLifecycle.mockImplementation(() => {
+      markProviderPollingCompleted(providerIssueHandoff);
+    });
+
+    const inFlightRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    await markProviderPollingStuck(providerIssueHandoff);
+
+    await expect(
+      runProviderIssueHandoffRecover(providerIssueHandoff, {
+        provider: 'linear',
+        issueId: 'lin-issue-330',
+        action: 'recover'
+      })
+    ).resolves.toMatchObject({
+      provider: 'linear',
+      issue_id: 'lin-issue-330',
+      action: 'recover',
+      kind: 'start',
+      reason: 'provider_issue_start_launched'
+    });
+    await expect(inFlightRefresh).resolves.toMatchObject({
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+
+    await expect(runProviderIssueHandoffRefresh(providerIssueHandoff)).resolves.toMatchObject({
+      queued: true,
+      coalesced: false
+    });
+    expect(refresh).toHaveBeenCalledTimes(2);
+    expect(resetStuckRefreshLifecycle).toHaveBeenCalledTimes(1);
+
+    resolveFirstRefresh?.();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  });
+
+  it('still runs explicit recovery when the active refresh fails while recovery is waiting', async () => {
+    let rejectFirstRefresh: (() => void) | null = null;
+    const firstRefresh = new Promise<void>((_resolve, reject) => {
+      rejectFirstRefresh = () => {
+        const error = new Error('provider_refresh_lifecycle_stuck');
+        error.name = 'ProviderRefreshLifecycleStuckError';
+        reject(error);
+      };
+    });
+    const refresh = vi.fn<() => Promise<void>>().mockImplementationOnce(async () => {
+      await firstRefresh;
+    });
+    const resetStuckRefreshLifecycle = vi.fn();
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh,
+      resetStuckRefreshLifecycle,
+      recoverIssue: vi.fn(async (input: {
+        provider: 'linear';
+        issueId: string;
+        action: 'recover' | 'relaunch' | 'nudge';
+      }) => {
+        return {
+          provider: input.provider,
+          issue_id: input.issueId,
+          action: input.action,
+          kind: 'start' as const,
+          reason: 'provider_issue_start_launched',
+          claim: null
+        };
+      })
+    };
+    resetStuckRefreshLifecycle.mockImplementation(() => {
+      markProviderPollingCompleted(providerIssueHandoff);
+    });
+
+    const inFlightRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff);
+    const recovery = runProviderIssueHandoffRecover(providerIssueHandoff, {
+      provider: 'linear',
+      issueId: 'lin-issue-330',
+      action: 'recover'
+    });
+
+    await Promise.resolve();
+    expect(providerIssueHandoff.recoverIssue).not.toHaveBeenCalled();
+
+    rejectFirstRefresh?.();
+
+    await expect(inFlightRefresh).resolves.toMatchObject({
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+    await expect(recovery).resolves.toMatchObject({
+      provider: 'linear',
+      issue_id: 'lin-issue-330',
+      action: 'recover',
+      kind: 'start',
+      reason: 'provider_issue_start_launched'
+    });
+    expect(providerIssueHandoff.recoverIssue).toHaveBeenCalledTimes(1);
+    expect(resetStuckRefreshLifecycle).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps explicit recovery registered after waiting for a healthy active refresh to settle', async () => {
+    let resolveFirstRefresh: (() => void) | null = null;
+    let resolveRecovery: (() => void) | null = null;
+    const firstRefresh = new Promise<void>((resolve) => {
+      resolveFirstRefresh = resolve;
+    });
+    const recoveryPending = new Promise<void>((resolve) => {
+      resolveRecovery = resolve;
+    });
+    const refresh = vi.fn<() => Promise<void>>().mockImplementationOnce(async () => {
+      await firstRefresh;
+    });
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh,
+      recoverIssue: vi.fn(async (input: {
+        provider: 'linear';
+        issueId: string;
+        action: 'recover' | 'relaunch' | 'nudge';
+      }) => {
+        await recoveryPending;
+        return {
+          provider: input.provider,
+          issue_id: input.issueId,
+          action: input.action,
+          kind: 'start' as const,
+          reason: 'provider_issue_start_launched',
+          claim: null
+        };
+      })
+    };
+
+    const activeRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff);
+    const recovery = runProviderIssueHandoffRecover(providerIssueHandoff, {
+      provider: 'linear',
+      issueId: 'lin-issue-330',
+      action: 'recover'
+    });
+
+    await Promise.resolve();
+    expect(providerIssueHandoff.recoverIssue).not.toHaveBeenCalled();
+
+    resolveFirstRefresh?.();
+    await expect(activeRefresh).resolves.toMatchObject({
+      queued: true,
+      coalesced: false
+    });
+    for (
+      let attempt = 0;
+      attempt < 10 && providerIssueHandoff.recoverIssue.mock.calls.length === 0;
+      attempt += 1
+    ) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+    expect(providerIssueHandoff.recoverIssue).toHaveBeenCalledTimes(1);
+
+    const refreshDuringRecovery = runProviderIssueHandoffRefresh(providerIssueHandoff);
+    await Promise.resolve();
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    resolveRecovery?.();
+    await expect(recovery).resolves.toMatchObject({
+      provider: 'linear',
+      issue_id: 'lin-issue-330',
+      action: 'recover',
+      kind: 'start',
+      reason: 'provider_issue_start_launched'
+    });
+    await expect(refreshDuringRecovery).resolves.toMatchObject({
+      queued: true,
+      coalesced: true
+    });
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the stuck watchdog while explicit recovery waits on an active refresh', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-30T12:00:00.000Z'));
+
+    const refresh = vi.fn<() => Promise<void>>().mockImplementationOnce(async () => {
+      await new Promise<void>(() => undefined);
+    });
+    const resetStuckRefreshLifecycle = vi.fn();
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh,
+      resetStuckRefreshLifecycle,
+      recoverIssue: vi.fn(async (input: {
+        provider: 'linear';
+        issueId: string;
+        action: 'recover' | 'relaunch' | 'nudge';
+      }) => {
+        return {
+          provider: input.provider,
+          issue_id: input.issueId,
+          action: input.action,
+          kind: 'start' as const,
+          reason: 'provider_issue_start_launched',
+          claim: null
+        };
+      })
+    };
+    resetStuckRefreshLifecycle.mockImplementation(() => {
+      markProviderPollingCompleted(providerIssueHandoff);
+    });
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 15_000,
+      stuckAfterMs: 45_000
+    });
+
+    const inFlightRefresh = runProviderIssueHandoffRefresh(providerIssueHandoff);
+    const recovery = runProviderIssueHandoffRecover(providerIssueHandoff, {
+      provider: 'linear',
+      issueId: 'lin-issue-330',
+      action: 'recover'
+    });
+
+    await Promise.resolve();
+    expect(providerIssueHandoff.recoverIssue).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(45_000);
+
+    await expect(inFlightRefresh).resolves.toMatchObject({
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck'
+    });
+    await expect(recovery).resolves.toMatchObject({
+      provider: 'linear',
+      issue_id: 'lin-issue-330',
+      action: 'recover',
+      kind: 'start',
+      reason: 'provider_issue_start_launched'
+    });
+    expect(providerIssueHandoff.recoverIssue).toHaveBeenCalledTimes(1);
+    expect(resetStuckRefreshLifecycle).toHaveBeenCalledTimes(1);
   });
 
   it('acknowledges a newly started refresh immediately for public-route callers while the refresh keeps running', async () => {

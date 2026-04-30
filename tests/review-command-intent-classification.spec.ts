@@ -98,6 +98,128 @@ describe('review command intent classification', () => {
     });
   });
 
+  it('classifies CO repo-local validation aliases and guard scripts as validation suites', () => {
+    for (const commandLine of [
+      `npm run test:core -- tests/spec-guard.spec.ts`,
+      `npm run test:orchestrator -- orchestrator/tests/ProviderLinearWorkerRunner.test.ts --runInBand`,
+      `pnpm run test:adapters -- --passWithNoTests`,
+      `npm run eval:test -- evaluation/tests/sample.spec.ts`,
+      `node --run test:core -- tests/spec-guard.spec.ts`,
+      `node scripts/run-test-all.mjs -- tests/spec-guard.spec.ts`,
+      `node scripts/spec-guard.mjs --dry-run`,
+      `node scripts/diff-budget.mjs`,
+      `scripts/spec-guard.mjs --dry-run`
+    ]) {
+      expect(
+        classifyCommandIntentCommandLine(commandLine, {
+          allowValidationCommandIntents: false
+        })
+      ).toEqual({
+        kind: 'validation-suite',
+        sample: commandLine
+      });
+    }
+
+    expect(
+      classifyCommandIntentCommandLine(
+        `/bin/zsh -lc 'tmp="$(mktemp -d)" && cd "$tmp" && node /Users/kbediako/Code/CO/scripts/spec-guard.mjs --dry-run'`,
+        {
+          allowValidationCommandIntents: false
+        }
+      )
+    ).toEqual({
+      kind: 'validation-suite',
+      sample: `node /Users/kbediako/Code/CO/scripts/spec-guard.mjs --dry-run`
+    });
+  });
+
+  it('keeps help-only repo-local validation script lookups outside the boundary', () => {
+    for (const commandLine of [
+      `node scripts/spec-guard.mjs --help`,
+      `node scripts/spec-guard.mjs -h`,
+      `node scripts/spec-guard.mjs help`,
+      `node scripts/spec-guard.mjs -- --help`,
+      `node scripts/diff-budget.mjs --help`,
+      `node scripts/delegation-guard.mjs --help`,
+      `node scripts/docs-freshness.mjs --check --help`,
+      `node scripts/docs-freshness-maintain.mjs --check --help`,
+      `node scripts/repo-stewardship-audit.mjs --check --help`,
+      `node scripts/spec-guard.mjs --help=false --help`,
+      `scripts/spec-guard.mjs --help`,
+      `scripts/spec-guard.mjs -h`,
+      `scripts/spec-guard.mjs help`,
+      `node --run docs:freshness -- --help`,
+      `node --run docs:freshness -- --help=false --help`,
+      `node --run=docs:freshness -- --help`,
+      `node --run docs:freshness:maintain -- --help`,
+      `node --run repo:stewardship -- --help`
+    ]) {
+      expect(
+        classifyCommandIntentCommandLine(commandLine, {
+          allowValidationCommandIntents: false
+        })
+      ).toBeNull();
+    }
+  });
+
+  it('keeps validation targets that do not stop at help inside the boundary', () => {
+    for (const commandLine of [
+      `node scripts/run-test-all.mjs --help`,
+      `node scripts/pack-smoke.mjs --help`,
+      `scripts/run-test-all.mjs --help`,
+      `scripts/pack-smoke.mjs --help`,
+      `node --run test:all -- --help`,
+      `node --run test:core -- --help`,
+      `node --run pack:smoke -- --help`,
+      `node --run docs:check -- --help`,
+      `node --run docs:freshness -- help`,
+      `node --run=docs:freshness -- help`,
+      `node --run docs:freshness:maintain -- help`,
+      `node --run repo:stewardship -- help`
+    ]) {
+      expect(
+        classifyCommandIntentCommandLine(commandLine, {
+          allowValidationCommandIntents: false
+        })
+      ).toEqual({
+        kind: 'validation-suite',
+        sample: commandLine
+      });
+    }
+  });
+
+  it('keeps disabled help flags on validation targets inside the boundary', () => {
+    for (const commandLine of [
+      `node scripts/spec-guard.mjs --help=false`,
+      `node scripts/spec-guard.mjs --help=false=1`,
+      `node scripts/spec-guard.mjs --help=0`,
+      `node scripts/spec-guard.mjs --help=0=1`,
+      `node scripts/spec-guard.mjs -h=false`,
+      `node scripts/spec-guard.mjs -h=false=1`,
+      `node scripts/spec-guard.mjs --help false`,
+      `node scripts/spec-guard.mjs --help --help=false`,
+      `node scripts/spec-guard.mjs -h -h=false`,
+      `node scripts/docs-freshness.mjs --check --help=false`,
+      `node scripts/docs-freshness.mjs --check --help=false=1`,
+      `node scripts/docs-freshness.mjs --check --help --help=false`,
+      `node --run docs:freshness -- --help=false`,
+      `node --run docs:freshness -- --help=false=1`,
+      `node --run docs:freshness -- --help --help=false`,
+      `node --run docs:freshness:maintain -- --help=0`,
+      `node --run docs:freshness:maintain -- --help=0=1`,
+      `node --run repo:stewardship -- --help false`
+    ]) {
+      expect(
+        classifyCommandIntentCommandLine(commandLine, {
+          allowValidationCommandIntents: false
+        })
+      ).toEqual({
+        kind: 'validation-suite',
+        sample: commandLine
+      });
+    }
+  });
+
   it('resolves launcher variants and nested review-orchestration commands', () => {
     expect(
       classifyCommandIntentCommandLine(

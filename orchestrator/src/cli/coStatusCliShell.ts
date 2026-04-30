@@ -39,6 +39,7 @@ import type { RunPaths } from './run/runPaths.js';
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
 const CO_STATUS_ATTACH_UNSUPPORTED_FLAGS = ['pipeline'] as const;
+const DEFAULT_CO_STATUS_JSON_REQUEST_TIMEOUT_MS = 5_000;
 const LOCAL_DEGRADED_FALLBACK_ALLOWED_VERDICTS = new Set<ProviderControlHostFreshnessVerdict>([
   'healthy',
   'degraded'
@@ -104,6 +105,7 @@ export async function readCoStatusJsonDataset(input: {
   requestTimeoutMs?: number;
 }): Promise<CoStatusJsonDataset> {
   let target = await resolveAttachTarget(input.flags);
+  const requestTimeoutMs = input.requestTimeoutMs ?? DEFAULT_CO_STATUS_JSON_REQUEST_TIMEOUT_MS;
   try {
     return await readUiDatasetWithEndpointRecovery({
       flags: input.flags,
@@ -111,7 +113,7 @@ export async function readCoStatusJsonDataset(input: {
       setTarget: (nextTarget) => {
         target = nextTarget;
       },
-      requestTimeoutMs: input.requestTimeoutMs,
+      requestTimeoutMs,
       recoverSameEndpointTimeout: true
     });
   } catch (error) {
@@ -773,5 +775,6 @@ function findRunsRoot(runDir: string): string {
 }
 
 export const __test__ = {
+  DEFAULT_CO_STATUS_JSON_REQUEST_TIMEOUT_MS,
   isDegradedMetadataPayloadMatchingClaim
 };

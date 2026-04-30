@@ -43,9 +43,13 @@ import {
 import {
   PROVIDER_LINEAR_AUDIT_ENV_VAR,
   PROVIDER_LINEAR_PARALLELIZATION_REASONS,
+  isProviderLinearParallelizationDecision,
+  isProviderLinearParallelizationReason,
+  isProviderLinearParallelizationReasonAllowed,
   readProviderLinearParallelizationSnapshot,
   readProviderLinearParallelizationSnapshots,
   summarizeProviderLinearAuditPath,
+  type ProviderLinearDecisionLineage,
   type ProviderLinearParallelizationSnapshot,
   type ProviderLinearAuditSummary
 } from './control/providerLinearWorkflowAudit.js';
@@ -318,6 +322,7 @@ export interface ProviderLinearWorkerChildLaneRecord {
   instructions: string | null;
   scope: ProviderLinearWorkerChildLaneScope;
   parent_snapshot: ProviderLinearWorkerChildLaneParentSnapshot;
+  decision_lineage?: ProviderLinearDecisionLineage | null;
   lane_workspace_path: string | null;
   patch_artifact_path: string | null;
   patch_bytes: number | null;
@@ -491,6 +496,16 @@ export interface ProviderLinearWorkerCurrentTurnActivity {
 export interface ProviderLinearWorkerParallelizationRecord
   extends ProviderLinearParallelizationSnapshot {
   child_lane_count: number;
+  recovered_child_lanes?: ProviderLinearWorkerRecoveredChildLaneRecord[];
+}
+
+export interface ProviderLinearWorkerRecoveredChildLaneRecord {
+  stream: string;
+  task_id: string;
+  run_id: string;
+  recovery_source: 'decision_lineage' | 'legacy_timestamp_fallback';
+  child_decision_lineage: ProviderLinearDecisionLineage | null;
+  parallelization_decision_lineage: ProviderLinearDecisionLineage | null;
 }
 
 export interface ProviderLinearTrackedIssueError {
@@ -5866,16 +5881,27 @@ function deriveProviderLinearWorkerParallelizationRecord(input: {
       recordedBefore: boundary
     }
   );
+  const effectiveChildLanes = selectEffectiveParallelizationChildLanes({
+    childLanes: input.childLanes,
+    attemptStartedAt: input.attemptStartedAt,
+    currentTurnStartedAt: boundary,
+    issueId: input.issueId,
+    currentParallelization: snapshot,
+    priorParallelizations
+  });
   return {
     ...snapshot,
-    child_lane_count: selectEffectiveParallelizationChildLanes({
+    child_lane_count: effectiveChildLanes.length,
+    recovered_child_lanes: selectRecoverablePriorAttemptSuccessfulChildLanes({
       childLanes: input.childLanes,
       attemptStartedAt: input.attemptStartedAt,
       currentTurnStartedAt: boundary,
       issueId: input.issueId,
       currentParallelization: snapshot,
       priorParallelizations
-    }).length
+    }).map((childLane) =>
+      buildRecoveredChildLaneRecord(childLane, priorParallelizations)
+    )
   };
 }
 
@@ -6009,12 +6035,38 @@ function latestPriorParallelizationSupportsRecoveredChildLane(
   priorParallelizations: ProviderLinearParallelizationSnapshot[],
   childLane: ProviderLinearWorkerChildLaneRecord
 ): boolean {
+  return resolveLatestPriorParallelizationChildLaneSupport(priorParallelizations, childLane) !== null;
+}
+
+function resolveLatestPriorParallelizationChildLaneSupport(
+  priorParallelizations: ProviderLinearParallelizationSnapshot[],
+  childLane: ProviderLinearWorkerChildLaneRecord
+): {
+  recoverySource: ProviderLinearWorkerRecoveredChildLaneRecord['recovery_source'];
+  parallelization: ProviderLinearParallelizationSnapshot;
+} | null {
   const priorParallelizeNowSnapshots = priorParallelizations.filter((snapshot) => snapshot.decision === 'parallelize_now');
   const latestPriorParallelization = priorParallelizeNowSnapshots.at(-1);
-  if (!latestPriorParallelization) return false;
+  if (!latestPriorParallelization) return null;
   const latestSummary = normalizeOptionalString(latestPriorParallelization.summary)?.toLowerCase() ?? '';
-  if (/(?:^|[^a-z0-9_:-])(?:recover_child_lane|recover_run):[a-z0-9_:-]+(?=$|[^a-z0-9_:-])/u.test(latestSummary)) {
-    return latestPriorParallelizationSupportsRecoveredChildLane(priorParallelizeNowSnapshots.slice(0, -1), childLane);
+  if (
+    /(?:^|[^a-z0-9_:-])(?:recover_child_lane|recover_run):[a-z0-9_:-]+(?=$|[^a-z0-9_:-])/u.test(latestSummary) &&
+    !parallelizationSummaryNamesRecoveredChildLane(latestPriorParallelization.summary, childLane)
+  ) {
+    return resolveLatestPriorParallelizationChildLaneSupport(priorParallelizeNowSnapshots.slice(0, -1), childLane);
+  }
+  const lineageSupport = resolveChildLaneDecisionLineageSupport(
+    childLane.decision_lineage ?? null,
+    latestPriorParallelization.decision_lineage ?? null
+  );
+  if (lineageSupport === 'matched') {
+    return {
+      recoverySource: 'decision_lineage',
+      parallelization: latestPriorParallelization
+    };
+  }
+  if (lineageSupport === 'mismatched') {
+    return null;
   }
   const childLaunchedAfterLatest = compareIsoTimestamp(childLane.launched_at, latestPriorParallelization.recorded_at) >= 0;
   const launchedAtMs = Date.parse(childLane.launched_at);
@@ -6023,11 +6075,86 @@ function latestPriorParallelizationSupportsRecoveredChildLane(
     childLaunchedAfterLatest ||
     (Number.isFinite(launchedAtMs) && Number.isFinite(latestRecordedAtMs) && latestRecordedAtMs - launchedAtMs <= 1_000);
   const previousPriorRecordedAt = priorParallelizeNowSnapshots.at(-2)?.recorded_at ?? null;
-  if (!previousPriorRecordedAt) return latestSupportsChildLane;
-  return (
+  const timestampSupportsChildLane = !previousPriorRecordedAt ? latestSupportsChildLane : (
     latestSupportsChildLane &&
     (childLaunchedAfterLatest || compareIsoTimestamp(childLane.launched_at, previousPriorRecordedAt) > 0)
   );
+  return timestampSupportsChildLane
+    ? {
+        recoverySource: 'legacy_timestamp_fallback',
+        parallelization: latestPriorParallelization
+      }
+    : null;
+}
+
+function resolveChildLaneDecisionLineageSupport(
+  childLineage: ProviderLinearDecisionLineage | null,
+  parallelizationLineage: ProviderLinearDecisionLineage | null
+): 'matched' | 'mismatched' | 'unknown' {
+  if (!childLineage || !parallelizationLineage) {
+    return 'unknown';
+  }
+  if (
+    childLineage.parent_task_id &&
+    parallelizationLineage.parent_task_id &&
+    childLineage.parent_task_id !== parallelizationLineage.parent_task_id
+  ) {
+    return 'mismatched';
+  }
+  if (
+    childLineage.parent_run_id &&
+    parallelizationLineage.parent_run_id &&
+    childLineage.parent_run_id !== parallelizationLineage.parent_run_id
+  ) {
+    return 'mismatched';
+  }
+  const hasSharedRun =
+    childLineage.parent_run_id !== null &&
+    parallelizationLineage.parent_run_id !== null &&
+    childLineage.parent_run_id === parallelizationLineage.parent_run_id;
+  if (!hasSharedRun) {
+    return 'unknown';
+  }
+  const turnStartedAtComparable =
+    childLineage.parent_turn_started_at !== null &&
+    parallelizationLineage.parent_turn_started_at !== null;
+  if (turnStartedAtComparable) {
+    return childLineage.parent_turn_started_at === parallelizationLineage.parent_turn_started_at
+      ? 'matched'
+      : 'mismatched';
+  }
+  const turnIdComparable =
+    childLineage.parent_turn_id !== null &&
+    parallelizationLineage.parent_turn_id !== null;
+  if (turnIdComparable) {
+    return childLineage.parent_turn_id === parallelizationLineage.parent_turn_id
+      ? 'matched'
+      : 'mismatched';
+  }
+  const turnCountComparable =
+    childLineage.parent_turn_count !== null &&
+    parallelizationLineage.parent_turn_count !== null;
+  if (turnCountComparable) {
+    return childLineage.parent_turn_count === parallelizationLineage.parent_turn_count
+      ? 'matched'
+      : 'mismatched';
+  }
+  return 'unknown';
+}
+
+function buildRecoveredChildLaneRecord(
+  childLane: ProviderLinearWorkerChildLaneRecord,
+  priorParallelizations: ProviderLinearParallelizationSnapshot[]
+): ProviderLinearWorkerRecoveredChildLaneRecord {
+  const support = resolveLatestPriorParallelizationChildLaneSupport(priorParallelizations, childLane);
+  return {
+    stream: childLane.stream,
+    task_id: childLane.task_id,
+    run_id: childLane.run_id,
+    recovery_source: support?.recoverySource ?? 'legacy_timestamp_fallback',
+    child_decision_lineage: childLane.decision_lineage ?? null,
+    parallelization_decision_lineage: support?.parallelization.decision_lineage ?? null
+  };
 }
 
 function parallelizationSummaryNamesRecoveredChildLane(
@@ -8792,6 +8919,7 @@ function normalizeProviderLinearWorkerChildLaneRecord(
     instructions: normalizeOptionalString(value.instructions),
     scope,
     parent_snapshot: parentSnapshot,
+    decision_lineage: normalizeProviderLinearDecisionLineage(value.decision_lineage),
     lane_workspace_path: normalizeOptionalString(value.lane_workspace_path),
     patch_artifact_path: normalizeOptionalString(value.patch_artifact_path),
     patch_bytes: normalizeOptionalInteger(value.patch_bytes),
@@ -8863,6 +8991,41 @@ function normalizeProviderLinearWorkerChildLaneParentSnapshot(
     issue_state_type: normalizeOptionalString(value.issue_state_type),
     captured_at: capturedAt
   };
+}
+
+function normalizeProviderLinearDecisionLineage(value: unknown): ProviderLinearDecisionLineage | null {
+  if (!isRecord(value) || value.schema_version !== 1) {
+    return null;
+  }
+  const decision = normalizeOptionalString(value.decision);
+  const reason = normalizeOptionalString(value.reason);
+  if (
+    !isProviderLinearParallelizationDecision(decision) ||
+    !isProviderLinearParallelizationReason(reason) ||
+    !isProviderLinearParallelizationReasonAllowed(decision, reason)
+  ) {
+    return null;
+  }
+  const normalized: ProviderLinearDecisionLineage = {
+    schema_version: 1,
+    parent_task_id: normalizeOptionalString(value.parent_task_id),
+    parent_run_id: normalizeOptionalString(value.parent_run_id),
+    parent_turn_started_at: normalizeOptionalString(value.parent_turn_started_at),
+    parent_turn_id: normalizeOptionalString(value.parent_turn_id),
+    parent_turn_count: normalizeNonNegativeInteger(value.parent_turn_count),
+    decision_id: normalizeOptionalString(value.decision_id),
+    decision_recorded_at: normalizeOptionalString(value.decision_recorded_at),
+    decision,
+    reason
+  };
+  return hasProviderLinearDecisionLineageIdentity(normalized) ? normalized : null;
+}
+
+function hasProviderLinearDecisionLineageIdentity(lineage: ProviderLinearDecisionLineage): boolean {
+  return Boolean(
+    lineage.parent_run_id &&
+    (lineage.parent_turn_started_at || lineage.parent_turn_id || lineage.parent_turn_count !== null)
+  );
 }
 
 function normalizeChildLaneDecision(

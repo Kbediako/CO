@@ -546,6 +546,8 @@ function enrichProjectionSourceWithProviderRetryState<
   const providerDebugSnapshot =
     claim !== null
       ? buildProviderIssueDebugSnapshot({
+          issue_id: source.issueId,
+          issue_identifier: source.issueIdentifier,
           tracked_issue: source.tracked?.linear ?? null,
           claim,
           proof: providerProof,

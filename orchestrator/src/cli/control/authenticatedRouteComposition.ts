@@ -2,7 +2,10 @@ import http from 'node:http';
 
 import type { CliManifest } from '../types.js';
 import type { ControlRuntime } from './controlRuntime.js';
-import { handleObservabilityApiRequest } from './observabilityApiController.js';
+import {
+  handleObservabilityApiRequest,
+  type ProviderWorkerRecoverAcceptedState
+} from './observabilityApiController.js';
 import { handleUiDataRequest } from './uiDataController.js';
 import { handleEventsSseRequest } from './eventsSseController.js';
 import { handleQuestionQueueRequest } from './questionQueueController.js';
@@ -74,6 +77,12 @@ export interface AuthenticatedRouteCompositionContext {
     issueId: string;
     action: ProviderIssueRecoveryAction;
   }): Promise<ProviderIssueHandoffRecoveryResult>;
+  readProviderWorkerRecoverAccepted?(input: {
+    provider: 'linear';
+    issueId: string;
+    action: ProviderIssueRecoveryAction;
+    requestedAt: string;
+  }): ProviderWorkerRecoverAcceptedState | null;
   readRequestBody(): Promise<Record<string, unknown>>;
   readDispatchEvaluation(): Promise<{
     issueIdentifier: string | null;
@@ -134,6 +143,7 @@ export function createAuthenticatedRouteDispatcherContext(
           return buildRefreshAcknowledgement(requestedAt, providerRefresh ?? null);
         },
         requestProviderWorkerRecover: context.requestProviderWorkerRecover,
+        readProviderWorkerRecoverAccepted: context.readProviderWorkerRecoverAccepted,
         readDispatchEvaluation: () => context.readDispatchEvaluation(),
         onDispatchEvaluated: (record) => context.onDispatchEvaluated(record)
       }),

@@ -38,6 +38,20 @@ export interface ProviderLinearParallelizationSnapshot {
   reason: ProviderLinearParallelizationReason;
   summary: string | null;
   recorded_at: string;
+  decision_lineage?: ProviderLinearDecisionLineage | null;
+}
+
+export interface ProviderLinearDecisionLineage {
+  schema_version: 1;
+  parent_task_id: string | null;
+  parent_run_id: string | null;
+  parent_turn_started_at: string | null;
+  parent_turn_id: string | null;
+  parent_turn_count: number | null;
+  decision_id: string | null;
+  decision_recorded_at: string | null;
+  decision: ProviderLinearParallelizationDecision | null;
+  reason: ProviderLinearParallelizationReason | null;
 }
 
 export const PROVIDER_LINEAR_PARALLELIZATION_REASONS = {
@@ -80,6 +94,7 @@ export interface ProviderLinearAuditEntry {
   expected_updated_at?: string | null;
   force?: boolean | null;
   force_reason?: string | null;
+  decision_lineage?: ProviderLinearDecisionLineage | null;
   error_code: string | null;
   error_message: string | null;
 }
@@ -155,7 +170,8 @@ export function readProviderLinearParallelizationSnapshots(
         decision,
         reason,
         summary: normalizeOptionalString(entry.via),
-        recorded_at: entry.recorded_at
+        recorded_at: entry.recorded_at,
+        decision_lineage: entry.decision_lineage ?? null
       }];
     })
     .sort((left, right) => compareIsoTimestamp(left.recorded_at, right.recorded_at));
@@ -331,6 +347,9 @@ function normalizeProviderLinearAuditEntry(value: unknown): ProviderLinearAuditE
     ...(Object.prototype.hasOwnProperty.call(entry, 'force_reason')
       ? { force_reason: normalizeOptionalString(entry.force_reason) }
       : {}),
+    ...(Object.prototype.hasOwnProperty.call(entry, 'decision_lineage')
+      ? { decision_lineage: normalizeProviderLinearDecisionLineage(entry.decision_lineage) }
+      : {}),
     error_code: normalizeOptionalString(entry.error_code),
     error_message: normalizeOptionalString(entry.error_message)
   };
@@ -352,12 +371,63 @@ function normalizeSourceSetup(value: unknown): DispatchPilotSourceSetup | null {
   };
 }
 
+function normalizeProviderLinearDecisionLineage(value: unknown): ProviderLinearDecisionLineage | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  if (record.schema_version !== 1) {
+    return null;
+  }
+  const decision = normalizeOptionalString(record.decision);
+  const reason = normalizeOptionalString(record.reason);
+  if (
+    !isProviderLinearParallelizationDecision(decision) ||
+    !isProviderLinearParallelizationReason(reason) ||
+    !isProviderLinearParallelizationReasonAllowed(decision, reason)
+  ) {
+    return null;
+  }
+  const normalized: ProviderLinearDecisionLineage = {
+    schema_version: 1,
+    parent_task_id: normalizeOptionalString(record.parent_task_id),
+    parent_run_id: normalizeOptionalString(record.parent_run_id),
+    parent_turn_started_at: normalizeOptionalString(record.parent_turn_started_at),
+    parent_turn_id: normalizeOptionalString(record.parent_turn_id),
+    parent_turn_count: normalizeOptionalNonNegativeInteger(record.parent_turn_count),
+    decision_id: normalizeOptionalString(record.decision_id),
+    decision_recorded_at: normalizeOptionalString(record.decision_recorded_at),
+    decision,
+    reason
+  };
+  return hasProviderLinearDecisionLineageIdentity(normalized) ? normalized : null;
+}
+
 function normalizeOptionalString(value: unknown): string | null {
   if (typeof value !== 'string') {
     return null;
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeOptionalInteger(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isInteger(value)) {
+    return null;
+  }
+  return value;
+}
+
+function normalizeOptionalNonNegativeInteger(value: unknown): number | null {
+  const normalized = normalizeOptionalInteger(value);
+  return normalized !== null && normalized >= 0 ? normalized : null;
+}
+
+function hasProviderLinearDecisionLineageIdentity(lineage: ProviderLinearDecisionLineage): boolean {
+  return Boolean(
+    lineage.parent_run_id &&
+    (lineage.parent_turn_started_at || lineage.parent_turn_id || lineage.parent_turn_count !== null)
+  );
 }
 
 function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {

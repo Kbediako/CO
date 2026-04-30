@@ -12,9 +12,16 @@ import {
 } from './controlServerAuditAndErrorHelpers.js';
 import {
   type ProviderIssueHandoffRefreshRequestOutcome,
+  runProviderIssueHandoffRecover,
   runProviderIssueHandoffRefresh
 } from './controlServerPublicLifecycle.js';
 import { readJsonBody } from './controlServerRequestBodyHelpers.js';
+import type { ProviderIssueRecoveryAction } from './providerIssueHandoff.js';
+import {
+  buildProviderIssueKey,
+  readProviderIntakeClaim,
+  type ProviderIntakeClaimRecord
+} from './providerIntakeState.js';
 
 export interface ControlAuthenticatedRouteHandoffInput {
   pathname: string;
@@ -30,6 +37,7 @@ export function createControlAuthenticatedRouteContext(
   input: ControlAuthenticatedRouteHandoffInput
 ): AuthenticatedRouteCompositionContext {
   const questionChildResolutionAdapter = createControlQuestionChildResolutionAdapter(input.context);
+  const providerIssueHandoff = input.context.providerIssueHandoff;
 
   return {
     pathname: input.pathname,
@@ -49,24 +57,35 @@ export function createControlAuthenticatedRouteContext(
     persist: input.context.persist,
     runtime: input.context.runtime,
     refreshProviderIssues: (): Promise<ProviderIssueHandoffRefreshRequestOutcome | null> =>
-      input.context.providerIssueHandoff
-        ? runProviderIssueHandoffRefresh(input.context.providerIssueHandoff, {
+      providerIssueHandoff
+        ? runProviderIssueHandoffRefresh(providerIssueHandoff, {
             queueIfBusy: true,
             acknowledgeAccepted: true,
             allowIdleRestartRequiredRetry: true
           })
         : Promise.resolve(null),
-    requestProviderWorkerRecover: (recoverInput) =>
-      input.context.providerIssueHandoff
-        ? input.context.providerIssueHandoff.recoverIssue(recoverInput)
-        : Promise.resolve({
-            provider: recoverInput.provider,
-            issue_id: recoverInput.issueId,
-            action: recoverInput.action,
-            kind: 'skipped',
-            reason: 'provider_issue_handoff_unavailable',
-            claim: null
-          }),
+    ...(
+      providerIssueHandoff
+        ? {
+            requestProviderWorkerRecover: (recoverInput: {
+              provider: 'linear';
+              issueId: string;
+              action: ProviderIssueRecoveryAction;
+            }) =>
+              runProviderIssueHandoffRecover(providerIssueHandoff, recoverInput),
+            readProviderWorkerRecoverAccepted: (recoverInput: {
+              provider: 'linear';
+              issueId: string;
+              action: ProviderIssueRecoveryAction;
+              requestedAt: string;
+            }) =>
+              readProviderWorkerRecoverAcceptedClaim(
+                input.context.readPersistedProviderIntakeState?.() ?? null,
+                recoverInput
+              )
+          }
+        : {}
+    ),
     readRequestBody: () => readJsonBody(input.req),
     readDispatchEvaluation: () => input.runtimeSnapshot.readDispatchEvaluation(),
     onDispatchEvaluated: (record) => emitDispatchPilotAuditEvents(input.context, record),
@@ -99,4 +118,83 @@ function resolveTaskIdFromManifestPath(manifestPath: string): string | null {
   const taskDir = dirname(cliDir);
   const taskId = basename(taskDir);
   return taskId || null;
+}
+
+function readProviderWorkerRecoverAcceptedClaim(
+  state: Parameters<typeof readProviderIntakeClaim>[0] | null | undefined,
+  input: {
+    provider: 'linear';
+    issueId: string;
+    action: ProviderIssueRecoveryAction;
+    requestedAt: string;
+  }
+) {
+  if (!state) {
+    return null;
+  }
+  const normalizedProvider = input.provider.trim().toLowerCase();
+  const normalizedIssueId = input.issueId.trim().toLowerCase();
+  const providerKey = buildProviderIssueKey(input.provider, input.issueId);
+  const normalizedProviderKey = buildProviderIssueKey(input.provider, normalizedIssueId);
+  const claim =
+    readProviderIntakeClaim(state, providerKey) ??
+    readProviderIntakeClaim(state, normalizedProviderKey) ??
+    state.claims.find((candidate) =>
+      candidate.provider.trim().toLowerCase() === normalizedProvider &&
+      (
+        normalizeOptionalString(candidate.issue_id)?.toLowerCase() === normalizedIssueId ||
+        normalizeOptionalString(candidate.issue_identifier)?.toLowerCase() === normalizedIssueId
+      )
+    ) ??
+    null;
+  if (!claim || !isFreshControlHostProviderWorkerRecoverClaim(claim, input)) {
+    return null;
+  }
+  return {
+    issue_id: claim.issue_id,
+    issue_identifier: normalizeOptionalString(claim.issue_identifier),
+    state: claim.state,
+    reason: normalizeOptionalString(claim.reason),
+    launch_source: claim.launch_source ?? null,
+    launch_token_present: normalizeOptionalString(claim.launch_token) !== null,
+    updated_at: normalizeOptionalString(claim.updated_at)
+  };
+}
+
+function isFreshControlHostProviderWorkerRecoverClaim(
+  claim: ProviderIntakeClaimRecord,
+  input: {
+    action: ProviderIssueRecoveryAction;
+    requestedAt: string;
+  }
+): boolean {
+  if (
+    claim.state !== 'starting' &&
+    claim.state !== 'resuming' &&
+    claim.state !== 'running'
+  ) {
+    return false;
+  }
+  if (
+    claim.last_event !== 'control_host_provider_worker_recover' ||
+    claim.last_action !== input.action ||
+    claim.launch_source !== 'control-host' ||
+    normalizeOptionalString(claim.launch_token) === null
+  ) {
+    return false;
+  }
+  return compareOptionalIsoTimestamp(claim.updated_at, input.requestedAt) >= 0;
+}
+
+function compareOptionalIsoTimestamp(left: string | null | undefined, right: string): number {
+  const leftMs = Date.parse(left ?? '');
+  const rightMs = Date.parse(right);
+  if (!Number.isFinite(leftMs) || !Number.isFinite(rightMs)) {
+    return -1;
+  }
+  return leftMs === rightMs ? 0 : leftMs > rightMs ? 1 : -1;
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }

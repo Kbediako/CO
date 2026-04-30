@@ -42,6 +42,18 @@ const CODERABBIT_ISSUE_COMMENT_COMPLETION_PATTERNS = [
   /Everything is clean\b/iu,
   /PR is ready to merge\b/iu
 ];
+const CODEX_MENTION_PATTERN = /@(?:chatgpt-codex-connector|codex)(?![\w-])/giu;
+const CODERABBIT_MENTION_PATTERN = /@coderabbitai(?![\w-])/giu;
+const CODEX_MENTION_AT_START_PATTERN =
+  /^[\t ,:&/-]*(?:and|&)?[\t ,:&/-]*@(?:chatgpt-codex-connector|codex)(?![\w-])/iu;
+const CODERABBIT_POST_MENTION_ACKNOWLEDGEMENT_PRELUDE_PATTERN =
+  /^[\t ,:;-]{0,80}(?:(?:(?:thank\s+you|thanks?|thx|noted|acknowledged|ack|got\s+it|understood|ok(?:ay)?|status\s+(?:noted|acknowledged))|(?:(?:addressed|fixed|handled|done|updated|implemented|resolved)(?:\s+(?:(?:it|this|that|these|those|them)|(?:(?:the|all|remaining|latest|current)\s+)?(?:(?:code\s*rabbit|coderabbit)(?:\s+review)?\s+)?(?:comments?|feedback|threads?|nits?|findings?|issues?|suggestions?|review\s+comments?)))?))[\t ,:;.!?-]+){1,3}/iu;
+const CODERABBIT_REREVIEW_REQUEST_AFTER_MENTION_PATTERN =
+  /^[\t ,:;-]{0,80}(?:(?:(?:please|pls|can\s+you|could\s+you|would\s+you)(?:\s+please)?\s+review)|(?:(?:please|pls|can\s+you|could\s+you|would\s+you)(?:\s+please)?\s+)?(?:re[-\s]?review|rereview|review\s+(?:again|this|the\s+(?:latest|current)\s+(?:head|iteration|changes?))|check\s+(?:again|this|these|it|the\s+(?:latest|current)\s+(?:head|iteration|changes?)|changes?)|take\s+(?:another\s+)?look|resolve|mark\s+(?:it|this|these|thread|threads|comments?)\s+resolved|rerun\s+(?:the\s+)?review|run\s+(?:the\s+)?review\s+again))\b/iu;
+const CODERABBIT_REREVIEW_REQUEST_BEFORE_MENTION_PATTERN =
+  /^[\t ,:;'"()/-]*(?:(?:(?:please|pls|can\s+you|could\s+you|would\s+you)(?:\s+please)?\s+review(?:\s+(?:this|these|it|changes?|fixes?|the\s+(?:latest|current)?\s*(?:head|iteration|changes?|fixes?))){0,3})|(?:(?:please|pls|can\s+you|could\s+you|would\s+you)(?:\s+please)?\s+)?(?:re[-\s]?review(?:\s+(?:again|this|these|it|iteration|the\s+(?:latest|current)\s+(?:head|iteration|changes?)|changes?)){0,3}|rereview(?:\s+(?:again|this|these|it|iteration|the\s+(?:latest|current)\s+(?:head|iteration|changes?)|changes?)){0,3}|review\s+(?:again|this|the\s+(?:latest|current)\s+(?:head|iteration|changes?))|check\s+(?:again|this|these|it|the\s+(?:latest|current)\s+(?:head|iteration|changes?)|changes?)|take\s+(?:another\s+)?look|resolve(?:\s+(?:this|these|it|(?:(?:the|all|remaining|latest|current)\s+){0,2}(?:thread|threads|comments?|feedback|issues?|findings?)))?|mark\s+(?:it|this|these|thread|threads|comments?)\s+resolved|rerun\s+(?:the\s+)?review|run\s+(?:the\s+)?review\s+again))\b[\t ,:;'"()/-]*$/iu;
+const REREVIEW_REQUEST_CLAUSE_BOUNDARY_PATTERN = /[;\n\r.!?]/u;
+const SHARED_BOT_REQUEST_JOINER_PATTERN = /^[\t ,:&/-]*(?:and|&)?[\t ,:&/-]*$/iu;
 const CODERABBIT_STATUS_NAMES = new Set(['coderabbit', 'coderabbitai', 'code rabbit', 'code rabbit ai']);
 
 function normalizeReadinessMode(rawValue) {
@@ -551,6 +563,114 @@ function extractMentionedBotKinds(body) {
     }
   }
   return mentionedKinds;
+}
+
+function sliceClauseBefore(text, index) {
+  const prefix = text.slice(0, index);
+  const boundaryMatches = [...prefix.matchAll(new RegExp(REREVIEW_REQUEST_CLAUSE_BOUNDARY_PATTERN, 'gu'))];
+  const lastBoundary = boundaryMatches.length > 0
+    ? boundaryMatches[boundaryMatches.length - 1].index ?? -1
+    : -1;
+  return prefix.slice(lastBoundary + 1);
+}
+
+function sliceClauseAfter(text, index) {
+  const suffix = text.slice(index);
+  const boundary = REREVIEW_REQUEST_CLAUSE_BOUNDARY_PATTERN.exec(suffix);
+  return boundary ? suffix.slice(0, boundary.index) : suffix;
+}
+
+function stripCoderabbitPostMentionAcknowledgementPrelude(text) {
+  const stripped = text.replace(CODERABBIT_POST_MENTION_ACKNOWLEDGEMENT_PRELUDE_PATTERN, '');
+  if (stripped === text || CODERABBIT_REREVIEW_REQUEST_AFTER_MENTION_PATTERN.test(stripped)) {
+    return stripped;
+  }
+  return stripped.replace(/^[\t ,:;-]*(?:\([^.!?\n\r]{0,160}\)|[^.!?\n\r]{0,160})?[.!?]\s*/u, '');
+}
+
+function stripLeadingSharedBotMentions(text) {
+  let remaining = text;
+  for (let index = 0; index < 4; index += 1) {
+    const next = remaining.replace(CODEX_MENTION_AT_START_PATTERN, '');
+    if (next === remaining) {
+      break;
+    }
+    remaining = next;
+  }
+  return remaining;
+}
+
+function sliceBeforeCoderabbitMentionRequestText(text, afterMention = '') {
+  const matches = [...text.matchAll(CODEX_MENTION_PATTERN)];
+  if (matches.length === 0) {
+    return text;
+  }
+  const lastMatch = matches[matches.length - 1];
+  const lastMatchIndex = typeof lastMatch.index === 'number' ? lastMatch.index : -1;
+  const beforeLastCodex = lastMatchIndex >= 0 ? text.slice(0, lastMatchIndex) : '';
+  const afterLastCodex = lastMatchIndex >= 0 ? text.slice(lastMatchIndex + lastMatch[0].length) : text;
+  const afterAcknowledgementPrelude = stripCoderabbitPostMentionAcknowledgementPrelude(afterLastCodex);
+  if (afterAcknowledgementPrelude !== afterLastCodex) {
+    return afterAcknowledgementPrelude;
+  }
+  if (SHARED_BOT_REQUEST_JOINER_PATTERN.test(afterLastCodex) && !/[^\s,;:&/-]/u.test(afterMention)) {
+    return beforeLastCodex;
+  }
+  return '';
+}
+
+function hasCoderabbitRereviewRequestIntent(body) {
+  if (typeof body !== 'string' || body.trim().length === 0) {
+    return false;
+  }
+  const matches = [...body.matchAll(CODERABBIT_MENTION_PATTERN)];
+  for (const match of matches) {
+    const mentionStart = typeof match.index === 'number' ? match.index : -1;
+    const mentionEnd = mentionStart + match[0].length;
+    if (mentionStart < 0) {
+      continue;
+    }
+    const beforeMention = sliceClauseBefore(body, mentionStart);
+    const afterMention = sliceClauseAfter(body, mentionEnd);
+    const afterMentionSuffix = body.slice(mentionEnd).replace(/^[\s,;:!?._-]+/u, '');
+    const afterSharedBotMentions = stripLeadingSharedBotMentions(afterMention);
+    const afterAcknowledgementPrelude = stripCoderabbitPostMentionAcknowledgementPrelude(afterMention);
+    const afterSuffixAcknowledgementPrelude = stripCoderabbitPostMentionAcknowledgementPrelude(afterMentionSuffix);
+    const afterSharedBotAcknowledgementPrelude =
+      stripCoderabbitPostMentionAcknowledgementPrelude(afterSharedBotMentions);
+    const beforeMentionForCoderabbit = sliceBeforeCoderabbitMentionRequestText(beforeMention, afterMention);
+    if (
+      CODERABBIT_REREVIEW_REQUEST_AFTER_MENTION_PATTERN.test(afterMention) ||
+      (!BOT_MENTION_PATTERNS.codex.test(afterAcknowledgementPrelude) && CODERABBIT_REREVIEW_REQUEST_AFTER_MENTION_PATTERN.test(afterAcknowledgementPrelude)) ||
+      (!BOT_MENTION_PATTERNS.codex.test(afterSuffixAcknowledgementPrelude) && CODERABBIT_REREVIEW_REQUEST_AFTER_MENTION_PATTERN.test(afterSuffixAcknowledgementPrelude)) ||
+      CODERABBIT_REREVIEW_REQUEST_AFTER_MENTION_PATTERN.test(afterSharedBotMentions) ||
+      (!BOT_MENTION_PATTERNS.codex.test(afterSharedBotAcknowledgementPrelude) && CODERABBIT_REREVIEW_REQUEST_AFTER_MENTION_PATTERN.test(afterSharedBotAcknowledgementPrelude)) ||
+      CODERABBIT_REREVIEW_REQUEST_BEFORE_MENTION_PATTERN.test(beforeMentionForCoderabbit)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function classifyBotRereviewMentions(body) {
+  const mentionedKinds = extractMentionedBotKinds(body);
+  const requestedKinds = [];
+  const ignoredMentions = [];
+  for (const kind of mentionedKinds) {
+    if (kind === 'coderabbit' && !hasCoderabbitRereviewRequestIntent(body)) {
+      ignoredMentions.push({
+        kind: BOT_KIND_LABELS.coderabbit,
+        reason: 'acknowledgement_only'
+      });
+      continue;
+    }
+    requestedKinds.push(kind);
+  }
+  return {
+    requestedKinds,
+    ignoredMentions
+  };
 }
 
 function withCommentSource(comments, source) {
@@ -1083,11 +1203,31 @@ function resolveEffectiveBotRereviewSignals({
   pendingBots,
   coderabbitStatusCheckRollup,
   requestTimesByBot,
+  ignoredMentions,
   hasUnresolvedThread,
   unacknowledgedBotFeedbackCount,
   botFeedbackFetchError
 }) {
   const rawPendingBots = Array.isArray(pendingBots) ? pendingBots : [];
+  const normalizedIgnoredMentions = Array.isArray(ignoredMentions)
+    ? ignoredMentions
+        .filter((mention) => mention && typeof mention === 'object')
+        .map((mention) => ({
+          kind: typeof mention.kind === 'string' && mention.kind.trim()
+            ? mention.kind.trim()
+            : BOT_KIND_LABELS.coderabbit,
+          reason: typeof mention.reason === 'string' && mention.reason.trim()
+            ? mention.reason.trim()
+            : 'acknowledgement_only',
+          commentId: Number.isInteger(Number(mention.commentId)) && Number(mention.commentId) > 0
+            ? Number(mention.commentId)
+            : null,
+          createdAtMs: typeof mention.createdAtMs === 'number' && Number.isFinite(mention.createdAtMs)
+            ? mention.createdAtMs
+            : null,
+          source: mention.source === 'pull' ? 'pull' : mention.source === 'review' ? 'review' : 'issue'
+        }))
+    : [];
   const effectivePendingBots = [];
   const clearedPendingBots = [];
   const canTrustResolvedFeedbackTruth =
@@ -1125,6 +1265,7 @@ function resolveEffectiveBotRereviewSignals({
     rawPendingBots,
     effectivePendingBots,
     clearedPendingBots,
+    ignoredMentions: normalizedIgnoredMentions,
     coderabbit: {
       statusCheckRollup: coderabbitStatusCheckRollup,
       stalePendingCleared: clearedPendingBots.includes(BOT_KIND_LABELS.coderabbit),
@@ -1370,6 +1511,7 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
     pendingBots: rawBotRereviewPending,
     coderabbitStatusCheckRollup,
     requestTimesByBot: botRereview?.requestTimesByBot,
+    ignoredMentions: botRereview?.ignoredMentions,
     hasUnresolvedThread,
     unacknowledgedBotFeedbackCount,
     botFeedbackFetchError
@@ -1596,6 +1738,25 @@ export function shouldSucceedAfterTimeout(snapshot, options = {}) {
   return readinessMode === 'review' && snapshot.readyToMerge === true;
 }
 
+function formatIgnoredBotRereviewMentions(mentions) {
+  if (!Array.isArray(mentions) || mentions.length === 0) {
+    return '-';
+  }
+  return mentions
+    .map((mention) => {
+      const kind = typeof mention.kind === 'string' && mention.kind.trim()
+        ? mention.kind.trim()
+        : BOT_KIND_LABELS.coderabbit;
+      const reason = typeof mention.reason === 'string' && mention.reason.trim()
+        ? mention.reason.trim()
+        : 'acknowledgement_only';
+      const source = mention.source === 'pull' ? 'pull' : mention.source === 'review' ? 'review' : 'issue';
+      const commentPart = mention.commentId ? `#${mention.commentId}` : 'unknown';
+      return `${kind}:${reason}:${source}:${commentPart}`;
+    })
+    .join(', ');
+}
+
 function formatStatusLine(snapshot, quietRemainingMs) {
   const requiredChecks = snapshot.requiredChecks;
   const failedNames = snapshot.checks.failed.map((item) => `${item.name}:${item.state}`).join(', ') || '-';
@@ -1616,6 +1777,9 @@ function formatStatusLine(snapshot, quietRemainingMs) {
   const clearedRereviewPending = Array.isArray(snapshot.botRereviewDiagnostics?.clearedPendingBots)
     ? snapshot.botRereviewDiagnostics.clearedPendingBots.join(', ') || '-'
     : '-';
+  const ignoredRereviewMentions = formatIgnoredBotRereviewMentions(
+    snapshot.botRereviewDiagnostics?.ignoredMentions
+  );
   return [
     `PR #${snapshot.number}`,
     `state=${snapshot.state}`,
@@ -1638,6 +1802,7 @@ function formatStatusLine(snapshot, quietRemainingMs) {
     `bot_rereview_pending=[${snapshot.botRereviewPending.join(', ') || '-'}]`,
     `bot_rereview_in_progress=[${snapshot.botRereviewInProgress.join(', ') || '-'}]`,
     `bot_rereview_cleared=[${clearedRereviewPending}]`,
+    `bot_rereview_ignored=[${ignoredRereviewMentions}]`,
     `coderabbit_rollup=${coderabbitRollupState}`,
     `coderabbit_rollup_contexts=[${coderabbitRollupNames}]`,
     `coderabbit_actionable=${snapshot.coderabbitReviewMeta.actionableCount}`,
@@ -1757,11 +1922,15 @@ function summarizeCoderabbitReviewMeta(reviews, headOid) {
   return summary;
 }
 
-export function resolveLatestBotRereviewRequests(comments) {
+export function resolveBotRereviewRequestMentions(comments) {
   if (!Array.isArray(comments)) {
-    return {};
+    return {
+      requests: {},
+      ignoredMentions: []
+    };
   }
   const latestByKind = {};
+  const ignoredMentions = [];
   for (const comment of comments) {
     if (!comment || typeof comment !== 'object') {
       continue;
@@ -1769,8 +1938,8 @@ export function resolveLatestBotRereviewRequests(comments) {
     if (!isHumanReviewActor(comment.user)) {
       continue;
     }
-    const requestedKinds = extractMentionedBotKinds(comment.body);
-    if (requestedKinds.length === 0) {
+    const { requestedKinds, ignoredMentions: ignoredForComment } = classifyBotRereviewMentions(comment.body);
+    if (requestedKinds.length === 0 && ignoredForComment.length === 0) {
       continue;
     }
     const createdAtMs = parseTimestampMs(comment.created_at);
@@ -1785,6 +1954,13 @@ export function resolveLatestBotRereviewRequests(comments) {
       createdAtMs,
       source
     };
+    for (const ignored of ignoredForComment) {
+      ignoredMentions.push({
+        ...request,
+        kind: ignored.kind,
+        reason: ignored.reason
+      });
+    }
     for (const kind of requestedKinds) {
       const previous = latestByKind[kind];
       if (!previous || request.createdAtMs > previous.createdAtMs) {
@@ -1792,7 +1968,14 @@ export function resolveLatestBotRereviewRequests(comments) {
       }
     }
   }
-  return latestByKind;
+  return {
+    requests: latestByKind,
+    ignoredMentions
+  };
+}
+
+export function resolveLatestBotRereviewRequests(comments) {
+  return resolveBotRereviewRequestMentions(comments).requests;
 }
 
 function maxReactionTimestampForKind(reactions, kind, contentSet, requestAtMs) {
@@ -1954,7 +2137,9 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
     const issueReactions = flattenReviewCommentPages(issueReactionsPayload);
     const coderabbit = summarizeCoderabbitReviewMeta(reviews, headOid);
 
-    const rereviewRequests = resolveLatestBotRereviewRequests([...allComments, ...reviewRequestCandidates]);
+    const rereviewRequestSignals = resolveBotRereviewRequestMentions([...allComments, ...reviewRequestCandidates]);
+    const rereviewRequests = rereviewRequestSignals.requests;
+    const ignoredMentions = rereviewRequestSignals.ignoredMentions;
     const requestedKinds = Object.keys(rereviewRequests);
     if (requestedKinds.length === 0) {
       return {
@@ -1962,6 +2147,7 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
         rateLimit: null,
         pendingBots: [],
         inProgressBots: [],
+        ignoredMentions,
         coderabbit
       };
     }
@@ -2018,6 +2204,7 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
       pendingBots,
       inProgressBots,
       requestTimesByBot,
+      ignoredMentions,
       coderabbit
     };
   } catch (error) {

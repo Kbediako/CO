@@ -1,10 +1,10 @@
 ---
 id: 20260330-linear-98ba135e-832e-4bec-bf4a-58acb3803f08
 title: CO: Clarify bounded-success vs failed review-wrapper outcomes for operators
-status: in_progress
+status: done
 owner: Codex
 created: 2026-03-30
-last_review: 2026-03-30
+last_review: 2026-04-30
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-98ba135e-832e-4bec-bf4a-58acb3803f08.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-98ba135e-832e-4bec-bf4a-58acb3803f0
 related_tasks:
   - tasks/tasks-linear-98ba135e-832e-4bec-bf4a-58acb3803f08.md
 review_notes:
+  - 2026-04-30: CO-428 live Linear audit confirmed CO-28 is `Done`; this completed-lane spec is reclassified to inactive `done` under canonical owner key `spec-guard:active-specs:last_review=2026-03-30` so historical implementation evidence remains preserved without staying in active-spec freshness.
   - 2026-03-30: Live `linear issue-context` confirmed the CO team workflow states, no attached PR, and no existing workpad on `CO-28`; the issue was moved from `Ready` to `In Progress` before active coding.
   - 2026-03-30: The bootstrap workpad was created in the single required `## Codex Workpad` comment after the state transition.
   - 2026-03-30: Baseline audit on the current tree confirmed the remaining gap is an operator-facing interpretation seam, not missing boundary detection: recent evidence includes one succeeded review with `termination_boundary: null`, one succeeded review with `termination_boundary.kind: relevant-reinspection-dwell`, and one failed review with `termination_boundary.kind: command-intent`.

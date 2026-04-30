@@ -17,7 +17,9 @@ import {
 import { resolveLinearWebhookSourceSetup } from './linearWebhookController.js';
 import type {
   ProviderIssueHandoffPollInput,
+  ProviderIssueHandoffRecoveryResult,
   ProviderIssueHandoffService,
+  ProviderIssueRecoveryAction,
   ProviderTrackedIssueRefetchInput,
   ProviderTrackedIssuePollResolution
 } from './providerIssueHandoff.js';
@@ -393,6 +395,62 @@ export function runProviderIssueHandoffRefresh(
   return acknowledgeAccepted
     ? acknowledgeProviderIssueHandoffAccepted(activeRefresh, activeOutcome)
     : mapProviderIssueHandoffRefreshOutcome(providerIssueHandoff, activeRefresh, activeOutcome);
+}
+
+export async function runProviderIssueHandoffRecover(
+  providerIssueHandoff: ProviderIssueHandoffService,
+  input: {
+    provider: 'linear';
+    issueId: string;
+    action: ProviderIssueRecoveryAction;
+  }
+): Promise<ProviderIssueHandoffRecoveryResult> {
+  const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
+  while (state.active || state.queuedRefresh) {
+    const stuckOutcome = await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
+    if (stuckOutcome) {
+      detachProviderIssueHandoffPending(state.active);
+      detachProviderIssueHandoffPending(state.queuedRefresh);
+      state.active = null;
+      state.queuedRefresh = null;
+      providerIssueHandoff.resetStuckRefreshLifecycle?.();
+      break;
+    }
+    try {
+      await waitForProviderIssueHandoffPendingWithWatchdog(
+        providerIssueHandoff,
+        state.queuedRefresh ?? state.active!,
+        () => resolveProviderIssueHandoffWatchdogDelayMs(providerIssueHandoff)
+      );
+    } catch (error) {
+      const stuckOutcome = await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
+      const stuckReason = resolveProviderIssueHandoffStuckErrorReason(error);
+      if (!stuckOutcome && !stuckReason) {
+        throw error;
+      }
+      detachProviderIssueHandoffPending(state.active);
+      detachProviderIssueHandoffPending(state.queuedRefresh);
+      state.active = null;
+      state.queuedRefresh = null;
+      providerIssueHandoff.resetStuckRefreshLifecycle?.();
+      break;
+    }
+  }
+
+  const recoveryState = getProviderIssueHandoffOperationState(providerIssueHandoff);
+  let recoveryResult: ProviderIssueHandoffRecoveryResult | null = null;
+  const recoveryOperation = startProviderIssueHandoffOperation(
+    providerIssueHandoff,
+    recoveryState,
+    async () => {
+      recoveryResult = await providerIssueHandoff.recoverIssue(input);
+    }
+  );
+  await waitForProviderIssueHandoffPending(providerIssueHandoff, recoveryOperation);
+  if (!recoveryResult) {
+    throw new Error('provider_issue_recover_result_missing');
+  }
+  return recoveryResult;
 }
 
 export function runProviderIssueHandoffRehydrate(

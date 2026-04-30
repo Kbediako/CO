@@ -47,6 +47,18 @@ const TEAM_STATES_NODES = [
     type: 'completed'
   }
 ];
+const ISSUE_LABEL_NODES = [
+  {
+    id: 'label-bug',
+    name: 'Bug',
+    color: '#d73a49'
+  },
+  {
+    id: 'label-provider-workflow',
+    name: 'Area: Provider Workflow',
+    color: '#5319e7'
+  }
+];
 
 afterEach(async () => {
   await Promise.all(
@@ -99,6 +111,13 @@ function buildIssueContextBody(overrides: Record<string, unknown> = {}): unknown
         project: {
           id: 'lin-project-1',
           name: 'CO'
+        },
+        labels: {
+          nodes: ISSUE_LABEL_NODES.map((label) => ({ ...label })),
+          pageInfo: {
+            hasNextPage: false,
+            endCursor: null
+          }
         },
         comments: {
           nodes: [
@@ -255,6 +274,7 @@ function buildCachedIssueContext(overrides: Record<string, unknown> = {}): Recor
       id: 'lin-project-1',
       name: 'CO'
     },
+    labels: ISSUE_LABEL_NODES.map((label) => ({ ...label })),
     comments: [
       {
         id: 'comment-workpad',
@@ -672,7 +692,7 @@ describe('providerLinearWorkflowFacade', () => {
     });
   });
 
-  it('reuses a recent cached issue-context snapshot when request headroom is degraded', async () => {
+  it('reuses a recent cached issue-context snapshot with labels when request headroom is degraded', async () => {
     const codexHome = await mkdtemp(join(tmpdir(), 'provider-linear-workflow-facade-'));
     tempDirs.push(codexHome);
     const env = {
@@ -720,9 +740,72 @@ describe('providerLinearWorkflowFacade', () => {
       issue: {
         identifier: 'CO-1',
         title: 'Cached issue context',
+        labels: ISSUE_LABEL_NODES,
         workpad_comment: {
           id: 'comment-workpad'
         }
+      }
+    });
+  });
+
+  it('does not reuse an issue-context cache snapshot that omits labels', async () => {
+    const codexHome = await mkdtemp(join(tmpdir(), 'provider-linear-workflow-facade-'));
+    tempDirs.push(codexHome);
+    const env = {
+      CODEX_HOME: codexHome,
+      CO_LINEAR_API_TOKEN: 'lin-api-token',
+      CODEX_PROVIDER_LINEAR_AUDIT_PATH: join(codexHome, 'provider-linear-worker-linear-audit.jsonl')
+    };
+    const resetAt = String(Date.now() + 60_000);
+
+    await writeCachedIssueContext(
+      env,
+      buildCachedIssueContext({
+        labels: undefined,
+        title: 'Legacy cache without labels'
+      }),
+      {
+        recordedAt: new Date(Date.now() - 45_000).toISOString()
+      }
+    );
+    await recordLinearBudgetHeadersObservation({
+      env,
+      source: 'provider-linear:issue-context',
+      headers: {
+        'x-ratelimit-requests-limit': '100',
+        'x-ratelimit-requests-remaining': '5',
+        'x-ratelimit-requests-reset': resetAt
+      }
+    });
+
+    const fetchImpl: typeof fetch = vi.fn(async () =>
+      jsonResponse(
+        buildIssueContextBody({
+          title: 'Live issue context after omitted-label cache'
+        }),
+        200,
+        {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '89',
+          'x-ratelimit-requests-reset': resetAt
+        }
+      )
+    );
+
+    const result = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env,
+      allowReadOnlyCacheReuse: true,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        title: 'Live issue context after omitted-label cache',
+        labels: ISSUE_LABEL_NODES
       }
     });
   });
@@ -1477,6 +1560,126 @@ describe('providerLinearWorkflowFacade', () => {
         title: 'Live issue context'
       }
     });
+  });
+
+  it('projects live issue-context labels and persists them into the scoped cache', async () => {
+    const env = await createBudgetedRunScopedEnv();
+    const graphqlQueries: string[] = [];
+    const resetAt = String(Date.now() + 60_000);
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+      };
+      graphqlQueries.push(body.query ?? '');
+      return jsonResponse(
+        buildIssueContextBody({
+          labels: {
+            nodes: ISSUE_LABEL_NODES,
+            pageInfo: {
+              hasNextPage: false,
+              endCursor: null
+            }
+          }
+        }),
+        200,
+        {
+          'x-ratelimit-requests-limit': '100',
+          'x-ratelimit-requests-remaining': '89',
+          'x-ratelimit-requests-reset': resetAt
+        }
+      );
+    });
+
+    const result = await getProviderLinearIssueContext({
+      issueId: 'lin-issue-1',
+      env,
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(graphqlQueries[0]).toMatch(/labels\s*(?:\([^)]*\))?\s*\{/u);
+    expect(graphqlQueries[0]).toContain('color');
+    expect(graphqlQueries[0]).toContain('hasNextPage');
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'issue-context',
+      issue: {
+        identifier: 'CO-1',
+        labels: ISSUE_LABEL_NODES
+      }
+    });
+
+    const cachedRecord = JSON.parse(
+      await readFile(resolveIssueContextCachePathForTest(env), 'utf8')
+    ) as {
+      issue: {
+        labels?: unknown;
+      };
+    };
+    expect(cachedRecord.issue.labels).toEqual(ISSUE_LABEL_NODES);
+  });
+
+  it('fails closed when live issue-context labels are omitted, malformed, or paginated', async () => {
+    const env = await createBudgetedRunScopedEnv();
+    const cases: Array<{
+      label: string;
+      labels: unknown;
+    }> = [
+      {
+        label: 'omitted labels',
+        labels: undefined
+      },
+      {
+        label: 'malformed label node',
+        labels: {
+          nodes: [
+            {
+              id: 'label-bug',
+              color: '#d73a49'
+            }
+          ],
+          pageInfo: {
+            hasNextPage: false,
+            endCursor: null
+          }
+        }
+      },
+      {
+        label: 'paginated labels',
+        labels: {
+          nodes: ISSUE_LABEL_NODES,
+          pageInfo: {
+            hasNextPage: true,
+            endCursor: 'cursor-labels'
+          }
+        }
+      }
+    ];
+
+    for (const testCase of cases) {
+      const fetchImpl: typeof fetch = vi.fn(async () =>
+        jsonResponse(
+          buildIssueContextBody({
+            labels: testCase.labels
+          })
+        )
+      );
+
+      const result = await getProviderLinearIssueContext({
+        issueId: 'lin-issue-1',
+        env,
+        fetchImpl
+      });
+
+      expect(fetchImpl, testCase.label).toHaveBeenCalledTimes(1);
+      expect(result, testCase.label).toMatchObject({
+        ok: false,
+        operation: 'issue-context',
+        error: {
+          code: 'linear_response_invalid'
+        }
+      });
+    }
   });
 
   it('does not reuse the issue-context cache when only complexity headroom is degraded', async () => {
@@ -10510,6 +10713,84 @@ describe('providerLinearWorkflowFacade', () => {
       },
       source_setup: null
     });
+  });
+
+  it('fails closed when a live issue summary omits, contains malformed label nodes, or paginates labels before transition', async () => {
+    const cases: Array<{
+      label: string;
+      labels: unknown;
+    }> = [
+      {
+        label: 'omitted labels',
+        labels: undefined
+      },
+      {
+        label: 'malformed label node',
+        labels: {
+          nodes: [
+            {
+              id: 'label-bug',
+              color: '#d73a49'
+            }
+          ],
+          pageInfo: {
+            hasNextPage: false,
+            endCursor: null
+          }
+        }
+      },
+      {
+        label: 'paginated labels',
+        labels: {
+          nodes: ISSUE_LABEL_NODES,
+          pageInfo: {
+            hasNextPage: true,
+            endCursor: 'cursor-labels'
+          }
+        }
+      }
+    ];
+
+    for (const testCase of cases) {
+      let summaryQuery = '';
+      const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+        const body = JSON.parse(String(init?.body ?? '{}')) as {
+          query?: string;
+        };
+        if (body.query?.includes('ProviderLinearIssueSummary')) {
+          summaryQuery = body.query;
+          return jsonResponse(
+            buildIssueContextBody({
+              labels: testCase.labels
+            })
+          );
+        }
+        if (body.query?.includes('ProviderLinearMoveIssue')) {
+          throw new Error('Transition mutation must not run after incomplete summary labels.');
+        }
+        throw new Error(`Unexpected query: ${body.query}`);
+      });
+
+      const result = await transitionProviderLinearIssueState({
+        issueId: 'lin-issue-1',
+        stateName: 'human review',
+        env: {
+          CO_LINEAR_API_TOKEN: 'lin-api-token'
+        },
+        fetchImpl
+      });
+
+      expect(fetchImpl, testCase.label).toHaveBeenCalledTimes(1);
+      expect(summaryQuery, testCase.label).toMatch(/labels\s*(?:\([^)]*\))?\s*\{/u);
+      expect(summaryQuery, testCase.label).toContain('hasNextPage');
+      expect(result, testCase.label).toMatchObject({
+        ok: false,
+        operation: 'transition',
+        error: {
+          code: 'linear_response_invalid'
+        }
+      });
+    }
   });
 
   it('fails closed when expected transition preconditions no longer match the live issue summary', async () => {

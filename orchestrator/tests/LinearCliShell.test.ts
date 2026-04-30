@@ -21,6 +21,18 @@ const DEFAULT_PARITY_FOLLOW_UP_FLAGS = {
   'acceptance-criteria': '- [ ] Captured',
   'parity-lane': true
 } as const;
+const ISSUE_LABEL_NODES = [
+  {
+    id: 'label-bug',
+    name: 'Bug',
+    color: '#d73a49'
+  },
+  {
+    id: 'label-provider-workflow',
+    name: 'Area: Provider Workflow',
+    color: '#5319e7'
+  }
+];
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -96,7 +108,7 @@ async function createSameAttemptFollowUpFixture(prefix: string, auditEntries: Re
 }
 
 describe('runLinearCliShell', () => {
-  it('routes issue-context into the facade and emits json', async () => {
+  it('routes issue-context labels into the facade and emits json', async () => {
     const printHelp = vi.fn();
     const log = vi.fn();
     const appendAuditEntry = vi.fn();
@@ -116,6 +128,7 @@ describe('runLinearCliShell', () => {
             state: null,
             team: null,
             project: null,
+            labels: ISSUE_LABEL_NODES,
             comments: [],
             attachments: [],
             workpad_comment: null
@@ -170,7 +183,8 @@ describe('runLinearCliShell', () => {
       ok: true,
       operation: 'issue-context',
       issue: {
-        identifier: 'CO-1'
+        identifier: 'CO-1',
+        labels: ISSUE_LABEL_NODES
       }
     });
     expect(appendAuditEntry).toHaveBeenCalledWith('/tmp/provider-linear-audit.jsonl', {
@@ -1858,7 +1872,9 @@ describe('runLinearCliShell', () => {
           pipelineId: 'provider-linear-worker',
           issueId: 'lin-issue-1',
           issueIdentifier: 'CO-101',
-          runDir: '/tmp/provider-run'
+          runDir: '/tmp/provider-run',
+          taskId: 'linear-lin-issue-1',
+          runId: 'provider-run-1'
         } as never);
     const refreshProviderLinearWorkerProofSnapshotMock =
       vi.fn<typeof import('../src/cli/providerLinearWorkerRunner.js').refreshProviderLinearWorkerProofSnapshot>()
@@ -1883,6 +1899,11 @@ describe('runLinearCliShell', () => {
           CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
         }),
         now: () => '2026-04-08T07:10:00.000Z',
+        readTextFile: vi.fn(async () => JSON.stringify({
+          current_turn_started_at: '2026-04-08T07:09:45.000Z',
+          latest_turn_id: 'turn-4',
+          turn_count: 4
+        })),
         appendAuditEntry,
         loadProviderLinearWorkerContext: loadProviderLinearWorkerContextMock,
         refreshProviderLinearWorkerProofSnapshot: refreshProviderLinearWorkerProofSnapshotMock,
@@ -1903,6 +1924,18 @@ describe('runLinearCliShell', () => {
       action: 'stay_serial',
       via: 'docs: no docs slice separates; test: no test slice separates; research: no research slice separates; review: no review slice separates.',
       state: 'single_bounded_change',
+      decision_lineage: {
+        schema_version: 1,
+        parent_task_id: 'linear-lin-issue-1',
+        parent_run_id: 'provider-run-1',
+        parent_turn_started_at: '2026-04-08T07:09:45.000Z',
+        parent_turn_id: 'turn-4',
+        parent_turn_count: 4,
+        decision_id: 'provider-linear-parallelization:provider-run-1:turn-4:2026-04-08T07_10_00.000Z',
+        decision_recorded_at: '2026-04-08T07:10:00.000Z',
+        decision: 'stay_serial',
+        reason: 'single_bounded_change'
+      },
       follow_up_issue_id: null,
       follow_up_issue_identifier: null,
       failed_relation_type: null,
@@ -1979,6 +2012,7 @@ describe('runLinearCliShell', () => {
       action: 'stay_serial',
       via: 'docs: no docs slice separates; test: no test slice separates; research: no research slice separates; review: no review slice separates.',
       state: 'single_bounded_change',
+      decision_lineage: null,
       follow_up_issue_id: null,
       follow_up_issue_identifier: null,
       failed_relation_type: null,

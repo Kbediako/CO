@@ -1,5 +1,8 @@
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import {
+  isProviderLinearParallelizationDecision,
+  isProviderLinearParallelizationReason,
+  isProviderLinearParallelizationReasonAllowed,
   readProviderLinearParallelizationSnapshot,
   type ProviderLinearParallelizationSnapshot,
   ProviderLinearAuditEntry,
@@ -117,6 +120,8 @@ interface ProviderIssueCurrentTurnActivityLike {
 }
 
 interface ProviderIssueClaimLike {
+  issue_id?: string | null;
+  issue_identifier?: string | null;
   state?: string | null;
   reason?: string | null;
   updated_at?: string | null;
@@ -244,12 +249,36 @@ interface ProviderIssueChildLaneLike {
   in_flight_action?: string | null;
   decision_at?: string | null;
   decision_reason?: string | null;
+  decision_lineage?: ProviderIssueDecisionLineageLike | null;
+}
+
+interface ProviderIssueDecisionLineageLike {
+  schema_version?: number | null;
+  parent_task_id?: string | null;
+  parent_run_id?: string | null;
+  parent_turn_started_at?: string | null;
+  parent_turn_id?: string | null;
+  parent_turn_count?: number | null;
+  decision_id?: string | null;
+  decision_recorded_at?: string | null;
+  decision?: string | null;
+  reason?: string | null;
+}
+
+interface ProviderIssueRecoveredChildLaneLike {
+  stream?: string | null;
+  task_id?: string | null;
+  run_id?: string | null;
+  recovery_source?: string | null;
+  child_decision_lineage?: ProviderIssueDecisionLineageLike | null;
+  parallelization_decision_lineage?: ProviderIssueDecisionLineageLike | null;
 }
 
 interface ProviderIssueProofLike {
   attempt_started_at?: string | null;
   current_turn_started_at?: string | null;
   issue_id?: string | null;
+  issue_identifier?: string | null;
   pid?: string | null;
   worker_host?: string | null;
   thread_id?: string | null;
@@ -267,6 +296,7 @@ interface ProviderIssueProofLike {
   child_lanes?: ProviderIssueChildLaneLike[] | null;
   parallelization?: (ProviderLinearParallelizationSnapshot & {
     child_lane_count?: number | null;
+    recovered_child_lanes?: ProviderIssueRecoveredChildLaneLike[] | null;
   }) | null;
   resident_session?: {
     logical_session_id?: string | null;
@@ -339,6 +369,8 @@ export interface ControlProviderDebugSnapshot {
     summary: string | null;
     recorded_at: string | null;
     child_lane_count: number | null;
+    decision_lineage: ProviderIssueDecisionLineageLike | null;
+    recovered_child_lanes: ProviderIssueRecoveredChildLaneLike[];
   } | null;
   pull_request: {
     review_promotion_status: string | null;
@@ -387,6 +419,19 @@ export interface ControlProviderDebugSnapshot {
     recorded_at: string;
     operation: string;
     ok: boolean;
+    target_issue_id: string | null;
+    target_issue_identifier: string | null;
+    action: string | null;
+    state: string | null;
+    error_code: string | null;
+    error_message: string | null;
+  } | null;
+  last_cross_issue_audit_operation: {
+    recorded_at: string;
+    operation: string;
+    ok: boolean;
+    target_issue_id: string | null;
+    target_issue_identifier: string | null;
     action: string | null;
     state: string | null;
     error_code: string | null;
@@ -428,8 +473,13 @@ export function deriveProviderIntakeClaimFreshness(input: {
 }
 
 export function buildProviderIssueDebugSnapshot(input: {
+  issue_id?: string | null | undefined;
+  issue_identifier?: string | null | undefined;
   tracked_issue?:
-    | Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>
+    | (
+        Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'> &
+        Partial<Pick<LiveLinearTrackedIssue, 'id' | 'identifier'>>
+      )
     | null
     | undefined;
   claim?: ProviderIssueClaimLike | null | undefined;
@@ -439,7 +489,26 @@ export function buildProviderIssueDebugSnapshot(input: {
   const trackedIssue = input.tracked_issue ?? null;
   const claim = input.claim ?? null;
   const proof = input.proof ?? null;
-  const latestAudit = selectLatestProviderLinearAuditEntry(proof?.linear_audit);
+  const currentAuditTarget = {
+    issueId:
+      normalizeOptionalString(input.issue_id) ??
+      normalizeOptionalString(proof?.issue_id) ??
+      normalizeOptionalString(trackedIssue?.id) ??
+      normalizeOptionalString(claim?.issue_id),
+    issueIdentifier:
+      normalizeOptionalString(input.issue_identifier) ??
+      normalizeOptionalString(proof?.issue_identifier) ??
+      normalizeOptionalString(trackedIssue?.identifier) ??
+      normalizeOptionalString(claim?.issue_identifier)
+  };
+  const latestAudit = selectLatestProviderLinearAuditEntryForIssue(
+    proof?.linear_audit,
+    currentAuditTarget
+  );
+  const latestCrossIssueAudit = selectLatestProviderLinearCrossIssueAuditEntry(
+    proof?.linear_audit,
+    currentAuditTarget
+  );
   const parallelization = resolveProviderParallelizationSnapshot(proof);
   const trackedWorkflowState = trackedIssue ? classifyProviderLinearWorkflowState(trackedIssue) : null;
   const claimWorkflowState = !trackedIssue ? resolveClaimWorkflowStateClassification(claim) : null;
@@ -462,6 +531,8 @@ export function buildProviderIssueDebugSnapshot(input: {
     ? null
     : claim?.merge_closeout ?? null;
   const progress = deriveProviderLinearWorkerProgressSnapshot({
+    issue_id: input.issue_id,
+    issue_identifier: input.issue_identifier,
     tracked_issue: trackedIssue,
     claim,
     proof
@@ -543,21 +614,20 @@ export function buildProviderIssueDebugSnapshot(input: {
           reason: parallelization.reason,
           summary: parallelization.summary,
           recorded_at: parallelization.recorded_at,
-          child_lane_count: parallelization.child_lane_count
+          child_lane_count: parallelization.child_lane_count,
+          decision_lineage: normalizeProviderIssueDecisionLineage(parallelization.decision_lineage),
+          recovered_child_lanes: normalizeProviderIssueRecoveredChildLanes(
+            parallelization.recovered_child_lanes
+          )
         }
       : null,
     pull_request: pullRequest,
     progress,
     last_audit_operation: latestAudit
-      ? {
-          recorded_at: latestAudit.recorded_at,
-          operation: latestAudit.operation,
-          ok: latestAudit.ok,
-          action: normalizeOptionalString(latestAudit.action),
-          state: normalizeOptionalString(latestAudit.state),
-          error_code: normalizeOptionalString(latestAudit.error_code),
-          error_message: normalizeOptionalString(latestAudit.error_message)
-        }
+      ? buildProviderDebugAuditOperation(latestAudit)
+      : null,
+    last_cross_issue_audit_operation: latestCrossIssueAudit
+      ? buildProviderDebugAuditOperation(latestCrossIssueAudit)
       : null,
     last_semantic_progress_at: latestIsoTimestamp(
       progress?.last_semantic_progress_at ?? null,
@@ -595,7 +665,10 @@ function buildProviderClaimRetrySnapshot(
 
 function resolveProviderParallelizationSnapshot(
   proof: ProviderIssueProofLike | null
-): (ProviderLinearParallelizationSnapshot & { child_lane_count: number | null }) | null {
+): (ProviderLinearParallelizationSnapshot & {
+  child_lane_count: number | null;
+  recovered_child_lanes?: ProviderIssueRecoveredChildLaneLike[] | null;
+}) | null {
   const currentTurnStartedAt = normalizeOptionalString(proof?.current_turn_started_at);
   const currentTurnChildLanes = Array.isArray(proof?.child_lanes)
     ? !currentTurnStartedAt
@@ -646,8 +719,13 @@ function resolveProviderParallelizationChildLaneCount(
 }
 
 export function deriveProviderLinearWorkerProgressSnapshot(input: {
+  issue_id?: string | null | undefined;
+  issue_identifier?: string | null | undefined;
   tracked_issue?:
-    | Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>
+    | (
+        Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'> &
+        Partial<Pick<LiveLinearTrackedIssue, 'id' | 'identifier'>>
+      )
     | null
     | undefined;
   claim?: ProviderIssueClaimLike | null | undefined;
@@ -658,7 +736,22 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
   const claim = input.claim ?? null;
   const proof = input.proof ?? null;
   const now = input.now ?? (() => new Date().toISOString());
-  const latestAudit = selectLatestProviderLinearAuditEntry(proof?.linear_audit);
+  const currentAuditTarget = {
+    issueId:
+      normalizeOptionalString(input.issue_id) ??
+      normalizeOptionalString(proof?.issue_id) ??
+      normalizeOptionalString(trackedIssue?.id) ??
+      normalizeOptionalString(claim?.issue_id),
+    issueIdentifier:
+      normalizeOptionalString(input.issue_identifier) ??
+      normalizeOptionalString(proof?.issue_identifier) ??
+      normalizeOptionalString(trackedIssue?.identifier) ??
+      normalizeOptionalString(claim?.issue_identifier)
+  };
+  const latestAudit = selectLatestProviderLinearAuditEntryForIssue(
+    proof?.linear_audit,
+    currentAuditTarget
+  );
   const activeChildLane = selectActiveChildLane(proof?.child_lanes ?? null);
   const activeChildStream = selectActiveChildStream(proof?.child_streams ?? null);
   const trackedWorkflowState = trackedIssue ? classifyProviderLinearWorkflowState(trackedIssue) : null;
@@ -1364,13 +1457,127 @@ function explainProviderLinearWorkerProgressCandidateRejection(
 export function selectLatestProviderLinearAuditEntry(
   audit: ProviderLinearAuditSummary | null | undefined
 ): ProviderLinearAuditEntry | null {
-  const entries = Object.values(audit?.latest_by_operation ?? {}).filter(
+  return selectLatestProviderLinearAuditEntryFromEntries(readProviderLinearAuditEntries(audit));
+}
+
+function selectLatestProviderLinearAuditEntryForIssue(
+  audit: ProviderLinearAuditSummary | null | undefined,
+  target: {
+    issueId: string | null;
+    issueIdentifier: string | null;
+  }
+): ProviderLinearAuditEntry | null {
+  const entries = readProviderLinearAuditEntries(audit);
+  if (!target.issueId && !target.issueIdentifier) {
+    return null;
+  }
+  return selectLatestProviderLinearAuditEntryFromEntries(
+    entries.filter((entry) => isProviderLinearAuditEntryForIssue(entry, target))
+  );
+}
+
+function selectLatestProviderLinearCrossIssueAuditEntry(
+  audit: ProviderLinearAuditSummary | null | undefined,
+  target: {
+    issueId: string | null;
+    issueIdentifier: string | null;
+  }
+): ProviderLinearAuditEntry | null {
+  if (!target.issueId && !target.issueIdentifier) {
+    return null;
+  }
+  return selectLatestProviderLinearAuditEntryFromEntries(
+    readProviderLinearAuditEntries(audit).filter((entry) =>
+      isProviderLinearAuditEntryForDifferentIssue(entry, target)
+    )
+  );
+}
+
+function readProviderLinearAuditEntries(
+  audit: ProviderLinearAuditSummary | null | undefined
+): ProviderLinearAuditEntry[] {
+  if (Array.isArray(audit?.entries) && audit.entries.length > 0) {
+    return audit.entries.filter((entry): entry is ProviderLinearAuditEntry => Boolean(entry));
+  }
+  return Object.values(audit?.latest_by_operation ?? {}).filter(
     (entry): entry is ProviderLinearAuditEntry => Boolean(entry)
   );
+}
+
+function selectLatestProviderLinearAuditEntryFromEntries(
+  entries: ProviderLinearAuditEntry[]
+): ProviderLinearAuditEntry | null {
   if (entries.length === 0) {
     return null;
   }
   return entries.sort((left, right) => compareIsoTimestamp(right.recorded_at, left.recorded_at))[0] ?? null;
+}
+
+function isProviderLinearAuditEntryForIssue(
+  entry: ProviderLinearAuditEntry,
+  target: {
+    issueId: string | null;
+    issueIdentifier: string | null;
+  }
+): boolean {
+  const match = readProviderLinearAuditEntryTargetMatch(entry, target);
+  return match.hasMatch && !match.hasMismatch;
+}
+
+function isProviderLinearAuditEntryForDifferentIssue(
+  entry: ProviderLinearAuditEntry,
+  target: {
+    issueId: string | null;
+    issueIdentifier: string | null;
+  }
+): boolean {
+  const match = readProviderLinearAuditEntryTargetMatch(entry, target);
+  return match.hasTargetIdentity && match.hasMismatch && !match.hasMatch;
+}
+
+function readProviderLinearAuditEntryTargetMatch(
+  entry: ProviderLinearAuditEntry,
+  target: {
+    issueId: string | null;
+    issueIdentifier: string | null;
+  }
+): {
+  hasTargetIdentity: boolean;
+  hasMatch: boolean;
+  hasMismatch: boolean;
+} {
+  const entryIssueId = normalizeOptionalString(entry.issue_id);
+  const entryIssueIdentifier = normalizeOptionalString(entry.issue_identifier);
+  const issueIdMatches =
+    target.issueId && entryIssueId ? entryIssueId === target.issueId : null;
+  const issueIdentifierMatches =
+    target.issueIdentifier && entryIssueIdentifier
+      ? entryIssueIdentifier === target.issueIdentifier
+      : null;
+  const comparisons = [issueIdMatches, issueIdentifierMatches].filter(
+    (comparison): comparison is boolean => comparison !== null
+  );
+  return {
+    hasTargetIdentity: Boolean(entryIssueId || entryIssueIdentifier),
+    hasMatch: comparisons.includes(true),
+    hasMismatch: comparisons.includes(false)
+  };
+}
+
+function buildProviderDebugAuditOperation(
+  entry: ProviderLinearAuditEntry
+): NonNullable<ControlProviderDebugSnapshot['last_audit_operation']> {
+  return {
+    recorded_at: entry.recorded_at,
+    operation: entry.operation,
+    ok: entry.ok,
+    target_issue_id: normalizeOptionalString(entry.issue_id),
+    target_issue_identifier: normalizeOptionalString(entry.issue_identifier),
+    action: normalizeOptionalString(entry.action),
+    state: normalizeOptionalString(entry.state),
+    error_code: normalizeOptionalString(entry.error_code),
+    error_message: normalizeOptionalString(entry.error_message)
+  };
 }
 
 function hasAuthoritativeWorkerProgressSignal(input: {
@@ -1456,6 +1663,30 @@ function deriveMergeCloseoutProgressSnapshot(
         stall_classification: 'stalled',
         stall_reason:
           normalizeOptionalString(sharedRoot?.reason) ?? 'pending_shared_root_reconciliation',
+        recovery_recommendation: 'inspect_merge_closeout'
+      };
+    }
+    if (mergeStatus === 'transition_failed') {
+      return {
+        phase: 'failed',
+        kind: 'merge_closeout',
+        status: 'failed',
+        summary,
+        last_semantic_progress_at: lastSemanticProgressAt,
+        stall_classification: 'failed',
+        stall_reason: normalizeOptionalString(mergeCloseout.reason) ?? mergeStatus,
+        recovery_recommendation: 'inspect_merge_closeout'
+      };
+    }
+    if (mergeStatus === 'action_required') {
+      return {
+        phase: 'watching_merge',
+        kind: 'merge_closeout',
+        status: 'stalled',
+        summary,
+        last_semantic_progress_at: lastSemanticProgressAt,
+        stall_classification: 'stalled',
+        stall_reason: normalizeOptionalString(mergeCloseout.reason) ?? 'merge_action_required',
         recovery_recommendation: 'inspect_merge_closeout'
       };
     }
@@ -2146,6 +2377,66 @@ function latestIsoTimestamp(...values: Array<string | null | undefined>): string
   return normalized[normalized.length - 1] ?? null;
 }
 
+function normalizeProviderIssueRecoveredChildLanes(
+  value: unknown
+): ProviderIssueRecoveredChildLaneLike[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      return [];
+    }
+    const record = entry as ProviderIssueRecoveredChildLaneLike;
+    return [{
+      stream: normalizeOptionalString(record.stream),
+      task_id: normalizeOptionalString(record.task_id),
+      run_id: normalizeOptionalString(record.run_id),
+      recovery_source: normalizeOptionalString(record.recovery_source),
+      child_decision_lineage: normalizeProviderIssueDecisionLineage(
+        record.child_decision_lineage
+      ),
+      parallelization_decision_lineage: normalizeProviderIssueDecisionLineage(
+        record.parallelization_decision_lineage
+      )
+    }];
+  });
+}
+
+function normalizeProviderIssueDecisionLineage(
+  value: unknown
+): ProviderIssueDecisionLineageLike | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as ProviderIssueDecisionLineageLike;
+  if (record.schema_version !== 1) {
+    return null;
+  }
+  const decision = normalizeOptionalString(record.decision);
+  const reason = normalizeOptionalString(record.reason);
+  if (
+    !isProviderLinearParallelizationDecision(decision) ||
+    !isProviderLinearParallelizationReason(reason) ||
+    !isProviderLinearParallelizationReasonAllowed(decision, reason)
+  ) {
+    return null;
+  }
+  const normalized: ProviderIssueDecisionLineageLike = {
+    schema_version: 1,
+    parent_task_id: normalizeOptionalString(record.parent_task_id),
+    parent_run_id: normalizeOptionalString(record.parent_run_id),
+    parent_turn_started_at: normalizeOptionalString(record.parent_turn_started_at),
+    parent_turn_id: normalizeOptionalString(record.parent_turn_id),
+    parent_turn_count: normalizeOptionalNonNegativeInteger(record.parent_turn_count),
+    decision_id: normalizeOptionalString(record.decision_id),
+    decision_recorded_at: normalizeOptionalString(record.decision_recorded_at),
+    decision,
+    reason
+  };
+  return hasProviderIssueDecisionLineageIdentity(normalized) ? normalized : null;
+}
+
 function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {
   const leftMs = safeParseTimestamp(left);
   const rightMs = safeParseTimestamp(right);
@@ -2174,6 +2465,18 @@ function normalizeOptionalInteger(value: unknown): number | null {
     return Math.trunc(value);
   }
   return null;
+}
+
+function normalizeOptionalNonNegativeInteger(value: unknown): number | null {
+  const normalized = normalizeOptionalInteger(value);
+  return normalized !== null && normalized >= 0 ? normalized : null;
+}
+
+function hasProviderIssueDecisionLineageIdentity(lineage: ProviderIssueDecisionLineageLike): boolean {
+  return Boolean(
+    lineage.parent_run_id &&
+    (lineage.parent_turn_started_at || lineage.parent_turn_id || lineage.parent_turn_count !== null)
+  );
 }
 
 function normalizeGuardrailsRequiredSource(value: unknown): string | null {
