@@ -4132,9 +4132,11 @@ export function createProviderIssueHandoffService(
       // refresh can relaunch unless we are retrying an explicit failed relaunch attempt.
       const latestCompletedClaimIssueUpdatedAt =
         latestExisting?.state === 'completed' ? latestExisting.issue_updated_at ?? null : null;
+      const latestCompletedRunIssueUpdatedAt =
+        latestRun?.issueUpdatedAt ?? latestRun?.startedAt ?? null;
       const latestCompletedIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
         latestCompletedClaimIssueUpdatedAt,
-        latestRun?.issueUpdatedAt ?? latestRun?.startedAt ?? null
+        latestCompletedRunIssueUpdatedAt
       );
       const retryingFailedRelaunch =
         latestRun?.status === 'succeeded' &&
@@ -4145,6 +4147,16 @@ export function createProviderIssueHandoffService(
           existingIssueUpdatedAt: latestExisting.issue_updated_at ?? latestCompletedIssueUpdatedAt,
           nextIssueUpdatedAt: input.trackedIssue.updated_at
         });
+      const explicitCompletedDuplicateRecoveryFreshness =
+        resolveExplicitCompletedDuplicateRecoveryFreshness({
+          claim: latestExisting,
+          event: input.event,
+          action: input.action,
+          trackedIssue: input.trackedIssue,
+          latestCompletedRunIssueUpdatedAt
+        });
+      const explicitCompletedDuplicateRecovery =
+        explicitCompletedDuplicateRecoveryFreshness === 'newer';
       if (latestRun?.status === 'succeeded' && latestExisting?.state !== 'released') {
         const reviewPromotionClaim = latestExisting
           ? await maybeHandleReviewHandoffPromotion({
@@ -4174,9 +4186,10 @@ export function createProviderIssueHandoffService(
             claim: mergeCloseoutClaim
           };
         }
-        if (!retryingFailedRelaunch) {
+        if (!retryingFailedRelaunch && !explicitCompletedDuplicateRecovery) {
           if (
             input.trackedIssue.updated_at === null ||
+            explicitCompletedDuplicateRecoveryFreshness === 'unknown' ||
             isTrackedIssueNonIncreasing({
               existingIssueUpdatedAt: latestCompletedIssueUpdatedAt,
               nextIssueUpdatedAt: input.trackedIssue.updated_at
@@ -4277,9 +4290,11 @@ export function createProviderIssueHandoffService(
           });
           const lockedLatestCompletedClaimIssueUpdatedAt =
             lockedExisting?.state === 'completed' ? lockedExisting.issue_updated_at ?? null : null;
+          const lockedLatestCompletedRunIssueUpdatedAt =
+            lockedLatestRun?.issueUpdatedAt ?? lockedLatestRun?.startedAt ?? null;
           const lockedLatestCompletedIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
             lockedLatestCompletedClaimIssueUpdatedAt,
-            lockedLatestRun?.issueUpdatedAt ?? lockedLatestRun?.startedAt ?? null
+            lockedLatestCompletedRunIssueUpdatedAt
           );
           const lockedRetryingFailedRelaunch =
             lockedLatestRun?.status === 'succeeded' &&
@@ -4291,6 +4306,16 @@ export function createProviderIssueHandoffService(
                 lockedExisting.issue_updated_at ?? lockedLatestCompletedIssueUpdatedAt,
               nextIssueUpdatedAt: input.trackedIssue.updated_at
             });
+          const lockedExplicitCompletedDuplicateRecoveryFreshness =
+            resolveExplicitCompletedDuplicateRecoveryFreshness({
+              claim: lockedExisting,
+              event: input.event,
+              action: input.action,
+              trackedIssue: input.trackedIssue,
+              latestCompletedRunIssueUpdatedAt: lockedLatestCompletedRunIssueUpdatedAt
+            });
+          const lockedExplicitCompletedDuplicateRecovery =
+            lockedExplicitCompletedDuplicateRecoveryFreshness === 'newer';
           const lockedHasResumableRun = Boolean(
             lockedLatestRun && lockedLatestRun.status && RESUME_ELIGIBLE_STATUSES.has(lockedLatestRun.status)
           );
@@ -4301,7 +4326,11 @@ export function createProviderIssueHandoffService(
             (
               lockedLatestRun?.status === 'succeeded' &&
               !lockedRetryingFailedRelaunch &&
-              (latestRun?.status !== 'succeeded' || retryingFailedRelaunch)
+              (
+                latestRun?.status !== 'succeeded' ||
+                retryingFailedRelaunch ||
+                (explicitCompletedDuplicateRecovery && !lockedExplicitCompletedDuplicateRecovery)
+              )
             )
           ) {
             return { kind: 'retry' };
@@ -6450,6 +6479,41 @@ function isTrackedIssueNonIncreasing(input: {
 }): boolean {
   const comparison = compareTrackedIssueUpdatedAt(input);
   return comparison === 'older' || comparison === 'equal';
+}
+
+function resolveExplicitCompletedDuplicateRecoveryFreshness(input: {
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason'
+  > | null;
+  event: string | null;
+  action: string | null;
+  trackedIssue: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>;
+  latestCompletedRunIssueUpdatedAt: string | null;
+}): ReturnType<typeof compareTrackedIssueUpdatedAt> | null {
+  if (
+    input.event !== 'control_host_provider_worker_recover' ||
+    !isProviderIssueRecoveryAction(input.action)
+  ) {
+    return null;
+  }
+  if (
+    input.claim?.state !== 'completed' ||
+    input.claim.reason !== 'provider_issue_run_already_completed'
+  ) {
+    return null;
+  }
+  if (!classifyProviderLinearWorkflowState(input.trackedIssue).isActive) {
+    return null;
+  }
+  return compareTrackedIssueUpdatedAt({
+    existingIssueUpdatedAt: input.latestCompletedRunIssueUpdatedAt,
+    nextIssueUpdatedAt: input.trackedIssue.updated_at
+  });
+}
+
+function isProviderIssueRecoveryAction(value: string | null): value is ProviderIssueRecoveryAction {
+  return value === 'recover' || value === 'relaunch' || value === 'nudge';
 }
 
 function selectMostRecentTrackedIssueUpdatedAt(
