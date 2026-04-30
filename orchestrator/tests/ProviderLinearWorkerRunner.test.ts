@@ -38,6 +38,7 @@ import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSo
 import {
   PROVIDER_LINEAR_AUDIT_ENV_VAR,
   appendProviderLinearAuditEntry,
+  type ProviderLinearDecisionLineage,
   type ProviderLinearParallelizationDecision,
   type ProviderLinearParallelizationReason,
   type ProviderLinearAuditSummary
@@ -429,6 +430,7 @@ async function appendParallelizationDecisionAudit(
     recordedAtBase?: string;
     issueId?: string;
     issueIdentifier?: string | null;
+    decisionLineage?: ProviderLinearDecisionLineage | null;
   }
 ): Promise<void> {
   const turnIndex = input.turnIndex ?? 1;
@@ -453,9 +455,28 @@ async function appendParallelizationDecisionAudit(
     failed_relation_type: null,
     comment_id: null,
     attachment_id: null,
+    decision_lineage: input.decisionLineage ?? null,
     error_code: null,
     error_message: null
   });
+}
+
+function buildTestDecisionLineage(
+  overrides: Partial<ProviderLinearDecisionLineage> = {}
+): ProviderLinearDecisionLineage {
+  return {
+    schema_version: 1,
+    parent_task_id: 'linear-lin-issue-1',
+    parent_run_id: 'prior-run-1',
+    parent_turn_started_at: '2026-03-21T08:59:45.000Z',
+    parent_turn_id: 'prior-turn-1',
+    parent_turn_count: 1,
+    decision_id: 'provider-linear-parallelization:prior-run-1:prior-turn-1:2026-03-21T08_59_59.500Z',
+    decision_recorded_at: '2026-03-21T08:59:59.500Z',
+    decision: 'parallelize_now',
+    reason: 'independent_scope_available',
+    ...overrides
+  };
 }
 
 async function appendParallelizationDecisionAuditForRequest(
@@ -469,6 +490,7 @@ async function appendParallelizationDecisionAuditForRequest(
     recordedAtBase?: string;
     issueId?: string;
     issueIdentifier?: string | null;
+    decisionLineage?: ProviderLinearDecisionLineage | null;
   }
 ): Promise<void> {
   const auditPath = request.env[PROVIDER_LINEAR_AUDIT_ENV_VAR];
@@ -497,6 +519,7 @@ async function appendParallelizationDecisionAuditForRequest(
     failed_relation_type: null,
     comment_id: null,
     attachment_id: null,
+    decision_lineage: input.decisionLineage ?? null,
     error_code: null,
     error_message: null
   });
@@ -14803,6 +14826,122 @@ for await (const line of rl) {
     };
   };
 
+  it('recovers a prior-attempt child lane launched just before its ordinary decision lineage', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const targetLineage = buildTestDecisionLineage();
+
+    await appendParallelizationDecisionAudit(runDir, {
+      decision: 'parallelize_now',
+      reason: 'independent_scope_available',
+      summary: 'Launch an unrelated docs child lane.',
+      recordedAt: '2026-03-21T08:50:00.000Z',
+      decisionLineage: buildTestDecisionLineage({
+        parent_run_id: 'stale-run-1',
+        parent_turn_started_at: '2026-03-21T08:49:50.000Z',
+        parent_turn_id: 'stale-turn-1',
+        decision_id: 'provider-linear-parallelization:stale-run-1:stale-turn-1:2026-03-21T08_50_00.000Z',
+        decision_recorded_at: '2026-03-21T08:50:00.000Z'
+      })
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, buildRetryRecoveryChildLane({
+      stream: 'docs-old',
+      run_id: 'child-run-old',
+      launched_at: '2026-03-21T08:50:00.500Z',
+      summary: 'older unrelated child lane completed successfully',
+      decision_lineage: buildTestDecisionLineage({
+        parent_run_id: 'stale-run-1',
+        parent_turn_started_at: '2026-03-21T08:49:50.000Z',
+        parent_turn_id: 'stale-turn-1',
+        decision_id: 'provider-linear-parallelization:stale-run-1:stale-turn-1:2026-03-21T08_50_00.000Z',
+        decision_recorded_at: '2026-03-21T08:50:00.000Z'
+      })
+    }));
+    await appendProviderLinearWorkerChildLaneRecord(runDir, buildRetryRecoveryChildLane({
+      launched_at: '2026-03-21T08:59:45.000Z',
+      summary: 'target child lane completed before decision audit but shares durable lineage',
+      decision_lineage: targetLineage
+    }));
+    await appendParallelizationDecisionAudit(runDir, {
+      decision: 'parallelize_now',
+      reason: 'independent_scope_available',
+      summary: 'Launch impl-a.',
+      recordedAt: '2026-03-21T08:59:59.500Z',
+      decisionLineage: targetLineage
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner: vi.fn(async (request) => {
+          await appendParallelizationDecisionAuditForRequest(request, {
+            decision: 'parallelize_now',
+            reason: 'independent_scope_available',
+            summary:
+              'Recover the prior completed lane. recover_child_lane:impl-a recover_run:child-run-1',
+            recordedAt: '2026-03-21T09:00:03.100Z'
+          });
+          return {
+            exitCode: 0,
+            stdout: PROVIDER_WORKER_TASK_COMPLETE_STDOUT,
+            stderr: ''
+          };
+        }),
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:03.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof).toMatchObject({
+      latest_turn_id: 'turn-1',
+      owner_status: 'succeeded',
+      end_reason: 'max_turns_reached_issue_still_active',
+      parallelization: {
+        decision: 'parallelize_now',
+        reason: 'independent_scope_available',
+        child_lane_count: 1
+      },
+      child_lanes: expect.arrayContaining([
+        expect.objectContaining({
+          stream: 'impl-a',
+          run_id: 'child-run-1',
+          status: 'succeeded',
+          decision: 'pending',
+          launched_at: '2026-03-21T08:59:45.000Z',
+          decision_lineage: expect.objectContaining({
+            parent_run_id: 'prior-run-1',
+            parent_turn_started_at: '2026-03-21T08:59:45.000Z',
+            decision_id: expect.any(String)
+          })
+        })
+      ])
+    });
+    expect(proof.parallelization?.recovered_child_lanes).toEqual([
+      expect.objectContaining({
+        stream: 'impl-a',
+        run_id: 'child-run-1',
+        recovery_source: 'decision_lineage',
+        child_decision_lineage: expect.objectContaining({
+          parent_run_id: 'prior-run-1',
+          parent_turn_started_at: '2026-03-21T08:59:45.000Z'
+        }),
+        parallelization_decision_lineage: expect.objectContaining({
+          parent_run_id: 'prior-run-1',
+          parent_turn_started_at: '2026-03-21T08:59:45.000Z'
+        })
+      })
+    ]);
+  });
+
   it('fails closed when a prior successful pending child lane is not named by the retry decision', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
 
@@ -14981,6 +15120,7 @@ for await (const line of rl) {
   async function expectPriorRecoveryFailsClosed(options: {
     historicalRecordedAt?: string;
     latestSummary?: string;
+    latestDecisionLineage?: ProviderLinearDecisionLineage | null;
     childLane?: Partial<Parameters<typeof appendProviderLinearWorkerChildLaneRecord>[1]>;
   } = {}) {
     const { manifestPath, runDir } = await createManifestRoot();
@@ -14999,7 +15139,8 @@ for await (const line of rl) {
       summary:
         options.latestSummary ??
         'Recover a different lane. recover_child_lane:impl-b recover_run:child-run-2',
-      recordedAt: '2026-03-21T08:59:59.500Z'
+      recordedAt: '2026-03-21T08:59:59.500Z',
+      decisionLineage: options.latestDecisionLineage
     });
 
     await expect(
@@ -15056,6 +15197,43 @@ for await (const line of rl) {
       latestSummary: 'Launch a later unrelated tests child lane.'
     });
   });
+
+  it('fails closed when recovery markers target an older child lane with mismatched decision lineage', async () => {
+    await expectPriorRecoveryFailsClosed({
+      historicalRecordedAt: '2026-03-21T08:50:00.000Z',
+      latestDecisionLineage: buildTestDecisionLineage({
+        parent_run_id: 'newer-prior-run',
+        parent_turn_started_at: '2026-03-21T08:59:55.000Z',
+        parent_turn_id: 'newer-prior-turn',
+        decision_id: 'provider-linear-parallelization:newer-prior-run:newer-prior-turn:2026-03-21T08_59_59.500Z'
+      }),
+      childLane: {
+        launched_at: '2026-03-21T08:59:59.000Z',
+        summary: 'stale older implementation child lane completed successfully',
+        decision_lineage: buildTestDecisionLineage({
+          parent_run_id: 'stale-prior-run',
+          parent_turn_started_at: '2026-03-21T08:59:55.000Z',
+          parent_turn_id: 'stale-prior-turn',
+          decision_id: 'provider-linear-parallelization:stale-prior-run:stale-prior-turn:2026-03-21T08_59_59.500Z'
+        })
+      },
+      latestSummary: 'Launch a later unrelated tests child lane.'
+    });
+  });
+
+  it.each(['accepted', 'rejected', 'invalidated'] as const)(
+    'fails closed when recovery markers target a prior child lane already %s',
+    async (decision) => {
+      await expectPriorRecoveryFailsClosed({
+        childLane: {
+          decision,
+          decision_at: '2026-03-21T08:59:59.250Z',
+          decision_reason: `Parent already ${decision} this child lane.`
+        },
+        latestSummary: 'Launch impl-a.'
+      });
+    }
+  );
 
   it('recovers a prior-attempt completed pending child lane after an intervening serial decision', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
@@ -15145,6 +15323,86 @@ for await (const line of rl) {
         })
       ])
     });
+  });
+
+  it('uses a latest recovery snapshot naming the child lane as the lineage boundary', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const targetLineage = buildTestDecisionLineage({
+      parent_run_id: 'prior-recovery-run',
+      parent_turn_started_at: '2026-03-21T09:00:03.000Z',
+      parent_turn_id: 'prior-recovery-turn',
+      decision_id: 'provider-linear-parallelization:prior-recovery-run:prior-recovery-turn:2026-03-21T09_00_03.100Z',
+      decision_recorded_at: '2026-03-21T09:00:03.100Z'
+    });
+
+    await appendParallelizationDecisionAudit(runDir, {
+      decision: 'parallelize_now',
+      reason: 'independent_scope_available',
+      summary: 'Launch a stale unrelated implementation child lane.',
+      recordedAt: '2026-03-21T08:59:59.500Z',
+      decisionLineage: buildTestDecisionLineage({
+        parent_run_id: 'stale-prior-run',
+        parent_turn_started_at: '2026-03-21T08:59:55.000Z',
+        parent_turn_id: 'stale-prior-turn',
+        decision_id: 'provider-linear-parallelization:stale-prior-run:stale-prior-turn:2026-03-21T08_59_59.500Z'
+      })
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, buildRetryRecoveryChildLane({
+      launched_at: '2026-03-21T08:59:59.000Z',
+      decision_lineage: targetLineage
+    }));
+    await appendParallelizationDecisionAudit(runDir, {
+      decision: 'parallelize_now',
+      reason: 'independent_scope_available',
+      summary:
+        'Recover impl-a after a prior retry. recover_child_lane:impl-a recover_run:child-run-1',
+      recordedAt: '2026-03-21T09:00:03.100Z',
+      decisionLineage: targetLineage
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+      },
+      {
+        readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+        resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+        execRunner: vi.fn(async (request) => {
+          await appendParallelizationDecisionAuditForRequest(request, {
+            decision: 'parallelize_now',
+            reason: 'independent_scope_available',
+            summary:
+              'Recover the same prior pending child lane again. recover_child_lane:impl-a recover_run:child-run-1',
+            recordedAt: '2026-03-21T09:00:12.100Z'
+          });
+          return {
+            exitCode: 0,
+            stdout: PROVIDER_WORKER_TASK_COMPLETE_STDOUT,
+            stderr: ''
+          };
+        }),
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:10.000Z')
+          .mockReturnValue('2026-03-21T09:00:12.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof.parallelization?.recovered_child_lanes).toEqual([
+      expect.objectContaining({
+        stream: 'impl-a',
+        run_id: 'child-run-1',
+        recovery_source: 'decision_lineage',
+        parallelization_decision_lineage: expect.objectContaining({
+          parent_run_id: 'prior-recovery-run',
+          parent_turn_id: 'prior-recovery-turn'
+        })
+      })
+    ]);
   });
 
   it('recovers a prior-attempt successful pending child lane across repeated retries before acceptance', async () => {

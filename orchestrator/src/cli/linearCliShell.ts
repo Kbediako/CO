@@ -29,6 +29,7 @@ import {
   isProviderLinearParallelizationReasonAllowed,
   resolveProviderLinearAuditPath,
   summarizeProviderLinearAuditPath,
+  type ProviderLinearDecisionLineage,
   type ProviderLinearParallelizationDecision,
   type ProviderLinearParallelizationReason,
   type ProviderLinearAuditEntry
@@ -173,6 +174,7 @@ type ProviderLinearParallelizationResult =
       decision: ProviderLinearParallelizationDecision;
       reason: ProviderLinearParallelizationReason;
       summary: string | null;
+      decision_lineage: ProviderLinearDecisionLineage | null;
     }
   | {
       ok: false;
@@ -373,6 +375,12 @@ export async function runLinearCliShell(
         const reason = requireParallelizationReason(params.flags, decision);
         const summary = requireParallelizationSummary(params.flags, decision, reason);
         const proofRefreshContext = await resolveParallelizationProofRefreshContext(issueId, env, dependencies);
+        const decisionLineage = await resolveParallelizationDecisionLineage(
+          proofRefreshContext,
+          decision,
+          reason,
+          dependencies
+        );
         const result: ProviderLinearParallelizationResult = {
           ok: true,
           operation: 'parallelization',
@@ -381,7 +389,8 @@ export async function runLinearCliShell(
           source_setup: resolveAuditSourceSetup(params.flags, env),
           decision,
           reason,
-          summary
+          summary,
+          decision_lineage: decisionLineage
         };
         await recordAuditResult(result, params.flags, env, dependencies);
         await refreshParallelizationProofSnapshotBestEffort(
@@ -637,6 +646,8 @@ interface ParallelizationProofRefreshContext {
   runDir: string;
   issueId: string;
   issueIdentifier: string;
+  taskId: string;
+  runId: string;
 }
 
 async function resolveParallelizationProofRefreshContext(
@@ -655,11 +666,58 @@ async function resolveParallelizationProofRefreshContext(
     return {
       runDir: context.runDir,
       issueId: context.issueId,
-      issueIdentifier: context.issueIdentifier
+      issueIdentifier: context.issueIdentifier,
+      taskId: context.taskId,
+      runId: context.runId
     };
   } catch {
     return null;
   }
+}
+
+async function resolveParallelizationDecisionLineage(
+  context: ParallelizationProofRefreshContext | null,
+  decision: ProviderLinearParallelizationDecision,
+  reason: ProviderLinearParallelizationReason,
+  dependencies: Pick<LinearCliShellDependencies, 'readTextFile'>
+): Promise<ProviderLinearDecisionLineage | null> {
+  if (!context) {
+    return null;
+  }
+  let proof: Record<string, unknown> | null = null;
+  try {
+    proof = JSON.parse(
+      await dependencies.readTextFile(join(context.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME))
+    ) as Record<string, unknown>;
+  } catch {
+    proof = null;
+  }
+  const parentTaskId = normalizeOptionalAuditString(context.taskId);
+  const parentRunId = normalizeOptionalAuditString(context.runId);
+  const parentTurnStartedAt = readUnknownString(proof?.current_turn_started_at);
+  const parentTurnId =
+    readUnknownString(proof?.latest_turn_id) ??
+    readUnknownString(proof?.session_log_turn_id);
+  const parentTurnCount = readUnknownNonNegativeInteger(proof?.turn_count);
+  if (
+    !parentTaskId ||
+    !parentRunId ||
+    (!parentTurnStartedAt && !parentTurnId && parentTurnCount === null)
+  ) {
+    return null;
+  }
+  return {
+    schema_version: 1,
+    parent_task_id: parentTaskId,
+    parent_run_id: parentRunId,
+    parent_turn_started_at: parentTurnStartedAt,
+    parent_turn_id: parentTurnId,
+    parent_turn_count: parentTurnCount,
+    decision_id: null,
+    decision_recorded_at: null,
+    decision,
+    reason
+  };
 }
 
 async function resolveProviderLinearWorkerAttemptStartedAtForIssue(
@@ -1345,6 +1403,12 @@ function buildAuditEntry(
         action: result.decision,
         via: result.summary,
         state: result.reason,
+        decision_lineage: finalizeProviderLinearDecisionLineage(
+          result.decision_lineage,
+          result.decision,
+          result.reason,
+          recordedAt
+        ),
         ...followUpAuditFields,
         comment_id: null,
         attachment_id: null,
@@ -1529,6 +1593,50 @@ function normalizeOptionalAuditString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function finalizeProviderLinearDecisionLineage(
+  lineage: ProviderLinearDecisionLineage | null,
+  decision: ProviderLinearParallelizationDecision,
+  reason: ProviderLinearParallelizationReason,
+  recordedAt: string
+): ProviderLinearDecisionLineage | null {
+  if (!lineage) {
+    return null;
+  }
+  const finalized: ProviderLinearDecisionLineage = {
+    ...lineage,
+    decision_recorded_at: recordedAt,
+    decision,
+    reason
+  };
+  return {
+    ...finalized,
+    decision_id: lineage.decision_id ?? buildProviderLinearDecisionLineageId(finalized)
+  };
+}
+
+function buildProviderLinearDecisionLineageId(lineage: ProviderLinearDecisionLineage): string | null {
+  if (!lineage.parent_run_id || !lineage.decision_recorded_at) {
+    return null;
+  }
+  const turnKey =
+    lineage.parent_turn_id ??
+    lineage.parent_turn_started_at ??
+    (lineage.parent_turn_count !== null ? `turn-${lineage.parent_turn_count}` : null);
+  if (!turnKey) {
+    return null;
+  }
+  return [
+    'provider-linear-parallelization',
+    sanitizeLineageIdPart(lineage.parent_run_id),
+    sanitizeLineageIdPart(turnKey),
+    sanitizeLineageIdPart(lineage.decision_recorded_at)
+  ].join(':');
+}
+
+function sanitizeLineageIdPart(value: string): string {
+  return value.trim().replace(/[^A-Za-z0-9._-]+/gu, '_').replace(/^_+|_+$/gu, '') || 'unknown';
+}
+
 function resolveFollowUpAuditFields(
   result: LinearCliResult
 ): Pick<
@@ -1583,6 +1691,15 @@ function readUnknownString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function readUnknownInteger(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) ? value : null;
+}
+
+function readUnknownNonNegativeInteger(value: unknown): number | null {
+  const normalized = readUnknownInteger(value);
+  return normalized !== null && normalized >= 0 ? normalized : null;
 }
 
 function resolveAuditSourceSetup(flags: ArgMap, env: NodeJS.ProcessEnv): DispatchPilotSourceSetup | null {

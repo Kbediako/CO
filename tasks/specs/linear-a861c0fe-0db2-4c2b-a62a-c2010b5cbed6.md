@@ -1,10 +1,10 @@
 ---
 id: 20260330-linear-a861c0fe-0db2-4c2b-a62a-c2010b5cbed6
 title: CO Add Terminal Observability Dashboard as CO STATUS
-status: in_progress
+status: done
 owner: Codex
 created: 2026-03-30
-last_review: 2026-03-30
+last_review: 2026-04-30
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-a861c0fe-0db2-4c2b-a62a-c2010b5cbed6.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-a861c0fe-0db2-4c2b-a62a-c2010b5cbed
 related_tasks:
   - tasks/tasks-linear-a861c0fe-0db2-4c2b-a62a-c2010b5cbed6.md
 review_notes:
+  - 2026-04-30: CO-428 live Linear audit confirmed CO-26 is `Done`; this completed-lane spec is reclassified to inactive `done` under canonical owner key `spec-guard:active-specs:last_review=2026-03-30` so historical implementation evidence remains preserved without staying in active-spec freshness.
   - 2026-03-30: Opened from Linear issue `CO-26` in the provider-worker workspace using the issue id `a861c0fe-0db2-4c2b-a62a-c2010b5cbed6`.
   - 2026-03-30: Live `linear issue-context` confirmed the CO workflow states (`Ready`, `In Progress`, `In Review`, `Merging`, `Rework`), showed no attached PR and no existing workpad, and the issue was transitioned from `Ready` to `In Progress` before active coding.
   - 2026-03-30: `CO-7` already landed the shared operator dashboard presenter/web consumer path (`operatorDashboardPresenter.ts`, `/ui/data.json`, poll-health projection, and status-ui), so the remaining truthful gap is terminal presentation rather than another observability-read-model lane.
