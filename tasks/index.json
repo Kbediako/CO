@@ -1,6 +1,76 @@
 {
   "items": [
     {
+      "id": "20260430-linear-b9e7583a-3051-40d3-a87f-0388faa9df61",
+      "title": "CO-441 re-home live docs freshness maintenance owner after terminal CO-427",
+      "relates_to": "tasks/tasks-linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-30",
+      "status": "in_progress",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "evidence": [
+        "docs/PRD-linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
+        "docs/TECH_SPEC-linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
+        "docs/ACTION_PLAN-linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
+        "tasks/specs/linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
+        "tasks/tasks-linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
+        ".agent/task/linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
+        "docs/docs-catalog.json",
+        "docs/guides/docs-freshness-cohorts.md",
+        "out/linear-b9e7583a-3051-40d3-a87f-0388faa9df61/docs-freshness-maintenance.json",
+        ".runs/linear-b9e7583a-3051-40d3-a87f-0388faa9df61/cli/2026-04-30T05-10-34-639Z-cd27959d/review/telemetry.json",
+        "out/linear-b9e7583a-3051-40d3-a87f-0388faa9df61/manual/elegance-review.md",
+        ".runs/linear-b9e7583a-3051-40d3-a87f-0388faa9df61-docs-packet/cli/2026-04-30T05-13-56-467Z-10e9a902/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet",
+          "date": "2026-04-30",
+          "status": "accepted",
+          "manifest": ".runs/linear-b9e7583a-3051-40d3-a87f-0388faa9df61-docs-packet/cli/2026-04-30T05-13-56-467Z-10e9a902/manifest.json",
+          "source_anchor": "ctx:sha256:3d74ddb36ff6df3076fcfaffb69b2c5a61c41ddc4d8183876a43443b010d4289#chunk:c000001",
+          "summary": "Created the CO-441 docs-first packet and registry mirrors only. The packet preserves docs:freshness:maintain, rolling freshness cohort, CO-427, configured_owner_terminal, canonical owner key docs:freshness:maintain, CO-330 scope, and CO-431 structural/root automation ownership while leaving docs/docs-catalog.json, docs/guides/docs-freshness-cohorts.md, Linear state, workpad, PR lifecycle, and full validation to the parent lane."
+        },
+        "owner_rehome": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-30",
+          "status": "implemented",
+          "evidence": "out/linear-b9e7583a-3051-40d3-a87f-0388faa9df61/docs-freshness-maintenance.json",
+          "summary": "Parent reproduced the terminal CO-427 maintenance blocker, re-homed docs/docs-catalog.json rolling owner metadata to live CO-441, updated docs/guides/docs-freshness-cohorts.md so CO-427 is terminal historical evidence, and preserved the 33-row March 28 rolling cohort without row deletion, hidden ownership, policy weakening, or CO-330 scope bleed."
+        },
+        "repo_validation": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-30",
+          "status": "passed",
+          "evidence": "out/linear-b9e7583a-3051-40d3-a87f-0388faa9df61/docs-freshness-maintenance.json",
+          "summary": "Delegation guard, spec guard, build, lint with existing DelegationMcpHealth warnings only, full test, docs:check, docs:freshness, docs:freshness:maintain, repo stewardship, JSON parse, git diff --check, and diff-budget passed; docs:freshness:maintain returned pass_with_owned_rolling_debt with owner_issue=CO-441 and blocking_changed_paths=[]."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-30",
+          "status": "bounded-success_no_actionable_issues_after_p2_fix",
+          "evidence": ".runs/linear-b9e7583a-3051-40d3-a87f-0388faa9df61/cli/2026-04-30T05-10-34-639Z-cd27959d/review/telemetry.json",
+          "summary": "Standalone review rerun completed as bounded-success after command-intent retry and found no actionable issues; the earlier P2 packet-scope contradiction was addressed by aligning the packet with the parent-owned catalog/cohort-guide owner repair."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-30",
+          "status": "passed",
+          "evidence": "out/linear-b9e7583a-3051-40d3-a87f-0388faa9df61/manual/elegance-review.md",
+          "summary": "Explicit elegance review found no simplification patch: the repair remains docs/config-only, keeps one catalog owner pointer plus guide lineage text, preserves the rolling cohort, and avoids CO-330 or CO-431 scope expansion."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
+        "task": "tasks/tasks-linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
+        "agent_task": ".agent/task/linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
+        "docs": "docs/TECH_SPEC-linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md"
+      }
+    },
+    {
       "id": "20260429-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566",
       "title": "CO-427 re-home docs:freshness:maintain owner after terminal CO-425",
       "relates_to": "tasks/tasks-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
