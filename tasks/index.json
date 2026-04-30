@@ -84,6 +84,7 @@
       "evidence": [
         "docs/PRD-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
         "docs/ACTION_PLAN-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
+        "docs/TECH_SPEC-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
         "tasks/specs/linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
         "tasks/tasks-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
         ".runs/linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377-docs-packet/cli/2026-04-30T06-34-58-998Z-34bebedf/manifest.json"
@@ -101,7 +102,7 @@
       "paths": {
         "spec": "tasks/specs/linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
         "task": "tasks/tasks-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
-        "docs": "tasks/specs/linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md"
+        "docs": "docs/TECH_SPEC-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md"
       }
     },
     {
