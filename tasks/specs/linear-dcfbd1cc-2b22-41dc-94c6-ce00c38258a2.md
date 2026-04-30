@@ -1,10 +1,10 @@
 ---
 id: 20260330-linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2
 title: CO Fix stale merge-handoff after successful provider-worker review handoff
-status: in_progress
+status: done
 owner: Codex
 created: 2026-03-30
-last_review: 2026-03-30
+last_review: 2026-04-30
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a
 related_tasks:
   - tasks/tasks-linear-dcfbd1cc-2b22-41dc-94c6-ce00c38258a2.md
 review_notes:
+  - 2026-04-30: CO-428 live Linear audit confirmed CO-40 is `Done`; this completed-lane spec is reclassified to inactive `done` under canonical owner key `spec-guard:active-specs:last_review=2026-03-30` so historical implementation evidence remains preserved without staying in active-spec freshness.
   - 2026-03-30: Opened from Linear issue `CO-40` in the provider-worker workspace using issue id `dcfbd1cc-2b22-41dc-94c6-ce00c38258a2`.
   - 2026-03-30: The packaged `linear issue-context` read succeeded before any transition; the live CO workflow states expose `In Progress`, `In Review`, `Merging`, and `Rework`, and the issue was moved from `Ready` to `In Progress`.
   - 2026-03-30: The single active `## Codex Workpad` comment was created after the state transition, and the detached workspace was resynced onto branch `linear/co-40-stale-merge-handoff` from `origin/main`.

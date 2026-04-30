@@ -1,10 +1,10 @@
 ---
 id: 20260330-linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3
 title: CO Prevent provider-worker env override leakage into repo validation
-status: in_progress
+status: done
 owner: Codex
 created: 2026-03-30
-last_review: 2026-03-30
+last_review: 2026-04-30
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a
 related_tasks:
   - tasks/tasks-linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3.md
 review_notes:
+  - 2026-04-30: CO-428 live Linear audit confirmed CO-42 is `Done`; this completed-lane spec is reclassified to inactive `done` under canonical owner key `spec-guard:active-specs:last_review=2026-03-30` so historical implementation evidence remains preserved without staying in active-spec freshness.
   - 2026-03-30: Opened from Linear issue `CO-42` in the provider-worker workspace using issue id `aadbe46e-9e5a-4810-b9fb-52afe70d73a3`.
   - 2026-03-30: The packaged `linear issue-context` read succeeded before any transition; the live CO workflow states expose `In Progress`, `In Review`, `Merging`, and `Rework`, and the issue was moved from `Ready` to `In Progress`.
   - 2026-03-30: The single active `## Codex Workpad` comment was created after the state transition, and the detached workspace was resynced onto branch `linear/co-42-provider-env-isolation` from `origin/main`.
