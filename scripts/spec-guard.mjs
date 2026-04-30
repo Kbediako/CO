@@ -90,6 +90,8 @@ const PLACEHOLDER_FALLBACK_VALUES = new Set([
   'future issue',
   'future owner'
 ]);
+const WEAK_EVIDENCE_VALUE_PATTERN = String.raw`(?:false|no|n|denied|unapproved|not granted|not recorded|not approved|not applicable|not available|unavailable|not ready|not yet ready|missing|absent|none|n\/a|na|pending|unknown|tbd|to be determined|todo|later|not planned|not complete|incomplete|not finalized|not linked|not started|unplanned|blocked|deferred)`;
+const WEAK_OR_BRACKETED_EVIDENCE_VALUE_PATTERN = String.raw`(?:${WEAK_EVIDENCE_VALUE_PATTERN}(?:\b|[.)])|\[(?:${WEAK_EVIDENCE_VALUE_PATTERN})(?:[^\]]*)?\])`;
 const HIGH_CHURN_FALLBACK_SURFACES = [
   'provider workflow',
   'review wrapper',
@@ -122,9 +124,9 @@ function hasNegatedReviewerApprovalEvidence(content) {
     /\b(?:no|without|lacks?|missing|absent|not)\s+(?:\w+\s+){0,3}reviewer (?:approval|approved)\b/.test(content) ||
     /\b(?:no|without|lacks?|missing|absent|not)\s+(?:\w+\s+){0,3}approved by reviewer\b/.test(content) ||
     /\breviewer\s+(?:did\s+)?not\s+approve\b/.test(content) ||
-    /\b(?:reviewer approval(?: (?:granted|recorded|approved))?|reviewer approved|approved by reviewer)\s*[:=-]?\s*(?:false|no|n|denied|unapproved|not granted|not recorded|not approved|not applicable|not available|unavailable|not ready|not yet ready|missing|absent|none|n\/a|na|pending|unknown)\b/.test(
-      content
-    ) ||
+    new RegExp(
+      String.raw`\b(?:reviewer approval(?: (?:granted|recorded|approved))?|reviewer approved|approved by reviewer)\s*[:=-]?\s*${WEAK_OR_BRACKETED_EVIDENCE_VALUE_PATTERN}`
+    ).test(content) ||
     /\breviewer (?:approval|approved)(?:\s+\w+){0,3}\s+(?:absent|missing|denied|unapproved|not granted|not recorded)\b/.test(
       content
     )
@@ -156,9 +158,10 @@ function hasNegatedDeprecationPlanEvidence(content) {
 function hasWeakDeprecationPlanEvidence(content) {
   return (
     /\bdeprecation plan\s*[:=-]\s*(?:$|[;,.])/.test(content) ||
-    /\bdeprecation plan\s*[:=-]?\s*(?:is\s+)?(?:tbd|to be determined|pending|unknown|todo|later|unrecorded|unconfirmed|false|none|no|n\/a|na|not applicable|not available|unavailable|not planned|not ready|not yet ready|not complete|incomplete|not finalized|not linked|not started|unplanned|blocked|deferred)\b/.test(
-      content
-    )
+    new RegExp(
+      String.raw`\bdeprecation plan\s*[:=-]?\s*(?:is\s+)?${WEAK_OR_BRACKETED_EVIDENCE_VALUE_PATTERN}`
+    ).test(content) ||
+    /\bdeprecation plan\s*[:=-]?\s*(?:is\s+)?(?:unrecorded|unconfirmed)\b/.test(content)
   );
 }
 

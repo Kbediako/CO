@@ -2347,7 +2347,11 @@ describe('spec-guard script', () => {
       'External ecosystem migration bridge has a deprecation plan and reviewer approved: no.',
       'External ecosystem migration bridge has a deprecation plan and approved-by-reviewer: false.',
       'External ecosystem migration bridge has a deprecation plan and reviewer approved: not available.',
-      'External ecosystem migration bridge has a deprecation plan and approved-by-reviewer: not applicable.'
+      'External ecosystem migration bridge has a deprecation plan and approved-by-reviewer: not applicable.',
+      'External ecosystem migration bridge has a deprecation plan and reviewer approved: TBD.',
+      'External ecosystem migration bridge has a deprecation plan and approved-by-reviewer: todo.',
+      'External ecosystem migration bridge has a deprecation plan and reviewer approval granted: later.',
+      'External ecosystem migration bridge has a deprecation plan and reviewer approved: [pending approval].'
     ]) {
       const repo = await initRepository();
       const decisionBody = fallbackDecisionTable([
@@ -2600,7 +2604,9 @@ describe('spec-guard script', () => {
       'External ecosystem migration bridge lists Deprecation plan: none while reviewer approval granted.',
       'External ecosystem migration bridge lists Deprecation plan: not applicable while reviewer approval granted.',
       'External ecosystem migration bridge lists Deprecation plan: not planned while reviewer approval granted.',
-      'External ecosystem migration bridge lists Deprecation plan: unplanned while reviewer approval granted.'
+      'External ecosystem migration bridge lists Deprecation plan: unplanned while reviewer approval granted.',
+      'External ecosystem migration bridge lists Deprecation plan: [TBD] while reviewer approval granted.',
+      'External ecosystem migration bridge lists Deprecation plan: [not recorded] while reviewer approval granted.'
     ]) {
       const repo = await initRepository();
       const decisionBody = fallbackDecisionTable([
