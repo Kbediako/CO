@@ -1007,7 +1007,8 @@ describe('runProviderDeterministicMergeCloseout', () => {
 
       expect(result).toMatchObject({
         status: 'action_required',
-        reason: 'docs_freshness_live_owner_blocks_done_transition',
+        reason: 'docs_freshness_owner_evidence_unavailable',
+        summary: expect.stringContaining('owner evidence could not be verified'),
         docs_freshness_owner: {
           status: 'evidence_unavailable',
           terminal_transition_blocked: true,

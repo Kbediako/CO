@@ -928,6 +928,19 @@ export async function runProviderDeterministicMergeCloseout(
     env
   });
   if (docsFreshnessOwner.terminal_transition_blocked) {
+    const ownerEvidenceUnavailable = docsFreshnessOwner.status === 'evidence_unavailable';
+    const blockedTransitionReason = ownerEvidenceUnavailable
+      ? 'docs_freshness_owner_evidence_unavailable'
+      : 'docs_freshness_live_owner_blocks_done_transition';
+    const blockedTransitionSummary = ownerEvidenceUnavailable
+      ? `Attached PR #${pr.number} merged and the shared root is reconciled, but ${DOCS_FRESHNESS_MAINTAIN_OWNER_KEY} owner evidence could not be verified; moved the issue to Blocked instead of transitioning it to Done.`
+      : `Attached PR #${pr.number} merged and the shared root is reconciled, but ${baseWithResolution.issue_identifier ?? input.issueId} is still the live ${DOCS_FRESHNESS_MAINTAIN_OWNER_KEY} owner; moved the issue to Blocked instead of transitioning it to Done.`;
+    const blockedTransitionFailureReason = ownerEvidenceUnavailable
+      ? 'linear_blocked_transition_failed_for_docs_freshness_owner_evidence_unavailable'
+      : 'linear_blocked_transition_failed_for_docs_freshness_owner';
+    const blockedTransitionFailureSummary = ownerEvidenceUnavailable
+      ? `Attached PR #${pr.number} merged and the shared root is reconciled, but ${DOCS_FRESHNESS_MAINTAIN_OWNER_KEY} owner evidence could not be verified and the Linear issue could not transition to Blocked instead of Done.`
+      : `Attached PR #${pr.number} merged and the shared root is reconciled, but ${DOCS_FRESHNESS_MAINTAIN_OWNER_KEY} still identifies ${baseWithResolution.issue_identifier ?? input.issueId} as the live owner and the Linear issue could not transition to Blocked instead of Done.`;
     const transitionAttemptedAt = now();
     const transitionResult = await transitionIssueState({
       issueId: input.issueId,
@@ -970,10 +983,8 @@ export async function runProviderDeterministicMergeCloseout(
         docs_freshness_owner: docsFreshnessOwner,
         linear_transition: linearTransition,
         status: 'transition_failed',
-        reason: 'linear_blocked_transition_failed_for_docs_freshness_owner',
-        summary: summarizeSelection(
-          `Attached PR #${pr.number} merged and the shared root is reconciled, but ${DOCS_FRESHNESS_MAINTAIN_OWNER_KEY} still identifies ${baseWithResolution.issue_identifier ?? input.issueId} as the live owner and the Linear issue could not transition to Blocked instead of Done.`
-        )
+        reason: blockedTransitionFailureReason,
+        summary: summarizeSelection(blockedTransitionFailureSummary)
       };
     }
     return {
@@ -989,10 +1000,8 @@ export async function runProviderDeterministicMergeCloseout(
       docs_freshness_owner: docsFreshnessOwner,
       linear_transition: linearTransition,
       status: 'action_required',
-      reason: 'docs_freshness_live_owner_blocks_done_transition',
-      summary: summarizeSelection(
-        `Attached PR #${pr.number} merged and the shared root is reconciled, but ${baseWithResolution.issue_identifier ?? input.issueId} is still the live ${DOCS_FRESHNESS_MAINTAIN_OWNER_KEY} owner; moved the issue to Blocked instead of transitioning it to Done.`
-      )
+      reason: blockedTransitionReason,
+      summary: summarizeSelection(blockedTransitionSummary)
     };
   }
 
