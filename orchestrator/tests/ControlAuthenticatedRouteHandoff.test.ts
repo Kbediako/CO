@@ -9,7 +9,10 @@ import {
   emitDispatchPilotAuditEvents,
   writeControlError
 } from '../src/cli/control/controlServerAuditAndErrorHelpers.js';
-import { runProviderIssueHandoffRefresh } from '../src/cli/control/controlServerPublicLifecycle.js';
+import {
+  runProviderIssueHandoffRecover,
+  runProviderIssueHandoffRefresh
+} from '../src/cli/control/controlServerPublicLifecycle.js';
 
 vi.mock('../src/cli/control/controlQuestionChildResolution.js', () => ({
   createControlQuestionChildResolutionAdapter: vi.fn()
@@ -21,9 +24,12 @@ vi.mock('../src/cli/control/controlServerAuditAndErrorHelpers.js', () => ({
   writeControlError: vi.fn()
 }));
 
-  vi.mock('../src/cli/control/controlServerPublicLifecycle.js', () => ({
-    runProviderIssueHandoffRefresh: vi.fn((providerIssueHandoff) => providerIssueHandoff.refresh())
-  }));
+vi.mock('../src/cli/control/controlServerPublicLifecycle.js', () => ({
+  runProviderIssueHandoffRecover: vi.fn((providerIssueHandoff, recoverInput) =>
+    providerIssueHandoff.recoverIssue(recoverInput)
+  ),
+  runProviderIssueHandoffRefresh: vi.fn((providerIssueHandoff) => providerIssueHandoff.refresh())
+}));
 
 function createInput() {
   const req = {
@@ -238,6 +244,11 @@ describe('ControlAuthenticatedRouteHandoff', () => {
       issueId: 'CO-404',
       action: 'nudge'
     });
+    expect(runProviderIssueHandoffRecover).toHaveBeenCalledWith(context.providerIssueHandoff, {
+      provider: 'linear',
+      issueId: 'CO-404',
+      action: 'nudge'
+    });
     expect(assembled.readProviderWorkerRecoverAccepted?.({
       provider: 'linear',
       issueId: 'CO-404',
@@ -332,6 +343,7 @@ describe('ControlAuthenticatedRouteHandoff', () => {
     await expect(assembled.refreshProviderIssues?.()).resolves.toBeNull();
     expect(assembled.requestProviderWorkerRecover).toBeUndefined();
     expect(assembled.readProviderWorkerRecoverAccepted).toBeUndefined();
+    expect(runProviderIssueHandoffRecover).not.toHaveBeenCalled();
     expect(runProviderIssueHandoffRefresh).not.toHaveBeenCalled();
   });
 });
