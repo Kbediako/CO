@@ -120,6 +120,8 @@ interface ProviderIssueCurrentTurnActivityLike {
 }
 
 interface ProviderIssueClaimLike {
+  issue_id?: string | null;
+  issue_identifier?: string | null;
   state?: string | null;
   reason?: string | null;
   updated_at?: string | null;
@@ -276,6 +278,7 @@ interface ProviderIssueProofLike {
   attempt_started_at?: string | null;
   current_turn_started_at?: string | null;
   issue_id?: string | null;
+  issue_identifier?: string | null;
   pid?: string | null;
   worker_host?: string | null;
   thread_id?: string | null;
@@ -416,6 +419,19 @@ export interface ControlProviderDebugSnapshot {
     recorded_at: string;
     operation: string;
     ok: boolean;
+    target_issue_id: string | null;
+    target_issue_identifier: string | null;
+    action: string | null;
+    state: string | null;
+    error_code: string | null;
+    error_message: string | null;
+  } | null;
+  last_cross_issue_audit_operation: {
+    recorded_at: string;
+    operation: string;
+    ok: boolean;
+    target_issue_id: string | null;
+    target_issue_identifier: string | null;
     action: string | null;
     state: string | null;
     error_code: string | null;
@@ -457,8 +473,13 @@ export function deriveProviderIntakeClaimFreshness(input: {
 }
 
 export function buildProviderIssueDebugSnapshot(input: {
+  issue_id?: string | null | undefined;
+  issue_identifier?: string | null | undefined;
   tracked_issue?:
-    | Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>
+    | (
+        Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'> &
+        Partial<Pick<LiveLinearTrackedIssue, 'id' | 'identifier'>>
+      )
     | null
     | undefined;
   claim?: ProviderIssueClaimLike | null | undefined;
@@ -468,7 +489,26 @@ export function buildProviderIssueDebugSnapshot(input: {
   const trackedIssue = input.tracked_issue ?? null;
   const claim = input.claim ?? null;
   const proof = input.proof ?? null;
-  const latestAudit = selectLatestProviderLinearAuditEntry(proof?.linear_audit);
+  const currentAuditTarget = {
+    issueId:
+      normalizeOptionalString(input.issue_id) ??
+      normalizeOptionalString(proof?.issue_id) ??
+      normalizeOptionalString(trackedIssue?.id) ??
+      normalizeOptionalString(claim?.issue_id),
+    issueIdentifier:
+      normalizeOptionalString(input.issue_identifier) ??
+      normalizeOptionalString(proof?.issue_identifier) ??
+      normalizeOptionalString(trackedIssue?.identifier) ??
+      normalizeOptionalString(claim?.issue_identifier)
+  };
+  const latestAudit = selectLatestProviderLinearAuditEntryForIssue(
+    proof?.linear_audit,
+    currentAuditTarget
+  );
+  const latestCrossIssueAudit = selectLatestProviderLinearCrossIssueAuditEntry(
+    proof?.linear_audit,
+    currentAuditTarget
+  );
   const parallelization = resolveProviderParallelizationSnapshot(proof);
   const trackedWorkflowState = trackedIssue ? classifyProviderLinearWorkflowState(trackedIssue) : null;
   const claimWorkflowState = !trackedIssue ? resolveClaimWorkflowStateClassification(claim) : null;
@@ -491,6 +531,8 @@ export function buildProviderIssueDebugSnapshot(input: {
     ? null
     : claim?.merge_closeout ?? null;
   const progress = deriveProviderLinearWorkerProgressSnapshot({
+    issue_id: input.issue_id,
+    issue_identifier: input.issue_identifier,
     tracked_issue: trackedIssue,
     claim,
     proof
@@ -582,15 +624,10 @@ export function buildProviderIssueDebugSnapshot(input: {
     pull_request: pullRequest,
     progress,
     last_audit_operation: latestAudit
-      ? {
-          recorded_at: latestAudit.recorded_at,
-          operation: latestAudit.operation,
-          ok: latestAudit.ok,
-          action: normalizeOptionalString(latestAudit.action),
-          state: normalizeOptionalString(latestAudit.state),
-          error_code: normalizeOptionalString(latestAudit.error_code),
-          error_message: normalizeOptionalString(latestAudit.error_message)
-        }
+      ? buildProviderDebugAuditOperation(latestAudit)
+      : null,
+    last_cross_issue_audit_operation: latestCrossIssueAudit
+      ? buildProviderDebugAuditOperation(latestCrossIssueAudit)
       : null,
     last_semantic_progress_at: latestIsoTimestamp(
       progress?.last_semantic_progress_at ?? null,
@@ -682,8 +719,13 @@ function resolveProviderParallelizationChildLaneCount(
 }
 
 export function deriveProviderLinearWorkerProgressSnapshot(input: {
+  issue_id?: string | null | undefined;
+  issue_identifier?: string | null | undefined;
   tracked_issue?:
-    | Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'>
+    | (
+        Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'> &
+        Partial<Pick<LiveLinearTrackedIssue, 'id' | 'identifier'>>
+      )
     | null
     | undefined;
   claim?: ProviderIssueClaimLike | null | undefined;
@@ -694,7 +736,22 @@ export function deriveProviderLinearWorkerProgressSnapshot(input: {
   const claim = input.claim ?? null;
   const proof = input.proof ?? null;
   const now = input.now ?? (() => new Date().toISOString());
-  const latestAudit = selectLatestProviderLinearAuditEntry(proof?.linear_audit);
+  const currentAuditTarget = {
+    issueId:
+      normalizeOptionalString(input.issue_id) ??
+      normalizeOptionalString(proof?.issue_id) ??
+      normalizeOptionalString(trackedIssue?.id) ??
+      normalizeOptionalString(claim?.issue_id),
+    issueIdentifier:
+      normalizeOptionalString(input.issue_identifier) ??
+      normalizeOptionalString(proof?.issue_identifier) ??
+      normalizeOptionalString(trackedIssue?.identifier) ??
+      normalizeOptionalString(claim?.issue_identifier)
+  };
+  const latestAudit = selectLatestProviderLinearAuditEntryForIssue(
+    proof?.linear_audit,
+    currentAuditTarget
+  );
   const activeChildLane = selectActiveChildLane(proof?.child_lanes ?? null);
   const activeChildStream = selectActiveChildStream(proof?.child_streams ?? null);
   const trackedWorkflowState = trackedIssue ? classifyProviderLinearWorkflowState(trackedIssue) : null;
@@ -1400,13 +1457,127 @@ function explainProviderLinearWorkerProgressCandidateRejection(
 export function selectLatestProviderLinearAuditEntry(
   audit: ProviderLinearAuditSummary | null | undefined
 ): ProviderLinearAuditEntry | null {
-  const entries = Object.values(audit?.latest_by_operation ?? {}).filter(
+  return selectLatestProviderLinearAuditEntryFromEntries(readProviderLinearAuditEntries(audit));
+}
+
+function selectLatestProviderLinearAuditEntryForIssue(
+  audit: ProviderLinearAuditSummary | null | undefined,
+  target: {
+    issueId: string | null;
+    issueIdentifier: string | null;
+  }
+): ProviderLinearAuditEntry | null {
+  const entries = readProviderLinearAuditEntries(audit);
+  if (!target.issueId && !target.issueIdentifier) {
+    return null;
+  }
+  return selectLatestProviderLinearAuditEntryFromEntries(
+    entries.filter((entry) => isProviderLinearAuditEntryForIssue(entry, target))
+  );
+}
+
+function selectLatestProviderLinearCrossIssueAuditEntry(
+  audit: ProviderLinearAuditSummary | null | undefined,
+  target: {
+    issueId: string | null;
+    issueIdentifier: string | null;
+  }
+): ProviderLinearAuditEntry | null {
+  if (!target.issueId && !target.issueIdentifier) {
+    return null;
+  }
+  return selectLatestProviderLinearAuditEntryFromEntries(
+    readProviderLinearAuditEntries(audit).filter((entry) =>
+      isProviderLinearAuditEntryForDifferentIssue(entry, target)
+    )
+  );
+}
+
+function readProviderLinearAuditEntries(
+  audit: ProviderLinearAuditSummary | null | undefined
+): ProviderLinearAuditEntry[] {
+  if (Array.isArray(audit?.entries) && audit.entries.length > 0) {
+    return audit.entries.filter((entry): entry is ProviderLinearAuditEntry => Boolean(entry));
+  }
+  return Object.values(audit?.latest_by_operation ?? {}).filter(
     (entry): entry is ProviderLinearAuditEntry => Boolean(entry)
   );
+}
+
+function selectLatestProviderLinearAuditEntryFromEntries(
+  entries: ProviderLinearAuditEntry[]
+): ProviderLinearAuditEntry | null {
   if (entries.length === 0) {
     return null;
   }
   return entries.sort((left, right) => compareIsoTimestamp(right.recorded_at, left.recorded_at))[0] ?? null;
+}
+
+function isProviderLinearAuditEntryForIssue(
+  entry: ProviderLinearAuditEntry,
+  target: {
+    issueId: string | null;
+    issueIdentifier: string | null;
+  }
+): boolean {
+  const match = readProviderLinearAuditEntryTargetMatch(entry, target);
+  return match.hasMatch && !match.hasMismatch;
+}
+
+function isProviderLinearAuditEntryForDifferentIssue(
+  entry: ProviderLinearAuditEntry,
+  target: {
+    issueId: string | null;
+    issueIdentifier: string | null;
+  }
+): boolean {
+  const match = readProviderLinearAuditEntryTargetMatch(entry, target);
+  return match.hasTargetIdentity && match.hasMismatch && !match.hasMatch;
+}
+
+function readProviderLinearAuditEntryTargetMatch(
+  entry: ProviderLinearAuditEntry,
+  target: {
+    issueId: string | null;
+    issueIdentifier: string | null;
+  }
+): {
+  hasTargetIdentity: boolean;
+  hasMatch: boolean;
+  hasMismatch: boolean;
+} {
+  const entryIssueId = normalizeOptionalString(entry.issue_id);
+  const entryIssueIdentifier = normalizeOptionalString(entry.issue_identifier);
+  const issueIdMatches =
+    target.issueId && entryIssueId ? entryIssueId === target.issueId : null;
+  const issueIdentifierMatches =
+    target.issueIdentifier && entryIssueIdentifier
+      ? entryIssueIdentifier === target.issueIdentifier
+      : null;
+  const comparisons = [issueIdMatches, issueIdentifierMatches].filter(
+    (comparison): comparison is boolean => comparison !== null
+  );
+  return {
+    hasTargetIdentity: Boolean(entryIssueId || entryIssueIdentifier),
+    hasMatch: comparisons.includes(true),
+    hasMismatch: comparisons.includes(false)
+  };
+}
+
+function buildProviderDebugAuditOperation(
+  entry: ProviderLinearAuditEntry
+): NonNullable<ControlProviderDebugSnapshot['last_audit_operation']> {
+  return {
+    recorded_at: entry.recorded_at,
+    operation: entry.operation,
+    ok: entry.ok,
+    target_issue_id: normalizeOptionalString(entry.issue_id),
+    target_issue_identifier: normalizeOptionalString(entry.issue_identifier),
+    action: normalizeOptionalString(entry.action),
+    state: normalizeOptionalString(entry.state),
+    error_code: normalizeOptionalString(entry.error_code),
+    error_message: normalizeOptionalString(entry.error_message)
+  };
 }
 
 function hasAuthoritativeWorkerProgressSignal(input: {
