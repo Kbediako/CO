@@ -7,6 +7,7 @@ var/
 .vscode/settings.json
 .runs/
 .workspaces/
+.child-lanes/
 **/:Zone.Identifier
 compliance/permit.local.json
 error.log

@@ -43,14 +43,21 @@ The maintenance report is the machine-readable decision future workers should ci
 - `owner_issue`
 - `owner_issue_action`
 - `owner_issue_verification`
+- `owner_action_evidence`
 - `fallback_expiry`
 - `candidate_cohorts`
+- `candidate_cohorts[].canonical_owner_key`
+- `candidate_cohorts[].canonical_owner_marker`
 - `blocking_changed_paths`
 - `diff_status`
 - `policy_capacity_status`
 - `expires_after`
 - `recommended_action`
 - sample paths for changed blockers, candidate rows, and hard stale rows
+
+Canonical owner routing uses the exact `canonical_owner_key` and `canonical_owner_marker` from the maintenance report. The marker is the stable owner identity, not the issue title, owner issue number, or a fuzzy title/body match. For the docs freshness maintenance owner family, the protected marker is `codex-orchestrator:canonical-owner-key=docs:freshness:maintain`.
+
+Before an owner is usable, automation must verify live owner state. Open same-project issues with the exact marker are reused and updated. Terminal, canceled, duplicate, out-of-project, or state-unverified owners are historical evidence only and require replacement action. Missing exact-marker owners must emit create-action evidence. Dry-run and no-token paths must not mutate Linear, but they must still emit copyable create/update bodies in `owner_action_evidence.actions[]` so the parent/provider lane can apply the action without re-inventing the issue text.
 
 Provider-worker gates use this decision in `docs-review` and `implementation-gate`. They may pass with `pass_with_owned_rolling_debt` only when the debt is in an eligible historical class, the policy owner issue is present, the rows are still inside the rolling window and caps, `spec-guard` is clean, and the current diff/task packet has no blocking freshness paths. The underlying `docs:freshness` JSON still preserves the raw stale and rolling row evidence.
 
@@ -77,9 +84,9 @@ Blocking decisions are fail-closed:
 - `block_diff_local`: current diff/task-packet freshness drift, a hard `spec-guard` failure, or an unavailable git base that prevents proving the current diff is clean.
 - `block_policy_expired`: eligible historical rows are past the rolling window.
 - `block_policy_over_budget`: eligible in-window historical rows exceed `max_entries` or `max_cohorts`.
-- `block_unowned_repo_debt`: stale rows need direct owner action before provider-worker gates may pass.
+- `block_unowned_repo_debt`: stale rows need direct owner action before provider-worker gates may pass, including terminal-owner replacement or missing exact-marker owner creation.
 
-The scheduled docs truthfulness maintenance workflow runs near UTC date rollover with `--warn`, uploads the maintenance JSON, and records the owner/action evidence in the workflow summary. It does not silently bump `last_review`; it either reports a pass-with-owned-debt decision or a hard blocker that the owner issue must resolve through review, archive, or reclassification.
+The scheduled docs truthfulness maintenance workflow runs near UTC date rollover with `--warn`, uploads the maintenance JSON, and records the owner/action evidence in the workflow summary. The summary must surface the decision, canonical owner key/marker, live owner action mode/reason, candidate cohort count, and any copyable create/update body emitted by dry-run or no-token execution. It does not silently bump `last_review`; it either reports a pass-with-owned-debt decision or a hard blocker that the owner issue must resolve through review, archive, or reclassification.
 
 ## Required Handling
 A rolling cohort must be resolved before the window expires by one of these explicit outcomes:
@@ -88,6 +95,13 @@ A rolling cohort must be resolved before the window expires by one of these expl
 - archive completed historical packets through the repo archive policy
 - reclassify docs only when their class is wrong
 - file a new same-project owner issue with acceptance criteria and evidence when the debt is still intentionally deferred
+
+Owner issue handling must follow the maintenance report instead of manual guesswork:
+
+- reuse/update an open same-project issue only when it has the exact canonical owner marker
+- replace a terminal, canceled, duplicate, out-of-project, or state-unverified owner with a new exact-marker owner action
+- create a same-project owner when no exact-marker owner exists
+- in dry-run or no-token execution, copy the emitted create/update body exactly rather than summarizing it
 
 Feature lanes may cite the owner issue for the rolling cohort, but they must still fix their own docs packet drift and any blocking freshness failures in their diff.
 
@@ -98,6 +112,17 @@ Feature lanes may cite the owner issue for the rolling cohort, but they must sti
 - Do not configure empty or malformed eligible classes; invalid policy fields make rolling deferral fail closed.
 - Do not omit or broaden `baseline_cohorts`; stale docs outside the declared baseline must remain blocking.
 - Do not treat a green `docs:freshness` exit as proof that rolling freshness debt is zero; inspect the report totals.
+- Do not reuse terminal owners as active owner issues, even when their title or older metadata looks relevant.
+- Do not create a fresh owner when an open same-project exact-marker owner can be reused or updated.
+
+## Escaped Recurrence History
+CO-188 and CO-323 were escaped historical root-cause attempts: they made the maintenance decision and owner-routing shape more explicit, but they did not fully close the loop on exact-marker live-owner reuse, terminal-owner replacement, and copyable dry-run/no-token owner actions.
+
+CO-428, CO-429, and CO-430 are the recent recurrence shapes that CO-431 is meant to prevent from becoming manual rediscovery work:
+
+- CO-428 proved stale active-spec debt owned by terminal issues must be reclassified or routed without weakening `spec-guard`.
+- CO-429 proved narrow registry residue can clear `docs:freshness` while `docs:freshness:maintain` still fails closed on terminal owner debt.
+- CO-430 proved live owner metadata can be repaired while a separate freshness/spec cohort remains blocking, so the owner action evidence must stay distinct from general freshness warnings.
 
 ## Apr 14 Baseline
 CO-175 reproduced the Apr 14 baseline at `cac56ec89`:
