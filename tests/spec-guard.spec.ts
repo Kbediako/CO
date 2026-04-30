@@ -1100,6 +1100,42 @@ describe('spec-guard script', () => {
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
 
+  it('requires decision evidence for acronym-prefixed fallback-sensitive identifiers', async () => {
+    const repo = await initRepository();
+    const today = new Date().toISOString().slice(0, 10);
+
+    await writeFile(
+      join(repo, 'src/acronyms.ts'),
+      [
+        'export const APICompatibilityMode = true;',
+        'export const URLSeamBridge = true;',
+        'export const SDKBreakGlassMode = true;',
+        ''
+      ].join('\n')
+    );
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      `last_review: ${today}\n\nGeneric spec update intentionally omits decision metadata.\n`
+    );
+    await execFileAsync('git', ['add', 'src/acronyms.ts', 'tasks/specs/0001-initial.md'], {
+      cwd: repo
+    });
+    await execFileAsync('git', ['commit', '-m', 'acronym-prefixed sensitive identifiers'], {
+      cwd: repo
+    });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain(
+      'fallback/seam-touching changes require updated PRD decision evidence (src/acronyms.ts)'
+    );
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
   it('requires decision evidence for all-caps fallback-sensitive identifiers', async () => {
     const repo = await initRepository();
     const today = new Date().toISOString().slice(0, 10);
@@ -1132,6 +1168,75 @@ describe('spec-guard script', () => {
     expect(stdout).toContain('❌ Spec guard: issues detected');
     expect(stdout).toContain(
       'fallback/seam-touching changes require updated PRD decision evidence (src/constants.ts)'
+    );
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not treat uppercase continuations as fallback-sensitive all-caps tokens', async () => {
+    const repo = await initRepository();
+    const today = new Date().toISOString().slice(0, 10);
+
+    await writeFile(
+      join(repo, 'src/constants.ts'),
+      [
+        'export const SEAMLESS_MODE = true;',
+        'export const COMPATIBLE_MODE = true;',
+        'export const BREAK_GLASSHOUSE = true;',
+        'export const LAST_KNOWNLEDGE_BASE = true;',
+        ''
+      ].join('\n')
+    );
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      `last_review: ${today}\n\nGeneric spec update for ordinary uppercase continuations.\n`
+    );
+    await execFileAsync('git', ['add', 'src/constants.ts', 'tasks/specs/0001-initial.md'], {
+      cwd: repo
+    });
+    await execFileAsync('git', ['commit', '-m', 'ordinary uppercase continuations'], {
+      cwd: repo
+    });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('requires decision evidence for fallback-sensitive CLI bin entrypoints', async () => {
+    const repo = await initRepository();
+    const today = new Date().toISOString().slice(0, 10);
+
+    await mkdir(join(repo, 'bin'), { recursive: true });
+    await writeFile(
+      join(repo, 'bin/codex-orchestrator.ts'),
+      [
+        '#!/usr/bin/env node',
+        "export const cliCompatibilityFallback = 'legacy provider fallback';",
+        ''
+      ].join('\n')
+    );
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      `last_review: ${today}\n\nGeneric spec update intentionally omits CLI fallback decision metadata.\n`
+    );
+    await execFileAsync('git', ['add', 'bin/codex-orchestrator.ts', 'tasks/specs/0001-initial.md'], {
+      cwd: repo
+    });
+    await execFileAsync('git', ['commit', '-m', 'cli bin fallback without decision'], {
+      cwd: repo
+    });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain(
+      'fallback/seam-touching changes require updated PRD decision evidence (bin/codex-orchestrator.ts)'
     );
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });

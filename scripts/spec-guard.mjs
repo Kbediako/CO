@@ -17,8 +17,9 @@ const ALLOWED_FALLBACK_DECISIONS = new Set([
   'justify retaining fallback'
 ]);
 function fallbackTouchTokenPattern(standaloneTokenPattern, prefixedTokenPattern = standaloneTokenPattern) {
+  const tokenEndBoundary = '(?=$|[^A-Za-z0-9]|[A-Z][a-z])';
   return new RegExp(
-    `(?:^|[^A-Za-z0-9])(?:${standaloneTokenPattern})(?=$|[^a-z0-9])|[a-z0-9](?:${prefixedTokenPattern})(?=$|[^a-z0-9])`
+    `(?:^|[^A-Za-z0-9])(?:${standaloneTokenPattern})${tokenEndBoundary}|[A-Za-z0-9](?:${prefixedTokenPattern})${tokenEndBoundary}`
   );
 }
 
@@ -378,7 +379,12 @@ function isGovernedFallbackSurface(file) {
 
 function isFallbackBehaviorScanCandidate(file) {
   const normalized = normalizeSpecFilePath(file);
-  return isCodePath(normalized) || normalized.startsWith('scripts/') || isGovernedFallbackSurface(normalized);
+  return (
+    isCodePath(normalized) ||
+    normalized.startsWith('bin/') ||
+    normalized.startsWith('scripts/') ||
+    isGovernedFallbackSurface(normalized)
+  );
 }
 
 function containsFallbackTouchPattern(value) {
