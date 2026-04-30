@@ -29,13 +29,13 @@
 - [x] CO-188 and CO-323 remain cited as escaped historical root-cause attempts. Evidence: `scripts/docs-freshness-maintain.mjs`, `docs/guides/docs-freshness-cohorts.md`.
 
 ## Focused Validation
-- [x] Focused route tests for `CO-428`, `CO-429`, and `CO-430`. Evidence: `npx vitest run tests/docs-freshness-maintain.spec.ts --config vitest.config.core.ts`.
+- [x] Focused route tests for `CO-428`, `CO-429`, and `CO-430`. Evidence: `npx vitest run tests/docs-freshness-maintain.spec.ts --config vitest.config.core.ts` passed 39 tests after PR feedback and spec-guard bullet-output parser fixes.
 - [x] Focused owner-state tests for open owner update/noop, missing owner create, terminal owner replacement, and mismatched marker failure. Evidence: `npx vitest run tests/docs-freshness-maintain.spec.ts --config vitest.config.core.ts`.
 - [x] Focused dry-run/no-token tests for no mutation plus copyable body output. Evidence: `npx vitest run tests/docs-freshness-maintain.spec.ts --config vitest.config.core.ts`.
 - [x] Focused scheduled/preflight wiring tests. Evidence: workflow summary Node block syntax check plus focused maintenance tests.
-- [x] Parent-owned validation floor after implementation import. Evidence: delegation guard, spec guard, build, lint, full test, docs:check, docs:freshness, docs:freshness:maintain, repo stewardship, git diff --check, and diff-budget override passed.
-- [x] Manifest-backed standalone review rerun after P2 fixes completed with `review_outcome=bounded-success`. Evidence: `.runs/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4/cli/2026-04-30T11-03-00-861Z-82d9d979/review/telemetry.json`.
-- [x] Explicit elegance/minimality pass found no simplification patch. Evidence: `out/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4/manual/elegance-review.md`.
+- [x] Parent-owned validation floor after implementation import and PR feedback fixes. Evidence: delegation guard, spec guard, build, lint, full test, docs:check, docs:freshness, docs:freshness:maintain, repo stewardship, git diff --check, and diff-budget passed after the final parser fix.
+- [x] Manifest-backed standalone review rerun after CodeRabbit and standalone-review fixes completed with `review_outcome=bounded-success` and command-intent boundary retry classified as bounded success, not a wrapper failure. Evidence: `.runs/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4/cli/2026-04-30T11-03-00-861Z-82d9d979/review/telemetry.json`.
+- [x] Explicit elegance/minimality passes found no simplification patch. Evidence: `out/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4/manual/elegance-review.md`, `out/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4/manual/elegance-review-coderabbit.md`.
 
 ## Child Lane Validation
 - [x] `git diff --check -- <declared CO-431 packet files>` passed locally.

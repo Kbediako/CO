@@ -62,6 +62,12 @@ jobs:
             : {};
           const actions = Array.isArray(evidence.actions) ? evidence.actions : [];
           const action = actions.find((item) => item && typeof item === 'object') || {};
+          const copyableCommands = actions
+            .map((item) => typeof item?.copyable_command === 'string' ? item.copyable_command.trim() : '')
+            .filter(Boolean);
+          const bodyDescriptions = actions
+            .map((item) => typeof item?.body?.description === 'string' ? item.body.description.trim() : '')
+            .filter(Boolean);
           const issueAction = action.owner_issue_action && typeof action.owner_issue_action === 'object'
             ? action.owner_issue_action
             : {};
@@ -74,12 +80,8 @@ jobs:
             lines.push('', `#### ${title}`, '', '```markdown', body, '```');
           };
 
-          const bodyDescription = typeof action.body?.description === 'string'
-            ? action.body.description.trim()
-            : '';
-          const copyableCommand = typeof action.copyable_command === 'string'
-            ? action.copyable_command.trim()
-            : '';
+          const bodyDescription = bodyDescriptions.join('\n\n---\n\n');
+          const copyableCommand = copyableCommands.join('\n\n');
 
           const lines = [
             '',

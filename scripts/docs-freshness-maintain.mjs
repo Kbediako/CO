@@ -114,6 +114,70 @@ function normalizeOptionalBoolean(value) {
   return typeof value === 'boolean' ? value : null;
 }
 
+const SPEC_GUARD_STALE_SPEC_PATTERN =
+  /^(?:-\s+)?((?:tasks\/specs|docs\/design\/specs)\/[^:]+): last_review (\d{4}-\d{2}-\d{2}) is (\d+) days old \(must be (?:<=|≤)(\d+) days\)$/u;
+
+function parseSpecGuardStaleSpecLine(line) {
+  const normalizedLine = normalizeOptionalString(line);
+  if (!normalizedLine) {
+    return null;
+  }
+  const match = SPEC_GUARD_STALE_SPEC_PATTERN.exec(normalizedLine);
+  if (!match) {
+    return null;
+  }
+  const [, file, lastReview, ageDaysRaw, cadenceDaysRaw] = match;
+  const pathFamily = file.startsWith('docs/design/specs/') ? 'docs/design/specs' : 'tasks/specs';
+  const cadenceDays = Number.parseInt(cadenceDaysRaw ?? '', 10);
+  const ageDays = Number.parseInt(ageDaysRaw ?? '', 10);
+  const overdueDays = Number.isFinite(ageDays) && Number.isFinite(cadenceDays) ? ageDays - cadenceDays : null;
+  return {
+    path: normalizeDocPath(file),
+    path_family: pathFamily,
+    last_review: lastReview,
+    cadence_days: Number.isFinite(cadenceDays) ? cadenceDays : null,
+    age_days: Number.isFinite(ageDays) ? ageDays : null,
+    overdue_days: Number.isFinite(overdueDays) ? overdueDays : null
+  };
+}
+
+function parseSpecGuardStaleSpecLines(lines) {
+  return (Array.isArray(lines) ? lines : [])
+    .map(parseSpecGuardStaleSpecLine)
+    .filter((entry) => entry && entry.path && entry.last_review);
+}
+
+function normalizeSpecGuardFailureEntry(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  const pathValue = normalizeOptionalString(entry.path ?? entry.file);
+  const lastReview = normalizeOptionalString(entry.last_review);
+  const pathFamily =
+    normalizeOptionalString(entry.path_family) ??
+    (pathValue?.startsWith('docs/design/specs/') ? 'docs/design/specs' : 'tasks/specs');
+  if (!pathValue || !lastReview || !pathFamily) {
+    return null;
+  }
+  const cadenceDays = Number.parseInt(String(entry.cadence_days ?? ''), 10);
+  const ageDays = Number.parseInt(String(entry.age_days ?? ''), 10);
+  const rawOverdueDays = Number.parseInt(String(entry.overdue_days ?? ''), 10);
+  const overdueDays =
+    Number.isFinite(rawOverdueDays)
+      ? rawOverdueDays
+      : Number.isFinite(ageDays) && Number.isFinite(cadenceDays)
+        ? ageDays - cadenceDays
+        : null;
+  return {
+    path: normalizeDocPath(pathValue),
+    path_family: pathFamily,
+    last_review: lastReview,
+    cadence_days: Number.isFinite(cadenceDays) ? cadenceDays : null,
+    age_days: Number.isFinite(ageDays) ? ageDays : null,
+    overdue_days: Number.isFinite(overdueDays) ? overdueDays : null
+  };
+}
+
 function normalizeOwnerIssueScope(config, env = process.env) {
   return {
     workspace_id:
@@ -745,7 +809,14 @@ function buildCanonicalOwnerBody({ decision, cohort, mode, routeId }) {
   };
 }
 
-function buildCopyableOwnerCommand(body, sourceIssue = '<source-linear-issue-id>') {
+function shouldEmitCreateOwnerCommand(actionMode) {
+  return ['create_required', 'create_or_update_required', 'replace_terminal_owner'].includes(actionMode);
+}
+
+function buildCopyableOwnerCommand(body, sourceIssue = '<source-linear-issue-id>', actionMode = null) {
+  if (!shouldEmitCreateOwnerCommand(actionMode)) {
+    return null;
+  }
   return [
     'codex-orchestrator linear create-follow-up',
     `--issue-id ${sourceIssue}`,
@@ -807,7 +878,7 @@ export function buildDocsFreshnessOwnerActionEvidence(
       owner_issue: ownerActionIssueForCohort(cohort, decision),
       owner_issue_action: cohort.owner_issue_action ?? decision.owner_issue_action ?? null,
       body,
-      copyable_command: buildCopyableOwnerCommand(body, decision?.owner_issue ?? '<source-linear-issue-id>'),
+      copyable_command: buildCopyableOwnerCommand(body, decision?.owner_issue ?? '<source-linear-issue-id>', mode),
       should_block: false
     };
   });
@@ -959,32 +1030,11 @@ function parseSpecGuardCandidateCohorts(
   if (specGuard?.status !== 'failed') {
     return [];
   }
-  const lines = [
-    ...(Array.isArray(specGuard.stdout_sample) ? specGuard.stdout_sample : []),
-    ...(Array.isArray(specGuard.stderr_sample) ? specGuard.stderr_sample : [])
-  ];
-  const entries = [];
-  for (const line of lines) {
-    const match = /^((?:tasks\/specs|docs\/design\/specs)\/[^:]+): last_review (\d{4}-\d{2}-\d{2}) is (\d+) days old \(must be (?:<=|≤)(\d+) days\)$/u.exec(
-      line
-    );
-    if (!match) {
-      continue;
-    }
-    const [, file, lastReview, ageDaysRaw, cadenceDaysRaw] = match;
-    const pathFamily = file.startsWith('docs/design/specs/') ? 'docs/design/specs' : 'tasks/specs';
-    const cadenceDays = Number.parseInt(cadenceDaysRaw ?? '', 10);
-    const ageDays = Number.parseInt(ageDaysRaw ?? '', 10);
-    const overdueDays = Number.isFinite(ageDays) && Number.isFinite(cadenceDays) ? ageDays - cadenceDays : null;
-    entries.push({
-      path: normalizeDocPath(file),
-      path_family: pathFamily,
-      last_review: lastReview,
-      cadence_days: Number.isFinite(cadenceDays) ? cadenceDays : null,
-      age_days: Number.isFinite(ageDays) ? ageDays : null,
-      overdue_days: Number.isFinite(overdueDays) ? overdueDays : null
-    });
-  }
+  const entries = Array.isArray(specGuard.parsed_failures)
+    ? specGuard.parsed_failures.map(normalizeSpecGuardFailureEntry).filter(Boolean)
+    : typeof specGuard.full_output === 'string'
+      ? parseSpecGuardStaleSpecLines(specGuard.full_output.split(/\r?\n/))
+      : [];
   const byKey = new Map();
   for (const entry of entries) {
     const key = [
@@ -1730,15 +1780,20 @@ async function runSpecGuard(repoRoot, { skip = false } = {}) {
     });
     return {
       status: 'succeeded',
+      parsed_failures: parseSpecGuardStaleSpecLines([...stdout.split(/\r?\n/), ...stderr.split(/\r?\n/)]),
       stdout_sample: sampleLines(stdout),
       stderr_sample: sampleLines(stderr)
     };
   } catch (error) {
+    const stdout = typeof error?.stdout === 'string' ? error.stdout : '';
+    const stderr = typeof error?.stderr === 'string' ? error.stderr : '';
+    const message = error?.message ? String(error.message) : '';
     return {
       status: 'failed',
       exit_code: typeof error?.code === 'number' ? error.code : 1,
-      stdout_sample: sampleLines(error?.stdout),
-      stderr_sample: sampleLines(error?.stderr || error?.message)
+      parsed_failures: parseSpecGuardStaleSpecLines([...stdout.split(/\r?\n/), ...stderr.split(/\r?\n/), message]),
+      stdout_sample: sampleLines(stdout),
+      stderr_sample: sampleLines(stderr || message)
     };
   }
 }

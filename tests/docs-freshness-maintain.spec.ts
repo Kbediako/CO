@@ -749,7 +749,7 @@ describe('docs freshness maintenance decisions', () => {
             route_id: 'co-429-completed-lane-registry-residue',
             mode: 'update_existing',
             owner_issue: 'CO-320',
-            copyable_command: expect.stringContaining(`--canonical-owner-key "${canonicalOwnerKey}"`)
+            copyable_command: null
           })
         ]
       })
@@ -787,9 +787,26 @@ describe('docs freshness maintenance decisions', () => {
         taskId: 'fixture',
         specGuard: {
           status: 'failed',
+          parsed_failures: [
+            {
+              path: 'tasks/specs/linear-co-428.md',
+              path_family: 'tasks/specs',
+              last_review: lastReview,
+              cadence_days: 30,
+              age_days: 31,
+              overdue_days: 1
+            },
+            {
+              path: 'docs/design/specs/CO-428-design.md',
+              path_family: 'docs/design/specs',
+              last_review: lastReview,
+              cadence_days: 30,
+              age_days: 31,
+              overdue_days: 1
+            }
+          ],
           stdout_sample: [
-            `tasks/specs/linear-co-428.md: last_review ${lastReview} is 31 days old (must be <=30 days)`,
-            `docs/design/specs/CO-428-design.md: last_review ${lastReview} is 31 days old (must be ≤30 days)`
+            `tasks/specs/linear-co-428.md: last_review ${lastReview} is 31 days old (must be <=30 days)`
           ],
           stderr_sample: []
         },
@@ -856,6 +873,98 @@ describe('docs freshness maintenance decisions', () => {
         })
       })
     );
+  });
+
+  it('does not derive spec-guard canonical owner cohorts from truncated samples alone', () => {
+    const lastReview = reviewDateDaysAgo(31);
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          canonical_owner_key: 'docs:freshness:maintain',
+          require_live_owner_verification: true,
+          owner_issue_project_id: 'project-1'
+        }),
+        stale_entries: [],
+        rolling_cohort_entries: [],
+        totals: {
+          docs_scanned: 0,
+          registry_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 0,
+          rolling_cohort_entries: 0,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: {
+          status: 'failed',
+          stdout_sample: [
+            `tasks/specs/linear-co-428.md: last_review ${lastReview} is 31 days old (must be <=30 days)`
+          ],
+          stderr_sample: []
+        },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main'
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_diff_local');
+    expect(decision.totals.spec_guard_candidate_cohorts).toBe(0);
+    expect(decision.candidate_cohorts).toEqual([]);
+  });
+
+  it('parses bullet-prefixed spec-guard stale active spec output from full output', () => {
+    const lastReview = reviewDateDaysAgo(31);
+    const canonicalOwnerKey =
+      `spec_guard_active_spec|path_family:tasks/specs|last_review:${lastReview}|cadence_days:30`;
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          canonical_owner_key: 'docs:freshness:maintain',
+          require_live_owner_verification: true,
+          owner_issue_project_id: 'project-1'
+        }),
+        stale_entries: [],
+        rolling_cohort_entries: [],
+        totals: {
+          docs_scanned: 0,
+          registry_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 0,
+          rolling_cohort_entries: 0,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: {
+          status: 'failed',
+          full_output: [
+            'Spec guard failed:',
+            ` - tasks/specs/linear-co-428.md: last_review ${lastReview} is 31 days old (must be ≤30 days)`
+          ].join('\n')
+        },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main'
+      }
+    );
+
+    expect(decision.totals.spec_guard_candidate_cohorts).toBe(1);
+    expect(decision.candidate_cohorts).toEqual([
+      expect.objectContaining({
+        route_id: 'co-428-stale-active-spec',
+        canonical_owner_key: canonicalOwnerKey,
+        source_breakdown: { spec_guard: 1 },
+        sample_paths: ['tasks/specs/linear-co-428.md']
+      })
+    ]);
   });
 
   it('does not reuse canonical owner verification across different scoped configs for the same issue', () => {
