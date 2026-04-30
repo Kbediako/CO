@@ -1,6 +1,49 @@
 {
   "items": [
     {
+      "id": "20260430-linear-345cd50c-4962-4376-a7ca-1982ba311699",
+      "title": "CO-445 provider merge closeout live docs:freshness owner terminal guard",
+      "relates_to": "tasks/tasks-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-30",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        "docs/TECH_SPEC-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        "docs/ACTION_PLAN-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        "tasks/specs/linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        "tasks/tasks-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        ".agent/task/linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-345cd50c-4962-4376-a7ca-1982ba311699-co445-docs-packet-r2/cli/2026-04-30T09-00-50-146Z-4d8a155f/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane co445-docs-packet-r2",
+          "date": "2026-04-30",
+          "status": "parent_corrected_after_import",
+          "manifest": ".runs/linear-345cd50c-4962-4376-a7ca-1982ba311699-co445-docs-packet-r2/cli/2026-04-30T09-00-50-146Z-4d8a155f/manifest.json",
+          "source_anchor": "ctx:sha256:e3cf9354b49bf4da338a134a6f2b07abc004119c12fa362d5cc4b7a2e44dbb0d#chunk:c000001",
+          "summary": "The bounded child lane completed a CO-445 docs packet, then the parent imported it manually after helper accept failed on Linear updated_at drift and corrected its scope after source inspection. The active issue contract is a provider merge closeout terminal-transition guard: after metadata PR merge and shared-root reconciliation, providerMergeCloseout.ts must check docs:freshness:maintain owner evidence before Done. If the current issue is still the live owner, closeout records owner_issue, configured_owner_terminal risk, block_unowned_repo_debt context, blocking_changed_paths=[], pass_with_owned_rolling_debt, and owner verification evidence, then leaves or moves the issue to non-terminal Blocked. If ownership is re-homed or retired, normal Done closeout remains valid. CO-431 remains adjacent canonical-owner automation and does not own this provider closeout lifecycle patch unless live evidence changes that boundary."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        "task": "tasks/tasks-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        "agent_task": ".agent/task/linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-345cd50c-4962-4376-a7ca-1982ba311699.md"
+        }
+      }
+    },
+    {
       "id": "20260430-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b",
       "title": "CO-444 re-home docs:freshness:maintain owner after terminal CO-441",
       "relates_to": "tasks/tasks-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",

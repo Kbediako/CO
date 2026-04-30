@@ -1,9 +1,40 @@
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  type ProviderDocsFreshnessOwnerCloseoutRecord,
   runProviderDeterministicMergeCloseout,
   runProviderReviewHandoffPromotion
 } from '../src/cli/control/providerMergeCloseout.js';
+
+function docsFreshnessOwnerCloseout(
+  overrides: Partial<ProviderDocsFreshnessOwnerCloseoutRecord> = {}
+): ProviderDocsFreshnessOwnerCloseoutRecord {
+  return {
+    status: 'not_current_owner',
+    terminal_transition_blocked: false,
+    reason: 'rolling_freshness_owner_is_different_issue',
+    policy_owner_issue: 'CO-431',
+    policy_canonical_owner_key: 'docs:freshness:maintain',
+    freshness_decision: null,
+    owner_issue: null,
+    owner_issue_action: null,
+    owner_issue_verification: null,
+    candidate_cohorts: [],
+    blocking_changed_paths: null,
+    command: null,
+    args: null,
+    exit_code: null,
+    ok: null,
+    stdout: null,
+    stderr: null,
+    parse_error: null,
+    report_path: null,
+    ...overrides
+  };
+}
 
 describe('runProviderDeterministicMergeCloseout', () => {
   it('records GitHub API rate limits as transient merge-closeout evidence', async () => {
@@ -678,6 +709,765 @@ describe('runProviderDeterministicMergeCloseout', () => {
     expect(result.issue_updated_at).toBe('2026-04-05T00:02:05.000Z');
     expect(fetchSnapshot).toHaveBeenCalledTimes(1);
     expect(runCommand).not.toHaveBeenCalledWith(expect.objectContaining({ command: 'gh' }));
+  });
+
+  it('moves a merged docs:freshness:maintain live-owner issue to Blocked instead of Done', async () => {
+    const runCommand = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        exitCode: 0,
+        stdout: 'git@github.com:asabeko/CO.git\n',
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        exitCode: 0,
+        stdout: '## main...origin/main\n',
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        exitCode: 0,
+        stdout: '',
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        exitCode: 0,
+        stdout: 'Already up to date.\n',
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        exitCode: 0,
+        stdout: '## main...origin/main\n',
+        stderr: ''
+      });
+    const fetchSnapshot = vi.fn().mockResolvedValue({
+      state: 'MERGED',
+      reviewDecision: 'APPROVED',
+      mergeStateStatus: 'UNKNOWN',
+      readyToMerge: false,
+      gateReasons: ['state=MERGED'],
+      unresolvedThreadCount: 0,
+      updatedAt: '2026-04-30T08:45:00.000Z',
+      mergedAt: '2026-04-30T08:45:00.000Z',
+      headOid: 'abc123',
+      checks: { pending: [], failed: [] },
+      requiredChecks: { pending: [], failed: [] }
+    });
+    const transitionIssueState = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'updated' as const,
+      issue: {
+        id: 'lin-co-444',
+        identifier: 'CO-444',
+        state: { id: 'state-blocked', name: 'Blocked', type: 'started' },
+        updated_at: '2026-04-30T08:46:00.000Z'
+      },
+      previous_state: { id: 'state-merging', name: 'Merging', type: 'started' },
+      target_state: { id: 'state-blocked', name: 'Blocked', type: 'started' },
+      source_setup: null
+    }));
+    const docsFreshnessOwner = docsFreshnessOwnerCloseout({
+      status: 'evidence_checked',
+      terminal_transition_blocked: true,
+      reason: 'current_issue_owns_docs_freshness_rolling_debt',
+      policy_owner_issue: 'CO-444',
+      freshness_decision: 'pass_with_owned_rolling_debt',
+      owner_issue: 'CO-444',
+      owner_issue_action: {
+        duplicate_policy: 'one_owner_issue_per_canonical_owner_key',
+        canonical_owner_key: 'docs:freshness:maintain',
+        mode: 'update_existing',
+        issue: 'CO-444',
+        existing_issue: null,
+        reason: 'succeeded'
+      },
+      owner_issue_verification: {
+        issue: 'CO-444',
+        state: 'Blocked',
+        state_type: 'started',
+        is_terminal: false,
+        usable: true,
+        verification_status: 'succeeded'
+      },
+      candidate_cohorts: [
+        {
+          id: 'co-420-apr-28-march-28-task-packet-mirror',
+          owner_issue: 'CO-444',
+          owner_issue_action: {
+            mode: 'update_existing',
+            issue: 'CO-444',
+            reason: 'succeeded'
+          }
+        }
+      ],
+      blocking_changed_paths: []
+    });
+
+    const result = await runProviderDeterministicMergeCloseout(
+      {
+        issueId: 'lin-co-444',
+        issueIdentifier: 'CO-444',
+        issueState: 'Merging',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-30T08:44:00.000Z',
+        repoRoot: '/tmp/co'
+      },
+      {
+        now: vi.fn().mockReturnValue('2026-04-30T08:46:00.000Z'),
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-co-444',
+            identifier: 'CO-444',
+            title: 'Docs freshness owner renewal',
+            description: null,
+            url: null,
+            updated_at: '2026-04-30T08:44:00.000Z',
+            workspace_id: null,
+            state: { id: 'state-merging', name: 'Merging', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/730' }],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+        resolveDocsFreshnessOwnerCloseout: vi.fn(async () => docsFreshnessOwner),
+        runCommand,
+        transitionIssueState
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'action_required',
+      reason: 'docs_freshness_live_owner_blocks_done_transition',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      shared_root: {
+        status: 'reconciled',
+        reason: 'shared_root_reconciled'
+      },
+      docs_freshness_owner: {
+        terminal_transition_blocked: true,
+        freshness_decision: 'pass_with_owned_rolling_debt',
+        owner_issue: 'CO-444',
+        blocking_changed_paths: []
+      },
+      linear_transition: {
+        status: 'transitioned',
+        target_state: 'Blocked',
+        issue_state: 'Blocked'
+      }
+    });
+    expect(result.summary).toContain('moved the issue to Blocked instead of transitioning it to Done');
+    expect(transitionIssueState).toHaveBeenCalledTimes(1);
+    expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'lin-co-444',
+      stateName: 'Blocked',
+      expectedStateName: 'Merging',
+      expectedStateType: 'started',
+      expectedUpdatedAt: '2026-04-30T08:44:00.000Z'
+    }));
+  });
+
+  it('uses the default docs:freshness policy resolver from docs-catalog policies before Done', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'provider-merge-closeout-docs-policy-'));
+    try {
+      await mkdir(join(repoRoot, 'docs'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'docs', 'docs-catalog.json'),
+        JSON.stringify({
+          policies: {
+            rolling_freshness_cohorts: {
+              canonical_owner_key: 'docs:freshness:maintain',
+              owner_issue: 'CO-444'
+            }
+          }
+        }),
+        'utf8'
+      );
+      await writeFile(
+        join(repoRoot, 'package.json'),
+        JSON.stringify({
+          scripts: {
+            'docs:freshness:maintain': 'node maintain.mjs'
+          }
+        }),
+        'utf8'
+      );
+      await writeFile(
+        join(repoRoot, 'maintain.mjs'),
+        `console.log(JSON.stringify({
+          freshness_decision: 'pass_with_owned_rolling_debt',
+          owner_issue: 'CO-444',
+          owner_issue_action: {
+            mode: 'update_existing',
+            issue: 'CO-444',
+            reason: 'succeeded'
+          },
+          owner_issue_verification: {
+            issue: 'CO-444',
+            state: 'Blocked',
+            state_type: 'started',
+            is_terminal: false,
+            usable: true
+          },
+          candidate_cohorts: [{ id: 'co-420-apr-28-march-28-task-packet-mirror' }],
+          blocking_changed_paths: []
+        }));\n`,
+        'utf8'
+      );
+
+      const runCommand = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          exitCode: 0,
+          stdout: 'git@github.com:asabeko/CO.git\n',
+          stderr: ''
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          exitCode: 0,
+          stdout: '## main...origin/main\n',
+          stderr: ''
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          exitCode: 0,
+          stdout: '',
+          stderr: ''
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          exitCode: 0,
+          stdout: 'Already up to date.\n',
+          stderr: ''
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          exitCode: 0,
+          stdout: '## main...origin/main\n',
+          stderr: ''
+        });
+      const transitionIssueState = vi.fn(async () => ({
+        ok: true as const,
+        operation: 'transition' as const,
+        action: 'updated' as const,
+        issue: {
+          id: 'lin-co-444',
+          identifier: 'CO-444',
+          state: { id: 'state-blocked', name: 'Blocked', type: 'started' },
+          updated_at: '2026-04-30T08:46:00.000Z'
+        },
+        previous_state: { id: 'state-merging', name: 'Merging', type: 'started' },
+        target_state: { id: 'state-blocked', name: 'Blocked', type: 'started' },
+        source_setup: null
+      }));
+
+      const result = await runProviderDeterministicMergeCloseout(
+        {
+          issueId: 'lin-co-444',
+          issueIdentifier: 'CO-444',
+          issueState: 'Merging',
+          issueStateType: 'started',
+          issueUpdatedAt: '2026-04-30T08:44:00.000Z',
+          repoRoot
+        },
+        {
+          now: vi.fn().mockReturnValue('2026-04-30T08:46:00.000Z'),
+          readIssueContext: vi.fn(async () => ({
+            ok: true,
+            operation: 'issue-context',
+            issue: {
+              id: 'lin-co-444',
+              identifier: 'CO-444',
+              title: 'Docs freshness owner renewal',
+              description: null,
+              url: null,
+              updated_at: '2026-04-30T08:44:00.000Z',
+              workspace_id: null,
+              state: { id: 'state-merging', name: 'Merging', type: 'started' },
+              team: null,
+              project: null,
+              comments: [],
+              attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/730' }],
+              workpad_comment: null
+            },
+            source_setup: null
+          })),
+          fetchSnapshot: vi.fn().mockResolvedValue({
+            state: 'MERGED',
+            reviewDecision: 'APPROVED',
+            mergeStateStatus: 'UNKNOWN',
+            readyToMerge: false,
+            gateReasons: ['state=MERGED'],
+            unresolvedThreadCount: 0,
+            updatedAt: '2026-04-30T08:45:00.000Z',
+            mergedAt: '2026-04-30T08:45:00.000Z',
+            headOid: 'abc123',
+            checks: { pending: [], failed: [] },
+            requiredChecks: { pending: [], failed: [] }
+          }),
+          resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+          runCommand,
+          transitionIssueState
+        }
+      );
+
+      expect(result).toMatchObject({
+        status: 'action_required',
+        reason: 'docs_freshness_live_owner_blocks_done_transition',
+        docs_freshness_owner: {
+          policy_owner_issue: 'CO-444',
+          policy_canonical_owner_key: 'docs:freshness:maintain',
+          terminal_transition_blocked: true,
+          owner_issue: 'CO-444',
+          blocking_changed_paths: []
+        },
+        linear_transition: {
+          target_state: 'Blocked'
+        }
+      });
+      expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
+        stateName: 'Blocked'
+      }));
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('blocks non-clean current-owner docs:freshness decisions without candidate cohorts', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'provider-merge-closeout-docs-blocking-owner-'));
+    try {
+      await mkdir(join(repoRoot, 'docs'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'docs', 'docs-catalog.json'),
+        JSON.stringify({
+          policies: {
+            rolling_freshness_cohorts: {
+              canonical_owner_key: 'docs:freshness:maintain',
+              owner_issue: 'CO-444'
+            }
+          }
+        }),
+        'utf8'
+      );
+      await writeFile(
+        join(repoRoot, 'package.json'),
+        JSON.stringify({
+          scripts: {
+            'docs:freshness:maintain': 'node maintain.mjs'
+          }
+        }),
+        'utf8'
+      );
+      await writeFile(
+        join(repoRoot, 'maintain.mjs'),
+        `console.log(JSON.stringify({
+          freshness_decision: 'block_diff_local',
+          owner_issue: 'CO-444',
+          owner_issue_action: {
+            mode: 'update_existing',
+            issue: 'CO-444',
+            reason: 'succeeded'
+          },
+          owner_issue_verification: {
+            issue: 'CO-444',
+            state: 'Blocked',
+            state_type: 'started',
+            is_terminal: false,
+            usable: true
+          },
+          candidate_cohorts: [],
+          blocking_changed_paths: ['docs/TASKS.md']
+        }));\n`,
+        'utf8'
+      );
+
+      const runCommand = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          exitCode: 0,
+          stdout: 'git@github.com:asabeko/CO.git\n',
+          stderr: ''
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          exitCode: 0,
+          stdout: '## main...origin/main\n',
+          stderr: ''
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          exitCode: 0,
+          stdout: '',
+          stderr: ''
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          exitCode: 0,
+          stdout: 'Already up to date.\n',
+          stderr: ''
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          exitCode: 0,
+          stdout: '## main...origin/main\n',
+          stderr: ''
+        });
+      const transitionIssueState = vi.fn(async () => ({
+        ok: true as const,
+        operation: 'transition' as const,
+        action: 'updated' as const,
+        issue: {
+          id: 'lin-co-444',
+          identifier: 'CO-444',
+          state: { id: 'state-blocked', name: 'Blocked', type: 'started' },
+          updated_at: '2026-04-30T08:46:00.000Z'
+        },
+        previous_state: { id: 'state-merging', name: 'Merging', type: 'started' },
+        target_state: { id: 'state-blocked', name: 'Blocked', type: 'started' },
+        source_setup: null
+      }));
+
+      const result = await runProviderDeterministicMergeCloseout(
+        {
+          issueId: 'lin-co-444',
+          issueIdentifier: 'CO-444',
+          issueState: 'Merging',
+          issueStateType: 'started',
+          issueUpdatedAt: '2026-04-30T08:44:00.000Z',
+          repoRoot
+        },
+        {
+          now: vi.fn().mockReturnValue('2026-04-30T08:46:00.000Z'),
+          readIssueContext: vi.fn(async () => ({
+            ok: true,
+            operation: 'issue-context',
+            issue: {
+              id: 'lin-co-444',
+              identifier: 'CO-444',
+              title: 'Docs freshness owner renewal',
+              description: null,
+              url: null,
+              updated_at: '2026-04-30T08:44:00.000Z',
+              workspace_id: null,
+              state: { id: 'state-merging', name: 'Merging', type: 'started' },
+              team: null,
+              project: null,
+              comments: [],
+              attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/730' }],
+              workpad_comment: null
+            },
+            source_setup: null
+          })),
+          fetchSnapshot: vi.fn().mockResolvedValue({
+            state: 'MERGED',
+            reviewDecision: 'APPROVED',
+            mergeStateStatus: 'UNKNOWN',
+            readyToMerge: false,
+            gateReasons: ['state=MERGED'],
+            unresolvedThreadCount: 0,
+            updatedAt: '2026-04-30T08:45:00.000Z',
+            mergedAt: '2026-04-30T08:45:00.000Z',
+            headOid: 'abc123',
+            checks: { pending: [], failed: [] },
+            requiredChecks: { pending: [], failed: [] }
+          }),
+          resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+          runCommand,
+          transitionIssueState
+        }
+      );
+
+      expect(result).toMatchObject({
+        status: 'action_required',
+        reason: 'docs_freshness_live_owner_blocks_done_transition',
+        docs_freshness_owner: {
+          terminal_transition_blocked: true,
+          freshness_decision: 'block_diff_local',
+          owner_issue: 'CO-444',
+          candidate_cohorts: [],
+          blocking_changed_paths: ['docs/TASKS.md']
+        },
+        linear_transition: {
+          target_state: 'Blocked'
+        }
+      });
+      expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
+        stateName: 'Blocked'
+      }));
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores non-canonical top-level rolling freshness policy data', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'provider-merge-closeout-docs-top-level-policy-'));
+    try {
+      await mkdir(join(repoRoot, 'docs'), { recursive: true });
+      await writeFile(
+        join(repoRoot, 'docs', 'docs-catalog.json'),
+        JSON.stringify({
+          rolling_freshness_cohorts: {
+            canonical_owner_key: 'docs:freshness:maintain',
+            owner_issue: 'CO-444'
+          }
+        }),
+        'utf8'
+      );
+
+      const runCommand = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          exitCode: 0,
+          stdout: 'git@github.com:asabeko/CO.git\n',
+          stderr: ''
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          exitCode: 0,
+          stdout: '## main...origin/main\n',
+          stderr: ''
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          exitCode: 0,
+          stdout: '',
+          stderr: ''
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          exitCode: 0,
+          stdout: 'Already up to date.\n',
+          stderr: ''
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          exitCode: 0,
+          stdout: '## main...origin/main\n',
+          stderr: ''
+        });
+      const transitionIssueState = vi.fn(async () => ({
+        ok: true as const,
+        operation: 'transition' as const,
+        action: 'updated' as const,
+        issue: {
+          id: 'lin-co-444',
+          identifier: 'CO-444',
+          state: { id: 'state-done', name: 'Done', type: 'completed' },
+          updated_at: '2026-04-30T08:46:00.000Z'
+        },
+        previous_state: { id: 'state-merging', name: 'Merging', type: 'started' },
+        target_state: { id: 'state-done', name: 'Done', type: 'completed' },
+        source_setup: null
+      }));
+
+      const result = await runProviderDeterministicMergeCloseout(
+        {
+          issueId: 'lin-co-444',
+          issueIdentifier: 'CO-444',
+          issueState: 'Merging',
+          issueStateType: 'started',
+          issueUpdatedAt: '2026-04-30T08:44:00.000Z',
+          repoRoot
+        },
+        {
+          now: vi.fn().mockReturnValue('2026-04-30T08:46:00.000Z'),
+          readIssueContext: vi.fn(async () => ({
+            ok: true,
+            operation: 'issue-context',
+            issue: {
+              id: 'lin-co-444',
+              identifier: 'CO-444',
+              title: 'Docs freshness owner renewal',
+              description: null,
+              url: null,
+              updated_at: '2026-04-30T08:44:00.000Z',
+              workspace_id: null,
+              state: { id: 'state-merging', name: 'Merging', type: 'started' },
+              team: null,
+              project: null,
+              comments: [],
+              attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/730' }],
+              workpad_comment: null
+            },
+            source_setup: null
+          })),
+          fetchSnapshot: vi.fn().mockResolvedValue({
+            state: 'MERGED',
+            reviewDecision: 'APPROVED',
+            mergeStateStatus: 'UNKNOWN',
+            readyToMerge: false,
+            gateReasons: ['state=MERGED'],
+            unresolvedThreadCount: 0,
+            updatedAt: '2026-04-30T08:45:00.000Z',
+            mergedAt: '2026-04-30T08:45:00.000Z',
+            headOid: 'abc123',
+            checks: { pending: [], failed: [] },
+            requiredChecks: { pending: [], failed: [] }
+          }),
+          resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+          runCommand,
+          transitionIssueState
+        }
+      );
+
+      expect(result).toMatchObject({
+        status: 'merged',
+        docs_freshness_owner: {
+          status: 'not_configured',
+          terminal_transition_blocked: false,
+          reason: 'rolling_freshness_owner_not_configured',
+          policy_owner_issue: null,
+          policy_canonical_owner_key: null
+        },
+        linear_transition: {
+          target_state: 'Done'
+        }
+      });
+      expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
+        stateName: 'Done'
+      }));
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps normal Done closeout when docs:freshness:maintain ownership is re-homed', async () => {
+    const runCommand = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        exitCode: 0,
+        stdout: 'git@github.com:asabeko/CO.git\n',
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        exitCode: 0,
+        stdout: '## main...origin/main\n',
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        exitCode: 0,
+        stdout: '',
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        exitCode: 0,
+        stdout: 'Already up to date.\n',
+        stderr: ''
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        exitCode: 0,
+        stdout: '## main...origin/main\n',
+        stderr: ''
+      });
+    const fetchSnapshot = vi.fn().mockResolvedValue({
+      state: 'MERGED',
+      reviewDecision: 'APPROVED',
+      mergeStateStatus: 'UNKNOWN',
+      readyToMerge: false,
+      gateReasons: ['state=MERGED'],
+      unresolvedThreadCount: 0,
+      updatedAt: '2026-04-30T09:10:00.000Z',
+      mergedAt: '2026-04-30T09:10:00.000Z',
+      headOid: 'abc123',
+      checks: { pending: [], failed: [] },
+      requiredChecks: { pending: [], failed: [] }
+    });
+    const transitionIssueState = vi.fn(async () => ({
+      ok: true as const,
+      operation: 'transition' as const,
+      action: 'updated' as const,
+      issue: {
+        id: 'lin-co-444',
+        identifier: 'CO-444',
+        state: { id: 'state-done', name: 'Done', type: 'completed' },
+        updated_at: '2026-04-30T09:11:00.000Z'
+      },
+      previous_state: { id: 'state-merging', name: 'Merging', type: 'started' },
+      target_state: { id: 'state-done', name: 'Done', type: 'completed' },
+      source_setup: null
+    }));
+
+    const result = await runProviderDeterministicMergeCloseout(
+      {
+        issueId: 'lin-co-444',
+        issueIdentifier: 'CO-444',
+        issueState: 'Merging',
+        issueStateType: 'started',
+        issueUpdatedAt: '2026-04-30T09:09:00.000Z',
+        repoRoot: '/tmp/co'
+      },
+      {
+        now: vi.fn().mockReturnValue('2026-04-30T09:11:00.000Z'),
+        readIssueContext: vi.fn(async () => ({
+          ok: true,
+          operation: 'issue-context',
+          issue: {
+            id: 'lin-co-444',
+            identifier: 'CO-444',
+            title: 'Docs freshness owner renewal',
+            description: null,
+            url: null,
+            updated_at: '2026-04-30T09:09:00.000Z',
+            workspace_id: null,
+            state: { id: 'state-merging', name: 'Merging', type: 'started' },
+            team: null,
+            project: null,
+            comments: [],
+            attachments: [{ id: 'att-1', title: 'PR', url: 'https://github.com/asabeko/CO/pull/730' }],
+            workpad_comment: null
+          },
+          source_setup: null
+        })),
+        fetchSnapshot,
+        resolveSnapshotActionRequiredReasons: vi.fn(() => []),
+        resolveDocsFreshnessOwnerCloseout: vi.fn(async () =>
+          docsFreshnessOwnerCloseout({
+            policy_owner_issue: 'CO-431',
+            owner_issue: 'CO-431',
+            freshness_decision: 'pass_with_owned_rolling_debt'
+          })
+        ),
+        runCommand,
+        transitionIssueState
+      }
+    );
+
+    expect(result).toMatchObject({
+      status: 'merged',
+      reason: 'merged_and_transitioned_done_after_recovery',
+      docs_freshness_owner: {
+        terminal_transition_blocked: false,
+        policy_owner_issue: 'CO-431'
+      },
+      linear_transition: {
+        status: 'transitioned',
+        target_state: 'Done',
+        issue_state: 'Done'
+      }
+    });
+    expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
+      stateName: 'Done'
+    }));
   });
 
   it('treats merged recovery as authoritative when shared-root reconciliation succeeded but the Done transition is cooldown-suppressed', async () => {

@@ -1,4 +1,6 @@
 import { execFile } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
 
@@ -28,7 +30,9 @@ import {
 
 const execFileAsync = promisify(execFile);
 const PROVIDER_MERGE_CLOSEOUT_COMMAND_TIMEOUT_MS = 15_000;
+const PROVIDER_MERGE_CLOSEOUT_DOCS_FRESHNESS_TIMEOUT_MS = 120_000;
 const PROVIDER_MERGE_CLOSEOUT_MERGE_METHOD = 'squash';
+const DOCS_FRESHNESS_MAINTAIN_OWNER_KEY = 'docs:freshness:maintain';
 
 export type ProviderMergeCloseoutStatus =
   | 'watching'
@@ -117,6 +121,28 @@ export interface ProviderMergeCloseoutLinearTransitionRecord {
   error: string | null;
 }
 
+export interface ProviderDocsFreshnessOwnerCloseoutRecord {
+  status: 'not_configured' | 'not_current_owner' | 'evidence_checked' | 'evidence_unavailable';
+  terminal_transition_blocked: boolean;
+  reason: string | null;
+  policy_owner_issue: string | null;
+  policy_canonical_owner_key: string | null;
+  freshness_decision: string | null;
+  owner_issue: string | null;
+  owner_issue_action: Record<string, unknown> | null;
+  owner_issue_verification: Record<string, unknown> | null;
+  candidate_cohorts: Record<string, unknown>[];
+  blocking_changed_paths: string[] | null;
+  command: string | null;
+  args: string[] | null;
+  exit_code: number | null;
+  ok: boolean | null;
+  stdout: string | null;
+  stderr: string | null;
+  parse_error: string | null;
+  report_path: string | null;
+}
+
 export type ProviderReviewHandoffPromotionStatus =
   | 'watching'
   | 'action_required'
@@ -165,6 +191,7 @@ export interface ProviderMergeCloseoutRecord {
   branch_recovery: ProviderBranchRecoveryAttemptRecord | null;
   merge_attempt: ProviderMergeCloseoutAttemptRecord | null;
   shared_root: ProviderMergeCloseoutSharedRootRecord | null;
+  docs_freshness_owner: ProviderDocsFreshnessOwnerCloseoutRecord | null;
   linear_transition: ProviderMergeCloseoutLinearTransitionRecord | null;
   github_rate_limit?: ProviderGitHubRateLimitRecord | null;
 }
@@ -197,6 +224,11 @@ interface ProviderMergeCloseoutDependencies {
   transitionIssueState?: typeof transitionProviderLinearIssueState;
   runCommand?: ProviderMergeCloseoutCommandRunner;
   fetchSnapshot?: (input: ProviderPrSnapshotReaderInput) => Promise<ProviderPrSnapshotRecord>;
+  resolveDocsFreshnessOwnerCloseout?: (input: {
+    repoRoot: string;
+    issueIdentifier: string | null;
+    env: NodeJS.ProcessEnv;
+  }) => Promise<ProviderDocsFreshnessOwnerCloseoutRecord>;
   resolveSnapshotActionRequiredReasons?: (
     snapshot: ProviderPrSnapshotRecord,
     options?: { readinessMode?: 'merge' | 'review' }
@@ -239,6 +271,8 @@ export async function runProviderDeterministicMergeCloseout(
   const transitionIssueState = deps.transitionIssueState ?? transitionProviderLinearIssueState;
   const runCommand = deps.runCommand ?? runProviderMergeCloseoutCommand;
   const resolveSnapshot = deps.fetchSnapshot ?? fetchPrStatusSnapshot;
+  const resolveDocsFreshnessOwnerCloseout =
+    deps.resolveDocsFreshnessOwnerCloseout ?? resolveProviderDocsFreshnessOwnerCloseout;
   const resolveSnapshotActionRequiredReasons =
     deps.resolveSnapshotActionRequiredReasons ??
     ((snapshot: ProviderPrSnapshotRecord, options?: { readinessMode?: 'merge' | 'review' }) =>
@@ -262,6 +296,7 @@ export async function runProviderDeterministicMergeCloseout(
     branch_recovery: null as ProviderBranchRecoveryAttemptRecord | null,
     merge_attempt: null as ProviderMergeCloseoutAttemptRecord | null,
     shared_root: null as ProviderMergeCloseoutSharedRootRecord | null,
+    docs_freshness_owner: null as ProviderDocsFreshnessOwnerCloseoutRecord | null,
     linear_transition: null as ProviderMergeCloseoutLinearTransitionRecord | null,
     github_rate_limit: null as ProviderGitHubRateLimitRecord | null
   };
@@ -879,6 +914,80 @@ export async function runProviderDeterministicMergeCloseout(
     };
   }
 
+  const docsFreshnessOwner = await resolveDocsFreshnessOwnerCloseout({
+    repoRoot: input.repoRoot,
+    issueIdentifier: baseWithResolution.issue_identifier,
+    env
+  });
+  if (docsFreshnessOwner.terminal_transition_blocked) {
+    const transitionAttemptedAt = now();
+    const transitionResult = await transitionIssueState({
+      issueId: input.issueId,
+      stateName: 'Blocked',
+      expectedStateName: currentIssueState,
+      expectedStateType: currentIssueStateType,
+      expectedUpdatedAt: currentIssueUpdatedAt,
+      env,
+      sourceSetup: input.sourceSetup
+    });
+    const linearTransition: ProviderMergeCloseoutLinearTransitionRecord = transitionResult.ok
+      ? {
+          status: transitionResult.action === 'noop' ? 'noop' : 'transitioned',
+          attempted_at: transitionAttemptedAt,
+          previous_state: transitionResult.previous_state?.name ?? currentIssueState ?? null,
+          target_state: transitionResult.target_state.name,
+          issue_state: transitionResult.issue.state?.name ?? null,
+          issue_state_type: transitionResult.issue.state?.type ?? null,
+          issue_updated_at: transitionResult.issue.updated_at ?? currentIssueUpdatedAt,
+          error: null
+        }
+      : {
+          status: 'failed',
+          attempted_at: transitionAttemptedAt,
+          previous_state: currentIssueState ?? null,
+          target_state: 'Blocked',
+          issue_state: currentIssueState ?? null,
+          issue_state_type: currentIssueStateType ?? null,
+          issue_updated_at: currentIssueUpdatedAt,
+          error: `${transitionResult.error.code}: ${transitionResult.error.message}`
+        };
+    if (!transitionResult.ok) {
+      return {
+        ...baseWithResolution,
+        pr,
+        snapshot: verificationSnapshot,
+        branch_recovery: branchRecovery,
+        merge_attempt: mergeAttempt,
+        shared_root: sharedRoot,
+        docs_freshness_owner: docsFreshnessOwner,
+        linear_transition: linearTransition,
+        status: 'transition_failed',
+        reason: 'linear_blocked_transition_failed_for_docs_freshness_owner',
+        summary: summarizeSelection(
+          `Attached PR #${pr.number} merged and the shared root is reconciled, but ${DOCS_FRESHNESS_MAINTAIN_OWNER_KEY} still identifies ${baseWithResolution.issue_identifier ?? input.issueId} as the live owner and the Linear issue could not transition to Blocked instead of Done.`
+        )
+      };
+    }
+    return {
+      ...baseWithResolution,
+      issue_state: linearTransition.issue_state,
+      issue_state_type: linearTransition.issue_state_type,
+      issue_updated_at: linearTransition.issue_updated_at,
+      pr,
+      snapshot: verificationSnapshot,
+      branch_recovery: branchRecovery,
+      merge_attempt: mergeAttempt,
+      shared_root: sharedRoot,
+      docs_freshness_owner: docsFreshnessOwner,
+      linear_transition: linearTransition,
+      status: 'action_required',
+      reason: 'docs_freshness_live_owner_blocks_done_transition',
+      summary: summarizeSelection(
+        `Attached PR #${pr.number} merged and the shared root is reconciled, but ${baseWithResolution.issue_identifier ?? input.issueId} is still the live ${DOCS_FRESHNESS_MAINTAIN_OWNER_KEY} owner; moved the issue to Blocked instead of transitioning it to Done.`
+      )
+    };
+  }
+
   const transitionAttemptedAt = now();
   const transitionResult = await transitionIssueState({
     issueId: input.issueId,
@@ -920,6 +1029,7 @@ export async function runProviderDeterministicMergeCloseout(
         branch_recovery: branchRecovery,
         merge_attempt: mergeAttempt,
         shared_root: sharedRoot,
+        docs_freshness_owner: docsFreshnessOwner,
         linear_transition: linearTransition,
         status: 'merged',
         reason: 'merged_and_shared_root_reconciled_transition_deferred',
@@ -935,6 +1045,7 @@ export async function runProviderDeterministicMergeCloseout(
       branch_recovery: branchRecovery,
       merge_attempt: mergeAttempt,
       shared_root: sharedRoot,
+      docs_freshness_owner: docsFreshnessOwner,
       linear_transition: linearTransition,
       status: 'transition_failed',
       reason: 'linear_done_transition_failed',
@@ -952,6 +1063,7 @@ export async function runProviderDeterministicMergeCloseout(
     branch_recovery: branchRecovery,
     merge_attempt: mergeAttempt,
     shared_root: sharedRoot,
+    docs_freshness_owner: docsFreshnessOwner,
     linear_transition: linearTransition,
     status: 'merged',
     reason: alreadyMerged
@@ -1568,6 +1680,266 @@ async function reconcileSharedRootAfterMerge(input: {
     after_status: normalizeCommandText(afterStatusResult.stdout),
     reason: afterStatusResult.ok ? 'shared_root_reconciled' : 'git_status_after_failed'
   };
+}
+
+async function resolveProviderDocsFreshnessOwnerCloseout(input: {
+  repoRoot: string;
+  issueIdentifier: string | null;
+  env: NodeJS.ProcessEnv;
+}): Promise<ProviderDocsFreshnessOwnerCloseoutRecord> {
+  const issueIdentifier = normalizeOptionalString(input.issueIdentifier);
+  let policy: { owner_issue: string | null; canonical_owner_key: string | null } | null = null;
+  try {
+    policy = await readDocsFreshnessOwnerPolicy(input.repoRoot);
+  } catch (error) {
+    return {
+      status: 'evidence_unavailable',
+      terminal_transition_blocked: false,
+      reason: `policy_read_failed: ${(error as Error)?.message ?? String(error)}`,
+      policy_owner_issue: null,
+      policy_canonical_owner_key: null,
+      freshness_decision: null,
+      owner_issue: null,
+      owner_issue_action: null,
+      owner_issue_verification: null,
+      candidate_cohorts: [],
+      blocking_changed_paths: null,
+      command: null,
+      args: null,
+      exit_code: null,
+      ok: null,
+      stdout: null,
+      stderr: null,
+      parse_error: null,
+      report_path: null
+    };
+  }
+
+  if (!policy?.owner_issue) {
+    return {
+      status: 'not_configured',
+      terminal_transition_blocked: false,
+      reason: 'rolling_freshness_owner_not_configured',
+      policy_owner_issue: policy?.owner_issue ?? null,
+      policy_canonical_owner_key: policy?.canonical_owner_key ?? null,
+      freshness_decision: null,
+      owner_issue: null,
+      owner_issue_action: null,
+      owner_issue_verification: null,
+      candidate_cohorts: [],
+      blocking_changed_paths: null,
+      command: null,
+      args: null,
+      exit_code: null,
+      ok: null,
+      stdout: null,
+      stderr: null,
+      parse_error: null,
+      report_path: null
+    };
+  }
+
+  if (!issueIdentifier || policy.owner_issue !== issueIdentifier) {
+    return {
+      status: 'not_current_owner',
+      terminal_transition_blocked: false,
+      reason: issueIdentifier ? 'rolling_freshness_owner_is_different_issue' : 'issue_identifier_unavailable',
+      policy_owner_issue: policy.owner_issue,
+      policy_canonical_owner_key: policy.canonical_owner_key,
+      freshness_decision: null,
+      owner_issue: null,
+      owner_issue_action: null,
+      owner_issue_verification: null,
+      candidate_cohorts: [],
+      blocking_changed_paths: null,
+      command: null,
+      args: null,
+      exit_code: null,
+      ok: null,
+      stdout: null,
+      stderr: null,
+      parse_error: null,
+      report_path: null
+    };
+  }
+
+  return await readDocsFreshnessMaintainOwnerEvidence({
+    repoRoot: input.repoRoot,
+    env: input.env,
+    policyOwnerIssue: policy.owner_issue,
+    policyCanonicalOwnerKey: policy.canonical_owner_key,
+    issueIdentifier
+  });
+}
+
+async function readDocsFreshnessOwnerPolicy(
+  repoRoot: string
+): Promise<{ owner_issue: string | null; canonical_owner_key: string | null } | null> {
+  const raw = await readFile(path.join(repoRoot, 'docs', 'docs-catalog.json'), 'utf8');
+  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  const policies = parsed.policies && typeof parsed.policies === 'object'
+    ? (parsed.policies as Record<string, unknown>)
+    : null;
+  const policy = policies?.rolling_freshness_cohorts;
+  if (!policy || typeof policy !== 'object') {
+    return null;
+  }
+  return {
+    owner_issue: normalizeOptionalString((policy as Record<string, unknown>).owner_issue),
+    canonical_owner_key: normalizeOptionalString((policy as Record<string, unknown>).canonical_owner_key)
+  };
+}
+
+async function readDocsFreshnessMaintainOwnerEvidence(input: {
+  repoRoot: string;
+  env: NodeJS.ProcessEnv;
+  policyOwnerIssue: string | null;
+  policyCanonicalOwnerKey: string | null;
+  issueIdentifier: string;
+}): Promise<ProviderDocsFreshnessOwnerCloseoutRecord> {
+  const command = 'npm';
+  const args = ['--silent', 'run', 'docs:freshness:maintain', '--', '--format', 'json'];
+  let stdout = '';
+  let stderr = '';
+  let exitCode: number | null = 0;
+  let ok = true;
+  try {
+    const result = await execFileAsync(command, args, {
+      cwd: input.repoRoot,
+      env: input.env,
+      timeout: PROVIDER_MERGE_CLOSEOUT_DOCS_FRESHNESS_TIMEOUT_MS,
+      maxBuffer: 10 * 1024 * 1024
+    });
+    stdout = result.stdout;
+    stderr = result.stderr;
+  } catch (error) {
+    const failed = error as Error & {
+      stdout?: string | Buffer;
+      stderr?: string | Buffer;
+      code?: number | string | null;
+    };
+    stdout = String(failed.stdout ?? '');
+    stderr = String(failed.stderr ?? failed.message ?? '');
+    exitCode = typeof failed.code === 'number' ? failed.code : null;
+    ok = false;
+  }
+
+  const parsed = parseDocsFreshnessMaintainJson(stdout);
+  const normalized = normalizeDocsFreshnessMaintainDecision(parsed.value);
+  const terminalTransitionBlocked = shouldBlockTerminalTransitionForDocsFreshnessOwner({
+    decision: normalized,
+    parseError: parsed.error,
+    issueIdentifier: input.issueIdentifier
+  });
+  return {
+    status: parsed.error ? 'evidence_unavailable' : 'evidence_checked',
+    terminal_transition_blocked: terminalTransitionBlocked,
+    reason: terminalTransitionBlocked
+      ? parsed.error
+        ? 'docs_freshness_owner_evidence_unavailable'
+        : 'current_issue_owns_docs_freshness_rolling_debt'
+      : parsed.error
+        ? 'docs_freshness_owner_evidence_unavailable'
+        : 'current_issue_not_owner_bearing_after_maintenance_check',
+    policy_owner_issue: input.policyOwnerIssue,
+    policy_canonical_owner_key: input.policyCanonicalOwnerKey,
+    freshness_decision: normalized.freshness_decision,
+    owner_issue: normalized.owner_issue,
+    owner_issue_action: normalized.owner_issue_action,
+    owner_issue_verification: normalized.owner_issue_verification,
+    candidate_cohorts: normalized.candidate_cohorts,
+    blocking_changed_paths: normalized.blocking_changed_paths,
+    command,
+    args,
+    exit_code: exitCode,
+    ok,
+    stdout: normalizeCommandText(stdout),
+    stderr: normalizeCommandText(stderr),
+    parse_error: parsed.error,
+    report_path: normalized.report_path
+  };
+}
+
+function parseDocsFreshnessMaintainJson(
+  stdout: string
+): { value: Record<string, unknown> | null; error: string | null } {
+  const trimmed = stdout.trim();
+  if (!trimmed) {
+    return { value: null, error: 'empty_stdout' };
+  }
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (firstBrace < 0 || lastBrace < firstBrace) {
+    return { value: null, error: 'json_object_not_found' };
+  }
+  try {
+    const value = JSON.parse(trimmed.slice(firstBrace, lastBrace + 1));
+    return value && typeof value === 'object'
+      ? { value: value as Record<string, unknown>, error: null }
+      : { value: null, error: 'json_value_not_object' };
+  } catch (error) {
+    return { value: null, error: `json_parse_failed: ${(error as Error)?.message ?? String(error)}` };
+  }
+}
+
+function normalizeDocsFreshnessMaintainDecision(value: Record<string, unknown> | null): {
+  freshness_decision: string | null;
+  owner_issue: string | null;
+  owner_issue_action: Record<string, unknown> | null;
+  owner_issue_verification: Record<string, unknown> | null;
+  candidate_cohorts: Record<string, unknown>[];
+  blocking_changed_paths: string[] | null;
+  report_path: string | null;
+} {
+  const ownerIssueAction =
+    value?.owner_issue_action && typeof value.owner_issue_action === 'object'
+      ? (value.owner_issue_action as Record<string, unknown>)
+      : null;
+  const ownerIssueVerification =
+    value?.owner_issue_verification && typeof value.owner_issue_verification === 'object'
+      ? (value.owner_issue_verification as Record<string, unknown>)
+      : null;
+  const candidateCohorts = Array.isArray(value?.candidate_cohorts)
+    ? value.candidate_cohorts.filter((cohort): cohort is Record<string, unknown> =>
+        Boolean(cohort && typeof cohort === 'object')
+      )
+    : [];
+  return {
+    freshness_decision: normalizeOptionalString(value?.freshness_decision),
+    owner_issue: normalizeOptionalString(value?.owner_issue),
+    owner_issue_action: ownerIssueAction,
+    owner_issue_verification: ownerIssueVerification,
+    candidate_cohorts: candidateCohorts,
+    blocking_changed_paths: Array.isArray(value?.blocking_changed_paths)
+      ? value.blocking_changed_paths.map(normalizeOptionalString).filter((entry): entry is string => Boolean(entry))
+      : null,
+    report_path: normalizeOptionalString(value?.report_path)
+  };
+}
+
+function shouldBlockTerminalTransitionForDocsFreshnessOwner(input: {
+  decision: ReturnType<typeof normalizeDocsFreshnessMaintainDecision>;
+  parseError: string | null;
+  issueIdentifier: string;
+}): boolean {
+  if (input.parseError) {
+    return true;
+  }
+  const ownerIssue = input.decision.owner_issue;
+  const ownerActionIssue = normalizeOptionalString(input.decision.owner_issue_action?.issue);
+  const ownerActionExistingIssue = normalizeOptionalString(input.decision.owner_issue_action?.existing_issue);
+  const ownerActionReason = normalizeOptionalString(input.decision.owner_issue_action?.reason);
+  if (
+    ownerActionExistingIssue === input.issueIdentifier &&
+    ownerActionReason === 'configured_owner_terminal'
+  ) {
+    return true;
+  }
+  const currentIssueIsOwner = ownerIssue === input.issueIdentifier || ownerActionIssue === input.issueIdentifier;
+  if (!currentIssueIsOwner) {
+    return false;
+  }
+  return input.decision.freshness_decision !== 'clean';
 }
 
 async function runProviderMergeCloseoutCommand(input: {

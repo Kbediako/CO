@@ -1495,6 +1495,30 @@ function deriveMergeCloseoutProgressSnapshot(
         recovery_recommendation: 'inspect_merge_closeout'
       };
     }
+    if (mergeStatus === 'transition_failed') {
+      return {
+        phase: 'failed',
+        kind: 'merge_closeout',
+        status: 'failed',
+        summary,
+        last_semantic_progress_at: lastSemanticProgressAt,
+        stall_classification: 'failed',
+        stall_reason: normalizeOptionalString(mergeCloseout.reason) ?? mergeStatus,
+        recovery_recommendation: 'inspect_merge_closeout'
+      };
+    }
+    if (mergeStatus === 'action_required') {
+      return {
+        phase: 'watching_merge',
+        kind: 'merge_closeout',
+        status: 'stalled',
+        summary,
+        last_semantic_progress_at: lastSemanticProgressAt,
+        stall_classification: 'stalled',
+        stall_reason: normalizeOptionalString(mergeCloseout.reason) ?? 'merge_action_required',
+        recovery_recommendation: 'inspect_merge_closeout'
+      };
+    }
     return {
       phase: 'completed',
       kind: 'merge_closeout',
