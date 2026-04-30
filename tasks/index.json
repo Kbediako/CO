@@ -1,6 +1,85 @@
 {
   "items": [
     {
+      "id": "20260429-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566",
+      "title": "CO-427 re-home docs:freshness:maintain owner after terminal CO-425",
+      "relates_to": "tasks/tasks-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-30",
+      "evidence": [
+        ".agent/task/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
+        "docs/ACTION_PLAN-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
+        "docs/PRD-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
+        "docs/TECH_SPEC-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
+        "docs/docs-catalog.json",
+        "docs/guides/docs-freshness-cohorts.md",
+        "tasks/specs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
+        "tasks/tasks-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
+        "out/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/docs-freshness-maintenance.json",
+        ".runs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/cli/2026-04-30T03-53-13-149Z-36af8a4c/review/telemetry.json",
+        "out/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/manual/elegance-review.md"
+      ],
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "approvals": {
+        "docs_packet_worker": {
+          "reviewer": "write-enabled CO-427 owner-rehome worker",
+          "date": "2026-04-29",
+          "status": "owner-rehome-implemented",
+          "summary": "Created the CO-427 docs-first packet, reproduced docs:freshness:maintain block_unowned_repo_debt for terminal CO-425 with blocking_changed_paths=[], re-homed rolling_freshness_cohorts.owner_issue to live same-project CO-427, and preserved the retained March 28 cohort without row refresh, archive, deletion, reclassification, or policy weakening."
+        },
+        "baseline_owner_check": {
+          "reviewer": "write-enabled CO-427 owner-rehome worker",
+          "date": "2026-04-29",
+          "status": "baseline-blocked-terminal-owner",
+          "evidence": "out/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/pre-packet-docs-freshness-maintenance.json",
+          "summary": "Pre-packet maintenance check reproduced block_unowned_repo_debt for owner_issue=CO-425 with configured_owner_terminal, state=Done, state_type=completed, usable=false, and blocking_changed_paths=[]."
+        },
+        "focused_validation": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-29",
+          "status": "passed-owned-rolling-debt",
+          "evidence": "out/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/docs-freshness-maintenance.json",
+          "summary": "Post-fix docs:freshness passed with 33 rolling rows under CO-427; docs:freshness:maintain returned pass_with_owned_rolling_debt, owner_issue=CO-427, owner verification usable=true, policy_capacity_status=within_policy, and blocking_changed_paths=[]."
+        },
+        "repo_validation": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-30",
+          "status": "passed",
+          "summary": "After merging current origin/main, delegation guard passed with the recorded parent-only parallelization override; spec guard, build, lint, test (357 files / 5049 tests), docs:check, docs:freshness, docs:freshness:maintain, repo stewardship, git diff --check, and diff budget passed."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-30",
+          "status": "bounded-success",
+          "manifest": ".runs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/cli/2026-04-30T03-53-13-149Z-36af8a4c/manifest.json",
+          "telemetry": ".runs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/cli/2026-04-30T03-53-13-149Z-36af8a4c/review/telemetry.json",
+          "summary": "Manifest-backed forced standalone review executed under FORCE_CODEX_REVIEW=1 after merging origin/main and resolving the PR #728 overlap. The first attempt hit the bounded validation-command boundary, then the read-only retry found no actionable issues; telemetry records review_outcome=bounded-success via command-intent retry."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-30",
+          "status": "clean",
+          "evidence": "out/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/manual/elegance-review.md",
+          "summary": "Explicit minimality pass after the current-main refresh kept the fix scoped to owner metadata, cohort-guide evidence, and required task mirrors; no simplification patch was warranted."
+        },
+        "current_main_rebase": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-04-30",
+          "status": "passed",
+          "summary": "Merged origin/main at f8584aceb after PR #728, preserved CO-428/CO-429 metadata, retained terminal CO-430 as historical owner evidence, and re-homed docs:freshness:maintain to live same-project CO-427. Validation passed: delegation guard with parent-only override, spec-guard --dry-run, build, lint (existing DelegationMcpHealth warnings only), test (357 files / 5049 tests), docs:check, docs:freshness, docs:freshness:maintain -- --format json, repo:stewardship, git diff --check, and diff-budget with integration-overlap override."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
+        "task": "tasks/tasks-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
+        "agent_task": ".agent/task/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
+        "docs": "docs/TECH_SPEC-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md"
+      }
+    },
+    {
       "id": "20260430-linear-dc2bb702-db1d-450c-be19-a98571289a21",
       "title": "CO-428 own March 30 active-spec spec-guard baseline cohort",
       "relates_to": "tasks/tasks-linear-dc2bb702-db1d-450c-be19-a98571289a21.md",
