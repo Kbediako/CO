@@ -139,7 +139,7 @@ describe('provider issue observability', () => {
           attempted_count: 2,
           success_count: 2,
           failure_count: 0,
-          latest_recorded_at: '2026-04-30T08:54:01.000Z',
+          latest_recorded_at: '2026-04-30T08:56:00.000Z',
           parallelization_entries: [],
           entries: [
             {
