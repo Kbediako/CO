@@ -1,6 +1,49 @@
 {
   "items": [
     {
+      "id": "20260430-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5",
+      "title": "CO-446 target-keyed last_audit_operation projection",
+      "relates_to": "tasks/tasks-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-30",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        "docs/TECH_SPEC-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        "docs/ACTION_PLAN-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        "tasks/specs/linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        "tasks/tasks-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        ".agent/task/linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5-co-446-docs/cli/2026-04-30T15-05-22-251Z-426bef02/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane co-446-docs",
+          "date": "2026-04-30",
+          "status": "produced",
+          "manifest": ".runs/linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5-co-446-docs/cli/2026-04-30T15-05-22-251Z-426bef02/manifest.json",
+          "source_anchor": "ctx:sha256:2a4e2273e36ecf9d026dd8224bb505b531aca97dbb560f4191c678cbed955cb5#chunk:c000001",
+          "summary": "Created the CO-446 docs-first packet and registry mirrors only. The packet preserves co-status, last_audit_operation, issue_identifier, issue id, provider-linear-worker-linear-audit.jsonl, issue-context, CO-444, CO-445, and Blocked while framing the invariant that audit operations targeting CO-444 must not project as CO-445 current audit state. The referenced source payload path was absent in the child checkout, so the packet uses the child prompt as the issue-shaping contract. Parent owns source inspection, implementation, validation, Linear state, workpad, PR lifecycle, and review handoff."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        "task": "tasks/tasks-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        "agent_task": ".agent/task/linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md"
+        }
+      }
+    },
+    {
       "id": "20260430-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4",
       "title": "CO-431 canonical-owner docs freshness automation",
       "relates_to": "tasks/tasks-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",

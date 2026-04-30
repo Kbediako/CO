@@ -9,6 +9,8 @@ describe('provider issue observability', () => {
   it('classifies merge closeout lanes from one authoritative snapshot', () => {
     const snapshot = buildProviderIssueDebugSnapshot({
       tracked_issue: {
+        id: 'lin-issue-82',
+        identifier: 'CO-82',
         state: 'Merging',
         state_type: 'started',
         updated_at: '2026-04-05T06:00:00.000Z'
@@ -115,6 +117,254 @@ describe('provider issue observability', () => {
       recovery_recommendation: 'wait_for_checks'
     });
     expect(snapshot?.last_semantic_progress_at).toBe('2026-04-05T06:02:00.000Z');
+  });
+
+  it('does not project a cross-issue audit read as the active issue audit state', () => {
+    const snapshot = buildProviderIssueDebugSnapshot({
+      tracked_issue: {
+        id: 'lin-issue-445',
+        identifier: 'CO-445',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-04-30T08:50:00.000Z'
+      },
+      proof: {
+        issue_id: 'lin-issue-445',
+        issue_identifier: 'CO-445',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        updated_at: '2026-04-30T08:55:00.000Z',
+        linear_audit: {
+          path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+          attempted_count: 2,
+          success_count: 2,
+          failure_count: 0,
+          latest_recorded_at: '2026-04-30T08:54:01.000Z',
+          parallelization_entries: [],
+          entries: [
+            {
+              recorded_at: '2026-04-30T08:50:00.000Z',
+              operation: 'upsert-workpad',
+              ok: true,
+              issue_id: 'lin-issue-445',
+              issue_identifier: 'CO-445',
+              source_setup: null,
+              action: 'updated',
+              via: null,
+              state: 'In Progress',
+              follow_up_issue_id: null,
+              follow_up_issue_identifier: null,
+              failed_relation_type: null,
+              comment_id: 'comment-445',
+              attachment_id: null,
+              error_code: null,
+              error_message: null
+            },
+            {
+              recorded_at: '2026-04-30T08:54:01.000Z',
+              operation: 'issue-context',
+              ok: true,
+              issue_id: 'lin-issue-444',
+              issue_identifier: 'CO-444',
+              source_setup: null,
+              action: 'read',
+              via: null,
+              state: 'Blocked',
+              follow_up_issue_id: null,
+              follow_up_issue_identifier: null,
+              failed_relation_type: null,
+              comment_id: null,
+              attachment_id: null,
+              error_code: null,
+              error_message: null
+            },
+            {
+              recorded_at: '2026-04-30T08:56:00.000Z',
+              operation: 'issue-context',
+              ok: true,
+              issue_id: 'lin-issue-444',
+              issue_identifier: 'CO-445',
+              source_setup: null,
+              action: 'read',
+              via: null,
+              state: 'Blocked',
+              follow_up_issue_id: null,
+              follow_up_issue_identifier: null,
+              failed_relation_type: null,
+              comment_id: null,
+              attachment_id: null,
+              error_code: null,
+              error_message: null
+            }
+          ],
+          latest_by_operation: {
+            'upsert-workpad': {
+              recorded_at: '2026-04-30T08:50:00.000Z',
+              operation: 'upsert-workpad',
+              ok: true,
+              issue_id: 'lin-issue-445',
+              issue_identifier: 'CO-445',
+              source_setup: null,
+              action: 'updated',
+              via: null,
+              state: 'In Progress',
+              follow_up_issue_id: null,
+              follow_up_issue_identifier: null,
+              failed_relation_type: null,
+              comment_id: 'comment-445',
+              attachment_id: null,
+              error_code: null,
+              error_message: null
+            },
+            'issue-context': {
+              recorded_at: '2026-04-30T08:54:01.000Z',
+              operation: 'issue-context',
+              ok: true,
+              issue_id: 'lin-issue-444',
+              issue_identifier: 'CO-444',
+              source_setup: null,
+              action: 'read',
+              via: null,
+              state: 'Blocked',
+              follow_up_issue_id: null,
+              follow_up_issue_identifier: null,
+              failed_relation_type: null,
+              comment_id: null,
+              attachment_id: null,
+              error_code: null,
+              error_message: null
+            }
+          }
+        }
+      }
+    });
+
+    expect(snapshot?.last_audit_operation).toMatchObject({
+      operation: 'upsert-workpad',
+      state: 'In Progress',
+      target_issue_id: 'lin-issue-445',
+      target_issue_identifier: 'CO-445'
+    });
+    expect(snapshot?.last_cross_issue_audit_operation).toMatchObject({
+      operation: 'issue-context',
+      state: 'Blocked',
+      target_issue_id: 'lin-issue-444',
+      target_issue_identifier: 'CO-444'
+    });
+    expect(snapshot?.progress?.last_semantic_progress_at).toBe('2026-04-30T08:50:00.000Z');
+    expect(snapshot?.last_semantic_progress_at).toBe('2026-04-30T08:50:00.000Z');
+  });
+
+  it('fails closed when the current audit target identity is unavailable', () => {
+    const snapshot = buildProviderIssueDebugSnapshot({
+      tracked_issue: {
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-04-30T08:50:00.000Z'
+      },
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        linear_audit: {
+          path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+          attempted_count: 1,
+          success_count: 1,
+          failure_count: 0,
+          latest_recorded_at: '2026-04-30T08:54:01.000Z',
+          parallelization_entries: [],
+          entries: [
+            {
+              recorded_at: '2026-04-30T08:54:01.000Z',
+              operation: 'issue-context',
+              ok: true,
+              issue_id: 'lin-issue-444',
+              issue_identifier: 'CO-444',
+              source_setup: null,
+              action: 'read',
+              via: null,
+              state: 'Blocked',
+              follow_up_issue_id: null,
+              follow_up_issue_identifier: null,
+              failed_relation_type: null,
+              comment_id: null,
+              attachment_id: null,
+              error_code: null,
+              error_message: null
+            }
+          ],
+          latest_by_operation: {
+            'issue-context': {
+              recorded_at: '2026-04-30T08:54:01.000Z',
+              operation: 'issue-context',
+              ok: true,
+              issue_id: 'lin-issue-444',
+              issue_identifier: 'CO-444',
+              source_setup: null,
+              action: 'read',
+              via: null,
+              state: 'Blocked',
+              follow_up_issue_id: null,
+              follow_up_issue_identifier: null,
+              failed_relation_type: null,
+              comment_id: null,
+              attachment_id: null,
+              error_code: null,
+              error_message: null
+            }
+          }
+        }
+      }
+    });
+
+    expect(snapshot?.last_audit_operation).toBeNull();
+    expect(snapshot?.last_cross_issue_audit_operation).toBeNull();
+    expect(snapshot?.progress?.last_semantic_progress_at).toBeNull();
+  });
+
+  it('uses explicit selected issue identity when older proof shapes omit it', () => {
+    const snapshot = buildProviderIssueDebugSnapshot({
+      issue_id: 'lin-issue-445',
+      issue_identifier: 'CO-445',
+      proof: {
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        linear_audit: {
+          path: '/tmp/provider-linear-worker-linear-audit.jsonl',
+          attempted_count: 1,
+          success_count: 1,
+          failure_count: 0,
+          latest_recorded_at: '2026-04-30T08:50:00.000Z',
+          parallelization_entries: [],
+          latest_by_operation: {
+            'upsert-workpad': {
+              recorded_at: '2026-04-30T08:50:00.000Z',
+              operation: 'upsert-workpad',
+              ok: true,
+              issue_id: 'lin-issue-445',
+              issue_identifier: 'CO-445',
+              source_setup: null,
+              action: 'updated',
+              via: null,
+              state: 'In Progress',
+              follow_up_issue_id: null,
+              follow_up_issue_identifier: null,
+              failed_relation_type: null,
+              comment_id: 'comment-445',
+              attachment_id: null,
+              error_code: null,
+              error_message: null
+            }
+          }
+        }
+      }
+    });
+
+    expect(snapshot?.last_audit_operation).toMatchObject({
+      operation: 'upsert-workpad',
+      target_issue_id: 'lin-issue-445',
+      target_issue_identifier: 'CO-445'
+    });
+    expect(snapshot?.progress?.last_semantic_progress_at).toBe('2026-04-30T08:50:00.000Z');
   });
 
   it('surfaces review-handoff promotion blocker truth before an issue reaches Merging', () => {

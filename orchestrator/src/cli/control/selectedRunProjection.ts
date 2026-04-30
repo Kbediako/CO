@@ -888,6 +888,8 @@ function buildProjectionContextFromParts(
         })
       : null;
   const providerDebugSnapshot = buildProviderIssueDebugSnapshot({
+    issue_id: issueId,
+    issue_identifier: issueIdentifier,
     tracked_issue: matchedTrackedIssue,
     claim: providerClaim,
     proof: proofIsFreshForStage ? parts.providerLinearWorkerProof : null,
