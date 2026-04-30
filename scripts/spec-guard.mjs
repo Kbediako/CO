@@ -499,10 +499,22 @@ function isMarkdownSeparatorRow(line) {
   return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell.replace(/\s+/g, '')));
 }
 
+function isMarkdownFenceLine(line) {
+  return /^(`{3,}|~{3,})/.test(String(line).trim());
+}
+
 function extractMarkdownTableRows(content) {
   const lines = content.split(/\r?\n/);
   const rows = [];
+  let inFence = false;
   for (let index = 0; index < lines.length - 1; index += 1) {
+    if (isMarkdownFenceLine(lines[index])) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) {
+      continue;
+    }
     const header = splitMarkdownTableRow(lines[index]);
     if (header.length === 0 || !isMarkdownSeparatorRow(lines[index + 1])) {
       continue;
@@ -510,6 +522,9 @@ function extractMarkdownTableRows(content) {
 
     const normalizedHeaders = header.map((cell) => normalizeDecisionText(cell));
     for (let rowIndex = index + 2; rowIndex < lines.length; rowIndex += 1) {
+      if (isMarkdownFenceLine(lines[rowIndex])) {
+        break;
+      }
       const cells = splitMarkdownTableRow(lines[rowIndex]);
       if (cells.length === 0) {
         break;
@@ -540,12 +555,13 @@ function parseFallbackDecisionRows(content) {
 }
 
 function hasPlaceholderValue(value) {
-  const normalized = normalizeDecisionText(value);
-  const comparable = normalized.replace(/[.,;:]+$/, '').trim();
+  const normalized = String(value)
+    .replace(/[`*]/g, '')
+    .trim()
+    .toLowerCase();
+  const comparable = normalizePlaceholderComparable(value);
   const bracketedPlaceholder = comparable.match(/^\[([^\]]*)\]$/);
-  const bracketedComparable = bracketedPlaceholder
-    ? bracketedPlaceholder[1].replace(/[.,;:]+$/, '').trim()
-    : '';
+  const bracketedComparable = bracketedPlaceholder ? normalizePlaceholderComparable(bracketedPlaceholder[1]) : '';
   const isAnglePlaceholder =
     /^<.*>$/.test(normalized) && !/^<https?:\/\/[^>\s]+>$/.test(normalized);
   return (
@@ -555,6 +571,16 @@ function hasPlaceholderValue(value) {
     (bracketedPlaceholder !== null && isPlaceholderComparable(bracketedComparable)) ||
     isAnglePlaceholder
   );
+}
+
+function normalizePlaceholderComparable(value) {
+  return String(value)
+    .replace(/[`*]/g, '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/[.,;:]+$/, '')
+    .trim()
+    .toLowerCase();
 }
 
 function isPlaceholderComparable(comparable) {

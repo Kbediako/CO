@@ -1374,6 +1374,29 @@ describe('spec-guard script', () => {
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
 
+  it('ignores fenced fallback decision example tables', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      'Large-refactor check: keep the fixture scoped to one governed surface and one lifecycle phase.',
+      'Minor-seam behavior is acceptable only when one bounded fallback decision exists.',
+      '',
+      '```markdown',
+      fallbackDecisionTable([completeExpireFallbackRow()]),
+      '```'
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('fallback/seam-touching changes require a parseable CO-382 fallback decision table');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
   it('rejects contradictory fallback decisions for the same surface and seam across packet sources', async () => {
     const repo = await initRepository();
     const expireDecisionBody = fallbackDecisionTable([completeExpireFallbackRow()]);
@@ -2077,6 +2100,32 @@ describe('spec-guard script', () => {
         trigger: 'none',
         removalCondition: 'Not applicable (docs-only)',
         validation: 'N/A.'
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback decision requires non-empty owner');
+    expect(stdout).toContain('expire fallback decision requires non-empty trigger');
+    expect(stdout).toContain('expire fallback decision requires non-empty removal condition');
+    expect(stdout).toContain('expire fallback decision requires non-empty validation');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects separator-delimited placeholder metadata in expire fallback rows', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        owner: 'not_available',
+        trigger: 'to_be_determined',
+        removalCondition: 'not-recorded',
+        validation: 'not_available'
       })
     ]);
 
