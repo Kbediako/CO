@@ -1,6 +1,77 @@
 {
   "items": [
     {
+      "id": "20260430-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b",
+      "title": "CO-444 re-home docs:freshness:maintain owner after terminal CO-441",
+      "relates_to": "tasks/tasks-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-30",
+      "status": "in_progress",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "evidence": [
+        "docs/PRD-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
+        "docs/TECH_SPEC-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
+        "docs/ACTION_PLAN-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
+        "tasks/specs/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
+        "tasks/tasks-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
+        ".agent/task/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b-docs-packet/cli/2026-04-30T07-35-51-905Z-15903f69/manifest.json",
+        "docs/docs-catalog.json",
+        "docs/guides/docs-freshness-cohorts.md",
+        "out/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b/docs-freshness-maintenance.json",
+        "../../.runs/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b/cli/2026-04-30T07-32-29-224Z-3f053a94/review/telemetry.json",
+        "out/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b/manual/elegance-review.md"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet",
+          "date": "2026-04-30",
+          "status": "produced",
+          "manifest": ".runs/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b-docs-packet/cli/2026-04-30T07-35-51-905Z-15903f69/manifest.json",
+          "source_anchor": "ctx:sha256:5e1fb213d42ae2c9050c3d396ee5c10556ac3d54403ab9ead6f695377a94207c#chunk:c000001",
+          "summary": "Created the CO-444 docs-first packet and registry mirrors only. The packet preserves docs:freshness:maintain, canonical_owner_key=docs:freshness:maintain, terminal configured owner CO-441, block_unowned_repo_debt, co-420-apr-28-march-28-task-packet-mirror, March 28 task-packet mirror rolling cohort, docs/docs-catalog.json, docs/guides/docs-freshness-cohorts.md, tasks/index.json, docs/TASKS.md, and docs/docs-freshness-registry.json while leaving docs/docs-catalog.json, docs/guides/docs-freshness-cohorts.md, Linear state, workpad, PR lifecycle, and full validation to the parent lane. The referenced source payload path was absent in the child checkout, so the packet uses the child prompt as the issue-shaping contract."
+        },
+        "owner_rehome": {
+          "reviewer": "write-enabled CO-444 provider worker",
+          "date": "2026-04-30",
+          "status": "owner-rehome-implemented",
+          "summary": "Parent reproduced docs:freshness:maintain block_unowned_repo_debt for terminal CO-441 with blocking_changed_paths=[], re-homed rolling_freshness_cohorts.owner_issue to live same-project CO-444, updated docs/guides/docs-freshness-cohorts.md so CO-441 is terminal historical evidence, and preserved the retained March 28 cohort without row refresh, archive, deletion, reclassification, CO-443 scope bleed, or policy weakening."
+        },
+        "repo_validation": {
+          "reviewer": "write-enabled CO-444 provider worker",
+          "date": "2026-04-30",
+          "status": "validation-green-before-review",
+          "summary": "Delegation guard, spec guard, build, lint with existing DelegationMcpHealth warnings only, full test, docs:check, docs:freshness, docs:freshness:maintain, repo stewardship, git diff --check, and diff-budget passed; docs:freshness:maintain returned pass_with_owned_rolling_debt with owner_issue=CO-444 and blocking_changed_paths=[]."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-30",
+          "status": "bounded-success",
+          "telemetry": "../../.runs/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b/cli/2026-04-30T07-32-29-224Z-3f053a94/review/telemetry.json",
+          "summary": "Manifest-backed forced standalone review executed under FORCE_CODEX_REVIEW=1. The first attempt crossed the validation command-intent boundary, then the bounded retry completed with status=succeeded and review_outcome=bounded-success; no actionable issues were found."
+        },
+        "elegance_review": {
+          "reviewer": "write-enabled CO-444 provider worker",
+          "date": "2026-04-30",
+          "status": "no-simplification-patch",
+          "artifact": "out/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b/manual/elegance-review.md",
+          "summary": "Explicit minimality pass kept the repair scoped to owner metadata, cohort-guide lineage, task mirrors, and registry evidence; no source, policy, validation script, package, or CO-443 behavior changes were needed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
+        "task": "tasks/tasks-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
+        "agent_task": ".agent/task/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
+        "docs": "docs/TECH_SPEC-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md"
+      }
+    },
+    {
       "id": "20260430-linear-b9e7583a-3051-40d3-a87f-0388faa9df61",
       "title": "CO-441 re-home live docs freshness maintenance owner after terminal CO-427",
       "relates_to": "tasks/tasks-linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
