@@ -1,10 +1,10 @@
 ---
 id: 20260330-linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612
 title: CO Preserve Scoped Standalone-Review Context Without Inline Prompt
-status: in_progress
+status: done
 owner: Codex
 created: 2026-03-30
-last_review: 2026-03-30
+last_review: 2026-04-30
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa161
 related_tasks:
   - tasks/tasks-linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612.md
 review_notes:
+  - 2026-04-30: CO-428 live Linear audit confirmed CO-43 is `Done`; this completed-lane spec is reclassified to inactive `done` under canonical owner key `spec-guard:active-specs:last_review=2026-03-30` so historical implementation evidence remains preserved without staying in active-spec freshness.
   - 2026-03-30: Opened from Linear issue `CO-43` after rechecking the live CO workflow states with `linear issue-context`; the issue started in `Ready`, had no attached PR or workpad, was transitioned to `In Progress`, and now uses the single active workpad comment `24f742f4-23e5-42a2-81d9-332064744d23`.
   - 2026-03-30: The workspace started detached at `bdf8c648f` and moved onto branch `co-43-preserve-scoped-review-context` before repo edits.
   - 2026-03-30: Pre-implementation review approves the narrow repair path: keep explicit scoped launches promptless, synthesize bounded reviewer-visible scoped title context from resolved `NOTES` plus review surface when `--title` is absent, preserve explicit user titles when present, and if Codex rejects a synthesized scoped title retry the same explicit scope without `--title` so telemetry/docs/tests make that fallback contract explicit.
