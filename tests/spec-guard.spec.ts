@@ -1100,6 +1100,42 @@ describe('spec-guard script', () => {
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
 
+  it('requires decision evidence for all-caps fallback-sensitive identifiers', async () => {
+    const repo = await initRepository();
+    const today = new Date().toISOString().slice(0, 10);
+
+    await writeFile(
+      join(repo, 'src/constants.ts'),
+      [
+        'export const COMPAT_MODE = true;',
+        'export const COMPATIBILITY_MODE = true;',
+        'export const SEAM_MODE = true;',
+        ''
+      ].join('\n')
+    );
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      `last_review: ${today}\n\nGeneric spec update intentionally omits decision metadata.\n`
+    );
+    await execFileAsync('git', ['add', 'src/constants.ts', 'tasks/specs/0001-initial.md'], {
+      cwd: repo
+    });
+    await execFileAsync('git', ['commit', '-m', 'uppercase sensitive identifiers'], {
+      cwd: repo
+    });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain(
+      'fallback/seam-touching changes require updated PRD decision evidence (src/constants.ts)'
+    );
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
   it('preserves fallback scanning for large diffs', async () => {
     const repo = await initRepository();
     const today = new Date().toISOString().slice(0, 10);
@@ -1972,6 +2008,32 @@ describe('spec-guard script', () => {
 
     expect(stdout).toContain('❌ Spec guard: issues detected');
     expect(stdout).toContain('expire fallback decision requires non-empty owner');
+    expect(stdout).toContain('expire fallback decision requires non-empty validation');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects bracketed placeholder fallback metadata', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        owner: '[pending owner]',
+        trigger: '[TODO]',
+        removalCondition: '[not recorded]',
+        validation: '[unknown]'
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback decision requires non-empty owner');
+    expect(stdout).toContain('expire fallback decision requires non-empty trigger');
+    expect(stdout).toContain('expire fallback decision requires non-empty removal condition');
     expect(stdout).toContain('expire fallback decision requires non-empty validation');
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });

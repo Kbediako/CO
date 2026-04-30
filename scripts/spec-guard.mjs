@@ -35,9 +35,12 @@ const FALLBACK_TOUCH_PATTERNS = [
   /\bcached\b/i,
   fallbackTouchTokenPattern('break[-_\\s]glass|[Bb]reakGlass|BREAK_GLASS', 'BreakGlass|BREAK_GLASS'),
   /\bcompat(?:ibility)?\b/i,
-  fallbackTouchTokenPattern('[Cc]ompat(?:ibility)?', 'Compat(?:ibility)?'),
+  fallbackTouchTokenPattern(
+    '[Cc]ompat(?:ibility)?|COMPAT(?:IBILITY)?',
+    'Compat(?:ibility)?|COMPAT(?:IBILITY)?'
+  ),
   fallbackTouchTokenPattern('minor[-_\\s]seam|[Mm]inorSeam|MINOR_SEAM', 'MinorSeam|MINOR_SEAM'),
-  fallbackTouchTokenPattern('[Ss]eam', 'Seam'),
+  fallbackTouchTokenPattern('[Ss]eam|SEAM', 'Seam|SEAM'),
   /\bstale\b/i,
   fallbackTouchTokenPattern(
     'last[-_\\s]known[-_\\s]good|[Ll]astKnownGood|LAST_KNOWN_GOOD',
@@ -530,8 +533,22 @@ function parseFallbackDecisionRows(content) {
 function hasPlaceholderValue(value) {
   const normalized = normalizeDecisionText(value);
   const comparable = normalized.replace(/[.,;:]+$/, '').trim();
+  const bracketedPlaceholder = comparable.match(/^\[([^\]]*)\]$/);
+  const bracketedComparable = bracketedPlaceholder
+    ? bracketedPlaceholder[1].replace(/[.,;:]+$/, '').trim()
+    : '';
   const isAnglePlaceholder =
     /^<.*>$/.test(normalized) && !/^<https?:\/\/[^>\s]+>$/.test(normalized);
+  return (
+    comparable.length === 0 ||
+    comparable === '-' ||
+    isPlaceholderComparable(comparable) ||
+    (bracketedPlaceholder !== null && isPlaceholderComparable(bracketedComparable)) ||
+    isAnglePlaceholder
+  );
+}
+
+function isPlaceholderComparable(comparable) {
   return (
     comparable.length === 0 ||
     comparable === '-' ||
@@ -540,8 +557,7 @@ function hasPlaceholderValue(value) {
       comparable
     ) ||
     /^future (?:cleanup|follow ?up|issue|owner)\b/.test(comparable) ||
-    /^cleanup later\b/.test(comparable) ||
-    isAnglePlaceholder
+    /^cleanup later\b/.test(comparable)
   );
 }
 
