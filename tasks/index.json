@@ -72,6 +72,40 @@
       }
     },
     {
+      "id": "20260430-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377",
+      "title": "CO-443 completed intake claim live-truth recovery",
+      "relates_to": "tasks/tasks-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-30",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
+        "docs/ACTION_PLAN-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
+        "docs/TECH_SPEC-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
+        "tasks/specs/linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
+        "tasks/tasks-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
+        ".runs/linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377-docs-packet/cli/2026-04-30T06-34-58-998Z-34bebedf/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet",
+          "date": "2026-04-30",
+          "status": "produced",
+          "manifest": ".runs/linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377-docs-packet/cli/2026-04-30T06-34-58-998Z-34bebedf/manifest.json",
+          "source_anchor": "ctx:sha256:cf913ea2dcd62e7ac2df8f89fd2725b8eb43ade503dd23e7c55ae65d81ad7cc7#chunk:c000001",
+          "summary": "Docs-first packet created for CO-443 from parent-provided issue context only. The referenced source payload path was absent in this child checkout. The packet preserves the narrow completed-claim contract: completed provider-intake claims with provider_issue_run_already_completed must not suppress supported control-host recover|relaunch|nudge when live Linear truth is active/fresher again, while unchanged/equal non-recovery duplicate truth remains duplicate-safe. The packet explicitly rejects CO-330 stale-owner recovery, CO-393 command plumbing, CO-404 timeout acknowledgement, CO-406 no-run capacity, CO-392 released-pending-reopen, direct provider-linear-worker starts, and manual provider-intake-state edits."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
+        "task": "tasks/tasks-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
+        "docs": "docs/TECH_SPEC-linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md"
+      }
+    },
+    {
       "id": "20260430-linear-b9e7583a-3051-40d3-a87f-0388faa9df61",
       "title": "CO-441 re-home live docs freshness maintenance owner after terminal CO-427",
       "relates_to": "tasks/tasks-linear-b9e7583a-3051-40d3-a87f-0388faa9df61.md",
