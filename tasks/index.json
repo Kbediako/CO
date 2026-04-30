@@ -16945,6 +16945,30 @@
         "agent_task": ".agent/task/linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba.md",
         "docs": "tasks/specs/linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba.md"
       }
+    },
+    {
+      "id": "20260427-linear-fd05f8a0-420a-4313-a462-690881c0a45c",
+      "title": "CO-399 fallback-expiry repo guard enforcement",
+      "relates_to": "tasks/tasks-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-27",
+      "approvals": {
+        "docs_packet": {
+          "reviewer": "bounded CO-399 packet worker",
+          "date": "2026-04-27",
+          "status": "produced",
+          "summary": "Docs-first packet created for CO-399 while the issue remains in Backlog. The packet applies CO-382 fallback-expiry and large-refactor policy to repo guards, defines a smallest parseable contract across PRD, TECH_SPEC, ACTION_PLAN, and task checklist, requires touched fallback/seam behavior to choose remove fallback, expire fallback, or justify retaining fallback, and preserves CO-394 through CO-398 as owner references instead of absorbing their cleanup scope."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-fd05f8a0-420a-4313-a462-690881c0a45c.md",
+        "task": "tasks/tasks-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md",
+        "agent_task": ".agent/task/linear-fd05f8a0-420a-4313-a462-690881c0a45c.md",
+        "docs": "docs/TECH_SPEC-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md"
+      }
     }
   ]
 }
