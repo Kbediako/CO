@@ -795,11 +795,15 @@ describe('createProviderIssueHandoffService', () => {
   );
 
   it.each([
-    { label: 'null', updatedAt: null },
-    { label: 'unparsable', updatedAt: 'not-a-date' }
+    { label: 'null', action: 'recover', updatedAt: null },
+    { label: 'null', action: 'relaunch', updatedAt: null },
+    { label: 'null', action: 'nudge', updatedAt: null },
+    { label: 'unparsable', action: 'recover', updatedAt: 'not-a-date' },
+    { label: 'unparsable', action: 'relaunch', updatedAt: 'not-a-date' },
+    { label: 'unparsable', action: 'nudge', updatedAt: 'not-a-date' }
   ] as const)(
-    'keeps explicit recovery duplicate-safe when active live issue freshness is $label',
-    async ({ updatedAt }) => {
+    'keeps explicit $action recovery duplicate-safe when active live issue freshness is $label',
+    async ({ action, updatedAt }) => {
       const { root, paths } = await createHostPaths();
       const childEnv = {
         repoRoot: root,
@@ -858,7 +862,7 @@ describe('createProviderIssueHandoffService', () => {
       const result = await service.recoverIssue({
         provider: 'linear',
         issueId: 'lin-issue-330',
-        action: 'recover'
+        action
       });
 
       expect(result).toMatchObject({
@@ -960,6 +964,87 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
   });
+
+  it.each(['recover', 'relaunch', 'nudge'] as const)(
+    'keeps explicit %s recovery duplicate-safe when the completed run lacks issue freshness',
+    async (action) => {
+      const { root, paths } = await createHostPaths();
+      const childEnv = {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'linear-lin-issue-330'
+      };
+      const childPaths = resolveRunPaths(childEnv, 'run-co-330-legacy-completed');
+      await mkdir(childPaths.runDir, { recursive: true });
+      await writeFile(
+        childPaths.manifestPath,
+        JSON.stringify({
+          run_id: 'run-co-330-legacy-completed',
+          task_id: 'linear-lin-issue-330',
+          status: 'succeeded',
+          issue_provider: 'linear',
+          issue_id: 'lin-issue-330',
+          issue_identifier: 'CO-330',
+          started_at: '2026-04-30T04:45:36.312Z',
+          updated_at: '2026-04-30T04:45:43.392Z'
+        }),
+        'utf8'
+      );
+
+      const state = createProviderIntakeState();
+      state.claims.push(createProviderClaim({
+        issue_id: 'lin-issue-330',
+        issue_identifier: 'CO-330',
+        issue_title: 'Control host stale owner reclaim still causes provider refresh',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-04-30T06:15:48.115Z',
+        task_id: 'linear-lin-issue-330',
+        state: 'completed',
+        reason: 'provider_issue_run_already_completed',
+        run_id: 'run-co-330-legacy-completed',
+        run_manifest_path: childPaths.manifestPath
+      }));
+      const persist = vi.fn(async () => undefined);
+      const launcher = { start: vi.fn(async () => null), resume: vi.fn(async () => undefined) };
+      const resolveTrackedIssue = vi.fn(async ({ issueId }: { provider: 'linear'; issueId: string }) => ({
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: issueId,
+          identifier: 'CO-330',
+          title: 'Control host stale owner reclaim still causes provider refresh',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-30T06:15:48.115Z'
+        })
+      }));
+      const service = createProviderIssueHandoffService({
+        paths, state, persist, launcher, startPipelineId: 'provider-linear-worker', resolveTrackedIssue
+      });
+
+      const result = await service.recoverIssue({
+        provider: 'linear',
+        issueId: 'lin-issue-330',
+        action
+      });
+
+      expect(result).toMatchObject({
+        kind: 'ignored',
+        reason: 'provider_issue_run_already_completed',
+        claim: {
+          issue_id: 'lin-issue-330',
+          issue_identifier: 'CO-330',
+          state: 'completed',
+          reason: 'provider_issue_run_already_completed',
+          run_id: 'run-co-330-legacy-completed',
+          run_manifest_path: childPaths.manifestPath
+        }
+      });
+      expect(launcher.start).not.toHaveBeenCalled();
+      expect(launcher.resume).not.toHaveBeenCalled();
+    }
+  );
 
   it('releases an existing claim when identifier-based recovery resolves the issue as gone', async () => {
     const { paths } = await createHostPaths();

@@ -4134,6 +4134,7 @@ export function createProviderIssueHandoffService(
         latestExisting?.state === 'completed' ? latestExisting.issue_updated_at ?? null : null;
       const latestCompletedRunIssueUpdatedAt =
         latestRun?.issueUpdatedAt ?? latestRun?.startedAt ?? null;
+      const latestCompletedRecoveryRunIssueUpdatedAt = latestRun?.issueUpdatedAt ?? null;
       const latestCompletedIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
         latestCompletedClaimIssueUpdatedAt,
         latestCompletedRunIssueUpdatedAt
@@ -4153,7 +4154,7 @@ export function createProviderIssueHandoffService(
           event: input.event,
           action: input.action,
           trackedIssue: input.trackedIssue,
-          latestCompletedRunIssueUpdatedAt
+          latestCompletedRunIssueUpdatedAt: latestCompletedRecoveryRunIssueUpdatedAt
         });
       const explicitCompletedDuplicateRecovery =
         explicitCompletedDuplicateRecoveryFreshness === 'newer';
@@ -4292,6 +4293,8 @@ export function createProviderIssueHandoffService(
             lockedExisting?.state === 'completed' ? lockedExisting.issue_updated_at ?? null : null;
           const lockedLatestCompletedRunIssueUpdatedAt =
             lockedLatestRun?.issueUpdatedAt ?? lockedLatestRun?.startedAt ?? null;
+          const lockedLatestCompletedRecoveryRunIssueUpdatedAt =
+            lockedLatestRun?.issueUpdatedAt ?? null;
           const lockedLatestCompletedIssueUpdatedAt = selectMostRecentTrackedIssueUpdatedAt(
             lockedLatestCompletedClaimIssueUpdatedAt,
             lockedLatestCompletedRunIssueUpdatedAt
@@ -4312,7 +4315,7 @@ export function createProviderIssueHandoffService(
               event: input.event,
               action: input.action,
               trackedIssue: input.trackedIssue,
-              latestCompletedRunIssueUpdatedAt: lockedLatestCompletedRunIssueUpdatedAt
+              latestCompletedRunIssueUpdatedAt: lockedLatestCompletedRecoveryRunIssueUpdatedAt
             });
           const lockedExplicitCompletedDuplicateRecovery =
             lockedExplicitCompletedDuplicateRecoveryFreshness === 'newer';
@@ -6506,6 +6509,9 @@ function resolveExplicitCompletedDuplicateRecoveryFreshness(input: {
   if (!classifyProviderLinearWorkflowState(input.trackedIssue).isActive) {
     return null;
   }
+  // Use explicit completed-run issue freshness, not completed-claim freshness. A healthy
+  // poll can already have copied the reopened issue timestamp into the completed duplicate
+  // claim, while legacy run started_at is not enough proof for this recovery bypass.
   return compareTrackedIssueUpdatedAt({
     existingIssueUpdatedAt: input.latestCompletedRunIssueUpdatedAt,
     nextIssueUpdatedAt: input.trackedIssue.updated_at
