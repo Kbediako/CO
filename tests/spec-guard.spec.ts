@@ -1063,6 +1063,43 @@ describe('spec-guard script', () => {
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
 
+  it('requires decision evidence for prefixed camelCase fallback-sensitive identifiers', async () => {
+    const repo = await initRepository();
+    const today = new Date().toISOString().slice(0, 10);
+
+    await writeFile(
+      join(repo, 'src/names.ts'),
+      [
+        'export const providerBreakGlassMode = true;',
+        'export const routingMinorSeamDecision = true;',
+        'export const statusLastKnownGoodRun = true;',
+        'export const workerCompatShim = true;',
+        ''
+      ].join('\n')
+    );
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      `last_review: ${today}\n\nGeneric spec update intentionally omits decision metadata.\n`
+    );
+    await execFileAsync('git', ['add', 'src/names.ts', 'tasks/specs/0001-initial.md'], {
+      cwd: repo
+    });
+    await execFileAsync('git', ['commit', '-m', 'prefixed camelcase sensitive identifiers'], {
+      cwd: repo
+    });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain(
+      'fallback/seam-touching changes require updated PRD decision evidence (src/names.ts)'
+    );
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
   it('preserves fallback scanning for large diffs', async () => {
     const repo = await initRepository();
     const today = new Date().toISOString().slice(0, 10);
@@ -1193,6 +1230,40 @@ describe('spec-guard script', () => {
     expect(stdout).toContain(
       'docs/ACTION_PLAN-linear-fallback-fixture.md: fallback/seam-touching changes require a parseable CO-382 fallback decision table'
     );
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('rejects contradictory fallback decisions for the same surface and seam across packet sources', async () => {
+    const repo = await initRepository();
+    const expireDecisionBody = fallbackDecisionTable([completeExpireFallbackRow()]);
+    const removeDecisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        decision: 'remove fallback',
+        owner: 'CO-399 parent lane',
+        trigger: 'Provider id mapping fallback is removed during the guard fixture cleanup.',
+        reviewDate: reviewDateDaysFromNow(14),
+        maximumLifetime: reviewDateDaysFromNow(28),
+        removalCondition: 'Provider id mapping fallback is removed from the guard fixture.',
+        validation: 'Focused same-surface contradictory decision regression test.'
+      })
+    ]);
+
+    await commitFallbackGuardChange(repo, {
+      decisionBody: expireDecisionBody,
+      sourceDecisionBodies: {
+        actionPlan: removeDecisionBody
+      }
+    });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('contradictory fallback decisions');
+    expect(stdout).toContain('provider workflow');
+    expect(stdout).toContain('Provider id mapping fallback retained for provider drift');
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
 

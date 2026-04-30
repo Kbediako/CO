@@ -16,6 +16,12 @@ const ALLOWED_FALLBACK_DECISIONS = new Set([
   'expire fallback',
   'justify retaining fallback'
 ]);
+function fallbackTouchTokenPattern(standaloneTokenPattern, prefixedTokenPattern = standaloneTokenPattern) {
+  return new RegExp(
+    `(?:^|[^A-Za-z0-9])(?:${standaloneTokenPattern})(?=$|[^a-z0-9])|[a-z0-9](?:${prefixedTokenPattern})(?=$|[^a-z0-9])`
+  );
+}
+
 const FALLBACK_DECISION_SOURCE_TYPES = new Set([
   'PRD',
   'TECH_SPEC',
@@ -27,14 +33,17 @@ const FALLBACK_TOUCH_PATTERNS = [
   /\bfall back\b/i,
   /legacy/i,
   /\bcached\b/i,
-  /\b(?:break[-_\s]glass|[Bb]reakGlass|BREAK_GLASS)(?=\b|[A-Z_])/,
+  fallbackTouchTokenPattern('break[-_\\s]glass|[Bb]reakGlass|BREAK_GLASS', 'BreakGlass|BREAK_GLASS'),
   /\bcompat(?:ibility)?\b/i,
-  /\b[Cc]ompat(?:ibility)?(?=[A-Z_])/,
-  /\b(?:minor[-_\s]seam|[Mm]inorSeam|MINOR_SEAM)(?=\b|[A-Z_])/,
-  /\b[Ss]eam(?=\b|[A-Z_])/,
+  fallbackTouchTokenPattern('[Cc]ompat(?:ibility)?', 'Compat(?:ibility)?'),
+  fallbackTouchTokenPattern('minor[-_\\s]seam|[Mm]inorSeam|MINOR_SEAM', 'MinorSeam|MINOR_SEAM'),
+  fallbackTouchTokenPattern('[Ss]eam', 'Seam'),
   /\bstale\b/i,
-  /\b(?:last[-_\s]known[-_\s]good|[Ll]astKnownGood|LAST_KNOWN_GOOD)(?=\b|[A-Z_])/,
-  /\b(?:last[-_\s]known|[Ll]astKnown|LAST_KNOWN)(?=\b|[A-Z_])/
+  fallbackTouchTokenPattern(
+    'last[-_\\s]known[-_\\s]good|[Ll]astKnownGood|LAST_KNOWN_GOOD',
+    'LastKnownGood|LAST_KNOWN_GOOD'
+  ),
+  fallbackTouchTokenPattern('last[-_\\s]known|[Ll]astKnown|LAST_KNOWN', 'LastKnown|LAST_KNOWN')
 ];
 const GOVERNED_FALLBACK_SURFACE_PATHS = [
   'orchestrator/src/cli/control/providerIssueHandoff.ts',
@@ -747,6 +756,63 @@ async function readChangedFallbackDecisionSources(changedFiles) {
   return sourceEntries;
 }
 
+function getFallbackDecisionRowKey(row) {
+  const surface = row.surface ?? '';
+  const fallbackSeam = getFallbackSeamValue(row);
+  if (hasPlaceholderValue(surface) || hasPlaceholderValue(fallbackSeam)) {
+    return null;
+  }
+  const normalizedSurface = normalizePolicyEvidenceCell(surface);
+  const normalizedFallbackSeam = normalizePolicyEvidenceCell(fallbackSeam);
+  if (!normalizedSurface || !normalizedFallbackSeam) {
+    return null;
+  }
+  return {
+    key: `${normalizedSurface}::${normalizedFallbackSeam}`,
+    label: `${surface} / ${fallbackSeam}`
+  };
+}
+
+function getCanonicalFallbackDecision(row) {
+  const decision = row.decision ?? '';
+  const normalizedDecision = normalizeDecisionText(decision);
+  const decisions = findAllowedDecisions(decision);
+  return decisions.length === 1 && normalizedDecision === decisions[0] ? decisions[0] : null;
+}
+
+function validateCanonicalFallbackDecisions(rows) {
+  const failures = [];
+  const rowsByKey = new Map();
+  for (const { file, row } of rows) {
+    const rowKey = getFallbackDecisionRowKey(row);
+    const decision = getCanonicalFallbackDecision(row);
+    if (!rowKey || !decision) {
+      continue;
+    }
+    const current = rowsByKey.get(rowKey.key) ?? {
+      label: rowKey.label,
+      decisions: new Map()
+    };
+    const files = current.decisions.get(decision) ?? [];
+    files.push(file);
+    current.decisions.set(decision, files);
+    rowsByKey.set(rowKey.key, current);
+  }
+
+  for (const { label, decisions } of rowsByKey.values()) {
+    if (decisions.size <= 1) {
+      continue;
+    }
+    const evidence = [...decisions.entries()]
+      .map(([decision, files]) => `${decision}: ${[...new Set(files)].join(', ')}`)
+      .join('; ');
+    failures.push(
+      `${label}: contradictory fallback decisions across packet sources; fallback decision evidence must use one canonical decision (${evidence})`
+    );
+  }
+  return failures;
+}
+
 function validateFallbackDecisionRows(rows, today) {
   const failures = [];
   if (rows.length === 0) {
@@ -976,6 +1042,7 @@ async function checkFallbackDecisionEvidence(baseRef, changedFiles) {
     }))
   );
   failures.push(...validateFallbackDecisionRows(rows, resolveFallbackGuardToday()));
+  failures.push(...validateCanonicalFallbackDecisions(rows));
 
   return failures;
 }
