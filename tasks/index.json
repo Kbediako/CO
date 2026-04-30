@@ -25,7 +25,7 @@
         "docs/docs-catalog.json",
         "docs/guides/docs-freshness-cohorts.md",
         "out/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b/docs-freshness-maintenance.json",
-        "../../.runs/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b/cli/2026-04-30T07-32-29-224Z-3f053a94/review/telemetry.json",
+        ".runs/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b/cli/2026-04-30T07-32-29-224Z-3f053a94/review/telemetry.json",
         "out/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b/manual/elegance-review.md"
       ],
       "approvals": {
@@ -53,7 +53,7 @@
           "reviewer": "codex-orchestrator review",
           "date": "2026-04-30",
           "status": "bounded-success",
-          "telemetry": "../../.runs/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b/cli/2026-04-30T07-32-29-224Z-3f053a94/review/telemetry.json",
+          "telemetry": ".runs/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b/cli/2026-04-30T07-32-29-224Z-3f053a94/review/telemetry.json",
           "summary": "Manifest-backed forced standalone review executed under FORCE_CODEX_REVIEW=1. The first attempt crossed the validation command-intent boundary, then the bounded retry completed with status=succeeded and review_outcome=bounded-success; no actionable issues were found."
         },
         "elegance_review": {

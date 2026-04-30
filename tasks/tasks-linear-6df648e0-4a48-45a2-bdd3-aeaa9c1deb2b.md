@@ -57,7 +57,7 @@
 - [x] `npm run repo:stewardship`. Evidence: 6121 tracked files, 0 action-required.
 - [x] `git diff --check`. Evidence: command completed with no output.
 - [x] `node scripts/diff-budget.mjs`. Evidence: files=9/25, lines=565/1200.
-- [x] Manifest-backed standalone review. Evidence: `../../.runs/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b/cli/2026-04-30T07-32-29-224Z-3f053a94/review/telemetry.json`, `status=succeeded`, `review_outcome=bounded-success` after command-intent retry, no actionable issues.
+- [x] Manifest-backed standalone review. Evidence: `.runs/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b/cli/2026-04-30T07-32-29-224Z-3f053a94/review/telemetry.json`, `status=succeeded`, `review_outcome=bounded-success` after command-intent retry, no actionable issues.
 - [x] Explicit elegance review. Evidence: `out/linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b/manual/elegance-review.md`.
 - [ ] PR checks, feedback sweep, and ready-review drain. Evidence: pending.
 
