@@ -235,6 +235,12 @@ interface ProviderMergeCloseoutDependencies {
   ) => string[];
 }
 
+type ProviderDocsFreshnessOwnerPolicy = {
+  owner_issue: string | null;
+  canonical_owner_key: string | null;
+  owner_issues: string[];
+};
+
 interface ProviderAttachedSameRepoPullRequestCandidate {
   pr: ProviderMergeCloseoutPullRequestRecord;
   attachment_title: string | null;
@@ -394,11 +400,13 @@ export async function runProviderDeterministicMergeCloseout(
   const currentIssueState = issueContext.issue.state?.name ?? base.issue_state;
   const currentIssueStateType = issueContext.issue.state?.type ?? base.issue_state_type;
   const currentIssueUpdatedAt = issueContext.issue.updated_at ?? base.issue_updated_at;
+  const currentIssueIdentifier = normalizeOptionalString(issueContext.issue.identifier) ?? base.issue_identifier;
   const currentIssueAlreadyCompleted = currentIssueStateType === 'completed';
   const allowCompletedIssueRecovery =
     mode === 'probe-merged-recovery' && currentIssueAlreadyCompleted;
   const baseWithContext = {
     ...base,
+    issue_identifier: currentIssueIdentifier,
     issue_state: currentIssueState,
     issue_state_type: currentIssueStateType,
     issue_updated_at: currentIssueUpdatedAt,
@@ -1688,13 +1696,13 @@ async function resolveProviderDocsFreshnessOwnerCloseout(input: {
   env: NodeJS.ProcessEnv;
 }): Promise<ProviderDocsFreshnessOwnerCloseoutRecord> {
   const issueIdentifier = normalizeOptionalString(input.issueIdentifier);
-  let policy: { owner_issue: string | null; canonical_owner_key: string | null } | null = null;
+  let policy: ProviderDocsFreshnessOwnerPolicy | null = null;
   try {
     policy = await readDocsFreshnessOwnerPolicy(input.repoRoot);
   } catch (error) {
     return {
       status: 'evidence_unavailable',
-      terminal_transition_blocked: false,
+      terminal_transition_blocked: true,
       reason: `policy_read_failed: ${(error as Error)?.message ?? String(error)}`,
       policy_owner_issue: null,
       policy_canonical_owner_key: null,
@@ -1715,7 +1723,7 @@ async function resolveProviderDocsFreshnessOwnerCloseout(input: {
     };
   }
 
-  if (!policy?.owner_issue) {
+  if (!policy || policy.owner_issues.length === 0) {
     return {
       status: 'not_configured',
       terminal_transition_blocked: false,
@@ -1739,7 +1747,7 @@ async function resolveProviderDocsFreshnessOwnerCloseout(input: {
     };
   }
 
-  if (!issueIdentifier || policy.owner_issue !== issueIdentifier) {
+  if (!issueIdentifier || !policy.owner_issues.includes(issueIdentifier)) {
     return {
       status: 'not_current_owner',
       terminal_transition_blocked: false,
@@ -1774,7 +1782,7 @@ async function resolveProviderDocsFreshnessOwnerCloseout(input: {
 
 async function readDocsFreshnessOwnerPolicy(
   repoRoot: string
-): Promise<{ owner_issue: string | null; canonical_owner_key: string | null } | null> {
+): Promise<ProviderDocsFreshnessOwnerPolicy | null> {
   const raw = await readFile(path.join(repoRoot, 'docs', 'docs-catalog.json'), 'utf8');
   const parsed = JSON.parse(raw) as Record<string, unknown>;
   const policies = parsed.policies && typeof parsed.policies === 'object'
@@ -1784,9 +1792,21 @@ async function readDocsFreshnessOwnerPolicy(
   if (!policy || typeof policy !== 'object') {
     return null;
   }
+  const policyRecord = policy as Record<string, unknown>;
+  const ownerIssue = normalizeOptionalString(policyRecord.owner_issue);
+  const canonicalOwnerIssues = Array.isArray(policyRecord.canonical_owner_issues)
+    ? policyRecord.canonical_owner_issues
+        .map((entry) =>
+          entry && typeof entry === 'object'
+            ? normalizeOptionalString((entry as Record<string, unknown>).owner_issue)
+            : null
+        )
+        .filter((entry): entry is string => Boolean(entry))
+    : [];
   return {
-    owner_issue: normalizeOptionalString((policy as Record<string, unknown>).owner_issue),
-    canonical_owner_key: normalizeOptionalString((policy as Record<string, unknown>).canonical_owner_key)
+    owner_issue: ownerIssue,
+    canonical_owner_key: normalizeOptionalString(policyRecord.canonical_owner_key),
+    owner_issues: [...new Set([ownerIssue, ...canonicalOwnerIssues].filter((entry): entry is string => Boolean(entry)))]
   };
 }
 
@@ -1826,21 +1846,12 @@ async function readDocsFreshnessMaintainOwnerEvidence(input: {
 
   const parsed = parseDocsFreshnessMaintainJson(stdout);
   const normalized = normalizeDocsFreshnessMaintainDecision(parsed.value);
-  const terminalTransitionBlocked = shouldBlockTerminalTransitionForDocsFreshnessOwner({
-    decision: normalized,
-    parseError: parsed.error,
-    issueIdentifier: input.issueIdentifier
-  });
   return {
     status: parsed.error ? 'evidence_unavailable' : 'evidence_checked',
-    terminal_transition_blocked: terminalTransitionBlocked,
-    reason: terminalTransitionBlocked
-      ? parsed.error
-        ? 'docs_freshness_owner_evidence_unavailable'
-        : 'current_issue_owns_docs_freshness_rolling_debt'
-      : parsed.error
-        ? 'docs_freshness_owner_evidence_unavailable'
-        : 'current_issue_not_owner_bearing_after_maintenance_check',
+    terminal_transition_blocked: true,
+    reason: parsed.error
+      ? 'docs_freshness_owner_evidence_unavailable'
+      : 'current_issue_owns_docs_freshness_rolling_debt',
     policy_owner_issue: input.policyOwnerIssue,
     policy_canonical_owner_key: input.policyCanonicalOwnerKey,
     freshness_decision: normalized.freshness_decision,
@@ -1915,31 +1926,6 @@ function normalizeDocsFreshnessMaintainDecision(value: Record<string, unknown> |
       : null,
     report_path: normalizeOptionalString(value?.report_path)
   };
-}
-
-function shouldBlockTerminalTransitionForDocsFreshnessOwner(input: {
-  decision: ReturnType<typeof normalizeDocsFreshnessMaintainDecision>;
-  parseError: string | null;
-  issueIdentifier: string;
-}): boolean {
-  if (input.parseError) {
-    return true;
-  }
-  const ownerIssue = input.decision.owner_issue;
-  const ownerActionIssue = normalizeOptionalString(input.decision.owner_issue_action?.issue);
-  const ownerActionExistingIssue = normalizeOptionalString(input.decision.owner_issue_action?.existing_issue);
-  const ownerActionReason = normalizeOptionalString(input.decision.owner_issue_action?.reason);
-  if (
-    ownerActionExistingIssue === input.issueIdentifier &&
-    ownerActionReason === 'configured_owner_terminal'
-  ) {
-    return true;
-  }
-  const currentIssueIsOwner = ownerIssue === input.issueIdentifier || ownerActionIssue === input.issueIdentifier;
-  if (!currentIssueIsOwner) {
-    return false;
-  }
-  return input.decision.freshness_decision !== 'clean';
 }
 
 async function runProviderMergeCloseoutCommand(input: {

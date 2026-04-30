@@ -2602,155 +2602,57 @@ describe('provider issue observability', () => {
     });
   });
 
-  it('keeps merged live-owner closeout action-required instead of projecting completed', () => {
-    const snapshot = buildProviderIssueDebugSnapshot({
-      tracked_issue: {
-        state: 'Blocked',
-        state_type: 'started',
-        updated_at: '2026-04-30T08:46:00.000Z'
+  it('keeps merged live-owner closeout blockers out of completed projection', () => {
+    for (const variant of [
+      {
+        mergeStatus: 'action_required',
+        reason: 'docs_freshness_live_owner_blocks_done_transition',
+        claimReason: 'provider_issue_merge_closeout_action_required',
+        trackedState: 'Blocked',
+        progress: { phase: 'watching_merge', status: 'stalled', stall_classification: 'stalled' }
       },
-      claim: {
-        state: 'handoff_failed',
-        reason: 'provider_issue_merge_closeout_action_required',
-        updated_at: '2026-04-30T08:46:00.000Z',
-        run_id: 'run-co444-live-owner',
-        merge_closeout: {
-          recorded_at: '2026-04-30T08:46:00.000Z',
-          status: 'action_required',
-          reason: 'docs_freshness_live_owner_blocks_done_transition',
-          summary:
-            'Attached PR #730 merged and the shared root is reconciled, but CO-444 is still the live docs:freshness:maintain owner; moved the issue to Blocked instead of transitioning it to Done.',
-          attached_pr_urls: ['https://github.com/asabeko/CO/pull/730'],
-          pr: {
-            url: 'https://github.com/asabeko/CO/pull/730',
-            owner: 'asabeko',
-            repo: 'CO',
-            number: 730
-          },
-          snapshot: {
-            review_decision: 'APPROVED',
-            merge_state_status: 'UNKNOWN',
-            ready_to_merge: false,
-            gate_reasons: ['state=MERGED'],
-            action_required_reasons: [],
-            unresolved_thread_count: 0,
-            checks_pending: 0,
-            checks_failed: 0,
-            required_checks_pending: 0,
-            required_checks_failed: 0,
-            updated_at: '2026-04-30T08:45:30.000Z',
-            merged_at: '2026-04-30T08:45:00.000Z'
-          },
-          shared_root: {
-            status: 'reconciled',
-            reason: 'shared_root_reconciled',
-            before_status: '## main...origin/main',
-            after_status: '## main...origin/main'
-          },
-          docs_freshness_owner: {
-            terminal_transition_blocked: true,
-            freshness_decision: 'pass_with_owned_rolling_debt',
-            owner_issue: 'CO-444',
-            blocking_changed_paths: []
-          }
-        }
-      },
-      proof: null
-    });
-
-    expect(snapshot).toMatchObject({
-      pull_request: {
-        number: 730,
-        merge_closeout_status: 'action_required',
-        reason: 'docs_freshness_live_owner_blocks_done_transition'
-      },
-      progress: {
-        phase: 'watching_merge',
-        kind: 'merge_closeout',
-        status: 'stalled',
-        stall_classification: 'stalled',
-        stall_reason: 'docs_freshness_live_owner_blocks_done_transition',
-        recovery_recommendation: 'inspect_merge_closeout'
+      {
+        mergeStatus: 'transition_failed',
+        reason: 'linear_blocked_transition_failed_for_docs_freshness_owner',
+        claimReason: 'provider_issue_merge_closeout_transition_failed',
+        trackedState: 'Merging',
+        progress: { phase: 'failed', status: 'failed', stall_classification: 'failed' }
       }
-    });
-  });
-
-  it('keeps merged live-owner Blocked transition failures visible as failed', () => {
-    const snapshot = buildProviderIssueDebugSnapshot({
-      tracked_issue: {
-        state: 'Merging',
-        state_type: 'started',
-        updated_at: '2026-04-30T08:46:00.000Z'
-      },
-      claim: {
-        state: 'handoff_failed',
-        reason: 'provider_issue_merge_closeout_transition_failed',
-        updated_at: '2026-04-30T08:46:00.000Z',
-        run_id: 'run-co444-live-owner',
-        merge_closeout: {
-          recorded_at: '2026-04-30T08:46:00.000Z',
-          status: 'transition_failed',
-          reason: 'linear_blocked_transition_failed_for_docs_freshness_owner',
-          summary:
-            'Attached PR #730 merged and the shared root is reconciled, but docs:freshness:maintain still identifies CO-444 as the live owner and the Linear issue could not transition to Blocked instead of Done.',
-          attached_pr_urls: ['https://github.com/asabeko/CO/pull/730'],
-          pr: {
-            url: 'https://github.com/asabeko/CO/pull/730',
-            owner: 'asabeko',
-            repo: 'CO',
-            number: 730
-          },
-          snapshot: {
-            review_decision: 'APPROVED',
-            merge_state_status: 'UNKNOWN',
-            ready_to_merge: false,
-            gate_reasons: ['state=MERGED'],
-            action_required_reasons: [],
-            unresolved_thread_count: 0,
-            checks_pending: 0,
-            checks_failed: 0,
-            required_checks_pending: 0,
-            required_checks_failed: 0,
-            updated_at: '2026-04-30T08:45:30.000Z',
-            merged_at: '2026-04-30T08:45:00.000Z'
-          },
-          shared_root: {
-            status: 'reconciled',
-            reason: 'shared_root_reconciled',
-            before_status: '## main...origin/main',
-            after_status: '## main...origin/main'
-          },
-          linear_transition: {
-            status: 'failed',
-            target_state: 'Blocked',
-            error: 'linear_state_changed: issue updated while transitioning'
-          },
-          docs_freshness_owner: {
-            terminal_transition_blocked: true,
-            freshness_decision: 'pass_with_owned_rolling_debt',
-            owner_issue: 'CO-444',
-            blocking_changed_paths: []
+    ]) {
+      const snapshot = buildProviderIssueDebugSnapshot({
+        tracked_issue: { state: variant.trackedState, state_type: 'started', updated_at: '2026-04-30T08:46:00.000Z' },
+        claim: {
+          state: 'handoff_failed',
+          reason: variant.claimReason,
+          updated_at: '2026-04-30T08:46:00.000Z',
+          run_id: 'run-co444-live-owner',
+          merge_closeout: {
+            recorded_at: '2026-04-30T08:46:00.000Z',
+            status: variant.mergeStatus,
+            reason: variant.reason,
+            summary: 'Merged PR remains owner-bearing for docs:freshness:maintain.',
+            pr: { url: 'https://github.com/asabeko/CO/pull/730', owner: 'asabeko', repo: 'CO', number: 730 },
+            snapshot: { updated_at: '2026-04-30T08:45:30.000Z', merged_at: '2026-04-30T08:45:00.000Z' },
+            shared_root: { status: 'reconciled', reason: 'shared_root_reconciled' },
+            docs_freshness_owner: { terminal_transition_blocked: true, owner_issue: 'CO-444' },
+            linear_transition: variant.mergeStatus === 'transition_failed'
+              ? { status: 'failed', target_state: 'Blocked', error: 'linear_state_changed' }
+              : null
           }
-        }
-      },
-      proof: null
-    });
+        },
+        proof: null
+      });
 
-    expect(snapshot).toMatchObject({
-      pull_request: {
-        number: 730,
-        merge_closeout_status: 'transition_failed',
-        reason: 'linear_blocked_transition_failed_for_docs_freshness_owner'
-      },
-      progress: {
-        phase: 'failed',
-        kind: 'merge_closeout',
-        status: 'failed',
-        stall_classification: 'failed',
-        stall_reason: 'linear_blocked_transition_failed_for_docs_freshness_owner',
-        recovery_recommendation: 'inspect_merge_closeout'
-      }
-    });
+      expect(snapshot).toMatchObject({
+        pull_request: { number: 730, merge_closeout_status: variant.mergeStatus, reason: variant.reason },
+        progress: {
+          ...variant.progress,
+          kind: 'merge_closeout',
+          stall_reason: variant.reason,
+          recovery_recommendation: 'inspect_merge_closeout'
+        }
+      });
+    }
   });
 
   it('prefers newer terminal tracked issue state over stale merge-closeout blockers', () => {
