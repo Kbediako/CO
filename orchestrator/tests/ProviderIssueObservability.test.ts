@@ -2602,6 +2602,59 @@ describe('provider issue observability', () => {
     });
   });
 
+  it('keeps merged live-owner closeout blockers out of completed projection', () => {
+    for (const variant of [
+      {
+        mergeStatus: 'action_required',
+        reason: 'docs_freshness_live_owner_blocks_done_transition',
+        claimReason: 'provider_issue_merge_closeout_action_required',
+        trackedState: 'Blocked',
+        progress: { phase: 'watching_merge', status: 'stalled', stall_classification: 'stalled' }
+      },
+      {
+        mergeStatus: 'transition_failed',
+        reason: 'linear_blocked_transition_failed_for_docs_freshness_owner',
+        claimReason: 'provider_issue_merge_closeout_transition_failed',
+        trackedState: 'Merging',
+        progress: { phase: 'failed', status: 'failed', stall_classification: 'failed' }
+      }
+    ]) {
+      const snapshot = buildProviderIssueDebugSnapshot({
+        tracked_issue: { state: variant.trackedState, state_type: 'started', updated_at: '2026-04-30T08:46:00.000Z' },
+        claim: {
+          state: 'handoff_failed',
+          reason: variant.claimReason,
+          updated_at: '2026-04-30T08:46:00.000Z',
+          run_id: 'run-co444-live-owner',
+          merge_closeout: {
+            recorded_at: '2026-04-30T08:46:00.000Z',
+            status: variant.mergeStatus,
+            reason: variant.reason,
+            summary: 'Merged PR remains owner-bearing for docs:freshness:maintain.',
+            pr: { url: 'https://github.com/asabeko/CO/pull/730', owner: 'asabeko', repo: 'CO', number: 730 },
+            snapshot: { updated_at: '2026-04-30T08:45:30.000Z', merged_at: '2026-04-30T08:45:00.000Z' },
+            shared_root: { status: 'reconciled', reason: 'shared_root_reconciled' },
+            docs_freshness_owner: { terminal_transition_blocked: true, owner_issue: 'CO-444' },
+            linear_transition: variant.mergeStatus === 'transition_failed'
+              ? { status: 'failed', target_state: 'Blocked', error: 'linear_state_changed' }
+              : null
+          }
+        },
+        proof: null
+      });
+
+      expect(snapshot).toMatchObject({
+        pull_request: { number: 730, merge_closeout_status: variant.mergeStatus, reason: variant.reason },
+        progress: {
+          ...variant.progress,
+          kind: 'merge_closeout',
+          stall_reason: variant.reason,
+          recovery_recommendation: 'inspect_merge_closeout'
+        }
+      });
+    }
+  });
+
   it('prefers newer terminal tracked issue state over stale merge-closeout blockers', () => {
     const progress = deriveProviderLinearWorkerProgressSnapshot({
       tracked_issue: {
