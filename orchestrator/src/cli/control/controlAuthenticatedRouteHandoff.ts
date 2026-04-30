@@ -12,6 +12,7 @@ import {
 } from './controlServerAuditAndErrorHelpers.js';
 import {
   type ProviderIssueHandoffRefreshRequestOutcome,
+  runProviderIssueHandoffRecover,
   runProviderIssueHandoffRefresh
 } from './controlServerPublicLifecycle.js';
 import { readJsonBody } from './controlServerRequestBodyHelpers.js';
@@ -71,7 +72,7 @@ export function createControlAuthenticatedRouteContext(
               issueId: string;
               action: ProviderIssueRecoveryAction;
             }) =>
-              providerIssueHandoff.recoverIssue(recoverInput),
+              runProviderIssueHandoffRecover(providerIssueHandoff, recoverInput),
             readProviderWorkerRecoverAccepted: (recoverInput: {
               provider: 'linear';
               issueId: string;

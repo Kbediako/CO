@@ -1172,6 +1172,60 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('keeps stuck polling diagnostics when explicit recovery cannot resolve the issue', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-28T03:30:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const launcher = { start: vi.fn(async () => null), resume: vi.fn(async () => undefined) };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'provider-linear-worker'
+    });
+    const stuckError = new Error('provider_refresh_lifecycle_stuck');
+    stuckError.name = 'ProviderRefreshLifecycleStuckError';
+
+    markProviderPollingStarted(service, {
+      mode: 'refresh',
+      atMs: Date.parse('2026-04-28T03:30:05.000Z')
+    });
+    await markProviderPollingStuck(service, {
+      atMs: Date.parse('2026-04-28T03:30:50.000Z')
+    });
+    markProviderPollingCompleted(service, {
+      error: stuckError,
+      atMs: Date.parse('2026-04-28T03:30:50.000Z')
+    });
+
+    vi.setSystemTime(new Date('2026-04-28T03:31:00.000Z'));
+
+    const result = await service.recoverIssue({
+      provider: 'linear',
+      issueId: 'lin-issue-399',
+      action: 'recover'
+    });
+
+    expect(result).toMatchObject({
+      kind: 'skipped',
+      reason: 'provider_issue_recover_resolution_unavailable'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: false,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      last_error: 'provider_refresh_lifecycle_stuck',
+      next_poll_at: null
+    });
+  });
+
   it('releases an existing claim when identifier-based recovery resolves the issue as gone', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();

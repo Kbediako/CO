@@ -539,9 +539,15 @@ export function createProviderIssueHandoffService(
     isStaleRefreshLifecycleOperation() ||
     hasConcurrentRestartRequiredPollingSnapshot() ||
     (providerIssueHandoffService !== null && isProviderPollingStuck(providerIssueHandoffService));
-  const throwRefreshLifecycleStuckError = (): never => {
-    const error = new Error('provider_refresh_lifecycle_stuck');
+  const buildRefreshLifecycleStuckError = (
+    message = 'provider_refresh_lifecycle_stuck'
+  ): Error => {
+    const error = new Error(message);
     error.name = 'ProviderRefreshLifecycleStuckError';
+    return error;
+  };
+  const throwRefreshLifecycleStuckError = (): never => {
+    const error = buildRefreshLifecycleStuckError();
     throw error;
   };
   const assertRefreshLifecycleCurrent = (): void => {
@@ -6411,6 +6417,7 @@ export function createProviderIssueHandoffService(
         return await runRecoveryOperation();
       }
 
+      const stuckPollingHealth = readProviderPollingHealth(recoveryService);
       resetStuckRefreshLifecycle();
       markProviderPollingStarted(recoveryService, { mode: 'refresh' });
       recordProviderPollingProgress(recoveryService, {
@@ -6420,6 +6427,16 @@ export function createProviderIssueHandoffService(
       });
       try {
         const result = await runRecoveryOperation();
+        if (result.kind === 'skipped') {
+          markProviderPollingCompleted(recoveryService, {
+            error: buildRefreshLifecycleStuckError(
+              stuckPollingHealth?.last_error ??
+                result.reason ??
+                'provider_refresh_lifecycle_stuck'
+            )
+          });
+          return result;
+        }
         markProviderPollingCompleted(recoveryService);
         return result;
       } catch (error) {
