@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import {
+  buildDocsFreshnessOwnerActionEvidence,
   buildDocsFreshnessMaintenanceDecision,
   collectChangedPaths,
   runDocsFreshnessMaintain
@@ -150,7 +151,8 @@ async function runMaintain(
     outRoot: join(repoRoot, 'out'),
     taskId,
     changedPaths,
-    skipSpecGuard: true
+    skipSpecGuard: true,
+    env: {} as NodeJS.ProcessEnv
   });
 }
 
@@ -735,6 +737,234 @@ describe('docs freshness maintenance decisions', () => {
       })
     );
     expect(decision.recommended_action).toContain('owner issue CO-320');
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(decision, {
+      env: { LINEAR_API_KEY: 'token' } as NodeJS.ProcessEnv
+    });
+    expect(ownerActionEvidence).toEqual(
+      expect.objectContaining({
+        status: 'resolved',
+        should_block: false,
+        actions: [
+          expect.objectContaining({
+            route_id: 'co-429-completed-lane-registry-residue',
+            mode: 'update_existing',
+            owner_issue: 'CO-320',
+            copyable_command: null
+          })
+        ]
+      })
+    );
+  });
+
+  it('routes stale active spec-guard cohorts through CO-428 owner action evidence', () => {
+    const lastReview = reviewDateDaysAgo(31);
+    const tasksSpecKey =
+      `spec_guard_active_spec|path_family:tasks/specs|last_review:${lastReview}|cadence_days:30`;
+    const designSpecKey =
+      `spec_guard_active_spec|path_family:docs/design/specs|last_review:${lastReview}|cadence_days:30`;
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          canonical_owner_key: 'docs:freshness:maintain',
+          require_live_owner_verification: true,
+          owner_issue_project_id: 'project-1'
+        }),
+        stale_entries: [],
+        rolling_cohort_entries: [],
+        totals: {
+          docs_scanned: 0,
+          registry_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 0,
+          rolling_cohort_entries: 0,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: {
+          status: 'failed',
+          parsed_failures: [
+            {
+              path: 'tasks/specs/linear-co-428.md',
+              path_family: 'tasks/specs',
+              last_review: lastReview,
+              cadence_days: 30,
+              age_days: 31,
+              overdue_days: 1
+            },
+            {
+              path: 'docs/design/specs/CO-428-design.md',
+              path_family: 'docs/design/specs',
+              last_review: lastReview,
+              cadence_days: 30,
+              age_days: 31,
+              overdue_days: 1
+            }
+          ],
+          stdout_sample: [
+            `tasks/specs/linear-co-428.md: last_review ${lastReview} is 31 days old (must be <=30 days)`
+          ],
+          stderr_sample: []
+        },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main',
+        ownerIssueVerification: {
+          issue: 'CO-444',
+          issue_id: 'owner-id',
+          state: 'In Progress',
+          state_type: 'started',
+          is_terminal: false,
+          usable: true,
+          project_id: 'project-1',
+          expected_project_id: 'project-1',
+          same_project: true,
+          verification_status: 'succeeded',
+          checked_at: null,
+          source: 'linear issue-context',
+          error: null
+        }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_diff_local');
+    expect(decision.totals.spec_guard_candidate_cohorts).toBe(2);
+    expect(decision.candidate_cohorts).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        route_id: 'co-428-stale-active-spec',
+        canonical_owner_key: tasksSpecKey,
+        source_breakdown: { spec_guard: 1 },
+        sample_paths: ['tasks/specs/linear-co-428.md']
+      }),
+      expect.objectContaining({
+        route_id: 'co-428-stale-active-spec',
+        canonical_owner_key: designSpecKey,
+        source_breakdown: { spec_guard: 1 },
+        sample_paths: ['docs/design/specs/CO-428-design.md']
+      })
+    ]));
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(decision, {
+      env: {} as NodeJS.ProcessEnv
+    });
+    const tasksAction = ownerActionEvidence.actions.find((action) => action.canonical_owner_key === tasksSpecKey);
+    const designAction = ownerActionEvidence.actions.find((action) => action.canonical_owner_key === designSpecKey);
+    expect(tasksAction).toEqual(
+      expect.objectContaining({
+        route_id: 'co-428-stale-active-spec',
+        mode: 'create_or_update_required',
+        canonical_owner_key: tasksSpecKey,
+        body: expect.objectContaining({
+          canonical_owner_marker:
+            `codex-orchestrator:canonical-owner-key=${tasksSpecKey}`,
+          description: expect.stringContaining('Recent recurrence shapes: `CO-428`, `CO-429`, `CO-430`')
+        })
+      })
+    );
+    expect(designAction).toEqual(
+      expect.objectContaining({
+        route_id: 'co-428-stale-active-spec',
+        mode: 'create_or_update_required',
+        canonical_owner_key: designSpecKey,
+        body: expect.objectContaining({
+          canonical_owner_marker: `codex-orchestrator:canonical-owner-key=${designSpecKey}`
+        })
+      })
+    );
+  });
+
+  it('does not derive spec-guard canonical owner cohorts from truncated samples alone', () => {
+    const lastReview = reviewDateDaysAgo(31);
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          canonical_owner_key: 'docs:freshness:maintain',
+          require_live_owner_verification: true,
+          owner_issue_project_id: 'project-1'
+        }),
+        stale_entries: [],
+        rolling_cohort_entries: [],
+        totals: {
+          docs_scanned: 0,
+          registry_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 0,
+          rolling_cohort_entries: 0,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: {
+          status: 'failed',
+          stdout_sample: [
+            `tasks/specs/linear-co-428.md: last_review ${lastReview} is 31 days old (must be <=30 days)`
+          ],
+          stderr_sample: []
+        },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main'
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_diff_local');
+    expect(decision.totals.spec_guard_candidate_cohorts).toBe(0);
+    expect(decision.candidate_cohorts).toEqual([]);
+  });
+
+  it('parses bullet-prefixed spec-guard stale active spec output from full output', () => {
+    const lastReview = reviewDateDaysAgo(31);
+    const canonicalOwnerKey =
+      `spec_guard_active_spec|path_family:tasks/specs|last_review:${lastReview}|cadence_days:30`;
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          canonical_owner_key: 'docs:freshness:maintain',
+          require_live_owner_verification: true,
+          owner_issue_project_id: 'project-1'
+        }),
+        stale_entries: [],
+        rolling_cohort_entries: [],
+        totals: {
+          docs_scanned: 0,
+          registry_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 0,
+          rolling_cohort_entries: 0,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: {
+          status: 'failed',
+          full_output: [
+            'Spec guard failed:',
+            ` - tasks/specs/linear-co-428.md: last_review ${lastReview} is 31 days old (must be ≤30 days)`
+          ].join('\n')
+        },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main'
+      }
+    );
+
+    expect(decision.totals.spec_guard_candidate_cohorts).toBe(1);
+    expect(decision.candidate_cohorts).toEqual([
+      expect.objectContaining({
+        route_id: 'co-428-stale-active-spec',
+        canonical_owner_key: canonicalOwnerKey,
+        source_breakdown: { spec_guard: 1 },
+        sample_paths: ['tasks/specs/linear-co-428.md']
+      })
+    ]);
   });
 
   it('does not reuse canonical owner verification across different scoped configs for the same issue', () => {
@@ -1702,6 +1932,7 @@ describe('docs freshness maintenance decisions', () => {
   it('fails closed when helper verification is unavailable but policy metadata marks the owner terminal', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-terminal-unavailable-'));
     createdDirs.push(repoRoot);
+    const baselineCanonicalOwnerKey = 'baseline_cohort_id:co-175-apr-14-march-14-tasks-1164-1195';
     await writeFixture(repoRoot, {
       entries: [{ path: 'tasks/tasks-1164-historical.md', daysOld: 31 }],
       policy: rollingFreshnessPolicy({
@@ -1734,6 +1965,26 @@ describe('docs freshness maintenance decisions', () => {
         verification_status: 'unavailable',
         source: 'rolling_freshness_policy',
         error: 'helper_missing'
+      })
+    );
+    expect(decision.owner_action_evidence).toEqual(
+      expect.objectContaining({
+        status: 'credentials_missing',
+        write_status: 'credentials_missing',
+        should_block: true,
+        required_actions: 1,
+        actions: [
+          expect.objectContaining({
+            route_id: 'co-430-terminal-owner-replacement',
+            mode: 'replace_terminal_owner',
+            canonical_owner_key: baselineCanonicalOwnerKey,
+            copyable_command: expect.stringContaining(`--canonical-owner-key "${baselineCanonicalOwnerKey}"`),
+            body: expect.objectContaining({
+              canonical_owner_marker: `codex-orchestrator:canonical-owner-key=${baselineCanonicalOwnerKey}`,
+              description: expect.stringContaining('Escaped historical root-cause attempts: `CO-188`, `CO-323`')
+            })
+          })
+        ]
       })
     );
   });
@@ -1952,6 +2203,21 @@ describe('docs freshness maintenance decisions', () => {
         sample_paths: [undeclaredPath]
       })
     ]);
+    expect(decision.owner_action_evidence).toEqual(
+      expect.objectContaining({
+        status: 'credentials_missing',
+        should_block: true,
+        actions: [
+          expect.objectContaining({
+            route_id: 'co-429-completed-lane-registry-residue',
+            copyable_command: expect.stringContaining('--canonical-owner-key'),
+            body: expect.objectContaining({
+              description: expect.stringContaining('completed-lane registry residue')
+            })
+          })
+        ]
+      })
+    );
   });
 
   it('bounds oversized machine-derived canonical owner keys before follow-up creation consumes them', async () => {

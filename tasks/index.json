@@ -43,6 +43,158 @@
       }
     },
     {
+      "id": "20260430-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5",
+      "title": "CO-446 target-keyed last_audit_operation projection",
+      "relates_to": "tasks/tasks-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-30",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        "docs/TECH_SPEC-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        "docs/ACTION_PLAN-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        "tasks/specs/linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        "tasks/tasks-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        ".agent/task/linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5-co-446-docs/cli/2026-04-30T15-05-22-251Z-426bef02/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane co-446-docs",
+          "date": "2026-04-30",
+          "status": "produced",
+          "manifest": ".runs/linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5-co-446-docs/cli/2026-04-30T15-05-22-251Z-426bef02/manifest.json",
+          "source_anchor": "ctx:sha256:2a4e2273e36ecf9d026dd8224bb505b531aca97dbb560f4191c678cbed955cb5#chunk:c000001",
+          "summary": "Created the CO-446 docs-first packet and registry mirrors only. The packet preserves co-status, last_audit_operation, issue_identifier, issue id, provider-linear-worker-linear-audit.jsonl, issue-context, CO-444, CO-445, and Blocked while framing the invariant that audit operations targeting CO-444 must not project as CO-445 current audit state. The referenced source payload path was absent in the child checkout, so the packet uses the child prompt as the issue-shaping contract. Parent owns source inspection, implementation, validation, Linear state, workpad, PR lifecycle, and review handoff."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        "task": "tasks/tasks-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        "agent_task": ".agent/task/linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md"
+        }
+      }
+    },
+    {
+      "id": "20260430-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4",
+      "title": "CO-431 canonical-owner docs freshness automation",
+      "relates_to": "tasks/tasks-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-30",
+      "status": "in_progress",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "evidence": [
+        "docs/PRD-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+        "docs/TECH_SPEC-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+        "docs/ACTION_PLAN-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+        "tasks/specs/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+        "tasks/tasks-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+        ".agent/task/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        "scripts/docs-freshness-maintain.mjs",
+        "tests/docs-freshness-maintain.spec.ts",
+        ".github/workflows/docs-truthfulness-weekly.yml",
+        "docs/guides/docs-freshness-cohorts.md",
+        ".runs/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4-docs-route-guide/cli/2026-04-30T11-15-57-835Z-cf61ab58/manifest.json",
+        "out/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4/docs-freshness-maintenance.json",
+        ".runs/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4/cli/2026-04-30T11-03-00-861Z-82d9d979/review/telemetry.json",
+        "out/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4/manual/elegance-review.md"
+      ],
+      "approvals": {
+        "docs_route_guide_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-route-guide",
+          "date": "2026-04-30",
+          "status": "accepted",
+          "manifest": ".runs/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4-docs-route-guide/cli/2026-04-30T11-15-57-835Z-cf61ab58/manifest.json",
+          "summary": "Docs/workflow wording patch accepted after scoped git apply check; parent owns implementation, validation, Linear, GitHub, PR, and review lifecycle."
+        },
+        "focused_validation": {
+          "reviewer": "write-enabled CO-431 provider worker",
+          "date": "2026-04-30",
+          "status": "validation-green-before-review",
+          "summary": "node --check for freshness scripts, focused Vitest with 37 tests, delegation guard, spec guard, build, lint with existing DelegationMcpHealth warnings only, full test, docs:check, docs:freshness, docs:freshness:maintain, repo stewardship, git diff --check, and diff-budget override passed."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-30",
+          "status": "bounded-success",
+          "telemetry": ".runs/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4/cli/2026-04-30T11-03-00-861Z-82d9d979/review/telemetry.json",
+          "summary": "Manifest-backed forced standalone review executed under FORCE_CODEX_REVIEW=1 after the first P2 fixes. The rerun completed with status=succeeded and review_outcome=bounded-success."
+        },
+        "elegance_review": {
+          "reviewer": "write-enabled CO-431 provider worker",
+          "date": "2026-04-30",
+          "status": "no-simplification-patch",
+          "artifact": "out/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4/manual/elegance-review.md",
+          "summary": "Checked placement, route classifier scope, no-token body behavior, workflow summary scope, and test focus; no smaller patch was available after standalone-review fixes."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+        "task": "tasks/tasks-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+        "agent_task": ".agent/task/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+        "docs": "docs/TECH_SPEC-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md"
+      }
+    },
+    {
+      "id": "20260430-linear-345cd50c-4962-4376-a7ca-1982ba311699",
+      "title": "CO-445 provider merge closeout live docs:freshness owner terminal guard",
+      "relates_to": "tasks/tasks-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-30",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        "docs/TECH_SPEC-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        "docs/ACTION_PLAN-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        "tasks/specs/linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        "tasks/tasks-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        ".agent/task/linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-345cd50c-4962-4376-a7ca-1982ba311699-co445-docs-packet-r2/cli/2026-04-30T09-00-50-146Z-4d8a155f/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane co445-docs-packet-r2",
+          "date": "2026-04-30",
+          "status": "parent_corrected_after_import",
+          "manifest": ".runs/linear-345cd50c-4962-4376-a7ca-1982ba311699-co445-docs-packet-r2/cli/2026-04-30T09-00-50-146Z-4d8a155f/manifest.json",
+          "source_anchor": "ctx:sha256:e3cf9354b49bf4da338a134a6f2b07abc004119c12fa362d5cc4b7a2e44dbb0d#chunk:c000001",
+          "summary": "The bounded child lane completed a CO-445 docs packet, then the parent imported it manually after helper accept failed on Linear updated_at drift and corrected its scope after source inspection. The active issue contract is a provider merge closeout terminal-transition guard: after metadata PR merge and shared-root reconciliation, providerMergeCloseout.ts must check docs:freshness:maintain owner evidence before Done. If the current issue is still the live owner, closeout records owner_issue, configured_owner_terminal risk, block_unowned_repo_debt context, blocking_changed_paths=[], pass_with_owned_rolling_debt, and owner verification evidence, then leaves or moves the issue to non-terminal Blocked. If ownership is re-homed or retired, normal Done closeout remains valid. CO-431 remains adjacent canonical-owner automation and does not own this provider closeout lifecycle patch unless live evidence changes that boundary."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        "task": "tasks/tasks-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        "agent_task": ".agent/task/linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-345cd50c-4962-4376-a7ca-1982ba311699.md"
+        }
+      }
+    },
+    {
       "id": "20260430-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b",
       "title": "CO-444 re-home docs:freshness:maintain owner after terminal CO-441",
       "relates_to": "tasks/tasks-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
