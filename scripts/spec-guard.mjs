@@ -529,18 +529,18 @@ function parseFallbackDecisionRows(content) {
 
 function hasPlaceholderValue(value) {
   const normalized = normalizeDecisionText(value);
+  const comparable = normalized.replace(/[.,;:]+$/, '').trim();
   const isAnglePlaceholder =
     /^<.*>$/.test(normalized) && !/^<https?:\/\/[^>\s]+>$/.test(normalized);
   return (
-    normalized.length === 0 ||
-    normalized === 'n/a' ||
-    normalized === 'na' ||
-    normalized === 'not applicable' ||
-    normalized === '-' ||
-    PLACEHOLDER_FALLBACK_VALUES.has(normalized) ||
-    /^(?:tbd|to be determined|pending|unknown|todo|later|not recorded|not available|unavailable)\b/.test(normalized) ||
-    /^future (?:cleanup|follow ?up|issue|owner)\b/.test(normalized) ||
-    /^cleanup later\b/.test(normalized) ||
+    comparable.length === 0 ||
+    comparable === '-' ||
+    PLACEHOLDER_FALLBACK_VALUES.has(comparable) ||
+    /^(?:n\/a|na|none|not applicable|tbd|to be determined|pending|unknown|todo|later|not recorded|not available|unavailable)(?:\b|[.)])/.test(
+      comparable
+    ) ||
+    /^future (?:cleanup|follow ?up|issue|owner)\b/.test(comparable) ||
+    /^cleanup later\b/.test(comparable) ||
     isAnglePlaceholder
   );
 }

@@ -1525,6 +1525,27 @@ describe('spec-guard script', () => {
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
 
+  it('rejects qualified placeholder refactor labels', async () => {
+    const repo = await initRepository();
+    const decisionBody = [
+      'Large-refactor decision: Not applicable (docs-only).',
+      'Minor-seam decision: none',
+      '',
+      fallbackDecisionTable([completeExpireFallbackRow()])
+    ].join('\n');
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('fallback/seam-touching changes require large refactor and minor seam decision evidence');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
   it('rejects underscore placeholder refactor labels', async () => {
     const repo = await initRepository();
     const decisionBody = [
@@ -1911,10 +1932,10 @@ describe('spec-guard script', () => {
     const repo = await initRepository();
     const decisionBody = fallbackDecisionTable([
       completeExpireFallbackRow({
-        owner: 'TBD until CO-410 is assigned',
-        trigger: 'unknown until owner assigned',
-        removalCondition: 'pending until migration completes',
-        validation: 'later after tests land'
+        owner: 'N/A until owner assigned',
+        trigger: 'none',
+        removalCondition: 'Not applicable (docs-only)',
+        validation: 'N/A.'
       })
     ]);
 
