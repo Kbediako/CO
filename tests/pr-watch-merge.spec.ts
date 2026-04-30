@@ -14,6 +14,7 @@ import {
   planGitHubRateLimitBackoff,
   resolveAutomaticBranchRecoveryReason,
   resolveActionRequiredReasons,
+  resolveBotRereviewRequestMentions,
   resolveLatestBotRereviewRequests,
   resolveBotRereviewTimingForKind,
   resolveCachedRequiredChecksSummary,
@@ -280,6 +281,111 @@ describe('pr watch-merge required-check gating', () => {
     expect(snapshot.botRereviewDiagnostics.coderabbit.stalePendingCleared).toBe(true);
     expect(snapshot.botRereviewDiagnostics.coderabbit.statusCheckRollup.state).toBe('success');
     expect(snapshot.botRereviewDiagnostics.coderabbit.successAfterRequest).toBe(true);
+  });
+
+  it('ignores acknowledgement-only coderabbit mentions after a current-head clean rollup', () => {
+    const mentionSignals = resolveBotRereviewRequestMentions([
+      {
+        id: 732,
+        body: '@coderabbitai acknowledged, the current-head clean rollup is enough for handoff.',
+        created_at: '2026-04-30T04:46:00.000Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'issue'
+      }
+    ]);
+    const response = makeResponse([
+      {
+        __typename: 'StatusContext',
+        context: 'CodeRabbit',
+        state: 'SUCCESS',
+        createdAt: '2026-04-30T04:45:00.000Z',
+        targetUrl: 'https://example.com/coderabbit'
+      }
+    ]);
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+
+    const snapshot = buildStatusSnapshot(
+      response,
+      requiredChecks,
+      {
+        fetchError: false,
+        unacknowledgedCount: 0,
+        rereview: {
+          fetchError: false,
+          pendingBots: [],
+          inProgressBots: [],
+          ignoredMentions: mentionSignals.ignoredMentions,
+          coderabbit: {
+            actionableCount: 0,
+            outsideDiffCount: 0,
+            nitpickCount: 0
+          }
+        }
+      },
+      { readinessMode: 'review' }
+    );
+
+    expect(mentionSignals.requests).toEqual({});
+    expect(mentionSignals.ignoredMentions).toEqual([
+      {
+        kind: 'coderabbitai',
+        reason: 'acknowledgement_only',
+        commentId: 732,
+        createdAtMs: Date.parse('2026-04-30T04:46:00.000Z'),
+        source: 'issue'
+      }
+    ]);
+    expect(snapshot.readyToMerge).toBe(true);
+    expect(snapshot.gateReasons).toEqual([]);
+    expect(snapshot.botRereviewPending).toEqual([]);
+    expect(snapshot.botRereviewDiagnostics.ignoredMentions).toEqual(mentionSignals.ignoredMentions);
+  });
+
+  it('keeps unacknowledged bot feedback as a hard gate even when a coderabbit mention is acknowledgement-only', () => {
+    const mentionSignals = resolveBotRereviewRequestMentions([
+      {
+        id: 733,
+        body: '@coderabbitai thanks, noted for the current clean rollup.',
+        created_at: '2026-04-30T04:46:00.000Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'pull'
+      }
+    ]);
+    const response = makeResponse([
+      {
+        __typename: 'StatusContext',
+        context: 'CodeRabbit',
+        state: 'SUCCESS',
+        createdAt: '2026-04-30T04:45:00.000Z',
+        targetUrl: 'https://example.com/coderabbit'
+      }
+    ]);
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: false,
+      unacknowledgedCount: 1,
+      rereview: {
+        fetchError: false,
+        pendingBots: [],
+        inProgressBots: [],
+        ignoredMentions: mentionSignals.ignoredMentions,
+        coderabbit: {
+          actionableCount: 0,
+          outsideDiffCount: 0,
+          nitpickCount: 0
+        }
+      }
+    });
+
+    expect(snapshot.readyToMerge).toBe(false);
+    expect(snapshot.gateReasons).toEqual(['unacknowledged_bot_feedback=1']);
+    expect(snapshot.botRereviewPending).toEqual([]);
+    expect(snapshot.botRereviewDiagnostics.ignoredMentions).toEqual(mentionSignals.ignoredMentions);
   });
 
   it('reports merge-state blockers instead of stale coderabbit rereview pending after current-head success', () => {
@@ -2265,6 +2371,226 @@ describe('resolveLatestBotRereviewRequests', () => {
     expect(requests.codex.source).toBe('pull');
     expect(requests.coderabbit.commentId).toBe(13);
     expect(requests.coderabbit.source).toBe('review');
+  });
+
+  it('does not treat acknowledgement-only coderabbit mentions as rereview requests', () => {
+    const signals = resolveBotRereviewRequestMentions([
+      {
+        id: 14,
+        body: '@coderabbitai thanks, clean rollup acknowledged.',
+        created_at: '2026-02-18T04:44:00Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'issue'
+      },
+      {
+        id: 15,
+        body: 'Addressed the CodeRabbit comments; @coderabbitai status noted.',
+        created_at: '2026-02-18T04:45:00Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'pull'
+      },
+      {
+        id: 16,
+        body: 'I will resolve the remaining thread @coderabbitai.',
+        created_at: '2026-02-18T04:46:00Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'review'
+      },
+      {
+        id: 17,
+        body: 'The @coderabbitai check passed.',
+        created_at: '2026-02-18T04:47:00Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'issue'
+      },
+      {
+        id: 19,
+        body: '@coderabbitai check is green.',
+        created_at: '2026-02-18T04:48:00Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'pull'
+      },
+      {
+        id: 21,
+        body: '@coderabbitai review complete.',
+        created_at: '2026-02-18T04:49:00Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'review'
+      }
+    ]);
+
+    expect(signals.requests).toEqual({});
+    expect(signals.ignoredMentions).toEqual([
+      {
+        kind: 'coderabbitai',
+        reason: 'acknowledgement_only',
+        commentId: 14,
+        createdAtMs: Date.parse('2026-02-18T04:44:00Z'),
+        source: 'issue'
+      },
+      {
+        kind: 'coderabbitai',
+        reason: 'acknowledgement_only',
+        commentId: 15,
+        createdAtMs: Date.parse('2026-02-18T04:45:00Z'),
+        source: 'pull'
+      },
+      {
+        kind: 'coderabbitai',
+        reason: 'acknowledgement_only',
+        commentId: 16,
+        createdAtMs: Date.parse('2026-02-18T04:46:00Z'),
+        source: 'review'
+      },
+      {
+        kind: 'coderabbitai',
+        reason: 'acknowledgement_only',
+        commentId: 17,
+        createdAtMs: Date.parse('2026-02-18T04:47:00Z'),
+        source: 'issue'
+      },
+      {
+        kind: 'coderabbitai',
+        reason: 'acknowledgement_only',
+        commentId: 19,
+        createdAtMs: Date.parse('2026-02-18T04:48:00Z'),
+        source: 'pull'
+      },
+      {
+        kind: 'coderabbitai',
+        reason: 'acknowledgement_only',
+        commentId: 21,
+        createdAtMs: Date.parse('2026-02-18T04:49:00Z'),
+        source: 'review'
+      }
+    ]);
+  });
+
+  it('does not borrow another bot request phrase for acknowledgement-only coderabbit mentions', () => {
+    const signals = resolveBotRereviewRequestMentions([
+      {
+        id: 18,
+        body: '@codex please re-review; @coderabbitai status acknowledged.',
+        created_at: '2026-02-18T04:47:00Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'pull'
+      },
+      {
+        id: 19,
+        body: '@codex please re-review and @coderabbitai status acknowledged.',
+        created_at: '2026-02-18T04:48:00Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'review'
+      },
+      {
+        id: 20,
+        body: '@coderabbitai thanks, please re-review @codex',
+        created_at: '2026-02-18T04:49:00Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'issue'
+      }
+    ]);
+
+    expect(signals.requests.codex).toEqual({
+      commentId: 20,
+      createdAtMs: Date.parse('2026-02-18T04:49:00Z'),
+      source: 'issue'
+    });
+    expect(signals.requests.coderabbit).toBeUndefined();
+    expect(signals.ignoredMentions).toEqual([
+      {
+        kind: 'coderabbitai',
+        reason: 'acknowledgement_only',
+        commentId: 18,
+        createdAtMs: Date.parse('2026-02-18T04:47:00Z'),
+        source: 'pull'
+      },
+      {
+        kind: 'coderabbitai',
+        reason: 'acknowledgement_only',
+        commentId: 19,
+        createdAtMs: Date.parse('2026-02-18T04:48:00Z'),
+        source: 'review'
+      },
+      {
+        kind: 'coderabbitai',
+        reason: 'acknowledgement_only',
+        commentId: 20,
+        createdAtMs: Date.parse('2026-02-18T04:49:00Z'),
+        source: 'issue'
+      }
+    ]);
+  });
+
+  it('keeps modal and adjacent coderabbit rereview requests blocking', () => {
+    for (const body of [
+      '@coderabbitai can you please re-review?',
+      '@coderabbitai. Please re-review', '@coderabbitai\nplease re-review',
+      '@coderabbitai please review',
+      '@coderabbitai please check this',
+      '@coderabbitai thanks, please re-review',
+      '@coderabbitai thanks, please resolve',
+      '@coderabbitai fixed it, please re-review',
+      '@coderabbitai fixed the comments (commit abc123). Please re-review',
+      '@coderabbitai addressed this, please resolve',
+      'please re-review this iteration @coderabbitai',
+      'please resolve the remaining thread @coderabbitai',
+      'please review @coderabbitai',
+      'please review these changes @coderabbitai',
+      'can you please review the fixes @coderabbitai',
+      '@codex acknowledged, please re-review @coderabbitai',
+      '@coderabbitai and @codex please re-review',
+      '@coderabbitai, @codex please re-review',
+      'please re-review @codex and @coderabbitai',
+      'please re-review @codex, @coderabbitai'
+    ]) {
+      const signals = resolveBotRereviewRequestMentions([
+        {
+          id: 20,
+          body,
+          created_at: '2026-02-18T04:49:00Z',
+          user: { login: 'maintainer', type: 'User' },
+          __source: 'pull'
+        }
+      ]);
+
+      expect(signals.requests.coderabbit).toEqual({
+        commentId: 20,
+        createdAtMs: Date.parse('2026-02-18T04:49:00Z'),
+        source: 'pull'
+      });
+      expect(signals.ignoredMentions).toEqual([]);
+    }
+  });
+
+  it('keeps explicit coderabbit rereview and resolve requests blocking', () => {
+    const requests = resolveLatestBotRereviewRequests([
+      {
+        id: 16,
+        body: '@coderabbitai please re-review this iteration',
+        created_at: '2026-02-18T04:44:00Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'issue'
+      },
+      {
+        id: 17,
+        body: '@coderabbitai please resolve the addressed threads',
+        created_at: '2026-02-18T04:45:00Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'pull'
+      },
+      {
+        id: 18,
+        body: '@coderabbitai resolve the remaining thread',
+        created_at: '2026-02-18T04:46:00Z',
+        user: { login: 'maintainer', type: 'User' },
+        __source: 'review'
+      }
+    ]);
+
+    expect(requests.coderabbit.commentId).toBe(18);
+    expect(requests.coderabbit.source).toBe('review');
+    expect(requests.coderabbit.createdAtMs).toBe(Date.parse('2026-02-18T04:46:00Z'));
   });
 
   it('ignores bot-authored mentions when deriving re-review requests', () => {

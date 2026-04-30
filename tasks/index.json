@@ -1,6 +1,44 @@
 {
   "items": [
     {
+      "id": "20260430-linear-033979b5-6903-4d5f-9c9b-41769aa69330",
+      "title": "CO-447 ready-review CodeRabbit acknowledgement-only mention classification",
+      "relates_to": "tasks/tasks-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-30",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
+        "docs/TECH_SPEC-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
+        "docs/ACTION_PLAN-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
+        "tasks/specs/linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
+        "tasks/tasks-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
+        ".agent/task/linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
+        "tasks/index.json",
+        ".runs/linear-033979b5-6903-4d5f-9c9b-41769aa69330-docs-packet/cli/2026-04-30T13-55-44-820Z-eab248c4/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet",
+          "date": "2026-04-30",
+          "status": "produced",
+          "manifest": ".runs/linear-033979b5-6903-4d5f-9c9b-41769aa69330-docs-packet/cli/2026-04-30T13-55-44-820Z-eab248c4/manifest.json",
+          "patch": ".runs/linear-033979b5-6903-4d5f-9c9b-41769aa69330-docs-packet/cli/2026-04-30T13-55-44-820Z-eab248c4/provider-linear-child-lane.patch",
+          "source_anchor": "ctx:sha256:00e03169d32aeae727af79b53f4e2ddc10bee8f33c56a41ed7c5f395565ad0a5#chunk:c000001",
+          "summary": "Docs-first packet created for CO-447 from parent-provided child-lane instructions and read-only local source inspection. The referenced source payload path was absent in this child checkout. The packet preserves ready-review classification of CodeRabbit acknowledgement-only mentions versus explicit rereview/resolve requests while keeping unacknowledged_bot_feedback, unresolved review-thread handling, CodeRabbit checks, and explicit rereview requests as hard readiness gates. Parent owns source/tests, validation, Linear state, workpad, PR lifecycle, and review handoff."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
+        "task": "tasks/tasks-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
+        "agent_task": ".agent/task/linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
+        "docs": "docs/TECH_SPEC-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md"
+      }
+    },
+    {
       "id": "20260430-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5",
       "title": "CO-446 target-keyed last_audit_operation projection",
       "relates_to": "tasks/tasks-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",

@@ -38,6 +38,7 @@ export interface PrWatchMergeBotRereviewDiagnostics {
   rawPendingBots: string[];
   effectivePendingBots: string[];
   clearedPendingBots: string[];
+  ignoredMentions: PrWatchMergeIgnoredBotRereviewMention[];
   coderabbit: {
     statusCheckRollup: {
       state: 'success' | 'pending' | 'failed' | 'missing' | string;
@@ -52,12 +53,21 @@ export interface PrWatchMergeBotRereviewDiagnostics {
   };
 }
 
+export interface PrWatchMergeIgnoredBotRereviewMention {
+  kind: string;
+  reason: string;
+  commentId: number | null;
+  createdAtMs: number | null;
+  source: 'issue' | 'pull' | 'review';
+}
+
 export interface PrWatchMergeBotRereviewSignals {
   fetchError: boolean;
   rateLimit?: PrWatchMergeGitHubRateLimitStatus | null;
   pendingBots: string[];
   inProgressBots: string[];
   requestTimesByBot?: Record<string, number>;
+  ignoredMentions?: PrWatchMergeIgnoredBotRereviewMention[];
   coderabbit: PrWatchMergeCoderabbitReviewMeta;
 }
 
@@ -267,6 +277,29 @@ export function resolveLatestBotRereviewRequests(
     source: 'issue' | 'pull' | 'review';
   }
 >;
+
+export function resolveBotRereviewRequestMentions(
+  comments: Array<{
+    id?: number | string | null;
+    body?: string | null;
+    created_at?: string | null;
+    user?: {
+      login?: string | null;
+      type?: string | null;
+    } | null;
+    __source?: 'issue' | 'pull' | 'review' | string | null;
+  }>
+): {
+  requests: Record<
+    string,
+    {
+      commentId: number | null;
+      createdAtMs: number;
+      source: 'issue' | 'pull' | 'review';
+    }
+  >;
+  ignoredMentions: PrWatchMergeIgnoredBotRereviewMention[];
+};
 
 export function resolveBotRereviewTimingForKind(params: {
   kind: string;
