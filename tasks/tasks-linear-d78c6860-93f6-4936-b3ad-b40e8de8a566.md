@@ -11,6 +11,7 @@
 - [x] CO-427 packet drafted with protected terms, non-goals, Not Done If, acceptance criteria, and parity matrix. Evidence: PRD, TECH_SPEC mirror, ACTION_PLAN, canonical spec, and mirrors above.
 - [x] Owner re-home scope recorded. Evidence: packet, catalog, and cohort guide describe live `CO-427` owner metadata and terminal `CO-425` evidence.
 - [x] Current owner lineage preserved. Evidence: packet references `CO-425`, `configured_owner_terminal`, `freshness_decision=block_unowned_repo_debt`, `blocking_changed_paths=[]`, rolling March 28 task-packet/mirror cohort, and source CO-330 maintenance report.
+- [x] Current-main rebase lineage preserved. Evidence: packet and cohort guide now record that CO-430 carried the integrated owner metadata from PR #728 but is terminal `Done` and historical evidence only.
 
 ## Registration
 - [x] `tasks/index.json` registration added. Evidence: item `20260429-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566`.
@@ -21,7 +22,7 @@
 - [x] Pre-fix terminal owner reproduced. Evidence: `npm run docs:freshness:maintain -- --format json` returned `freshness_decision=block_unowned_repo_debt`, `owner_issue=CO-425`, `reason=configured_owner_terminal`, `state=Done`, `state_type=completed`, and `blocking_changed_paths=[]`.
 - [x] Open, stamped owner reused. Evidence: post-fix `owner_issue_verification.issue=CO-427`, `state=In Progress`, `state_type=started`, `same_project=true`, `usable=true`.
 - [x] Catalog owner re-homed. Evidence: `docs/docs-catalog.json` sets `policies.rolling_freshness_cohorts.owner_issue` to `CO-427`.
-- [x] Cohort guide updated. Evidence: `docs/guides/docs-freshness-cohorts.md` names `CO-427` as current owner and keeps `CO-425` as terminal historical evidence.
+- [x] Cohort guide updated. Evidence: `docs/guides/docs-freshness-cohorts.md` names `CO-427` as current owner and keeps `CO-425` and `CO-430` as terminal historical evidence.
 - [x] Retained cohort preserved. Evidence: post-fix maintenance output keeps `co-420-apr-28-march-28-task-packet-mirror`, 33 rows, 28 Task Packet, 5 Task Mirror, `last_review=2026-03-28`, `cadence_days=30`, `expires_after=2026-05-04`.
 
 ## Validation
@@ -42,6 +43,7 @@
 - [x] PR attached to Linear issue if helper/API permits. Evidence: `codex-orchestrator linear attach-pr` returned `ok=true` with attachment `3dba6d71-71c9-44b9-a0fb-5d8871d841c0`.
 - [x] Linear workpad created with branch, commit, PR, and validation evidence. Evidence: Linear workpad comment `6aad5861-3130-4fbe-bdea-db847d13ea96` / https://linear.app/asabeko/issue/CO-427/re-home-live-docs-freshness-maintenance-owner-after-terminal-co-425#comment-6aad5861.
 - [x] PR updated with owner-rehome patch. Evidence: final branch head includes merged `origin/main` plus CO-427 owner-rehome patch; PR push/check drain remains the next lifecycle gate.
+- [x] Current-main rebase validation completed after PR #728 overlap. Evidence: delegation guard passed with parent-only override; `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test` (357 files / 5049 tests), `npm run docs:check`, `npm run docs:freshness`, `npm run docs:freshness:maintain -- --format json`, `npm run repo:stewardship`, `git diff --check`, and `node scripts/diff-budget.mjs` with integration-overlap override passed.
 - [ ] `pr ready-review` drain clean. Evidence: pending handoff.
 - [ ] Linear issue moved to `In Review` only after required gates are green.
 
