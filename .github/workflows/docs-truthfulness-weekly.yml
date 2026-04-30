@@ -51,7 +51,63 @@ jobs:
       - name: Publish workflow summary
         run: |
           cat "$REPORT_DIR/docs-freshness-summary.md" >> "$GITHUB_STEP_SUMMARY"
-          node -e "const fs=require('fs'); const report=JSON.parse(fs.readFileSync(process.env.REPORT_DIR + '/docs-freshness-maintenance.json', 'utf8')); fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n## Docs Freshness Maintenance Decision\n\n' + '- Decision: ' + report.freshness_decision + '\n' + '- Owner issue: ' + (report.owner_issue || 'none') + '\n' + '- Policy capacity: ' + report.policy_capacity_status.status + '\n' + '- Recommended action: ' + report.recommended_action + '\n');"
+          node <<'NODE'
+          const fs = require('fs');
+
+          const report = JSON.parse(
+            fs.readFileSync(`${process.env.REPORT_DIR}/docs-freshness-maintenance.json`, 'utf8')
+          );
+          const evidence = report.owner_action_evidence && typeof report.owner_action_evidence === 'object'
+            ? report.owner_action_evidence
+            : {};
+          const actions = Array.isArray(evidence.actions) ? evidence.actions : [];
+          const action = actions.find((item) => item && typeof item === 'object') || {};
+          const issueAction = action.owner_issue_action && typeof action.owner_issue_action === 'object'
+            ? action.owner_issue_action
+            : {};
+          const cohorts = Array.isArray(report.candidate_cohorts) ? report.candidate_cohorts : [];
+          const firstCohort = cohorts.find((cohort) => cohort && typeof cohort === 'object') || {};
+          const appendBody = (lines, title, body) => {
+            if (!body) {
+              return;
+            }
+            lines.push('', `#### ${title}`, '', '```markdown', body, '```');
+          };
+
+          const bodyDescription = typeof action.body?.description === 'string'
+            ? action.body.description.trim()
+            : '';
+          const copyableCommand = typeof action.copyable_command === 'string'
+            ? action.copyable_command.trim()
+            : '';
+
+          const lines = [
+            '',
+            '## Docs Freshness Maintenance Decision',
+            '',
+            `- Decision: ${report.freshness_decision || 'unknown'}`,
+            `- Owner issue: ${report.owner_issue || 'none'}`,
+            `- Policy capacity: ${report.policy_capacity_status?.status || 'unknown'}`,
+            `- Recommended action: ${report.recommended_action || 'none'}`,
+            '',
+            '### Canonical Owner Action Evidence',
+            '',
+            `- Evidence status: ${evidence.status || 'not_emitted'}`,
+            `- Write status: ${evidence.write_status || 'unknown'}`,
+            `- Required actions: ${evidence.required_actions ?? 0}`,
+            `- Mode: ${action.mode || 'none'}`,
+            `- Reason: ${issueAction.reason || 'none'}`,
+            `- Issue: ${action.owner_issue || issueAction.issue || report.owner_issue || 'none'}`,
+            `- Canonical owner key: ${action.canonical_owner_key || firstCohort.canonical_owner_key || 'none'}`,
+            `- Canonical owner marker: ${action.canonical_owner_marker || firstCohort.canonical_owner_marker || 'none'}`,
+            `- Candidate cohorts: ${cohorts.length}`,
+            `- Copyable command: ${copyableCommand ? 'emitted' : 'none'}`,
+            `- Copyable body: ${bodyDescription ? 'emitted' : 'none'}`
+          ];
+          appendBody(lines, 'Copyable Command', copyableCommand);
+          appendBody(lines, 'Copyable Owner Body', bodyDescription);
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
+          NODE
           printf '\n' >> "$GITHUB_STEP_SUMMARY"
           cat "$REPORT_DIR/repo-stewardship-summary.md" >> "$GITHUB_STEP_SUMMARY"
 

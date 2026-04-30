@@ -1,6 +1,72 @@
 {
   "items": [
     {
+      "id": "20260430-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4",
+      "title": "CO-431 canonical-owner docs freshness automation",
+      "relates_to": "tasks/tasks-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-04-30",
+      "status": "in_progress",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "evidence": [
+        "docs/PRD-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+        "docs/TECH_SPEC-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+        "docs/ACTION_PLAN-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+        "tasks/specs/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+        "tasks/tasks-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+        ".agent/task/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        "scripts/docs-freshness-maintain.mjs",
+        "tests/docs-freshness-maintain.spec.ts",
+        ".github/workflows/docs-truthfulness-weekly.yml",
+        "docs/guides/docs-freshness-cohorts.md",
+        ".runs/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4-docs-route-guide/cli/2026-04-30T11-15-57-835Z-cf61ab58/manifest.json",
+        "out/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4/docs-freshness-maintenance.json",
+        ".runs/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4/cli/2026-04-30T11-03-00-861Z-82d9d979/review/telemetry.json",
+        "out/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4/manual/elegance-review.md"
+      ],
+      "approvals": {
+        "docs_route_guide_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-route-guide",
+          "date": "2026-04-30",
+          "status": "accepted",
+          "manifest": ".runs/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4-docs-route-guide/cli/2026-04-30T11-15-57-835Z-cf61ab58/manifest.json",
+          "summary": "Docs/workflow wording patch accepted after scoped git apply check; parent owns implementation, validation, Linear, GitHub, PR, and review lifecycle."
+        },
+        "focused_validation": {
+          "reviewer": "write-enabled CO-431 provider worker",
+          "date": "2026-04-30",
+          "status": "validation-green-before-review",
+          "summary": "node --check for freshness scripts, focused Vitest with 37 tests, delegation guard, spec guard, build, lint with existing DelegationMcpHealth warnings only, full test, docs:check, docs:freshness, docs:freshness:maintain, repo stewardship, git diff --check, and diff-budget override passed."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-04-30",
+          "status": "bounded-success",
+          "telemetry": ".runs/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4/cli/2026-04-30T11-03-00-861Z-82d9d979/review/telemetry.json",
+          "summary": "Manifest-backed forced standalone review executed under FORCE_CODEX_REVIEW=1 after the first P2 fixes. The rerun completed with status=succeeded and review_outcome=bounded-success."
+        },
+        "elegance_review": {
+          "reviewer": "write-enabled CO-431 provider worker",
+          "date": "2026-04-30",
+          "status": "no-simplification-patch",
+          "artifact": "out/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4/manual/elegance-review.md",
+          "summary": "Checked placement, route classifier scope, no-token body behavior, workflow summary scope, and test focus; no smaller patch was available after standalone-review fixes."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+        "task": "tasks/tasks-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+        "agent_task": ".agent/task/linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md",
+        "docs": "docs/TECH_SPEC-linear-5d677c44-06c1-43ca-9aac-5a74f96671b4.md"
+      }
+    },
+    {
       "id": "20260430-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b",
       "title": "CO-444 re-home docs:freshness:maintain owner after terminal CO-441",
       "relates_to": "tasks/tasks-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md",
