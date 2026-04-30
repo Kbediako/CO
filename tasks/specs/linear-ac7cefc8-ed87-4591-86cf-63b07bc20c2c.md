@@ -1,11 +1,11 @@
 ---
 id: 20260425-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c
-title: "CO-330 reopened stale-owner/provider-refresh recurrence after PR #624"
+title: "CO-330 stale-owner/provider-refresh recurrence after PR #624 and PR #658"
 relates_to: docs/PRD-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-25
+last_review: 2026-04-28
 related_action_plan: docs/ACTION_PLAN-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md
 task_checklists:
   - tasks/tasks-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md
@@ -19,11 +19,13 @@ task_checklists:
 - Source anchor: `ctx:sha256:d14a6cd66c90db64bf91248f6f68d329bf0b540a68b4243aec21a6770b4dce3b#chunk:c000001`
 
 ## Summary
-- Objective: complete the reopened CO-330 stale-owner/provider-refresh recurrence after PR #624 by pairing the docs refresh with a parent-owned supervision fix and regression coverage.
+- Objective: complete the reopened CO-330 stale-owner/provider-refresh recurrence after PR #624 and PR #658 by pairing the docs refresh with parent-owned recovery fixes and regression coverage.
 - Current evidence: the 2026-04-24/2026-04-25 recurrence shows provider workers for `CO-351`, `CO-352`, and `CO-355` still observed `stale_control_host_owner` plus `fetch failed` / `refresh request timeout`, while live `co-status freshness` / `control-host` freshness still timed out or reported stale.
+- Current 2026-04-27/2026-04-28 evidence: `CO-403` retained `stale_control_host_owner` plus repeated `refresh request timeout` / `fetch failed`, and `CO-399` `control-host recover` returned `provider_refresh_lifecycle_stuck` even though explicit recovery should preserve provider-worker progress.
 - Scope:
   - CO-330 PRD, TECH_SPEC, ACTION_PLAN, task checklist, and `.agent` mirror
-  - `controlHostSupervision` restart classification and focused tests for the repeated probe-timeout recurrence
+  - explicit provider recovery after stale refresh lifecycle evidence
+  - focused tests for the repeated probe-timeout recurrence and recovery recurrence
 - Constraints:
   - keep stale-owner artifacting and provider refresh retry behavior from PR #624 intact
   - do not broaden the fix into generic host restart, provider queue redesign, or admission/backfill work
@@ -41,6 +43,9 @@ task_checklists:
   - `control-host-stale-owner.json`
   - `provider-control-host-refresh-failure.json`
   - `active_worker_probe_timeout_quarantine`
+  - `provider_refresh_lifecycle_stuck`
+  - `control-host recover`
+  - `/api/v1/provider-worker/recover`
   - `owner pid/host/task/run`
   - `attempted pid/host`
   - `co-status freshness`
@@ -51,6 +56,8 @@ task_checklists:
   - `CO-351`
   - `CO-352`
   - `CO-355`
+  - `CO-403`
+  - `CO-399`
 - Related prior context:
   - `CO-152` stale-owner ownership: reference only as prior owner-safety context
   - `CO-119` refresh-timeout recovery: reference only as prior refresh-timeout recovery context
@@ -68,6 +75,7 @@ task_checklists:
 - `control-host-stale-owner.json` omits `owner pid/host/task/run` or `attempted pid/host`.
 - `stale_reclaimed` is recorded, but `co-status freshness` / `control-host` freshness still times out or reports stale state without a failure artifact.
 - Persistent refresh failure after reclaim does not write `provider-control-host-refresh-failure.json`.
+- `control-host recover` returns `provider_refresh_lifecycle_stuck` for a recoverable provider issue after stale-owner reclaim.
 - Owner reclaim can run against an active owner or without liveness evidence.
 - Provider refresh queue state is dropped, duplicated, or marked terminal during reclaim.
 - Focused validation does not cover the `CO-351` / `CO-352` / `CO-355` recurrence shape.
@@ -101,7 +109,8 @@ task_checklists:
   2. Preserve the 2026-04-25 source anchor and parent manifest pointer.
   3. Preserve protected terms and wrong-interpretation guardrails in the packet.
   4. Treat active provider refresh polling (`checking=true`, `refresh_phase=refresh:*`, no `restart_required`, no current stuck `reason`) as eligible for the same repeated same-worker probe-timeout quarantine used after lifecycle-stuck restarts, even when a historical `last_error` from the previous retry remains.
-  5. State that PR #624's single retry is insufficient acceptance when supervision keeps restarting the control host before the active provider refresh can recover or truthfully fail.
+  5. Let explicit provider recovery (`control-host recover` / `/api/v1/provider-worker/recover`) reset a stale refresh lifecycle boundary for the recovery attempt so `recoverIssue` can resolve the tracked issue and preserve progress.
+  6. State that PR #624's single retry and PR #658's supervision quarantine are insufficient acceptance when operator recovery still fails with `provider_refresh_lifecycle_stuck`.
 - Non-functional requirements:
   - concise packet suitable for parent patch export
   - no Linear mutations
@@ -120,7 +129,8 @@ task_checklists:
 - Unrecovered `fetch failed` or `refresh request timeout` after reclaim writes `provider-control-host-refresh-failure.json`.
 - Provider refresh queue state is preserved without duplicate launch, dropped work, or false terminal state.
 - Control-host supervision returns `active_worker_probe_timeout_quarantine` to stop repeated same-worker restart churn during active provider refresh before `restart_required`, preserving the active provider workers instead of rotating the owner again, including retries with a retained historical `last_error`.
-- Focused validation covers the reopened recurrence from `CO-351`, `CO-352`, and `CO-355`.
+- Explicit recovery through `control-host recover` / `/api/v1/provider-worker/recover` preserves provider progress after stale-owner reclaim and stale refresh lifecycle evidence.
+- Focused validation covers the reopened recurrence from `CO-351`, `CO-352`, `CO-355`, `CO-403`, and `CO-399`.
 
 ## Validation Plan
 - Child-lane scoped checks:
@@ -130,6 +140,7 @@ task_checklists:
 - Parent-owned checks:
   - docs-review before implementation
   - focused tests for repeated probe-timeout churn while provider refresh is active before `restart_required`
+  - focused tests for explicit recovery when prior provider polling is stuck with `provider_refresh_lifecycle_stuck`
   - explicit regression scenario that keeps `CO-351`, `CO-352`, and `CO-355` visible as active worker series through the quarantine path
   - normal parent validation floor and PR lifecycle
 

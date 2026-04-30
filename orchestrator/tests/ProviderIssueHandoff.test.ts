@@ -1046,6 +1046,186 @@ describe('createProviderIssueHandoffService', () => {
     }
   );
 
+  it('lets explicit control-host recovery reset a stale refresh lifecycle and preserve progress', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-28T03:30:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const startedRun = {
+      runId: 'run-recover-co399',
+      manifestPath: join(paths.runDir, 'co399-provider-run-manifest.json')
+    };
+    const launcher = { start: vi.fn(async () => startedRun), resume: vi.fn(async () => undefined) };
+    const resolveTrackedIssue = vi.fn(async ({ issueId }: { provider: 'linear'; issueId: string }) => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: issueId,
+        identifier: 'CO-399',
+        title: 'Recover provider refresh after stale owner',
+        updated_at: '2026-04-28T03:30:30.000Z'
+      })
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue
+    });
+    const stuckError = new Error('provider_refresh_lifecycle_stuck');
+    stuckError.name = 'ProviderRefreshLifecycleStuckError';
+
+    markProviderPollingStarted(service, {
+      mode: 'refresh',
+      atMs: Date.parse('2026-04-28T03:30:05.000Z')
+    });
+    await markProviderPollingStuck(service, {
+      atMs: Date.parse('2026-04-28T03:30:50.000Z')
+    });
+    markProviderPollingCompleted(service, {
+      error: stuckError,
+      atMs: Date.parse('2026-04-28T03:30:50.000Z')
+    });
+    state.polling = {
+      checking: false,
+      queued: false,
+      last_mode: 'refresh',
+      last_requested_at: '2026-04-28T03:30:05.000Z',
+      last_completed_at: '2026-04-28T03:30:50.000Z',
+      last_success_at: null,
+      last_error_at: '2026-04-28T03:30:50.000Z',
+      last_error: 'provider_refresh_lifecycle_stuck',
+      next_poll_at: null,
+      next_poll_in_ms: null,
+      next_refresh_state: 'unknown',
+      next_refresh_at: null,
+      next_refresh_in_ms: null,
+      source_updated_at: '2026-04-28T03:30:50.000Z',
+      updated_at: '2026-04-28T03:30:50.000Z',
+      operation_started_at: null,
+      operation_elapsed_ms: null,
+      stalled_after_ms: 45000,
+      refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+      refresh_request_class: 'claim_issue_by_id:running',
+      refresh_provider_keys: ['linear:lin-issue-399'],
+      refresh_counts: {
+        claims_total: 1,
+        claims_scanned: 1,
+        issue_by_id_reads: 1,
+        issue_by_id_deferred: 0,
+        occupied_slots: 0,
+        fresh_discovery_runs: 0,
+        fresh_discovery_candidates: 0,
+        fresh_discovery_started: 0
+      },
+      stuck: true,
+      stuck_since_at: '2026-04-28T03:30:50.000Z',
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      linear_budget: null
+    };
+    state.updated_at = '2026-04-28T03:30:50.000Z';
+
+    vi.setSystemTime(new Date('2026-04-28T03:31:00.000Z'));
+
+    const result = await service.recoverIssue({
+      provider: 'linear',
+      issueId: 'lin-issue-399',
+      action: 'recover'
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-399'
+    });
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      kind: 'start',
+      reason: 'provider_issue_start_launched',
+      claim: {
+        issue_id: 'lin-issue-399',
+        issue_identifier: 'CO-399',
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        task_id: 'linear-lin-issue-399',
+        run_id: startedRun.runId,
+        run_manifest_path: startedRun.manifestPath,
+        launch_source: 'control-host',
+        launch_token_present: true
+      }
+    });
+    expect(state.claims[0]).toMatchObject({
+      issue_id: 'lin-issue-399',
+      issue_identifier: 'CO-399',
+      last_event: 'control_host_provider_worker_recover',
+      last_action: 'recover',
+      launch_source: 'control-host'
+    });
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: false,
+      stuck: false,
+      restart_required: false,
+      last_error: null
+    });
+  });
+
+  it('keeps stuck polling diagnostics when explicit recovery cannot resolve the issue', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-28T03:30:00.000Z'));
+
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const persist = vi.fn(async () => undefined);
+    const launcher = { start: vi.fn(async () => null), resume: vi.fn(async () => undefined) };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'provider-linear-worker'
+    });
+    const stuckError = new Error('provider_refresh_lifecycle_stuck');
+    stuckError.name = 'ProviderRefreshLifecycleStuckError';
+
+    markProviderPollingStarted(service, {
+      mode: 'refresh',
+      atMs: Date.parse('2026-04-28T03:30:05.000Z')
+    });
+    await markProviderPollingStuck(service, {
+      atMs: Date.parse('2026-04-28T03:30:50.000Z')
+    });
+    markProviderPollingCompleted(service, {
+      error: stuckError,
+      atMs: Date.parse('2026-04-28T03:30:50.000Z')
+    });
+
+    vi.setSystemTime(new Date('2026-04-28T03:31:00.000Z'));
+
+    const result = await service.recoverIssue({
+      provider: 'linear',
+      issueId: 'lin-issue-399',
+      action: 'recover'
+    });
+
+    expect(result).toMatchObject({
+      kind: 'skipped',
+      reason: 'provider_issue_recover_resolution_unavailable'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: false,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      last_error: 'provider_refresh_lifecycle_stuck',
+      next_poll_at: null
+    });
+  });
+
   it('releases an existing claim when identifier-based recovery resolves the issue as gone', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
