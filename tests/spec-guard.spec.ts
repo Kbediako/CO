@@ -2536,7 +2536,9 @@ describe('spec-guard script', () => {
       'External ecosystem migration bridge lists Deprecation plan:',
       'External ecosystem migration bridge lists Deprecation plan: false while reviewer approval granted.',
       'External ecosystem migration bridge lists Deprecation plan: none while reviewer approval granted.',
-      'External ecosystem migration bridge lists Deprecation plan: not applicable while reviewer approval granted.'
+      'External ecosystem migration bridge lists Deprecation plan: not applicable while reviewer approval granted.',
+      'External ecosystem migration bridge lists Deprecation plan: not planned while reviewer approval granted.',
+      'External ecosystem migration bridge lists Deprecation plan: unplanned while reviewer approval granted.'
     ]) {
       const repo = await initRepository();
       const decisionBody = fallbackDecisionTable([

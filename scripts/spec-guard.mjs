@@ -144,7 +144,7 @@ function hasAffirmativeReviewerApprovalEvidence(content) {
 function hasNegatedDeprecationPlanEvidence(content) {
   return (
     /\b(?:no|without|lacks?|missing|absent|not)\s+(?:\w+\s+){0,3}deprecation plan\b/.test(content) ||
-    /\bdeprecation plan\s*[:=-]?\s*(?:is\s+)?(?:absent|missing|denied|unapproved|not granted|not recorded|not approved|not in place|not available|not ready|not yet ready|not complete|not finalized|not linked|not started)\b/.test(
+    /\bdeprecation plan\s*[:=-]?\s*(?:is\s+)?(?:absent|missing|denied|unapproved|not granted|not recorded|not approved|not in place|not available|not planned|not ready|not yet ready|not complete|not finalized|not linked|not started|unplanned)\b/.test(
       content
     )
   );
@@ -153,7 +153,7 @@ function hasNegatedDeprecationPlanEvidence(content) {
 function hasWeakDeprecationPlanEvidence(content) {
   return (
     /\bdeprecation plan\s*[:=-]\s*(?:$|[;,.])/.test(content) ||
-    /\bdeprecation plan\s*[:=-]?\s*(?:is\s+)?(?:tbd|to be determined|pending|unknown|todo|later|unrecorded|unconfirmed|false|none|no|n\/a|na|not applicable|not available|unavailable|not ready|not yet ready|not complete|incomplete|not finalized|not linked|not started|blocked|deferred)\b/.test(
+    /\bdeprecation plan\s*[:=-]?\s*(?:is\s+)?(?:tbd|to be determined|pending|unknown|todo|later|unrecorded|unconfirmed|false|none|no|n\/a|na|not applicable|not available|unavailable|not planned|not ready|not yet ready|not complete|incomplete|not finalized|not linked|not started|unplanned|blocked|deferred)\b/.test(
       content
     )
   );
@@ -166,7 +166,7 @@ function hasDeprecationPlanEvidence(content) {
   return (
     /\bhas (?:a |an )?deprecation plan\b/.test(content) ||
     /\bdeprecation plan (?:exists|recorded|approved|published|linked|available|complete|in place)\b/.test(content) ||
-    /\bdeprecation plan\s*[:=-]\s*(?!(?:tbd|to be determined|pending|unknown|todo|later|unrecorded|unconfirmed|false|none|no|n\/a|na|not applicable|not approved|not in place|not available|unavailable|not ready|not yet ready|not complete|incomplete|not finalized|not linked|not started|blocked|deferred)\b).{4,}/.test(
+    /\bdeprecation plan\s*[:=-]\s*(?!(?:tbd|to be determined|pending|unknown|todo|later|unrecorded|unconfirmed|false|none|no|n\/a|na|not applicable|not approved|not in place|not available|unavailable|not planned|not ready|not yet ready|not complete|incomplete|not finalized|not linked|not started|unplanned|blocked|deferred)\b).{4,}/.test(
       content
     )
   );
