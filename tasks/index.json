@@ -19,7 +19,7 @@
         "tasks/specs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
         "tasks/tasks-linear-d78c6860-93f6-4936-b3ad-b40e8de8a566.md",
         "out/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/docs-freshness-maintenance.json",
-        ".runs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/cli/2026-04-29T21-28-23-361Z-7f1ccdf1/review/telemetry.json",
+        ".runs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/cli/2026-04-30T03-53-13-149Z-36af8a4c/review/telemetry.json",
         "out/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/manual/elegance-review.md"
       ],
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
@@ -46,24 +46,24 @@
         },
         "repo_validation": {
           "reviewer": "provider worker parent lane",
-          "date": "2026-04-29",
+          "date": "2026-04-30",
           "status": "passed",
-          "summary": "After merging current origin/main, delegation guard passed with a recorded single-bounded-change override; spec guard, build, lint, test (357 files / 5049 tests), docs:check, docs:freshness, docs:freshness:maintain, repo stewardship, and diff budget passed."
+          "summary": "After merging current origin/main, delegation guard passed with the recorded parent-only parallelization override; spec guard, build, lint, test (357 files / 5049 tests), docs:check, docs:freshness, docs:freshness:maintain, repo stewardship, git diff --check, and diff budget passed."
         },
         "standalone_review": {
           "reviewer": "codex-orchestrator review",
-          "date": "2026-04-29",
+          "date": "2026-04-30",
           "status": "bounded-success",
-          "manifest": ".runs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/cli/2026-04-29T21-28-23-361Z-7f1ccdf1/manifest.json",
-          "telemetry": ".runs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/cli/2026-04-29T21-28-23-361Z-7f1ccdf1/review/telemetry.json",
-          "summary": "Manifest-backed forced standalone review executed under FORCE_CODEX_REVIEW=1 after merging origin/main. The first attempt hit the bounded validation-command boundary, then the read-only retry found no actionable issues; telemetry records review_outcome=bounded-success via command-intent retry."
+          "manifest": ".runs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/cli/2026-04-30T03-53-13-149Z-36af8a4c/manifest.json",
+          "telemetry": ".runs/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/cli/2026-04-30T03-53-13-149Z-36af8a4c/review/telemetry.json",
+          "summary": "Manifest-backed forced standalone review executed under FORCE_CODEX_REVIEW=1 after merging origin/main and resolving the PR #728 overlap. The first attempt hit the bounded validation-command boundary, then the read-only retry found no actionable issues; telemetry records review_outcome=bounded-success via command-intent retry."
         },
         "elegance_review": {
           "reviewer": "provider worker parent lane",
-          "date": "2026-04-29",
+          "date": "2026-04-30",
           "status": "clean",
           "evidence": "out/linear-d78c6860-93f6-4936-b3ad-b40e8de8a566/manual/elegance-review.md",
-          "summary": "Explicit minimality pass kept the fix scoped to owner metadata, cohort-guide evidence, and required task mirrors; no simplification patch was warranted."
+          "summary": "Explicit minimality pass after the current-main refresh kept the fix scoped to owner metadata, cohort-guide evidence, and required task mirrors; no simplification patch was warranted."
         },
         "current_main_rebase": {
           "reviewer": "provider worker parent lane",
