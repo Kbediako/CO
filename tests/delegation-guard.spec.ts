@@ -71,6 +71,169 @@ function cleanGuardOverrideEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.Proces
   return { ...sanitizedBase, ...overrides };
 }
 
+async function createProviderDocsReviewChildFixture(options: {
+  childTaskId?: string;
+  parentTaskId?: string;
+  claimTaskId?: string;
+  claimLaunchSource?: string | null;
+  claimLaunchToken?: string | null;
+  childIssueId?: string;
+  childIssueIdentifier?: string;
+  childIssueProvider?: string;
+  childIssueIdCamelCase?: string;
+  childIssueIdentifierCamelCase?: string;
+  childIssueProviderCamelCase?: string;
+  childManifestCase?: 'snake' | 'camel';
+  parentManifestCase?: 'snake' | 'camel';
+  staleParentRunBefore?: string;
+  registeredParentKey?: string;
+} = {}): Promise<{
+  dir: string;
+  taskId: string;
+  parentTaskId: string;
+  parentRunId: string;
+  manifestPath: string;
+  parentManifestPath: string;
+}> {
+  const dir = await initRepo();
+  const parentTaskId = options.parentTaskId ?? 'linear-lin-issue-1';
+  const taskId = options.childTaskId ?? `${parentTaskId}-docs-review`;
+  const parentRunId = 'run-parent';
+  const childRunId = 'run-docs-review';
+  const manifestDir = join(dir, '.runs', taskId, 'cli', childRunId);
+  const manifestPath = join(manifestDir, 'manifest.json');
+  const parentRunDir = join(dir, '.runs', parentTaskId, 'cli', parentRunId);
+  const parentManifestPath = join(parentRunDir, 'manifest.json');
+  const childIssueProvider = options.childIssueProvider ?? 'linear';
+  const childIssueId = options.childIssueId ?? 'lin-issue-1';
+  const childIssueIdentifier = options.childIssueIdentifier ?? 'CO-2';
+  await mkdir(manifestDir, { recursive: true });
+  await mkdir(parentRunDir, { recursive: true });
+  let staleParentManifestPath = '';
+  if (options.staleParentRunBefore) {
+    const staleParentRunDir = join(dir, '.runs', parentTaskId, 'cli', options.staleParentRunBefore);
+    staleParentManifestPath = join(staleParentRunDir, 'manifest.json');
+    await mkdir(staleParentRunDir, { recursive: true });
+    await writeJson(staleParentManifestPath, {
+      task_id: parentTaskId,
+      run_id: options.staleParentRunBefore,
+      status: 'in_progress',
+      issue_provider: 'linear',
+      issue_id: 'lin-issue-1',
+      issue_identifier: 'CO-2'
+    });
+  }
+  if (options.registeredParentKey) {
+    await writeTaskIndex(dir, [
+      {
+        id: options.registeredParentKey,
+        relates_to: `tasks/tasks-${options.registeredParentKey}.md`
+      }
+    ]);
+  }
+  await writeJson(
+    manifestPath,
+    options.childManifestCase === 'camel'
+      ? {
+          taskId,
+          runId: childRunId,
+          status: 'in_progress',
+          parentRunId,
+          issueProvider: childIssueProvider,
+          issueId: childIssueId,
+          issueIdentifier: childIssueIdentifier
+        }
+      : {
+          task_id: taskId,
+          run_id: childRunId,
+          status: 'in_progress',
+          parent_run_id: parentRunId,
+          issue_provider: childIssueProvider,
+          issue_id: childIssueId,
+          issue_identifier: childIssueIdentifier,
+          ...(options.childIssueProviderCamelCase === undefined
+            ? {}
+            : { issueProvider: options.childIssueProviderCamelCase }),
+          ...(options.childIssueIdCamelCase === undefined ? {} : { issueId: options.childIssueIdCamelCase }),
+          ...(options.childIssueIdentifierCamelCase === undefined
+            ? {}
+            : { issueIdentifier: options.childIssueIdentifierCamelCase })
+        }
+  );
+  await writeJson(
+    parentManifestPath,
+    options.parentManifestCase === 'camel'
+      ? {
+          taskId: parentTaskId,
+          runId: parentRunId,
+          status: 'in_progress',
+          issueProvider: 'linear',
+          issueId: 'lin-issue-1',
+          issueIdentifier: 'CO-2'
+        }
+      : {
+          task_id: parentTaskId,
+          run_id: parentRunId,
+          status: 'in_progress',
+          issue_provider: 'linear',
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2'
+        }
+  );
+
+  const controlHostDir = join(dir, '.runs', 'local-mcp', 'cli', 'control-host');
+  await mkdir(controlHostDir, { recursive: true });
+  await writeJson(join(controlHostDir, 'linear-advisory-state.json'), {
+    schema_version: 1,
+    updated_at: '2026-03-20T00:00:01.000Z',
+    tracked_issue: null
+  });
+  const baseClaim = {
+    provider: 'linear',
+    provider_key: 'linear:lin-issue-1',
+    issue_id: 'lin-issue-1',
+    issue_identifier: 'CO-2',
+    issue_title: 'Autonomous intake handoff',
+    issue_state: 'In Progress',
+    issue_state_type: 'started',
+    issue_updated_at: '2026-03-20T00:00:00.000Z',
+    task_id: options.claimTaskId ?? parentTaskId,
+    mapping_source: 'provider_id_fallback',
+    state: 'running',
+    reason: 'provider_issue_rehydrated_active_run',
+    accepted_at: '2026-03-20T00:00:00.000Z',
+    updated_at: '2026-03-20T00:00:01.000Z',
+    last_delivery_id: 'delivery-1',
+    last_event: 'Issue',
+    last_action: 'update',
+    last_webhook_timestamp: 1_742_430_000_000,
+    run_id: parentRunId,
+    run_manifest_path: parentManifestPath,
+    launch_source: options.claimLaunchSource === undefined ? 'control-host' : options.claimLaunchSource,
+    launch_token: options.claimLaunchToken === undefined ? 'launch-token-1' : options.claimLaunchToken
+  };
+  const claims = options.staleParentRunBefore
+    ? [
+        {
+          ...baseClaim,
+          run_id: options.staleParentRunBefore,
+          run_manifest_path: staleParentManifestPath
+        },
+        baseClaim
+      ]
+    : [baseClaim];
+  await writeJson(join(controlHostDir, 'provider-intake-state.json'), {
+    schema_version: 1,
+    updated_at: '2026-03-20T00:00:01.000Z',
+    rehydrated_at: '2026-03-20T00:00:01.000Z',
+    latest_provider_key: 'linear:lin-issue-1',
+    latest_reason: 'provider_issue_rehydrated_active_run',
+    claims
+  });
+
+  return { dir, taskId, parentTaskId, parentRunId, manifestPath, parentManifestPath };
+}
+
 describe('delegation-guard script', () => {
   it('reports missing task id with export example', async () => {
     tempDir = await initRepo();
@@ -1327,6 +1490,169 @@ describe('delegation-guard script', () => {
       `Delegation guard: '${taskId}' treated as subagent run for sanctioned provider task '${parentTaskId}'`
     );
     expect(stdout).toContain('Delegation guard: OK (subagent runs are exempt).');
+  });
+
+  it('accepts provider docs-review child runs with issue fields when the sanctioned provider parent matches', async () => {
+    const fixture = await createProviderDocsReviewChildFixture();
+    tempDir = fixture.dir;
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: fixture.dir,
+      env: cleanGuardOverrideEnv({
+        MCP_RUNNER_TASK_ID: fixture.taskId,
+        CODEX_ORCHESTRATOR_ROOT: fixture.dir,
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: fixture.manifestPath
+      })
+    });
+
+    expect(stdout).toContain(
+      `Delegation guard: '${fixture.taskId}' treated as subagent run for sanctioned provider task '${fixture.parentTaskId}'`
+    );
+    expect(stdout).toContain('Delegation guard: OK (subagent runs are exempt).');
+    expect(stdout).not.toContain(`Provider-started task id '${fixture.taskId}' is missing control-host launch provenance`);
+    expect(stdout).not.toContain(`Task id '${fixture.taskId}' is not registered in tasks/index.json`);
+  });
+
+  it('accepts provider docs-review child runs when child and parent manifests use camelCase aliases', async () => {
+    const fixture = await createProviderDocsReviewChildFixture({
+      childManifestCase: 'camel',
+      parentManifestCase: 'camel'
+    });
+    tempDir = fixture.dir;
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: fixture.dir,
+      env: cleanGuardOverrideEnv({
+        MCP_RUNNER_TASK_ID: fixture.taskId,
+        CODEX_ORCHESTRATOR_ROOT: fixture.dir,
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: fixture.manifestPath
+      })
+    });
+
+    expect(stdout).toContain(
+      `Delegation guard: '${fixture.taskId}' treated as subagent run for sanctioned provider task '${fixture.parentTaskId}'`
+    );
+    expect(stdout).toContain('Delegation guard: OK (subagent runs are exempt).');
+    expect(stdout).not.toContain(`Task id '${fixture.taskId}' is not registered in tasks/index.json`);
+  });
+
+  it('rejects provider docs-review child runs with issue fields when parent provenance is missing', async () => {
+    const fixture = await createProviderDocsReviewChildFixture({
+      claimLaunchSource: null,
+      claimLaunchToken: null
+    });
+    tempDir = fixture.dir;
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: fixture.dir,
+      env: cleanGuardOverrideEnv({
+        MCP_RUNNER_TASK_ID: fixture.taskId,
+        CODEX_ORCHESTRATOR_ROOT: fixture.dir,
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: fixture.manifestPath
+      })
+    });
+
+    expect(stdout).toContain(
+      `Provider-started task id '${fixture.taskId}' is missing control-host launch provenance`
+    );
+    expect(stdout).toContain(`Task id '${fixture.taskId}' is not registered in tasks/index.json`);
+    expect(stdout).not.toContain('treated as subagent run for sanctioned provider task');
+  });
+
+  it('rejects provider docs-review child runs when child issue fields mismatch the sanctioned parent', async () => {
+    const fixture = await createProviderDocsReviewChildFixture({
+      childIssueId: 'foreign-issue'
+    });
+    tempDir = fixture.dir;
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: fixture.dir,
+      env: cleanGuardOverrideEnv({
+        MCP_RUNNER_TASK_ID: fixture.taskId,
+        CODEX_ORCHESTRATOR_ROOT: fixture.dir,
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: fixture.manifestPath
+      })
+    });
+
+    expect(stdout).toContain(
+      `Provider-child task id '${fixture.taskId}' issue_id 'foreign-issue' does not match sanctioned provider parent issue_id 'lin-issue-1'`
+    );
+    expect(stdout).toContain(`Task id '${fixture.taskId}' is not registered in tasks/index.json`);
+    expect(stdout).not.toContain('treated as subagent run for sanctioned provider task');
+  });
+
+  it('reports child issue-field mismatches before stale parent-run mismatches', async () => {
+    const fixture = await createProviderDocsReviewChildFixture({
+      childIssueId: 'foreign-issue',
+      staleParentRunBefore: 'run-stale-parent'
+    });
+    tempDir = fixture.dir;
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: fixture.dir,
+      env: cleanGuardOverrideEnv({
+        MCP_RUNNER_TASK_ID: fixture.taskId,
+        CODEX_ORCHESTRATOR_ROOT: fixture.dir,
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: fixture.manifestPath
+      })
+    });
+
+    expect(stdout).toContain(
+      `Provider-child task id '${fixture.taskId}' issue_id 'foreign-issue' does not match sanctioned provider parent issue_id 'lin-issue-1'`
+    );
+    expect(stdout).not.toContain(
+      `Provider-child task id '${fixture.taskId}' parent_run_id '${fixture.parentRunId}' does not match sanctioned provider parent run 'run-stale-parent'`
+    );
+  });
+
+  it('rejects provider docs-review child runs when camelCase child issue fields mismatch the sanctioned parent', async () => {
+    const fixture = await createProviderDocsReviewChildFixture({
+      childIssueIdCamelCase: 'foreign-issue'
+    });
+    tempDir = fixture.dir;
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: fixture.dir,
+      env: cleanGuardOverrideEnv({
+        MCP_RUNNER_TASK_ID: fixture.taskId,
+        CODEX_ORCHESTRATOR_ROOT: fixture.dir,
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: fixture.manifestPath
+      })
+    });
+
+    expect(stdout).toContain(
+      `Provider-child task id '${fixture.taskId}' issueId 'foreign-issue' does not match sanctioned provider parent issue_id 'lin-issue-1'`
+    );
+    expect(stdout).toContain(`Task id '${fixture.taskId}' is not registered in tasks/index.json`);
+    expect(stdout).not.toContain('treated as subagent run for sanctioned provider task');
+  });
+
+  it('rejects provider docs-review child runs when the registered parent prefix does not match', async () => {
+    const registeredParentKey = 'CO-458-source-root-freshness-drift';
+    const observedUnregisteredChildTask = 'linear-lin-issue-1-docs-review';
+    const fixture = await createProviderDocsReviewChildFixture({
+      parentTaskId: registeredParentKey,
+      childTaskId: observedUnregisteredChildTask,
+      registeredParentKey
+    });
+    tempDir = fixture.dir;
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: fixture.dir,
+      env: cleanGuardOverrideEnv({
+        MCP_RUNNER_TASK_ID: fixture.taskId,
+        CODEX_ORCHESTRATOR_ROOT: fixture.dir,
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: fixture.manifestPath
+      })
+    });
+
+    expect(stdout).toContain(`Task id '${fixture.taskId}' is not registered in tasks/index.json`);
+    expect(stdout).toContain('Use MCP_RUNNER_TASK_ID="<registered-parent-task>-<stream>"');
+    expect(stdout).toContain('--parent-run <provider-parent-run-id>');
+    expect(stdout).toContain('Do not append another nested stream to an unregistered child task id');
+    expect(stdout).not.toContain(
+      `Delegation guard: '${fixture.taskId}' treated as subagent run for sanctioned provider task '${registeredParentKey}'`
+    );
   });
 
   it('accepts provider-child runs when provider parent claim lacks run_manifest_path before rehydrate completes', async () => {

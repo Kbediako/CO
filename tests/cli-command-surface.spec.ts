@@ -937,6 +937,7 @@ describe('codex-orchestrator command surface', () => {
         NOTES: 'Goal: launch review via CLI shell | Summary: non-interactive handoff | Risks: arg forwarding',
         CODEX_REVIEW_MONITOR_INTERVAL_SECONDS: '0',
         FORCE_CODEX_REVIEW: '0',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '0',
         CODEX_REVIEW_NON_INTERACTIVE: '0',
         CODEX_NON_INTERACTIVE: '0',
         CODEX_NO_INTERACTIVE: '0',

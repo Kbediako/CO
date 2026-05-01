@@ -1,6 +1,54 @@
 {
   "items": [
     {
+      "id": "20260501-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc",
+      "title": "CO-461 provider docs-review child-stream task identity guard compatibility",
+      "relates_to": "tasks/tasks-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-01",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
+        "docs/TECH_SPEC-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
+        "docs/ACTION_PLAN-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
+        "tasks/specs/linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
+        "tasks/tasks-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
+        "tasks/index.json",
+        ".runs/linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc-co461-docs-packet/cli/2026-05-01T03-53-17-330Z-6fa1d127/manifest.json",
+        ".runs/linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc-docs-review/cli/2026-05-01T16-49-31-779Z-1304879a/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane co461-docs-packet",
+          "date": "2026-05-01",
+          "status": "produced",
+          "manifest": ".runs/linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc-co461-docs-packet/cli/2026-05-01T03-53-17-330Z-6fa1d127/manifest.json",
+          "patch": ".runs/linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc-co461-docs-packet/cli/2026-05-01T03-53-17-330Z-6fa1d127/provider-linear-child-lane.patch",
+          "source_anchor": "ctx:sha256:471c87a980984a9fa78484180d20caa0853870300b60d3719fd86502570efbfb#chunk:c000001",
+          "summary": "Docs-first packet created for CO-461 from parent-provided child-lane instructions and the source payload lineage. The packet preserves the CO-458 shape of child task_id=linear-<issue-id>-docs-review, parent_run_id set, no accepted provider launch provenance, and delegation-guard failure; it requires valid provider parent lineage/provenance or a registered parent task prefix for docs-review children while retaining strict failures for ordinary unregistered top-level task ids, missing or mismatched provider provenance, and registered-parent-prefix mismatch. Parent owns source/tests, validation, Linear state, workpad, PR lifecycle, and review handoff."
+        },
+        "docs_review_child_stream": {
+          "reviewer": "linear child-stream docs-review",
+          "date": "2026-05-01",
+          "status": "succeeded",
+          "manifest": ".runs/linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc-docs-review/cli/2026-05-01T16-49-31-779Z-1304879a/manifest.json",
+          "summary": "Provider-launched docs-review child stream used task_id linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc-docs-review with parent_run_id 2026-05-01T16-20-48-963Z-a1971f7c; delegation guard treated it as a subagent run for the registered parent task, then spec guard, docs checks, docs freshness maintenance, and forced review completed successfully."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
+        "task": "tasks/tasks-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md"
+        }
+      }
+    },
+    {
       "id": "20260501-linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7",
       "title": "CO-451 Agent Identity auth provenance",
       "relates_to": "tasks/tasks-linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7.md",
