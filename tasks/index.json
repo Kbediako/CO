@@ -146,6 +146,61 @@
       }
     },
     {
+      "id": "20260501-linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7",
+      "title": "CO-451 Agent Identity auth provenance",
+      "relates_to": "tasks/tasks-linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-01",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7.md",
+        "docs/TECH_SPEC-linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7.md",
+        "docs/ACTION_PLAN-linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7.md",
+        "tasks/specs/linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7.md",
+        "tasks/tasks-linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7.md",
+        ".agent/task/linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        "orchestrator/src/cli/utils/cloudPreflight.ts",
+        "orchestrator/src/cli/providerLinearWorkerRunner.ts",
+        "orchestrator/tests/CloudPreflight.test.ts",
+        "orchestrator/tests/ProviderLinearWorkerRunner.test.ts",
+        ".runs/linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7/cli/2026-05-01T16-41-57-405Z-39b1234f/review/telemetry.json",
+        "out/linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7/manual/elegance-review.md"
+      ],
+      "approvals": {
+        "docs_packet": {
+          "reviewer": "write-enabled CO-451 provider worker",
+          "date": "2026-05-01",
+          "status": "produced",
+          "source_anchor": "ctx:sha256:1d12d17d552faf262c39610bc990b49e2ef3876d873fd0a767bb239d258e9ce0#chunk:c000001",
+          "summary": "Docs-first packet created for a bounded Agent Identity auth provenance lane. The packet preserves CODEX_AGENT_IDENTITY, codex login --with-agent-identity, cloud preflight credential-source detection, provider-worker/runtime auth provenance, redaction/reporting paths, and the CO-449/CO-450 ownership split."
+        },
+        "parallelization": {
+          "reviewer": "write-enabled CO-451 provider worker",
+          "date": "2026-05-01",
+          "status": "launched",
+          "summary": "Recorded parallelize_now and launched same-issue child lane agent-identity-provider-tests for orchestrator/tests/ProviderLinearWorkerRunner.test.ts only; parent owns implementation and docs packet."
+        },
+        "current_turn_refresh": {
+          "reviewer": "write-enabled CO-451 provider worker",
+          "date": "2026-05-01",
+          "status": "validation_green_review_complete",
+          "summary": "Current turn recorded stay_serial/review_or_validation_only, fast-forwarded the branch to current origin/main, preserved the Agent Identity implementation diff, fixed standalone-review redaction findings, and passed targeted tests plus required repo gates, final manifest-backed standalone review, and explicit elegance review; PR attachment, PR checks, feedback sweep, and ready-review drain remain before In Review."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7.md",
+        "task": "tasks/tasks-linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7.md",
+        "agent_task": ".agent/task/linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7.md",
+        "docs": "docs/TECH_SPEC-linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7.md"
+      }
+    },
+    {
       "id": "20260501-linear-590e4e09-315a-4957-bb72-66b8322e86a6",
       "title": "CO-472 Ready released-pending-reopen no-run explicit recovery",
       "relates_to": "tasks/tasks-linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
