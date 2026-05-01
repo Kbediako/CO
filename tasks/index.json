@@ -20,8 +20,10 @@
         "tasks/index.json",
         "docs/TASKS.md",
         "docs/docs-freshness-registry.json",
+        ".runs/linear-b7381274-d6eb-4886-86f4-3976b154c26d/cli/2026-05-01T19-11-42-975Z-ede1a8fc/manifest.json",
         ".runs/linear-b7381274-d6eb-4886-86f4-3976b154c26d-co465-docs-packet/cli/2026-05-01T19-14-31-418Z-9a2afec6/manifest.json",
-        ".runs/linear-b7381274-d6eb-4886-86f4-3976b154c26d-docs-review/cli/2026-05-01T19-31-24-245Z-e13ccc69/manifest.json"
+        ".runs/linear-b7381274-d6eb-4886-86f4-3976b154c26d-docs-review/cli/2026-05-01T19-31-24-245Z-e13ccc69/manifest.json",
+        ".runs/linear-b7381274-d6eb-4886-86f4-3976b154c26d/cli/2026-05-01T19-11-42-975Z-ede1a8fc/review/telemetry.json"
       ],
       "approvals": {
         "docs_packet_child_lane": {
@@ -39,6 +41,13 @@
           "status": "succeeded",
           "manifest": ".runs/linear-b7381274-d6eb-4886-86f4-3976b154c26d-docs-review/cli/2026-05-01T19-31-24-245Z-e13ccc69/manifest.json",
           "summary": "Provider-launched docs-review child stream validated the accepted CO-465 docs packet plus the Doctor test isolation patch: delegation guard passed for the subagent run, spec guard and docs checks passed, docs freshness maintenance passed with no blocking changed paths, and forced standalone review returned clean-success."
+        },
+        "standalone_review": {
+          "reviewer": "npm run review -- --task linear-b7381274-d6eb-4886-86f4-3976b154c26d --uncommitted --non-interactive",
+          "date": "2026-05-02",
+          "status": "bounded-success",
+          "telemetry": ".runs/linear-b7381274-d6eb-4886-86f4-3976b154c26d/cli/2026-05-01T19-11-42-975Z-ede1a8fc/review/telemetry.json",
+          "summary": "Final manifest-backed standalone review completed as bounded success via command-intent after the wrapper blocked an attempted validation command; the read-only retry found no actionable regressions in the Doctor test isolation or docs/task registry updates."
         }
       },
       "paths": {
