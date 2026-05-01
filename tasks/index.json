@@ -1,6 +1,54 @@
 {
   "items": [
     {
+      "id": "20260502-linear-b7381274-d6eb-4886-86f4-3976b154c26d",
+      "title": "CO-465 Doctor gpt-5.5 defaults full-suite validation gate",
+      "relates_to": "tasks/tasks-linear-b7381274-d6eb-4886-86f4-3976b154c26d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-02",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-b7381274-d6eb-4886-86f4-3976b154c26d.md",
+        "docs/TECH_SPEC-linear-b7381274-d6eb-4886-86f4-3976b154c26d.md",
+        "docs/ACTION_PLAN-linear-b7381274-d6eb-4886-86f4-3976b154c26d.md",
+        "tasks/specs/linear-b7381274-d6eb-4886-86f4-3976b154c26d.md",
+        "tasks/tasks-linear-b7381274-d6eb-4886-86f4-3976b154c26d.md",
+        ".agent/task/linear-b7381274-d6eb-4886-86f4-3976b154c26d.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-b7381274-d6eb-4886-86f4-3976b154c26d-co465-docs-packet/cli/2026-05-01T19-14-31-418Z-9a2afec6/manifest.json",
+        ".runs/linear-b7381274-d6eb-4886-86f4-3976b154c26d-docs-review/cli/2026-05-01T19-31-24-245Z-e13ccc69/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane co465-docs-packet",
+          "date": "2026-05-02",
+          "status": "produced",
+          "manifest": ".runs/linear-b7381274-d6eb-4886-86f4-3976b154c26d-co465-docs-packet/cli/2026-05-01T19-14-31-418Z-9a2afec6/manifest.json",
+          "patch": ".runs/linear-b7381274-d6eb-4886-86f4-3976b154c26d-co465-docs-packet/cli/2026-05-01T19-14-31-418Z-9a2afec6/provider-linear-child-lane.patch",
+          "source_anchor": "ctx:sha256:16b4be52eda49eabac589fc41aca4b843e4a04597237ee4143aa87a4ae0c4603#chunk:c000001",
+          "summary": "Docs-first packet created for CO-465 from the parent-provided issue contract and protected terms. The packet preserves `npm run test`, `orchestrator/tests/Doctor.test.ts`, `accepts unmarked gpt-5.5 defaults when access is verified`, `gpt-5.5 defaults`, `full-suite timeout`, `isolated rerun passes`, and `provider-worker validation gate`; it rejects CO-456 spec-guard behavior changes, Doctor policy weakening, skipped Doctor tests, and blanket global timeout increases without explaining the full-suite-only slow path. Parent owns source/tests, docs-review, validation, Linear/workpad state, PR lifecycle, and final patch integration."
+        },
+        "docs_review_child_stream": {
+          "reviewer": "linear child-stream docs-review",
+          "date": "2026-05-02",
+          "status": "succeeded",
+          "manifest": ".runs/linear-b7381274-d6eb-4886-86f4-3976b154c26d-docs-review/cli/2026-05-01T19-31-24-245Z-e13ccc69/manifest.json",
+          "summary": "Provider-launched docs-review child stream validated the accepted CO-465 docs packet plus the Doctor test isolation patch: delegation guard passed for the subagent run, spec guard and docs checks passed, docs freshness maintenance passed with no blocking changed paths, and forced standalone review returned clean-success."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-b7381274-d6eb-4886-86f4-3976b154c26d.md",
+        "task": "tasks/tasks-linear-b7381274-d6eb-4886-86f4-3976b154c26d.md",
+        "agent_task": ".agent/task/linear-b7381274-d6eb-4886-86f4-3976b154c26d.md",
+        "docs": "docs/TECH_SPEC-linear-b7381274-d6eb-4886-86f4-3976b154c26d.md"
+      }
+    },
+    {
       "id": "20260501-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc",
       "title": "CO-461 provider docs-review child-stream task identity guard compatibility",
       "relates_to": "tasks/tasks-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
