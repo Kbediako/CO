@@ -17070,7 +17070,7 @@
           "reviewer": "parent provider worker",
           "date": "2026-05-01",
           "status": "approved",
-          "summary": "CO-452 is not merely wording cleanup: current docs plus code/test and active canary surfaces must align with Codex CLI 0.128.0 removing js_repl while generic non-removed feature flag pass-through remains supported."
+          "summary": "CO-452 is not merely wording cleanup: current docs, bundled skill guidance, code/test, and active canary surfaces must align with Codex CLI 0.128.0 removing js_repl while generic non-removed feature flag pass-through remains supported."
         },
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review child stream",

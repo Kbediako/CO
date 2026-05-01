@@ -32,7 +32,7 @@
 ### What changed in CO since those docs (2026-02-24 / 2026-02-25)
 - Runtime defaults/policy changed: local default runtime is now `runtimeMode=appserver`, with `--runtime-mode cli` retained as break-glass.
 - Mode semantics are now explicit policy: `executionMode` and `runtimeMode` are orthogonal controls, and `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported/fail-fast.
-- Feature policy changed: `js_repl` is enabled by default globally (local and cloud lanes), with task-scoped enable/disable lanes used for deterministic cloud contracts.
+- Feature policy changed again in Codex CLI `0.128.0`: `js_repl` and `js_repl_tools_only` are removed, so control-bridge implementation must not rely on those feature gates or recommend task-scoped enable/disable lanes for them.
 - Delegation/process policy tightened: top-level task streams require manifest-backed delegation evidence by default, with explicit override rationale when unavailable.
 - These policy updates post-date the coordinator planning drafts and must be reflected before implementation work starts.
 

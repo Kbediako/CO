@@ -9940,7 +9940,7 @@
       "path": "skills/codex-orchestrator/SKILL.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-03",
+      "last_review": "2026-05-01",
       "cadence_days": 30
     },
     {
@@ -18157,9 +18157,9 @@
     {
       "path": "docs/ACTION_PLAN-js-repl-cloud-usage-evidence-gate.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-02",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-05-01",
+      "cadence_days": 365
     },
     {
       "path": "docs/ACTION_PLAN-manifest-persister-throughput.md",
@@ -21007,7 +21007,7 @@
       "path": "docs/PRD-codex-orchestrator-skill-and-memory-alignment.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-03",
+      "last_review": "2026-05-01",
       "cadence_days": 90
     },
     {
@@ -21056,7 +21056,7 @@
       "path": "docs/PRD-coordinator-control-bridge-slice-1.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-03-03",
+      "last_review": "2026-05-01",
       "cadence_days": 90
     },
     {
@@ -23386,9 +23386,9 @@
     {
       "path": "docs/PRD-js-repl-cloud-usage-evidence-gate.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-02",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-05-01",
+      "cadence_days": 365
     },
     {
       "path": "docs/PRD-manifest-persister-throughput.md",
@@ -26361,9 +26361,9 @@
     {
       "path": "docs/TECH_SPEC-js-repl-cloud-usage-evidence-gate.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-03-02",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-05-01",
+      "cadence_days": 365
     },
     {
       "path": "docs/TECH_SPEC-manifest-persister-throughput.md",

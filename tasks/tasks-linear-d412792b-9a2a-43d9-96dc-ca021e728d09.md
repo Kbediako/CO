@@ -18,11 +18,11 @@
 - [x] Docs-review evidence captured before implementation. Evidence: `.runs/linear-d412792b-9a2a-43d9-96dc-ca021e728d09-docs-review/cli/2026-04-30T23-45-07-409Z-1e813802/manifest.json` succeeded with `delegation-guard`, `spec-guard`, `docs:check`, `docs:freshness:maintain`, and review outcome `clean success`.
 
 ## Parent Implementation Acceptance
-- [x] Current-facing docs no longer say `js_repl` is default-on or toggleable. Evidence: `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`, `docs/README.md`, `docs/guides/cloud-mode-preflight.md`, `docs/guides/rlm-recursion-v2.md`, and `docs/guides/upstream-codex-cli-sync.md`.
+- [x] Current-facing docs and bundled skill guidance no longer say `js_repl` is default-on or toggleable. Evidence: `AGENTS.md`, `docs/AGENTS.md`, `.agent/AGENTS.md`, `docs/README.md`, `docs/guides/cloud-mode-preflight.md`, `docs/guides/rlm-recursion-v2.md`, `docs/guides/upstream-codex-cli-sync.md`, and `skills/codex-orchestrator/SKILL.md`.
 - [x] Generic cloud feature env vars remain documented for non-removed features. Evidence: `docs/README.md`, `docs/guides/cloud-mode-preflight.md`, and unchanged cloud executor request shaping.
 - [x] Cloud feature pass-through tests use non-removed feature names instead of `js_repl`. Evidence: `orchestrator/tests/CodexCloudTaskExecutor.test.ts`, `orchestrator/tests/OrchestratorCloudTargetExecutor.test.ts`.
 - [x] Active `js_repl` canary script/package affordance is removed or clearly retired. Evidence: `package.json` removes `canary:js-repl-usage`; scripts/js-repl-usage-matrix.mjs is deleted.
-- [x] Historical evidence-gate packet is labeled history-only by the accepted child lane patch. Evidence: child patch from `.runs/linear-d412792b-9a2a-43d9-96dc-ca021e728d09-archive-js-repl-packet/cli/2026-04-30T23-39-24-326Z-1a3ae7d1/provider-linear-child-lane.patch` was manually imported after helper accept failed on Linear `updated_at` drift.
+- [x] Historical evidence-gate packet is labeled history-only and registry rows are archived. Evidence: child patch from `.runs/linear-d412792b-9a2a-43d9-96dc-ca021e728d09-archive-js-repl-packet/cli/2026-04-30T23-39-24-326Z-1a3ae7d1/provider-linear-child-lane.patch` was manually imported after helper accept failed on Linear `updated_at` drift; `docs/docs-freshness-registry.json` archives the PRD/TECH_SPEC/ACTION_PLAN rows.
 
 ## CO-382 Fallback Metadata
 - Large-refactor check: no large refactor is required because CO-452 removes the stale `js_repl` active posture instead of adding another compatibility layer.

@@ -30,7 +30,7 @@
 - Primary success metric: `docs:check` + `docs:freshness` + `pack:smoke` pass with consistent guidance language and installed skill packaging intact.
 - Guardrails:
   - Keep `executionMode`/`runtimeMode` semantics unchanged.
-  - Keep `js_repl` default-on posture unchanged.
+  - Historical note: this task kept the then-current `js_repl` posture unchanged; CO-452 supersedes that posture after Codex CLI `0.128.0` removed `js_repl`.
   - Keep memory usage scoped and non-promotional (eval-lane framing only).
 
 ## Approvals
