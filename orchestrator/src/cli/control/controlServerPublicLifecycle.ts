@@ -52,6 +52,8 @@ import {
 const EXPIRY_INTERVAL_MS = 15_000;
 const PROVIDER_REFRESH_INTERVAL_MS = 15_000;
 const PROVIDER_REFRESH_STUCK_AFTER_MS = 45_000;
+// Explicit operator recovery must settle before the CLI default request timeout.
+const PROVIDER_WORKER_RECOVER_ACTIVE_WAIT_MS = 10_000;
 const PROVIDER_CLOSE_STUCK_DRAIN_GRACE_MS = 1_000;
 const PROVIDER_FULL_RECOVERY_SWEEP_INTERVAL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 15 * 60 * 1000;
@@ -428,7 +430,8 @@ export async function runProviderIssueHandoffRecover(
       await waitForProviderIssueHandoffPendingWithWatchdog(
         providerIssueHandoff,
         state.queuedRefresh ?? state.active!,
-        () => resolveProviderIssueHandoffWatchdogDelayMs(providerIssueHandoff)
+        () => resolveProviderWorkerRecoverWatchdogDelayMs(providerIssueHandoff),
+        { forceStuckOnWatchdog: true }
       );
     } catch (error) {
       const stuckOutcome = await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
@@ -663,6 +666,15 @@ function resolveProviderIssueHandoffWatchdogDelayMs(
     return PROVIDER_REFRESH_STUCK_AFTER_MS;
   }
   return Math.max(0, PROVIDER_REFRESH_STUCK_AFTER_MS - health.operation_elapsed_ms);
+}
+
+function resolveProviderWorkerRecoverWatchdogDelayMs(
+  providerIssueHandoff: ProviderIssueHandoffService
+): number {
+  return Math.min(
+    PROVIDER_WORKER_RECOVER_ACTIVE_WAIT_MS,
+    resolveProviderIssueHandoffWatchdogDelayMs(providerIssueHandoff)
+  );
 }
 
 async function resolveProviderPollTrackedIssues(
@@ -997,9 +1009,15 @@ function clearProviderIssueHandoffOperationState(
 }
 
 async function resolveProviderIssueHandoffStuckOutcome(
-  providerIssueHandoff: ProviderIssueHandoffService
+  providerIssueHandoff: ProviderIssueHandoffService,
+  options: { force?: boolean } = {}
 ): Promise<ProviderIssueHandoffRefreshRequestOutcome | null> {
-  if (!isProviderPollingStuck(providerIssueHandoff)) {
+  const health = readProviderPollingHealth(providerIssueHandoff);
+  if (options.force) {
+    if (!health?.checking) {
+      return null;
+    }
+  } else if (health?.stuck !== true) {
     return null;
   }
   await markProviderPollingStuck(providerIssueHandoff);
@@ -1087,7 +1105,8 @@ function waitForProviderIssueHandoffPending(
 async function waitForProviderIssueHandoffPendingWithWatchdog(
   providerIssueHandoff: ProviderIssueHandoffService,
   pending: Promise<void>,
-  resolveWatchdogDelayMs: () => number
+  resolveWatchdogDelayMs: () => number,
+  options: { forceStuckOnWatchdog?: boolean } = {}
 ): Promise<void> {
   let stuckWatchdog: NodeJS.Timeout | null = null;
   try {
@@ -1096,7 +1115,9 @@ async function waitForProviderIssueHandoffPendingWithWatchdog(
       new Promise<void>((resolve) => {
         const watchdogDelayMs = resolveWatchdogDelayMs();
         stuckWatchdog = setTimeout(() => {
-          void resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff).finally(resolve);
+          void resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff, {
+            force: options.forceStuckOnWatchdog === true
+          }).finally(resolve);
         }, watchdogDelayMs);
         stuckWatchdog.unref?.();
       })

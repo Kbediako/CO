@@ -1222,7 +1222,7 @@ describe('startControlServerPublicLifecycle', () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
-  it('uses the stuck watchdog while explicit recovery waits on an active refresh', async () => {
+  it('uses a bounded explicit-recovery watchdog while waiting on an active refresh', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-30T12:00:00.000Z'));
 
@@ -1268,7 +1268,7 @@ describe('startControlServerPublicLifecycle', () => {
     await Promise.resolve();
     expect(providerIssueHandoff.recoverIssue).not.toHaveBeenCalled();
 
-    await vi.advanceTimersByTimeAsync(45_000);
+    await vi.advanceTimersByTimeAsync(10_000);
 
     await expect(inFlightRefresh).resolves.toMatchObject({
       stuck: true,

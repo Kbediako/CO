@@ -1,6 +1,53 @@
 {
   "items": [
     {
+      "id": "20260501-linear-590e4e09-315a-4957-bb72-66b8322e86a6",
+      "title": "CO-472 Ready released-pending-reopen no-run explicit recovery",
+      "relates_to": "tasks/tasks-linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-01",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
+        "docs/TECH_SPEC-linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
+        "docs/ACTION_PLAN-linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
+        "tasks/specs/linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
+        "tasks/tasks-linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
+        ".agent/task/linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        ".runs/linear-590e4e09-315a-4957-bb72-66b8322e86a6-docs-packet/cli/2026-05-01T14-52-08-418Z-9ab38c6b/manifest.json",
+        ".runs/linear-590e4e09-315a-4957-bb72-66b8322e86a6-docs-review/cli/2026-05-01T15-07-58-193Z-d4098018/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet",
+          "date": "2026-05-01",
+          "status": "produced",
+          "manifest": ".runs/linear-590e4e09-315a-4957-bb72-66b8322e86a6-docs-packet/cli/2026-05-01T14-52-08-418Z-9ab38c6b/manifest.json",
+          "patch": ".runs/linear-590e4e09-315a-4957-bb72-66b8322e86a6-docs-packet/cli/2026-05-01T14-52-08-418Z-9ab38c6b/provider-linear-child-lane.patch",
+          "source_anchor": "ctx:sha256:62343fa2846668b3dbcd05bf2756b63280c04cfbd1d188e0dfea705809da58a2#chunk:c000001",
+          "summary": "Docs-first packet created for CO-472 from the parent-provided child-lane brief and protected terms; parent verified the worker run source payload path after importing the child patch. The packet preserves Ready released-pending-reopen no-run claims with provider-intake state=released, reason=provider_issue_released_pending_reopen:provider_issue_released:not_active, run_id=null, run_manifest_path=null, and no launch token under explicit control-host recover/relaunch/nudge. Parent owns source inspection, implementation, validation, Linear/workpad state, PR lifecycle, and preservation checks for CO-468 accepted pending-revalidation behavior, CO-193 Ready reclaim safety, CO-392 live-started refresh behavior, and CO-443 completed-claim suppression."
+        },
+        "docs_review_child_stream": {
+          "reviewer": "linear child-stream docs-review",
+          "date": "2026-05-01",
+          "status": "failed_on_unrelated_owner_debt",
+          "manifest": ".runs/linear-590e4e09-315a-4957-bb72-66b8322e86a6-docs-review/cli/2026-05-01T15-07-58-193Z-d4098018/manifest.json",
+          "summary": "Docs-review child-stream reached spec guard/docs:check, then docs:freshness:maintain failed on unrelated CO-444 owner-verification debt with blocking_changed_paths=[] after CO-472 registry rows were fixed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
+        "task": "tasks/tasks-linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
+        "agent_task": ".agent/task/linear-590e4e09-315a-4957-bb72-66b8322e86a6.md",
+        "docs": "docs/TECH_SPEC-linear-590e4e09-315a-4957-bb72-66b8322e86a6.md"
+      }
+    },
+    {
       "id": "20260501-linear-bdfd9046-97b5-43bd-850f-b305558cdada",
       "title": "CO-466 Codex CLI 0.128.0 release-intake",
       "relates_to": "tasks/tasks-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
