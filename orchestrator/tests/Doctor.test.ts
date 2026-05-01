@@ -174,6 +174,17 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     ).toBe(true);
   });
 
+  it('reports source-root freshness separately from checkout posture', () => {
+    const result = runDoctor(process.cwd());
+
+    expect(result.checkout_posture).toHaveProperty('repo_root');
+    expect(result.source_root_freshness).toMatchObject({
+      schema_version: 1,
+      base_ref: 'origin/main'
+    });
+    expect(formatDoctorSummary(result).join('\n')).toContain('Source root freshness:');
+  });
+
   it('reports missing devtools config and skill when absent', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));

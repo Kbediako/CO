@@ -1,6 +1,47 @@
 {
   "items": [
     {
+      "id": "20260501-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f",
+      "title": "CO-458 source-root freshness drift",
+      "relates_to": "tasks/tasks-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-01",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
+        "docs/ACTION_PLAN-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
+        "tasks/specs/linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
+        "tasks/tasks-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
+        ".agent/task/linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
+        "docs/TASKS.md",
+        "tasks/index.json",
+        ".runs/linear-f57f28e8-e876-4bff-9217-fc5e17ee030f-docs-packet/cli/2026-05-01T03-00-41-368Z-0d6554a3/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet",
+          "date": "2026-05-01",
+          "status": "produced",
+          "manifest": ".runs/linear-f57f28e8-e876-4bff-9217-fc5e17ee030f-docs-packet/cli/2026-05-01T03-00-41-368Z-0d6554a3/manifest.json",
+          "source_anchor": "ctx:sha256:574bd8d4264b6ff98102b84cdb1968660a10226102286ef392f76c7647b0ac89#chunk:c000001",
+          "summary": "Created the CO-458 docs-first packet and declared registry/checklist mirrors only. The packet preserves source/root freshness drift in control-host status/proof surfaces: actual control-host source root, command path, package root, git ref, freshness relative to origin/main, shared checkout drift, supervised source-root drift, source-vs-dist drift, and global binary/package provenance drift. CO-113, CO-25, CO-388, and CO-450 are historical related lanes, not reopened scope. Parent owns source inspection, implementation, validation, Linear state, workpad, PR lifecycle, review handoff, and any registry files outside the declared child scope."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
+        "task": "tasks/tasks-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
+        "agent_task": ".agent/task/linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md"
+        }
+      }
+    },
+    {
       "id": "20260430-linear-033979b5-6903-4d5f-9c9b-41769aa69330",
       "title": "CO-447 ready-review CodeRabbit acknowledgement-only mention classification",
       "relates_to": "tasks/tasks-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",

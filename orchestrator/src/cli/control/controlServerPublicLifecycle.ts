@@ -84,6 +84,10 @@ export interface StartControlServerPublicLifecycleOptions {
     repoRoot?: string | null;
     taskId?: string | null;
     pipelineId?: string | null;
+    cwd?: string | null;
+    argv?: string[];
+    commandPath?: string | null;
+    packageRoot?: string | null;
   } | false;
   providerWorkflowConfigStore?: ProviderWorkflowConfigStore;
   createProviderIssueHandoff?: ((input: {
@@ -129,7 +133,11 @@ export async function startControlServerPublicLifecycle(
             runId: options.runId,
             repoRoot: options.controlHostOwnership?.repoRoot,
             taskId: options.controlHostOwnership?.taskId,
-            pipelineId: options.controlHostOwnership?.pipelineId
+            pipelineId: options.controlHostOwnership?.pipelineId,
+            cwd: options.controlHostOwnership?.cwd,
+            argv: options.controlHostOwnership?.argv,
+            commandPath: options.controlHostOwnership?.commandPath,
+            packageRoot: options.controlHostOwnership?.packageRoot
           });
 
     const startupInputs = await prepareControlServerStartupInputs({

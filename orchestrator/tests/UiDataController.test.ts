@@ -339,7 +339,62 @@ describe('UiDataController', () => {
         last_error_at: null,
         last_error: null,
         next_poll_at: '2026-04-03T08:00:15.000Z',
-        next_poll_in_ms: 15000
+        next_poll_in_ms: 15000,
+        control_host_owner: {
+          status: 'owned',
+          reason: null,
+          updated_at: '2026-04-03T08:00:00.000Z',
+          diagnostic_path: null,
+          lock_dir: '/repo/.runs/local-mcp/cli/control-host/control-host-owner.lock',
+          owner_path: '/repo/.runs/local-mcp/cli/control-host/control-host-owner.json',
+          owner: {
+            owner_token: 'owner-token',
+            status: 'owned',
+            pid: 123,
+            ppid: 1,
+            hostname: 'host.local',
+            acquired_at: '2026-04-03T08:00:00.000Z',
+            updated_at: '2026-04-03T08:00:00.000Z',
+            released_at: null,
+            repo_root: '/repo',
+            task_id: 'local-mcp',
+            run_id: 'control-host',
+            run_dir: '/repo/.runs/local-mcp/cli/control-host',
+            pipeline_id: 'provider-linear-worker',
+            source_root_freshness: {
+              schema_version: 1,
+              status: 'warning',
+              observed_at: '2026-04-03T08:00:00.000Z',
+              intended_repo_root: '/repo',
+              intended_repo_root_realpath: '/repo',
+              command_path: '/stale/bin/codex-orchestrator.ts',
+              command_path_realpath: '/stale/bin/codex-orchestrator.ts',
+              package_root: '/stale',
+              package_root_realpath: '/stale',
+              source_root: '/stale',
+              source_root_realpath: '/stale',
+              entrypoint_kind: 'source',
+              base_ref: 'origin/main',
+              source_checkout: null,
+              intended_checkout: null,
+              drift_classes: ['supervised_source_root_drift'],
+              provenance: {
+                command_path_source: 'argv',
+                package_root_source: 'explicit',
+                source_root_source: 'package_root',
+                command_path_inside_package: true,
+                package_root_matches_intended: false,
+                source_root_matches_intended: false,
+                source_entry_exists: true,
+                dist_entry_exists: true
+              },
+              guidance: ['Restart or relaunch the supervised control-host from the intended current source root before trusting provider-worker posture.'],
+              detail: 'Detected source/root drift: supervised_source_root_drift.'
+            },
+            lock_dir: '/repo/.runs/local-mcp/cli/control-host/control-host-owner.lock',
+            owner_path: '/repo/.runs/local-mcp/cli/control-host/control-host-owner.json'
+          }
+        }
       }
     });
 
@@ -475,6 +530,11 @@ describe('UiDataController', () => {
     expect(dataset.totals).toEqual(state.codex_totals);
     expect(dataset.rate_limits).toEqual(state.rate_limits);
     expect(dataset.polling).toEqual(state.polling);
+    expect(dataset.polling?.control_host_owner?.owner?.source_root_freshness).toMatchObject({
+      status: 'warning',
+      command_path: '/stale/bin/codex-orchestrator.ts',
+      drift_classes: ['supervised_source_root_drift']
+    });
     expect(dataset.selected).toEqual(state.selected);
     expect(dataset.selected?.run_id).toBe('run-1');
   });
