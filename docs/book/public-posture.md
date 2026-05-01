@@ -2,7 +2,7 @@
 
 ## Stable Compatibility Vs Local Posture
 
-CO's current release-facing package/downstream-smoke compatibility target is Codex CLI `0.125.0`. Current `gpt-5.5` / `xhigh` local ChatGPT-auth/appserver posture and release-facing package Codex CLI pins are already adopted; cloud execution remains separately gated by the canonical version policy.
+CO's current local ChatGPT-auth/appserver posture is Codex CLI `0.128.0` with `gpt-5.5` / `xhigh` when live access smoke passes. CO's current release-facing package/downstream-smoke compatibility target is Codex CLI `0.125.0`, and cloud execution remains separately gated by the canonical version policy.
 
 Newer stable and prerelease Codex CLI builds remain evidence-gated. The canonical policy is [docs/guides/codex-version-policy.md](../guides/codex-version-policy.md).
 

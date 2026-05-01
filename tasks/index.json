@@ -1,6 +1,63 @@
 {
   "items": [
     {
+      "id": "20260501-linear-bdfd9046-97b5-43bd-850f-b305558cdada",
+      "title": "CO-466 Codex CLI 0.128.0 release-intake",
+      "relates_to": "tasks/tasks-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-01",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
+        "docs/TECH_SPEC-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
+        "docs/ACTION_PLAN-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
+        "tasks/specs/linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
+        "tasks/tasks-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
+        ".agent/task/linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-bdfd9046-97b5-43bd-850f-b305558cdada-docs-packet-bootstrap/cli/2026-05-01T13-19-25-864Z-a46f6e90/manifest.json",
+        "docs/codex-posture-matrix.json",
+        "docs/guides/codex-version-policy.md",
+        ".runs/linear-bdfd9046-97b5-43bd-850f-b305558cdada-docs-review-pre-implementation/cli/2026-05-01T13-33-57-985Z-824f7284/manifest.json",
+        ".runs/linear-bdfd9046-97b5-43bd-850f-b305558cdada-cloud-required-0128/cli/2026-05-01T13-25-57-476Z-518dbd5d/manifest.json",
+        ".runs/linear-bdfd9046-97b5-43bd-850f-b305558cdada-cloud-fallback-0128/cli/2026-05-01T13-27-36-042Z-2cd22803/manifest.json",
+        "out/linear-bdfd9046-97b5-43bd-850f-b305558cdada/manual/runtime-mode-canary-0128-r2/runtime-canary-summary.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet-bootstrap",
+          "date": "2026-05-01",
+          "status": "produced",
+          "manifest": ".runs/linear-bdfd9046-97b5-43bd-850f-b305558cdada-docs-packet-bootstrap/cli/2026-05-01T13-19-25-864Z-a46f6e90/manifest.json",
+          "source_anchor": "ctx:sha256:246da4b00bfe547dbd454953dbd4a371e6bc66dc1103e2c6e042e09fcf424425#chunk:c000001",
+          "canonical_owner_key": "codex-cli-release-intake:stable:0.128.0",
+          "summary": "Docs packet bootstraps CO-466 as the candidate 0.128.0 Codex CLI release-intake owner using the CO-386 release-intake template. It preserves upstream Codex CLI release detection, GitHub release truth, npm @openai/codex dist-tags/time, CO version-policy target, workflow pins, candidate 0.128.0, canonical owner key codex-cli-release-intake:stable:0.128.0, all CO-386 evidence axes, supersedes/holds rows, closeout classification, and closure gates. The referenced source payload path was unavailable in this child checkout, so the packet is anchored to the parent-provided source anchor, issue description, and template. Parent owns Linear/workpad reconciliation, release evidence collection, implementation, validation, PR lifecycle, and final closeout classification."
+        },
+        "parent_release_intake_closeout": {
+          "reviewer": "provider worker parent lane",
+          "date": "2026-05-01",
+          "status": "classified_pending_final_pr_handoff",
+          "canonical_owner_key": "codex-cli-release-intake:stable:0.128.0",
+          "summary": "CO-466 adopts Codex CLI 0.128.0 for local ChatGPT-auth/appserver command/runtime posture and latest-audited-candidate marker; intentionally holds release-facing package/downstream workflow pins at 0.125.0 and cloud-canary at 0.124.0 because required cloud canary failed with environment_not_found while fallback cloud contract passed; keeps gpt-5.5/xhigh local model posture and portable gpt-5.4/xhigh fallback unchanged; preserves historical 0.124 evidence as archive-only."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
+        "task": "tasks/tasks-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
+        "agent_task": ".agent/task/linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-bdfd9046-97b5-43bd-850f-b305558cdada.md"
+        }
+      }
+    },
+    {
       "id": "20260501-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f",
       "title": "CO-458 source-root freshness drift",
       "relates_to": "tasks/tasks-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
