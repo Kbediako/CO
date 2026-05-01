@@ -2551,7 +2551,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       profile: string;
       account: string;
       email?: string;
-      credentialSource: string;
+      credentialSource: string | null;
       authFreshness: string;
       observedAt: string;
     }> = [
@@ -2600,6 +2600,51 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         credentialSource: 'agent_identity',
         authFreshness: 'valid',
         observedAt: '2026-05-01T00:45:01.000Z'
+      },
+      {
+        event: {
+          type: 'event_msg',
+          payload: {
+            type: 'agent_identity.observed',
+            params: {
+              agent_identity: {
+                profile_id: 'agent-profile-raw-3',
+                account_id: 'agent-account-raw-3',
+                credential_source: 'Agent Identity',
+                auth_freshness: 'valid'
+              }
+            },
+            timestamp: '2026-05-01T00:45:02.000Z'
+          }
+        },
+        profile: 'agent-profile-raw-3',
+        account: 'agent-account-raw-3',
+        credentialSource: 'agent_identity',
+        authFreshness: 'valid',
+        observedAt: '2026-05-01T00:45:02.000Z'
+      },
+      {
+        event: {
+          type: 'event_msg',
+          payload: {
+            type: 'agent_identity.observed',
+            params: {
+              agentIdentity: {
+                profileId: 'agent-profile-raw-4',
+                account: {
+                  id: 'agent-account-raw-4'
+                },
+                freshness: 'valid'
+              }
+            },
+            timestamp: '2026-05-01T00:45:03.000Z'
+          }
+        },
+        profile: 'agent-profile-raw-4',
+        account: 'agent-account-raw-4',
+        credentialSource: null,
+        authFreshness: 'valid',
+        observedAt: '2026-05-01T00:45:03.000Z'
       }
     ];
 
@@ -2629,6 +2674,53 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         expect(serialized).not.toContain(email);
       }
     }
+  });
+
+  it('ignores non-auth Agent Identity metadata when merging auth provenance', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        JSON.stringify({
+          type: 'notification',
+          method: 'agentIdentity/auth/updated',
+          params: {
+            agentIdentity: {
+              profileId: 'agent-auth-profile',
+              account: {
+                id: 'agent-auth-account'
+              },
+              credentialSource: 'agent_identity',
+              authFreshness: 'env_credential_present'
+            }
+          },
+          timestamp: '2026-05-01T00:45:00.000Z'
+        }),
+        JSON.stringify({
+          type: 'event_msg',
+          payload: {
+            type: 'agent_identity.metadata.observed',
+            params: {
+              agentIdentity: {
+                profileId: 'agent-metadata-profile',
+                account: {
+                  id: 'agent-metadata-account'
+                }
+              }
+            },
+            timestamp: '2026-05-01T00:46:00.000Z'
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.authProvenance).toMatchObject({
+      active_profile_fingerprint: testFingerprint('agent-auth-profile'),
+      active_account_fingerprint: testFingerprint('agent-auth-account'),
+      credential_source: 'agent_identity',
+      auth_freshness: 'env_credential_present',
+      observed_at: '2026-05-01T00:45:00.000Z'
+    });
+    expect(JSON.stringify(parsed.authProvenance)).not.toContain('agent-metadata-profile');
+    expect(JSON.stringify(parsed.authProvenance)).not.toContain('agent-metadata-account');
   });
 
   it('does not let older auth provenance events overwrite newer fingerprints', () => {
