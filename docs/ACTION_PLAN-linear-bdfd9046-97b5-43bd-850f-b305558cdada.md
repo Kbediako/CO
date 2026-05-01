@@ -47,8 +47,8 @@
 5. [x] Fill every supersedes/holds matrix row with adopt latest, intentionally hold, or demote/archive-only classification.
 6. [x] Keep archive-only classification limited to superseded evidence; unresolved blockers stay intentional holds or linked follow-ups.
 7. [x] Update only the parent-owned surfaces justified by evidence.
-8. [ ] Run final validation and review for touched parent surfaces.
-9. [ ] Record final closeout classification in workpad, task mirrors, PR, and current docs surfaces.
+8. [x] Run final validation and review for touched parent surfaces.
+9. [x] Record final closeout classification in workpad, task mirrors, PR, and current docs surfaces.
 
 ## Parent Evidence Summary - 2026-05-01
 - Adopt latest locally: Codex CLI `0.128.0` is adopted for CO-local ChatGPT-auth/appserver command/runtime posture after local command/auth/model probes, runtime-mode canary 20/20, package smoke, docs-review, and docs updates.
