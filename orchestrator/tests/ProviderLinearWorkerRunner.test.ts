@@ -2545,6 +2545,92 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     }
   });
 
+  it('extracts redacted auth provenance from Agent Identity containers', () => {
+    const cases: Array<{
+      event: Record<string, unknown>;
+      profile: string;
+      account: string;
+      email?: string;
+      credentialSource: string;
+      authFreshness: string;
+      observedAt: string;
+    }> = [
+      {
+        event: {
+          type: 'notification',
+          method: 'agentIdentity/auth/updated',
+          params: {
+            agentIdentity: {
+              profileId: 'agent-profile-raw-1',
+              account: {
+                id: 'agent-account-raw-1',
+                email: 'agent-operator@example.com'
+              },
+              credentialSource: 'agent_identity',
+              authFreshness: 'fresh'
+            }
+          },
+          timestamp: '2026-05-01T00:45:00.000Z'
+        },
+        profile: 'agent-profile-raw-1',
+        account: 'agent-account-raw-1',
+        email: 'agent-operator@example.com',
+        credentialSource: 'agent_identity',
+        authFreshness: 'fresh',
+        observedAt: '2026-05-01T00:45:00.000Z'
+      },
+      {
+        event: {
+          type: 'event_msg',
+          payload: {
+            type: 'agent_identity.auth.updated',
+            params: {
+              agent_identity: {
+                profile_id: 'agent-profile-raw-2',
+                account_id: 'agent-account-raw-2',
+                credential_source: 'Agent Identity',
+                auth_freshness: 'valid'
+              }
+            },
+            timestamp: '2026-05-01T00:45:01.000Z'
+          }
+        },
+        profile: 'agent-profile-raw-2',
+        account: 'agent-account-raw-2',
+        credentialSource: 'agent_identity',
+        authFreshness: 'valid',
+        observedAt: '2026-05-01T00:45:01.000Z'
+      }
+    ];
+
+    for (const {
+      event,
+      profile,
+      account,
+      email,
+      credentialSource,
+      authFreshness,
+      observedAt
+    } of cases) {
+      const parsed = parseProviderLinearWorkerJsonl(JSON.stringify(event));
+      expect(parsed.authProvenance).toMatchObject({
+        provider_kind: 'codex',
+        active_profile_fingerprint: testFingerprint(profile),
+        active_account_fingerprint: testFingerprint(account),
+        credential_source: credentialSource,
+        auth_freshness: authFreshness,
+        observed_at: observedAt,
+        source: 'stdout_jsonl'
+      });
+      const serialized = JSON.stringify(parsed.authProvenance);
+      expect(serialized).not.toContain(profile);
+      expect(serialized).not.toContain(account);
+      if (email) {
+        expect(serialized).not.toContain(email);
+      }
+    }
+  });
+
   it('does not let older auth provenance events overwrite newer fingerprints', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [
@@ -2702,7 +2788,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           credentialSource: 'operator@example.com',
           authFreshness: 'profile=personal-profile',
           message:
-            'profile mismatch for operator@example.com OPENAI_API_KEY=secret-openai-key "OPENAI_API_KEY":"secret-openai-json" oauth_refresh=secret-oauth-refresh oauth_access=secret-oauth-access {"profile_id":"personal-profile","account_id":"acct_raw_123","org_id":"org_raw_456","refresh_token":"secret-refresh-token"} profile id personal-profile account id acct-raw-123 organization id org-raw-456 user id user-raw-789 session id sess-secret-123 refresh token secret-refresh-token standalone acct-standalone-123 org-standalone-456 user-standalone-789 account id abc123 profile identifier xyz789 account id: acctcolon123 profile id: profilecolon123 organization id: orgcolon123 user id: usercolon123 session id: sesscolon123'
+            'profile mismatch for operator@example.com OPENAI_API_KEY=secret-openai-key "OPENAI_API_KEY":"secret-openai-json" CODEX_AGENT_IDENTITY=agent-identity-secret oauth_refresh=secret-oauth-refresh oauth_access=secret-oauth-access {"profile_id":"personal-profile","account_id":"acct_raw_123","org_id":"org_raw_456","refresh_token":"secret-refresh-token"} profile id personal-profile account id acct-raw-123 organization id org-raw-456 user id user-raw-789 session id sess-secret-123 refresh token secret-refresh-token standalone acct-standalone-123 org-standalone-456 user-standalone-789 account id abc123 profile identifier xyz789 account id: acctcolon123 profile id: profilecolon123 organization id: orgcolon123 user id: usercolon123 session id: sesscolon123'
         },
         timestamp: '2026-04-15T20:45:21.000Z'
       })
@@ -2727,18 +2813,59 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       'acctcolon123', 'profilecolon123', 'orgcolon123', 'usercolon123', 'sesscolon123',
       'operator@example.com', 'example.com', 'secret-refresh-token',
       'secret-oauth-refresh', 'secret-oauth-access', 'secret-openai-key',
-      'secret-openai-json', 'sess-secret-123'
+      'secret-openai-json', 'agent-identity-secret', 'sess-secret-123'
     ]) {
       expect(signal).not.toContain(fragment);
     }
     for (const fragment of [
       '<email-redacted>', 'OPENAI_API_KEY=<redacted>', '"OPENAI_API_KEY":"<redacted>"',
+      'CODEX_AGENT_IDENTITY=<redacted>',
       'oauth_refresh=<redacted>', 'oauth_access=<redacted>', '"refresh_token":"<redacted>"',
       'session id <redacted>', 'profile id <redacted>',
       'account id <redacted>', 'organization id <redacted>', 'user id <redacted>'
     ]) {
       expect(signal).toContain(fragment);
     }
+  });
+
+  it('redacts structured Agent Identity values from provider diagnostics', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'notification',
+        method: 'account/authProfile/mismatch',
+        params: {
+          message:
+            'agent identity probe CODEX_AGENT_IDENTITY={"id":"agent-identity-deep-id","account":{"owner":{"id":"agent-identity-deep-owner"}}} agent_identity: { "id": "agent-identity-pretty-id", "account": { "owner": { "id": "agent-identity-pretty-owner" } } } CODEX_AGENT_IDENTITY="agent identity spaced secret" CODEX_AGENT_IDENTITY="{\\"id\\":\\"agent-identity-escaped-env-id\\",\\"subject\\":\\"agent-identity-escaped-env-subject\\"}" CODEX_AGENT_IDENTITY={"id":"agent-identity-object-id","subject":"agent-identity-object-subject"} {"CODEX_AGENT_IDENTITY":"agent-identity-json-secret"} {"CODEX_AGENT_IDENTITY":"{\\"id\\":\\"agent-identity-escaped-json-id\\",\\"subject\\":\\"agent-identity-escaped-json-subject\\"}"} {"CODEX_AGENT_IDENTITY":{"id":"agent-identity-json-object-id","subject":"agent-identity-json-object-subject"}} agent_identity: agent-identity-colon-secret agent_identity: \'agent identity colon spaced secret\' agent_identity: {"id":"agent-identity-colon-object-id","subject":"agent-identity-colon-object-subject"}'
+        },
+        timestamp: '2026-05-01T00:46:00.000Z'
+      })
+    );
+
+    expect(parsed.failureDiagnosis).toMatchObject({
+      diagnostic_category: 'auth_mismatch',
+      source: 'stdout_jsonl'
+    });
+    const signal = parsed.failureDiagnosis?.signal ?? '';
+    expect(signal).toContain('"CODEX_AGENT_IDENTITY":"<redacted>"');
+    expect(signal).toContain('agent_identity=<redacted>');
+    expect(signal).not.toContain('agent-identity-deep-id');
+    expect(signal).not.toContain('agent-identity-deep-owner');
+    expect(signal).not.toContain('agent-identity-pretty-id');
+    expect(signal).not.toContain('agent-identity-pretty-owner');
+    expect(signal).not.toContain('agent identity spaced secret');
+    expect(signal).not.toContain('agent-identity-escaped-env-id');
+    expect(signal).not.toContain('agent-identity-escaped-env-subject');
+    expect(signal).not.toContain('agent-identity-object-id');
+    expect(signal).not.toContain('agent-identity-object-subject');
+    expect(signal).not.toContain('agent-identity-json-secret');
+    expect(signal).not.toContain('agent-identity-escaped-json-id');
+    expect(signal).not.toContain('agent-identity-escaped-json-subject');
+    expect(signal).not.toContain('agent-identity-json-object-id');
+    expect(signal).not.toContain('agent-identity-json-object-subject');
+    expect(signal).not.toContain('agent-identity-colon-secret');
+    expect(signal).not.toContain('agent identity colon spaced secret');
+    expect(signal).not.toContain('agent-identity-colon-object-id');
+    expect(signal).not.toContain('agent-identity-colon-object-subject');
   });
 
   it('redacts app-server terminal turn error details before diagnostics are persisted', async () => {
@@ -4153,7 +4280,8 @@ for await (const line of rl) {
         CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
         CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
         CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
-        CODEX_CLOUD_ENV_ID: 'env-appserver-proof'
+        CODEX_CLOUD_ENV_ID: 'env-appserver-proof',
+        CODEX_AGENT_IDENTITY: 'agent-identity-runtime-raw'
       },
       {
         readTrackedIssue,
@@ -4185,6 +4313,10 @@ for await (const line of rl) {
           occurred: false
         }
       },
+      auth_provenance: expect.objectContaining({
+        credential_source: 'env:CODEX_AGENT_IDENTITY',
+        auth_freshness: 'env_credential_present'
+      }),
       appserver_supervision: {
         selected_runtime: {
           requested_mode: 'appserver',
@@ -4214,6 +4346,10 @@ for await (const line of rl) {
       await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
     ) as Record<string, unknown>;
     expect(written).toMatchObject({
+      auth_provenance: expect.objectContaining({
+        credential_source: 'env:CODEX_AGENT_IDENTITY',
+        auth_freshness: 'env_credential_present'
+      }),
       appserver_supervision: {
         sticky_environment_status: 'proven',
         turn_persistence_status: 'blocked',
@@ -4221,6 +4357,7 @@ for await (const line of rl) {
         fork_blocker: 'appserver_fork_probe_not_implemented'
       }
     });
+    expect(JSON.stringify(written)).not.toContain('agent-identity-runtime-raw');
   });
 
   it('preserves live session-log ids when final stdout parse supplies the turn', async () => {

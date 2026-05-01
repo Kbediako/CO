@@ -157,14 +157,113 @@ function compactCloudPreflightOutput(output: string): string {
   return output.length > 500 ? `${output.slice(0, 497)}...` : output;
 }
 
+function readCloudPreflightQuotedValueEnd(input: string, start: number, quote: string): number {
+  let escaped = false;
+  for (let index = start + 1; index < input.length; index += 1) {
+    const char = input[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (char === quote) {
+      return index + 1;
+    }
+  }
+  return input.length;
+}
+
+function readCloudPreflightBalancedValueEnd(
+  input: string,
+  start: number,
+  open: string,
+  close: string
+): number {
+  let depth = 0;
+  let quote: string | null = null;
+  let escaped = false;
+  for (let index = start; index < input.length; index += 1) {
+    const char = input[index];
+    if (quote) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (char === open) {
+      depth += 1;
+      continue;
+    }
+    if (char === close) {
+      depth -= 1;
+      if (depth <= 0) {
+        return index + 1;
+      }
+    }
+  }
+  return input.length;
+}
+
+function readCloudPreflightAgentIdentityValueEnd(input: string, start: number): number {
+  const first = input[start];
+  if (first === '"' || first === "'") {
+    return readCloudPreflightQuotedValueEnd(input, start, first);
+  }
+  if (first === '{') {
+    return readCloudPreflightBalancedValueEnd(input, start, '{', '}');
+  }
+  if (first === '[') {
+    return readCloudPreflightBalancedValueEnd(input, start, '[', ']');
+  }
+  let index = start;
+  while (index < input.length && !/[\s,;}]/u.test(input[index] ?? '')) {
+    index += 1;
+  }
+  return index;
+}
+
+function redactCloudPreflightAgentIdentityAssignments(output: string): string {
+  const assignmentPattern =
+    /(["']?(?:CODEX_AGENT_IDENTITY|agent[_-]?identity|agent\s+identity)["']?)\s*[:=]\s*/giu;
+  let result = '';
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+  while ((match = assignmentPattern.exec(output)) !== null) {
+    const label = match[1] ?? '';
+    const valueStart = assignmentPattern.lastIndex;
+    const valueEnd = readCloudPreflightAgentIdentityValueEnd(output, valueStart);
+    result += output.slice(cursor, match.index);
+    const quotedLabel = label.startsWith('"') || label.startsWith("'");
+    result += quotedLabel ? `${label}:"<redacted>"` : `${label}=<redacted>`;
+    cursor = valueEnd;
+    assignmentPattern.lastIndex = valueEnd;
+  }
+  return result + output.slice(cursor);
+}
+
 function redactCloudPreflightOutput(output: string): string {
-  return output
+  return redactCloudPreflightAgentIdentityAssignments(output)
     .replace(/\b(?:authorization|bearer)\s*[:=]\s*bearer\s+[^\s,;]+/giu, 'authorization: Bearer <redacted>')
     .replace(/\bbearer\s+[A-Za-z0-9._~+/-]{10,}/giu, 'Bearer <redacted>')
     .replace(/\b(?:sk|sess|eyJ)[A-Za-z0-9._~+/-]{12,}/gu, '<redacted-token>')
     .replace(
-      /\b(?:CODEX|OPENAI|CHATGPT|GITHUB|GH)_[A-Z0-9_]*(?:API_KEY|AUTH_TOKEN|ACCESS_TOKEN|REFRESH_TOKEN|TOKEN|SECRET|PASSWORD)\s*=\s*[^\s,;]+/gu,
-      (match) => `${match.split('=')[0] ?? 'secret'}=<redacted>`
+      /\b(?:CODEX|OPENAI|CHATGPT|GITHUB|GH)_[A-Z0-9_]*(?:API_KEY|AUTH_TOKEN|ACCESS_TOKEN|REFRESH_TOKEN|TOKEN|SECRET|PASSWORD|AGENT_IDENTITY)\s*[:=]\s*(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\s,;]+)/gu,
+      (match) => `${match.split(/[:=]/u)[0] ?? 'secret'}=<redacted>`
     )
     .replace(
       /\b(?:api[_ -]?key|auth[_ -]?token|access[_ -]?token|refresh[_ -]?token|bearer[_ -]?token|password|secret|credential)\s*[:=]\s*[^\s,;]+/giu,
@@ -376,6 +475,7 @@ function readFirstCloudPreflightCredentialSource(env: NodeJS.ProcessEnv | undefi
   for (const key of [
     'CODEX_API_KEY',
     'OPENAI_API_KEY',
+    'CODEX_AGENT_IDENTITY',
     'CODEX_AUTH_TOKEN',
     'OPENAI_AUTH_TOKEN',
     'CHATGPT_AUTH_TOKEN'

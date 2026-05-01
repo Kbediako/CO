@@ -3673,6 +3673,7 @@ function findValueAtPath(input: Record<string, unknown>, path: string[]): unknow
 }
 
 const PROVIDER_WORKER_CREDENTIAL_SOURCE_LABELS = new Set([
+  'agent_identity',
   'api_key',
   'browser_login',
   'chatgpt_login',
@@ -3690,6 +3691,7 @@ const PROVIDER_WORKER_CREDENTIAL_SOURCE_LABELS = new Set([
 
 const PROVIDER_WORKER_CREDENTIAL_SOURCE_ENV_KEYS = new Set([
   'CHATGPT_AUTH_TOKEN',
+  'CODEX_AGENT_IDENTITY',
   'CODEX_API_KEY',
   'CODEX_AUTH_TOKEN',
   'OPENAI_API_KEY',
@@ -3910,9 +3912,17 @@ function isProviderWorkerAuthProvenanceCarrier(input: Record<string, unknown>): 
   if (
     findRecordAtPaths(input, [
       ['auth'],
+      ['agentIdentity'],
+      ['agent_identity'],
       ['params', 'auth'],
+      ['params', 'agentIdentity'],
+      ['params', 'agent_identity'],
       ['payload', 'auth'],
-      ['payload', 'params', 'auth']
+      ['payload', 'agentIdentity'],
+      ['payload', 'agent_identity'],
+      ['payload', 'params', 'auth'],
+      ['payload', 'params', 'agentIdentity'],
+      ['payload', 'params', 'agent_identity']
     ])
   ) {
     return true;
@@ -3951,6 +3961,12 @@ function extractProviderWorkerAuthProvenance(
       ['auth', 'profile'],
       ['auth', 'profile_id'],
       ['auth', 'profileId'],
+      ['agentIdentity', 'profile'],
+      ['agentIdentity', 'profile_id'],
+      ['agentIdentity', 'profileId'],
+      ['agent_identity', 'profile'],
+      ['agent_identity', 'profile_id'],
+      ['agent_identity', 'profileId'],
       ['params', 'auth_profile'],
       ['params', 'authProfile'],
       ['params', 'profile'],
@@ -3961,6 +3977,12 @@ function extractProviderWorkerAuthProvenance(
       ['params', 'auth', 'profile'],
       ['params', 'auth', 'profile_id'],
       ['params', 'auth', 'profileId'],
+      ['params', 'agentIdentity', 'profile'],
+      ['params', 'agentIdentity', 'profile_id'],
+      ['params', 'agentIdentity', 'profileId'],
+      ['params', 'agent_identity', 'profile'],
+      ['params', 'agent_identity', 'profile_id'],
+      ['params', 'agent_identity', 'profileId'],
       ['payload', 'auth_profile'],
       ['payload', 'authProfile'],
       ['payload', 'profile'],
@@ -3971,6 +3993,12 @@ function extractProviderWorkerAuthProvenance(
       ['payload', 'auth', 'profile'],
       ['payload', 'auth', 'profile_id'],
       ['payload', 'auth', 'profileId'],
+      ['payload', 'agentIdentity', 'profile'],
+      ['payload', 'agentIdentity', 'profile_id'],
+      ['payload', 'agentIdentity', 'profileId'],
+      ['payload', 'agent_identity', 'profile'],
+      ['payload', 'agent_identity', 'profile_id'],
+      ['payload', 'agent_identity', 'profileId'],
       ['payload', 'params', 'auth_profile'],
       ['payload', 'params', 'authProfile'],
       ['payload', 'params', 'profile'],
@@ -3980,7 +4008,13 @@ function extractProviderWorkerAuthProvenance(
       ['payload', 'params', 'auth', 'authProfile'],
       ['payload', 'params', 'auth', 'profile'],
       ['payload', 'params', 'auth', 'profile_id'],
-      ['payload', 'params', 'auth', 'profileId']
+      ['payload', 'params', 'auth', 'profileId'],
+      ['payload', 'params', 'agentIdentity', 'profile'],
+      ['payload', 'params', 'agentIdentity', 'profile_id'],
+      ['payload', 'params', 'agentIdentity', 'profileId'],
+      ['payload', 'params', 'agent_identity', 'profile'],
+      ['payload', 'params', 'agent_identity', 'profile_id'],
+      ['payload', 'params', 'agent_identity', 'profileId']
     ],
     env
   );
@@ -4004,6 +4038,24 @@ function extractProviderWorkerAuthProvenance(
       ['auth', 'organizationId'],
       ['auth', 'org_id'],
       ['auth', 'orgId'],
+      ['agentIdentity', 'account_id'],
+      ['agentIdentity', 'accountId'],
+      ['agentIdentity', 'account'],
+      ['agentIdentity', 'account', 'id'],
+      ['agentIdentity', 'account', 'email'],
+      ['agentIdentity', 'organization_id'],
+      ['agentIdentity', 'organizationId'],
+      ['agentIdentity', 'org_id'],
+      ['agentIdentity', 'orgId'],
+      ['agent_identity', 'account_id'],
+      ['agent_identity', 'accountId'],
+      ['agent_identity', 'account'],
+      ['agent_identity', 'account', 'id'],
+      ['agent_identity', 'account', 'email'],
+      ['agent_identity', 'organization_id'],
+      ['agent_identity', 'organizationId'],
+      ['agent_identity', 'org_id'],
+      ['agent_identity', 'orgId'],
       ['params', 'account_id'],
       ['params', 'accountId'],
       ['params', 'account'],
@@ -4022,6 +4074,24 @@ function extractProviderWorkerAuthProvenance(
       ['params', 'auth', 'organizationId'],
       ['params', 'auth', 'org_id'],
       ['params', 'auth', 'orgId'],
+      ['params', 'agentIdentity', 'account'],
+      ['params', 'agentIdentity', 'account', 'id'],
+      ['params', 'agentIdentity', 'account', 'email'],
+      ['params', 'agentIdentity', 'account_id'],
+      ['params', 'agentIdentity', 'accountId'],
+      ['params', 'agentIdentity', 'organization_id'],
+      ['params', 'agentIdentity', 'organizationId'],
+      ['params', 'agentIdentity', 'org_id'],
+      ['params', 'agentIdentity', 'orgId'],
+      ['params', 'agent_identity', 'account'],
+      ['params', 'agent_identity', 'account', 'id'],
+      ['params', 'agent_identity', 'account', 'email'],
+      ['params', 'agent_identity', 'account_id'],
+      ['params', 'agent_identity', 'accountId'],
+      ['params', 'agent_identity', 'organization_id'],
+      ['params', 'agent_identity', 'organizationId'],
+      ['params', 'agent_identity', 'org_id'],
+      ['params', 'agent_identity', 'orgId'],
       ['payload', 'account_id'],
       ['payload', 'accountId'],
       ['payload', 'account'],
@@ -4040,6 +4110,24 @@ function extractProviderWorkerAuthProvenance(
       ['payload', 'auth', 'organizationId'],
       ['payload', 'auth', 'org_id'],
       ['payload', 'auth', 'orgId'],
+      ['payload', 'agentIdentity', 'account_id'],
+      ['payload', 'agentIdentity', 'accountId'],
+      ['payload', 'agentIdentity', 'account'],
+      ['payload', 'agentIdentity', 'account', 'id'],
+      ['payload', 'agentIdentity', 'account', 'email'],
+      ['payload', 'agentIdentity', 'organization_id'],
+      ['payload', 'agentIdentity', 'organizationId'],
+      ['payload', 'agentIdentity', 'org_id'],
+      ['payload', 'agentIdentity', 'orgId'],
+      ['payload', 'agent_identity', 'account_id'],
+      ['payload', 'agent_identity', 'accountId'],
+      ['payload', 'agent_identity', 'account'],
+      ['payload', 'agent_identity', 'account', 'id'],
+      ['payload', 'agent_identity', 'account', 'email'],
+      ['payload', 'agent_identity', 'organization_id'],
+      ['payload', 'agent_identity', 'organizationId'],
+      ['payload', 'agent_identity', 'org_id'],
+      ['payload', 'agent_identity', 'orgId'],
       ['payload', 'params', 'account_id'],
       ['payload', 'params', 'accountId'],
       ['payload', 'params', 'account'],
@@ -4057,7 +4145,25 @@ function extractProviderWorkerAuthProvenance(
       ['payload', 'params', 'auth', 'organization_id'],
       ['payload', 'params', 'auth', 'organizationId'],
       ['payload', 'params', 'auth', 'org_id'],
-      ['payload', 'params', 'auth', 'orgId']
+      ['payload', 'params', 'auth', 'orgId'],
+      ['payload', 'params', 'agentIdentity', 'account'],
+      ['payload', 'params', 'agentIdentity', 'account', 'id'],
+      ['payload', 'params', 'agentIdentity', 'account', 'email'],
+      ['payload', 'params', 'agentIdentity', 'account_id'],
+      ['payload', 'params', 'agentIdentity', 'accountId'],
+      ['payload', 'params', 'agentIdentity', 'organization_id'],
+      ['payload', 'params', 'agentIdentity', 'organizationId'],
+      ['payload', 'params', 'agentIdentity', 'org_id'],
+      ['payload', 'params', 'agentIdentity', 'orgId'],
+      ['payload', 'params', 'agent_identity', 'account'],
+      ['payload', 'params', 'agent_identity', 'account', 'id'],
+      ['payload', 'params', 'agent_identity', 'account', 'email'],
+      ['payload', 'params', 'agent_identity', 'account_id'],
+      ['payload', 'params', 'agent_identity', 'accountId'],
+      ['payload', 'params', 'agent_identity', 'organization_id'],
+      ['payload', 'params', 'agent_identity', 'organizationId'],
+      ['payload', 'params', 'agent_identity', 'org_id'],
+      ['payload', 'params', 'agent_identity', 'orgId']
     ],
     env
   );
@@ -4072,6 +4178,14 @@ function extractProviderWorkerAuthProvenance(
         ['auth', 'credentialSource'],
         ['auth', 'auth_source'],
         ['auth', 'authSource'],
+        ['agentIdentity', 'credential_source'],
+        ['agentIdentity', 'credentialSource'],
+        ['agentIdentity', 'auth_source'],
+        ['agentIdentity', 'authSource'],
+        ['agent_identity', 'credential_source'],
+        ['agent_identity', 'credentialSource'],
+        ['agent_identity', 'auth_source'],
+        ['agent_identity', 'authSource'],
         ['params', 'credential_source'],
         ['params', 'credentialSource'],
         ['params', 'auth_source'],
@@ -4080,6 +4194,14 @@ function extractProviderWorkerAuthProvenance(
         ['params', 'auth', 'credentialSource'],
         ['params', 'auth', 'auth_source'],
         ['params', 'auth', 'authSource'],
+        ['params', 'agentIdentity', 'credential_source'],
+        ['params', 'agentIdentity', 'credentialSource'],
+        ['params', 'agentIdentity', 'auth_source'],
+        ['params', 'agentIdentity', 'authSource'],
+        ['params', 'agent_identity', 'credential_source'],
+        ['params', 'agent_identity', 'credentialSource'],
+        ['params', 'agent_identity', 'auth_source'],
+        ['params', 'agent_identity', 'authSource'],
         ['payload', 'credential_source'],
         ['payload', 'credentialSource'],
         ['payload', 'auth_source'],
@@ -4088,6 +4210,14 @@ function extractProviderWorkerAuthProvenance(
         ['payload', 'auth', 'credentialSource'],
         ['payload', 'auth', 'auth_source'],
         ['payload', 'auth', 'authSource'],
+        ['payload', 'agentIdentity', 'credential_source'],
+        ['payload', 'agentIdentity', 'credentialSource'],
+        ['payload', 'agentIdentity', 'auth_source'],
+        ['payload', 'agentIdentity', 'authSource'],
+        ['payload', 'agent_identity', 'credential_source'],
+        ['payload', 'agent_identity', 'credentialSource'],
+        ['payload', 'agent_identity', 'auth_source'],
+        ['payload', 'agent_identity', 'authSource'],
         ['payload', 'params', 'credential_source'],
         ['payload', 'params', 'credentialSource'],
         ['payload', 'params', 'auth_source'],
@@ -4095,7 +4225,15 @@ function extractProviderWorkerAuthProvenance(
         ['payload', 'params', 'auth', 'credential_source'],
         ['payload', 'params', 'auth', 'credentialSource'],
         ['payload', 'params', 'auth', 'auth_source'],
-        ['payload', 'params', 'auth', 'authSource']
+        ['payload', 'params', 'auth', 'authSource'],
+        ['payload', 'params', 'agentIdentity', 'credential_source'],
+        ['payload', 'params', 'agentIdentity', 'credentialSource'],
+        ['payload', 'params', 'agentIdentity', 'auth_source'],
+        ['payload', 'params', 'agentIdentity', 'authSource'],
+        ['payload', 'params', 'agent_identity', 'credential_source'],
+        ['payload', 'params', 'agent_identity', 'credentialSource'],
+        ['payload', 'params', 'agent_identity', 'auth_source'],
+        ['payload', 'params', 'agent_identity', 'authSource']
       ])
     ) ?? null;
   const authFreshness = normalizeProviderWorkerAuthFreshness(
@@ -4106,24 +4244,48 @@ function extractProviderWorkerAuthProvenance(
       ['auth', 'auth_freshness'],
       ['auth', 'authFreshness'],
       ['auth', 'freshness'],
+      ['agentIdentity', 'auth_freshness'],
+      ['agentIdentity', 'authFreshness'],
+      ['agentIdentity', 'freshness'],
+      ['agent_identity', 'auth_freshness'],
+      ['agent_identity', 'authFreshness'],
+      ['agent_identity', 'freshness'],
       ['params', 'auth_freshness'],
       ['params', 'authFreshness'],
       ['params', 'freshness'],
       ['params', 'auth', 'auth_freshness'],
       ['params', 'auth', 'authFreshness'],
       ['params', 'auth', 'freshness'],
+      ['params', 'agentIdentity', 'auth_freshness'],
+      ['params', 'agentIdentity', 'authFreshness'],
+      ['params', 'agentIdentity', 'freshness'],
+      ['params', 'agent_identity', 'auth_freshness'],
+      ['params', 'agent_identity', 'authFreshness'],
+      ['params', 'agent_identity', 'freshness'],
       ['payload', 'auth_freshness'],
       ['payload', 'authFreshness'],
       ['payload', 'freshness'],
       ['payload', 'auth', 'auth_freshness'],
       ['payload', 'auth', 'authFreshness'],
       ['payload', 'auth', 'freshness'],
+      ['payload', 'agentIdentity', 'auth_freshness'],
+      ['payload', 'agentIdentity', 'authFreshness'],
+      ['payload', 'agentIdentity', 'freshness'],
+      ['payload', 'agent_identity', 'auth_freshness'],
+      ['payload', 'agent_identity', 'authFreshness'],
+      ['payload', 'agent_identity', 'freshness'],
       ['payload', 'params', 'auth_freshness'],
       ['payload', 'params', 'authFreshness'],
       ['payload', 'params', 'freshness'],
       ['payload', 'params', 'auth', 'auth_freshness'],
       ['payload', 'params', 'auth', 'authFreshness'],
-      ['payload', 'params', 'auth', 'freshness']
+      ['payload', 'params', 'auth', 'freshness'],
+      ['payload', 'params', 'agentIdentity', 'auth_freshness'],
+      ['payload', 'params', 'agentIdentity', 'authFreshness'],
+      ['payload', 'params', 'agentIdentity', 'freshness'],
+      ['payload', 'params', 'agent_identity', 'auth_freshness'],
+      ['payload', 'params', 'agent_identity', 'authFreshness'],
+      ['payload', 'params', 'agent_identity', 'freshness']
     ])
   );
   if (
@@ -4226,8 +4388,107 @@ function redactProviderWorkerFreeFormPlanDetails(raw: string): string {
     );
 }
 
+function readProviderWorkerQuotedValueEnd(input: string, start: number, quote: string): number {
+  let escaped = false;
+  for (let index = start + 1; index < input.length; index += 1) {
+    const char = input[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (char === quote) {
+      return index + 1;
+    }
+  }
+  return input.length;
+}
+
+function readProviderWorkerBalancedValueEnd(
+  input: string,
+  start: number,
+  open: string,
+  close: string
+): number {
+  let depth = 0;
+  let quote: string | null = null;
+  let escaped = false;
+  for (let index = start; index < input.length; index += 1) {
+    const char = input[index];
+    if (quote) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (char === open) {
+      depth += 1;
+      continue;
+    }
+    if (char === close) {
+      depth -= 1;
+      if (depth <= 0) {
+        return index + 1;
+      }
+    }
+  }
+  return input.length;
+}
+
+function readProviderWorkerAgentIdentityValueEnd(input: string, start: number): number {
+  const first = input[start];
+  if (first === '"' || first === "'") {
+    return readProviderWorkerQuotedValueEnd(input, start, first);
+  }
+  if (first === '{') {
+    return readProviderWorkerBalancedValueEnd(input, start, '{', '}');
+  }
+  if (first === '[') {
+    return readProviderWorkerBalancedValueEnd(input, start, '[', ']');
+  }
+  let index = start;
+  while (index < input.length && !/[\s,}]/u.test(input[index] ?? '')) {
+    index += 1;
+  }
+  return index;
+}
+
+function redactProviderWorkerAgentIdentityAssignments(raw: string): string {
+  const assignmentPattern =
+    /(["']?(?:CODEX_AGENT_IDENTITY|agent[_-]?identity|agent\s+identity)["']?)\s*[=:]\s*/giu;
+  let result = '';
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+  while ((match = assignmentPattern.exec(raw)) !== null) {
+    const label = match[1] ?? '';
+    const valueStart = assignmentPattern.lastIndex;
+    const valueEnd = readProviderWorkerAgentIdentityValueEnd(raw, valueStart);
+    result += raw.slice(cursor, match.index);
+    const quotedLabel = label.startsWith('"') || label.startsWith("'");
+    result += quotedLabel ? `${label}:"<redacted>"` : `${label}=<redacted>`;
+    cursor = valueEnd;
+    assignmentPattern.lastIndex = valueEnd;
+  }
+  return result + raw.slice(cursor);
+}
+
 function redactProviderWorkerDiagnosticText(raw: string): string {
-  return redactProviderWorkerFreeFormPlanDetails(raw)
+  return redactProviderWorkerAgentIdentityAssignments(redactProviderWorkerFreeFormPlanDetails(raw))
     .replace(/\bBearer\s+(?!token\b)[A-Za-z0-9._~+/=-]+/giu, 'Bearer <redacted>')
     .replace(/sk-[A-Za-z0-9_-]+/gu, 'sk-<redacted>')
     .replace(
@@ -6987,6 +7248,7 @@ function readProviderWorkerCredentialSourceFromEnv(env: NodeJS.ProcessEnv): stri
   for (const key of [
     'CODEX_API_KEY',
     'OPENAI_API_KEY',
+    'CODEX_AGENT_IDENTITY',
     'CODEX_AUTH_TOKEN',
     'OPENAI_AUTH_TOKEN',
     'CHATGPT_AUTH_TOKEN'
