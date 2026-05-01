@@ -417,6 +417,38 @@ describe('ObservabilityApiController', () => {
     expect(requestProviderWorkerRecover).toHaveBeenCalledTimes(1);
   });
 
+  it('classifies provider-worker recover background failures with the underlying machine reason', async () => {
+    const { res, state } = createResponseRecorder();
+    const requestProviderWorkerRecover = vi.fn(async () => {
+      throw new Error('provider_refresh_lifecycle_stuck');
+    });
+
+    const handled = await handleObservabilityApiRequest({
+      authKind: 'control',
+      req: { method: 'POST', url: '/api/v1/provider-worker/recover' } as Pick<http.IncomingMessage, 'method' | 'url'>,
+      res,
+      presenterContext: buildControlHostPresenterContext(),
+      readRequestBody: async () => ({ issue_id: 'CO-470', action: 'relaunch' }),
+      requestRefresh: async () => { throw new Error('unused'); },
+      requestProviderWorkerRecover,
+      readDispatchEvaluation: readDisabledDispatchEvaluation
+    });
+
+    expect(handled).toBe(true);
+    expect(state.statusCode).toBe(202);
+    expect(state.body).toMatchObject({
+      mode: 'provider_worker_recover',
+      issue_id: 'CO-470',
+      action: 'relaunch',
+      kind: 'skipped',
+      reason: 'provider_worker_recover_failed:provider_refresh_lifecycle_stuck',
+      queued: false,
+      coalesced: false,
+      async: false,
+      claim: null
+    });
+  });
+
   it('keeps provider-worker recover API retries action-scoped while launch is in flight', async () => {
     const recovery = createDeferred<void>();
     let accepted: ProviderWorkerRecoverAcceptedState | null = null;

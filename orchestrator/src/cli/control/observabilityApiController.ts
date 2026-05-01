@@ -417,6 +417,7 @@ function queueProviderWorkerRecover(input: {
   const recoveryPromise = Promise.resolve()
     .then(input.run)
     .catch((error) => {
+      const reason = buildProviderWorkerRecoverFailureReason(error);
       logger.warn(
         `[observability-api] provider-worker ${input.action} background recovery failed for ${input.issueId}: ${
           (error as Error)?.message ?? String(error)
@@ -427,7 +428,7 @@ function queueProviderWorkerRecover(input: {
         issue_id: input.issueId,
         action: input.action,
         kind: 'skipped' as const,
-        reason: 'provider_worker_recover_failed',
+        reason,
         claim: null
       };
     });
@@ -571,6 +572,17 @@ function createProviderWorkerRecoverAcceptanceObserver(input: {
     poll();
   });
   return { promise, stop };
+}
+
+function buildProviderWorkerRecoverFailureReason(error: unknown): string {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : '';
+  const machineReason = message.match(/\bprovider_[a-z0-9_:-]+/u)?.[0] ?? null;
+  return `provider_worker_recover_failed:${machineReason ?? 'unexpected_error'}`;
 }
 
 function resolveProviderWorkerRecoverRuntimeKey(context: ObservabilityPresenterContext): string {
