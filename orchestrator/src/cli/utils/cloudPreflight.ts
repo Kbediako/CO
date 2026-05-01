@@ -176,6 +176,21 @@ function readCloudPreflightQuotedValueEnd(input: string, start: number, quote: s
   return input.length;
 }
 
+function isCloudPreflightEscapedQuoteBoundary(
+  input: string,
+  slashIndex: number,
+  quote: string
+): boolean {
+  if (input[slashIndex] !== '\\' || input[slashIndex + 1] !== quote) {
+    return false;
+  }
+  let backslashCount = 0;
+  for (let index = slashIndex; index >= 0 && input[index] === '\\'; index -= 1) {
+    backslashCount += 1;
+  }
+  return backslashCount % 2 === 1;
+}
+
 function readCloudPreflightEscapedQuotedBalancedValueEnd(
   input: string,
   start: number,
@@ -186,7 +201,7 @@ function readCloudPreflightEscapedQuotedBalancedValueEnd(
   let depth = 0;
   let quoted = false;
   for (let index = start; index < input.length; index += 1) {
-    if (input[index] === '\\' && input[index + 1] === quote) {
+    if (isCloudPreflightEscapedQuoteBoundary(input, index, quote)) {
       quoted = !quoted;
       index += 1;
       continue;
@@ -201,7 +216,9 @@ function readCloudPreflightEscapedQuotedBalancedValueEnd(
     if (input[index] === close) {
       depth -= 1;
       if (depth <= 0) {
-        return input[index + 1] === '\\' && input[index + 2] === quote ? index + 3 : index + 1;
+        return isCloudPreflightEscapedQuoteBoundary(input, index + 1, quote)
+          ? index + 3
+          : index + 1;
       }
     }
   }
@@ -221,7 +238,7 @@ function readCloudPreflightEscapedQuotedValueEnd(input: string, start: number, q
     return readCloudPreflightEscapedQuotedBalancedValueEnd(input, valueStart, '[', ']', quote);
   }
   for (let index = start + 2; index < input.length - 1; index += 1) {
-    if (input[index] !== '\\' || input[index + 1] !== quote) {
+    if (!isCloudPreflightEscapedQuoteBoundary(input, index, quote)) {
       continue;
     }
     return index + 2;

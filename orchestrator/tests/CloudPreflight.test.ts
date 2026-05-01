@@ -358,7 +358,7 @@ describe('buildCloudPreflightRequest', () => {
     const { result } = await runCloudPreflightWithCloudList({
       environmentId: 'env-delimiter',
       stderr:
-        'Error: environment env-delimiter not found CODEX_AGENT_IDENTITY=\\"agent identity delimiter secret\\"; forbidden for active account user@example.com CODEX_AGENT_IDENTITY=\\"agent identity bracket delimiter secret\\"] forbidden active profile CODEX_AGENT_IDENTITY=\\"agent identity colon delimiter secret\\": forbidden colon active profile',
+        'Error: environment env-delimiter not found CODEX_AGENT_IDENTITY=\\"agent identity delimiter secret\\"; forbidden for active account user@example.com CODEX_AGENT_IDENTITY=\\"agent identity bracket delimiter secret\\"] forbidden active profile CODEX_AGENT_IDENTITY=\\"agent identity colon delimiter secret\\": forbidden colon active profile CODEX_AGENT_IDENTITY=\\"{ \\"id\\" : \\"agent-identity-edge-brace\\\\"}\\", \\"tail\\" : \\"agent-identity-edge-brace-tail\\" }\\"} escaped brace tail remains visible CODEX_AGENT_IDENTITY=\\"[ \\"agent-identity-edge-bracket\\\\"]\\", \\"agent-identity-edge-bracket-tail\\" ]\\" ] escaped bracket tail remains visible',
       exitCode: 1
     });
 
@@ -367,10 +367,16 @@ describe('buildCloudPreflightRequest', () => {
     expect(message).toContain('CODEX_AGENT_IDENTITY=<redacted>; forbidden for active account');
     expect(message).toContain('forbidden active profile');
     expect(message).toContain('CODEX_AGENT_IDENTITY=<redacted>: forbidden colon active profile');
+    expect(message).toContain('escaped brace tail remains visible');
+    expect(message).toContain('escaped bracket tail remains visible');
     expect(message).toContain('<redacted-email>');
     expect(message).not.toContain('agent identity delimiter secret');
     expect(message).not.toContain('agent identity bracket delimiter secret');
     expect(message).not.toContain('agent identity colon delimiter secret');
+    expect(message).not.toContain('agent-identity-edge-brace');
+    expect(message).not.toContain('agent-identity-edge-brace-tail');
+    expect(message).not.toContain('agent-identity-edge-bracket');
+    expect(message).not.toContain('agent-identity-edge-bracket-tail');
     expect(message).not.toContain('user@example.com');
   });
 

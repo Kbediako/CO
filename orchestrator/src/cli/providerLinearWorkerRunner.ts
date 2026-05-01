@@ -4407,6 +4407,21 @@ function readProviderWorkerQuotedValueEnd(input: string, start: number, quote: s
   return input.length;
 }
 
+function isProviderWorkerEscapedQuoteBoundary(
+  input: string,
+  slashIndex: number,
+  quote: string
+): boolean {
+  if (input[slashIndex] !== '\\' || input[slashIndex + 1] !== quote) {
+    return false;
+  }
+  let backslashCount = 0;
+  for (let index = slashIndex; index >= 0 && input[index] === '\\'; index -= 1) {
+    backslashCount += 1;
+  }
+  return backslashCount % 2 === 1;
+}
+
 function readProviderWorkerEscapedQuotedBalancedValueEnd(
   input: string,
   start: number,
@@ -4417,7 +4432,7 @@ function readProviderWorkerEscapedQuotedBalancedValueEnd(
   let depth = 0;
   let quoted = false;
   for (let index = start; index < input.length; index += 1) {
-    if (input[index] === '\\' && input[index + 1] === quote) {
+    if (isProviderWorkerEscapedQuoteBoundary(input, index, quote)) {
       quoted = !quoted;
       index += 1;
       continue;
@@ -4432,7 +4447,9 @@ function readProviderWorkerEscapedQuotedBalancedValueEnd(
     if (input[index] === close) {
       depth -= 1;
       if (depth <= 0) {
-        return input[index + 1] === '\\' && input[index + 2] === quote ? index + 3 : index + 1;
+        return isProviderWorkerEscapedQuoteBoundary(input, index + 1, quote)
+          ? index + 3
+          : index + 1;
       }
     }
   }
@@ -4452,7 +4469,7 @@ function readProviderWorkerEscapedQuotedValueEnd(input: string, start: number, q
     return readProviderWorkerEscapedQuotedBalancedValueEnd(input, valueStart, '[', ']', quote);
   }
   for (let index = start + 2; index < input.length - 1; index += 1) {
-    if (input[index] !== '\\' || input[index + 1] !== quote) {
+    if (!isProviderWorkerEscapedQuoteBoundary(input, index, quote)) {
       continue;
     }
     return index + 2;

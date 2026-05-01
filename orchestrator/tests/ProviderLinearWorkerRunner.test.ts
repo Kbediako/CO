@@ -2877,7 +2877,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         type: 'notification',
         params: {
           message:
-            'CODEX_AGENT_IDENTITY=\\"agent identity delimiter secret\\"; auth profile mismatch for selected account CODEX_AGENT_IDENTITY=\\"agent identity brace delimiter secret\\"} active profile mismatch remains visible CODEX_AGENT_IDENTITY=\\"agent identity colon delimiter secret\\": auth profile colon mismatch remains visible'
+            'CODEX_AGENT_IDENTITY=\\"agent identity delimiter secret\\"; auth profile mismatch for selected account CODEX_AGENT_IDENTITY=\\"agent identity brace delimiter secret\\"} active profile mismatch remains visible CODEX_AGENT_IDENTITY=\\"agent identity colon delimiter secret\\": auth profile colon mismatch remains visible CODEX_AGENT_IDENTITY=\\"{ \\"id\\" : \\"agent-identity-edge-brace\\\\"}\\", \\"tail\\" : \\"agent-identity-edge-brace-tail\\" }\\"} escaped brace tail remains visible CODEX_AGENT_IDENTITY=\\"[ \\"agent-identity-edge-bracket\\\\"]\\", \\"agent-identity-edge-bracket-tail\\" ]\\" ] escaped bracket tail remains visible'
         },
         timestamp: '2026-05-01T00:47:00.000Z'
       })
@@ -2891,9 +2891,15 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(signal).toContain('CODEX_AGENT_IDENTITY=<redacted>; auth profile mismatch');
     expect(signal).toContain('active profile mismatch remains visible');
     expect(signal).toContain('CODEX_AGENT_IDENTITY=<redacted>: auth profile colon mismatch remains visible');
+    expect(signal).toContain('escaped brace tail remains visible');
+    expect(signal).toContain('escaped bracket tail remains visible');
     expect(signal).not.toContain('agent identity delimiter secret');
     expect(signal).not.toContain('agent identity brace delimiter secret');
     expect(signal).not.toContain('agent identity colon delimiter secret');
+    expect(signal).not.toContain('agent-identity-edge-brace');
+    expect(signal).not.toContain('agent-identity-edge-brace-tail');
+    expect(signal).not.toContain('agent-identity-edge-bracket');
+    expect(signal).not.toContain('agent-identity-edge-bracket-tail');
   });
 
   it('redacts app-server terminal turn error details before diagnostics are persisted', async () => {
