@@ -634,6 +634,21 @@ async function resolveProviderParentClaim(runsDir, claim, taskId) {
   return (await hasActiveProviderParentManifest(runsDir, contract)) ? contract : null;
 }
 
+function describeProviderChildIssueMismatch(taskId, manifest, contract) {
+  const childFields = [
+    ['issue_provider', 'provider'],
+    ['issue_id', 'issueId'],
+    ['issue_identifier', 'issueIdentifier']
+  ];
+  for (const [manifestKey, contractKey] of childFields) {
+    const childValue = readNonEmptyString(manifest, manifestKey);
+    if (childValue && childValue !== contract[contractKey]) {
+      return `Provider-child task id '${taskId}' ${manifestKey} '${childValue}' does not match sanctioned provider parent ${manifestKey} '${contract[contractKey]}'`;
+    }
+  }
+  return null;
+}
+
 async function collectProviderParentContracts(runsDir, state, taskId, statePath) {
   const candidateContracts = [];
   const claims = Array.isArray(state?.claims) ? state.claims : [];
@@ -744,7 +759,8 @@ async function findProviderParentTaskProof(runsDir, taskId, env) {
       error: `Provider-child task id '${taskId}' is missing active manifest context for provider-parent validation`
     };
   }
-  if (buildProviderContractCandidate(taskId, manifest)) {
+  const childParentRunId = readNonEmptyString(manifest, 'parent_run_id');
+  if (buildProviderContractCandidate(taskId, manifest) && !childParentRunId) {
     return {
       matched: false,
       parentTaskId: null,
@@ -752,7 +768,6 @@ async function findProviderParentTaskProof(runsDir, taskId, env) {
       error: null
     };
   }
-  const childParentRunId = manifest ? readNonEmptyString(manifest, 'parent_run_id') : '';
 
   const { statePath, explicit, state, error: stateError } = await loadControlHostProviderIntakeState(
     runsDir,
@@ -831,6 +846,11 @@ async function findProviderParentTaskProof(runsDir, taskId, env) {
       mismatchError =
         mismatchError ??
         `Provider-child task id '${taskId}' parent_run_id '${childParentRunId}' does not match sanctioned provider parent run '${contract.parentRunId}'`;
+      continue;
+    }
+    const issueMismatch = describeProviderChildIssueMismatch(taskId, manifest, contract);
+    if (issueMismatch) {
+      mismatchError = mismatchError ?? issueMismatch;
       continue;
     }
     if (!bestMatch || contract.parentTaskId.length > bestMatch.parentTaskId.length) {
@@ -1006,9 +1026,24 @@ async function main() {
       console.log(` - export MCP_RUNNER_TASK_ID=${exampleTaskId}`);
       console.log(` - or run: node scripts/delegation-guard.mjs --task ${exampleTaskId}`);
     } else {
-      console.log(` - Use MCP_RUNNER_TASK_ID="${taskId}-<stream>" for subagent runs.`);
+      const registeredParentExample = taskKeys.includes(taskId) ? taskId : exampleTaskId;
+      if (taskIndexReadable && registeredParentExample !== '<task-id>') {
+        console.log(
+          ` - Use MCP_RUNNER_TASK_ID="<registered-parent-task>-<stream>" for subagent or child runs; registered parent example: ${registeredParentExample}-guard`
+        );
+        console.log(
+          ` - Example: MCP_RUNNER_TASK_ID=${registeredParentExample}-guard npx codex-orchestrator start diagnostics --format json --task ${registeredParentExample}-guard`
+        );
+      } else {
+        console.log(
+          ' - Use MCP_RUNNER_TASK_ID="<registered-parent-task>-<stream>" for subagent or child runs after registering the parent task.'
+        );
+      }
       console.log(
-        ` - Example: MCP_RUNNER_TASK_ID=${taskId}-guard npx codex-orchestrator start diagnostics --format json --task ${taskId}-guard`
+        ' - Provider child streams must keep task_id prefixed by the registered/sanctioned parent task and set parent_run_id to that provider parent run.'
+      );
+      console.log(
+        ' - Do not append another nested stream to an unregistered child task id; fix the parent task prefix or provider parent provenance instead.'
       );
     }
     if (dryRun) {
