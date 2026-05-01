@@ -31,7 +31,7 @@
   - 2026-05-01: packet preserves both halves of the requested contract: valid provider docs-review children should pass, while unregistered or invalid provenance cases remain fail-closed.
   - 2026-05-01: packet explicitly names the parent/child identity contract and rejects blanket override or broad guard relaxation.
 - Fallback / refactor decision:
-  - Applies: `Yes`, because this lane touches fallback-shaped provider child task identity and guard compatibility.
+  - Applies: `Yes` because this lane touches fallback-shaped provider child task identity and guard compatibility.
   - Decision: expire the ambiguous `linear-<issue-id>-docs-review` identity shape unless it is backed by sanctioned provider parent proof or a registered parent prefix; retain strict provenance and task-registration failures as correctness contracts.
 - Durable retention evidence:
   - `parent_run_id`, provider launch provenance, and `tasks/index.json` registration remain required proof surfaces.
@@ -40,15 +40,15 @@
 
 ## Milestones & Sequencing
 1. Register docs-first packet and task index entry.
-2. Parent writes a focused CO-458 reproduction covering `linear-<issue-id>-docs-review`, `parent_run_id`, absent accepted provider provenance, and `delegation-guard` failure.
-3. Parent inspects `orchestrator/src/cli/providerLinearChildStreamShell.ts` and chooses the identity fix:
+2. Write a focused CO-458 reproduction covering `linear-<issue-id>-docs-review`, `parent_run_id`, absent accepted provider provenance, and `delegation-guard` failure.
+3. Inspect `orchestrator/src/cli/providerLinearChildStreamShell.ts` and choose the identity fix:
    - inherit valid parent provider provenance/lineage into the docs-review child contract, or
    - use a docs-review child task id under a registered parent task prefix that guard accepts.
-4. Parent updates `scripts/delegation-guard.mjs` and `scripts/lib/provider-run-contract.js` only as needed to make the chosen contract explicit and fail closed.
-5. Parent preserves missing provenance, mismatched provenance, registered-parent-prefix mismatch, and ordinary unregistered top-level failures.
-6. Parent updates worker-facing guard diagnostics or guidance so the failure points to the parent/child task identity contract.
-7. Parent runs focused guard and provider child-stream tests, then selected broader validation/review gates.
-8. Parent updates workpad, PR, and review handoff evidence after the real docs-review child-stream path is clean.
+4. Update `scripts/delegation-guard.mjs` and `scripts/lib/provider-run-contract.js` only as needed to make the chosen contract explicit and fail closed.
+5. Preserve missing provenance, mismatched provenance, registered-parent-prefix mismatch, and ordinary unregistered top-level failures.
+6. Refresh worker-facing guard diagnostics or guidance so the failure points to the parent/child task identity contract.
+7. Run focused guard and provider child-stream tests, then selected broader validation/review gates.
+8. Update workpad, PR, and review handoff evidence after the real docs-review child-stream path is clean.
 
 ## Dependencies
 - `scripts/delegation-guard.mjs`

@@ -636,14 +636,16 @@ async function resolveProviderParentClaim(runsDir, claim, taskId) {
 
 function describeProviderChildIssueMismatch(taskId, manifest, contract) {
   const childFields = [
-    ['issue_provider', 'provider'],
-    ['issue_id', 'issueId'],
-    ['issue_identifier', 'issueIdentifier']
+    [['issue_provider', 'issueProvider'], 'provider', 'issue_provider'],
+    [['issue_id', 'issueId'], 'issueId', 'issue_id'],
+    [['issue_identifier', 'issueIdentifier'], 'issueIdentifier', 'issue_identifier']
   ];
-  for (const [manifestKey, contractKey] of childFields) {
-    const childValue = readNonEmptyString(manifest, manifestKey);
-    if (childValue && childValue !== contract[contractKey]) {
-      return `Provider-child task id '${taskId}' ${manifestKey} '${childValue}' does not match sanctioned provider parent ${manifestKey} '${contract[contractKey]}'`;
+  for (const [manifestKeys, contractKey, label] of childFields) {
+    for (const manifestKey of manifestKeys) {
+      const childValue = readNonEmptyString(manifest, manifestKey);
+      if (childValue && childValue !== contract[contractKey]) {
+        return `Provider-child task id '${taskId}' ${manifestKey} '${childValue}' does not match sanctioned provider parent ${label} '${contract[contractKey]}'`;
+      }
     }
   }
   return null;

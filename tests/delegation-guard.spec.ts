@@ -80,6 +80,9 @@ async function createProviderDocsReviewChildFixture(options: {
   childIssueId?: string;
   childIssueIdentifier?: string;
   childIssueProvider?: string;
+  childIssueIdCamelCase?: string;
+  childIssueIdentifierCamelCase?: string;
+  childIssueProviderCamelCase?: string;
   registeredParentKey?: string;
 } = {}): Promise<{
   dir: string;
@@ -115,7 +118,14 @@ async function createProviderDocsReviewChildFixture(options: {
     parent_run_id: parentRunId,
     issue_provider: options.childIssueProvider ?? 'linear',
     issue_id: options.childIssueId ?? 'lin-issue-1',
-    issue_identifier: options.childIssueIdentifier ?? 'CO-2'
+    issue_identifier: options.childIssueIdentifier ?? 'CO-2',
+    ...(options.childIssueProviderCamelCase === undefined
+      ? {}
+      : { issueProvider: options.childIssueProviderCamelCase }),
+    ...(options.childIssueIdCamelCase === undefined ? {} : { issueId: options.childIssueIdCamelCase }),
+    ...(options.childIssueIdentifierCamelCase === undefined
+      ? {}
+      : { issueIdentifier: options.childIssueIdentifierCamelCase })
   });
   await writeJson(parentManifestPath, {
     task_id: parentTaskId,
@@ -1489,6 +1499,28 @@ describe('delegation-guard script', () => {
 
     expect(stdout).toContain(
       `Provider-child task id '${fixture.taskId}' issue_id 'foreign-issue' does not match sanctioned provider parent issue_id 'lin-issue-1'`
+    );
+    expect(stdout).toContain(`Task id '${fixture.taskId}' is not registered in tasks/index.json`);
+    expect(stdout).not.toContain('treated as subagent run for sanctioned provider task');
+  });
+
+  it('rejects provider docs-review child runs when camelCase child issue fields mismatch the sanctioned parent', async () => {
+    const fixture = await createProviderDocsReviewChildFixture({
+      childIssueIdCamelCase: 'foreign-issue'
+    });
+    tempDir = fixture.dir;
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: fixture.dir,
+      env: cleanGuardOverrideEnv({
+        MCP_RUNNER_TASK_ID: fixture.taskId,
+        CODEX_ORCHESTRATOR_ROOT: fixture.dir,
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: fixture.manifestPath
+      })
+    });
+
+    expect(stdout).toContain(
+      `Provider-child task id '${fixture.taskId}' issueId 'foreign-issue' does not match sanctioned provider parent issue_id 'lin-issue-1'`
     );
     expect(stdout).toContain(`Task id '${fixture.taskId}' is not registered in tasks/index.json`);
     expect(stdout).not.toContain('treated as subagent run for sanctioned provider task');

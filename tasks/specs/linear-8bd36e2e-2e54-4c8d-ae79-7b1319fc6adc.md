@@ -113,12 +113,12 @@ task_checklists:
   - Reproduce the CO-458 shape in focused guard coverage: child `task_id=linear-<issue-id>-docs-review`, `parent_run_id` set, no accepted provider launch provenance, and `delegation-guard` failure.
   - Ensure a valid provider parent plus docs-review child clears `delegation-guard`.
   - Ensure the child identity contract uses either inherited valid provider parent provenance/lineage or a registered parent task prefix accepted by guard.
-  - Keep `parent_run_id` continuity required for provider docs-review child recognition.
-  - Keep missing provider provenance fail-closed.
-  - Keep mismatched provider provenance fail-closed.
-  - Keep registered-parent-prefix mismatch fail-closed.
-  - Keep ordinary unregistered top-level task ids fail-closed without provider-child diagnostics.
-  - Keep provider child-stream records truthful in `provider-linear-worker-child-streams.json`.
+  - Parent run ID continuity: required for provider docs-review child recognition.
+  - Missing provider provenance: fail-closed.
+  - Mismatched provider provenance: fail-closed.
+  - Registered-parent-prefix mismatch: fail-closed.
+  - Ordinary unregistered top-level task ids: fail-closed without provider-child diagnostics.
+  - Provider child-stream records: truthful in `provider-linear-worker-child-streams.json`.
 - Non-functional requirements:
   - Keep the implementation narrow to provider docs-review child task identity and guard recognition.
   - Prefer explicit parent/child contract checks over broad task id pattern matching.
