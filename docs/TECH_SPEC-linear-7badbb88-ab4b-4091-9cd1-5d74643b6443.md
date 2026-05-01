@@ -29,6 +29,11 @@ Protected terms: `CO-470`, `CO-472`, `control-host recover`, `Ready issue`, `acc
 - Preserve duplicate-launch safety for live runs while refusing stale manifestless recovery starts as terminal inflight truth.
 - Preserve actionable polling diagnostics on skipped/failed recovery.
 - Keep stale abandoned queued operations from deleting new recovery state.
+Large-refactor check: not required; one bounded lifecycle seam removes the indefinite accepted/no-run inflight truth while preserving existing launch authority.
+Minor-seam decision: acceptable because the fix centralizes explicit recovery timeout/retry behavior and has focused regressions for duplicate-launch safety.
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Provider-worker recover | Accepted/no-run pending-revalidation recovery treated as indefinite inflight truth | remove fallback | CO-474 | Ready issue has null run/manifest/launch and no retry error | observed 2026-05-01 | N/A after removal | N/A after removal | Explicit recover launches/retries or fails fast deterministically without occupying capacity | Focused lifecycle and handoff regressions |
 
 ## Validation
 Focused ProviderIssueHandoff fixture for recover/relaunch/nudge, control lifecycle tests for stranded recovery retry, slow launch, retry deadline, no-health active operation abandonment, skipped diagnostics, stale queued cleanup, and stale manifestless starting retry; then delegation guard, spec guard, build, lint, full test, docs gates, stewardship, diff budget, standalone review, elegance review, and pack smoke.

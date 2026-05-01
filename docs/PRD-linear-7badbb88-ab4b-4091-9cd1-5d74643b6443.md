@@ -36,5 +36,6 @@ Reject interpretations that implement CO-470 fixture-env cleanup, rewrite CO-472
 - A `provider_issue_rehydration_pending_revalidation` claim with null run/manifest/launch evidence still occupies active capacity indefinitely.
 - The fix requires manual state surgery, direct `provider-linear-worker` starts, CO-470 fixture-env cleanup, or CO-472 rewrite.
 
-## Fallback Decision
-Remove the accepted/no-run recovery hang. Retain CO-470 as evidence and CO-472 as adjacent reference only. If recovery truth is split across multiple lifecycle owners, file a follow-up instead of adding another ad hoc branch.
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Provider-worker recover | Accepted/no-run pending-revalidation recovery treated as indefinite inflight truth | remove fallback | CO-474 | Ready issue has null run/manifest/launch and no retry error | observed 2026-05-01 | N/A after removal | N/A after removal | Explicit recover launches/retries or fails fast deterministically without occupying capacity | Focused lifecycle and handoff regressions |
