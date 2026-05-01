@@ -52,8 +52,11 @@ import {
 const EXPIRY_INTERVAL_MS = 15_000;
 const PROVIDER_REFRESH_INTERVAL_MS = 15_000;
 const PROVIDER_REFRESH_STUCK_AFTER_MS = 45_000;
-// Explicit operator recovery must settle before the CLI default request timeout.
-const PROVIDER_WORKER_RECOVER_ACTIVE_WAIT_MS = 10_000;
+// Prior operation waits stay short; actual recovery allows launch overhead plus remote manifest polling.
+const PROVIDER_WORKER_RECOVER_ACTIVE_WAIT_MS = 22_000;
+const PROVIDER_WORKER_RECOVER_ACTIVE_TOTAL_WAIT_MS = 24_000;
+const PROVIDER_WORKER_RECOVER_OPERATION_WAIT_MS = PROVIDER_REFRESH_STUCK_AFTER_MS;
+const PROVIDER_WORKER_RECOVER_OPERATION_TOTAL_WAIT_MS = 90_000;
 const PROVIDER_CLOSE_STUCK_DRAIN_GRACE_MS = 1_000;
 const PROVIDER_FULL_RECOVERY_SWEEP_INTERVAL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 15 * 60 * 1000;
@@ -62,6 +65,16 @@ interface ProviderIssueHandoffOperationState {
   queuedRefresh: Promise<void> | null;
   stuckSignal: Promise<ProviderIssueHandoffRefreshRequestOutcome>;
   resolveStuckSignal: ((outcome: ProviderIssueHandoffRefreshRequestOutcome) => void) | null;
+}
+
+interface ProviderIssueHandoffOperationHealthContext {
+  mode: ControlPollingMode;
+  completeOnSuccess?: boolean;
+}
+
+interface ProviderWorkerRecoverRestartRequiredContext {
+  reason: string;
+  lastError: string;
 }
 
 interface ProviderPollTrackedIssueContext {
@@ -415,22 +428,105 @@ export async function runProviderIssueHandoffRecover(
     action: ProviderIssueRecoveryAction;
   }
 ): Promise<ProviderIssueHandoffRecoveryResult> {
+  const activeWaitStartedAtMs = Date.now();
+  let restartRequiredForRecoverySkip =
+    readProviderWorkerRecoverRestartRequiredContext(providerIssueHandoff);
+  const captureRestartRequiredForRecoverySkip = (fallbackReason: string | null = null): void => {
+    const currentContext = readProviderWorkerRecoverRestartRequiredContext(providerIssueHandoff);
+    if (currentContext) {
+      restartRequiredForRecoverySkip = currentContext;
+      return;
+    }
+    if (!restartRequiredForRecoverySkip && fallbackReason) {
+      restartRequiredForRecoverySkip = {
+        reason: fallbackReason,
+        lastError: fallbackReason
+      };
+    }
+  };
   const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
+  let stuckLifecycleResetForRecovery = false;
+  const resetStuckRefreshLifecycleForRecovery = (): void => {
+    stuckLifecycleResetForRecovery = true;
+    providerIssueHandoff.resetStuckRefreshLifecycle?.();
+  };
   while (state.active || state.queuedRefresh) {
     const stuckOutcome = await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
     if (stuckOutcome) {
+      captureRestartRequiredForRecoverySkip(stuckOutcome.reason ?? null);
       detachProviderIssueHandoffPending(state.active);
       detachProviderIssueHandoffPending(state.queuedRefresh);
       state.active = null;
       state.queuedRefresh = null;
-      providerIssueHandoff.resetStuckRefreshLifecycle?.();
+      resetStuckRefreshLifecycleForRecovery();
       break;
     }
     try {
       await waitForProviderIssueHandoffPendingWithWatchdog(
         providerIssueHandoff,
         state.queuedRefresh ?? state.active!,
-        () => resolveProviderWorkerRecoverWatchdogDelayMs(providerIssueHandoff),
+        () => resolveProviderWorkerRecoverWatchdogDelayMs(
+          providerIssueHandoff,
+          activeWaitStartedAtMs,
+          PROVIDER_WORKER_RECOVER_ACTIVE_WAIT_MS,
+          PROVIDER_WORKER_RECOVER_ACTIVE_TOTAL_WAIT_MS
+        ),
+        { forceStuckOnWatchdog: true }
+      );
+      if (hasProviderWorkerRecoverDeadlineExpired(
+        activeWaitStartedAtMs,
+        PROVIDER_WORKER_RECOVER_ACTIVE_TOTAL_WAIT_MS
+      )) {
+        captureRestartRequiredForRecoverySkip();
+        detachProviderIssueHandoffPending(state.active);
+        detachProviderIssueHandoffPending(state.queuedRefresh);
+        state.active = null;
+        state.queuedRefresh = null;
+        clearProviderIssueHandoffOperationState(providerIssueHandoff, state);
+        resetStuckRefreshLifecycleForRecovery();
+        break;
+      }
+    } catch (error) {
+      const stuckOutcome = await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
+      const stuckReason = resolveProviderIssueHandoffStuckErrorReason(error);
+      if (!stuckOutcome && !stuckReason) {
+        throw error;
+      }
+      captureRestartRequiredForRecoverySkip(stuckOutcome?.reason ?? stuckReason);
+      detachProviderIssueHandoffPending(state.active);
+      detachProviderIssueHandoffPending(state.queuedRefresh);
+      state.active = null;
+      state.queuedRefresh = null;
+      resetStuckRefreshLifecycleForRecovery();
+      break;
+    }
+  }
+  if (restartRequiredForRecoverySkip && !stuckLifecycleResetForRecovery) {
+    resetStuckRefreshLifecycleForRecovery();
+  }
+
+  const recoveryAttemptsStartedAtMs = Date.now();
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const recoveryState = getProviderIssueHandoffOperationState(providerIssueHandoff);
+    let recoveryResult: ProviderIssueHandoffRecoveryResult | null = null;
+    const recoveryOperation = startProviderIssueHandoffOperation(
+      providerIssueHandoff,
+      recoveryState,
+      async () => {
+        recoveryResult = await providerIssueHandoff.recoverIssue(input);
+      },
+      { mode: 'refresh', completeOnSuccess: false }
+    );
+    try {
+      await waitForProviderIssueHandoffPendingWithWatchdog(
+        providerIssueHandoff,
+        recoveryOperation,
+        () => resolveProviderWorkerRecoverWatchdogDelayMs(
+          providerIssueHandoff,
+          recoveryAttemptsStartedAtMs,
+          PROVIDER_WORKER_RECOVER_OPERATION_WAIT_MS,
+          PROVIDER_WORKER_RECOVER_OPERATION_TOTAL_WAIT_MS
+        ),
         { forceStuckOnWatchdog: true }
       );
     } catch (error) {
@@ -439,29 +535,116 @@ export async function runProviderIssueHandoffRecover(
       if (!stuckOutcome && !stuckReason) {
         throw error;
       }
-      detachProviderIssueHandoffPending(state.active);
-      detachProviderIssueHandoffPending(state.queuedRefresh);
-      state.active = null;
-      state.queuedRefresh = null;
+      captureRestartRequiredForRecoverySkip(stuckOutcome?.reason ?? stuckReason);
+      detachProviderIssueHandoffPending(recoveryOperation);
+      if (recoveryState.active === recoveryOperation) {
+        recoveryState.active = null;
+      }
+      clearProviderIssueHandoffOperationState(providerIssueHandoff, recoveryState);
       providerIssueHandoff.resetStuckRefreshLifecycle?.();
-      break;
+      if (attempt === 0) {
+        continue;
+      }
+      const finalReason = stuckOutcome?.reason ?? stuckReason ?? 'provider_refresh_lifecycle_stuck';
+      markProviderWorkerRecoverLifecycleFailure(providerIssueHandoff, finalReason);
+      throw new Error(finalReason);
     }
+    const completedRecoveryResult = recoveryResult as ProviderIssueHandoffRecoveryResult | null;
+    if (completedRecoveryResult) {
+      if (completedRecoveryResult.kind === 'skipped') {
+        markProviderWorkerRecoverSkipped(
+          providerIssueHandoff,
+          completedRecoveryResult.reason,
+          restartRequiredForRecoverySkip
+        );
+      } else {
+        markProviderPollingCompleted(providerIssueHandoff);
+      }
+      return completedRecoveryResult;
+    }
+    const stuckOutcome = await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
+    if (!stuckOutcome && hasProviderWorkerRecoverDeadlineExpired(
+      recoveryAttemptsStartedAtMs,
+      PROVIDER_WORKER_RECOVER_OPERATION_TOTAL_WAIT_MS
+    )) {
+      captureRestartRequiredForRecoverySkip();
+      detachProviderIssueHandoffPending(recoveryOperation);
+      if (recoveryState.active === recoveryOperation) {
+        recoveryState.active = null;
+      }
+      clearProviderIssueHandoffOperationState(providerIssueHandoff, recoveryState);
+      providerIssueHandoff.resetStuckRefreshLifecycle?.();
+      if (attempt === 0) {
+        continue;
+      }
+      markProviderWorkerRecoverLifecycleFailure(
+        providerIssueHandoff,
+        'provider_refresh_lifecycle_stuck'
+      );
+      throw new Error('provider_worker_recover_timeout');
+    }
+    if (!stuckOutcome) {
+      throw new Error('provider_issue_recover_result_missing');
+    }
+    captureRestartRequiredForRecoverySkip(stuckOutcome.reason ?? null);
+    detachProviderIssueHandoffPending(recoveryOperation);
+    if (recoveryState.active === recoveryOperation) {
+      recoveryState.active = null;
+    }
+    clearProviderIssueHandoffOperationState(providerIssueHandoff, recoveryState);
+    providerIssueHandoff.resetStuckRefreshLifecycle?.();
+    if (attempt === 0) {
+      continue;
+    }
+    markProviderWorkerRecoverLifecycleFailure(
+      providerIssueHandoff,
+      stuckOutcome.reason ?? 'provider_refresh_lifecycle_stuck'
+    );
+    throw new Error(stuckOutcome.reason ?? 'provider_worker_recover_timeout');
   }
+  throw new Error('provider_worker_recover_timeout');
+}
 
-  const recoveryState = getProviderIssueHandoffOperationState(providerIssueHandoff);
-  let recoveryResult: ProviderIssueHandoffRecoveryResult | null = null;
-  const recoveryOperation = startProviderIssueHandoffOperation(
-    providerIssueHandoff,
-    recoveryState,
-    async () => {
-      recoveryResult = await providerIssueHandoff.recoverIssue(input);
-    }
-  );
-  await waitForProviderIssueHandoffPending(providerIssueHandoff, recoveryOperation);
-  if (!recoveryResult) {
-    throw new Error('provider_issue_recover_result_missing');
+function markProviderWorkerRecoverLifecycleFailure(
+  providerIssueHandoff: ProviderIssueHandoffService,
+  reason: string
+): void {
+  const error = new Error(reason);
+  error.name =
+    reason === 'provider_poll_lifecycle_stuck'
+      ? 'ProviderPollLifecycleStuckError'
+      : 'ProviderRefreshLifecycleStuckError';
+  markProviderPollingCompleted(providerIssueHandoff, { error });
+}
+
+function markProviderWorkerRecoverSkipped(
+  providerIssueHandoff: ProviderIssueHandoffService,
+  skipReason: string,
+  restartRequiredBeforeRecovery: ProviderWorkerRecoverRestartRequiredContext | null
+): void {
+  if (!restartRequiredBeforeRecovery) {
+    markProviderPollingCompleted(providerIssueHandoff, { error: new Error(skipReason) });
+    return;
   }
-  return recoveryResult;
+  const error = new Error(restartRequiredBeforeRecovery.lastError);
+  error.name =
+    restartRequiredBeforeRecovery.reason === 'provider_poll_lifecycle_stuck'
+      ? 'ProviderPollLifecycleStuckError'
+      : 'ProviderRefreshLifecycleStuckError';
+  markProviderPollingCompleted(providerIssueHandoff, { error });
+}
+
+function readProviderWorkerRecoverRestartRequiredContext(
+  providerIssueHandoff: ProviderIssueHandoffService
+): ProviderWorkerRecoverRestartRequiredContext | null {
+  const health = readProviderPollingHealth(providerIssueHandoff);
+  if (health?.restart_required !== true) {
+    return null;
+  }
+  return {
+    reason: health.reason ?? 'provider_refresh_lifecycle_stuck',
+    lastError: health.last_error ?? health.reason ?? 'provider_refresh_lifecycle_stuck'
+  };
 }
 
 export function runProviderIssueHandoffRehydrate(
@@ -669,12 +852,23 @@ function resolveProviderIssueHandoffWatchdogDelayMs(
 }
 
 function resolveProviderWorkerRecoverWatchdogDelayMs(
-  providerIssueHandoff: ProviderIssueHandoffService
+  providerIssueHandoff: ProviderIssueHandoffService,
+  recoveryStartedAtMs: number,
+  maxWaitMs: number,
+  totalWaitMs: number
 ): number {
   return Math.min(
-    PROVIDER_WORKER_RECOVER_ACTIVE_WAIT_MS,
-    resolveProviderIssueHandoffWatchdogDelayMs(providerIssueHandoff)
+    maxWaitMs,
+    resolveProviderIssueHandoffWatchdogDelayMs(providerIssueHandoff),
+    Math.max(0, totalWaitMs - (Date.now() - recoveryStartedAtMs))
   );
+}
+
+function hasProviderWorkerRecoverDeadlineExpired(
+  recoveryStartedAtMs: number,
+  totalWaitMs: number
+): boolean {
+  return Date.now() - recoveryStartedAtMs >= totalWaitMs;
 }
 
 async function resolveProviderPollTrackedIssues(
@@ -748,7 +942,7 @@ function runProviderIssueHandoffOperation(
   providerIssueHandoff: ProviderIssueHandoffService,
   operation: () => Promise<void>,
   options?: { queueIfBusy?: boolean },
-  healthContext?: { mode: ControlPollingMode }
+  healthContext?: ProviderIssueHandoffOperationHealthContext
 ): Promise<void> {
   const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
   if (state.active) {
@@ -810,7 +1004,7 @@ function startProviderIssueHandoffOperation(
   providerIssueHandoff: ProviderIssueHandoffService,
   state: ProviderIssueHandoffOperationState,
   operation: () => Promise<void>,
-  healthContext?: { mode: ControlPollingMode }
+  healthContext?: ProviderIssueHandoffOperationHealthContext
 ): Promise<void> {
   resetProviderIssueHandoffStuckSignal(state);
   if (healthContext) {
@@ -827,7 +1021,11 @@ function startProviderIssueHandoffOperation(
   const operationPromise = operationResult
     .then(
       (value) => {
-        if (healthContext && state.active === operationPromise) {
+        if (
+          healthContext &&
+          healthContext.completeOnSuccess !== false &&
+          state.active === operationPromise
+        ) {
           markProviderPollingCompleted(providerIssueHandoff);
         }
         return value;
@@ -855,7 +1053,7 @@ function queueProviderIssueHandoffRefresh(
   providerIssueHandoff: ProviderIssueHandoffService,
   state: ProviderIssueHandoffOperationState,
   operation: () => Promise<void>,
-  healthContext?: { mode: ControlPollingMode }
+  healthContext?: ProviderIssueHandoffOperationHealthContext
 ): Promise<void> {
   if (state.queuedRefresh) {
     return state.queuedRefresh;
@@ -1003,7 +1201,11 @@ function clearProviderIssueHandoffOperationState(
   providerIssueHandoff: ProviderIssueHandoffService,
   state: ProviderIssueHandoffOperationState
 ): void {
-  if (!state.active && !state.queuedRefresh) {
+  if (
+    providerIssueHandoffOperations.get(providerIssueHandoff) === state &&
+    !state.active &&
+    !state.queuedRefresh
+  ) {
     providerIssueHandoffOperations.delete(providerIssueHandoff);
   }
 }

@@ -3610,6 +3610,10 @@ export function createProviderIssueHandoffService(
       const taskId = buildProviderFallbackTaskId(input.trackedIssue);
       const mappingSource: ProviderTaskMappingSource = 'provider_id_fallback';
       const existing = readProviderIntakeClaim(options.state, providerKey);
+      const explicitProviderWorkerRecovery = isExplicitProviderWorkerRecovery({
+        event: input.event,
+        action: input.action
+      });
       const claimBase = {
         provider: 'linear' as const,
         provider_key: providerKey,
@@ -4075,7 +4079,13 @@ export function createProviderIssueHandoffService(
         return { kind: 'ignored', reason: 'provider_issue_run_already_active', claim };
       }
 
-      if (latestExisting && (latestExisting.state === 'starting' || latestExisting.state === 'resuming')) {
+      const latestExistingManifestlessHandoff =
+        latestExisting ? isProviderManifestlessHandoffClaim(latestExisting) : false;
+      if (
+        latestExisting &&
+        (latestExisting.state === 'starting' || latestExisting.state === 'resuming') &&
+        !(explicitProviderWorkerRecovery && latestExistingManifestlessHandoff)
+      ) {
         const claim = await upsertProviderClaimAndPersist({
           ...latestClaimBase,
           task_id: latestExisting.task_id,
@@ -4282,6 +4292,8 @@ export function createProviderIssueHandoffService(
             startPipelineId
           );
           const lockedExisting = readProviderIntakeClaim(options.state, providerKey);
+          const lockedExistingManifestlessHandoff =
+            lockedExisting ? isProviderManifestlessHandoffClaim(lockedExisting) : false;
           const lockedLatestClaimBase = {
             ...claimBase,
             accepted_at: lockedExisting?.accepted_at ?? claimBase.accepted_at
@@ -4365,7 +4377,11 @@ export function createProviderIssueHandoffService(
             };
           }
 
-          if (lockedExisting && (lockedExisting.state === 'starting' || lockedExisting.state === 'resuming')) {
+          if (
+            lockedExisting &&
+            (lockedExisting.state === 'starting' || lockedExisting.state === 'resuming') &&
+            !(explicitProviderWorkerRecovery && lockedExistingManifestlessHandoff)
+          ) {
             const claim = await upsertProviderClaimAndPersist({
               ...lockedLatestClaimBase,
               task_id: lockedExisting.task_id,
@@ -4385,7 +4401,12 @@ export function createProviderIssueHandoffService(
 
           const admissionGate = await createProviderAdmissionGate({
             excludeClaimProviderKey:
-              lockedExisting?.retry_queued === true || lockedExisting?.state === 'resumable'
+              lockedExisting &&
+              (
+                lockedExisting.retry_queued === true ||
+                lockedExisting.state === 'resumable' ||
+                (explicitProviderWorkerRecovery && lockedExistingManifestlessHandoff)
+              )
                 ? lockedExisting.provider_key
                 : null
           });
@@ -6558,8 +6579,26 @@ function resolveExplicitCompletedDuplicateRecoveryFreshness(input: {
   });
 }
 
+function isExplicitProviderWorkerRecovery(input: {
+  event: string | null;
+  action: string | null;
+}): boolean {
+  return input.event === 'control_host_provider_worker_recover' &&
+    isProviderIssueRecoveryAction(input.action);
+}
+
 function isProviderIssueRecoveryAction(value: string | null): value is ProviderIssueRecoveryAction {
   return value === 'recover' || value === 'relaunch' || value === 'nudge';
+}
+
+function isProviderManifestlessHandoffClaim(
+  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'run_id' | 'run_manifest_path'>
+): boolean {
+  return (
+    (claim.state === 'starting' || claim.state === 'resuming') &&
+    normalizeOptionalString(claim.run_id) === null &&
+    normalizeOptionalString(claim.run_manifest_path) === null
+  );
 }
 
 function selectMostRecentTrackedIssueUpdatedAt(
