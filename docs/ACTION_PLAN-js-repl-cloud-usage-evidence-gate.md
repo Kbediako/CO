@@ -4,6 +4,15 @@
 - Historical packet only. Codex CLI 0.128.0 removed `js_repl`, so this action plan is not a current execution plan or validation checklist.
 - Keep this file for audit context; do not run the steps below as current `js_repl` adoption, feature-gate, or cloud guidance work.
 
+## CO-382 Fallback Metadata
+- Large-refactor check: no large refactor is required because CO-452 removes the stale `js_repl` active posture instead of adding another compatibility layer.
+- Minor-seam check: the bounded minor-seam removal is acceptable because generic cloud feature pass-through remains intact while only removed-feature guidance and canary affordances are retired.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `js_repl` active posture guidance | default-on, break-glass, and cloud feature-contract guidance for a removed feature | remove fallback | CO-452 | Codex CLI `0.128.0` removed `js_repl` | 2026-03-03 | 2026-05-01 | immediate removal | current-facing docs no longer recommend `js_repl` enable/disable or cloud feature toggles | `rg`, docs checks, focused cloud feature tests |
+| scripts/js-repl-usage-matrix.mjs | active canary matrix for a removed feature | remove fallback | CO-452 | Codex CLI `0.128.0` removed `js_repl` | 2026-03-02 | 2026-05-01 | immediate removal | package script and source checkout no longer expose the `js_repl` canary as current guidance | package script audit and focused cloud feature tests |
+
 ## Summary
 - Historical goal: produce decision-grade evidence for `js_repl` usage guidance via broad dummy-repo local+cloud simulations, then update global guidance docs.
 - Historical scope: docs-first scaffolding, delegated discovery streams, minimal automation, matrix execution, and synchronized checklists/index/docs.

@@ -24,17 +24,27 @@
 - [x] Active `js_repl` canary script/package affordance is removed or clearly retired. Evidence: `package.json` removes `canary:js-repl-usage`; scripts/js-repl-usage-matrix.mjs is deleted.
 - [x] Historical evidence-gate packet is labeled history-only by the accepted child lane patch. Evidence: child patch from `.runs/linear-d412792b-9a2a-43d9-96dc-ca021e728d09-archive-js-repl-packet/cli/2026-04-30T23-39-24-326Z-1a3ae7d1/provider-linear-child-lane.patch` was manually imported after helper accept failed on Linear `updated_at` drift.
 
+## CO-382 Fallback Metadata
+- Large-refactor check: no large refactor is required because CO-452 removes the stale `js_repl` active posture instead of adding another compatibility layer.
+- Minor-seam check: the bounded minor-seam removal is acceptable because generic cloud feature pass-through remains intact while only removed-feature guidance and canary affordances are retired.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `js_repl` active posture guidance | default-on, break-glass, and cloud feature-contract guidance for a removed feature | remove fallback | CO-452 | Codex CLI `0.128.0` removed `js_repl` | 2026-03-03 | 2026-05-01 | immediate removal | current-facing docs no longer recommend `js_repl` enable/disable or cloud feature toggles | `rg`, docs checks, focused cloud feature tests |
+| scripts/js-repl-usage-matrix.mjs | active canary matrix for a removed feature | remove fallback | CO-452 | Codex CLI `0.128.0` removed `js_repl` | 2026-03-02 | 2026-05-01 | immediate removal | package script and source checkout no longer expose the `js_repl` canary as current guidance | package script audit and focused cloud feature tests |
+
 ## Validation
 - [x] Focused `CodexCloudTaskExecutor` / `OrchestratorCloudTargetExecutor` tests. Evidence: `npm run test:core -- orchestrator/tests/CodexCloudTaskExecutor.test.ts orchestrator/tests/OrchestratorCloudTargetExecutor.test.ts` passed.
 - [x] `node scripts/delegation-guard.mjs`. Evidence: command passed with existing same-issue child evidence.
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: command passed.
 - [x] `npm run build`. Evidence: command passed.
 - [x] `npm run lint`. Evidence: command passed with existing `DelegationMcpHealth.test.ts` warnings only.
-- [x] `npm run test`. Evidence: rerun passed 357 files / 5,180 tests after a first full-suite timing timeout was classified by an isolated `tests/spec-guard.spec.ts` pass.
+- [x] `npm run test`. Evidence: rerun passed 357 files / 5,180 tests after first-run timing failures in `CliExecRuntime` and `ControlRuntime` were isolated as passing individually.
 - [x] `npm run docs:check`. Evidence: command passed after tightening `0.128.0` wording so it does not conflict with the separate CO version policy and removing deleted-script backtick path references.
-- [ ] `npm run docs:freshness`. Evidence: blocked by unrelated docs freshness owner debt; current branch reports 30 stale docs plus 33 rolling rows under `CO-444`, and `docs:freshness:maintain -- --format json` returns `block_diff_local` for March 31 candidate cohorts. Clean `origin/main` worktree `/Users/kbediako/Code/CO/.workspaces/co452-main-baseline` at `2fa556a95` reproduces the same blocker. Related canonical-owner follow-up: `CO-454`.
-- [ ] `npm run repo:stewardship`. Evidence: pending.
-- [ ] `node scripts/diff-budget.mjs`. Evidence: pending.
+- [x] `npm run docs:freshness`. Evidence: command passed after related CO-454 resolved the earlier March 31 candidate-cohort blocker; rolling CO-444 rows remain report-only with no stale failure.
+- [x] `npm run repo:stewardship`. Evidence: command passed with 6,173 tracked files and 0 action-required.
+- [x] `node scripts/diff-budget.mjs`. Evidence: command passed for the working tree, 7 files / 59 lines.
+- [x] `npm run pack:smoke`. Evidence: command passed; downstream review smoke completed with clean success.
 - [ ] Manifest-backed standalone review and explicit elegance review. Evidence: pending.
 - [ ] PR checks, actionable feedback sweep, and ready-review drain. Evidence: pending.
 
@@ -44,6 +54,7 @@
 - 2026-05-01: Docs-review child stream succeeded before implementation. Evidence: `.runs/linear-d412792b-9a2a-43d9-96dc-ca021e728d09-docs-review/cli/2026-04-30T23-45-07-409Z-1e813802/manifest.json`.
 - 2026-05-01: Child lane `archive-js-repl-packet` succeeded and produced a clean three-file patch; helper accept failed after Linear `updated_at` drift, so parent imported the already checked patch manually.
 - 2026-05-01: Parent validation reached `docs:freshness` / `docs:freshness:maintain` and found an unrelated canonical docs freshness blocker: `block_diff_local` on March 31 candidate cohorts owned by live same-project `CO-444`. A clean `origin/main` worktree reproduced the same result, so parent created related follow-up `CO-454` with canonical owner key `docs:freshness:maintain` and should block CO-452 rather than widen into stale packet/mirror debt.
+- 2026-05-01: After CO-454 landed upstream, parent merged `origin/main`, reran required gates, and confirmed `docs:freshness`, `repo:stewardship`, diff-budget, full tests, and pack smoke are clean. Remaining work is standalone review, elegance review, PR lifecycle, and Linear review handoff.
 
 ## Relevant Files
 - `docs/PRD-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md`

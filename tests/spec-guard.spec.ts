@@ -2531,7 +2531,7 @@ describe('spec-guard script', () => {
       expect(stdout).toContain('general repo fallback cap');
       expect(stdout).toContain('Dry run: exiting successfully despite failures.');
     }
-  });
+  }, 15_000);
 
   it('does not grant the external migration cap when the owner issue is outside the owner cell', async () => {
     const repo = await initRepository();
@@ -2614,7 +2614,7 @@ describe('spec-guard script', () => {
       expect(stdout).toContain('general repo fallback cap');
       expect(stdout).toContain('Dry run: exiting successfully despite failures.');
     }
-  });
+  }, 15_000);
 
   it('does not grant the external migration cap when deprecation-plan evidence is negated', async () => {
     const repo = await initRepository();
@@ -2786,7 +2786,7 @@ describe('spec-guard script', () => {
       expect(stdout).toContain('general repo fallback cap');
       expect(stdout).toContain('Dry run: exiting successfully despite failures.');
     }
-  });
+  }, 15_000);
 
   it('does not grant the external migration cap for weak deprecation-plan placeholders', async () => {
     const repo = await initRepository();

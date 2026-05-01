@@ -11,7 +11,13 @@
 - Pre-implementation issue-quality review: 2026-05-01 parent review confirms the lane must cover docs plus code/test surfaces and must not broaden into adjacent release-intake issues.
 - Fallback / refactor decision: this lane removes stale default-on and break-glass guidance for a removed feature; it does not introduce or retain a fallback seam.
 - Durable retention evidence: not applicable because the stale `js_repl` active posture is removed, while old evidence docs are retained only as history.
-- Large-refactor check: not required; this is a narrow stale-posture removal.
+- Large-refactor check: no large refactor is required because CO-452 removes the stale `js_repl` active posture instead of adding another compatibility layer.
+- Minor-seam check: the bounded minor-seam removal is acceptable because generic cloud feature pass-through remains intact while only removed-feature guidance and canary affordances are retired.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `js_repl` active posture guidance | default-on, break-glass, and cloud feature-contract guidance for a removed feature | remove fallback | CO-452 | Codex CLI `0.128.0` removed `js_repl` | 2026-03-03 | 2026-05-01 | immediate removal | current-facing docs no longer recommend `js_repl` enable/disable or cloud feature toggles | `rg`, docs checks, focused cloud feature tests |
+| scripts/js-repl-usage-matrix.mjs | active canary matrix for a removed feature | remove fallback | CO-452 | Codex CLI `0.128.0` removed `js_repl` | 2026-03-02 | 2026-05-01 | immediate removal | package script and source checkout no longer expose the `js_repl` canary as current guidance | package script audit and focused cloud feature tests |
 
 ## Milestones & Sequencing
 1. Create and register the CO-452 docs-first packet.
