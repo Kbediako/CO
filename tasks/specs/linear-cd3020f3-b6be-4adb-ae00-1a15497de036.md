@@ -1,10 +1,10 @@
 ---
 id: 20260331-linear-cd3020f3-b6be-4adb-ae00-1a15497de036
 title: CO: Make CO STATUS inspectable in smaller terminals and easy to launch
-status: in_progress
+status: done
 owner: Codex
 created: 2026-03-31
-last_review: 2026-03-31
+last_review: 2026-05-01
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-cd3020f3-b6be-4adb-ae00-1a15497de036.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-cd3020f3-b6be-4adb-ae00-1a15497de03
 related_tasks:
   - tasks/tasks-linear-cd3020f3-b6be-4adb-ae00-1a15497de036.md
 review_notes:
+  - 2026-05-01: CO-454 live Linear audit confirmed CO-55 is `Done`; this completed-lane spec is reclassified to inactive `done` under canonical owner key `spec-guard:active-specs:last_review=2026-03-31` so historical implementation evidence remains preserved without staying in active-spec freshness. Evidence: `codex-orchestrator linear issue-context --issue-id cd3020f3-b6be-4adb-ae00-1a15497de036 --format json`.
   - 2026-03-31: Opened from Linear issue `CO-55` in the provider-worker workspace using the issue id `cd3020f3-b6be-4adb-ae00-1a15497de036`.
   - 2026-03-31: Live `linear issue-context` confirmed the CO workflow states (`Ready`, `In Progress`, `In Review`, `Merging`, `Rework`), showed no attached PR and no existing workpad, and the issue was transitioned from `Ready` to `In Progress` before active coding.
   - 2026-03-31: The workspace started detached at `64bcb2464`; a task branch `linear/co-55-status-inspectable-launch` was created before repo edits.

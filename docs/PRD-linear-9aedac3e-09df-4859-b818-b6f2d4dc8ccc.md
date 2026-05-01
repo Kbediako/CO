@@ -31,7 +31,7 @@
 
 ## Summary
 - Problem Statement: CO-452 reproduced `docs:freshness:maintain` returning `block_diff_local` on clean `origin/main`, so the blocker is not owned by the CO-452 js_repl posture diff. The live follow-up is CO-454, which must carry traceability for the March 31 docs freshness candidate cohorts under `co-429-completed-lane-registry-residue`.
-- Desired Outcome: create the CO-454 docs-first packet and registry mirrors so autopilot no longer blocks `Backlog -> Ready` on `backlog_head_follow_up_traceability_pending`, while preserving that the actual March 31 cohort repair and fresh validator proof remain parent-owned work.
+- Desired Outcome: create the CO-454 docs-first packet and registry mirrors so autopilot no longer blocks `Backlog -> Ready` on `backlog_head_follow_up_traceability_pending`, then reclassify the completed March 31 source-issue packet families with live Linear review evidence and fresh validator proof.
 
 ## User Request Translation
 - User intent / needs:
@@ -39,12 +39,14 @@
   - preserve source lineage from CO-452 into CO-454
   - preserve `docs:freshness:maintain` and canonical owner marker `codex-orchestrator:canonical-owner-key=docs:freshness:maintain`
   - preserve the exact blocker shape: March 31 docs freshness candidate cohorts, `block_diff_local`, `co-429-completed-lane-registry-residue`, and `blocking_changed_paths=[]`
-  - make clear that this packet clears traceability gating only, not the underlying freshness or owner-rehome work
+  - make clear that this branch resolves only the reviewed completed-lane March 31 rows, while preserving the separate CO-444 rolling cohort and owner-rehome boundaries
 - Success criteria / acceptance:
   - all six packet files exist for `linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc`
   - `tasks/index.json` registers `20260501-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc`
   - `docs/TASKS.md` includes a CO-454 traceability snapshot
   - `docs/docs-freshness-registry.json` covers the six packet files with `last_review=2026-05-01`
+  - the completed CO-54, CO-45, CO-52, CO-55, and CO-56 packet families are archived with `last_review=2026-05-01` after live Linear review
+  - `spec-guard`, `docs:freshness`, and `docs:freshness:maintain -- --format json` pass for this diff
   - protected terms are visible across packet/checklist surfaces
 - Constraints / non-goals:
   - do not change CO-452 js_repl posture docs or tests
@@ -69,7 +71,7 @@
   - `backlog_head_follow_up_traceability_pending`
 - Nearby wrong interpretations to reject:
   - treating the CO-452 js_repl posture diff as owner of March 31 stale packet/mirror debt
-  - clearing the traceability packet and then claiming `block_diff_local` is fixed without fresh validator evidence
+  - clearing the traceability packet and then claiming `block_diff_local` is fixed without live source-issue review and fresh validator evidence
   - weakening docs freshness checks or deleting registry rows
   - broadening into general Codex CLI `0.128.0` release intake
   - re-homing canonical owner metadata without a fresh `docs:freshness:maintain -- --format json` proof
@@ -79,8 +81,8 @@
 | Surface | Current Truth | Reference Truth | Target Truth | Explicitly Out Of Scope |
 | --- | --- | --- | --- | --- |
 | Backlog traceability | CO-454 includes Immediate Traceability in Linear but no repo packet or registry mirrors. | Helper-created follow-ups must create six packet files and mirror them into task and freshness registries before leaving Backlog. | Repo contains the CO-454 packet plus `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` mirrors. | Linear transition, provider launch, workpad, PR review lifecycle. |
-| Freshness blocker | CO-452 and clean `origin/main` reproduced `block_diff_local` under `co-429-completed-lane-registry-residue`. | The blocker belongs to canonical owner key `docs:freshness:maintain`, not the CO-452 js_repl posture lane. | Packet preserves the exact blocker and routes parent work to CO-454. | Actual row refresh/archive/reclassification or validator green claim. |
-| March 31 candidate cohorts | Candidate paths include `.agent/task`, `docs/ACTION_PLAN-*`, `docs/PRD-*`, `docs/TECH_SPEC-*`, `tasks/specs`, and `tasks/tasks-*`. | March 31 docs freshness candidate cohorts need explicit review rationale and preserved historical content. | Packet names the route, sample families, and non-goals so later work can resolve them intentionally. | Blind `last_review` bumps, row deletion, or policy weakening. |
+| Freshness blocker | CO-452 and clean `origin/main` reproduced `block_diff_local` under `co-429-completed-lane-registry-residue`. | The blocker belongs to canonical owner key `docs:freshness:maintain`, not the CO-452 js_repl posture lane. | CO-454 archives the completed-lane March 31 packet families after live Linear review and fresh validator proof. | CO-444 rolling cohort re-home or release-intake work. |
+| March 31 candidate cohorts | Candidate paths include `.agent/task`, `docs/ACTION_PLAN-*`, `docs/PRD-*`, `docs/TECH_SPEC-*`, `tasks/specs`, and `tasks/tasks-*`. | March 31 docs freshness candidate cohorts need explicit review rationale and preserved historical content. | CO-54, CO-45, CO-52, CO-55, and CO-56 rows remain on disk as archived historical packet records with `last_review=2026-05-01`. | Blind `last_review` bumps, row deletion, or policy weakening. |
 | Canonical owner evidence | Current validator evidence names `owner_issue=CO-444`, `blocking_changed_paths=[]`, and action-required routes. | Owner evidence must remain machine-readable and current. | Packet says owner re-home or owner action is not complete without fresh validator evidence. | Claiming live owner repair is complete from this packet alone. |
 
 ## Not Done If
@@ -94,13 +96,13 @@
 - Create and register the CO-454 docs-first packet.
 - Clear the repo-side traceability prerequisites that drive `backlog_head_follow_up_traceability_pending`.
 - Preserve CO-452 source lineage and the exact docs freshness route evidence.
-- Keep parent implementation and validation boundaries explicit.
+- Keep the completed-lane repair and separate rolling-owner boundary explicit.
 
 ## Non-Goals
 - No source code, test, validation script, package, Linear state, or GitHub lifecycle changes.
 - No docs freshness policy weakening.
 - No registry row deletion or blind review-date refresh.
-- No claim that `docs:freshness:maintain` now passes for March 31 candidate cohorts.
+- No claim that the separate CO-444 rolling cohort is resolved by this completed-lane repair.
 - No owner re-home claim without a fresh machine-readable validator report.
 
 ## Stakeholders
@@ -115,8 +117,10 @@
   - `docs/TASKS.md` contains the CO-454 snapshot
   - `docs/docs-freshness-registry.json` contains six active packet rows
   - protected-term scan finds the required blocker and owner terms
+  - completed-lane packet rows for CO-54, CO-45, CO-52, CO-55, and CO-56 are archived with current review evidence
+  - `spec-guard`, `docs:freshness`, and `docs:freshness:maintain -- --format json` pass
 - Guardrails:
-  - packet-only diff
+  - docs metadata-only diff
   - no stale-row deletion
   - no docs freshness weakening
   - no owner re-home or green-validator claim without fresh evidence
@@ -128,7 +132,7 @@
 - Removal condition: CO-454 repo packet and mirrors land on the branch consumed by autopilot.
 
 ## Open Questions
-- None for the traceability packet. Parent CO-454 work owns actual March 31 cohort resolution and fresh validator evidence.
+- None for the completed-lane March 31 cohort repair. CO-444 rolling cohort ownership remains separate.
 
 ## Approvals
 - Product: CO-454 Linear issue and current worker prompt

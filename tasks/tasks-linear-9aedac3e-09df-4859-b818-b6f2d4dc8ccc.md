@@ -7,9 +7,9 @@
 
 ## Acceptance
 - [x] The traceability packet and registry mirrors exist so autopilot can clear `backlog_head_follow_up_traceability_pending` after the PR lands.
-- [ ] Parent CO-454 work resolves or intentionally reclassifies the March 31 docs freshness candidate cohorts with fresh validator evidence.
-- [ ] Parent CO-454 work records review rationale before changing `last_review:2026-03-31` rows.
-- [ ] Parent CO-454 work proves any owner action or owner re-home with fresh `docs:freshness:maintain -- --format json` evidence.
+- [x] CO-454 reclassifies the completed March 31 CO-54, CO-45, CO-52, CO-55, and CO-56 packet families with fresh validator evidence.
+- [x] CO-454 records review rationale before changing `last_review:2026-03-31` rows. Evidence: live `linear issue-context` reads for all five source issues confirmed `Done`.
+- [x] CO-454 proves owner action status with fresh `docs:freshness:maintain -- --format json` evidence. Evidence: `pass_with_owned_rolling_debt`, `owner_issue=CO-444`, `blocking_changed_paths=[]`, `required_actions=0`.
 
 ## Not Done If
 - Required packet files or registry mirrors are missing.
@@ -17,6 +17,7 @@
 - The packet weakens `docs:freshness`, `docs:freshness:maintain`, `docs:check`, or `spec-guard`.
 - The packet deletes registry rows or historical task packets.
 - The packet claims March 31 cohort resolution, owner re-home, archive, or row refresh is complete without fresh validator evidence.
+- The packet claims the separate CO-444 rolling cohort is resolved by this completed-lane archive.
 
 ## Validation
 - [x] JSON parse for `tasks/index.json`. Evidence: `node -e "JSON.parse(...tasks/index.json...)"`.
@@ -24,7 +25,9 @@
 - [x] Protected-term scan over packet files and `docs/TASKS.md`. Evidence: fixed-string scan for CO-454, source CO-452, owner marker, March 31 candidate route, and traceability hold terms.
 - [x] `git diff --check`. Evidence: command completed with no output.
 - [x] `npm run docs:check`. Evidence: command completed successfully using a temporary worktree-local `node_modules` symlink that was removed after the run.
-- [ ] Parent implementation and full docs freshness validation after actual cohort decisions.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `Spec guard: OK`.
+- [x] `npm run docs:freshness`. Evidence: `docs:freshness OK - 5040 docs, 5043 registry entries`.
+- [x] `npm run docs:freshness:maintain -- --format json`. Evidence: `pass_with_owned_rolling_debt`, `owner_issue=CO-444`, `blocking_changed_paths=[]`, `required_actions=0`.
 
 ## Notes
-This branch is traceability-only. It creates the packet and mirrors required before Backlog promotion; it does not resolve `block_diff_local` or alter March 31 registry rows.
+This branch remains docs metadata-only. It creates the packet and mirrors required before Backlog promotion and archives the reviewed completed-lane March 31 rows; it does not delete historical packets, weaken docs freshness, or resolve the separate CO-444 rolling cohort.
