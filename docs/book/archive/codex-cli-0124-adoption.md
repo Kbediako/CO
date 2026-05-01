@@ -1,12 +1,12 @@
 # Historical CO-345 Evidence Book: Codex CLI 0.124.0 Adoption Evidence
 
-Scope: archived CO-345 README/book evidence page. This page preserves the CO-341/CO-345 `codex-cli 0.124.0` adoption step against repo evidence and official OpenAI Codex docs. Current posture has since moved: release-facing package/downstream-smoke compatibility and local ChatGPT-auth/appserver posture now use `0.125.0`, while cloud execution remains separately pinned to `0.124.0`. This archive page does not change runtime defaults and is not current posture guidance.
+Scope: archived CO-345 README/book evidence page. This page preserves the CO-341/CO-345 `codex-cli 0.124.0` adoption step against repo evidence and official OpenAI Codex docs. Current posture has since moved: local ChatGPT-auth/appserver posture now uses `0.128.0`, release-facing package/downstream-smoke compatibility intentionally holds on `0.125.0`, and cloud execution remains separately pinned to `0.124.0`. This archive page does not change runtime defaults and is not current posture guidance.
 
 ## Bottom Line
 
 CO adopted Codex CLI `0.124.0` as the repo compatibility target during CO-341/CO-345.
 
-That adoption was intentionally narrow. It promoted `0.124.0` after CO-341 runtime, cloud, pack-smoke, and review evidence while keeping packaged/generated model defaults on portable `gpt-5.4` with `model_reasoning_effort = "xhigh"`. Local ChatGPT-auth `gpt-5.5` / `xhigh` remained a marker-backed local opt-in rather than the generic shipped default. Current local ChatGPT-auth appserver/model posture, package/downstream-smoke `0.125.0` compatibility, and the cloud-only `0.124.0` candidate split now live in `docs/guides/codex-version-policy.md`.
+That adoption was intentionally narrow. It promoted `0.124.0` after CO-341 runtime, cloud, pack-smoke, and review evidence while keeping packaged/generated model defaults on portable `gpt-5.4` with `model_reasoning_effort = "xhigh"`. Local ChatGPT-auth `gpt-5.5` / `xhigh` remained a marker-backed local opt-in rather than the generic shipped default. Current local ChatGPT-auth appserver/model posture on `0.128.0`, package/downstream-smoke `0.125.0` compatibility hold, and the cloud-only `0.124.0` candidate split now live in `docs/guides/codex-version-policy.md`.
 
 ## Evidence Boundary
 
@@ -45,7 +45,7 @@ Relevant docs:
 
 | Surface | Current posture on `main` | Classification |
 | --- | --- | --- |
-| Compatibility target | This page records the previous `0.124.0` target evidence; current local ChatGPT-auth appserver/model posture, package/downstream-smoke `0.125.0` compatibility, and the cloud-only `0.124.0` candidate split live in `docs/guides/codex-version-policy.md`. | Historical evidence |
+| Compatibility target | This page records the previous `0.124.0` target evidence; current local ChatGPT-auth appserver/model posture on `0.128.0`, package/downstream-smoke `0.125.0` compatibility hold, and the cloud-only `0.124.0` candidate split live in `docs/guides/codex-version-policy.md`. | Historical evidence |
 | Packaged/generated model defaults | `gpt-5.4` with `model_reasoning_effort = "xhigh"`. | Adopted, intentionally portable |
 | Local `gpt-5.5` / `xhigh` | Allowed after live access smoke plus `[codex_orchestrator] local_model_opt_in = "gpt-5.5"`. | Adopted as local opt-in |
 | Generic shipped `gpt-5.5` default | Not promoted because bundled/cloud/API portability remains unproven. | Held |

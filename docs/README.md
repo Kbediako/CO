@@ -22,8 +22,8 @@ Codex Orchestrator is the coordination layer that glues together Codex-driven ag
 - Codex CLI sync strategy: `docs/guides/upstream-codex-cli-sync.md`.
 
 ## Current Posture
-- Current CO-local ChatGPT-auth/appserver model posture: `gpt-5.5` / `xhigh` on Codex CLI `0.125.0` when live access smoke passes.
-- Release-facing package/downstream-smoke compatibility targets Codex CLI `0.125.0`; `cloud-canary` remains on the explicit `0.124.0` cloud execution candidate until the CO-352 configured-environment blocker is cleared.
+- Current CO-local ChatGPT-auth/appserver model posture: `gpt-5.5` / `xhigh` on Codex CLI `0.128.0` when live access smoke passes.
+- Release-facing package/downstream-smoke compatibility targets Codex CLI `0.125.0`; `cloud-canary` remains on the explicit `0.124.0` cloud execution candidate until the CO-466 configured-environment blocker is cleared.
 - Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
 - Portable packaged/generated defaults still keep `gpt-5.4` / `xhigh` as fallback values when `gpt-5.5`, API/cloud portability, or downstream/no-network access is not proven.
 - `codex-orchestrator doctor` treats `gpt-5.5` as non-drift when `codex debug models` verifies current model access; additive defaults keep fresh configs on portable fallback values unless `--auth-scope chatgpt` is explicitly requested after live access smoke, and they preserve compatible prior `gpt-5.5` role files without requiring extra marker metadata.

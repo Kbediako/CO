@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp a63e710a06cee08c709ab591542812965a1ed5628e3d363f0de62065a5497d70 -->
+<!-- codex:instruction-stamp c25432dc4923d9d3eac39161d9d602c4107a0037974cf69350939c5d5f3f1964 -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -43,10 +43,10 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Use `codex-orchestrator doctor` as an advisory drift check for Codex defaults (model/reasoning/agent baseline); remediation is additive via `codex-orchestrator codex defaults --yes` for portable fallback defaults or `codex-orchestrator codex defaults --auth-scope chatgpt --yes` after live access smoke, with exact prior CO-managed role baselines auto-migrated to the access-verified current ChatGPT-auth posture while preserving unrelated local customization and the `multi_agent_v2` rule that omits `agents.max_threads`.
 
 ## Codex Version Policy (CO Scope)
-- Current CO-local ChatGPT-auth/appserver model posture is `gpt-5.5` / `xhigh` on Codex CLI `0.125.0` when live access smoke passes; release-facing cloud/downstream pins stay on the explicit promoted candidate recorded in `docs/guides/codex-version-policy.md`.
+- Current CO-local ChatGPT-auth/appserver model posture is `gpt-5.5` / `xhigh` on Codex CLI `0.128.0` when live access smoke passes; release-facing package/downstream-smoke pins intentionally hold at Codex CLI `0.125.0`, and `cloud-canary` intentionally holds at Codex CLI `0.124.0`, as recorded in `docs/guides/codex-version-policy.md`.
 - Current `0.124.0` CO-local posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, live `gpt-5.5` `xhigh` availability, and a post-build runtime-mode canary pass (`20/20` per scenario, `ready_for_default_flip=true`).
-- CO-352 `0.125.0` model-catalog audit adopts `gpt-5.5` / `xhigh` for validated CO-local ChatGPT-auth top-level, delegated, review-wrapper fallback, and appserver/runtime surfaces; required cloud execution still fails with the configured environment id not found, so cloud/release promotion stays blocked by that exact surface blocker.
-- Release-facing downstream-smoke workflows and `cloud-canary` pin the explicit promoted candidate recorded in `docs/guides/codex-version-policy.md`.
+- CO-466 `0.128.0` release-intake adopts the local ChatGPT-auth/appserver CLI command/runtime posture while keeping the CO-352 `gpt-5.5` / `xhigh` model posture; required cloud execution still fails with the configured environment id not found, so cloud/release promotion stays blocked by that exact surface blocker.
+- Release-facing downstream-smoke workflows intentionally pin `@openai/codex@0.125.0`, and `cloud-canary` intentionally pins `@openai/codex@0.124.0` until the required gates in `docs/guides/codex-version-policy.md` pass.
 - Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
 - Portable packaged/generated config still keeps `gpt-5.4` / `xhigh` as the fallback for unavailable `gpt-5.5`, API/cloud portability gaps, or unproven downstream/no-network contexts; use `gpt-5.5` for delegated/review surfaces after live access smoke unless a fresh provider lane validates a Codex-suffixed model variant.
 - Caveat: app-server `model/list` still reports `gpt-5.4` as `isDefault=true`; CO-341 live app-server `model/list` and live `codex exec` show `gpt-5.5` supports `xhigh` for explicit local configuration, and the bundled debug model catalog may lag the live catalog.
