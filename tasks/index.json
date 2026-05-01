@@ -17037,6 +17037,13 @@
             "npm run docs:freshness:maintain -- --format json",
             "npm run docs:check"
           ]
+        },
+        "docs_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-01",
+          "status": "bounded-success",
+          "manifest": ".runs/linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc/cli/2026-05-01T06-07-46-062Z-cbb5e775/manifest.json",
+          "summary": "Manifest-backed pre-handoff review completed with no actionable findings; telemetry recorded bounded-success via command-intent."
         }
       },
       "paths": {
