@@ -1,8 +1,12 @@
 # PRD - JS_REPL + Cloud Usage Evidence Gate (0990)
 
+## Archive Status
+- Historical packet only. As of Codex CLI 0.128.0, `js_repl` has been removed, so this evidence-gate packet is not current `js_repl` usage guidance.
+- Preserve this document as historical context for the prior evidence-gate decision; do not use it to justify enabling, recommending, or feature-gating `js_repl` in current CO guidance.
+
 ## Summary
-- Problem Statement: CO currently has capability-level questions about when `js_repl` should be used, especially in cloud paths; recommendations were approved by the user, but with an explicit requirement to run broad dummy-repo local+cloud simulations before deciding default guidance.
-- Desired Outcome: produce evidence-backed usage guidance for `js_repl` (and related advanced capability notes) from a wide local+cloud simulation matrix, then apply globally relevant docs updates in CO.
+- Problem Statement: At the time this packet was created, CO had capability-level questions about when `js_repl` should be used, especially in cloud paths; recommendations were approved by the user, but with an explicit requirement to run broad dummy-repo local+cloud simulations before deciding default guidance.
+- Desired Outcome: produce evidence-backed usage guidance for `js_repl` (and related advanced capability notes) from a wide local+cloud simulation matrix, then apply globally relevant docs updates in CO. This outcome is now historical because Codex CLI 0.128.0 removed `js_repl`.
 
 ## User Request Translation (Context Anchor)
 - User intent / needs (in your own words): do not finalize `js_repl` guidance until it is tested first; run a wide array of usage-based tests in dummy repos including cloud; then apply approved recommendation updates globally.
@@ -15,23 +19,23 @@
   - Minimal, high-leverage deltas only.
   - Preserve backward-compatible runtime behavior.
 
-## Goals
+## Historical Goals
 - Validate `js_repl`-related capability behavior across local and cloud canary lanes in dummy repos.
 - Capture deterministic evidence for runtime/cloud compatibility assertions and feature-flag propagation.
 - Update global guidance surfaces in-repo (`AGENTS`, guides, README, skills) based on evidence, not assumptions.
 
-## Non-Goals
+## Historical Non-Goals
 - Large architecture refactors.
 - Enabling `js_repl` as default without passing the evidence gate.
 
-## Metrics & Guardrails
+## Metrics & Historical Guardrails
 - Primary success metric: matrix pass rates at or above thresholds for required lanes with explicit artifacts and summaries.
 - Guardrails:
   - `executionMode` and `runtimeMode` semantics remain orthogonal and documented.
   - Unsupported combos (notably cloud + appserver) remain fail-fast.
-  - `js_repl` stays policy-deferred until matrix evidence is complete.
+  - Historical status: `js_repl` was policy-deferred for this packet and is now removed in Codex CLI 0.128.0.
 
-## Approvals
+## Historical Approvals
 - Product: User approved recommendation set with testing-first condition on 2026-03-02.
-- Engineering: Pending completion of matrix + docs updates.
+- Engineering: Was pending completion of matrix + docs updates while this packet was active.
 - Design: N/A.

@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp d557b53b3e4fa59efc6ca6089847a4128e1a993fd091a37b64e11d4bbbaa9f95 -->
+<!-- codex:instruction-stamp 0bad51740d09baac411b93cee5044df2f1f49f99fd71cb2a9d85d4fbceb9c5ca -->
 # Codex-Orchestrator Agent Handbook (Template)
 
 Use this repository as the wrapper that coordinates multiple Codex-driven projects. After cloning, replace placeholder metadata (task IDs, documents, SOPs) with values for each downstream initiative while keeping these shared guardrails in place.
@@ -12,7 +12,7 @@ Use this repository as the wrapper that coordinates multiple Codex-driven projec
 - Keep mode semantics explicit and orthogonal: `executionMode=mcp|cloud` and `runtimeMode=cli|appserver` are separate controls.
 - Local default runtime remains `appserver` (ChatGPT login-first / app-server path), with `--runtime-mode cli` preserved as break-glass.
 - `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and must fail fast with actionable errors.
-- Feature posture: `js_repl` is enabled by default globally (local + cloud lanes). For deterministic cloud contracts, pin explicit task-scoped feature lanes (`CODEX_CLOUD_ENABLE_FEATURES=js_repl` and separate `CODEX_CLOUD_DISABLE_FEATURES=js_repl` runs) and record manifest-backed evidence in checklist mirrors. Use `CODEX_CLOUD_DISABLE_FEATURES=js_repl` for task-scoped cloud break-glass; reserve `codex features disable js_repl` for global emergency toggles and re-enable afterward with `codex features enable js_repl`. Keep `memories` scoped to explicit eval lanes (legacy alias `memory_tool` remains compatibility-only).
+- Feature posture: upstream `rust-v0.128.0` removed `js_repl` and `js_repl_tools_only`; do not set `CODEX_CLOUD_ENABLE_FEATURES=js_repl`, `CODEX_CLOUD_DISABLE_FEATURES=js_repl`, or run `codex features enable/disable js_repl`. Use `CODEX_CLOUD_ENABLE_FEATURES` / `CODEX_CLOUD_DISABLE_FEATURES` only for active non-removed feature names after checking `codex features list`. Keep `memories` scoped to explicit eval lanes (legacy alias `memory_tool` remains compatibility-only).
 - Keep the safe approval profile (`read/edit/run/network`). Capture any escalation in `.runs/<task>/<timestamp>/manifest.json` under `approvals`.
 - Run `node scripts/delegation-guard.mjs` before requesting review; if delegation is not possible, set `DELEGATION_GUARD_OVERRIDE_REASON` and record the rationale in the task checklist.
 - Run `node scripts/spec-guard.mjs --dry-run` before requesting review. The guard fails when tracked implementation paths change without a spec update (`tasks/specs/**`, `docs/design/specs/**`, or `tasks/index.json`) or when any spec file in those directories has `last_review` older than 30 days.

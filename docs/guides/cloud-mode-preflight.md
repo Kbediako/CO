@@ -22,14 +22,14 @@ Runtime compatibility:
   selection or fails fast with equivalent metadata. See
   `docs/guides/fallback-expiry-and-refactor-policy.md` before changing the contract.
 - Cloud lanes should request `--runtime-mode cli` explicitly when deterministic contract testing is required.
-- `js_repl` is enabled by default globally; for cloud edge-case testing, set explicit feature toggles (`CODEX_CLOUD_ENABLE_FEATURES=js_repl` or `CODEX_CLOUD_DISABLE_FEATURES=js_repl`) instead of relying on implicit defaults.
-- Keep enabled/disabled lanes separate (do not set the same feature in both lists for one run).
-- `codex features disable js_repl` updates persistent config; use it only for global emergency toggles and re-enable with `codex features enable js_repl` after triage.
+- Codex CLI `0.128.0` removed `js_repl` and `js_repl_tools_only`; do not set `CODEX_CLOUD_ENABLE_FEATURES=js_repl`, `CODEX_CLOUD_DISABLE_FEATURES=js_repl`, or run `codex features enable/disable js_repl`.
+- Keep enabled/disabled lanes separate for active non-removed features only (do not set the same feature in both lists for one run).
+- Check `codex features list` in version-audit lanes before naming feature flags in cloud contracts.
 
 Typical wiring:
 - `CODEX_CLOUD_ENV_ID`: required for cloud execution
 - `CODEX_CLOUD_BRANCH`: optional, must exist on `origin` (remote)
-- `CODEX_CLOUD_ENABLE_FEATURES` / `CODEX_CLOUD_DISABLE_FEATURES`: optional, use for explicit cloud feature-contract lanes
+- `CODEX_CLOUD_ENABLE_FEATURES` / `CODEX_CLOUD_DISABLE_FEATURES`: optional, use only for explicit cloud feature-contract lanes whose feature names are active in the target Codex CLI
 
 Example:
 ```bash

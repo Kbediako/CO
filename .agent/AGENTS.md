@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 8fd058ecd1c40213b588e1bf03b4fd53d96ed16b7f6c3d017948f0b861ef6dcb -->
+<!-- codex:instruction-stamp 7b9386cbe42ed63734eb1cb0cd2958233133c769f17d487be899555e64f33ab3 -->
 # Agent Enablement
 
 Task-specific project blocks were removed from this file in `CO-88`. Keep repo-wide guidance here and use `.agent/task/**` for active task-scoped instructions.
@@ -19,7 +19,7 @@ Task-specific project blocks were removed from this file in `CO-88`. Keep repo-w
 - Keep mode semantics explicit and orthogonal: `executionMode=mcp|cloud` and `runtimeMode=cli|appserver` are separate controls.
 - Local default runtime remains `appserver`, with `--runtime-mode cli` preserved as break-glass.
 - `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and must fail fast with actionable errors.
-- `js_repl` is enabled by default globally (local + cloud lanes); for deterministic cloud contracts, use explicit feature lanes (`CODEX_CLOUD_ENABLE_FEATURES=js_repl` and separate `CODEX_CLOUD_DISABLE_FEATURES=js_repl` runs).
+- Upstream `rust-v0.128.0` removed `js_repl` and `js_repl_tools_only`; do not set `CODEX_CLOUD_ENABLE_FEATURES=js_repl`, `CODEX_CLOUD_DISABLE_FEATURES=js_repl`, or run `codex features enable/disable js_repl`. Use cloud feature env vars only for active non-removed feature names after checking `codex features list`.
 - Keep `memories` scoped to explicit eval lanes until promoted by evidence (legacy alias `memory_tool` is compatibility-only).
 - Honor the safe `read/edit/run/network` approval profile. Capture escalations in the manifest `approvals` array with reviewer justification and timestamp.
 - Run `node scripts/delegation-guard.mjs` prior to requesting review; if delegation is not possible, set `DELEGATION_GUARD_OVERRIDE_REASON` and record the justification in the checklist.

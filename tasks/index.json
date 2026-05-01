@@ -16969,6 +16969,68 @@
         "agent_task": ".agent/task/linear-fd05f8a0-420a-4313-a462-690881c0a45c.md",
         "docs": "docs/TECH_SPEC-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md"
       }
+    },
+    {
+      "id": "20260501-linear-d412792b-9a2a-43d9-96dc-ca021e728d09",
+      "title": "CO-452 retire js_repl posture after Codex CLI 0.128.0 removal",
+      "status": "blocked",
+      "relates_to": "tasks/tasks-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-01",
+      "approvals": {
+        "pre_implementation_issue_quality_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-05-01",
+          "status": "approved",
+          "summary": "CO-452 is not merely wording cleanup: current docs plus code/test and active canary surfaces must align with Codex CLI 0.128.0 removing js_repl while generic non-removed feature flag pass-through remains supported."
+        },
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review child stream",
+          "date": "2026-05-01",
+          "status": "succeeded",
+          "manifest": ".runs/linear-d412792b-9a2a-43d9-96dc-ca021e728d09-docs-review/cli/2026-04-30T23-45-07-409Z-1e813802/manifest.json",
+          "summary": "Docs-review child stream succeeded before implementation with delegation-guard, spec-guard, docs:check, docs:freshness:maintain, and review outcome clean success."
+        },
+        "archive_js_repl_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane plus parent provider worker",
+          "date": "2026-05-01",
+          "status": "manually_imported_after_stale_accept",
+          "manifest": ".runs/linear-d412792b-9a2a-43d9-96dc-ca021e728d09-archive-js-repl-packet/cli/2026-04-30T23-39-24-326Z-1a3ae7d1/manifest.json",
+          "summary": "Child lane succeeded and produced a clean three-file historical packet patch. Helper accept failed after Linear updated_at drift from a parent workpad update, so parent verified git apply --check and imported the patch manually."
+        }
+      },
+      "validation": {
+        "status": "blocked",
+        "passed": [
+          "delegation-guard",
+          "spec-guard --dry-run",
+          "targeted cloud feature tests",
+          "build",
+          "lint",
+          "test",
+          "docs:check"
+        ],
+        "blocker": {
+          "owner_issue": "CO-454",
+          "canonical_owner_key": "docs:freshness:maintain",
+          "current_report": "out/linear-d412792b-9a2a-43d9-96dc-ca021e728d09/docs-freshness-maintenance.json",
+          "clean_main_reproduction": "/Users/kbediako/Code/CO/.workspaces/co452-main-baseline at 2fa556a95",
+          "summary": "Current branch and clean origin/main both reproduce docs:freshness:maintain freshness_decision=block_diff_local for March 31 candidate cohorts under live same-project docs freshness owner CO-444; related follow-up CO-454 was created and CO-452 must stay out of review until the gate clears."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
+        "task": "tasks/tasks-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
+        "agent_task": ".agent/task/linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md"
+        }
+      }
     }
   ]
 }
