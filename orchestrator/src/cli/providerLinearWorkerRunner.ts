@@ -5391,7 +5391,9 @@ function buildProviderWorkerSessionLogHydrationProofSignature(
     rate_limits: proof.rate_limits ?? null,
     auth_provenance: proof.auth_provenance ?? null,
     worker_control: proof.worker_control ?? null,
-    source_root_freshness: proof.source_root_freshness ?? null,
+    source_root_freshness: normalizeProviderLinearWorkerSourceRootFreshnessForProofComparison(
+      proof.source_root_freshness
+    ),
     failure_diagnosis: proof.failure_diagnosis ?? null
   });
 }
@@ -7149,26 +7151,32 @@ async function readProviderWorkerControlHostSourceRootFreshness(
 function resolveProviderWorkerControlHostRunDir(
   context: Pick<
     ProviderLinearWorkerContext,
-    'manifestPath' | 'providerControlHostRunId' | 'providerControlHostTaskId'
+    | 'controlHostManifestPath'
+    | 'manifestPath'
+    | 'providerControlHostRunId'
+    | 'providerControlHostTaskId'
   >
 ): string | null {
   if (!context.providerControlHostTaskId || !context.providerControlHostRunId) {
     return null;
   }
-  const runsRoot = resolveRunsRootFromProviderWorkerManifestPath(context.manifestPath);
-  if (!runsRoot) {
-    return null;
+  for (const manifestPath of [context.controlHostManifestPath, context.manifestPath]) {
+    const runsRoot = resolveRunsRootFromProviderWorkerManifestPath(manifestPath);
+    if (!runsRoot) {
+      continue;
+    }
+    try {
+      return join(
+        runsRoot,
+        sanitizeTaskId(context.providerControlHostTaskId),
+        'cli',
+        sanitizeRunId(context.providerControlHostRunId)
+      );
+    } catch {
+      return null;
+    }
   }
-  try {
-    return join(
-      runsRoot,
-      sanitizeTaskId(context.providerControlHostTaskId),
-      'cli',
-      sanitizeRunId(context.providerControlHostRunId)
-    );
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 function resolveRunsRootFromProviderWorkerManifestPath(manifestPath: string): string | null {

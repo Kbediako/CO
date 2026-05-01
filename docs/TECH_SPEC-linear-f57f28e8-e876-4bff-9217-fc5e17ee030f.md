@@ -13,3 +13,14 @@ Control-host status and proof surfaces must expose the actual supervised source 
 
 ## Validation
 Parent owns focused regressions for linked package, dist fallback, source checkout, no `origin/main`, package/command mismatch, proof refresh, and status/proof projection surfaces. Required gates include `npm run docs:check`, `npm run docs:freshness`, implementation validation, standalone review, elegance review, PR feedback cleanup, and ready-review drain.
+
+## Fallback Expiry / Refactor Decision
+- Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `Yes`.
+- Required decision table:
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Control-host status/proof source-root projection | Stale or missing status/proof provenance can fall back to shared checkout posture, stale projected owner data, dist entrypoints, or global package/link state. | remove fallback | CO-458 | Operators read `co-status`, doctor, `/api/v1/state`, `/ui/data.json`, or provider proof surfaces to decide whether the supervised control-host source is current. | existing control-host status/proof projection behavior | N/A after removal | N/A after removal | Status/proof readers inspect recorded command, package root, source root, local git ref, and freshness without fetching, relinking, rebuilding, restarting, or mutating global package state. | Focused source-root freshness, control-host ownership, doctor, UI data, provider proof refresh, hydration, and docs gates. |
+
+- For `justify retaining fallback`: Not applicable. No temporary fallback is approved by this packet.
+- Large-refactor check: keep CO-458 bounded to provenance/freshness surfacing and proof refresh behavior; do not absorb unrelated control-host lifecycle cleanup, package relinking, or historical owner lanes.

@@ -189,6 +189,28 @@ describe('source root freshness inspection', () => {
     expect(result.drift_classes).not.toContain('shared_checkout_drift');
   });
 
+  it('warns on ahead source checkout posture when no intended checkout is available', async () => {
+    const repoRoot = await createPackageRepo('source-root-ahead-only-', { stale: false });
+    await writeFile(join(repoRoot, 'ahead.txt'), 'ahead\n', 'utf8');
+    git(repoRoot, ['add', '.']);
+    git(repoRoot, ['commit', '-m', 'ahead local work']);
+
+    const result = inspectSourceRootFreshness({
+      packageRoot: repoRoot,
+      commandPath: join(repoRoot, 'bin', 'codex-orchestrator.ts'),
+      cwd: repoRoot,
+      now: () => '2026-05-01T00:00:00.000Z'
+    });
+
+    expect(result.status).toBe('warning');
+    expect(result.intended_checkout).toBeNull();
+    expect(result.source_checkout).toMatchObject({
+      status: 'ahead',
+      ahead: 1
+    });
+    expect(result.drift_classes).toContain('supervised_source_root_drift');
+  });
+
   it('keeps a current source checkout clean when it matches the intended root', async () => {
     const repoRoot = await createPackageRepo('source-root-current-', { stale: false });
 

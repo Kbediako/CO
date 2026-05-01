@@ -285,7 +285,8 @@ function classifyDriftClasses(input: {
   }
   if (
     input.sourceRootMatchesIntended === false ||
-    checkoutIsStaleOrDiverged(input.sourceCheckout)
+    checkoutIsStaleOrDiverged(input.sourceCheckout) ||
+    (!input.intendedCheckout && checkoutHasPostureDrift(input.sourceCheckout))
   ) {
     classes.push('supervised_source_root_drift');
   }

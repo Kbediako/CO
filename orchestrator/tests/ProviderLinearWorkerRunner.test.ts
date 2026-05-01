@@ -6014,6 +6014,7 @@ for await (const line of rl) {
       bootstrap_pending: false,
       proof_signature: expect.any(String)
     });
+    expect(secondHydration.proof_signature).toBe(firstHydration.proof_signature);
   });
 
   it('recovers a stale proof lock before classifying active appserver proof telemetry', async () => {
