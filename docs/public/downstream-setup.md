@@ -6,11 +6,11 @@ This guide is the downstream-safe setup path shipped in the npm package.
 
 - Once per machine: install Codex CLI and authenticate.
 - Once per repo: seed the CO templates, run setup with the repo root so delegation is repo-scoped while bundled skills are installed and DevTools wiring is applied at the machine level, review the generated config, and start using task-scoped runs.
-- CO-local ChatGPT-auth/appserver posture now uses `gpt-5.5` / `xhigh` on Codex CLI `0.125.0` when live access smoke passes; release-facing cloud/downstream pins remain evidence-gated in the version policy.
+- CO-local ChatGPT-auth/appserver posture now uses `gpt-5.5` / `xhigh` on Codex CLI `0.128.0` when live access smoke passes; release-facing cloud/downstream pins remain evidence-gated in the version policy.
 - Portable generated downstream defaults keep `gpt-5.4` / `xhigh` as a fallback when `gpt-5.5`, API/cloud portability, or downstream/no-network access is not proven.
 - Local ChatGPT-auth `gpt-5.5` / `xhigh` is the preferred CO posture after `codex debug models` verifies current model access.
 - `codex-orchestrator doctor` treats `gpt-5.5` as non-drift when `codex debug models` verifies current model access, and additive defaults keep fresh configs on portable fallback values unless `--auth-scope chatgpt` is explicitly requested after live access smoke; compatible prior `gpt-5.5` role files are preserved without requiring extra marker metadata.
-- CO-196 posture lineage remains unchanged: npm is the supported baseline because it is the simplest supported CLI install path, and marketplace packaging is an additive registration path for newer Codex releases. `0.121.0` accepts both `codex marketplace add` and `codex plugin marketplace add`; `0.122.0+` require `codex plugin marketplace add`, and current `0.125.0` also exposes `codex plugin marketplace upgrade` / `remove`.
+- CO-196 posture lineage remains unchanged: npm is the supported baseline because it is the simplest supported CLI install path, and marketplace packaging is an additive registration path for newer Codex releases. `0.121.0` accepts both `codex marketplace add` and `codex plugin marketplace add`; `0.122.0+` require `codex plugin marketplace add`, and current local `0.128.0` also exposes `codex plugin marketplace upgrade` / `remove`.
 
 ## Once per machine
 
@@ -50,7 +50,7 @@ The shipped marketplace files are:
 - Local-directory add: Run the version-appropriate add command against the repository root that contains those files instead of the npm install directory. `0.121.0` accepts either `codex marketplace add <repository-root>` or `codex plugin marketplace add <repository-root>`; `0.122.0+` require `codex plugin marketplace add <repository-root>`.
 - Git-backed add: Pass a Git identifier or URL such as `owner/repo[@ref]`, an HTTPS Git URL, or an SSH Git URL rather than a local path.
 - When to re-run add: Re-run the same version-appropriate add command if you move or replace a local-directory source, or if you remove Codex's installed marketplace checkout and want to restore the Git-backed install. `0.121.0` documents the add flow under both marketplace paths; `0.122.0+` document local directories plus Git-backed sources under `codex plugin marketplace add --help`.
-- Marketplace updates/removal: On current Codex CLI `0.125.0`, run `codex plugin marketplace upgrade codex-orchestrator` to refresh a Git-backed marketplace checkout when you want Codex to pull a newer source ref. Run `codex plugin marketplace remove codex-orchestrator` to remove the marketplace registration.
+- Marketplace updates/removal: On current local Codex CLI `0.128.0`, run `codex plugin marketplace upgrade codex-orchestrator` to refresh a Git-backed marketplace checkout when you want Codex to pull a newer source ref. Run `codex plugin marketplace remove codex-orchestrator` to remove the marketplace registration.
 - Debug caveats: The bundled debug catalog can lag runtime posture briefly, and residual plugin warnings are local temporary plugin cache warnings rather than CO posture failures.
 
 ## Rollback and removal
