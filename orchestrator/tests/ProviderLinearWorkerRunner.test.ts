@@ -2835,7 +2835,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         method: 'account/authProfile/mismatch',
         params: {
           message:
-            'agent identity probe CODEX_AGENT_IDENTITY={"id":"agent-identity-deep-id","account":{"owner":{"id":"agent-identity-deep-owner"}}} agent_identity: { "id": "agent-identity-pretty-id", "account": { "owner": { "id": "agent-identity-pretty-owner" } } } CODEX_AGENT_IDENTITY="agent identity spaced secret" CODEX_AGENT_IDENTITY="{\\"id\\":\\"agent-identity-escaped-env-id\\",\\"subject\\":\\"agent-identity-escaped-env-subject\\"}" CODEX_AGENT_IDENTITY={"id":"agent-identity-object-id","subject":"agent-identity-object-subject"} {"CODEX_AGENT_IDENTITY":"agent-identity-json-secret"} {"CODEX_AGENT_IDENTITY":"{\\"id\\":\\"agent-identity-escaped-json-id\\",\\"subject\\":\\"agent-identity-escaped-json-subject\\"}"} {"CODEX_AGENT_IDENTITY":{"id":"agent-identity-json-object-id","subject":"agent-identity-json-object-subject"}} agent_identity: agent-identity-colon-secret agent_identity: \'agent identity colon spaced secret\' agent_identity: {"id":"agent-identity-colon-object-id","subject":"agent-identity-colon-object-subject"}'
+            'agent identity probe CODEX_AGENT_IDENTITY={"id":"agent-identity-deep-id","account":{"owner":{"id":"agent-identity-deep-owner"}}} agent_identity: { "id": "agent-identity-pretty-id", "account": { "owner": { "id": "agent-identity-pretty-owner" } } } CODEX_AGENT_IDENTITY="agent identity spaced secret" CODEX_AGENT_IDENTITY=\\"agent identity escaped wrapper secret\\" CODEX_AGENT_IDENTITY=\\"{ \\"id\\" : \\"agent-identity-escaped-pretty-id\\" }\\" CODEX_AGENT_IDENTITY=\\" { \\"id\\" : \\"agent-identity-escaped-whitespace-id\\" }\\" CODEX_AGENT_IDENTITY="{\\"id\\":\\"agent-identity-escaped-env-id\\",\\"subject\\":\\"agent-identity-escaped-env-subject\\"}" CODEX_AGENT_IDENTITY={"id":"agent-identity-object-id","subject":"agent-identity-object-subject"} {"CODEX_AGENT_IDENTITY":"agent-identity-json-secret"} {"CODEX_AGENT_IDENTITY":"{\\"id\\":\\"agent-identity-escaped-json-id\\",\\"subject\\":\\"agent-identity-escaped-json-subject\\"}"} {"CODEX_AGENT_IDENTITY":{"id":"agent-identity-json-object-id","subject":"agent-identity-json-object-subject"}} agent_identity: agent-identity-colon-secret agent_identity: \'agent identity colon spaced secret\' agent_identity: {"id":"agent-identity-colon-object-id","subject":"agent-identity-colon-object-subject"}'
         },
         timestamp: '2026-05-01T00:46:00.000Z'
       })
@@ -2853,6 +2853,9 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(signal).not.toContain('agent-identity-pretty-id');
     expect(signal).not.toContain('agent-identity-pretty-owner');
     expect(signal).not.toContain('agent identity spaced secret');
+    expect(signal).not.toContain('agent identity escaped wrapper secret');
+    expect(signal).not.toContain('agent-identity-escaped-pretty-id');
+    expect(signal).not.toContain('agent-identity-escaped-whitespace-id');
     expect(signal).not.toContain('agent-identity-escaped-env-id');
     expect(signal).not.toContain('agent-identity-escaped-env-subject');
     expect(signal).not.toContain('agent-identity-object-id');
@@ -2866,6 +2869,31 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(signal).not.toContain('agent identity colon spaced secret');
     expect(signal).not.toContain('agent-identity-colon-object-id');
     expect(signal).not.toContain('agent-identity-colon-object-subject');
+  });
+
+  it('preserves diagnostics after delimiter-terminated escaped Agent Identity values', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'notification',
+        params: {
+          message:
+            'CODEX_AGENT_IDENTITY=\\"agent identity delimiter secret\\"; auth profile mismatch for selected account CODEX_AGENT_IDENTITY=\\"agent identity brace delimiter secret\\"} active profile mismatch remains visible CODEX_AGENT_IDENTITY=\\"agent identity colon delimiter secret\\": auth profile colon mismatch remains visible'
+        },
+        timestamp: '2026-05-01T00:47:00.000Z'
+      })
+    );
+
+    expect(parsed.failureDiagnosis).toMatchObject({
+      diagnostic_category: 'auth_mismatch',
+      source: 'stdout_jsonl'
+    });
+    const signal = parsed.failureDiagnosis?.signal ?? '';
+    expect(signal).toContain('CODEX_AGENT_IDENTITY=<redacted>; auth profile mismatch');
+    expect(signal).toContain('active profile mismatch remains visible');
+    expect(signal).toContain('CODEX_AGENT_IDENTITY=<redacted>: auth profile colon mismatch remains visible');
+    expect(signal).not.toContain('agent identity delimiter secret');
+    expect(signal).not.toContain('agent identity brace delimiter secret');
+    expect(signal).not.toContain('agent identity colon delimiter secret');
   });
 
   it('redacts app-server terminal turn error details before diagnostics are persisted', async () => {

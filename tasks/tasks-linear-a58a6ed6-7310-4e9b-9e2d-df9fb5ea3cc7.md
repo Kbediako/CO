@@ -37,6 +37,7 @@
 - [x] Targeted ProviderLinearWorkerRunner test passes. Evidence: same targeted command passed 286 tests.
 - [x] Required repo gates pass after current-main refresh. Evidence: delegation guard, spec guard, build, lint, clean-env full test, docs:check, docs:freshness, repo:stewardship, diff-budget, git diff --check, and pack:smoke passed.
 - [x] Final manifest-backed standalone review rerun passes under `FORCE_CODEX_REVIEW=1`. Evidence: `.runs/linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7/cli/2026-05-01T16-41-57-405Z-39b1234f/review/telemetry.json` recorded `review_outcome=bounded-success` via command-intent retry with no actionable findings.
+- [x] Standalone review NOTES metadata recorded for the authoritative gate. NOTES: `Goal: recognize Agent Identity auth provenance in cloud preflight and provider-worker runtime. | Summary: refreshed CO-451 diff onto origin/main; added CODEX_AGENT_IDENTITY env provenance, agent_identity event parsing/redaction, balanced nested/pretty Agent Identity assignment redaction, focused tests, and task packet evidence. | Risks: auth provenance redaction safety, env-source ordering, and current-main docs registry merge.` Evidence: same final review telemetry.
 - [x] Elegance/minimality review completed. Evidence: `out/linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7/manual/elegance-review.md`.
 - [ ] PR attached and `pr ready-review` drain clean before In Review. Evidence: pending PR creation, checks, feedback sweep, and drain.
 

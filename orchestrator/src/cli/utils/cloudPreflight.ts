@@ -176,6 +176,59 @@ function readCloudPreflightQuotedValueEnd(input: string, start: number, quote: s
   return input.length;
 }
 
+function readCloudPreflightEscapedQuotedBalancedValueEnd(
+  input: string,
+  start: number,
+  open: string,
+  close: string,
+  quote: string
+): number {
+  let depth = 0;
+  let quoted = false;
+  for (let index = start; index < input.length; index += 1) {
+    if (input[index] === '\\' && input[index + 1] === quote) {
+      quoted = !quoted;
+      index += 1;
+      continue;
+    }
+    if (quoted) {
+      continue;
+    }
+    if (input[index] === open) {
+      depth += 1;
+      continue;
+    }
+    if (input[index] === close) {
+      depth -= 1;
+      if (depth <= 0) {
+        return input[index + 1] === '\\' && input[index + 2] === quote ? index + 3 : index + 1;
+      }
+    }
+  }
+  return input.length;
+}
+
+function readCloudPreflightEscapedQuotedValueEnd(input: string, start: number, quote: string): number {
+  let valueStart = start + 2;
+  while (/\s/u.test(input[valueStart] ?? '')) {
+    valueStart += 1;
+  }
+  const firstValue = input[valueStart];
+  if (firstValue === '{') {
+    return readCloudPreflightEscapedQuotedBalancedValueEnd(input, valueStart, '{', '}', quote);
+  }
+  if (firstValue === '[') {
+    return readCloudPreflightEscapedQuotedBalancedValueEnd(input, valueStart, '[', ']', quote);
+  }
+  for (let index = start + 2; index < input.length - 1; index += 1) {
+    if (input[index] !== '\\' || input[index + 1] !== quote) {
+      continue;
+    }
+    return index + 2;
+  }
+  return input.length;
+}
+
 function readCloudPreflightBalancedValueEnd(
   input: string,
   start: number,
@@ -221,6 +274,10 @@ function readCloudPreflightBalancedValueEnd(
 
 function readCloudPreflightAgentIdentityValueEnd(input: string, start: number): number {
   const first = input[start];
+  const escapedQuote = input[start + 1];
+  if (first === '\\' && (escapedQuote === '"' || escapedQuote === "'")) {
+    return readCloudPreflightEscapedQuotedValueEnd(input, start, escapedQuote);
+  }
   if (first === '"' || first === "'") {
     return readCloudPreflightQuotedValueEnd(input, start, first);
   }
@@ -256,6 +313,10 @@ function redactCloudPreflightAgentIdentityAssignments(output: string): string {
   return result + output.slice(cursor);
 }
 
+function isCloudPreflightAlreadyRedactedAssignment(match: string): boolean {
+  return /[:=]\s*(?:"<redacted>"|'<redacted>'|<redacted>)(?:[:}\]])?$/u.test(match);
+}
+
 function redactCloudPreflightOutput(output: string): string {
   return redactCloudPreflightAgentIdentityAssignments(output)
     .replace(/\b(?:authorization|bearer)\s*[:=]\s*bearer\s+[^\s,;]+/giu, 'authorization: Bearer <redacted>')
@@ -263,7 +324,10 @@ function redactCloudPreflightOutput(output: string): string {
     .replace(/\b(?:sk|sess|eyJ)[A-Za-z0-9._~+/-]{12,}/gu, '<redacted-token>')
     .replace(
       /\b(?:CODEX|OPENAI|CHATGPT|GITHUB|GH)_[A-Z0-9_]*(?:API_KEY|AUTH_TOKEN|ACCESS_TOKEN|REFRESH_TOKEN|TOKEN|SECRET|PASSWORD|AGENT_IDENTITY)\s*[:=]\s*(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\s,;]+)/gu,
-      (match) => `${match.split(/[:=]/u)[0] ?? 'secret'}=<redacted>`
+      (match) =>
+        isCloudPreflightAlreadyRedactedAssignment(match)
+          ? match
+          : `${match.split(/[:=]/u)[0] ?? 'secret'}=<redacted>`
     )
     .replace(
       /\b(?:api[_ -]?key|auth[_ -]?token|access[_ -]?token|refresh[_ -]?token|bearer[_ -]?token|password|secret|credential)\s*[:=]\s*[^\s,;]+/giu,

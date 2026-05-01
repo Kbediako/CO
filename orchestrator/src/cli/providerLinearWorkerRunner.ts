@@ -4407,6 +4407,59 @@ function readProviderWorkerQuotedValueEnd(input: string, start: number, quote: s
   return input.length;
 }
 
+function readProviderWorkerEscapedQuotedBalancedValueEnd(
+  input: string,
+  start: number,
+  open: string,
+  close: string,
+  quote: string
+): number {
+  let depth = 0;
+  let quoted = false;
+  for (let index = start; index < input.length; index += 1) {
+    if (input[index] === '\\' && input[index + 1] === quote) {
+      quoted = !quoted;
+      index += 1;
+      continue;
+    }
+    if (quoted) {
+      continue;
+    }
+    if (input[index] === open) {
+      depth += 1;
+      continue;
+    }
+    if (input[index] === close) {
+      depth -= 1;
+      if (depth <= 0) {
+        return input[index + 1] === '\\' && input[index + 2] === quote ? index + 3 : index + 1;
+      }
+    }
+  }
+  return input.length;
+}
+
+function readProviderWorkerEscapedQuotedValueEnd(input: string, start: number, quote: string): number {
+  let valueStart = start + 2;
+  while (/\s/u.test(input[valueStart] ?? '')) {
+    valueStart += 1;
+  }
+  const firstValue = input[valueStart];
+  if (firstValue === '{') {
+    return readProviderWorkerEscapedQuotedBalancedValueEnd(input, valueStart, '{', '}', quote);
+  }
+  if (firstValue === '[') {
+    return readProviderWorkerEscapedQuotedBalancedValueEnd(input, valueStart, '[', ']', quote);
+  }
+  for (let index = start + 2; index < input.length - 1; index += 1) {
+    if (input[index] !== '\\' || input[index + 1] !== quote) {
+      continue;
+    }
+    return index + 2;
+  }
+  return input.length;
+}
+
 function readProviderWorkerBalancedValueEnd(
   input: string,
   start: number,
@@ -4452,6 +4505,10 @@ function readProviderWorkerBalancedValueEnd(
 
 function readProviderWorkerAgentIdentityValueEnd(input: string, start: number): number {
   const first = input[start];
+  const escapedQuote = input[start + 1];
+  if (first === '\\' && (escapedQuote === '"' || escapedQuote === "'")) {
+    return readProviderWorkerEscapedQuotedValueEnd(input, start, escapedQuote);
+  }
   if (first === '"' || first === "'") {
     return readProviderWorkerQuotedValueEnd(input, start, first);
   }
