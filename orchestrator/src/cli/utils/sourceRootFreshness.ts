@@ -250,7 +250,7 @@ export function refreshSourceRootFreshnessInspection(
   fallbackIntendedRepoRoot?: string | null
 ): SourceRootFreshnessInspection {
   const intendedRepoRoot = prior.intended_repo_root ?? fallbackIntendedRepoRoot ?? null;
-  return inspectSourceRootFreshness({
+  const refreshed = inspectSourceRootFreshness({
     intendedRepoRoot,
     commandPath: prior.command_path,
     commandPathRealpath: prior.command_path_realpath,
@@ -259,6 +259,15 @@ export function refreshSourceRootFreshnessInspection(
     sourceRootRealpath: prior.source_root_realpath,
     cwd: intendedRepoRoot ?? prior.source_root ?? null
   });
+  return {
+    ...refreshed,
+    provenance: {
+      ...refreshed.provenance,
+      command_path_source: prior.provenance.command_path_source,
+      package_root_source: prior.provenance.package_root_source,
+      source_root_source: prior.provenance.source_root_source
+    }
+  };
 }
 
 function classifyDriftClasses(input: {

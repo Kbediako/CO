@@ -57,6 +57,7 @@ import {
   PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
   PROVIDER_LAUNCH_SOURCE_ENV
 } from '../../scripts/lib/provider-run-contract.js';
+import { inspectSourceRootFreshness } from '../src/cli/utils/sourceRootFreshness.js';
 
 let tempRoot: string | null = null;
 let extraTempRoots: string[] = [];
@@ -5793,6 +5794,225 @@ for await (const line of rl) {
     expect(refreshed).toMatchObject({
       issue_identifier: 'CO-2',
       updated_at: '2026-03-21T09:00:10.000Z'
+    });
+  });
+
+  it('refreshes persisted source-root freshness while refreshing a provider proof snapshot', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const sourceRoot = await createProviderWorkerSourceRootRepo('provider-worker-refresh-source-');
+    const sourceEntrypoint = join(sourceRoot, 'bin', 'codex-orchestrator.ts');
+    const sourceBaseHash = git(sourceRoot, ['rev-parse', 'HEAD']).stdout.trim();
+    const sourceRootFreshness = inspectSourceRootFreshness({
+      intendedRepoRoot: sourceRoot,
+      argv: ['node', sourceEntrypoint],
+      cwd: sourceRoot,
+      now: () => '2026-05-01T00:00:00.000Z'
+    });
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          workspace_path: sourceRoot,
+          source_root_freshness: sourceRootFreshness
+        })
+      ),
+      'utf8'
+    );
+    await writeFile(join(sourceRoot, 'README.md'), 'origin advanced\n', 'utf8');
+    git(sourceRoot, ['add', '.']);
+    git(sourceRoot, ['commit', '-m', 'origin advanced']);
+    git(sourceRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    git(sourceRoot, ['reset', '--hard', sourceBaseHash]);
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:10.000Z'
+    );
+    const persisted = JSON.parse(await readFile(proofPath, 'utf8')) as ProviderLinearWorkerProof;
+
+    expect(refreshed?.updated_at).toBe('2026-03-21T09:00:10.000Z');
+    expect(refreshed?.source_root_freshness).toMatchObject({
+      status: 'warning',
+      observed_at: expect.not.stringMatching('2026-05-01T00:00:00.000Z'),
+      source_checkout: {
+        status: 'stale',
+        behind: 1
+      },
+      provenance: {
+        command_path_source: 'argv',
+        package_root_source: 'command_path',
+        source_root_source: 'package_root'
+      }
+    });
+    expect(persisted.source_root_freshness).toEqual(refreshed?.source_root_freshness);
+  });
+
+  it('does not advance proof updated_at when only source-root observed_at changes', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const sourceRoot = await createProviderWorkerSourceRootRepo('provider-worker-refresh-observed-at-');
+    const sourceEntrypoint = join(sourceRoot, 'bin', 'codex-orchestrator.ts');
+    const sourceRootFreshness = inspectSourceRootFreshness({
+      intendedRepoRoot: sourceRoot,
+      argv: ['node', sourceEntrypoint],
+      cwd: sourceRoot,
+      now: () => '2026-05-01T00:00:00.000Z'
+    });
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          current_turn_started_at: null,
+          session_log_thread_id: null,
+          session_log_turn_id: null,
+          session_log_session_id: null,
+          resume_source_thread_id: null,
+          last_message_source: null,
+          last_message_delta_key: null,
+          current_turn_activity: null,
+          runtime: null,
+          appserver_supervision: null,
+          auth_provenance: null,
+          worker_control: null,
+          source_root_freshness: sourceRootFreshness,
+          failure_diagnosis: null,
+          workspace_path: sourceRoot,
+          worker_host: null,
+          source_setup: null,
+          child_streams: [],
+          child_lanes: [],
+          parallelization: null,
+          progress: null,
+          linear_budget: null,
+          tracked_issue_error: null,
+          resident_session: null
+        })
+      ),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:10.000Z'
+    );
+    const persisted = JSON.parse(await readFile(proofPath, 'utf8')) as ProviderLinearWorkerProof;
+
+    expect(refreshed?.updated_at).toBe('2026-03-21T09:00:00.000Z');
+    expect(refreshed?.source_root_freshness?.observed_at).not.toBe(sourceRootFreshness.observed_at);
+    expect(refreshed?.source_root_freshness).toMatchObject({
+      status: 'current',
+      source_checkout: {
+        status: 'current',
+        behind: 0
+      }
+    });
+    expect(persisted.updated_at).toBe('2026-03-21T09:00:00.000Z');
+    expect(persisted.source_root_freshness).toEqual(refreshed?.source_root_freshness);
+  });
+
+  it('keeps session-log hydration signatures aligned after refreshing source-root freshness', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    const sourceRoot = await createProviderWorkerSourceRootRepo('provider-worker-refresh-source-hydration-');
+    const sourceEntrypoint = join(sourceRoot, 'bin', 'codex-orchestrator.ts');
+    const sourceBaseHash = git(sourceRoot, ['rev-parse', 'HEAD']).stdout.trim();
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-1.jsonl');
+    const sessionLog = [
+      JSON.stringify({
+        type: 'session_meta',
+        payload: {
+          id: 'thread-1',
+          cwd: sourceRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        }
+      }),
+      JSON.stringify({ type: 'turn_context', payload: { turn_id: 'turn-1' } }),
+      JSON.stringify({
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          info: {
+            total_token_usage: {
+              input_tokens: 4,
+              output_tokens: 5,
+              total_tokens: 9
+            }
+          }
+        }
+      })
+    ].join('\n');
+    const sourceRootFreshness = inspectSourceRootFreshness({
+      intendedRepoRoot: sourceRoot,
+      argv: ['node', sourceEntrypoint],
+      cwd: sourceRoot,
+      now: () => '2026-05-01T00:00:00.000Z'
+    });
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(sessionLogPath, sessionLog, 'utf8');
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          workspace_path: sourceRoot,
+          source_root_freshness: sourceRootFreshness
+        })
+      ),
+      'utf8'
+    );
+    await writeFile(join(sourceRoot, 'README.md'), 'origin advanced\n', 'utf8');
+    git(sourceRoot, ['add', '.']);
+    git(sourceRoot, ['commit', '-m', 'origin advanced']);
+    git(sourceRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    git(sourceRoot, ['reset', '--hard', sourceBaseHash]);
+
+    const firstRefresh = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:10.000Z',
+      undefined,
+      {
+        CODEX_HOME: tempRoot!
+      }
+    );
+    const firstHydration = await readPersistedSessionLogHydrationState(hydrationPath);
+
+    expect(firstRefresh?.source_root_freshness?.source_checkout).toMatchObject({
+      status: 'stale',
+      behind: 1
+    });
+    expect(firstHydration).toMatchObject({
+      path: sessionLogPath,
+      offset_bytes: Buffer.byteLength(sessionLog, 'utf8'),
+      bootstrap_pending: false,
+      proof_signature: expect.any(String)
+    });
+
+    const secondRefresh = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:20.000Z',
+      undefined,
+      {
+        CODEX_HOME: tempRoot!
+      }
+    );
+    const secondHydration = await readPersistedSessionLogHydrationState(hydrationPath);
+
+    expect(secondRefresh?.source_root_freshness?.source_checkout).toMatchObject({
+      status: 'stale',
+      behind: 1
+    });
+    expect(secondHydration).toMatchObject({
+      path: sessionLogPath,
+      offset_bytes: Buffer.byteLength(sessionLog, 'utf8'),
+      trailing_text: '',
+      bootstrap_pending: false,
+      proof_signature: expect.any(String)
     });
   });
 

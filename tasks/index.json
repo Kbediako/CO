@@ -36,6 +36,7 @@
         "agent_task": ".agent/task/linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
         "docs": {
           "PRD": "docs/PRD-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
           "ACTION_PLAN": "docs/ACTION_PLAN-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md"
         }
       }

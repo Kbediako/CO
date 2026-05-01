@@ -5803,7 +5803,9 @@ function normalizeProviderLinearWorkerProofForUpdatedAtComparison(
     auth_provenance: proof.auth_provenance ?? null,
     failure_diagnosis: proof.failure_diagnosis ?? null,
     worker_host: proof.worker_host ?? null,
-    source_root_freshness: proof.source_root_freshness ?? null,
+    source_root_freshness: normalizeProviderLinearWorkerSourceRootFreshnessForProofComparison(
+      proof.source_root_freshness
+    ),
     source_setup: proof.source_setup ?? null,
     linear_budget: proof.linear_budget ?? null,
     tracked_issue_error: proof.tracked_issue_error ?? null,
@@ -5811,6 +5813,18 @@ function normalizeProviderLinearWorkerProofForUpdatedAtComparison(
     parallelization: proof.parallelization ?? null,
     progress: null,
     updated_at: null
+  };
+}
+
+function normalizeProviderLinearWorkerSourceRootFreshnessForProofComparison(
+  sourceRootFreshness: ProviderLinearWorkerProof['source_root_freshness']
+): Record<string, unknown> | null {
+  if (!sourceRootFreshness) {
+    return null;
+  }
+  return {
+    ...sourceRootFreshness,
+    observed_at: null
   };
 }
 
@@ -5856,7 +5870,9 @@ function selectProviderLinearWorkerProofTelemetryFields(
     rate_limits: proof.rate_limits ?? null,
     auth_provenance: proof.auth_provenance ?? null,
     worker_control: proof.worker_control ?? null,
-    source_root_freshness: proof.source_root_freshness ?? null,
+    source_root_freshness: normalizeProviderLinearWorkerSourceRootFreshnessForProofComparison(
+      proof.source_root_freshness
+    ),
     failure_diagnosis: proof.failure_diagnosis ?? null,
     owner_phase: proof.owner_phase,
     owner_status: proof.owner_status,
@@ -7188,6 +7204,21 @@ async function refreshProviderWorkerProofSourceRootFreshness(
   return {
     ...proof,
     source_root_freshness: sourceRootFreshness
+  };
+}
+
+function refreshProviderWorkerProofSourceRootFreshnessFromPrior(
+  proof: ProviderLinearWorkerProof
+): ProviderLinearWorkerProof {
+  if (!proof.source_root_freshness) {
+    return proof;
+  }
+  return {
+    ...proof,
+    source_root_freshness: refreshSourceRootFreshnessInspection(
+      proof.source_root_freshness,
+      proof.workspace_path ?? null
+    )
   };
 }
 
@@ -9836,23 +9867,33 @@ export async function refreshProviderLinearWorkerProofSnapshot(
         now
       })
     };
+    const hydratedWithFreshSourceRoot = refreshProviderWorkerProofSourceRootFreshnessFromPrior(
+      hydratedWithoutUpdatedAt
+    );
     const nextUpdatedAt = shouldAdvanceProviderLinearWorkerProofUpdatedAt(
       parsed,
-      hydratedWithoutUpdatedAt,
+      hydratedWithFreshSourceRoot,
       options.updatedAtComparisonScope ?? 'full'
     )
       ? now()
       : parsed.updated_at ?? null;
     const hydratedBase: ProviderLinearWorkerProof = {
-      ...hydratedWithoutUpdatedAt,
+      ...hydratedWithFreshSourceRoot,
       updated_at: nextUpdatedAt
     };
     const hydrated: ProviderLinearWorkerProof = {
       ...hydratedBase,
       appserver_supervision: buildProviderLinearWorkerAppServerSupervisionProofIfRelevant(hydratedBase)
     };
+    const hydrationState =
+      proofWithSessionTelemetryResult.hydrationState === null
+        ? null
+        : {
+            ...proofWithSessionTelemetryResult.hydrationState,
+            proof_signature: buildProviderWorkerSessionLogHydrationProofSignature(hydrated)
+          };
     await writeProof(proofPath, hydrated);
-    await writeProviderWorkerSessionLogHydrationState(runDir, proofWithSessionTelemetryResult.hydrationState);
+    await writeProviderWorkerSessionLogHydrationState(runDir, hydrationState);
     if (
       options.emitProgressEvent &&
       buildProviderLinearWorkerProgressSemanticSignature(parsed.progress ?? null)

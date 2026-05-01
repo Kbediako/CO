@@ -46,6 +46,7 @@ describe('control host ownership', () => {
       host: TEST_HOST,
       cwd: '/repo',
       argv: ['node', '/repo/bin/codex-orchestrator.ts', 'control-host'],
+      commandPath: '/repo/bin/codex-orchestrator.ts',
       packageRoot: '/repo',
       now: () => '2026-04-11T00:00:00.000Z'
     });

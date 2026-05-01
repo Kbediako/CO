@@ -63,10 +63,14 @@ Create the CO-458 docs-first packet and guide the parent implementation so contr
   - JSON parse for `tasks/index.json`
   - protected-term scan over the declared CO-458 packet/mirror files
   - `git diff --check` over the declared touched paths
+  - `npm run docs:check`
+  - `npm run docs:freshness`
 - Parent lane:
   - focused status/proof tests for all four drift classes
   - no-fetch/no-mutation behavior when comparing to local `origin/main`
   - implementation gate
+  - `npm run docs:check`
+  - `npm run docs:freshness`
   - standalone review and elegance/minimality review
   - PR checks, actionable feedback cleanup, ready-review drain, and Linear handoff
 

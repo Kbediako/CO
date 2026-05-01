@@ -5,7 +5,10 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { inspectSourceRootFreshness } from '../src/cli/utils/sourceRootFreshness.js';
+import {
+  inspectSourceRootFreshness,
+  refreshSourceRootFreshnessInspection
+} from '../src/cli/utils/sourceRootFreshness.js';
 
 const roots: string[] = [];
 
@@ -206,6 +209,30 @@ describe('source root freshness inspection', () => {
       status: 'current',
       ahead: 0,
       behind: 0
+    });
+  });
+
+  it('preserves original provenance source labels when refreshing saved freshness', async () => {
+    const repoRoot = await createPackageRepo('source-root-refresh-provenance-', { stale: false });
+    const prior = inspectSourceRootFreshness({
+      intendedRepoRoot: repoRoot,
+      argv: ['node', join(repoRoot, 'bin', 'codex-orchestrator.ts')],
+      cwd: repoRoot,
+      now: () => '2026-05-01T00:00:00.000Z'
+    });
+
+    expect(prior.provenance).toMatchObject({
+      command_path_source: 'argv',
+      package_root_source: 'command_path',
+      source_root_source: 'package_root'
+    });
+
+    const refreshed = refreshSourceRootFreshnessInspection(prior, repoRoot);
+
+    expect(refreshed.provenance).toMatchObject({
+      command_path_source: 'argv',
+      package_root_source: 'command_path',
+      source_root_source: 'package_root'
     });
   });
 });
