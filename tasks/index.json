@@ -17043,11 +17043,9 @@
         "spec": "tasks/specs/linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
         "task": "tasks/tasks-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
         "agent_task": ".agent/task/linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md"
-        }
+        "prd": "docs/PRD-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
+        "docs": "docs/TECH_SPEC-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
+        "action_plan": "docs/ACTION_PLAN-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md"
       }
     }
   ]
