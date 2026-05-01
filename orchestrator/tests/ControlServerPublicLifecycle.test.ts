@@ -52,7 +52,8 @@ vi.mock('../src/cli/control/controlServerStartupInputPreparation.js', () => ({
 }));
 
 vi.mock('../src/cli/control/controlHostOwnership.js', () => ({
-  acquireControlHostOwnership: vi.fn()
+  acquireControlHostOwnership: vi.fn(),
+  refreshControlHostOwnershipPollingPayload: vi.fn((payload) => payload)
 }));
 
 vi.mock('../src/cli/control/controlServerReadyInstanceLifecycle.js', () => ({
@@ -138,6 +139,7 @@ function buildMockControlHostOwnershipHandle(
       hostname: 'host',
       cwd: null,
       argv: [],
+      source_root_freshness: null,
       lock_dir: '/tmp/run/control-host-owner.lock',
       lock_owner_path: '/tmp/run/control-host-owner.lock/owner.json',
       owner_path: '/tmp/run/control-host-owner.json'

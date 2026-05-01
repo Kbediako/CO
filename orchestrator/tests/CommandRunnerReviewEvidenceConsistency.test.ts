@@ -464,10 +464,20 @@ describe('runCommandStage review evidence consistency', () => {
 
   it('waits for delayed review telemetry on interactive runs without FORCE_CODEX_REVIEW', async () => {
     const isTTYDescriptor = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
+    const reviewInteractiveEnv = {
+      CODEX_REVIEW_NON_INTERACTIVE: process.env.CODEX_REVIEW_NON_INTERACTIVE,
+      CODEX_NON_INTERACTIVE: process.env.CODEX_NON_INTERACTIVE,
+      CODEX_NO_INTERACTIVE: process.env.CODEX_NO_INTERACTIVE,
+      FORCE_CODEX_REVIEW: process.env.FORCE_CODEX_REVIEW
+    };
     Object.defineProperty(process.stdin, 'isTTY', {
       value: true,
       configurable: true
     });
+    delete process.env.CODEX_REVIEW_NON_INTERACTIVE;
+    delete process.env.CODEX_NON_INTERACTIVE;
+    delete process.env.CODEX_NO_INTERACTIVE;
+    delete process.env.FORCE_CODEX_REVIEW;
 
     mockState.runImpl = async (input) => {
       setTimeout(() => {
@@ -486,11 +496,19 @@ describe('runCommandStage review evidence consistency', () => {
     };
 
     try {
-      const { manifest, stage, ...context } = await bootstrapCommandStage({
-        id: 'review',
-        title: 'npm run review',
-        command: 'npm run review'
-      });
+      const { manifest, stage, ...context } = await bootstrapCommandStage(
+        {
+          id: 'review',
+          title: 'npm run review',
+          command: 'npm run review'
+        },
+        {
+          CODEX_REVIEW_NON_INTERACTIVE: '0',
+          CODEX_NON_INTERACTIVE: '0',
+          CODEX_NO_INTERACTIVE: '0',
+          FORCE_CODEX_REVIEW: '0'
+        }
+      );
       const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
 
       expect(result.exitCode).toBe(0);
@@ -505,6 +523,13 @@ describe('runCommandStage review evidence consistency', () => {
         Object.defineProperty(process.stdin, 'isTTY', isTTYDescriptor);
       } else {
         delete (process.stdin as NodeJS.ReadStream & { isTTY?: boolean }).isTTY;
+      }
+      for (const [key, value] of Object.entries(reviewInteractiveEnv)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
       }
     }
   });

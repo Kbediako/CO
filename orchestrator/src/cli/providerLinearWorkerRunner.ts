@@ -36,6 +36,7 @@ import {
   classifyProviderLinearWorkerLifecycle,
 } from './control/providerLinearWorkflowStates.js';
 import {
+  readControlHostOwnerMetadata,
   readControlHostOwnershipDiagnosticSummary,
   readControlHostOwnershipOperatorHint,
   type ControlHostOwnershipPollingPayload
@@ -76,6 +77,10 @@ import {
 } from './run/runMemoryController.js';
 import { writeJsonAtomic } from './utils/fs.js';
 import { fingerprintAuthProvenanceValue } from './utils/authProvenanceFingerprint.js';
+import {
+  refreshSourceRootFreshnessInspection,
+  type SourceRootFreshnessInspection
+} from './utils/sourceRootFreshness.js';
 import {
   createRuntimeCodexCommandContext,
   formatRuntimeSelectionSummary,
@@ -459,6 +464,7 @@ export interface ProviderLinearWorkerProof {
   appserver_supervision?: ProviderLinearWorkerAppServerSupervisionProof | null;
   auth_provenance?: ProviderLinearWorkerAuthProvenance | null;
   worker_control?: ProviderLinearWorkerControlPlane | null;
+  source_root_freshness?: SourceRootFreshnessInspection | null;
   failure_diagnosis?: ProviderLinearWorkerFailureDiagnosis | null;
   owner_phase: string;
   owner_status: 'in_progress' | 'succeeded' | 'failed';
@@ -5385,6 +5391,7 @@ function buildProviderWorkerSessionLogHydrationProofSignature(
     rate_limits: proof.rate_limits ?? null,
     auth_provenance: proof.auth_provenance ?? null,
     worker_control: proof.worker_control ?? null,
+    source_root_freshness: proof.source_root_freshness ?? null,
     failure_diagnosis: proof.failure_diagnosis ?? null
   });
 }
@@ -5796,6 +5803,7 @@ function normalizeProviderLinearWorkerProofForUpdatedAtComparison(
     auth_provenance: proof.auth_provenance ?? null,
     failure_diagnosis: proof.failure_diagnosis ?? null,
     worker_host: proof.worker_host ?? null,
+    source_root_freshness: proof.source_root_freshness ?? null,
     source_setup: proof.source_setup ?? null,
     linear_budget: proof.linear_budget ?? null,
     tracked_issue_error: proof.tracked_issue_error ?? null,
@@ -5848,6 +5856,7 @@ function selectProviderLinearWorkerProofTelemetryFields(
     rate_limits: proof.rate_limits ?? null,
     auth_provenance: proof.auth_provenance ?? null,
     worker_control: proof.worker_control ?? null,
+    source_root_freshness: proof.source_root_freshness ?? null,
     failure_diagnosis: proof.failure_diagnosis ?? null,
     owner_phase: proof.owner_phase,
     owner_status: proof.owner_status,
@@ -7090,6 +7099,96 @@ function applyProviderWorkerRuntimeSelectionToManifest(input: {
     provider_worker_control: input.manifest.provider_worker_control ?? null
   });
   return before !== after;
+}
+
+async function readProviderWorkerControlHostSourceRootFreshness(
+  context: Pick<
+    ProviderLinearWorkerContext,
+    | 'controlHostManifestPath'
+    | 'manifestPath'
+    | 'providerControlHostRunId'
+    | 'providerControlHostTaskId'
+    | 'runDir'
+  >
+): Promise<SourceRootFreshnessInspection | null> {
+  const controlHostRunDir = resolveProviderWorkerControlHostRunDir(context);
+  const runDirs = [
+    ...new Set(
+      [
+        controlHostRunDir,
+        dirname(context.controlHostManifestPath),
+        context.runDir
+      ].filter((entry): entry is string => Boolean(entry))
+    )
+  ];
+  for (const runDir of runDirs) {
+    const owner = await readControlHostOwnerMetadata(runDir).catch(() => null);
+    if (owner?.source_root_freshness) {
+      return refreshSourceRootFreshnessInspection(owner.source_root_freshness, owner.repo_root);
+    }
+  }
+  return null;
+}
+
+function resolveProviderWorkerControlHostRunDir(
+  context: Pick<
+    ProviderLinearWorkerContext,
+    'manifestPath' | 'providerControlHostRunId' | 'providerControlHostTaskId'
+  >
+): string | null {
+  if (!context.providerControlHostTaskId || !context.providerControlHostRunId) {
+    return null;
+  }
+  const runsRoot = resolveRunsRootFromProviderWorkerManifestPath(context.manifestPath);
+  if (!runsRoot) {
+    return null;
+  }
+  try {
+    return join(
+      runsRoot,
+      sanitizeTaskId(context.providerControlHostTaskId),
+      'cli',
+      sanitizeRunId(context.providerControlHostRunId)
+    );
+  } catch {
+    return null;
+  }
+}
+
+function resolveRunsRootFromProviderWorkerManifestPath(manifestPath: string): string | null {
+  const resolvedManifestPath = resolve(manifestPath);
+  const runDir = dirname(resolvedManifestPath);
+  const cliDir = dirname(runDir);
+  const taskDir = dirname(cliDir);
+  const runsRoot = dirname(taskDir);
+  if (
+    basename(resolvedManifestPath) !== 'manifest.json' ||
+    basename(cliDir) !== 'cli'
+  ) {
+    return null;
+  }
+  return runsRoot;
+}
+
+async function refreshProviderWorkerProofSourceRootFreshness(
+  context: Pick<
+    ProviderLinearWorkerContext,
+    | 'controlHostManifestPath'
+    | 'manifestPath'
+    | 'providerControlHostRunId'
+    | 'providerControlHostTaskId'
+    | 'repoRoot'
+    | 'runDir'
+  >,
+  proof: ProviderLinearWorkerProof
+): Promise<ProviderLinearWorkerProof> {
+  const sourceRootFreshness = proof.source_root_freshness
+    ? refreshSourceRootFreshnessInspection(proof.source_root_freshness, context.repoRoot)
+    : await readProviderWorkerControlHostSourceRootFreshness(context);
+  return {
+    ...proof,
+    source_root_freshness: sourceRootFreshness
+  };
 }
 
 async function persistProviderWorkerRuntimeSelectionToManifests(input: {
@@ -9861,6 +9960,7 @@ export async function runProviderLinearWorker(
     runtime: runtimeContext.runtime,
     workerControl
   });
+  const sourceRootFreshness = await readProviderWorkerControlHostSourceRootFreshness(context);
   let finalProof: ProviderLinearWorkerProof = {
     issue_id: context.issueId,
     issue_identifier: context.issueIdentifier,
@@ -9893,6 +9993,7 @@ export async function runProviderLinearWorker(
       observedAt: attemptStartedAt
     }),
     worker_control: workerControl,
+    source_root_freshness: sourceRootFreshness,
     failure_diagnosis: null,
     owner_phase: 'bootstrapping',
     owner_status: 'in_progress',
@@ -9927,8 +10028,15 @@ export async function runProviderLinearWorker(
     );
   };
 
+  const writeFreshProofSnapshot = async (
+    nextProof: ProviderLinearWorkerProof
+  ): Promise<ProviderLinearWorkerProof> => {
+    const proofWithFreshSourceRoot = await refreshProviderWorkerProofSourceRootFreshness(context, nextProof);
+    return await writeProofSnapshot(deps, context.runDir, auditPath, proofWithFreshSourceRoot, childEnv);
+  };
+
   const persistProof = async (nextProof: ProviderLinearWorkerProof): Promise<ProviderLinearWorkerProof> => {
-    const hydratedProof = await writeProofSnapshot(deps, context.runDir, auditPath, nextProof, childEnv);
+    const hydratedProof = await writeFreshProofSnapshot(nextProof);
     emitSemanticProgressIfChanged(hydratedProof);
     await requestProviderControlHostRefresh({
       currentManifestPath: context.controlHostManifestPath,
@@ -10130,16 +10238,10 @@ export async function runProviderLinearWorker(
               if (liveRefreshClosed || !shouldKeepPollingLiveSemanticState(finalProof)) {
                 return;
               }
-              const hydratedProof = await writeProofSnapshot(
-                deps,
-                context.runDir,
-                auditPath,
-                {
-                  ...finalProof,
-                  updated_at: deps.now()
-                },
-                childEnv
-              );
+              const hydratedProof = await writeFreshProofSnapshot({
+                ...finalProof,
+                updated_at: deps.now()
+              });
               finalProof = hydratedProof;
               emitSemanticProgressIfChanged(hydratedProof);
               queueLiveRefresh(hydratedProof);
@@ -10250,7 +10352,7 @@ export async function runProviderLinearWorker(
         finalProof = nextProof;
         liveProofWrite = liveProofWrite
           .then(async () => {
-            const hydratedProof = await writeProofSnapshot(deps, context.runDir, auditPath, nextProof, childEnv);
+            const hydratedProof = await writeFreshProofSnapshot(nextProof);
             finalProof = hydratedProof;
             emitSemanticProgressIfChanged(hydratedProof);
             scheduleLiveSemanticStallRefresh(hydratedProof);
@@ -10343,17 +10445,13 @@ export async function runProviderLinearWorker(
       };
       const previousTurnProof = finalProof;
       const turnStartedAt = deps.now();
-      finalProof = await writeProofSnapshot(
-        deps,
-        context.runDir,
-        auditPath,
+      finalProof = await writeFreshProofSnapshot(
         buildProviderLinearWorkerTurnBootstrapProof(
           finalProof,
           turnNumber,
           turnStartedAt,
           resumeSourceThreadIdForTurn
-        ),
-        childEnv
+        )
       );
       const parallelizationDecisionCountBeforeTurn = readProviderLinearParallelizationSnapshots(
         finalProof.linear_audit,
@@ -10694,6 +10792,7 @@ export async function runProviderLinearWorker(
           parsed.authProvenance
         ),
         worker_control: finalProof.worker_control ?? workerControl,
+        source_root_freshness: finalProof.source_root_freshness ?? sourceRootFreshness,
         failure_diagnosis:
           (useAppServerControl ? stderrFailureDiagnosis : parsed.failureDiagnosis) ??
           (useAppServerControl ? parsed.failureDiagnosis : stderrFailureDiagnosis) ??

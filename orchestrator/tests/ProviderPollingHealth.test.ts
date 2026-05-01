@@ -1,6 +1,12 @@
+import { spawnSync } from 'node:child_process';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
+  initializeProviderPollingHealth,
   markProviderPollingCompleted,
   markProviderPollingStarted,
   markProviderPollingStuck,
@@ -10,6 +16,7 @@ import {
 } from '../src/cli/control/providerPollingHealth.js';
 import type { LinearBudgetStatus } from '../src/cli/control/linearBudgetState.js';
 import type { ProviderIssueHandoffService } from '../src/cli/control/providerIssueHandoff.js';
+import { inspectSourceRootFreshness } from '../src/cli/utils/sourceRootFreshness.js';
 
 function buildLinearBudget(
   overrides: Partial<LinearBudgetStatus> = {}
@@ -278,4 +285,104 @@ describe('providerPollingHealth next-refresh projection', () => {
       }
     });
   });
+
+  it('does not refresh control-host source-root freshness on hot polling health reads', async () => {
+    const service = {} as ProviderIssueHandoffService;
+    const repoRoot = await createSourceRootRepo('provider-polling-source-root-');
+
+    try {
+      initializeProviderPollingHealth(service, {
+        intervalMs: 15_000,
+        controlHostOwner: {
+          status: 'owned',
+          reason: null,
+          updated_at: '2026-05-01T00:00:00.000Z',
+          diagnostic_path: null,
+          lock_dir: join(repoRoot, '.runs', 'control-host-owner.lock'),
+          owner_path: join(repoRoot, '.runs', 'control-host-owner.json'),
+          owner: {
+            owner_token: 'owner-token',
+            status: 'owned',
+            pid: 123,
+            ppid: 1,
+            hostname: 'host.local',
+            acquired_at: '2026-05-01T00:00:00.000Z',
+            updated_at: '2026-05-01T00:00:00.000Z',
+            released_at: null,
+            repo_root: repoRoot,
+            task_id: 'local-mcp',
+            run_id: 'control-host',
+            run_dir: join(repoRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+            pipeline_id: 'provider-linear-worker',
+            source_root_freshness: inspectSourceRootFreshness({
+              intendedRepoRoot: repoRoot,
+              packageRoot: repoRoot,
+              argv: ['node', join(repoRoot, 'bin', 'codex-orchestrator.ts')],
+              cwd: repoRoot,
+              now: () => '2026-05-01T00:00:00.000Z'
+            }),
+            lock_dir: join(repoRoot, '.runs', 'control-host-owner.lock'),
+            owner_path: join(repoRoot, '.runs', 'control-host-owner.json')
+          }
+        }
+      });
+
+      const baseHash = git(repoRoot, ['rev-parse', 'HEAD']).stdout.trim();
+      await writeFile(join(repoRoot, 'README.md'), 'origin advanced\n', 'utf8');
+      git(repoRoot, ['add', '.']);
+      git(repoRoot, ['commit', '-m', 'origin advanced']);
+      git(repoRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+      git(repoRoot, ['reset', '--hard', baseHash]);
+
+      expect(
+        readProviderPollingHealth(
+          service,
+          Date.parse('2026-05-01T00:01:00.000Z')
+        )?.control_host_owner?.owner?.source_root_freshness
+      ).toMatchObject({
+        status: 'current',
+        drift_classes: [],
+        source_checkout: {
+          status: 'current',
+          behind: 0
+        }
+      });
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
 });
+
+async function createSourceRootRepo(prefix: string): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), prefix));
+  await mkdir(join(root, 'bin'), { recursive: true });
+  await writeFile(
+    join(root, 'package.json'),
+    `${JSON.stringify({ name: '@kbediako/codex-orchestrator' }, null, 2)}\n`,
+    'utf8'
+  );
+  await writeFile(join(root, 'bin', 'codex-orchestrator.ts'), 'console.log("source");\n', 'utf8');
+  git(root, ['init', '-b', 'main']);
+  git(root, ['add', '.']);
+  git(root, ['commit', '-m', 'base']);
+  git(root, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  return root;
+}
+
+function git(cwd: string, args: string[]): { stdout: string } {
+  const result = spawnSync(
+    'git',
+    ['-c', 'user.name=Codex Test', '-c', 'user.email=codex@example.test', ...args],
+    {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe']
+    }
+  );
+  if (result.error || result.status !== 0) {
+    throw new Error(
+      `git ${args.join(' ')} failed: ${result.stderr || result.error?.message || 'unknown error'}`
+    );
+  }
+  return { stdout: String(result.stdout ?? '') };
+}

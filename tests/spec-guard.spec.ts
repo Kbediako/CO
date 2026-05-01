@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 const scriptPath = join(process.cwd(), 'scripts', 'spec-guard.mjs');
+const SPEC_GUARD_TEST_TIMEOUT_MS = 15_000;
 
 const createdDirs: string[] = [];
 
@@ -325,7 +326,7 @@ afterEach(async () => {
   }
 });
 
-describe('spec-guard script', () => {
+describe('spec-guard script', { timeout: SPEC_GUARD_TEST_TIMEOUT_MS }, () => {
   it('reports missing spec updates when code changes without spec touch (dry-run)', async () => {
     const repo = await initRepository();
 

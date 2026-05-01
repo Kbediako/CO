@@ -25,6 +25,11 @@ import {
 } from './utils/codexFeatures.js';
 import { formatCheckoutPostureSummary, inspectCheckoutPosture, type CheckoutPostureInspection } from './utils/checkoutPosture.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
+import {
+  formatSourceRootFreshnessSummary,
+  inspectSourceRootFreshness,
+  type SourceRootFreshnessInspection
+} from './utils/sourceRootFreshness.js';
 import { resolveOptionalDependency, type OptionalResolutionSource } from './utils/optionalDeps.js';
 import {
   buildCloudPreflightAuthProvenance,
@@ -170,6 +175,7 @@ export interface DoctorResult {
   };
   codex_defaults: DoctorCodexDefaultsAdvisory;
   checkout_posture: CheckoutPostureInspection;
+  source_root_freshness: SourceRootFreshnessInspection;
   collab: {
     status: 'ok' | 'disabled' | 'unavailable';
     enabled: boolean | null;
@@ -421,6 +427,14 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
           : 'not_configured';
   const repoRoot = resolveDoctorRepoRoot(cwd);
   const checkoutPosture = inspectCheckoutPosture(repoRoot);
+  const sourceRootFreshness = inspectSourceRootFreshness({
+    intendedRepoRoot: repoRoot,
+    argv: process.argv.slice(),
+    cwd,
+    packageRoot:
+      normalizeOptionalString(process.env.CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT)
+      ?? normalizeOptionalString(process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT)
+  });
 
   const delegationSnapshot = inspectDelegationMcpConfig(process.env);
   const delegationTransport = classifyDelegationTransport(delegationSnapshot.entry);
@@ -460,6 +474,7 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
     },
     codex_defaults: codexDefaults,
     checkout_posture: checkoutPosture,
+    source_root_freshness: sourceRootFreshness,
     collab: {
       status: collabStatus,
       enabled: collabEnabled,
@@ -880,6 +895,7 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
   }
 
   lines.push(...formatCheckoutPostureSummary(result.checkout_posture));
+  lines.push(...formatSourceRootFreshnessSummary(result.source_root_freshness));
 
   lines.push(`Collab: ${result.collab.status}`);
   if (result.collab.enabled !== null) {

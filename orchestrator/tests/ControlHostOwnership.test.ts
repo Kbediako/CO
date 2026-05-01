@@ -33,6 +33,37 @@ describe('control host ownership', () => {
     return join(root, 'runs', 'local-mcp', 'cli', 'control-host');
   }
 
+  it('records source-root freshness on owner metadata and polling summaries', async () => {
+    const runDir = await createRunDir();
+    const handle = await acquireControlHostOwnership({
+      paths: { runDir },
+      runId: 'control-host',
+      repoRoot: '/repo',
+      taskId: 'local-mcp',
+      pipelineId: 'provider-linear-worker',
+      processId: 123,
+      parentProcessId: 1,
+      host: TEST_HOST,
+      cwd: '/repo',
+      argv: ['node', '/repo/bin/codex-orchestrator.ts', 'control-host'],
+      packageRoot: '/repo',
+      now: () => '2026-04-11T00:00:00.000Z'
+    });
+
+    expect(handle.metadata.source_root_freshness).toMatchObject({
+      schema_version: 1,
+      command_path: '/repo/bin/codex-orchestrator.ts',
+      package_root: '/repo',
+      source_root: '/repo'
+    });
+    expect(handle.polling.owner?.source_root_freshness).toMatchObject({
+      command_path: '/repo/bin/codex-orchestrator.ts',
+      package_root: '/repo'
+    });
+
+    await handle.release();
+  });
+
   it('rejects duplicate same-task startup while preserving the active owner lock', async () => {
     const runDir = await createRunDir();
     const first = await acquireControlHostOwnership({
