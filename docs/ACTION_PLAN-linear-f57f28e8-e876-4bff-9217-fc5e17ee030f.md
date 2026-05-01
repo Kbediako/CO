@@ -31,8 +31,15 @@ Create the CO-458 docs-first packet and guide the parent implementation so contr
   - This task touches stale/cached/inferred provenance behavior. Decision: remove the inferred provenance seam by recording explicit source/root evidence on parent-owned status/proof surfaces.
 - Durable retention evidence:
   - Not applicable; no fallback is retained by this docs packet.
-- Large-refactor check:
-  - A broad provider/control-host refactor is not required for docs packet readiness. Parent should prefer a small shared provenance helper only if multiple status/proof surfaces need the same structured fields.
+- Large-refactor check: parent should keep this scoped to one governed status/proof provenance surface and prefer a small shared provenance helper only if multiple status/proof surfaces need the same structured fields.
+
+## CO-382 Fallback Metadata
+- Large-refactor check: keep this scoped to one governed status/proof provenance surface and one lifecycle phase; a shared helper is acceptable only when it removes duplication across proof, intake, and status projection.
+- Minor-seam behavior is acceptable only because CO-458 removes inferred source-root provenance and records one bounded fallback decision.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| control-host status/proof provenance | inferred or cached source root, package root, command path, and freshness from the current shell, global binary, or prior projection | remove fallback | CO-458 | status/proof output can look current while the supervised control-host actually runs from a stale or different source root | 2026-05-01 | 2026-05-01 | 0 days | `co-status`, doctor, `/api/v1/state`, `/ui/data.json`, and proof snapshots expose explicit read-only command/package/source/git provenance and drift classes | focused provenance tests, full core suite, docs checks, standalone review |
 
 ## Plan
 1. Register the CO-458 packet in the declared files: PRD, ACTION_PLAN, canonical TECH_SPEC, task checklist, `.agent` mirror, `tasks/index.json`, and `docs/TASKS.md`.

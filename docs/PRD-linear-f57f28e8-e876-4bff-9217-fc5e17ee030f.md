@@ -143,6 +143,14 @@
 - Decision: remove the stale/inferred provenance seam by requiring explicit source/root provenance fields on control-host status/proof surfaces.
 - Rationale: inferred source roots are stale/cached operator assumptions. The parent implementation should expose actual command/source/package/git evidence instead of adding another compatibility fallback.
 
+## CO-382 Fallback Metadata
+- Large-refactor check: keep this scoped to one governed status/proof provenance surface and one lifecycle phase; a shared helper is acceptable only when it removes duplication across proof, intake, and status projection.
+- Minor-seam behavior is acceptable only because CO-458 removes inferred source-root provenance and records one bounded fallback decision.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| control-host status/proof provenance | inferred or cached source root, package root, command path, and freshness from the current shell, global binary, or prior projection | remove fallback | CO-458 | status/proof output can look current while the supervised control-host actually runs from a stale or different source root | 2026-05-01 | 2026-05-01 | 0 days | `co-status`, doctor, `/api/v1/state`, `/ui/data.json`, and proof snapshots expose explicit read-only command/package/source/git provenance and drift classes | focused provenance tests, full core suite, docs checks, standalone review |
+
 ## Open Questions
 - Which parent-owned proof artifact should become canonical for the source/root provenance bundle: `provider-linear-worker-proof.json`, `provider-intake-state.json`, the status dataset, or a shared helper feeding all three?
 - Should text `co-status` show only summarized freshness while `--format json` carries the full provenance bundle?
