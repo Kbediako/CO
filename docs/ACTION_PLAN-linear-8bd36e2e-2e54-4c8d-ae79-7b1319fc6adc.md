@@ -33,10 +33,19 @@
 - Fallback / refactor decision:
   - Applies: `Yes` because this lane touches fallback-shaped provider child task identity and guard compatibility.
   - Decision: expire the ambiguous `linear-<issue-id>-docs-review` identity shape unless it is backed by sanctioned provider parent proof or a registered parent prefix; retain strict provenance and task-registration failures as correctness contracts.
-- Durable retention evidence:
-  - `parent_run_id`, provider launch provenance, and `tasks/index.json` registration remain required proof surfaces.
-- Large-refactor check:
-  - A large refactor is not expected. Parent should widen only if the child-stream launch and guard contract cannot be aligned at the existing seams.
+- Large refactor: scoped guard-contract edit is sufficient. Parent should widen only if the child-stream launch and guard contract cannot be aligned at the existing seams.
+- Minor seam: acceptable only with the bounded expiry and durable strict-failure contract below.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Provider docs-review child task id | `linear-<issue-id>-docs-review` child task identity can launch without enough guard-accepted parent identity. | expire fallback | CO-461 parent implementation | Provider workflow launches `docs-review` child streams. | 2026-05-01 | 2026-05-15 | 2026-05-31 | Child task identity inherits sanctioned provider parent lineage/provenance or uses a guard-registered parent prefix. | Focused valid-parent docs-review child regression clears `delegation-guard`. |
+| Delegation guard strict failure contracts | Contract name: provider docs-review strict provenance and registration guard | justify retaining fallback | Owning surface: `scripts/delegation-guard.mjs` | Steady-state proof: missing provenance, mismatched issue identity, and ordinary unregistered top-level task ids fail closed. | 2026-05-01 | 2026-05-15 | Non-expiring durable retention only with rationale | Non-expiring rationale: strict provenance and task registration are supported correctness contracts, not temporary fallback behavior. | Tests/docs: missing provenance, issue mismatch, registered-prefix mismatch, and ordinary top-level registration regressions. |
+
+- Contract name: provider docs-review strict provenance and registration guard.
+- Owning surface: `scripts/delegation-guard.mjs`.
+- Steady-state proof: missing provenance, mismatched issue identity, and ordinary unregistered top-level task ids fail closed.
+- Tests/docs: missing provenance, issue mismatch, registered-prefix mismatch, and ordinary top-level registration regressions.
+- Non-expiring rationale: strict provenance and task registration are supported correctness contracts, not temporary fallback behavior.
 
 ## Milestones & Sequencing
 1. Register docs-first packet and task index entry.

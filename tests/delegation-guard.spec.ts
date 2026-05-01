@@ -1629,8 +1629,10 @@ describe('delegation-guard script', () => {
 
   it('rejects provider docs-review child runs when the registered parent prefix does not match', async () => {
     const registeredParentKey = 'CO-458-source-root-freshness-drift';
+    const observedUnregisteredChildTask = 'linear-lin-issue-1-docs-review';
     const fixture = await createProviderDocsReviewChildFixture({
-      claimTaskId: registeredParentKey,
+      parentTaskId: registeredParentKey,
+      childTaskId: observedUnregisteredChildTask,
       registeredParentKey
     });
     tempDir = fixture.dir;

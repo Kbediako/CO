@@ -24,6 +24,21 @@
 - [x] Docs-review manifest captured - Evidence: `.runs/linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc-docs-review/cli/2026-05-01T16-49-31-779Z-1304879a/manifest.json` status `succeeded`; delegation guard treated the docs-review child as a subagent run for the parent task.
 - [x] Implementation review manifest captured - Evidence: parent standalone review telemetry above plus docs-review child review telemetry `.runs/linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc-docs-review/cli/2026-05-01T16-49-31-779Z-1304879a/review/telemetry.json` status `succeeded`, review outcome `clean-success`.
 
+### CO-382 Fallback Metadata
+- Large refactor: scoped child-stream task id construction and guard-side provider contract recognition are sufficient for this lane.
+- Minor seam: acceptable only with the bounded expiry and durable strict-failure contract below.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Provider docs-review child task id | `linear-<issue-id>-docs-review` child task identity can launch without enough guard-accepted parent identity. | expire fallback | CO-461 parent implementation | Provider workflow launches `docs-review` child streams. | 2026-05-01 | 2026-05-15 | 2026-05-31 | Child task identity inherits sanctioned provider parent lineage/provenance or uses a guard-registered parent prefix. | Focused valid-parent docs-review child regression clears `delegation-guard`. |
+| Delegation guard strict failure contracts | Contract name: provider docs-review strict provenance and registration guard | justify retaining fallback | Owning surface: `scripts/delegation-guard.mjs` | Steady-state proof: missing provenance, mismatched issue identity, and ordinary unregistered top-level task ids fail closed. | 2026-05-01 | 2026-05-15 | Non-expiring durable retention only with rationale | Non-expiring rationale: strict provenance and task registration are supported correctness contracts, not temporary fallback behavior. | Tests/docs: missing provenance, issue mismatch, registered-prefix mismatch, and ordinary top-level registration regressions. |
+
+- Contract name: provider docs-review strict provenance and registration guard.
+- Owning surface: `scripts/delegation-guard.mjs`.
+- Steady-state proof: missing provenance, mismatched issue identity, and ordinary unregistered top-level task ids fail closed.
+- Tests/docs: missing provenance, issue mismatch, registered-prefix mismatch, and ordinary top-level registration regressions.
+- Non-expiring rationale: strict provenance and task registration are supported correctness contracts, not temporary fallback behavior.
+
 ### Progress Log (continuity)
 - 2026-05-01: Created docs-first packet from parent-provided child-lane instructions, local source payload lineage, and read-only local packet/source inspection.
 - 2026-05-01: Registered PRD, TECH_SPEC mirror, ACTION_PLAN, canonical task spec, task checklist, and `tasks/index.json`. No Linear/GitHub/PR lifecycle surfaces were mutated, and no source/test files were edited.

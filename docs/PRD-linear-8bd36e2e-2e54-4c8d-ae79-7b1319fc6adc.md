@@ -144,12 +144,16 @@
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Provider docs-review child task id | `linear-<issue-id>-docs-review` can be launched without enough guard-accepted parent identity. | expire fallback | CO-461 parent implementation | Provider worker launches `docs-review`. | existing provider child-stream behavior | 2026-05-01 | 30 days | Child task identity either inherits sanctioned provider parent lineage/provenance or uses a guard-registered parent prefix. | Focused valid-parent docs-review child regression clears `delegation-guard`. |
-| Provider provenance failure | Missing or mismatched provider provenance fails closed. | justify retaining fallback | CO-461 parent implementation | Provider child or provider-started guard validation. | existing provider guard contract | 2026-05-01 | Non-expiring correctness contract | Replace only with stricter/equivalent provenance proof. | Missing and mismatched provenance regressions fail closed. |
-| Ordinary top-level task registration | Unregistered top-level task ids fail guard. | justify retaining fallback | CO-461 parent implementation | `delegation-guard` validates task registration. | existing delegation guard contract | 2026-05-01 | Non-expiring correctness contract | Replace only with stricter/equivalent registration proof. | Ordinary unregistered top-level regression fails. |
+| Provider docs-review child task id | `linear-<issue-id>-docs-review` child task identity can launch without enough guard-accepted parent identity. | expire fallback | CO-461 parent implementation | Provider workflow launches `docs-review` child streams. | 2026-05-01 | 2026-05-15 | 2026-05-31 | Child task identity inherits sanctioned provider parent lineage/provenance or uses a guard-registered parent prefix. | Focused valid-parent docs-review child regression clears `delegation-guard`. |
+| Delegation guard strict failure contracts | Contract name: provider docs-review strict provenance and registration guard | justify retaining fallback | Owning surface: `scripts/delegation-guard.mjs` | Steady-state proof: missing provenance, mismatched issue identity, and ordinary unregistered top-level task ids fail closed. | 2026-05-01 | 2026-05-15 | Non-expiring durable retention only with rationale | Non-expiring rationale: strict provenance and task registration are supported correctness contracts, not temporary fallback behavior. | Tests/docs: missing provenance, issue mismatch, registered-prefix mismatch, and ordinary top-level registration regressions. |
 
-- Durable retention evidence: strict provenance and task-registration failures are retained correctness contracts, not temporary bypasses.
-- Large-refactor check: no large refactor is expected if the parent can make provider child task identity and guard proof agree at the child-stream launch or guard contract seam. Relaunch with widened ownership if source inspection proves the fix requires broader provider-worker launch restructuring.
+- Contract name: provider docs-review strict provenance and registration guard.
+- Owning surface: `scripts/delegation-guard.mjs`.
+- Steady-state proof: missing provenance, mismatched issue identity, and ordinary unregistered top-level task ids fail closed.
+- Tests/docs: missing provenance, issue mismatch, registered-prefix mismatch, and ordinary top-level registration regressions.
+- Non-expiring rationale: strict provenance and task registration are supported correctness contracts, not temporary fallback behavior.
+- Large refactor: scoped guard-contract edit is sufficient when provider child task identity and guard proof agree at the child-stream launch or guard contract seam. Relaunch with widened ownership if source inspection proves the fix requires broader provider-worker launch restructuring.
+- Minor seam: acceptable only with the bounded expiry and durable strict-failure contract above.
 
 ## Open Questions
 - Parent should choose whether to solve the mismatch by propagating valid provider parent provenance/lineage into the docs-review child or by changing the child task id to a registered parent prefix.
