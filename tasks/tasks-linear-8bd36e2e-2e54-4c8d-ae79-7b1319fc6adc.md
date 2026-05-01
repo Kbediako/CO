@@ -24,7 +24,7 @@
 - [x] Docs-review manifest captured - Evidence: `.runs/linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc-docs-review/cli/2026-05-01T16-49-31-779Z-1304879a/manifest.json` status `succeeded`; delegation guard treated the docs-review child as a subagent run for the parent task.
 - [x] Implementation review manifest captured - Evidence: parent standalone review telemetry above plus docs-review child review telemetry `.runs/linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc-docs-review/cli/2026-05-01T16-49-31-779Z-1304879a/review/telemetry.json` status `succeeded`, review outcome `clean-success`.
 
-### CO-382 Fallback Metadata
+### CO-461 Fallback Metadata
 - Large refactor: scoped child-stream task id construction and guard-side provider contract recognition are sufficient for this lane.
 - Minor seam: acceptable only with the bounded expiry and durable strict-failure contract below.
 
