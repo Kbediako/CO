@@ -36,6 +36,14 @@
 - Delegation/process policy tightened: top-level task streams require manifest-backed delegation evidence by default, with explicit override rationale when unavailable.
 - These policy updates post-date the coordinator planning drafts and must be reflected before implementation work starts.
 
+## CO-382 Fallback Metadata
+- Large-refactor check: no large refactor is required because CO-452 only corrects a stale posture note inside this control-bridge planning PRD.
+- Minor-seam check: the bounded minor-seam correction is acceptable because control-bridge scope, auth, and runtime-mode semantics remain unchanged.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `js_repl` control-bridge policy note | implementation-prep doc referenced enable/disable lanes for a removed feature | remove fallback | CO-452 | Codex CLI `0.128.0` removed `js_repl` | 2026-03-03 | 2026-05-01 | immediate removal | this PRD no longer recommends relying on `js_repl` gates for control-bridge implementation | `spec-guard`, docs checks |
+
 ### What must be updated before coding
 - Update bridge contract language to align with current runtime policy wording (appserver default, CLI break-glass) without changing the Coordinator-only control scope.
 - Define the control auth token boundary precisely (issuer, audience, scope, expiry, rotation expectations, and failure semantics) while keeping CO as the enforcement point.

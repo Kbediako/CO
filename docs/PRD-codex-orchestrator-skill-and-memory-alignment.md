@@ -4,6 +4,14 @@
 - Problem Statement: CO currently lacks a dedicated bundled `codex-orchestrator` entrypoint skill that routes users to the right downstream skills, and docs/guidance still contain drift in feature naming (`memory_tool` vs canonical `memories`) plus stale Codex stable-version references.
 - Desired Outcome: ship a minimal, high-leverage guidance update that introduces a dedicated bundled `codex-orchestrator` skill, aligns canonical feature naming and policy wording across repo guidance, and refreshes version references to current stable policy.
 
+## CO-382 Fallback Metadata
+- Large-refactor check: no large refactor is required because CO-452 supersedes only the stale `js_repl` posture note in this historical task packet.
+- Minor-seam check: the bounded minor-seam correction is acceptable because memory-skill alignment remains unchanged while removed-feature guidance now points to CO-452.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `js_repl` posture guardrail note | historical guardrail preserved a now-removed default-on posture | remove fallback | CO-452 | Codex CLI `0.128.0` removed `js_repl` | 2026-03-03 | 2026-05-01 | immediate removal | this PRD points to CO-452 as the superseding posture instead of preserving default-on guidance | `spec-guard`, docs checks |
+
 ## User Request Translation (Context Anchor)
 - User intent / needs (in your own words): confirm whether a codex-orchestrator usage skill exists; if missing, decide deeply whether it should be shipped and what it should include; keep docs globally aligned and relevant.
 - Success criteria / acceptance:
