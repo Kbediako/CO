@@ -75,7 +75,7 @@
    - Files: parent lane owned manifests, workpad, PR, and review artifacts.
    - Commands: parent lane to choose focused and broader validation gates.
    - Acceptance: parent captures validation/review evidence and handles Linear/GitHub lifecycle after docs-review child-stream truth is clean.
-   - [ ] Status: Pending parent implementation - Evidence: pending.
+   - [ ] Status: Pending parent handoff/lifecycle closeout - Evidence: implementation and validation evidence captured above; PR #741 ready-review and Linear handoff pending.
 
 ## Relevant Files
 - `docs/PRD-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md`
@@ -94,6 +94,6 @@
 ## Notes
 - PRD/TECH_SPEC/ACTION_PLAN Requirements: Complete for this docs packet.
 - Intent checksum / parity matrix status: Captured in PRD, TECH_SPEC, ACTION_PLAN, and checklist.
-- Approvals Needed: Parent lane review before implementation.
+- Approvals Needed: Parent lane final handoff review and lifecycle closeout.
 - Scope note: `.agent/task`, `docs/TASKS.md`, docs freshness registry updates, source files, and tests are not included because this child lane's declared file scope is limited to the packet files and `tasks/index.json`.
 - Subagent usage: This is already a bounded same-issue child lane; no nested delegation was launched from this docs-only packet scope.
