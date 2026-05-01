@@ -16969,6 +16969,34 @@
         "agent_task": ".agent/task/linear-fd05f8a0-420a-4313-a462-690881c0a45c.md",
         "docs": "docs/TECH_SPEC-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md"
       }
+    },
+    {
+      "id": "20260501-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc",
+      "title": "CO-454 resolve March 31 docs freshness candidate cohorts",
+      "relates_to": "tasks/tasks-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-01",
+      "approvals": {
+        "traceability_packet": {
+          "reviewer": "CO-454 traceability packet branch",
+          "date": "2026-05-01",
+          "status": "produced",
+          "summary": "Created the CO-454 docs-first packet and registry mirrors to clear backlog_head_follow_up_traceability_pending; actual March 31 docs freshness candidate cohort resolution and fresh owner evidence remain parent-owned."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
+        "task": "tasks/tasks-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
+        "agent_task": ".agent/task/linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md"
+        }
+      }
     }
   ]
 }
