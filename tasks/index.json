@@ -7806,12 +7806,19 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-31",
+      "last_review": "2026-05-01",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-03-31",
           "manifest": ".runs/linear-cd3020f3-b6be-4adb-ae00-1a15497de036-docs-review/cli/2026-03-31T08-32-40-711Z-9badba58/manifest.json"
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex worker for CO-454",
+          "date": "2026-05-01",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-03-31",
+          "summary": "Live Linear issue-context confirmed CO-55 is Done; reclassified the March 31 task packet/spec mirrors as completed-lane historical metadata without weakening spec-guard."
         }
       },
       "paths": {
@@ -7819,7 +7826,8 @@
         "task": "tasks/tasks-linear-cd3020f3-b6be-4adb-ae00-1a15497de036.md",
         "agent_task": ".agent/task/linear-cd3020f3-b6be-4adb-ae00-1a15497de036.md",
         "docs": "docs/TECH_SPEC-linear-cd3020f3-b6be-4adb-ae00-1a15497de036.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260331-linear-50228784-e908-4b2f-81b5-d94dbcf6707c",
@@ -7829,12 +7837,19 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-31",
+      "last_review": "2026-05-01",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-03-31",
           "manifest": ".runs/linear-50228784-e908-4b2f-81b5-d94dbcf6707c-co-52-docs-review/cli/2026-03-31T08-30-32-323Z-139a4464/manifest.json"
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex worker for CO-454",
+          "date": "2026-05-01",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-03-31",
+          "summary": "Live Linear issue-context confirmed CO-52 is Done; reclassified the March 31 task packet/spec mirrors as completed-lane historical metadata without weakening spec-guard."
         }
       },
       "paths": {
@@ -7842,7 +7857,8 @@
         "task": "tasks/tasks-linear-50228784-e908-4b2f-81b5-d94dbcf6707c.md",
         "agent_task": ".agent/task/linear-50228784-e908-4b2f-81b5-d94dbcf6707c.md",
         "docs": "docs/TECH_SPEC-linear-50228784-e908-4b2f-81b5-d94dbcf6707c.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260331-linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be",
@@ -7852,12 +7868,19 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-31",
+      "last_review": "2026-05-01",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-03-31",
           "manifest": ".runs/linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be-docs-review/cli/2026-03-31T08-23-01-823Z-0c86b6cb/manifest.json"
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex worker for CO-454",
+          "date": "2026-05-01",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-03-31",
+          "summary": "Live Linear issue-context confirmed CO-56 is Done; reclassified the March 31 task packet/spec mirrors as completed-lane historical metadata without weakening spec-guard."
         }
       },
       "paths": {
@@ -7865,7 +7888,8 @@
         "task": "tasks/tasks-linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be.md",
         "agent_task": ".agent/task/linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be.md",
         "docs": "docs/TECH_SPEC-linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260331-linear-06732957-908a-4f3e-96b5-bebb33fc612e",
@@ -7875,12 +7899,19 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-31",
+      "last_review": "2026-05-01",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-03-31",
           "manifest": ".runs/linear-06732957-908a-4f3e-96b5-bebb33fc612e-co-54-docs-review/cli/2026-03-31T08-25-28-926Z-ced6037e/manifest.json"
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex worker for CO-454",
+          "date": "2026-05-01",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-03-31",
+          "summary": "Live Linear issue-context confirmed CO-54 is Done; reclassified the March 31 task packet/spec mirrors as completed-lane historical metadata without weakening spec-guard."
         }
       },
       "paths": {
@@ -7888,7 +7919,8 @@
         "task": "tasks/tasks-linear-06732957-908a-4f3e-96b5-bebb33fc612e.md",
         "agent_task": ".agent/task/linear-06732957-908a-4f3e-96b5-bebb33fc612e.md",
         "docs": "docs/TECH_SPEC-linear-06732957-908a-4f3e-96b5-bebb33fc612e.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260331-linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277",
@@ -7898,13 +7930,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-31",
+      "last_review": "2026-05-01",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-03-31",
           "manifest": ".runs/linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277-co-45-docs-review/cli/2026-03-31T05-38-11-020Z-51bac25e/manifest.json",
           "override_reason": "review telemetry classified the wrapper result as failed-boundary/startup-anchor; docs approval used the recorded fallback in out/linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277/manual/20260331T165600Z-docs-review-fallback.md after delegation-guard, spec-guard, docs:check, and docs:freshness passed"
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex worker for CO-454",
+          "date": "2026-05-01",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-03-31",
+          "summary": "Live Linear issue-context confirmed CO-45 is Done; reclassified the March 31 task packet/spec mirrors as completed-lane historical metadata without weakening spec-guard."
         }
       },
       "paths": {
@@ -7912,7 +7951,8 @@
         "task": "tasks/tasks-linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277.md",
         "agent_task": ".agent/task/linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277.md",
         "docs": "docs/TECH_SPEC-linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260330-linear-9ff97d4a-dead-4bbf-b6e8-ee9423fa1612",
@@ -16968,6 +17008,51 @@
         "task": "tasks/tasks-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md",
         "agent_task": ".agent/task/linear-fd05f8a0-420a-4313-a462-690881c0a45c.md",
         "docs": "docs/TECH_SPEC-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md"
+      }
+    },
+    {
+      "id": "20260501-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc",
+      "title": "CO-454 resolve March 31 docs freshness candidate cohorts",
+      "relates_to": "tasks/tasks-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-01",
+      "approvals": {
+        "traceability_packet": {
+          "reviewer": "CO-454 traceability packet branch",
+          "date": "2026-05-01",
+          "status": "produced",
+          "summary": "Created the CO-454 docs-first packet and registry mirrors to clear backlog_head_follow_up_traceability_pending."
+        },
+        "completed_lane_reclassification": {
+          "reviewer": "Codex worker for CO-454",
+          "date": "2026-05-01",
+          "status": "validated",
+          "summary": "Live Linear issue-context confirmed CO-54, CO-45, CO-52, CO-55, and CO-56 are Done; reclassified five task specs to inactive done and archived 30 matching registry rows without weakening docs freshness or spec-guard.",
+          "validation": [
+            "node scripts/spec-guard.mjs --dry-run",
+            "npm run docs:freshness",
+            "npm run docs:freshness:maintain -- --format json",
+            "npm run docs:check"
+          ]
+        },
+        "docs_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-01",
+          "status": "bounded-success",
+          "manifest": ".runs/linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc/cli/2026-05-01T06-07-46-062Z-cbb5e775/manifest.json",
+          "summary": "Manifest-backed pre-handoff review completed with no actionable findings; telemetry recorded bounded-success via command-intent."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
+        "task": "tasks/tasks-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
+        "agent_task": ".agent/task/linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
+        "prd": "docs/PRD-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
+        "docs": "docs/TECH_SPEC-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
+        "action_plan": "docs/ACTION_PLAN-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md"
       }
     }
   ]
