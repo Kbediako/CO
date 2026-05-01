@@ -6,13 +6,13 @@
 - Assumptions: generic cloud feature flag support remains valid for non-removed feature names.
 
 ## Issue Readiness Gate
-- Intent checksum / protected terms carried forward: `js_repl`, `js_repl_tools_only`, `removed false`, `CODEX_CLOUD_ENABLE_FEATURES=js_repl`, `CODEX_CLOUD_DISABLE_FEATURES=js_repl`, `codex features enable js_repl`, `codex features disable js_repl`, `CO-449`, `CO-450`, `CO-451`.
+- Intent checksum / protected terms carried forward: `js_repl`, `js_repl_tools_only`, `removed false`, `CODEX_CLOUD_ENABLE_FEATURES=js_repl`, `CODEX_CLOUD_ENABLE_FEATURES=js_repl_tools_only`, `CODEX_CLOUD_DISABLE_FEATURES=js_repl`, `CODEX_CLOUD_DISABLE_FEATURES=js_repl_tools_only`, `codex features enable js_repl`, `codex features enable js_repl_tools_only`, `codex features disable js_repl`, `codex features disable js_repl_tools_only`, `CO-449`, `CO-450`, `CO-451`.
 - Not done if: any current-facing doc still recommends `js_repl` toggles; tests still encode `js_repl` as an active feature; historical packet docs can be mistaken for current posture.
 - Pre-implementation issue-quality review: 2026-05-01 parent review confirms the lane must cover docs plus code/test surfaces and must not broaden into adjacent release-intake issues.
 - Fallback / refactor decision: this lane removes stale default-on and break-glass guidance for a removed feature; it does not introduce or retain a fallback seam.
 - Durable retention evidence: not applicable because the stale `js_repl` active posture is removed, while old evidence docs are retained only as history.
 - Large-refactor check: no large refactor is required because CO-452 removes the stale `js_repl` active posture instead of adding another compatibility layer.
-- Minor-seam check: the bounded minor-seam removal is acceptable because generic cloud feature pass-through remains intact while only removed-feature guidance and canary affordances are retired.
+- Minor-seam check: the bounded minor-seam removal is acceptable because generic cloud feature pass-through remains intact; only guidance and canary affordances for the removed feature are retired.
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -24,7 +24,7 @@
 2. Capture docs-review evidence before implementation. Completed: `.runs/linear-d412792b-9a2a-43d9-96dc-ca021e728d09-docs-review/cli/2026-04-30T23-45-07-409Z-1e813802/manifest.json`.
 3. Update current-facing docs and remove the active `js_repl` canary affordance. Completed in current diff.
 4. Update cloud feature pass-through tests to use non-removed examples. Completed in current diff.
-5. Accept or reject the bounded child-lane patch for historical packet labeling. Child helper accept failed on Linear `updated_at` drift; parent manually imported the clean checked patch.
+5. Accept or reject the bounded child-lane patch for historical packet labeling. Child helper acceptance failed due to Linear `updated_at` drift; parent manually imported the clean checked patch.
 6. Run targeted and full validation, standalone review, elegance review, PR checks, and ready-review drain.
 
 ## Dependencies

@@ -42,7 +42,7 @@
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `js_repl` control-bridge policy note | implementation-prep doc referenced enable/disable lanes for a removed feature | remove fallback | CO-452 | Codex CLI `0.128.0` removed `js_repl` | 2026-03-03 | 2026-05-01 | immediate removal | this PRD no longer recommends relying on `js_repl` gates for control-bridge implementation | `spec-guard`, docs checks |
+| `js_repl` control-bridge policy note | implementation-prep doc that referenced enable/disable lanes for a now-removed feature | remove fallback | CO-452 | Codex CLI `0.128.0` removed `js_repl` | 2026-03-03 | 2026-05-01 | immediate removal | this PRD no longer recommends relying on `js_repl` gates for control-bridge implementation | `spec-guard`, docs checks |
 
 ### What must be updated before coding
 - Update bridge contract language to align with current runtime policy wording (appserver default, CLI break-glass) without changing the Coordinator-only control scope.

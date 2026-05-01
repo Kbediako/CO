@@ -12,7 +12,7 @@ This mirror exists for docs navigation and freshness tracking. The implementatio
 
 ## CO-382 Fallback Metadata
 - Large-refactor check: no large refactor is required because CO-452 removes the stale `js_repl` active posture instead of adding another compatibility layer.
-- Minor-seam check: the bounded minor-seam removal is acceptable because generic cloud feature pass-through remains intact while only removed-feature guidance and canary affordances are retired.
+- Minor-seam check: the bounded minor-seam removal is acceptable because generic cloud feature pass-through remains intact, while only removed-feature guidance and canary affordances are retired.
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

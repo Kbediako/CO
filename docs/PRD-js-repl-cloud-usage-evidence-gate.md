@@ -1,12 +1,12 @@
 # PRD - JS_REPL + Cloud Usage Evidence Gate (0990)
 
 ## Archive Status
-- Historical packet only. As of Codex CLI 0.128.0, `js_repl` has been removed, so this evidence-gate packet is not current `js_repl` usage guidance.
+- Historical packet only; as of Codex CLI 0.128.0, `js_repl` has been removed, so this evidence-gate packet is not current `js_repl` usage guidance.
 - Preserve this document as historical context for the prior evidence-gate decision; do not use it to justify enabling, recommending, or feature-gating `js_repl` in current CO guidance.
 
 ## CO-382 Fallback Metadata
 - Large-refactor check: no large refactor is required because CO-452 removes the stale `js_repl` active posture instead of adding another compatibility layer.
-- Minor-seam check: the bounded minor-seam removal is acceptable because generic cloud feature pass-through remains intact while only removed-feature guidance and canary affordances are retired.
+- Minor-seam check: the bounded minor-seam removal is acceptable because generic cloud feature pass-through remains intact, while only removed-feature guidance and canary affordances are retired.
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

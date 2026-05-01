@@ -6,7 +6,7 @@
 
 ## CO-382 Fallback Metadata
 - Large-refactor check: no large refactor is required because CO-452 removes the stale `js_repl` active posture instead of adding another compatibility layer.
-- Minor-seam check: the bounded minor-seam removal is acceptable because generic cloud feature pass-through remains intact while only removed-feature guidance and canary affordances are retired.
+- Minor-seam check: the bounded minor-seam removal is acceptable because generic cloud feature pass-through remains intact, while only removed-feature guidance and canary affordances are retired.
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -16,7 +16,7 @@
 ## Summary
 - Historical goal: produce decision-grade evidence for `js_repl` usage guidance via broad dummy-repo local+cloud simulations, then update global guidance docs.
 - Historical scope: docs-first scaffolding, delegated discovery streams, minimal automation, matrix execution, and synchronized checklists/index/docs.
-- Historical assumptions: cloud environment access remained available for required cloud canary contracts at the time this plan was written.
+- Assumptions at the time: cloud environment access remained available for required cloud canary contracts when this plan was written.
 
 ## Historical Milestones & Sequencing
 1) Docs-first artifacts + task registration/mirrors + delegated stream capture.

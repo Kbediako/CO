@@ -26,7 +26,7 @@
 
 ## CO-382 Fallback Metadata
 - Large-refactor check: no large refactor is required because CO-452 removes the stale `js_repl` active posture instead of adding another compatibility layer.
-- Minor-seam check: the bounded minor-seam removal is acceptable because generic cloud feature pass-through remains intact while only removed-feature guidance and canary affordances are retired.
+- Minor-seam check: the bounded minor-seam removal is acceptable because generic cloud feature pass-through remains intact, while only removed-feature guidance and canary affordances are retired.
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -50,7 +50,7 @@
 
 ## Progress Log
 - 2026-05-01: Live issue context showed `Ready`, no workpad, and no attached PR. Parent moved the issue to `In Progress`, created the single workpad, normalized the detached workspace onto branch `linear/co-452-retire-js-repl-posture` from `origin/main`, recorded `parallelize_now`, and launched child lane `archive-js-repl-packet` for historical packet labeling.
-- 2026-05-01: Parent verified active `/opt/homebrew/bin/codex` is `codex-cli 0.128.0`; `codex features list` reports `js_repl` and `js_repl_tools_only` as `removed false`.
+- 2026-05-01: Parent verified active `codex` is `codex-cli 0.128.0`; `codex features list` reports `js_repl` and `js_repl_tools_only` as `removed false`.
 - 2026-05-01: Docs-review child stream succeeded before implementation. Evidence: `.runs/linear-d412792b-9a2a-43d9-96dc-ca021e728d09-docs-review/cli/2026-04-30T23-45-07-409Z-1e813802/manifest.json`.
 - 2026-05-01: Child lane `archive-js-repl-packet` succeeded and produced a clean three-file patch; helper accept failed after Linear `updated_at` drift, so parent imported the already checked patch manually.
 - 2026-05-01: Parent validation reached `docs:freshness` / `docs:freshness:maintain` and found an unrelated canonical docs freshness blocker: `block_diff_local` on March 31 candidate cohorts owned by live same-project `CO-444`. A clean `origin/main` worktree reproduced the same result, so parent created related follow-up `CO-454` with canonical owner key `docs:freshness:maintain` and should block CO-452 rather than widen into stale packet/mirror debt.
