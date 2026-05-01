@@ -3,7 +3,7 @@
 ## Docs-First
 - [x] PRD, canonical spec, TECH_SPEC mirror, ACTION_PLAN, task checklist, and agent mirror exist for `linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc`.
 - [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` register the docs-first packet.
-- [x] Protected terms are visible: `CO-454`, source `CO-452`, `docs:freshness:maintain`, `codex-orchestrator:canonical-owner-key=docs:freshness:maintain`, March 31 docs freshness candidate cohorts, `block_diff_local`, `co-429-completed-lane-registry-residue`, and `backlog_head_follow_up_traceability_pending`.
+- [x] Protected terms are visible: `CO-454`, source `CO-452`, `docs:freshness:maintain`, `codex-orchestrator:canonical-owner-key=docs:freshness:maintain`, March 31 docs freshness candidate cohorts, `block_diff_local`, `co-429-completed-lane-registry-residue`, `candidate-2026-03-31-cadence-30-age-31`, `docs_freshness_candidate`, and `backlog_head_follow_up_traceability_pending`.
 
 ## Acceptance
 - [x] The traceability packet and registry mirrors exist so autopilot can clear `backlog_head_follow_up_traceability_pending` after the PR lands.
