@@ -51,5 +51,5 @@
 - [x] Record focused and full validation evidence in the workpad or task packet.
 
 ## Validation Evidence
-- 2026-05-02: after merging current `origin/main`, `npm run test:core -- tests/spec-guard.spec.ts -t "external migration cap"` passed with 37 passed / 92 skipped in 19.27s.
-- 2026-05-02: full `npm run test` passed on rerun with 358 files and 5235 tests passed; `tests/spec-guard.spec.ts` passed under full-suite load.
+- 2026-05-02: after merging current `origin/main` at `5463be355`, `npm run test:core -- tests/spec-guard.spec.ts -t "external migration cap"` passed with 37 passed / 92 skipped in 13.24s.
+- 2026-05-02: full `npm run test` passed with 359 files and 5250 tests passed in 388.80s; `tests/spec-guard.spec.ts` passed under full-suite load in 66.859s.

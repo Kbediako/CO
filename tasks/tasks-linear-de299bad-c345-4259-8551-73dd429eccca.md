@@ -17,11 +17,12 @@
 - [x] Child docs lane JSON parse, protected-term scan, and `git diff --check`. Evidence: `.runs/linear-de299bad-c345-4259-8551-73dd429eccca-docs-packet/cli/2026-05-01T03-01-11-354Z-21ccbfb3/manifest.json`.
 - [x] Reproduced: `npm run test:core -- tests/spec-guard.spec.ts -t "external migration cap"` failed on two 5000ms timeouts.
 - [x] Focused pass after fix: `npm run test:core -- tests/spec-guard.spec.ts -t "external migration cap"` passed 36 tests in about 24s.
-- [x] Current merged-branch focused pass: `npm run test:core -- tests/spec-guard.spec.ts -t "external migration cap"` passed 37 tests / 92 skipped in 19.27s after splitting the temporary negated-external-signals timeout loop too.
+- [x] Current merged-branch focused pass: `npm run test:core -- tests/spec-guard.spec.ts -t "external migration cap"` passed 37 tests / 92 skipped in 13.24s after splitting the temporary negated-external-signals timeout loop too.
 - [x] Targeted command-surface pass after env scrub: `npm run test:core -- tests/cli-command-surface.spec.ts -t "launches review via the CLI shell in non-interactive handoff mode"`.
 - [x] `node scripts/spec-guard.mjs --dry-run`.
-- [x] `npm run test` passed on rerun with 358 files / 5235 tests; the first full run had one unrelated `CheckoutPosture` timeout, and the isolated case plus full rerun passed.
-- [ ] Required repo validation, standalone review, elegance pass, PR checks, ready-review drain, and Linear handoff.
+- [x] `npm run test` passed on the current post-`origin/main` merge branch with 359 files / 5250 tests in 388.80s; `tests/spec-guard.spec.ts` passed under full-suite load in 66.859s.
+- [x] Required repo validation passed: delegation guard, spec guard, build, lint, focused test, full test, docs check, docs freshness, repo stewardship, diff budget, and whitespace check.
+- [ ] Standalone review, elegance pass, PR checks, ready-review drain, and Linear handoff.
 
 ## Notes
 - The implementation changed test structure only; no `scripts/spec-guard.mjs` policy logic changed.

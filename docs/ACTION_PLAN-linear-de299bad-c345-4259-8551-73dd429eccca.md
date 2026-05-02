@@ -25,8 +25,8 @@
 
 ## Validation
 - [x] Child docs lane completed and was accepted: `.runs/linear-de299bad-c345-4259-8551-73dd429eccca-docs-packet/cli/2026-05-01T03-01-11-354Z-21ccbfb3/manifest.json`.
-- [x] Focused before/after `npm run test:core -- tests/spec-guard.spec.ts -t "external migration cap"`; current merged-branch pass was 37 passed / 92 skipped in 19.27s.
-- [x] Full `npm run test`; current rerun passed 358 files / 5235 tests after one unrelated `CheckoutPosture` full-suite timeout was isolated and did not reproduce.
+- [x] Focused before/after `npm run test:core -- tests/spec-guard.spec.ts -t "external migration cap"`; current merged-branch pass was 37 passed / 92 skipped in 13.24s.
+- [x] Full `npm run test`; current post-`origin/main` merge run passed 359 files / 5250 tests in 388.80s.
 - [x] `node scripts/spec-guard.mjs --dry-run`.
 - [ ] Required repo validation and review handoff gates.
 
