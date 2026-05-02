@@ -1,0 +1,78 @@
+# Task Checklist - linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc
+
+- Linear Issue: `CO-486` / `6a92b5d9-3293-4e27-9bc5-28c8c62becfc`
+- MCP Task ID: `linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc`
+- PRD: `docs/PRD-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md`
+- TECH_SPEC: `docs/TECH_SPEC-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md`
+- Checklist mirror: `.agent/task/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md`
+- Current child manifest: `.runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc-docs-packet-rebase-r2/cli/2026-05-02T19-51-38-188Z-83e5dfff/manifest.json`
+- Source anchor: `ctx:sha256:968e79825ece74f1535532921c7bb2fe3b53e6ab34bad59ecefe3796d897cfe3#chunk:c000001`
+
+## Docs-First Packet Rebase R2
+- [x] Source payload path checked and available. Evidence: `.runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc-docs-packet-rebase-r2/cli/2026-05-02T19-51-38-188Z-83e5dfff/memory/source-0/source.txt`; source object `sha256:968e79825ece74f1535532921c7bb2fe3b53e6ab34bad59ecefe3796d897cfe3`.
+- [x] PRD recreated inside declared file scope. Evidence: `docs/PRD-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md`.
+- [x] TECH_SPEC recreated inside declared file scope. Evidence: `docs/TECH_SPEC-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md`.
+- [x] ACTION_PLAN recreated inside declared file scope. Evidence: `docs/ACTION_PLAN-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md`.
+- [x] Canonical task spec recreated inside declared file scope. Evidence: `tasks/specs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md`.
+- [x] Task checklist recreated inside declared file scope. Evidence: `tasks/tasks-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md`.
+- [x] Checklist mirrored to `.agent/task`. Evidence: `.agent/task/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md`.
+- [x] Child lane avoided parent-owned registries, source, tests, package files, canary commands, validation scripts, Linear, GitHub, workpad, and PR lifecycle surfaces. Evidence: scoped changed-file review.
+
+## Rework Truth
+- [x] Prior PR `#751` recorded as closed/stale, not active handoff evidence.
+- [x] Parent registry reset commit `e8a904d8c089` recorded as the current branch registry restore point.
+- [x] Stale appserver child lane `docs-packet-rebase` recorded as invalidated.
+- [x] Current r2 child lane `docs-packet-rebase-r2` recorded as packet producer.
+- [x] Linear/workpad authority boundaries preserved as parent-owned.
+
+## Protected Issue Terms
+- [x] live Codex CLI `0.128.0`
+- [x] persisted `/goal` canary
+- [x] goals feature
+- [x] app-server APIs
+- [x] model tools
+- [x] runtime continuation
+- [x] TUI controls
+- [x] provider-worker run evidence
+- [x] manifest evidence contract
+- [x] workpad evidence contract
+- [x] advisory-only `goal_evidence`
+- [x] `authority=advisory_only`
+- [x] provider-worker recovery classification
+- [x] long-poll recovery classification
+- [x] hook recovery classification
+- [x] no hook/resume integration
+- [x] Linear remains source of truth
+- [x] `CO-492` follow-up reference
+
+## Parent-Owned Follow-On
+- [x] Reconcile this r2 packet against current CO-486 Linear issue/workpad truth before relying on it. Evidence: refreshed workpad `73434b16-0c72-44ca-959a-76b078c42fe5` and docs-review run below.
+- [x] Import child patch into the authoritative issue workspace without overwriting parent-owned registry/lifecycle changes. Evidence: `git apply --check` passed for `provider-linear-child-lane.patch`; parent imported only the six declared packet files after helper accept failed closed on a backwards Linear `updated_at` comparison.
+- [x] Run parent-owned docs-review or equivalent packet review after import. Evidence: `.runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc-docs-review-rework/cli/2026-05-02T20-03-43-756Z-b4ecd8e0/manifest.json`.
+- [x] Confirm whether existing live Codex CLI `0.128.0` canary evidence is still sufficient or whether fresh Rework evidence is required. Evidence: parent refreshed `codex-cli 0.128.0`, goals feature enabled, and current model-tool goal canary; prior exec/resume persistence artifact remains the durable persistence proof.
+- [x] Preserve advisory-only `goal_evidence` contract in parent workpad and manifests. Evidence: workpad and TECH_SPEC both record `authority=advisory_only`.
+- [x] Keep hook/resume integration out of scope; any required hook/resume implementation needs a separate owner lane before implementation.
+- [x] Preserve `CO-492` / `779bc931-f6b4-4a1c-b16f-145d500aca73` only as the optional advisory `goal_evidence` provider-worker manifest/workpad capture follow-up.
+- [ ] Complete parent-owned validation, PR lifecycle, feedback drain, and Linear handoff.
+
+## Validation
+- [x] Scoped trailing-whitespace hygiene passes over the six declared files. Evidence: `rg -n '[ \t]+$' ...` returned no matches for declared packet files.
+- [x] Protected-term scan covers the six declared files. Evidence: scoped `rg` found persisted `/goal`, `goal_evidence`, `authority=advisory_only`, `Linear remains source of truth`, `CO-492`, PR `#751`, `e8a904d8c089`, `docs-packet-rebase`, and `docs-packet-rebase-r2`.
+- [x] Child-lane export status review confirms r2 edits stayed inside declared file scope. Evidence: in the child workspace, tracked diff was empty and `git ls-files --others --exclude-standard` listed only the six declared packet files.
+- [x] Parent docs-review or equivalent packet review completed after import. Evidence: docs-review-rework manifest above, clean success.
+- [x] Parent manifest/workpad evidence contract reviewed. Evidence: docs-review output reported no concrete correctness regression in the touched packet files.
+- [x] Parent validation suite passed where required by parent-owned changes. Evidence: delegation guard, spec guard, build, lint, test, docs:check, docs:freshness, repo:stewardship, and diff-budget passed.
+
+## Progress Log
+- 2026-05-02T19:51:38Z: Bounded same-issue docs child lane `docs-packet-rebase-r2` received source anchor `ctx:sha256:968e79825ece74f1535532921c7bb2fe3b53e6ab34bad59ecefe3796d897cfe3#chunk:c000001`.
+- 2026-05-02T19:51:38Z: Packet recreation scope is limited to six docs/task files. Parent owns Linear/workpad truth, registries, implementation, validation, PR lifecycle, and handoff.
+- 2026-05-02T19:51:38Z: Child-lane scoped hygiene, protected-term, and changed-file checks passed; parent-owned validation was still pending at child export time.
+- 2026-05-02T20:00:20Z: Child lane `docs-packet-rebase-r2` completed successfully and emitted `provider-linear-child-lane.patch` plus proof JSON.
+- 2026-05-02T20:06:21Z: Parent docs-review-rework completed with clean success and no concrete correctness regression.
+- 2026-05-02T20:14Z: Parent validation chain through diff-budget completed green; PR lifecycle remains pending.
+
+## Notes
+- Do not edit `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`, source code, tests, package files, canary commands, validation scripts, Linear, GitHub, workpad, or PR lifecycle surfaces in this child lane.
+- Do not decide the final canary result in this child lane beyond preserving the prior advisory-only classification.
+- Do not add hook/resume integration in this lane.

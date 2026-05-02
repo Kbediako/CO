@@ -33,7 +33,16 @@ import type {
 const REVIEW_COMMAND_CHECK_TIMEOUT_MS = 30_000;
 const REVIEW_ARTIFACTS_DIRNAME = 'review';
 const REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE = 'mcp_servers.delegation.enabled=false';
-const REVIEW_READ_ONLY_SANDBOX_CONFIG_OVERRIDE = 'sandbox_mode="read-only"';
+const REVIEW_READ_ONLY_PERMISSION_PROFILE_CONFIG_OVERRIDE = 'default_permissions=":read-only"';
+const REVIEW_LEGACY_READ_ONLY_SANDBOX_CONFIG_OVERRIDE = 'sandbox_mode="read-only"';
+const REVIEW_LEGACY_READ_ONLY_SANDBOX_FALLBACK_OWNER = 'CO-485';
+const REVIEW_LEGACY_READ_ONLY_SANDBOX_FALLBACK_TRIGGER =
+  'active Codex CLI rejects default_permissions';
+const REVIEW_LEGACY_READ_ONLY_SANDBOX_FALLBACK_INTRODUCED_AT = '2026-05-02';
+const REVIEW_LEGACY_READ_ONLY_SANDBOX_FALLBACK_REVIEW_AT = '2026-05-02';
+const REVIEW_LEGACY_READ_ONLY_SANDBOX_FALLBACK_EXPIRES_AT = '2026-06-01';
+const REVIEW_LEGACY_READ_ONLY_SANDBOX_FALLBACK_REMOVAL_CONDITION =
+  'release-facing Codex CLI pins move beyond 0.125 or the pinned CLI accepts default_permissions';
 const REVIEW_PARTIAL_OUTPUT_HINT_BOUNDARY_KINDS = new Set(['timeout', 'stall', 'startup-loop']);
 const COMMAND_INTENT_RETRY_PROMPT_PREFIX = [
   'Strict bounded review retry.',
@@ -62,6 +71,7 @@ interface ReviewArgsOptions {
   includeScopeFlags: boolean;
   disableDelegationMcp: boolean;
   inlineReadOnlySandbox?: boolean;
+  readOnlyConfigOverride?: string;
 }
 
 export interface ReviewArtifactPaths {
@@ -324,14 +334,15 @@ export async function runReviewLaunchAttemptShell(
       commandIntentFailureState,
       options.cliOptions
     );
-    const commandIntentRetryArgs = buildReviewArgs(
-      commandIntentRetryOptions,
-      commandIntentRetryPrompt,
-      {
+    const buildCommandIntentRetryArgs = (readOnlyConfigOverride: string): string[] =>
+      buildReviewArgs(commandIntentRetryOptions, commandIntentRetryPrompt, {
         includeScopeFlags: false,
         disableDelegationMcp,
-        inlineReadOnlySandbox: true
-      }
+        inlineReadOnlySandbox: true,
+        readOnlyConfigOverride
+      });
+    const commandIntentRetryArgs = buildCommandIntentRetryArgs(
+      REVIEW_READ_ONLY_PERMISSION_PROFILE_CONFIG_OVERRIDE
     );
     const commandIntentRetryLaunchContext = buildReviewLaunchContext(
       commandIntentRetryOptions,
@@ -349,13 +360,13 @@ export async function runReviewLaunchAttemptShell(
     }
     // CO-395 justify retaining fallback: durable bounded-review safety contract.
     // This retry preserves the logical scope in the prompt, adds no-validation
-    // guidance, uses read-only sandboxing, and records the original command-intent
+    // guidance, uses a read-only permission profile, and records the original command-intent
     // boundary in success telemetry instead of masking it as clean success.
     console.log(
       '[run-review] bounded review blocked a validation command; retrying once with reviewer-visible inline no-validation context so the reviewer can produce a verdict without running validation.'
     );
     console.log(
-      '[run-review] command-intent retry keeps the original scope in the inline prompt and adds a read-only sandbox override; another validation command remains a fail-closed boundary.'
+      '[run-review] command-intent retry keeps the original scope in the inline prompt and adds a read-only permission-profile override; another validation command remains a fail-closed boundary.'
     );
     try {
       const retryExecution = await options.runReview(resolvedCommandIntentRetry);
@@ -369,6 +380,40 @@ export async function runReviewLaunchAttemptShell(
       );
       return true;
     } catch (retryError) {
+      if (isDefaultPermissionsUnsupportedError(retryError)) {
+        const legacyRetryLaunchContext = withLegacyReadOnlySandboxFallbackContext(
+          commandIntentRetryLaunchContext
+        );
+        const legacyFallbackExpiryError = buildLegacyReadOnlySandboxFallbackExpiryError();
+        if (legacyFallbackExpiryError) {
+          await reportFailure(legacyFallbackExpiryError, legacyRetryLaunchContext);
+          throw legacyFallbackExpiryError;
+        }
+        const legacyRetryArgs = buildCommandIntentRetryArgs(
+          REVIEW_LEGACY_READ_ONLY_SANDBOX_CONFIG_OVERRIDE
+        );
+        const resolvedLegacyRetry = resolveCommand(legacyRetryArgs, options.runtimeContext);
+        if (!resolvedReviewCommandsEqual(resolvedCommandIntentRetry, resolvedLegacyRetry)) {
+          console.log(
+            `[run-review] read-only permission-profile override was rejected by this Codex CLI; retrying command-intent recovery once with legacy sandbox_mode="read-only" compatibility override. legacy_fallback_owner=${REVIEW_LEGACY_READ_ONLY_SANDBOX_FALLBACK_OWNER} legacy_fallback_expires_at=${REVIEW_LEGACY_READ_ONLY_SANDBOX_FALLBACK_EXPIRES_AT}.`
+          );
+          try {
+            const legacyRetryExecution = await options.runReview(resolvedLegacyRetry);
+            if (commandIntentFailureState) {
+              legacyRetryExecution.state.recordCommandIntentViolationsFrom(commandIntentFailureState);
+            }
+            await reportSuccess(
+              legacyRetryExecution,
+              legacyRetryLaunchContext,
+              commandIntentBoundary
+            );
+            return true;
+          } catch (legacyRetryError) {
+            await reportFailure(legacyRetryError, legacyRetryLaunchContext);
+            throw legacyRetryError;
+          }
+        }
+      }
       await reportFailure(retryError, commandIntentRetryLaunchContext);
       throw retryError;
     }
@@ -565,7 +610,7 @@ function buildReviewArgs(
     args.push('-c', REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE);
   }
   if (opts.inlineReadOnlySandbox) {
-    args.push('-c', REVIEW_READ_ONLY_SANDBOX_CONFIG_OVERRIDE);
+    args.push('-c', opts.readOnlyConfigOverride ?? REVIEW_READ_ONLY_PERMISSION_PROFILE_CONFIG_OVERRIDE);
   }
   args.push('review');
   const reviewTitle = resolveReviewTitle(options);
@@ -601,6 +646,31 @@ function buildReviewLaunchContext(
       : 'inline-prompt',
     reviewer_visible_title_source: scopedFlag ? reviewTitle.source : null
   };
+}
+
+function withLegacyReadOnlySandboxFallbackContext(
+  launchContext: ReviewLaunchContext
+): ReviewLaunchContext {
+  return {
+    ...launchContext,
+    legacy_fallback_attempt: 'review-wrapper-read-only-sandbox-compatibility',
+    legacy_fallback_owner: REVIEW_LEGACY_READ_ONLY_SANDBOX_FALLBACK_OWNER,
+    legacy_fallback_trigger: REVIEW_LEGACY_READ_ONLY_SANDBOX_FALLBACK_TRIGGER,
+    legacy_fallback_introduced_at: REVIEW_LEGACY_READ_ONLY_SANDBOX_FALLBACK_INTRODUCED_AT,
+    legacy_fallback_review_at: REVIEW_LEGACY_READ_ONLY_SANDBOX_FALLBACK_REVIEW_AT,
+    legacy_fallback_expires_at: REVIEW_LEGACY_READ_ONLY_SANDBOX_FALLBACK_EXPIRES_AT,
+    legacy_fallback_removal_condition: REVIEW_LEGACY_READ_ONLY_SANDBOX_FALLBACK_REMOVAL_CONDITION
+  };
+}
+
+function buildLegacyReadOnlySandboxFallbackExpiryError(now = new Date()): Error | null {
+  const expiryEnd = Date.parse(`${REVIEW_LEGACY_READ_ONLY_SANDBOX_FALLBACK_EXPIRES_AT}T23:59:59.999Z`);
+  if (!Number.isFinite(expiryEnd) || now.getTime() <= expiryEnd) {
+    return null;
+  }
+  return new Error(
+    `[run-review] legacy sandbox_mode="read-only" compatibility fallback expired after ${REVIEW_LEGACY_READ_ONLY_SANDBOX_FALLBACK_EXPIRES_AT}; remove the fallback or refresh the CO-485 fallback-expiry contract before retrying.`
+  );
 }
 
 function resolveReviewTitle(
@@ -688,6 +758,14 @@ function resolvedReviewCommandsEqual(
     left.args.length === right.args.length &&
     left.args.every((arg, index) => arg === right.args[index])
   );
+}
+
+function isDefaultPermissionsUnsupportedError(error: unknown): boolean {
+  const haystack = [
+    error instanceof Error ? error.message : String(error),
+    error instanceof CodexReviewError ? error.outputPreview : ''
+  ].join('\n');
+  return /default_permissions requires a `?\[permissions\]`? table/i.test(haystack);
 }
 
 function shouldRetryAfterCommandIntentBoundary(

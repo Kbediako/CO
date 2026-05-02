@@ -174,6 +174,17 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     ).toBe(true);
   });
 
+  it('reports source-root freshness separately from checkout posture', () => {
+    const result = runDoctor(process.cwd());
+
+    expect(result.checkout_posture).toHaveProperty('repo_root');
+    expect(result.source_root_freshness).toMatchObject({
+      schema_version: 1,
+      base_ref: 'origin/main'
+    });
+    expect(formatDoctorSummary(result).join('\n')).toContain('Source root freshness:');
+  });
+
   it('reports missing devtools config and skill when absent', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
@@ -196,6 +207,59 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       await rm(tempHome, { recursive: true, force: true });
     }
   }, 15000);
+
+  it('surfaces danger-no-sandbox permission profiles in normal doctor output', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-profile-advisory-'));
+    const codexHome = join(tempDir, 'codex-home');
+    await mkdir(codexHome, { recursive: true });
+    await writeFile(
+      join(codexHome, 'config.toml'),
+      [
+        'model = "gpt-5.5"',
+        'review_model = "gpt-5.5"',
+        'model_reasoning_effort = "xhigh"',
+        'default_permissions = ":danger-no-sandbox"',
+        '',
+        '[agents]',
+        'max_threads = 12',
+        'max_depth = 4'
+      ].join('\n'),
+      'utf8'
+    );
+    process.env.CODEX_HOME = codexHome;
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+
+    try {
+      const result = runDoctor(process.cwd());
+      const summary = formatDoctorSummary(result).join('\n');
+
+      expect(result.status).toBe('warning');
+      expect(result.security_advisories).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          code: 'codex_config_danger_no_sandbox_profile',
+          scope: 'local-only',
+          severity: 'warning',
+          details: expect.objectContaining({ default_permissions: ':danger-no-sandbox' })
+        })
+      ]));
+      expect(summary).toContain('Sandbox/security advisories: warning');
+      expect(summary).toContain('[codex_config_danger_no_sandbox_profile/local-only]');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
 
   it('skips missing-config max_threads recommendation when Codex feature output enables multi_agent_v2', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
@@ -290,9 +354,11 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
 
   it('accepts access-verified local gpt-5.5 models', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
     const originalDebugModelsJson = process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
     process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempHome, 'multi_agent experimental true');
     process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON = JSON.stringify({
       models: [{ slug: 'gpt-5.4' }, { slug: 'gpt-5.5' }]
     });
@@ -330,6 +396,11 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       } else {
         process.env.CODEX_HOME = originalCodexHome;
       }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
       if (originalDebugModelsJson === undefined) {
         delete process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
       } else {
@@ -341,9 +412,11 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
 
   it('accepts unmarked gpt-5.5 defaults when access is verified', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
     const originalDebugModelsJson = process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
     process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempHome, 'multi_agent experimental true');
     process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON = JSON.stringify({
       models: [{ slug: 'gpt-5.5' }]
     });
@@ -376,6 +449,11 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       } else {
         process.env.CODEX_HOME = originalCodexHome;
       }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
       if (originalDebugModelsJson === undefined) {
         delete process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
       } else {
@@ -387,9 +465,11 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
 
   it('flags configured gpt-5.5 models when model access evidence is missing', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
     const originalDebugModelsJson = process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
     process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempHome, 'multi_agent experimental true');
     process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON = JSON.stringify({
       models: [{ slug: 'gpt-5.4' }]
     });
@@ -422,6 +502,11 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       } else {
         process.env.CODEX_HOME = originalCodexHome;
       }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
       if (originalDebugModelsJson === undefined) {
         delete process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
       } else {
@@ -433,9 +518,11 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
 
   it('ignores stale legacy markers when portable fallback defaults are active', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
     const originalDebugModelsJson = process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-'));
     process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempHome, 'multi_agent experimental true');
     process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON = JSON.stringify({
       models: [{ slug: 'gpt-5.4' }]
     });
@@ -469,6 +556,11 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
         delete process.env.CODEX_HOME;
       } else {
         process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
       }
       if (originalDebugModelsJson === undefined) {
         delete process.env.CODEX_ORCHESTRATOR_DEBUG_MODELS_JSON;
@@ -1824,6 +1916,40 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       ]));
       expect(formatDoctorCloudPreflightSummary(result).join('\n')).toContain(
         '[codex_config_danger_full_access/local-only]'
+      );
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('reports danger-no-sandbox permission profiles as local-only advisories without failing cloud preflight', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-profile-advisory-'));
+    const codexHome = join(tempDir, 'codex-home');
+    await mkdir(codexHome, { recursive: true });
+    await writeFile(join(codexHome, 'config.toml'), 'default_permissions = ":danger-no-sandbox"\n', 'utf8');
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: process.cwd(),
+        env: buildDoctorCloudEnv({
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: 'env_123',
+          CODEX_HOME: codexHome
+        })
+      });
+      expect(result.ok).toBe(true);
+      expect(result.issues).toHaveLength(0);
+      expect(result.security_advisories).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          code: 'codex_config_danger_no_sandbox_profile',
+          scope: 'local-only',
+          severity: 'warning',
+          details: expect.objectContaining({ default_permissions: ':danger-no-sandbox' })
+        })
+      ]));
+      expect(formatDoctorCloudPreflightSummary(result).join('\n')).toContain(
+        '[codex_config_danger_no_sandbox_profile/local-only]'
       );
     } finally {
       await rm(tempDir, { recursive: true, force: true });

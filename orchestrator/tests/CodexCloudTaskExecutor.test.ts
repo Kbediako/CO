@@ -318,8 +318,8 @@ describe('CodexCloudTaskExecutor', () => {
       timeoutSeconds: 60,
       attempts: 1,
       branch: 'main',
-      enableFeatures: ['sqlite', 'memories', 'sqlite'],
-      disableFeatures: ['js_repl']
+      enableFeatures: ['apps', 'memories', 'apps'],
+      disableFeatures: ['browser_use']
     });
 
     expect(runner).toHaveBeenCalledTimes(4);
@@ -333,11 +333,11 @@ describe('CodexCloudTaskExecutor', () => {
       '--branch',
       'main',
       '--enable',
-      'sqlite',
+      'apps',
       '--enable',
       'memories',
       '--disable',
-      'js_repl',
+      'browser_use',
       'Fix the issue'
     ]);
   });

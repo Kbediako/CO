@@ -25,6 +25,11 @@ import {
 } from './utils/codexFeatures.js';
 import { formatCheckoutPostureSummary, inspectCheckoutPosture, type CheckoutPostureInspection } from './utils/checkoutPosture.js';
 import { resolveCodexHome } from './utils/codexPaths.js';
+import {
+  formatSourceRootFreshnessSummary,
+  inspectSourceRootFreshness,
+  type SourceRootFreshnessInspection
+} from './utils/sourceRootFreshness.js';
 import { resolveOptionalDependency, type OptionalResolutionSource } from './utils/optionalDeps.js';
 import {
   buildCloudPreflightAuthProvenance,
@@ -169,7 +174,9 @@ export interface DoctorResult {
     managed: CodexCliReadiness;
   };
   codex_defaults: DoctorCodexDefaultsAdvisory;
+  security_advisories?: DoctorSandboxSecurityAdvisory[];
   checkout_posture: CheckoutPostureInspection;
+  source_root_freshness: SourceRootFreshnessInspection;
   collab: {
     status: 'ok' | 'disabled' | 'unavailable';
     enabled: boolean | null;
@@ -307,7 +314,10 @@ export interface DoctorCloudPreflightResult {
 }
 
 export interface DoctorSandboxSecurityAdvisory {
-  code: 'codex_config_danger_full_access' | 'wsl1_bubblewrap_unsupported';
+  code:
+    | 'codex_config_danger_full_access'
+    | 'codex_config_danger_no_sandbox_profile'
+    | 'wsl1_bubblewrap_unsupported';
   scope: 'local-only';
   severity: 'warning';
   message: string;
@@ -317,6 +327,7 @@ export interface DoctorSandboxSecurityAdvisory {
     platform?: string;
     os_release?: string;
     sandbox_mode?: string;
+    default_permissions?: string;
   };
 }
 
@@ -386,6 +397,7 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
   const featureProbe = readCodexFeatureProbe(codexBin, process.env);
   const features = featureProbe.flags;
   const codexDefaults = inspectCodexDefaultsAdvisory(process.env, codexBin, featureProbe);
+  const securityAdvisories = inspectCodexSandboxSecurityAdvisories({ env: process.env });
   const collabFeatureKey: DoctorResult['collab']['feature_key'] =
     features === null
       ? null
@@ -421,6 +433,14 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
           : 'not_configured';
   const repoRoot = resolveDoctorRepoRoot(cwd);
   const checkoutPosture = inspectCheckoutPosture(repoRoot);
+  const sourceRootFreshness = inspectSourceRootFreshness({
+    intendedRepoRoot: repoRoot,
+    argv: process.argv.slice(),
+    cwd,
+    packageRoot:
+      normalizeOptionalString(process.env.CODEX_ORCHESTRATOR_PROVIDER_PACKAGE_ROOT)
+      ?? normalizeOptionalString(process.env.CODEX_ORCHESTRATOR_PACKAGE_ROOT)
+  });
 
   const delegationSnapshot = inspectDelegationMcpConfig(process.env);
   const delegationTransport = classifyDelegationTransport(delegationSnapshot.entry);
@@ -445,6 +465,7 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
     status:
       missing.length === 0 &&
       codexDefaults.status === 'ok' &&
+      securityAdvisories.length === 0 &&
       providers.status === 'ok' &&
       !checkoutPostureBlocksOverallStatus &&
       cloudStatus !== 'invalid_policy' &&
@@ -459,7 +480,9 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
       managed: managedCodex
     },
     codex_defaults: codexDefaults,
+    security_advisories: securityAdvisories,
     checkout_posture: checkoutPosture,
+    source_root_freshness: sourceRootFreshness,
     collab: {
       status: collabStatus,
       enabled: collabEnabled,
@@ -652,6 +675,7 @@ export function inspectCodexSandboxSecurityAdvisories(options: {
       const parsed = getTomlParser().parse(raw);
       if (isRecord(parsed)) {
         const sandboxMode = normalizeOptionalString(readStringValue(parsed.sandbox_mode));
+        const defaultPermissions = normalizeOptionalString(readStringValue(parsed.default_permissions));
         if (sandboxMode === 'danger-full-access') {
           advisories.push({
             code: 'codex_config_danger_full_access',
@@ -663,6 +687,20 @@ export function inspectCodexSandboxSecurityAdvisories(options: {
             details: {
               path: configPath,
               sandbox_mode: sandboxMode
+            }
+          });
+        }
+        if (defaultPermissions === ':danger-no-sandbox') {
+          advisories.push({
+            code: 'codex_config_danger_no_sandbox_profile',
+            scope: 'local-only',
+            severity: 'warning',
+            message: 'Codex config sets default_permissions to :danger-no-sandbox.',
+            guidance:
+              'Treat this profile-backed no-sandbox posture as a local-only advisory; do not use it to satisfy cloud readiness or weaken CO permission-profile defaults.',
+            details: {
+              path: configPath,
+              default_permissions: defaultPermissions
             }
           });
         }
@@ -878,8 +916,25 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
   for (const line of result.codex_defaults.guidance) {
     lines.push(`  - ${line}`);
   }
+  const securityAdvisories = result.security_advisories ?? [];
+  if (securityAdvisories.length > 0) {
+    lines.push('Sandbox/security advisories: warning');
+    for (const advisory of securityAdvisories) {
+      lines.push(`  - [${advisory.code}/${advisory.scope}] ${advisory.message}`);
+      lines.push(`    guidance: ${advisory.guidance}`);
+      if (advisory.details?.path) {
+        lines.push(`    path: ${advisory.details.path}`);
+      }
+      if (advisory.details?.platform || advisory.details?.os_release) {
+        lines.push(
+          `    platform: ${advisory.details.platform ?? '<unknown>'}, os_release: ${advisory.details.os_release ?? '<unknown>'}`
+        );
+      }
+    }
+  }
 
   lines.push(...formatCheckoutPostureSummary(result.checkout_posture));
+  lines.push(...formatSourceRootFreshnessSummary(result.source_root_freshness));
 
   lines.push(`Collab: ${result.collab.status}`);
   if (result.collab.enabled !== null) {

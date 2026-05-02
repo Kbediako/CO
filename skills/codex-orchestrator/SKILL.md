@@ -58,7 +58,9 @@ For explicit stage control:
 
 ## Feature Posture
 
-- `js_repl` is default-on globally (local + cloud lanes); use explicit cloud feature lanes for deterministic contracts.
+- Codex CLI `0.128.0` removed `js_repl` and `js_repl_tools_only`; do not treat them as default-on, break-glass toggleable, or eligible for cloud feature lanes, and do not set cloud feature env vars or `codex features enable/disable` commands for either removed name.
+- Codex CLI `0.128.0` deprecates `--full-auto`; steer current guidance toward explicit permission profiles and trust flows. Built-in config profile ids are `:read-only`, `:workspace`, and `:danger-no-sandbox`; no-sandbox profile selection is local-only advisory evidence.
+- Use cloud feature lanes only for active non-removed feature names after checking `codex features list`.
 - `memories` stays scoped to explicit eval lanes.
 - Subagent context forking (`fork_context`) is guidance-first: keep it `false` for bounded streams, and set `true` only when the child must inherit prior thread history.
 - Compatibility note: upstream still accepts the legacy alias `memory_tool`; use `memories` in new CO guidance unless documenting legacy compatibility behavior.

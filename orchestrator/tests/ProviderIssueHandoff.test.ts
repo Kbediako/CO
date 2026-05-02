@@ -382,25 +382,45 @@ describe('createProviderIssueHandoffService', () => {
 
     expect(records.map((record) => record.id)).toEqual([
       'provider-id-mapping-fallback',
-      'retained-claim-autopilot-fallback'
+      'retained-claim-autopilot-fallback',
+      'stale-manifestless-recovery-seam'
     ]);
     for (const record of records) {
       expect(record.surface).toBe('provider workflow');
-      expect(record.decision).toBe('expire fallback');
-      expect(record.owner).toBe('CO-400');
-      expect(record.review_date).toBe('2026-05-10');
-      expect(record.maximum_lifetime).toBe('2026-05-26');
       expect(record.introduced_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(record.trigger).not.toHaveLength(0);
       expect(record.removal_condition).not.toHaveLength(0);
       expect(record.validation.length).toBeGreaterThan(1);
-      expect(record.large_refactor).toBe('required');
     }
 
+    expect(records[0]).toMatchObject({
+      decision: 'expire fallback',
+      owner: 'CO-400',
+      review_date: '2026-05-10',
+      maximum_lifetime: '2026-05-26',
+      large_refactor: 'required'
+    });
+    expect(records[1]).toMatchObject({
+      decision: 'expire fallback',
+      owner: 'CO-400',
+      review_date: '2026-05-10',
+      maximum_lifetime: '2026-05-26',
+      large_refactor: 'required'
+    });
+    expect(records[2]).toMatchObject({
+      decision: 'justify retaining fallback',
+      owner: 'CO-474',
+      review_date: '2026-05-16',
+      large_refactor: 'not_required'
+    });
     expect(records[0]?.trigger).toContain('buildProviderFallbackTaskId');
     expect(records[0]?.validation.join('\n')).toContain('provider-id fallback activation');
     expect(records[1]?.trigger).toContain('cached claim issue state');
     expect(records[1]?.validation.join('\n')).toContain('activation and non-activation paths');
+    expect(records[2]?.trigger).toContain('PROVIDER_MANIFESTLESS_HANDOFF_RECOVERY_STALE_MS');
+    expect(records[2]?.trigger).toContain('provider_issue_rehydration_pending_revalidation');
+    expect(records[2]?.maximum_lifetime).toBe('14 days (until 2026-05-16)');
+    expect(records[2]?.validation.join('\n')).toContain('stale manifestless starts');
 
     records[0]?.validation.push('mutated test copy');
     expect(readProviderWorkflowFallbackExpiryRecords()[0]?.validation).not.toContain('mutated test copy');
@@ -683,6 +703,443 @@ describe('createProviderIssueHandoffService', () => {
       launch_source: 'control-host',
       launch_token: launchInput?.launchToken
     });
+  });
+
+  it.each(['recover', 'relaunch', 'nudge'] as const)(
+    'reclaims a Ready released-pending-reopen no-run claim through explicit %s',
+    async (action) => {
+      const { paths } = await createHostPaths();
+      const state = createProviderIntakeState();
+      state.claims.push(createProviderClaim({
+        issue_id: 'lin-issue-470',
+        issue_identifier: 'CO-470',
+        issue_title: 'Review fixture env contamination',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        issue_updated_at: '2026-05-01T13:40:00.000Z',
+        issue_blocked_by: [],
+        task_id: 'linear-lin-issue-470',
+        state: 'released',
+        reason: 'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+        run_id: null,
+        run_manifest_path: null,
+        launch_source: null,
+        launch_token: null
+      }));
+      const persist = vi.fn(async () => undefined);
+      const startedRun = {
+        runId: 'run-co-470-recovered',
+        manifestPath: join(paths.runDir, 'provider-run-co-470-recovered-manifest.json')
+      };
+      const launcher = { start: vi.fn(async () => startedRun), resume: vi.fn(async () => undefined) };
+      const resolveTrackedIssue = vi.fn(async ({ issueId }: { provider: 'linear'; issueId: string }) => ({
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: issueId,
+          identifier: 'CO-470',
+          title: 'Review fixture env contamination',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-05-01T13:40:00.000Z',
+          blocked_by: []
+        })
+      }));
+      const service = createProviderIssueHandoffService({
+        paths,
+        state,
+        persist,
+        launcher,
+        startPipelineId: 'provider-linear-worker',
+        resolveTrackedIssue,
+        readFeatureToggles: () => ({
+          agent: {
+            max_concurrent_agents: 1
+          }
+        })
+      });
+
+      const result = await service.recoverIssue({ provider: 'linear', issueId: 'lin-issue-470', action });
+
+      expect(result).toMatchObject({
+        kind: 'start',
+        reason: 'provider_issue_start_launched',
+        claim: {
+          issue_id: 'lin-issue-470',
+          issue_identifier: 'CO-470',
+          issue_state: 'Ready',
+          issue_state_type: 'unstarted',
+          state: 'starting',
+          reason: 'provider_issue_start_launched',
+          task_id: 'linear-lin-issue-470',
+          run_id: startedRun.runId,
+          run_manifest_path: startedRun.manifestPath,
+          launch_source: 'control-host',
+          launch_token_present: true
+        }
+      });
+      expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+        taskId: 'linear-lin-issue-470',
+        pipelineId: 'provider-linear-worker',
+        provider: 'linear',
+        issueId: 'lin-issue-470',
+        issueIdentifier: 'CO-470',
+        issueUpdatedAt: '2026-05-01T13:40:00.000Z',
+        launchToken: expect.any(String)
+      }));
+      expect(launcher.resume).not.toHaveBeenCalled();
+      expect(state.claims[0]).toMatchObject({
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        run_id: startedRun.runId,
+        run_manifest_path: startedRun.manifestPath,
+        launch_source: 'control-host',
+        launch_token: expect.any(String),
+        last_event: 'control_host_provider_worker_recover',
+        last_action: action
+      });
+      expect(persist).toHaveBeenCalled();
+    }
+  );
+
+  it.each(['recover', 'relaunch', 'nudge'] as const)(
+    'reclaims a Ready accepted/no-run pending-revalidation claim through explicit %s',
+    async (action) => {
+      const { paths } = await createHostPaths();
+      const state = createProviderIntakeState();
+      state.claims.push(createProviderClaim({
+        issue_id: 'lin-issue-470',
+        issue_identifier: 'CO-470',
+        issue_title: 'Review fixture env contamination',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        issue_updated_at: '2026-05-01T17:17:53.207Z',
+        issue_blocked_by: [],
+        task_id: 'linear-lin-issue-470',
+        state: 'accepted',
+        reason: 'provider_issue_rehydration_pending_revalidation',
+        accepted_at: '2026-05-01T17:18:00.000Z',
+        updated_at: '2026-05-01T17:18:00.000Z',
+        run_id: null,
+        run_manifest_path: null,
+        launch_started_at: null,
+        launch_source: null,
+        launch_token: null,
+        retry_error: null
+      }));
+      const persist = vi.fn(async () => undefined);
+      const startedRun = {
+        runId: 'run-co-470-recovered-pending-revalidation',
+        manifestPath: join(paths.runDir, 'provider-run-co-470-recovered-pending-revalidation.json')
+      };
+      const launcher = { start: vi.fn(async () => startedRun), resume: vi.fn(async () => undefined) };
+      const resolveTrackedIssue = vi.fn(async ({ issueId }: { provider: 'linear'; issueId: string }) => ({
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: issueId,
+          identifier: 'CO-470',
+          title: 'Review fixture env contamination',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-05-01T17:20:00.000Z',
+          blocked_by: []
+        })
+      }));
+      const service = createProviderIssueHandoffService({
+        paths,
+        state,
+        persist,
+        launcher,
+        startPipelineId: 'provider-linear-worker',
+        resolveTrackedIssue
+      });
+
+      const result = await service.recoverIssue({ provider: 'linear', issueId: 'lin-issue-470', action });
+
+      expect(result).toMatchObject({
+        kind: 'start',
+        reason: 'provider_issue_start_launched',
+        claim: {
+          issue_id: 'lin-issue-470',
+          issue_identifier: 'CO-470',
+          issue_state: 'Ready',
+          issue_state_type: 'unstarted',
+          state: 'starting',
+          reason: 'provider_issue_start_launched',
+          task_id: 'linear-lin-issue-470',
+          run_id: startedRun.runId,
+          run_manifest_path: startedRun.manifestPath,
+          launch_source: 'control-host',
+          launch_token_present: true
+        }
+      });
+      expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+        taskId: 'linear-lin-issue-470',
+        pipelineId: 'provider-linear-worker',
+        provider: 'linear',
+        issueId: 'lin-issue-470',
+        issueIdentifier: 'CO-470',
+        issueUpdatedAt: '2026-05-01T17:20:00.000Z',
+        launchToken: expect.any(String)
+      }));
+      expect(launcher.resume).not.toHaveBeenCalled();
+      expect(state.claims[0]).toMatchObject({
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        run_id: startedRun.runId,
+        run_manifest_path: startedRun.manifestPath,
+        launch_source: 'control-host',
+        launch_token: expect.any(String),
+        last_event: 'control_host_provider_worker_recover',
+        last_action: action
+      });
+      expect(persist).toHaveBeenCalled();
+    }
+  );
+
+  it('keeps a fresh manifestless explicit-recovery claim inflight before relaunching once stale', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-470',
+      issue_identifier: 'CO-470',
+      issue_title: 'Review fixture env contamination',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-05-01T17:20:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-issue-470',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      accepted_at: '2026-05-01T17:18:00.000Z',
+      updated_at: '2026-05-01T17:21:04.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      launch_started_at: '2026-05-01T17:21:04.000Z',
+      launch_source: 'control-host',
+      launch_token: 'stale-recovery-launch-token',
+      retry_error: null
+    }));
+    const persist = vi.fn(async () => undefined);
+    const startedRun = {
+      runId: 'run-co-470-recovered-after-stale-start',
+      manifestPath: join(paths.runDir, 'provider-run-co-470-recovered-after-stale-start.json')
+    };
+    const launcher = { start: vi.fn(async () => startedRun), resume: vi.fn(async () => undefined) };
+    const resolveTrackedIssue = vi.fn(async ({ issueId }: { provider: 'linear'; issueId: string }) => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: issueId,
+        identifier: 'CO-470',
+        title: 'Review fixture env contamination',
+        state: 'Ready',
+        state_type: 'unstarted',
+        updated_at: '2026-05-01T17:21:00.000Z',
+        blocked_by: []
+      })
+    }));
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-05-01T17:21:05.000Z'));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    const freshResult = await service.recoverIssue({
+      provider: 'linear',
+      issueId: 'lin-issue-470',
+      action: 'recover'
+    });
+
+    expect(freshResult).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_handoff_inflight',
+      claim: {
+        state: 'starting',
+        run_id: null,
+        run_manifest_path: null,
+        launch_token_present: true
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      launch_token: 'stale-recovery-launch-token',
+      launch_started_at: '2026-05-01T17:21:04.000Z'
+    });
+    Object.assign(state.claims[0]!, {
+      updated_at: '2026-05-01T17:20:01.000Z',
+      launch_started_at: '2026-05-01T17:20:01.000Z'
+    });
+    persist.mockClear();
+    launcher.start.mockClear();
+    launcher.resume.mockClear();
+
+    const result = await service.recoverIssue({
+      provider: 'linear',
+      issueId: 'lin-issue-470',
+      action: 'recover'
+    });
+
+    expect(result).toMatchObject({
+      kind: 'start',
+      reason: 'provider_issue_start_launched',
+      claim: {
+        issue_id: 'lin-issue-470',
+        issue_identifier: 'CO-470',
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        run_id: startedRun.runId,
+        run_manifest_path: startedRun.manifestPath,
+        launch_source: 'control-host',
+        launch_token_present: true
+      }
+    });
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-470',
+      pipelineId: 'provider-linear-worker',
+      provider: 'linear',
+      issueId: 'lin-issue-470',
+      issueIdentifier: 'CO-470',
+      issueUpdatedAt: '2026-05-01T17:21:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      run_id: startedRun.runId,
+      run_manifest_path: startedRun.manifestPath,
+      launch_source: 'control-host',
+      launch_token: expect.any(String),
+      last_event: 'control_host_provider_worker_recover',
+      last_action: 'recover'
+    });
+    expect(state.claims[0]?.launch_token).not.toBe('stale-recovery-launch-token');
+    expect(persist).toHaveBeenCalled();
+  });
+
+  it('keeps a stale manifestless explicit-recovery claim bound to an existing queued run', async () => {
+    const { root, paths } = await createHostPaths();
+    const queuedRunPaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'linear-lin-issue-470'
+      },
+      'run-co-470-queued-existing'
+    );
+    await mkdir(queuedRunPaths.runDir, { recursive: true });
+    await writeFile(
+      queuedRunPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-470-queued-existing',
+        task_id: 'linear-lin-issue-470',
+        pipeline_id: 'provider-linear-worker',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-470',
+        issue_identifier: 'CO-470',
+        issue_updated_at: '2026-05-01T17:21:00.000Z',
+        updated_at: '2026-05-01T17:21:02.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-470',
+      issue_identifier: 'CO-470',
+      issue_title: 'Review fixture env contamination',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-05-01T17:21:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-issue-470',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      accepted_at: '2026-05-01T17:18:00.000Z',
+      updated_at: '2026-05-01T17:20:01.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      launch_started_at: '2026-05-01T17:20:01.000Z',
+      launch_source: 'control-host',
+      launch_token: 'queued-run-launch-token',
+      retry_error: null
+    }));
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-470-duplicate-recovery',
+        manifestPath: join(paths.runDir, 'provider-run-co-470-duplicate-recovery.json')
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async ({ issueId }: { provider: 'linear'; issueId: string }) => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: issueId,
+        identifier: 'CO-470',
+        title: 'Review fixture env contamination',
+        state: 'Ready',
+        state_type: 'unstarted',
+        updated_at: '2026-05-01T17:21:00.000Z',
+        blocked_by: []
+      })
+    }));
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-05-01T17:21:00.000Z'));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    const result = await service.recoverIssue({
+      provider: 'linear',
+      issueId: 'lin-issue-470',
+      action: 'recover'
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_rehydrated_queued_run',
+      claim: {
+        state: 'starting',
+        reason: 'provider_issue_rehydrated_queued_run',
+        run_id: 'run-co-470-queued-existing',
+        run_manifest_path: queuedRunPaths.manifestPath,
+        launch_token_present: false
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_rehydrated_queued_run',
+      run_id: 'run-co-470-queued-existing',
+      run_manifest_path: queuedRunPaths.manifestPath,
+      launch_token: null,
+      updated_at: '2026-05-01T17:21:00.000Z',
+      last_event: 'control_host_provider_worker_recover',
+      last_action: 'recover'
+    });
+    expect(persist).toHaveBeenCalled();
   });
 
   it.each(['recover', 'relaunch', 'nudge'] as const)(
@@ -19515,6 +19972,221 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('suppresses branch-recovery review-promotion action-required during completed-run rehydrate when Rework is current', async () => {
+    const { root, paths } = await createHostPaths();
+    const taskId = 'linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc';
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(
+      childEnv,
+      '2026-05-02T15-12-45-555Z-8bb96e84'
+    );
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: '2026-05-02T15-12-45-555Z-8bb96e84',
+        task_id: taskId,
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-486',
+        issue_identifier: 'CO-486',
+        issue_updated_at: '2026-05-02T17:20:00.000Z',
+        updated_at: '2026-05-02T17:21:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-486',
+      issue_id: 'lin-issue-486',
+      issue_identifier: 'CO-486',
+      issue_title: 'Persisted goal workflows as provider-worker run evidence',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-02T17:20:00.000Z',
+      issue_viewer_id: 'viewer-1',
+      issue_assignee_id: 'viewer-1',
+      issue_assignee_name: 'Codex',
+      task_id: taskId,
+      mapping_source: 'provider_id_fallback',
+      state: 'handoff_failed',
+      reason: 'provider_issue_review_promotion_action_required',
+      accepted_at: '2026-05-02T15:12:45.555Z',
+      updated_at: '2026-05-02T17:21:05.000Z',
+      last_delivery_id: 'delivery-co-486-branch-conflict',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_746_206_465_000,
+      run_id: '2026-05-02T15-12-45-555Z-8bb96e84',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      review_promotion: {
+        recorded_at: '2026-05-02T17:25:21.000Z',
+        issue_id: 'lin-issue-486',
+        issue_identifier: 'CO-486',
+        issue_state: 'Rework',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-02T17:25:21.000Z',
+        status: 'action_required',
+        reason: 'branch_recovery_conflict',
+        summary:
+          'Automatic conflict recovery hit a merge conflict for attached PR #751; moved the issue to Rework with exact recovery metadata recorded.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/751'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/751',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 751
+        },
+        snapshot: {
+          state: 'OPEN',
+          review_decision: 'APPROVED',
+          merge_state_status: 'DIRTY',
+          ready_to_merge: false,
+          gate_reasons: ['mergeStateStatus=DIRTY'],
+          action_required_reasons: ['mergeStateStatus=DIRTY'],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-05-02T17:24:30.000Z',
+          merged_at: null,
+          head_oid: 'a0ad27a5bd6029466ed77e23b8b5b3c3bbda742f'
+        },
+        branch_recovery: {
+          attempted_at: '2026-05-02T17:25:00.000Z',
+          head_oid: 'a0ad27a5bd6029466ed77e23b8b5b3c3bbda742f',
+          recovery_reason: 'merge_state=DIRTY',
+          command: 'gh',
+          args: ['pr', 'update-branch', '751', '--repo', 'asabeko/CO'],
+          exit_code: 1,
+          ok: false,
+          stdout: null,
+          stderr: 'merge conflict',
+          failure_kind: 'conflict'
+        },
+        linear_transition: {
+          status: 'transitioned',
+          attempted_at: '2026-05-02T17:25:21.000Z',
+          previous_state: 'In Review',
+          target_state: 'Rework',
+          issue_state: 'Rework',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-05-02T17:25:21.000Z',
+          error: null
+        }
+      }
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-486',
+          identifier: 'CO-486',
+          title: 'Persisted goal workflows as provider-worker run evidence',
+          state: 'Rework',
+          state_type: 'started',
+          updated_at: '2026-05-02T17:25:21.000Z'
+        })
+      })
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      issue_state: 'Rework',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-02T17:25:21.000Z',
+      task_id: taskId,
+      run_id: '2026-05-02T15-12-45-555Z-8bb96e84',
+      run_manifest_path: childPaths.manifestPath,
+      retry_queued: true
+    });
+    expect(state.claims[0]?.review_promotion).toMatchObject({
+      status: 'action_required',
+      reason: 'branch_recovery_conflict',
+      branch_recovery: {
+        failure_kind: 'conflict',
+        recovery_reason: 'merge_state=DIRTY'
+      }
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      issue_state: 'Rework',
+      retry_queued: true
+    });
+    expect(getPersistedState().claims[0]?.review_promotion).toMatchObject({
+      reason: 'branch_recovery_conflict',
+      branch_recovery: {
+        failure_kind: 'conflict'
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+
+    const queuedRetryDueAt = state.claims[0]?.retry_due_at;
+    const recoveryResult = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-486',
+        identifier: 'CO-486',
+        title: 'Persisted goal workflows as provider-worker run evidence',
+        state: 'Rework',
+        state_type: 'started',
+        updated_at: '2026-05-02T17:25:21.000Z'
+      }),
+      deliveryId: null,
+      event: 'control_host_provider_worker_recover',
+      action: 'recover',
+      webhookTimestamp: null
+    });
+
+    expect(recoveryResult).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_run_already_completed',
+      claim: {
+        state: 'completed',
+        reason: 'provider_issue_run_already_completed',
+        issue_state: 'Rework',
+        retry_queued: true,
+        retry_attempt: 1,
+        retry_due_at: queuedRetryDueAt,
+        retry_error: null
+      }
+    });
+    expect(state.claims[0]?.review_promotion).toMatchObject({
+      reason: 'branch_recovery_conflict',
+      branch_recovery: {
+        failure_kind: 'conflict'
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
   it('rehydrates a completed run by promoting a fresh review handoff before falling back to completed state', async () => {
     const { root, paths } = await createHostPaths();
     const taskId = 'linear-lin-issue-1';
@@ -28333,6 +29005,222 @@ describe('createProviderIssueHandoffService', () => {
     });
     expect(state.claims[0]?.issue_title).toBe('Cached retained row source issue');
     expect(state.claims[0]?.issue_blocked_by).toEqual([]);
+    expect(persist).toHaveBeenCalled();
+    expect(publishRuntime).toHaveBeenCalledWith('provider-intake.refresh');
+  });
+
+  it('refreshes canceled retained released not-active metadata from persisted dependent blocker truth', async () => {
+    const { paths } = await createHostPaths();
+    const co470CanceledBlockerSnapshot = {
+      id: 'lin-co-470',
+      identifier: 'CO-470',
+      state: 'Duplicate',
+      state_type: 'canceled'
+    };
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-470',
+      issue_identifier: 'CO-470',
+      issue_title: 'Cached retained row source issue',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-01T19:09:06.995Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-470-retained',
+      run_id: null,
+      run_manifest_path: null
+    }));
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-460',
+      issue_identifier: 'CO-460',
+      issue_title: 'Dependent issue already seeing canceled blocker truth',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-02T08:07:24.760Z',
+      issue_blocked_by: [co470CanceledBlockerSnapshot],
+      task_id: 'linear-lin-co-460-retained',
+      run_id: null,
+      run_manifest_path: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const publishRuntime = vi.fn();
+    const launcher = createCo202Launcher(
+      'run-co-470-should-not-start',
+      '/tmp/provider-run/co-470-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-co-470',
+        identifier: 'CO-470',
+        title: 'Live Duplicate title should refresh from issue-context',
+        state: 'Duplicate',
+        state_type: 'canceled',
+        updated_at: '2026-05-02T08:01:03.083Z',
+        blocked_by: []
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      publishRuntime,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-co-470'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-co-470')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_title: 'Live Duplicate title should refresh from issue-context',
+      issue_state: co470CanceledBlockerSnapshot.state,
+      issue_state_type: co470CanceledBlockerSnapshot.state_type,
+      issue_updated_at: '2026-05-02T08:01:03.083Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-470-retained',
+      run_id: null,
+      run_manifest_path: null
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-co-460')).toMatchObject({
+      issue_blocked_by: [co470CanceledBlockerSnapshot]
+    });
+    expect(persist).toHaveBeenCalled();
+    expect(publishRuntime).toHaveBeenCalledWith('provider-intake.refresh');
+  });
+
+  it('refetches persisted dependent blocker truth when the cached blocker still matches stale retained metadata', async () => {
+    const { paths } = await createHostPaths();
+    const staleCo470BlockerSnapshot = {
+      id: 'lin-co-470',
+      identifier: 'CO-470',
+      state: 'Blocked',
+      state_type: 'started'
+    };
+    const freshCo470BlockerSnapshot = {
+      id: 'lin-co-470',
+      identifier: 'CO-470',
+      state: 'Duplicate',
+      state_type: 'canceled'
+    };
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-470',
+      issue_identifier: 'CO-470',
+      issue_title: 'Cached retained row source issue',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-01T19:09:06.995Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-470-retained',
+      run_id: null,
+      run_manifest_path: null
+    }));
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-460',
+      issue_identifier: 'CO-460',
+      issue_title: 'Dependent issue still carrying stale blocker truth',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-02T08:07:24.760Z',
+      issue_blocked_by: [staleCo470BlockerSnapshot],
+      task_id: 'linear-lin-co-460-retained',
+      run_id: null,
+      run_manifest_path: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const publishRuntime = vi.fn();
+    const launcher = createCo202Launcher(
+      'run-co-470-should-not-start',
+      '/tmp/provider-run/co-470-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-co-470',
+        identifier: 'CO-470',
+        title: 'Live Duplicate title should refresh after blocker refetch',
+        state: 'Duplicate',
+        state_type: 'canceled',
+        updated_at: '2026-05-02T08:01:03.083Z',
+        blocked_by: []
+      })
+    }));
+    const refetchTrackedIssues = vi.fn(async (input?: { mode?: string }) => {
+      if (input?.mode !== 'fresh_discovery') {
+        return {
+          kind: 'ready' as const,
+          trackedIssues: []
+        };
+      }
+      return {
+        kind: 'ready' as const,
+        trackedIssues: [
+          createTrackedIssue({
+            id: 'lin-co-460',
+            identifier: 'CO-460',
+            title: 'Dependent issue now seeing canceled blocker truth',
+            state: 'Blocked',
+            state_type: 'started',
+            updated_at: '2026-05-02T08:07:24.760Z',
+            blocked_by: [freshCo470BlockerSnapshot]
+          })
+        ]
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      publishRuntime,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(refetchTrackedIssues).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'fresh_discovery' })
+    );
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-co-470'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-co-470')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_title: 'Live Duplicate title should refresh after blocker refetch',
+      issue_state: freshCo470BlockerSnapshot.state,
+      issue_state_type: freshCo470BlockerSnapshot.state_type,
+      issue_updated_at: '2026-05-02T08:01:03.083Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-470-retained',
+      run_id: null,
+      run_manifest_path: null
+    });
     expect(persist).toHaveBeenCalled();
     expect(publishRuntime).toHaveBeenCalledWith('provider-intake.refresh');
   });

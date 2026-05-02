@@ -106,9 +106,15 @@ export type ProviderWorkflowFallbackDecision =
   | 'justify retaining fallback';
 
 export interface ProviderWorkflowFallbackExpiryRecord {
-  id: 'provider-id-mapping-fallback' | 'retained-claim-autopilot-fallback';
+  id:
+    | 'provider-id-mapping-fallback'
+    | 'retained-claim-autopilot-fallback'
+    | 'stale-manifestless-recovery-seam';
   surface: 'provider workflow';
-  fallback: 'provider-id mapping fallback' | 'retained-claim/autopilot fallback';
+  fallback:
+    | 'provider-id mapping fallback'
+    | 'retained-claim/autopilot fallback'
+    | 'stale manifestless recovery seam';
   decision: ProviderWorkflowFallbackDecision;
   owner: string;
   trigger: string;
@@ -158,6 +164,26 @@ const PROVIDER_WORKFLOW_FALLBACK_EXPIRY_RECORDS: readonly ProviderWorkflowFallba
       'Existing ProviderIssueHandoff.test.ts retained released claim coverage validates activation and non-activation paths'
     ],
     large_refactor: 'required'
+  },
+  {
+    id: 'stale-manifestless-recovery-seam',
+    surface: 'provider workflow',
+    fallback: 'stale manifestless recovery seam',
+    decision: 'justify retaining fallback',
+    owner: 'CO-474',
+    trigger:
+      'Explicit control-host recovery sees a starting/resuming claim, or an accepted provider_issue_rehydration_pending_revalidation claim, older than PROVIDER_MANIFESTLESS_HANDOFF_RECOVERY_STALE_MS with null run_id and null run_manifest_path.',
+    introduced_date: '2026-05-02',
+    review_date: '2026-05-16',
+    maximum_lifetime: '14 days (until 2026-05-16)',
+    removal_condition:
+      'Remove after provider launch persistence can no longer leave starting/resuming or accepted pending-revalidation claims without run identity or a durable retry/failure record.',
+    validation: [
+      'ProviderIssueHandoff.test.ts reclaims Ready accepted/no-run pending-revalidation through explicit recovery',
+      'ProviderIssueHandoff.test.ts keeps fresh manifestless starts inflight and relaunches only stale manifestless starts',
+      'ProviderIssueHandoff.test.ts binds stale manifestless recovery to an existing queued same-issue run without carrying launch tokens'
+    ],
+    large_refactor: 'not_required'
   }
 ];
 
@@ -436,6 +462,7 @@ const PROVIDER_RETRY_START_FAILED_REASON = 'provider_issue_retry_start_failed';
 const PROVIDER_CONTINUATION_RETRY_DELAY_MS = 1_000;
 const PROVIDER_FAILURE_RETRY_BASE_MS = 10_000;
 const PROVIDER_FAILURE_RETRY_MAX_BACKOFF_MS = 300_000;
+const PROVIDER_MANIFESTLESS_HANDOFF_RECOVERY_STALE_MS = 45_000;
 type ProviderControlHostRunLocator = { taskId: string; runId: string };
 type ProviderRehydratedLaunchProvenanceFields = {
   launch_source?: ProviderLaunchSource | null;
@@ -3610,6 +3637,10 @@ export function createProviderIssueHandoffService(
       const taskId = buildProviderFallbackTaskId(input.trackedIssue);
       const mappingSource: ProviderTaskMappingSource = 'provider_id_fallback';
       const existing = readProviderIntakeClaim(options.state, providerKey);
+      const explicitProviderWorkerRecovery = isExplicitProviderWorkerRecovery({
+        event: input.event,
+        action: input.action
+      });
       const claimBase = {
         provider: 'linear' as const,
         provider_key: providerKey,
@@ -4075,7 +4106,13 @@ export function createProviderIssueHandoffService(
         return { kind: 'ignored', reason: 'provider_issue_run_already_active', claim };
       }
 
-      if (latestExisting && (latestExisting.state === 'starting' || latestExisting.state === 'resuming')) {
+      const latestExistingManifestlessHandoff =
+        latestExisting ? isProviderStaleManifestlessHandoffClaim(latestExisting) : false;
+      if (
+        latestExisting &&
+        (latestExisting.state === 'starting' || latestExisting.state === 'resuming') &&
+        !(explicitProviderWorkerRecovery && latestExistingManifestlessHandoff)
+      ) {
         const claim = await upsertProviderClaimAndPersist({
           ...latestClaimBase,
           task_id: latestExisting.task_id,
@@ -4204,6 +4241,17 @@ export function createProviderIssueHandoffService(
               nextIssueUpdatedAt: input.trackedIssue.updated_at
             })
           ) {
+            const completedDuplicateRetryFields =
+              latestExisting?.retry_queued === true
+                ? buildQueuedProviderRetryFields({
+                    claim: latestExisting,
+                    previousRun: latestRun,
+                    error: null,
+                    preserveCurrentAttempt: true,
+                    preserveExistingDueAt: true,
+                    delayType: 'continuation'
+                  })
+                : clearProviderRetryFields();
             const claim = await upsertProviderClaimAndPersist({
               ...latestClaimBase,
               task_id: latestRun.taskId,
@@ -4213,6 +4261,7 @@ export function createProviderIssueHandoffService(
               run_id: latestRun.runId,
               run_manifest_path: latestRun.manifestPath,
               worker_host: latestRunWorkerHost,
+              ...completedDuplicateRetryFields
             });
             return { kind: 'ignored', reason: 'provider_issue_run_already_completed', claim };
           }
@@ -4282,6 +4331,8 @@ export function createProviderIssueHandoffService(
             startPipelineId
           );
           const lockedExisting = readProviderIntakeClaim(options.state, providerKey);
+          const lockedExistingManifestlessHandoff =
+            lockedExisting ? isProviderStaleManifestlessHandoffClaim(lockedExisting) : false;
           const lockedLatestClaimBase = {
             ...claimBase,
             accepted_at: lockedExisting?.accepted_at ?? claimBase.accepted_at
@@ -4292,6 +4343,8 @@ export function createProviderIssueHandoffService(
           > = lockedExisting ?? clearProviderRetryFields();
           const lockedActiveRun =
             lockedAttachableDiscoveredRuns.find((run) => run.status === 'in_progress') ?? null;
+          const lockedQueuedRun =
+            lockedAttachableDiscoveredRuns.find((run) => run.status === 'queued') ?? null;
           const lockedLatestRun = resolveLatestKnownProviderRun(lockedAttachableDiscoveredRuns);
           const lockedPreferredWorkerHost = resolvePreferredStartWorkerHost({
             claimWorkerHost: lockedExisting?.worker_host ?? null,
@@ -4365,7 +4418,40 @@ export function createProviderIssueHandoffService(
             };
           }
 
-          if (lockedExisting && (lockedExisting.state === 'starting' || lockedExisting.state === 'resuming')) {
+          if (
+            explicitProviderWorkerRecovery &&
+            lockedExisting &&
+            lockedExistingManifestlessHandoff &&
+            lockedQueuedRun
+          ) {
+            const lockedWorkerHost = resolveRehydratedActiveRunWorkerHost(lockedQueuedRun, lockedExisting);
+            const reboundAt = isoTimestamp(new Date(Date.now()));
+            const claim = await upsertProviderClaimAndPersist({
+              ...lockedLatestClaimBase,
+              task_id: lockedQueuedRun.taskId,
+              mapping_source: mappingSource,
+              state: lockedExisting.state,
+              reason: 'provider_issue_rehydrated_queued_run',
+              run_id: lockedQueuedRun.runId,
+              run_manifest_path: lockedQueuedRun.manifestPath,
+              worker_host: lockedWorkerHost,
+              launch_source: null,
+              launch_token: null,
+              launch_started_at: null,
+              accepted_at: lockedExisting.accepted_at,
+              updated_at: reboundAt
+            });
+            return {
+              kind: 'settled',
+              result: { kind: 'ignored', reason: 'provider_issue_rehydrated_queued_run', claim }
+            };
+          }
+
+          if (
+            lockedExisting &&
+            (lockedExisting.state === 'starting' || lockedExisting.state === 'resuming') &&
+            !(explicitProviderWorkerRecovery && lockedExistingManifestlessHandoff)
+          ) {
             const claim = await upsertProviderClaimAndPersist({
               ...lockedLatestClaimBase,
               task_id: lockedExisting.task_id,
@@ -4385,7 +4471,12 @@ export function createProviderIssueHandoffService(
 
           const admissionGate = await createProviderAdmissionGate({
             excludeClaimProviderKey:
-              lockedExisting?.retry_queued === true || lockedExisting?.state === 'resumable'
+              lockedExisting &&
+              (
+                lockedExisting.retry_queued === true ||
+                lockedExisting.state === 'resumable' ||
+                (explicitProviderWorkerRecovery && lockedExistingManifestlessHandoff)
+              )
                 ? lockedExisting.provider_key
                 : null
           });
@@ -4662,6 +4753,21 @@ export function createProviderIssueHandoffService(
           let trackedIssueBlockersByKey = pollInput
             ? buildTrackedIssuePollBlockerMap(pollInput.trackedIssues)
             : null;
+          const retainedClaimBlockersByKey = buildProviderIntakeClaimBlockerMap(
+            options.state.claims
+          );
+          if (retainedClaimBlockersByKey.size > 0) {
+            if (trackedIssueBlockersByKey) {
+              for (const [providerKey, blocker] of retainedClaimBlockersByKey.entries()) {
+                if (trackedIssueBlockersByKey.has(providerKey)) {
+                  continue;
+                }
+                trackedIssueBlockersByKey.set(providerKey, blocker);
+              }
+            } else {
+              trackedIssueBlockersByKey = retainedClaimBlockersByKey;
+            }
+          }
           const deferredRetainedReleasedBlockerRefreshProviderKeys = new Set<string>();
           const consumedTrackedIssueKeys = new Set<string>();
           if (!options.resolveTrackedIssue && !trackedIssuesByKey) {
@@ -6558,8 +6664,45 @@ function resolveExplicitCompletedDuplicateRecoveryFreshness(input: {
   });
 }
 
+function isExplicitProviderWorkerRecovery(input: {
+  event: string | null;
+  action: string | null;
+}): boolean {
+  return input.event === 'control_host_provider_worker_recover' &&
+    isProviderIssueRecoveryAction(input.action);
+}
+
 function isProviderIssueRecoveryAction(value: string | null): value is ProviderIssueRecoveryAction {
   return value === 'recover' || value === 'relaunch' || value === 'nudge';
+}
+
+function isProviderStaleManifestlessHandoffClaim(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'run_id' | 'run_manifest_path' | 'launch_started_at' | 'updated_at'
+  >
+): boolean {
+  const manifestlessCandidateState =
+    claim.state === 'starting' ||
+    claim.state === 'resuming' ||
+    (
+      claim.state === 'accepted' &&
+      claim.reason === 'provider_issue_rehydration_pending_revalidation'
+    );
+  if (
+    !manifestlessCandidateState ||
+    normalizeOptionalString(claim.run_id) !== null ||
+    normalizeOptionalString(claim.run_manifest_path) !== null
+  ) {
+    return false;
+  }
+  const startedAtMs = Date.parse(
+    normalizeOptionalString(claim.launch_started_at) ??
+      normalizeOptionalString(claim.updated_at) ??
+      ''
+  );
+  return Number.isFinite(startedAtMs) &&
+    Date.now() - startedAtMs >= PROVIDER_MANIFESTLESS_HANDOFF_RECOVERY_STALE_MS;
 }
 
 function selectMostRecentTrackedIssueUpdatedAt(
@@ -9139,7 +9282,8 @@ function buildProviderCompletedRunRehydrateState(input: {
   if (
     !input.claim.merge_closeout &&
     input.claim.review_promotion &&
-    resolveProviderReviewPromotionClaimState(input.claim.review_promotion) === 'handoff_failed'
+    resolveProviderReviewPromotionClaimState(input.claim.review_promotion) === 'handoff_failed' &&
+    !shouldSuppressActionRequiredReviewPromotionForActiveIssue(input.claim)
   ) {
     return {
       task_id: input.run.taskId,
@@ -9201,6 +9345,31 @@ function buildProviderCompletedRunRehydrateState(input: {
     run_manifest_path: input.run.manifestPath,
     ...queuedRetryFields
   };
+}
+
+function shouldSuppressActionRequiredReviewPromotionForActiveIssue(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_state' | 'issue_state_type' | 'issue_updated_at' | 'review_promotion'
+  >
+): boolean {
+  const reviewPromotion = claim.review_promotion ?? null;
+  if (!reviewPromotion || reviewPromotion.status !== 'action_required') {
+    return false;
+  }
+  if (
+    !classifyProviderLinearWorkflowState({
+      state: claim.issue_state,
+      state_type: claim.issue_state_type
+    }).isActive
+  ) {
+    return false;
+  }
+  const freshness = compareTrackedIssueUpdatedAt({
+    existingIssueUpdatedAt: reviewPromotion.issue_updated_at ?? null,
+    nextIssueUpdatedAt: claim.issue_updated_at ?? null
+  });
+  return freshness === 'equal' || freshness === 'newer';
 }
 
 type ProviderRetryDelayType = 'continuation' | 'failure';
@@ -9601,6 +9770,39 @@ function buildTrackedIssuePollBlockerMap(
         continue;
       }
       const providerKey = buildProviderIssueKey('linear', blocker.id);
+      if (blockersByKey.has(providerKey)) {
+        continue;
+      }
+      blockersByKey.set(providerKey, blocker);
+    }
+  }
+  return blockersByKey;
+}
+
+function buildProviderIntakeClaimBlockerMap(
+  claims: ProviderIntakeClaimRecord[]
+): Map<string, LiveLinearTrackedBlocker> {
+  const blockersByKey = new Map<string, LiveLinearTrackedBlocker>();
+  const claimsByProviderKey = new Map<string, ProviderIntakeClaimRecord>();
+  for (const claim of claims) {
+    claimsByProviderKey.set(buildProviderIssueKey(claim.provider, claim.issue_id), claim);
+  }
+  for (const claim of claims) {
+    for (const blocker of claim.issue_blocked_by ?? []) {
+      if (typeof blocker.id !== 'string' || blocker.id.length === 0) {
+        continue;
+      }
+      const providerKey = buildProviderIssueKey(claim.provider, blocker.id);
+      const blockedClaim = claimsByProviderKey.get(providerKey) ?? null;
+      if (
+        !blockedClaim ||
+        !shouldUseTrackedIssueBlockerSnapshotForRetainedReleasedNotActiveMetadataRefresh({
+          claim: blockedClaim,
+          blocker
+        })
+      ) {
+        continue;
+      }
       if (blockersByKey.has(providerKey)) {
         continue;
       }

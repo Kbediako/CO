@@ -1,10 +1,10 @@
 ---
 id: 20260331-linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be
 title: CO: Reconcile provider-worker child-stream delegation evidence with delegation guard
-status: in_progress
+status: done
 owner: Codex
 created: 2026-03-31
-last_review: 2026-03-31
+last_review: 2026-05-01
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27b
 related_tasks:
   - tasks/tasks-linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be.md
 review_notes:
+  - 2026-05-01: CO-454 live Linear audit confirmed CO-56 is `Done`; this completed-lane spec is reclassified to inactive `done` under canonical owner key `spec-guard:active-specs:last_review=2026-03-31` so historical implementation evidence remains preserved without staying in active-spec freshness. Evidence: `codex-orchestrator linear issue-context --issue-id fabdf855-dd07-4f8d-8ffa-f02d22cb27be --format json`.
   - 2026-03-31: Opened from Linear issue `CO-56` in the provider-worker workspace using the issue id `fabdf855-dd07-4f8d-8ffa-f02d22cb27be`.
   - 2026-03-31: Live `linear issue-context` confirmed the CO workflow states (`Ready`, `In Progress`, `In Review`, `Merging`, `Rework`, `Done`), showed no attached PR and no existing workpad, and the issue was transitioned from `Ready` to `In Progress` before active work.
   - 2026-03-31: Current provider-worker env in this run carries `CODEX_ORCHESTRATOR_ROOT=/Users/kbediako/Code/CO/.workspaces/linear-fabdf855-dd07-4f8d-8ffa-f02d22cb27be` and `CODEX_ORCHESTRATOR_RUNS_DIR=/Users/kbediako/Code/CO/.runs`, which explains why top-level `delegation-guard` currently searches only the shared-root artifact path.

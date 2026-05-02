@@ -11,7 +11,10 @@ import {
   readProviderPollingHealth,
   resolveControlPollingNextRefreshProjection
 } from './providerPollingHealth.js';
-import { normalizeControlHostOwnershipPollingPayload } from './controlHostOwnership.js';
+import {
+  normalizeControlHostOwnershipPollingPayload,
+  refreshControlHostOwnershipPollingPayload
+} from './controlHostOwnership.js';
 import {
   buildProviderIntakeSummary,
   isRecordLike,
@@ -397,9 +400,24 @@ function readProviderPollingSnapshot(
     context.providerIntakeState?.polling
   );
   if (persistedPolling && livePolling?.updated_at === null) {
-    return persistedPolling;
+    return refreshProviderPollingSnapshotOwnership({
+      ...persistedPolling,
+      control_host_owner: livePolling.control_host_owner ?? persistedPolling.control_host_owner
+    });
   }
-  return livePolling ?? persistedPolling;
+  return refreshProviderPollingSnapshotOwnership(livePolling ?? persistedPolling);
+}
+
+function refreshProviderPollingSnapshotOwnership(
+  polling: ControlPollingHealthPayload | null
+): ControlPollingHealthPayload | null {
+  if (!polling) {
+    return null;
+  }
+  return {
+    ...polling,
+    control_host_owner: refreshControlHostOwnershipPollingPayload(polling.control_host_owner ?? null)
+  };
 }
 
 function normalizePersistedProviderPollingSnapshot(
@@ -466,7 +484,9 @@ function normalizePersistedProviderPollingSnapshot(
     restart_required: polling.restart_required === true,
     reason: typeof polling.reason === 'string' ? polling.reason : null,
     linear_budget: linearBudget,
-    control_host_owner: normalizeControlHostOwnershipPollingPayload(polling.control_host_owner)
+    control_host_owner: refreshControlHostOwnershipPollingPayload(
+      normalizeControlHostOwnershipPollingPayload(polling.control_host_owner)
+    )
   };
 }
 
