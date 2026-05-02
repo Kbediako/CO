@@ -1,14 +1,14 @@
 {
   "items": [
     {
-      "id": "20260503-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc",
+      "id": "20260502-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc",
       "title": "CO-486 persisted goal evidence canary",
       "relates_to": "tasks/tasks-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md",
       "risk": "medium",
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-03",
+      "last_review": "2026-05-02",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md",
@@ -19,31 +19,25 @@
         ".agent/task/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md",
         "tasks/index.json",
         "docs/TASKS.md",
-        "docs/docs-freshness-registry.json",
-        ".runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc/manual/goal-surface-json-schema",
-        ".runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc/manual/goal-surface-ts",
-        ".runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc/manual/goal-persistence/resume-session-evidence.json",
-        ".runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc-docs-checklist-scaffold/cli/2026-05-02T15-15-46-450Z-560e82b6/manifest.json",
-        ".runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc-docs-review/cli/2026-05-02T15-25-40-851Z-0acbfb39/manifest.json"
+        "docs/docs-freshness-registry.json"
       ],
       "approvals": {
         "docs_checklist_child_lane": {
           "reviewer": "bounded same-issue child lane docs-checklist-scaffold",
-          "date": "2026-05-03",
+          "date": "2026-05-02",
           "status": "accepted",
-          "manifest": ".runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc-docs-checklist-scaffold/cli/2026-05-02T15-15-46-450Z-560e82b6/manifest.json",
-          "patch": ".runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc-docs-checklist-scaffold/cli/2026-05-02T15-15-46-450Z-560e82b6/provider-linear-child-lane.patch",
+          "run_id": "2026-05-02T15-15-46-450Z-560e82b6",
           "summary": "Child lane created only the CO-486 ACTION_PLAN and checklist mirrors, preserving the live 0.128 persisted /goal canary, manifest/workpad evidence contract, provider-worker/long-poll/hook recovery classifications, and no hook/resume integration."
         },
         "canary_probe": {
           "reviewer": "parent provider worker",
-          "date": "2026-05-03",
+          "date": "2026-05-02",
           "status": "completed",
           "summary": "Live probes confirmed codex-cli 0.128.0, goals feature enabled, app-server goal schema/type notifications, runtime continuation help surfaces, direct model-tool goal state, and exec/resume persistence for the same goal objective/thread. The evidence contract is advisory-only; goal state cannot authorize Linear, PR, review, ready-review, merge, hook recovery, or long-poll terminal decisions."
         },
         "follow_up_scope": {
           "reviewer": "parent provider worker",
-          "date": "2026-05-03",
+          "date": "2026-05-02",
           "status": "created",
           "issue": "CO-492 / 779bc931-f6b4-4a1c-b16f-145d500aca73",
           "url": "https://linear.app/asabeko/issue/CO-492/co-capture-advisory-persisted-goal-evidence-in-provider-worker",

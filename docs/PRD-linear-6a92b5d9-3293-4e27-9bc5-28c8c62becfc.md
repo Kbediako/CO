@@ -66,7 +66,7 @@
 - Contract name: Linear-first provider-worker lifecycle authority.
 - Owner / owning surface: CO provider-worker workflow and Linear helper surfaces.
 - Introduced date: existing behavior predates this lane.
-- Review date: 2026-05-03.
+- Review date: 2026-05-02.
 - Steady-state proof: live issue-context, workpad helper, review/ready-review/merge gates, and existing provider-worker manifests remain authoritative.
 - Tests/docs that describe it as supported: repo-local `skills/linear/SKILL.md`, `skills/land/SKILL.md`, AGENTS provider-worker workflow instructions, and this packet.
 - Non-expiring rationale: Linear/workpad/PR/review state is the governed provider-worker authority model. Goal state is a user-continuity aid and cannot safely replace external workflow truth.

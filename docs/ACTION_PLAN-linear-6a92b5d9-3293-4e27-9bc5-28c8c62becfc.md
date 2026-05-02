@@ -78,4 +78,4 @@
 
 ## Approvals
 - Reviewer: bounded same-issue docs child lane.
-- Date: 2026-05-03.
+- Date: 2026-05-02.

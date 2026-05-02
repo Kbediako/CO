@@ -1,11 +1,11 @@
 ---
-id: 20260503-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc
+id: 20260502-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc
 title: "CO-486 persisted goal evidence canary"
 relates_to: docs/PRD-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-05-03
+last_review: 2026-05-02
 ---
 
 ## Summary
@@ -33,8 +33,8 @@ last_review: 2026-05-03
   - follow-up implementation scope is not classified
   - Linear/workpad authority can be bypassed by goal state
 - Pre-implementation issue-quality review evidence:
-  - 2026-05-03: issue is appropriately broader than a micro-task because correctness depends on protected wording, live local canary evidence, and lifecycle authority boundaries.
-  - 2026-05-03: canary/design scope is intentionally separate from CO-466 release-intake; this lane consumes the already classified local `0.128.0` posture rather than re-promoting release pins.
+  - 2026-05-02T16:15:44Z: issue is appropriately broader than a micro-task because correctness depends on protected wording, live local canary evidence, and lifecycle authority boundaries.
+  - 2026-05-02T16:15:44Z: canary/design scope is intentionally separate from CO-466 release-intake; this lane consumes the already classified local `0.128.0` posture rather than re-promoting release pins.
 - Safeguard ownership split:
   - Parent owns PRD, TECH_SPEC, canonical spec, registries, canary probes, Linear/workpad state, docs-review, validation, follow-up filing, and PR lifecycle.
   - Same-issue child lane `docs-checklist-scaffold` owns only `docs/ACTION_PLAN-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md`, `tasks/tasks-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md`, and `.agent/task/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md` until accepted.
@@ -58,7 +58,7 @@ last_review: 2026-05-03
   - allowed statuses observed in generated bindings: `active`, `paused`, `budgetLimited`, `complete`
   - model tools observed in this worker session: `get_goal`, `create_goal`, and `update_goal` lifecycle semantics
 
-## Canary Evidence - 2026-05-03
+## Canary Evidence - 2026-05-02T16:15Z
 - `which codex && codex --version`: `/opt/homebrew/bin/codex`, `codex-cli 0.128.0`.
 - `codex features list`: `goals` is `under development` and `true`; removed `js_repl` / `js_repl_tools_only` remain false, matching CO-466 posture.
 - `codex app-server --help`: app-server exposes `proxy`, `generate-ts`, and `generate-json-schema` plus `stdio://`, `unix://`, and websocket listen modes.
@@ -140,7 +140,7 @@ last_review: 2026-05-03
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Provider-worker lifecycle authority | Goal evidence may exist beside Linear/workpad truth | justify retaining fallback | CO provider-worker workflow | goal feature enabled or unavailable | existing authority predates CO-486 | 2026-05-03 | non-expiring authority contract | only replaced by a separate approved authority redesign | Linear issue-context, workpad contract, review/ready-review/merge gates, this canary |
+| Provider-worker lifecycle authority | Goal evidence may exist beside Linear/workpad truth | justify retaining fallback | CO provider-worker workflow | goal feature enabled or unavailable | existing authority predates CO-486 | 2026-05-02 | non-expiring authority contract | only replaced by a separate approved authority redesign | Linear issue-context, workpad contract, review/ready-review/merge gates, this canary |
 
 - For `justify retaining fallback`, contract name: Linear-first lifecycle authority with optional advisory goal evidence.
 - Large-refactor check: a larger refactor is not warranted in this canary lane because the canary does not split authority; it documents an additive evidence field and reserves implementation for a follow-up.
@@ -172,4 +172,4 @@ last_review: 2026-05-03
 ## Approvals
 - Docs-review: `.runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc-docs-review/cli/2026-05-02T15-25-40-851Z-0acbfb39/manifest.json`; P2 persistence concern addressed with exec/resume evidence.
 - Final standalone/elegance review: provider-worker handoff evidence is recorded in the Linear workpad and PR lifecycle rather than self-authorized in this tracked packet.
-- Date: 2026-05-03.
+- Date: 2026-05-02.
