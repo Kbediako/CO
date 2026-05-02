@@ -172,12 +172,12 @@ const PROVIDER_WORKFLOW_FALLBACK_EXPIRY_RECORDS: readonly ProviderWorkflowFallba
     decision: 'justify retaining fallback',
     owner: 'CO-474',
     trigger:
-      'Explicit control-host recovery sees a starting/resuming provider claim older than PROVIDER_MANIFESTLESS_HANDOFF_RECOVERY_STALE_MS with null run_id and null run_manifest_path.',
+      'Explicit control-host recovery sees a starting/resuming claim, or an accepted provider_issue_rehydration_pending_revalidation claim, older than PROVIDER_MANIFESTLESS_HANDOFF_RECOVERY_STALE_MS with null run_id and null run_manifest_path.',
     introduced_date: '2026-05-02',
     review_date: '2026-05-16',
-    maximum_lifetime: '45 seconds per manifestless claim; review retained seam by 2026-06-01',
+    maximum_lifetime: '14 days (until 2026-05-16)',
     removal_condition:
-      'Remove after provider launch persistence can no longer leave a starting/resuming claim without run identity or a durable retry/failure record.',
+      'Remove after provider launch persistence can no longer leave starting/resuming or accepted pending-revalidation claims without run identity or a durable retry/failure record.',
     validation: [
       'ProviderIssueHandoff.test.ts reclaims Ready accepted/no-run pending-revalidation through explicit recovery',
       'ProviderIssueHandoff.test.ts keeps fresh manifestless starts inflight and relaunches only stale manifestless starts',
@@ -6652,11 +6652,18 @@ function isProviderIssueRecoveryAction(value: string | null): value is ProviderI
 function isProviderStaleManifestlessHandoffClaim(
   claim: Pick<
     ProviderIntakeClaimRecord,
-    'state' | 'run_id' | 'run_manifest_path' | 'launch_started_at' | 'updated_at'
+    'state' | 'reason' | 'run_id' | 'run_manifest_path' | 'launch_started_at' | 'updated_at'
   >
 ): boolean {
+  const manifestlessCandidateState =
+    claim.state === 'starting' ||
+    claim.state === 'resuming' ||
+    (
+      claim.state === 'accepted' &&
+      claim.reason === 'provider_issue_rehydration_pending_revalidation'
+    );
   if (
-    (claim.state !== 'starting' && claim.state !== 'resuming') ||
+    !manifestlessCandidateState ||
     normalizeOptionalString(claim.run_id) !== null ||
     normalizeOptionalString(claim.run_manifest_path) !== null
   ) {

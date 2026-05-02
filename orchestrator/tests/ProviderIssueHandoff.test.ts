@@ -418,7 +418,8 @@ describe('createProviderIssueHandoffService', () => {
     expect(records[1]?.trigger).toContain('cached claim issue state');
     expect(records[1]?.validation.join('\n')).toContain('activation and non-activation paths');
     expect(records[2]?.trigger).toContain('PROVIDER_MANIFESTLESS_HANDOFF_RECOVERY_STALE_MS');
-    expect(records[2]?.maximum_lifetime).toContain('45 seconds');
+    expect(records[2]?.trigger).toContain('provider_issue_rehydration_pending_revalidation');
+    expect(records[2]?.maximum_lifetime).toBe('14 days (until 2026-05-16)');
     expect(records[2]?.validation.join('\n')).toContain('stale manifestless starts');
 
     records[0]?.validation.push('mutated test copy');
@@ -749,7 +750,12 @@ describe('createProviderIssueHandoffService', () => {
         persist,
         launcher,
         startPipelineId: 'provider-linear-worker',
-        resolveTrackedIssue
+        resolveTrackedIssue,
+        readFeatureToggles: () => ({
+          agent: {
+            max_concurrent_agents: 1
+          }
+        })
       });
 
       const result = await service.recoverIssue({ provider: 'linear', issueId: 'lin-issue-470', action });
