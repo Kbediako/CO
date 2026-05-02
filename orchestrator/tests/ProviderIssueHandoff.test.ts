@@ -28984,6 +28984,9 @@ describe('createProviderIssueHandoffService', () => {
       deferFreshDiscovery: true
     });
 
+    expect(refetchTrackedIssues).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'fresh_discovery' })
+    );
     expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
     expect(resolveTrackedIssue).toHaveBeenCalledWith({
       provider: 'linear',

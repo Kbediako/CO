@@ -91,11 +91,19 @@ task_checklists:
 
 ## Fallback Expiry / Refactor Decision
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `Yes`.
+- Large-refactor decision: not required; the change routes one stale cached retained-row case into the existing live issue refresh machinery.
+- Minor-seam decision: acceptable because the persisted blocker-edge branch only decides whether to refresh, while live issue-by-id remains the metadata authority.
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Retained terminal/canceled metadata | Cached same-issue retained row can carry stale started metadata while blocker-edge truth is terminal/canceled | `remove fallback` | CO-491 | Retained released/not_active claim disagrees with blocker-edge terminal metadata. | 2026-05-02 | 2026-05-02 | This issue | Live source refresh updates or degrades the retained row. | Focused persisted blocker-edge regression. |
 | Still-open released/not_active recovery | Existing retention/recovery behavior for non-terminal issues | `justify retaining fallback` | Provider-intake control-host | Live truth remains non-terminal or unavailable. | Existing CO-292-era behavior | 2026-05-02 | Existing provider-intake policy | Separate owner decides removal. | Existing retained released/not_active recovery coverage remains green. |
+
+- Contract name: Still-open released/not_active recovery.
+- Owning surface: Provider-intake control-host retained released/not_active recovery.
+- Steady-state proof: existing retained released/not_active recovery coverage remains green after the terminal/canceled metadata refresh change.
+- Tests/docs: `orchestrator/tests/ProviderIssueHandoff.test.ts -t "retained released"` and CO-491 PRD/TECH_SPEC docs.
+- Non-expiring rationale: still-open released/not_active recovery is supported provider-intake behavior; it is not governed as an expiring fallback unless a future owner removes that contract.
 
 ## Validation Plan
 - Focused tests:
