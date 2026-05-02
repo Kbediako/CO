@@ -17,7 +17,7 @@
 - [x] ACTION_PLAN drafted for parent closeout sequencing. Evidence: `docs/ACTION_PLAN-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md`.
 - [x] Checklist mirrored to `.agent/task`. Evidence: `.agent/task/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md`.
 - [x] Task registration mirrors updated in declared scope. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
-- [x] Parent docs-review or equivalent packet review completed. Evidence: manifest-backed standalone review succeeded with `review_outcome=bounded-success` in `/Users/kbediako/Code/CO/.runs/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392/cli/2026-05-02T10-08-57-509Z-30f2a4c9/review/telemetry.json`.
+- [x] Parent docs-review or equivalent packet review completed. Evidence: manifest-backed standalone review succeeded with `review_outcome=bounded-success` in `.runs/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392/cli/2026-05-02T10-08-57-509Z-30f2a4c9/review/telemetry.json`.
 
 ## Protected Issue Terms
 - [x] `CODEX_REVIEW_AUTHORITATIVE_GATE=1`

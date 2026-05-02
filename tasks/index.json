@@ -22,7 +22,7 @@
         "docs/docs-freshness-registry.json",
         "tests/cli-command-surface.spec.ts",
         ".runs/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392-docs-packet/cli/2026-05-02T10-13-30-750Z-22643d24/manifest.json",
-        "../../.runs/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392/cli/2026-05-02T10-08-57-509Z-30f2a4c9/review/telemetry.json",
+        ".runs/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392/cli/2026-05-02T10-08-57-509Z-30f2a4c9/review/telemetry.json",
         "out/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392/manual/elegance-review.md"
       ],
       "approvals": {
@@ -52,7 +52,7 @@
           "reviewer": "codex-orchestrator review",
           "date": "2026-05-02",
           "status": "bounded-success",
-          "telemetry": "../../.runs/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392/cli/2026-05-02T10-08-57-509Z-30f2a4c9/review/telemetry.json",
+          "telemetry": ".runs/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392/cli/2026-05-02T10-08-57-509Z-30f2a4c9/review/telemetry.json",
           "summary": "Manifest-backed review completed with status=succeeded, review_outcome=bounded-success, termination_boundary.kind=command-intent, and no actionable regressions."
         },
         "elegance_review": {
