@@ -1,6 +1,63 @@
 {
   "items": [
     {
+      "id": "20260503-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc",
+      "title": "CO-486 persisted goal evidence canary",
+      "relates_to": "tasks/tasks-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-03",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md",
+        "docs/TECH_SPEC-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md",
+        "docs/ACTION_PLAN-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md",
+        "tasks/specs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md",
+        "tasks/tasks-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md",
+        ".agent/task/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc/manual/goal-surface-json-schema",
+        ".runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc/manual/goal-surface-ts",
+        ".runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc/manual/goal-persistence/resume-session-evidence.json",
+        ".runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc-docs-checklist-scaffold/cli/2026-05-02T15-15-46-450Z-560e82b6/manifest.json",
+        ".runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc-docs-review/cli/2026-05-02T15-25-40-851Z-0acbfb39/manifest.json"
+      ],
+      "approvals": {
+        "docs_checklist_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-checklist-scaffold",
+          "date": "2026-05-03",
+          "status": "accepted",
+          "manifest": ".runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc-docs-checklist-scaffold/cli/2026-05-02T15-15-46-450Z-560e82b6/manifest.json",
+          "patch": ".runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc-docs-checklist-scaffold/cli/2026-05-02T15-15-46-450Z-560e82b6/provider-linear-child-lane.patch",
+          "summary": "Child lane created only the CO-486 ACTION_PLAN and checklist mirrors, preserving the live 0.128 persisted /goal canary, manifest/workpad evidence contract, provider-worker/long-poll/hook recovery classifications, and no hook/resume integration."
+        },
+        "canary_probe": {
+          "reviewer": "parent provider worker",
+          "date": "2026-05-03",
+          "status": "completed",
+          "summary": "Live probes confirmed codex-cli 0.128.0, goals feature enabled, app-server goal schema/type notifications, runtime continuation help surfaces, direct model-tool goal state, and exec/resume persistence for the same goal objective/thread. The evidence contract is advisory-only; goal state cannot authorize Linear, PR, review, ready-review, merge, hook recovery, or long-poll terminal decisions."
+        },
+        "follow_up_scope": {
+          "reviewer": "parent provider worker",
+          "date": "2026-05-03",
+          "status": "created",
+          "issue": "CO-492 / 779bc931-f6b4-4a1c-b16f-145d500aca73",
+          "url": "https://linear.app/asabeko/issue/CO-492/co-capture-advisory-persisted-goal-evidence-in-provider-worker",
+          "summary": "Created a blocked-by-source Backlog follow-up for optional advisory provider-worker manifest/workpad goal_evidence capture, preserving Linear/workpad/PR/review/check authority and excluding hook/resume or long-poll control."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md",
+        "task": "tasks/tasks-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md",
+        "agent_task": ".agent/task/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md",
+        "docs": "docs/TECH_SPEC-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md"
+      }
+    },
+    {
       "id": "20260502-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf",
       "title": "CO-485 Codex CLI 0.128 permission-profile/trust-flow rebaseline",
       "relates_to": "tasks/tasks-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md",
