@@ -48,6 +48,17 @@
 - [x] Source payload absence recorded. Evidence: source payload path from the parent brief was not present in this child checkout; packet is anchored on source anchor `ctx:sha256:7b8009ed1070b9651f8299646e34cc07a9edf0d71d948584365cd01269075452#chunk:c000001` and parent-provided issue contract.
 - [x] Fallback-expiry decisions recorded. Evidence: packet records `remove fallback` for stale `--full-auto` normal-flow guidance and trust-flow shorthand, plus `expire fallback` for doctor/default setup posture drift.
 
+## Fallback / Refactor Decision
+- Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `Yes`.
+- Large-refactor decision: not required for this bounded rebaseline; ownership remains in existing current-facing docs, doctor/default setup, and review-wrapper surfaces.
+- Minor-seam decision: acceptable only for the temporary legacy Codex config retry while 0.124/0.125 release-facing pins still reject `default_permissions`.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `--full-auto` current guidance | Deprecated flag remains normal recommendation. | remove fallback | CO-485 | Current-facing docs/prompts recommend `--full-auto`. | pre-0.128 guidance | 2026-05-02 | N/A after removal | Current guidance uses permission profiles or marks historical examples as deprecated/migration-only. | Protected-term scan plus focused parent validation. |
+| Doctor/default setup drift | Profile-backed posture is checked through old fields only. | expire fallback | CO-485 | Active profile differs from expected sandbox profile config controls or cwd controls. | 2026-05-02 | 2026-05-02 | 2026-06-01 | Doctor/default setup reports active-profile metadata and drift. | Parent-owned focused test or live command evidence. |
+| Trust-flow shorthand | Cwd trust is treated as full permission posture. | remove fallback | CO-485 | Guidance conflates cwd controls, trust flows, permission profiles, and sandbox controls. | pre-0.128 guidance | 2026-05-02 | N/A after removal | Guidance separates the controls. | Parent-owned prompt/docs scan plus focused validation. |
+
 ## Parent-Owned Implementation / Closeout
 - [x] Audit current-facing docs and provider-worker prompts for stale `--full-auto` normal-flow recommendations. Evidence: scoped `rg -- '--full-auto'` left only current-facing deprecation guidance plus intentionally historical autonomy PRD/TECH_SPEC mentions.
 - [x] Distinguish permission profiles, sandbox profile config controls, cwd controls, active-profile metadata, and trust flows in selected surfaces. Evidence: `AGENTS.md`, `templates/codex/AGENTS.md`, `docs/guides/cloud-mode-preflight.md`, `docs/guides/codex-version-policy.md`, `docs/standalone-review-guide.md`, and `skills/codex-orchestrator/SKILL.md`.

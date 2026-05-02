@@ -67,8 +67,14 @@ function buildProviderWorkerRecoverAcceptedState(
   return {
     issue_id: 'CO-404-id',
     issue_identifier: 'CO-404',
+    issue_state: 'In Progress',
+    issue_state_type: 'started',
     state: 'starting',
     reason: 'provider_issue_start_launched',
+    task_id: 'linear-CO-404-id',
+    run_id: 'run-CO-404-id',
+    run_manifest_path: '/repo/.runs/linear-CO-404-id/cli/run-CO-404-id/manifest.json',
+    worker_host: null,
     launch_source: 'control-host',
     launch_token_present: true,
     updated_at: '2026-04-26T17:44:00.000Z',
@@ -373,6 +379,218 @@ describe('ObservabilityApiController', () => {
     expect(state.body).not.toHaveProperty('claim.launch_token');
     expect(requestProviderWorkerRecover).toHaveBeenCalledTimes(1);
     expect(recovered).toBe(false);
+    recovery.resolve();
+    await recovery.promise;
+    await Promise.resolve();
+    expect(recovered).toBe(true);
+  });
+
+  it('rejects accepted pending-revalidation recover acknowledgements without launch evidence', async () => {
+    const { res, state } = createResponseRecorder();
+    const recovery = createDeferred<void>();
+    let recovered = false;
+    const noLaunchAccepted = buildProviderWorkerRecoverAcceptedState({
+      issue_id: 'lin-issue-468',
+      issue_identifier: 'CO-468',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      task_id: 'linear-lin-issue-468',
+      run_id: null,
+      run_manifest_path: null,
+      worker_host: null,
+      launch_source: null,
+      launch_token_present: false,
+      updated_at: '2026-05-01T13:00:01.000Z'
+    });
+    let currentAccepted = noLaunchAccepted;
+    let originalRequestedAt: string | null = null;
+    const readCurrentAccepted = (input: { requestedAt: string }) => {
+      originalRequestedAt ??= input.requestedAt;
+      if (
+        currentAccepted.launch_token_present &&
+        input.requestedAt !== originalRequestedAt
+      ) {
+        return null;
+      }
+      return currentAccepted;
+    };
+    const requestProviderWorkerRecover = vi.fn(async (input: {
+      provider: 'linear';
+      issueId: string;
+      action: 'recover' | 'relaunch' | 'nudge';
+    }) => {
+      await recovery.promise;
+      recovered = true;
+      return {
+        provider: input.provider,
+        issue_id: input.issueId,
+        action: input.action,
+        kind: 'start' as const,
+        reason: 'provider_issue_start_launched',
+        claim: null
+      };
+    });
+
+    const handled = await handleObservabilityApiRequest({
+      authKind: 'control',
+      req: {
+        method: 'POST',
+        url: '/api/v1/provider-worker/recover'
+      } as Pick<http.IncomingMessage, 'method' | 'url'>,
+      res,
+      presenterContext: buildControlHostPresenterContext(),
+      readRequestBody: async () => ({
+        issue_id: 'lin-issue-468',
+        action: 'nudge'
+      }),
+      requestRefresh: async () => { throw new Error('unused'); },
+      requestProviderWorkerRecover,
+      readProviderWorkerRecoverAccepted: readCurrentAccepted,
+      readDispatchEvaluation: readDisabledDispatchEvaluation
+    });
+
+    expect(handled).toBe(true);
+    expect(state.statusCode).toBe(202);
+    expect(state.body).toMatchObject({
+      mode: 'provider_worker_recover',
+      provider: 'linear',
+      issue_id: 'lin-issue-468',
+      action: 'nudge',
+      kind: 'skipped',
+      reason: 'provider_worker_recover_no_launch_evidence',
+      queued: false,
+      coalesced: false,
+      async: false,
+      claim: {
+        provider: 'linear',
+        issue_id: 'lin-issue-468',
+        issue_identifier: 'CO-468',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        state: 'accepted',
+        reason: 'provider_issue_rehydration_pending_revalidation',
+        task_id: 'linear-lin-issue-468',
+        run_id: null,
+        run_manifest_path: null,
+        worker_host: null,
+        launch_source: null,
+        launch_token_present: false,
+        updated_at: '2026-05-01T13:00:01.000Z'
+      },
+      traceability: {
+        decision: 'acknowledged',
+        reason: 'provider_worker_recover_no_launch_evidence',
+        issue_identifier: 'CO-468'
+      }
+    });
+    expect(state.body).not.toHaveProperty('accepted');
+    expect(state.body).not.toHaveProperty('claim.launch_token');
+    expect(requestProviderWorkerRecover).toHaveBeenCalledTimes(1);
+    expect(recovered).toBe(false);
+
+    const retry = createResponseRecorder();
+    await Promise.resolve();
+    await handleObservabilityApiRequest({
+      authKind: 'control',
+      req: {
+        method: 'POST',
+        url: '/api/v1/provider-worker/recover'
+      } as Pick<http.IncomingMessage, 'method' | 'url'>,
+      res: retry.res,
+      presenterContext: buildControlHostPresenterContext(),
+      readRequestBody: async () => ({
+        issue_id: 'CO-468',
+        action: 'nudge'
+      }),
+      requestRefresh: async () => { throw new Error('unused'); },
+      requestProviderWorkerRecover,
+      readProviderWorkerRecoverAccepted: readCurrentAccepted,
+      readDispatchEvaluation: readDisabledDispatchEvaluation
+    });
+    expect(retry.state.body).toMatchObject({
+      mode: 'provider_worker_recover',
+      provider: 'linear',
+      issue_id: 'CO-468',
+      action: 'nudge',
+      kind: 'skipped',
+      reason: 'provider_worker_recover_no_launch_evidence',
+      queued: false,
+      coalesced: true,
+      async: false,
+      in_flight_action: 'nudge',
+      claim: {
+        issue_id: 'lin-issue-468',
+        issue_identifier: 'CO-468',
+        run_id: null,
+        run_manifest_path: null,
+        launch_token_present: false
+      }
+    });
+    expect(retry.state.body).not.toHaveProperty('accepted');
+    expect(retry.state.body).not.toHaveProperty('claim.launch_token');
+    expect(requestProviderWorkerRecover).toHaveBeenCalledTimes(1);
+
+    currentAccepted = buildProviderWorkerRecoverAcceptedState({
+      issue_id: 'lin-issue-468',
+      issue_identifier: 'CO-468',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      task_id: 'linear-lin-issue-468',
+      run_id: 'run-lin-issue-468',
+      run_manifest_path: '/repo/.runs/linear-lin-issue-468/cli/run-lin-issue-468/manifest.json',
+      worker_host: 'worker-a',
+      launch_source: 'control-host',
+      launch_token_present: true,
+      updated_at: '2026-05-01T13:00:02.000Z'
+    });
+    const launchRetry = createResponseRecorder();
+    await handleObservabilityApiRequest({
+      authKind: 'control',
+      req: {
+        method: 'POST',
+        url: '/api/v1/provider-worker/recover'
+      } as Pick<http.IncomingMessage, 'method' | 'url'>,
+      res: launchRetry.res,
+      presenterContext: buildControlHostPresenterContext(),
+      readRequestBody: async () => ({
+        issue_id: 'CO-468',
+        action: 'nudge'
+      }),
+      requestRefresh: async () => { throw new Error('unused'); },
+      requestProviderWorkerRecover,
+      readProviderWorkerRecoverAccepted: readCurrentAccepted,
+      readDispatchEvaluation: readDisabledDispatchEvaluation
+    });
+    expect(launchRetry.state.body).toMatchObject({
+      mode: 'provider_worker_recover',
+      provider: 'linear',
+      issue_id: 'CO-468',
+      action: 'nudge',
+      kind: 'queued',
+      reason: 'provider_worker_recover_already_in_progress',
+      queued: true,
+      coalesced: true,
+      async: true,
+      in_flight_action: 'nudge',
+      accepted: {
+        issue_id: 'lin-issue-468',
+        issue_identifier: 'CO-468',
+        state: 'starting',
+        run_id: 'run-lin-issue-468',
+        run_manifest_path: '/repo/.runs/linear-lin-issue-468/cli/run-lin-issue-468/manifest.json',
+        launch_source: 'control-host',
+        launch_token_present: true
+      },
+      claim: null
+    });
+    expect(launchRetry.state.body).not.toHaveProperty('accepted.launch_token');
+    expect(launchRetry.state.body).not.toHaveProperty('claim.launch_token');
+    expect(requestProviderWorkerRecover).toHaveBeenCalledTimes(1);
+
     recovery.resolve();
     await recovery.promise;
     await Promise.resolve();
