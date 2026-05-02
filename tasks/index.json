@@ -25,9 +25,9 @@
         "docs_checklist_child_lane": {
           "reviewer": "bounded same-issue child lane docs-checklist-scaffold",
           "date": "2026-05-02",
-          "status": "accepted",
+          "status": "historical_superseded_by_rework",
           "run_id": "2026-05-02T15-15-46-450Z-560e82b6",
-          "summary": "Child lane created only the CO-486 ACTION_PLAN and checklist mirrors, preserving the live 0.128 persisted /goal canary, manifest/workpad evidence contract, provider-worker/long-poll/hook recovery classifications, and no hook/resume integration."
+          "summary": "Historical pre-Rework child lane output only. It is not current packet authority after PR #751 was closed and the Rework reset rebuilt from origin/main."
         },
         "canary_probe": {
           "reviewer": "parent provider worker",
@@ -46,8 +46,32 @@
         "rework_reset": {
           "reviewer": "parent provider worker",
           "date": "2026-05-02",
-          "status": "started",
-          "summary": "Rework reset closed stale PR #751, deleted the previous workpad, branched from current origin/main, recorded parallelize_now, and is rebuilding CO-486 packet and registry evidence with Linear/workpad authority preserved."
+          "status": "completed_through_validation",
+          "summary": "Rework reset closed stale PR #751, deleted the previous workpad, branched from current origin/main, restored registry mirrors in commit e8a904d8c089, recorded parallelize_now, completed docs-packet-rebase-r2 child lane, imported its scoped patch after helper accept failed closed on stale Linear updated_at, and kept Linear/workpad authority preserved."
+        },
+        "docs_review_rework": {
+          "reviewer": "codex-orchestrator docs-review child stream",
+          "date": "2026-05-02",
+          "status": "clean_success",
+          "run_id": "2026-05-02T20-03-43-756Z-b4ecd8e0",
+          "manifest": ".runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc-docs-review-rework/cli/2026-05-02T20-03-43-756Z-b4ecd8e0/manifest.json",
+          "summary": "Forced docs-review rework run passed delegation guard, spec guard, docs:check, docs:freshness:maintain, and bounded review; review found no concrete correctness regression in the touched docs/task packet."
+        },
+        "validation_rework": {
+          "reviewer": "parent provider worker",
+          "date": "2026-05-02",
+          "status": "passed_through_diff_budget",
+          "summary": "Parent validation passed: node scripts/delegation-guard.mjs, node scripts/spec-guard.mjs --dry-run, npm run build, npm run lint (3 existing warnings), npm run test (5258 tests), npm run docs:check, npm run docs:freshness, npm run repo:stewardship, and node scripts/diff-budget.mjs."
+        },
+        "docs_packet_rebase_r2": {
+          "reviewer": "bounded same-issue child lane docs-packet-rebase-r2",
+          "date": "2026-05-02",
+          "status": "current_packet_producer",
+          "run_id": "2026-05-02T19-51-38-188Z-83e5dfff",
+          "manifest": ".runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc-docs-packet-rebase-r2/cli/2026-05-02T19-51-38-188Z-83e5dfff/manifest.json",
+          "proof": ".runs/linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc-docs-packet-rebase-r2/cli/2026-05-02T19-51-38-188Z-83e5dfff/provider-linear-child-lane-proof.json",
+          "source_anchor": "ctx:sha256:968e79825ece74f1535532921c7bb2fe3b53e6ab34bad59ecefe3796d897cfe3#chunk:c000001",
+          "summary": "Current Rework packet producer. The lane completed successfully and emitted a scoped patch for the six packet files; parent imported the verified patch manually after helper accept failed closed on a backwards Linear updated_at comparison."
         }
       },
       "paths": {
