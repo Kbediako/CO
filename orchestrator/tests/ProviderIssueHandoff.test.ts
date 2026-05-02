@@ -871,7 +871,7 @@ describe('createProviderIssueHandoffService', () => {
     }
   );
 
-  it('relaunches a manifestless explicit-recovery starting claim instead of treating it as inflight', async () => {
+  it('keeps a fresh manifestless explicit-recovery claim inflight before relaunching once stale', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
     state.claims.push(createProviderClaim({
@@ -886,10 +886,10 @@ describe('createProviderIssueHandoffService', () => {
       state: 'starting',
       reason: 'provider_issue_start_launched',
       accepted_at: '2026-05-01T17:18:00.000Z',
-      updated_at: '2026-05-01T17:20:01.000Z',
+      updated_at: '2026-05-01T17:21:04.000Z',
       run_id: null,
       run_manifest_path: null,
-      launch_started_at: null,
+      launch_started_at: '2026-05-01T17:21:04.000Z',
       launch_source: 'control-host',
       launch_token: 'stale-recovery-launch-token',
       retry_error: null
@@ -912,6 +912,7 @@ describe('createProviderIssueHandoffService', () => {
         blocked_by: []
       })
     }));
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-05-01T17:21:05.000Z'));
     const service = createProviderIssueHandoffService({
       paths,
       state,
@@ -925,6 +926,35 @@ describe('createProviderIssueHandoffService', () => {
         }
       })
     });
+
+    const freshResult = await service.recoverIssue({
+      provider: 'linear',
+      issueId: 'lin-issue-470',
+      action: 'recover'
+    });
+
+    expect(freshResult).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_handoff_inflight',
+      claim: {
+        state: 'starting',
+        run_id: null,
+        run_manifest_path: null,
+        launch_token_present: true
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      launch_token: 'stale-recovery-launch-token',
+      launch_started_at: '2026-05-01T17:21:04.000Z'
+    });
+    Object.assign(state.claims[0]!, {
+      updated_at: '2026-05-01T17:20:01.000Z',
+      launch_started_at: '2026-05-01T17:20:01.000Z'
+    });
+    persist.mockClear();
+    launcher.start.mockClear();
+    launcher.resume.mockClear();
 
     const result = await service.recoverIssue({
       provider: 'linear',

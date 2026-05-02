@@ -24,6 +24,7 @@
 
 ## Validation
 - [x] Focused ProviderIssueHandoff/control-server lifecycle regressions.
-- [x] Delegation guard, spec guard, build, lint, full test, docs checks, freshness, stewardship, diff budget, and pack smoke.
-- [ ] Final standalone review and elegance pass after latest review fix.
-- [ ] PR create/attach, latest-main merge, checks, ready-review drain, and Linear review handoff.
+- [x] Delegation guard, build, lint, full test, docs:check, repo:stewardship, diff budget, and pack smoke.
+- [x] Manifest-backed standalone review completed with `review_outcome=bounded-success`, followed by an explicit elegance pass.
+- [ ] `spec-guard` and `docs:freshness` remain blocked by baseline stale docs/specs reproduced on clean `origin/main`; keep CO-474 out of review until the baseline owner clears them.
+- [ ] PR create/attach, checks, ready-review drain, and Linear review handoff after required gates are green.

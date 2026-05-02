@@ -436,6 +436,7 @@ const PROVIDER_RETRY_START_FAILED_REASON = 'provider_issue_retry_start_failed';
 const PROVIDER_CONTINUATION_RETRY_DELAY_MS = 1_000;
 const PROVIDER_FAILURE_RETRY_BASE_MS = 10_000;
 const PROVIDER_FAILURE_RETRY_MAX_BACKOFF_MS = 300_000;
+const PROVIDER_MANIFESTLESS_HANDOFF_RECOVERY_STALE_MS = 45_000;
 type ProviderControlHostRunLocator = { taskId: string; runId: string };
 type ProviderRehydratedLaunchProvenanceFields = {
   launch_source?: ProviderLaunchSource | null;
@@ -4080,7 +4081,7 @@ export function createProviderIssueHandoffService(
       }
 
       const latestExistingManifestlessHandoff =
-        latestExisting ? isProviderManifestlessHandoffClaim(latestExisting) : false;
+        latestExisting ? isProviderStaleManifestlessHandoffClaim(latestExisting) : false;
       if (
         latestExisting &&
         (latestExisting.state === 'starting' || latestExisting.state === 'resuming') &&
@@ -4293,7 +4294,7 @@ export function createProviderIssueHandoffService(
           );
           const lockedExisting = readProviderIntakeClaim(options.state, providerKey);
           const lockedExistingManifestlessHandoff =
-            lockedExisting ? isProviderManifestlessHandoffClaim(lockedExisting) : false;
+            lockedExisting ? isProviderStaleManifestlessHandoffClaim(lockedExisting) : false;
           const lockedLatestClaimBase = {
             ...claimBase,
             accepted_at: lockedExisting?.accepted_at ?? claimBase.accepted_at
@@ -6591,14 +6592,26 @@ function isProviderIssueRecoveryAction(value: string | null): value is ProviderI
   return value === 'recover' || value === 'relaunch' || value === 'nudge';
 }
 
-function isProviderManifestlessHandoffClaim(
-  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'run_id' | 'run_manifest_path'>
+function isProviderStaleManifestlessHandoffClaim(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'run_id' | 'run_manifest_path' | 'launch_started_at' | 'updated_at'
+  >
 ): boolean {
-  return (
-    (claim.state === 'starting' || claim.state === 'resuming') &&
-    normalizeOptionalString(claim.run_id) === null &&
-    normalizeOptionalString(claim.run_manifest_path) === null
+  if (
+    (claim.state !== 'starting' && claim.state !== 'resuming') ||
+    normalizeOptionalString(claim.run_id) !== null ||
+    normalizeOptionalString(claim.run_manifest_path) !== null
+  ) {
+    return false;
+  }
+  const startedAtMs = Date.parse(
+    normalizeOptionalString(claim.launch_started_at) ??
+      normalizeOptionalString(claim.updated_at) ??
+      ''
   );
+  return Number.isFinite(startedAtMs) &&
+    Date.now() - startedAtMs >= PROVIDER_MANIFESTLESS_HANDOFF_RECOVERY_STALE_MS;
 }
 
 function selectMostRecentTrackedIssueUpdatedAt(

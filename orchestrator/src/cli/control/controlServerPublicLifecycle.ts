@@ -450,14 +450,17 @@ export async function runProviderIssueHandoffRecover(
     stuckLifecycleResetForRecovery = true;
     providerIssueHandoff.resetStuckRefreshLifecycle?.();
   };
+  const abandonPriorOperationForRecovery = (): void => {
+    detachProviderIssueHandoffPending(state.active);
+    detachProviderIssueHandoffPending(state.queuedRefresh);
+    state.active = null;
+    state.queuedRefresh = null;
+  };
   while (state.active || state.queuedRefresh) {
     const stuckOutcome = await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff);
     if (stuckOutcome) {
       captureRestartRequiredForRecoverySkip(stuckOutcome.reason ?? null);
-      detachProviderIssueHandoffPending(state.active);
-      detachProviderIssueHandoffPending(state.queuedRefresh);
-      state.active = null;
-      state.queuedRefresh = null;
+      abandonPriorOperationForRecovery();
       resetStuckRefreshLifecycleForRecovery();
       break;
     }
@@ -478,10 +481,7 @@ export async function runProviderIssueHandoffRecover(
         PROVIDER_WORKER_RECOVER_ACTIVE_TOTAL_WAIT_MS
       )) {
         captureRestartRequiredForRecoverySkip();
-        detachProviderIssueHandoffPending(state.active);
-        detachProviderIssueHandoffPending(state.queuedRefresh);
-        state.active = null;
-        state.queuedRefresh = null;
+        abandonPriorOperationForRecovery();
         clearProviderIssueHandoffOperationState(providerIssueHandoff, state);
         resetStuckRefreshLifecycleForRecovery();
         break;
@@ -493,10 +493,7 @@ export async function runProviderIssueHandoffRecover(
         throw error;
       }
       captureRestartRequiredForRecoverySkip(stuckOutcome?.reason ?? stuckReason);
-      detachProviderIssueHandoffPending(state.active);
-      detachProviderIssueHandoffPending(state.queuedRefresh);
-      state.active = null;
-      state.queuedRefresh = null;
+      abandonPriorOperationForRecovery();
       resetStuckRefreshLifecycleForRecovery();
       break;
     }
@@ -517,6 +514,14 @@ export async function runProviderIssueHandoffRecover(
       },
       { mode: 'refresh', completeOnSuccess: false }
     );
+    const abandonRecoveryOperation = (): void => {
+      detachProviderIssueHandoffPending(recoveryOperation);
+      if (recoveryState.active === recoveryOperation) {
+        recoveryState.active = null;
+      }
+      clearProviderIssueHandoffOperationState(providerIssueHandoff, recoveryState);
+      providerIssueHandoff.resetStuckRefreshLifecycle?.();
+    };
     try {
       await waitForProviderIssueHandoffPendingWithWatchdog(
         providerIssueHandoff,
@@ -536,12 +541,7 @@ export async function runProviderIssueHandoffRecover(
         throw error;
       }
       captureRestartRequiredForRecoverySkip(stuckOutcome?.reason ?? stuckReason);
-      detachProviderIssueHandoffPending(recoveryOperation);
-      if (recoveryState.active === recoveryOperation) {
-        recoveryState.active = null;
-      }
-      clearProviderIssueHandoffOperationState(providerIssueHandoff, recoveryState);
-      providerIssueHandoff.resetStuckRefreshLifecycle?.();
+      abandonRecoveryOperation();
       if (attempt === 0) {
         continue;
       }
@@ -568,12 +568,7 @@ export async function runProviderIssueHandoffRecover(
       PROVIDER_WORKER_RECOVER_OPERATION_TOTAL_WAIT_MS
     )) {
       captureRestartRequiredForRecoverySkip();
-      detachProviderIssueHandoffPending(recoveryOperation);
-      if (recoveryState.active === recoveryOperation) {
-        recoveryState.active = null;
-      }
-      clearProviderIssueHandoffOperationState(providerIssueHandoff, recoveryState);
-      providerIssueHandoff.resetStuckRefreshLifecycle?.();
+      abandonRecoveryOperation();
       if (attempt === 0) {
         continue;
       }
@@ -587,12 +582,7 @@ export async function runProviderIssueHandoffRecover(
       throw new Error('provider_issue_recover_result_missing');
     }
     captureRestartRequiredForRecoverySkip(stuckOutcome.reason ?? null);
-    detachProviderIssueHandoffPending(recoveryOperation);
-    if (recoveryState.active === recoveryOperation) {
-      recoveryState.active = null;
-    }
-    clearProviderIssueHandoffOperationState(providerIssueHandoff, recoveryState);
-    providerIssueHandoff.resetStuckRefreshLifecycle?.();
+    abandonRecoveryOperation();
     if (attempt === 0) {
       continue;
     }
