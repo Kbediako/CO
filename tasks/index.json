@@ -139,6 +139,46 @@
       }
     },
     {
+      "id": "20260501-linear-7badbb88-ab4b-4091-9cd1-5d74643b6443",
+      "title": "CO-474 Ready accepted/no-run pending-revalidation recover timeout",
+      "relates_to": "tasks/tasks-linear-7badbb88-ab4b-4091-9cd1-5d74643b6443.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-02",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-7badbb88-ab4b-4091-9cd1-5d74643b6443.md",
+        "docs/TECH_SPEC-linear-7badbb88-ab4b-4091-9cd1-5d74643b6443.md",
+        "docs/ACTION_PLAN-linear-7badbb88-ab4b-4091-9cd1-5d74643b6443.md",
+        "tasks/specs/linear-7badbb88-ab4b-4091-9cd1-5d74643b6443.md",
+        "tasks/tasks-linear-7badbb88-ab4b-4091-9cd1-5d74643b6443.md",
+        ".agent/task/linear-7badbb88-ab4b-4091-9cd1-5d74643b6443.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-7badbb88-ab4b-4091-9cd1-5d74643b6443-docs-packet/cli/2026-05-01T20-33-30-098Z-88f678f6/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet",
+          "date": "2026-05-01",
+          "status": "produced",
+          "manifest": ".runs/linear-7badbb88-ab4b-4091-9cd1-5d74643b6443-docs-packet/cli/2026-05-01T20-33-30-098Z-88f678f6/manifest.json",
+          "patch": ".runs/linear-7badbb88-ab4b-4091-9cd1-5d74643b6443-docs-packet/cli/2026-05-01T20-33-30-098Z-88f678f6/provider-linear-child-lane.patch",
+          "source_anchor": "ctx:sha256:6d52cf6567409cd84048cdb42f67a9e5cc222d16bcf7fd7afdc32b5b51924cf8#chunk:c000001",
+          "summary": "Docs-first packet created for CO-474 from parent workpad acceptance criteria, child-lane instructions, and source anchor metadata. The packet preserves CO-470, CO-472, control-host recover, Ready issue, accepted/no-run, provider_issue_rehydration_pending_revalidation, run_id=null, run_manifest_path=null, launch_started_at=null, and request timeout 120000ms. Parent owns source inspection, implementation, validation, Linear/workpad state, PR lifecycle, CO-470 artifact or fixture reproduction, and CO-472 transition preservation; this child lane did not call Linear or GitHub and did not edit implementation or test files."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-7badbb88-ab4b-4091-9cd1-5d74643b6443.md",
+        "task": "tasks/tasks-linear-7badbb88-ab4b-4091-9cd1-5d74643b6443.md",
+        "agent_task": ".agent/task/linear-7badbb88-ab4b-4091-9cd1-5d74643b6443.md",
+        "docs": "docs/TECH_SPEC-linear-7badbb88-ab4b-4091-9cd1-5d74643b6443.md"
+      }
+    },
+    {
       "id": "20260501-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc",
       "title": "CO-461 provider docs-review child-stream task identity guard compatibility",
       "relates_to": "tasks/tasks-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
