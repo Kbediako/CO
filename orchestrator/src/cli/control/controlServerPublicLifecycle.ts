@@ -63,6 +63,7 @@ const SESSION_TTL_MS = 15 * 60 * 1000;
 interface ProviderIssueHandoffOperationState {
   active: Promise<void> | null;
   activeKind: ProviderIssueHandoffOperationKind | null;
+  activeRecoveryResults: Map<string, Promise<ProviderIssueHandoffRecoveryResult>>;
   queuedRefresh: Promise<void> | null;
   stuckSignal: Promise<ProviderIssueHandoffRefreshRequestOutcome>;
   resolveStuckSignal: ((outcome: ProviderIssueHandoffRefreshRequestOutcome) => void) | null;
@@ -433,6 +434,37 @@ export async function runProviderIssueHandoffRecover(
     action: ProviderIssueRecoveryAction;
   }
 ): Promise<ProviderIssueHandoffRecoveryResult> {
+  const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
+  const recoveryKey = buildProviderIssueHandoffRecoveryKey(input);
+  const existingRecoveryResult = state.activeRecoveryResults.get(recoveryKey);
+  if (existingRecoveryResult) {
+    return await existingRecoveryResult;
+  }
+  const recoveryResult = runProviderIssueHandoffRecoverExclusive(
+    providerIssueHandoff,
+    input,
+    state
+  );
+  state.activeRecoveryResults.set(recoveryKey, recoveryResult);
+  try {
+    return await recoveryResult;
+  } finally {
+    if (state.activeRecoveryResults.get(recoveryKey) === recoveryResult) {
+      state.activeRecoveryResults.delete(recoveryKey);
+      clearProviderIssueHandoffOperationState(providerIssueHandoff, state);
+    }
+  }
+}
+
+async function runProviderIssueHandoffRecoverExclusive(
+  providerIssueHandoff: ProviderIssueHandoffService,
+  input: {
+    provider: 'linear';
+    issueId: string;
+    action: ProviderIssueRecoveryAction;
+  },
+  state: ProviderIssueHandoffOperationState
+): Promise<ProviderIssueHandoffRecoveryResult> {
   const activeWaitStartedAtMs = Date.now();
   let restartRequiredForRecoverySkip =
     readProviderWorkerRecoverRestartRequiredContext(providerIssueHandoff);
@@ -449,7 +481,6 @@ export async function runProviderIssueHandoffRecover(
       };
     }
   };
-  const state = getProviderIssueHandoffOperationState(providerIssueHandoff);
   let stuckLifecycleResetForRecovery = false;
   const resetStuckRefreshLifecycleForRecovery = (): void => {
     stuckLifecycleResetForRecovery = true;
@@ -608,6 +639,14 @@ export async function runProviderIssueHandoffRecover(
     throw new Error(stuckOutcome.reason ?? 'provider_worker_recover_timeout');
   }
   throw new Error('provider_worker_recover_timeout');
+}
+
+function buildProviderIssueHandoffRecoveryKey(input: {
+  provider: 'linear';
+  issueId: string;
+  action: ProviderIssueRecoveryAction;
+}): string {
+  return `${input.provider}:${input.issueId}:${input.action}`;
 }
 
 function markProviderWorkerRecoverLifecycleFailure(
@@ -1199,6 +1238,7 @@ function getProviderIssueHandoffOperationState(
   const nextState: ProviderIssueHandoffOperationState = {
     active: null,
     activeKind: null,
+    activeRecoveryResults: new Map(),
     queuedRefresh: null,
     ...createProviderIssueHandoffStuckSignal()
   };
@@ -1213,6 +1253,7 @@ function clearProviderIssueHandoffOperationState(
   if (
     providerIssueHandoffOperations.get(providerIssueHandoff) === state &&
     !state.active &&
+    state.activeRecoveryResults.size === 0 &&
     !state.queuedRefresh
   ) {
     providerIssueHandoffOperations.delete(providerIssueHandoff);

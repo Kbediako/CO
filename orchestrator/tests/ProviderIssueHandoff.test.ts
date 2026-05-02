@@ -382,25 +382,44 @@ describe('createProviderIssueHandoffService', () => {
 
     expect(records.map((record) => record.id)).toEqual([
       'provider-id-mapping-fallback',
-      'retained-claim-autopilot-fallback'
+      'retained-claim-autopilot-fallback',
+      'stale-manifestless-recovery-seam'
     ]);
     for (const record of records) {
       expect(record.surface).toBe('provider workflow');
-      expect(record.decision).toBe('expire fallback');
-      expect(record.owner).toBe('CO-400');
-      expect(record.review_date).toBe('2026-05-10');
-      expect(record.maximum_lifetime).toBe('2026-05-26');
       expect(record.introduced_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(record.trigger).not.toHaveLength(0);
       expect(record.removal_condition).not.toHaveLength(0);
       expect(record.validation.length).toBeGreaterThan(1);
-      expect(record.large_refactor).toBe('required');
     }
 
+    expect(records[0]).toMatchObject({
+      decision: 'expire fallback',
+      owner: 'CO-400',
+      review_date: '2026-05-10',
+      maximum_lifetime: '2026-05-26',
+      large_refactor: 'required'
+    });
+    expect(records[1]).toMatchObject({
+      decision: 'expire fallback',
+      owner: 'CO-400',
+      review_date: '2026-05-10',
+      maximum_lifetime: '2026-05-26',
+      large_refactor: 'required'
+    });
+    expect(records[2]).toMatchObject({
+      decision: 'justify retaining fallback',
+      owner: 'CO-474',
+      review_date: '2026-05-16',
+      large_refactor: 'not_required'
+    });
     expect(records[0]?.trigger).toContain('buildProviderFallbackTaskId');
     expect(records[0]?.validation.join('\n')).toContain('provider-id fallback activation');
     expect(records[1]?.trigger).toContain('cached claim issue state');
     expect(records[1]?.validation.join('\n')).toContain('activation and non-activation paths');
+    expect(records[2]?.trigger).toContain('PROVIDER_MANIFESTLESS_HANDOFF_RECOVERY_STALE_MS');
+    expect(records[2]?.maximum_lifetime).toContain('45 seconds');
+    expect(records[2]?.validation.join('\n')).toContain('stale manifestless starts');
 
     records[0]?.validation.push('mutated test copy');
     expect(readProviderWorkflowFallbackExpiryRecords()[0]?.validation).not.toContain('mutated test copy');
@@ -1109,6 +1128,8 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_rehydrated_queued_run',
       run_id: 'run-co-470-queued-existing',
       run_manifest_path: queuedRunPaths.manifestPath,
+      launch_token: null,
+      updated_at: '2026-05-01T17:21:00.000Z',
       last_event: 'control_host_provider_worker_recover',
       last_action: 'recover'
     });

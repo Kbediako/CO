@@ -11,6 +11,7 @@
 - [x] Protected terms preserved: `CO-470`, `CO-472`, `control-host recover`, `Ready issue`, `accepted/no-run`, `provider_issue_rehydration_pending_revalidation`, `run_id=null`, `run_manifest_path=null`, `launch_started_at=null`, `request timeout 120000ms`.
 - [x] Non-goals recorded: no CO-470 fixture-env cleanup, no CO-472 rewrite, no manual `provider-intake-state.json` fix, no direct `provider-linear-worker` launch, no cap relaxation.
 - [x] Docs-review child stream completed with manifest-backed clean telemetry.
+
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Provider-worker recover | Accepted/no-run pending-revalidation recovery treated as indefinite inflight truth | remove fallback | CO-474 | Ready issue has null run/manifest/launch and no retry error | observed 2026-05-01 | N/A after removal | N/A after removal | Explicit recover launches/retries or fails fast deterministically without occupying capacity | Focused lifecycle and handoff regressions |
@@ -24,7 +25,6 @@
 
 ## Validation
 - [x] Focused ProviderIssueHandoff/control-server lifecycle regressions.
-- [x] Delegation guard, build, lint, full test, docs:check, repo:stewardship, diff budget, and pack smoke.
+- [x] Delegation guard, spec guard, build, lint, full test, docs:check, docs:freshness, repo:stewardship, diff budget, and pack smoke.
 - [x] Manifest-backed standalone review completed with `review_outcome=bounded-success`, followed by an explicit elegance pass.
-- [ ] `spec-guard` and `docs:freshness` remain blocked by baseline stale docs/specs reproduced on clean `origin/main`; keep CO-474 out of review until the baseline owner clears them.
 - [ ] PR create/attach, checks, ready-review drain, and Linear review handoff after required gates are green.

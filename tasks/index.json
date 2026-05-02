@@ -146,8 +146,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-01",
-      "status": "blocked",
+      "last_review": "2026-05-02",
+      "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-7badbb88-ab4b-4091-9cd1-5d74643b6443.md",
         "docs/TECH_SPEC-linear-7badbb88-ab4b-4091-9cd1-5d74643b6443.md",

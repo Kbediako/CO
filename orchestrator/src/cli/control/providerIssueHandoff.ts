@@ -106,9 +106,15 @@ export type ProviderWorkflowFallbackDecision =
   | 'justify retaining fallback';
 
 export interface ProviderWorkflowFallbackExpiryRecord {
-  id: 'provider-id-mapping-fallback' | 'retained-claim-autopilot-fallback';
+  id:
+    | 'provider-id-mapping-fallback'
+    | 'retained-claim-autopilot-fallback'
+    | 'stale-manifestless-recovery-seam';
   surface: 'provider workflow';
-  fallback: 'provider-id mapping fallback' | 'retained-claim/autopilot fallback';
+  fallback:
+    | 'provider-id mapping fallback'
+    | 'retained-claim/autopilot fallback'
+    | 'stale manifestless recovery seam';
   decision: ProviderWorkflowFallbackDecision;
   owner: string;
   trigger: string;
@@ -158,6 +164,26 @@ const PROVIDER_WORKFLOW_FALLBACK_EXPIRY_RECORDS: readonly ProviderWorkflowFallba
       'Existing ProviderIssueHandoff.test.ts retained released claim coverage validates activation and non-activation paths'
     ],
     large_refactor: 'required'
+  },
+  {
+    id: 'stale-manifestless-recovery-seam',
+    surface: 'provider workflow',
+    fallback: 'stale manifestless recovery seam',
+    decision: 'justify retaining fallback',
+    owner: 'CO-474',
+    trigger:
+      'Explicit control-host recovery sees a starting/resuming provider claim older than PROVIDER_MANIFESTLESS_HANDOFF_RECOVERY_STALE_MS with null run_id and null run_manifest_path.',
+    introduced_date: '2026-05-02',
+    review_date: '2026-05-16',
+    maximum_lifetime: '45 seconds per manifestless claim; review retained seam by 2026-06-01',
+    removal_condition:
+      'Remove after provider launch persistence can no longer leave a starting/resuming claim without run identity or a durable retry/failure record.',
+    validation: [
+      'ProviderIssueHandoff.test.ts reclaims Ready accepted/no-run pending-revalidation through explicit recovery',
+      'ProviderIssueHandoff.test.ts keeps fresh manifestless starts inflight and relaunches only stale manifestless starts',
+      'ProviderIssueHandoff.test.ts binds stale manifestless recovery to an existing queued same-issue run without carrying launch tokens'
+    ],
+    large_refactor: 'not_required'
   }
 ];
 
@@ -4387,6 +4413,7 @@ export function createProviderIssueHandoffService(
             lockedQueuedRun
           ) {
             const lockedWorkerHost = resolveRehydratedActiveRunWorkerHost(lockedQueuedRun, lockedExisting);
+            const reboundAt = isoTimestamp(new Date(Date.now()));
             const claim = await upsertProviderClaimAndPersist({
               ...lockedLatestClaimBase,
               task_id: lockedQueuedRun.taskId,
@@ -4400,7 +4427,7 @@ export function createProviderIssueHandoffService(
               launch_token: null,
               launch_started_at: null,
               accepted_at: lockedExisting.accepted_at,
-              updated_at: lockedExisting.updated_at
+              updated_at: reboundAt
             });
             return {
               kind: 'settled',
