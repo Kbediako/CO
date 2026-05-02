@@ -8,7 +8,6 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 const scriptPath = join(process.cwd(), 'scripts', 'spec-guard.mjs');
-const SPEC_GUARD_TEST_TIMEOUT_MS = 15_000;
 
 const createdDirs: string[] = [];
 
@@ -326,7 +325,7 @@ afterEach(async () => {
   }
 });
 
-describe('spec-guard script', { timeout: SPEC_GUARD_TEST_TIMEOUT_MS }, () => {
+describe('spec-guard script', () => {
   it('reports missing spec updates when code changes without spec touch (dry-run)', async () => {
     const repo = await initRepository();
 
@@ -2493,46 +2492,80 @@ describe('spec-guard script', { timeout: SPEC_GUARD_TEST_TIMEOUT_MS }, () => {
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
 
-  it('does not grant the external migration cap for false reviewer-approval labels', async () => {
-    for (const trigger of [
-      'External ecosystem migration bridge has a deprecation plan and reviewer approved:',
-      'External ecosystem migration bridge has a deprecation plan and approved-by-reviewer:',
-      'External ecosystem migration bridge has a deprecation plan and reviewer approval granted: no.',
-      'External ecosystem migration bridge has a deprecation plan and reviewer approval recorded=false.',
-      'External ecosystem migration bridge has a deprecation plan and reviewer approved: no.',
-      'External ecosystem migration bridge has a deprecation plan and approved-by-reviewer: false.',
-      'External ecosystem migration bridge has a deprecation plan and reviewer approved: not available.',
-      'External ecosystem migration bridge has a deprecation plan and approved-by-reviewer: not applicable.',
-      'External ecosystem migration bridge has a deprecation plan and reviewer approved: TBD.',
-      'External ecosystem migration bridge has a deprecation plan and approved-by-reviewer: todo.',
-      'External ecosystem migration bridge has a deprecation plan and reviewer approval granted: later.',
+  it.each([
+    [
+      'empty reviewer-approved label',
+      'External ecosystem migration bridge has a deprecation plan and reviewer approved:'
+    ],
+    [
+      'empty approved-by-reviewer label',
+      'External ecosystem migration bridge has a deprecation plan and approved-by-reviewer:'
+    ],
+    [
+      'reviewer approval no',
+      'External ecosystem migration bridge has a deprecation plan and reviewer approval granted: no.'
+    ],
+    [
+      'reviewer approval false',
+      'External ecosystem migration bridge has a deprecation plan and reviewer approval recorded=false.'
+    ],
+    [
+      'reviewer approved no',
+      'External ecosystem migration bridge has a deprecation plan and reviewer approved: no.'
+    ],
+    [
+      'approved-by-reviewer false',
+      'External ecosystem migration bridge has a deprecation plan and approved-by-reviewer: false.'
+    ],
+    [
+      'reviewer approved not available',
+      'External ecosystem migration bridge has a deprecation plan and reviewer approved: not available.'
+    ],
+    [
+      'approved-by-reviewer not applicable',
+      'External ecosystem migration bridge has a deprecation plan and approved-by-reviewer: not applicable.'
+    ],
+    [
+      'reviewer approved TBD',
+      'External ecosystem migration bridge has a deprecation plan and reviewer approved: TBD.'
+    ],
+    [
+      'approved-by-reviewer todo',
+      'External ecosystem migration bridge has a deprecation plan and approved-by-reviewer: todo.'
+    ],
+    [
+      'reviewer approval later',
+      'External ecosystem migration bridge has a deprecation plan and reviewer approval granted: later.'
+    ],
+    [
+      'reviewer approved pending approval',
       'External ecosystem migration bridge has a deprecation plan and reviewer approved: [pending approval].'
-    ]) {
-      const repo = await initRepository();
-      const decisionBody = fallbackDecisionTable([
-        completeExpireFallbackRow({
-          surface: '`repo guards`',
-          fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
-          owner: 'CO-410',
-          trigger,
-          reviewDate: reviewDateDaysFromNow(30),
-          maximumLifetime: reviewDateDaysFromNow(90)
-        })
-      ]);
+    ]
+  ])('does not grant the external migration cap for false reviewer-approval labels: %s', async (_label, trigger) => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
+        owner: 'CO-410',
+        trigger,
+        reviewDate: reviewDateDaysFromNow(30),
+        maximumLifetime: reviewDateDaysFromNow(90)
+      })
+    ]);
 
-      await commitFallbackGuardChange(repo, { decisionBody });
+    await commitFallbackGuardChange(repo, { decisionBody });
 
-      const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
-        cwd: repo,
-        env: specGuardEnv()
-      });
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
 
-      expect(stdout).toContain('❌ Spec guard: issues detected');
-      expect(stdout).toContain('expire fallback maximum lifetime');
-      expect(stdout).toContain('general repo fallback cap');
-      expect(stdout).toContain('Dry run: exiting successfully despite failures.');
-    }
-  }, 15_000);
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('general repo fallback cap');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
 
   it('does not grant the external migration cap when the owner issue is outside the owner cell', async () => {
     const repo = await initRepository();
@@ -2586,36 +2619,40 @@ describe('spec-guard script', { timeout: SPEC_GUARD_TEST_TIMEOUT_MS }, () => {
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
 
-  it('does not grant the external migration cap for negated external signals', async () => {
-    for (const trigger of [
-      'Local cleanup is not an external migration; it has a deprecation plan and reviewer approval granted.',
+  it.each([
+    [
+      'not external migration',
+      'Local cleanup is not an external migration; it has a deprecation plan and reviewer approval granted.'
+    ],
+    [
+      'not release compatibility bridge',
       'Local cleanup is not a release compatibility bridge; it has a deprecation plan and reviewer approval granted.'
-    ]) {
-      const repo = await initRepository();
-      const decisionBody = fallbackDecisionTable([
-        completeExpireFallbackRow({
-          surface: '`repo guards`',
-          fallback: 'General repo fallback retained during local cleanup.',
-          owner: 'CO-410',
-          trigger,
-          reviewDate: reviewDateDaysFromNow(30),
-          maximumLifetime: reviewDateDaysFromNow(90)
-        })
-      ]);
+    ]
+  ])('does not grant the external migration cap for negated external signals: %s', async (_label, trigger) => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'General repo fallback retained during local cleanup.',
+        owner: 'CO-410',
+        trigger,
+        reviewDate: reviewDateDaysFromNow(30),
+        maximumLifetime: reviewDateDaysFromNow(90)
+      })
+    ]);
 
-      await commitFallbackGuardChange(repo, { decisionBody });
+    await commitFallbackGuardChange(repo, { decisionBody });
 
-      const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
-        cwd: repo,
-        env: specGuardEnv()
-      });
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
 
-      expect(stdout).toContain('❌ Spec guard: issues detected');
-      expect(stdout).toContain('expire fallback maximum lifetime');
-      expect(stdout).toContain('general repo fallback cap');
-      expect(stdout).toContain('Dry run: exiting successfully despite failures.');
-    }
-  }, 15_000);
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('general repo fallback cap');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
 
   it('does not grant the external migration cap when deprecation-plan evidence is negated', async () => {
     const repo = await initRepository();
@@ -2752,42 +2789,61 @@ describe('spec-guard script', { timeout: SPEC_GUARD_TEST_TIMEOUT_MS }, () => {
     }
   });
 
-  it('does not grant the external migration cap for empty deprecation-plan labels', async () => {
-    for (const trigger of [
-      'External ecosystem migration bridge lists Deprecation plan:',
-      'External ecosystem migration bridge lists Deprecation plan: false while reviewer approval granted.',
-      'External ecosystem migration bridge lists Deprecation plan: none while reviewer approval granted.',
-      'External ecosystem migration bridge lists Deprecation plan: not applicable while reviewer approval granted.',
-      'External ecosystem migration bridge lists Deprecation plan: not planned while reviewer approval granted.',
-      'External ecosystem migration bridge lists Deprecation plan: unplanned while reviewer approval granted.',
-      'External ecosystem migration bridge lists Deprecation plan: [TBD] while reviewer approval granted.',
+  it.each([
+    ['empty label', 'External ecosystem migration bridge lists Deprecation plan:'],
+    [
+      'false label',
+      'External ecosystem migration bridge lists Deprecation plan: false while reviewer approval granted.'
+    ],
+    [
+      'none label',
+      'External ecosystem migration bridge lists Deprecation plan: none while reviewer approval granted.'
+    ],
+    [
+      'not applicable label',
+      'External ecosystem migration bridge lists Deprecation plan: not applicable while reviewer approval granted.'
+    ],
+    [
+      'not planned label',
+      'External ecosystem migration bridge lists Deprecation plan: not planned while reviewer approval granted.'
+    ],
+    [
+      'unplanned label',
+      'External ecosystem migration bridge lists Deprecation plan: unplanned while reviewer approval granted.'
+    ],
+    [
+      'TBD bracketed label',
+      'External ecosystem migration bridge lists Deprecation plan: [TBD] while reviewer approval granted.'
+    ],
+    [
+      'not recorded bracketed label',
       'External ecosystem migration bridge lists Deprecation plan: [not recorded] while reviewer approval granted.'
-    ]) {
-      const repo = await initRepository();
-      const decisionBody = fallbackDecisionTable([
-        completeExpireFallbackRow({
-          surface: '`repo guards`',
-          fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
-          owner: 'CO-410',
-          trigger,
-          reviewDate: reviewDateDaysFromNow(30),
-          maximumLifetime: reviewDateDaysFromNow(90)
-        })
-      ]);
+    ]
+  ])('does not grant the external migration cap for empty deprecation-plan labels: %s', async (_label, trigger) => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'Release compatibility fallback retained for an external ecosystem migration.',
+        owner: 'CO-410',
+        trigger,
+        reviewDate: reviewDateDaysFromNow(30),
+        maximumLifetime: reviewDateDaysFromNow(90)
+      })
+    ]);
 
-      await commitFallbackGuardChange(repo, { decisionBody });
+    await commitFallbackGuardChange(repo, { decisionBody });
 
-      const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
-        cwd: repo,
-        env: specGuardEnv()
-      });
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
 
-      expect(stdout).toContain('❌ Spec guard: issues detected');
-      expect(stdout).toContain('expire fallback maximum lifetime');
-      expect(stdout).toContain('general repo fallback cap');
-      expect(stdout).toContain('Dry run: exiting successfully despite failures.');
-    }
-  }, 15_000);
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('general repo fallback cap');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
 
   it('does not grant the external migration cap for weak deprecation-plan placeholders', async () => {
     const repo = await initRepository();

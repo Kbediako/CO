@@ -1,0 +1,152 @@
+---
+id: 20260502-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392
+title: CO-473 review-wrapper command-surface authoritative-gate env isolation
+relates_to: docs/PRD-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md
+risk: high
+owners:
+  - Codex
+last_review: 2026-05-02
+related_action_plan: docs/ACTION_PLAN-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md
+task_checklists:
+  - tasks/tasks-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md
+---
+
+# TECH_SPEC - CO-473 review-wrapper command-surface authoritative-gate env isolation
+
+## Canonical Reference
+- PRD: `docs/PRD-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md`
+- TECH_SPEC mirror: `docs/TECH_SPEC-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md`
+- Task checklist: `tasks/tasks-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md`
+- Linear issue: `CO-473` / https://linear.app/asabeko/issue/CO-473
+- Child lane manifest: `.runs/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392-docs-packet/cli/2026-05-02T10-13-30-750Z-22643d24/manifest.json`
+- Source anchor: `ctx:sha256:8605482f091c307d8fc7505b7287a4a4315a06964f7bd7a1789d330806a70534#chunk:c000001`
+
+## Summary
+- Objective: preserve command-surface coverage for prompt-only noninteractive review handoff while isolating it from inherited `CODEX_REVIEW_AUTHORITATIVE_GATE=1` provider-worker env, without weakening the review wrapper authoritative gate.
+- Scope:
+  - docs-first packet for CO-473
+  - registry/checklist mirrors
+  - current-main focused repro evidence for `tests/cli-command-surface.spec.ts`
+  - parent-owned decision on whether any further source closeout is required
+- Constraints:
+  - child lane is docs-only
+  - no CO-468 recovery changes
+  - no Linear or GitHub lifecycle commands
+  - no full repo validation suites from this child lane
+
+## Issue-Shaping Contract
+- User-request translation carried forward: CO-473 owns the review-wrapper command-surface authoritative-gate env isolation issue. The exact defect shape is a clean-main command-surface regression caused by ambient provider-worker `CODEX_REVIEW_AUTHORITATIVE_GATE=1` contaminating a prompt-only noninteractive review handoff test that intentionally runs with `FORCE_CODEX_REVIEW=0`.
+- Protected terms / exact artifact and surface names:
+  - `CODEX_REVIEW_AUTHORITATIVE_GATE=1`
+  - `FORCE_CODEX_REVIEW=1`
+  - `prompt-only noninteractive review handoff`
+  - `command-surface regression`
+  - `tests/cli-command-surface.spec.ts`
+  - `review wrapper authoritative gate`
+  - `provider-worker environment`
+  - `clean-main repro`
+  - `CO-468`
+- Nearby wrong interpretations to reject:
+  - CO-468 recovery changes
+  - weakened authoritative-gate fail-closed semantics
+  - treating prompt-only handoff as success under authoritative gate
+  - deletion of equivalent regression coverage
+  - broad provider-worker environment scrubbing
+  - production review-wrapper behavior changes disguised as test isolation
+- Explicit non-goals carried forward:
+  - no source/test mutation from this child lane
+  - no Linear/workpad/PR lifecycle mutation from this child lane
+  - no full validation suite from this child lane
+
+## Parity / Alignment Matrix
+
+| Surface | Current truth | Reference truth | Target truth | Explicitly out-of-scope differences |
+| --- | --- | --- | --- | --- |
+| Command-surface test | The focused test invokes `codex-orchestrator review` through the CLI shell in noninteractive handoff mode. | It must prove prompt-only handoff text and prompt artifact generation, not authoritative review execution. | It pins subprocess env so ambient `CODEX_REVIEW_AUTHORITATIVE_GATE=1` does not alter the intended non-authoritative mode. | Removing the test, weakening assertions, or changing production review semantics. |
+| Authoritative gate | `CODEX_REVIEW_AUTHORITATIVE_GATE=1` requires terminal authoritative review execution via `FORCE_CODEX_REVIEW=1`. | Prompt-only handoff is not review success under authoritative gate. | Fail-closed gate behavior is preserved. | Accepting prompt-only handoff under the gate. |
+| Provider-worker env | Provider-worker validation can set review gate env globally. | Test-local command-surface cases should not be polluted by unrelated inherited env. | The regression isolates gate and noninteractive flags per subprocess. | Global provider-worker env redesign. |
+| Clean-main repro | CO-468 found this as clean-main baseline debt, not CO-468 behavior. | Baseline debt belongs to CO-473. | Current-main proof now passes the focused repro under ambient gate. | Reopening CO-468 recovery implementation. |
+
+## Readiness Gate
+- Not done if:
+  - the focused `tests/cli-command-surface.spec.ts` repro fails under ambient `CODEX_REVIEW_AUTHORITATIVE_GATE=1`
+  - `CODEX_REVIEW_AUTHORITATIVE_GATE=1` can treat prompt-only noninteractive review handoff as authoritative success
+  - equivalent command-surface regression coverage is removed
+  - CO-468 recovery behavior changes
+  - docs/task mirrors omit the current-main focused pass evidence
+- Pre-implementation issue-quality review evidence:
+  - 2026-05-02: source payload path from the parent brief is not present in this child checkout, so the packet is anchored on the parent-provided source anchor and issue contract.
+  - 2026-05-02: current-main focused repro passed in this child workspace under ambient `CODEX_REVIEW_AUTHORITATIVE_GATE=1`: `npx vitest run tests/cli-command-surface.spec.ts -t "launches review via the CLI shell in non-interactive handoff mode"` reported 1 passed test and 120 skipped.
+  - The micro-task path is unavailable because exact env names, authoritative-gate semantics, and regression coverage retention are central to correctness.
+- Safeguard ownership split:
+  - child lane owns only the declared docs/task packet files and registry mirrors
+  - parent lane owns any source/test closeout, Linear/workpad state, PR lifecycle, and final patch integration
+
+## Technical Requirements
+- Functional requirements:
+  1. Preserve a regression in `tests/cli-command-surface.spec.ts` that exercises prompt-only noninteractive review handoff.
+  2. Ensure that regression isolates `CODEX_REVIEW_AUTHORITATIVE_GATE`, `FORCE_CODEX_REVIEW`, and noninteractive review env from inherited provider-worker environment.
+  3. Preserve review wrapper authoritative gate fail-closed semantics under `CODEX_REVIEW_AUTHORITATIVE_GATE=1`.
+  4. Preserve `FORCE_CODEX_REVIEW=1` as the explicit path for authoritative execution under the gate.
+  5. Keep CO-468 recovery behavior out of scope.
+  6. Record current-main focused repro evidence in the packet and mirrors.
+- Non-functional requirements:
+  - keep any parent source change minimal and test-local if current evidence still passes
+  - avoid broad review-wrapper or provider-worker env rewrites without fresh failure evidence
+  - keep docs-freshness and task registry updates surgical
+- Interfaces / contracts:
+  - `tests/cli-command-surface.spec.ts` remains the regression surface
+  - `codex-orchestrator review` remains the CLI command under test
+  - `CODEX_REVIEW_AUTHORITATIVE_GATE=1` remains the fail-closed gate
+  - `FORCE_CODEX_REVIEW=1` remains the authoritative execution switch
+
+## Fallback Expiry / Refactor Decision
+- Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `Yes`.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Command-surface env isolation | Ambient provider-worker `CODEX_REVIEW_AUTHORITATIVE_GATE=1` leaks into a prompt-only handoff regression | `remove fallback` | CO-473 | Focused command-surface test runs from an authoritative-gate shell. | observed 2026-05-01 | N/A after removal | N/A after removal | Test subprocess isolates gate/noninteractive env and passes under ambient gate. | Focused current-main repro passed on 2026-05-02. |
+| Prompt-only noninteractive handoff | Non-authoritative prompt-only handoff remains supported for direct/manual wrapper use | `justify retaining fallback` | review wrapper authoritative gate | Wrapper is invoked noninteractively without authoritative-gate requirements. | existing review-wrapper contract | 2026-05-02 | Non-expiring supported command-surface mode | Remove only if prompt-only handoff support is intentionally retired. | Command-surface regression remains active. |
+| Authoritative gate execution | `FORCE_CODEX_REVIEW=1` is required to execute review under `CODEX_REVIEW_AUTHORITATIVE_GATE=1` | `justify retaining fallback` | review wrapper authoritative gate | Provider-worker gate requires terminal review telemetry. | existing review-wrapper contract | 2026-05-02 | Non-expiring safety contract | Replace only with stronger terminal-review enforcement. | Gate must continue rejecting prompt-only success under `CODEX_REVIEW_AUTHORITATIVE_GATE=1`. |
+
+- For `justify retaining fallback`, contract names:
+  - prompt-only noninteractive review handoff outside authoritative gates
+  - review wrapper authoritative gate fail-closed execution via `FORCE_CODEX_REVIEW=1`
+- Large-refactor check: current evidence supports a narrow issue because the focused repro passes after test-local env isolation. A larger refactor is deferred unless new evidence shows repeated gate-env contamination across multiple command-surface tests or provider-worker launch surfaces.
+
+## Architecture & Data
+- Architecture / design adjustments:
+  - Prefer test-subprocess env pinning for this command-surface regression.
+  - Do not change production review wrapper gate semantics to satisfy this test.
+  - If parent needs source changes, keep them to equivalent env isolation or equivalent coverage restoration.
+- Data model changes / migrations:
+  - None.
+- External dependencies / integrations:
+  - Vitest command-surface test harness
+  - review wrapper env contract
+  - provider-worker validation environment
+
+## Validation Plan
+- Child-lane checks:
+  - focused current-main repro under ambient `CODEX_REVIEW_AUTHORITATIVE_GATE=1`
+  - JSON parse for `tasks/index.json` and `docs/docs-freshness-registry.json`
+  - scoped `git diff --check`
+  - protected-term coverage scan over packet files
+  - scoped `git status --short` review
+- Parent-owned checks:
+  - docs-review or equivalent packet review
+  - any source/test closeout needed after current-main proof
+  - review wrapper authoritative gate regression coverage if source behavior changes
+  - normal provider-worker validation floor before review handoff
+- Rollout verification:
+  - parent workpad should record child patch import, current-main focused pass, docs-review, any source decision, validation, standalone review, PR lifecycle, and final Linear state.
+- Monitoring / alerts:
+  - no new monitor required.
+
+## Open Questions
+- Closed 2026-05-02: parent decided current-main focused pass evidence plus full provider-worker validation is sufficient for docs/evidence-only closeout. No source/test patch is required because `tests/cli-command-surface.spec.ts` already isolates `CODEX_REVIEW_AUTHORITATIVE_GATE`, `FORCE_CODEX_REVIEW`, and noninteractive review env inside the subprocess.
+
+## Approvals
+- Reviewer: bounded same-issue child lane, parent standalone review, parent elegance review.
+- Date: 2026-05-02.

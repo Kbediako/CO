@@ -5,7 +5,11 @@ import process from 'node:process';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { buildCloudPreflightRequest, runCloudPreflight } from '../src/cli/utils/cloudPreflight.js';
+import {
+  buildCloudPreflightAuthProvenance,
+  buildCloudPreflightRequest,
+  runCloudPreflight
+} from '../src/cli/utils/cloudPreflight.js';
 
 const createdDirs: string[] = [];
 
@@ -133,6 +137,25 @@ describe('buildCloudPreflightRequest', () => {
 
     expect(request.codexBin).toBe('/tmp/fake-codex');
     expect(request.branch).toBe('refs/heads/env-branch');
+  });
+
+  it('reports Agent Identity as known cloud preflight credential provenance', () => {
+    const provenance = buildCloudPreflightAuthProvenance({
+      environmentId: 'env-agent',
+      branch: 'agent-branch',
+      env: {
+        CODEX_AGENT_IDENTITY: 'agent-identity-raw-value'
+      }
+    });
+
+    expect(provenance).toMatchObject({
+      providerKind: 'codex_cloud',
+      cloudEnvId: 'env-agent',
+      cloudBranch: 'agent-branch',
+      credentialSource: 'env:CODEX_AGENT_IDENTITY',
+      authFreshness: 'env_credential_present'
+    });
+    expect(JSON.stringify(provenance)).not.toContain('agent-identity-raw-value');
   });
 
   it('probes configured cloud env visibility before cloud exec', async () => {
@@ -288,7 +311,7 @@ describe('buildCloudPreflightRequest', () => {
     const { result } = await runCloudPreflightWithCloudList({
       environmentId: 'env-forbidden',
       stderr:
-        'Error: environment env-forbidden not found; forbidden for active account user@example.com OPENAI_API_KEY=sk-testsecret1234567890 Authorization: Bearer sess-secret1234567890 Bearer standalonesecret1234567890',
+        'Error: environment env-forbidden not found; forbidden for active account user@example.com OPENAI_API_KEY=sk-testsecret1234567890 OPENAI_AUTH_TOKEN=<redacted>still-secret-token-value Authorization: Bearer sess-secret1234567890 CODEX_AGENT_IDENTITY=agent-identity-secret CODEX_AGENT_IDENTITY={"id":"agent-identity-deep-id","account":{"owner":{"id":"agent-identity-deep-owner"}}} agent_identity: { "id": "agent-identity-pretty-id", "account": { "owner": { "id": "agent-identity-pretty-owner" } } } CODEX_AGENT_IDENTITY="agent identity spaced secret" CODEX_AGENT_IDENTITY=\\"agent identity escaped wrapper secret\\" CODEX_AGENT_IDENTITY=\\"{ \\"id\\" : \\"agent-identity-escaped-pretty-id\\" }\\" CODEX_AGENT_IDENTITY=\\" { \\"id\\" : \\"agent-identity-escaped-whitespace-id\\" }\\" CODEX_AGENT_IDENTITY="{\\"id\\":\\"agent-identity-escaped-env-id\\",\\"subject\\":\\"agent-identity-escaped-env-subject\\"}" CODEX_AGENT_IDENTITY={"id":"agent-identity-object-id","subject":"agent-identity-object-subject"} {"CODEX_AGENT_IDENTITY":"agent-identity-json-secret"} {"CODEX_AGENT_IDENTITY":"{\\"id\\":\\"agent-identity-escaped-json-id\\",\\"subject\\":\\"agent-identity-escaped-json-subject\\"}"} {"CODEX_AGENT_IDENTITY":{"id":"agent-identity-json-object-id","subject":"agent-identity-json-object-subject"}} agent_identity: agent-identity-colon-secret agent_identity: \'agent identity colon spaced secret\' agent_identity: {"id":"agent-identity-colon-object-id","subject":"agent-identity-colon-object-subject"} Bearer standalonesecret1234567890',
       exitCode: 1
     });
 
@@ -297,11 +320,64 @@ describe('buildCloudPreflightRequest', () => {
     expect(message).toContain('forbidden for active account');
     expect(message).toContain('<redacted-email>');
     expect(message).toContain('OPENAI_API_KEY=<redacted>');
+    expect(message).toContain('OPENAI_AUTH_TOKEN=<redacted>');
+    expect(message).toContain('CODEX_AGENT_IDENTITY=<redacted>');
+    expect(message).toContain('"CODEX_AGENT_IDENTITY":"<redacted>"');
+    expect(message).toContain('agent_identity=<redacted>');
     expect(message).toContain('authorization: Bearer <redacted>');
     expect(message).not.toContain('user@example.com');
     expect(message).not.toContain('sk-testsecret1234567890');
+    expect(message).not.toContain('still-secret-token-value');
+    expect(message).not.toContain('agent-identity-secret');
+    expect(message).not.toContain('agent-identity-deep-id');
+    expect(message).not.toContain('agent-identity-deep-owner');
+    expect(message).not.toContain('agent-identity-pretty-id');
+    expect(message).not.toContain('agent-identity-pretty-owner');
+    expect(message).not.toContain('agent identity spaced secret');
+    expect(message).not.toContain('agent identity escaped wrapper secret');
+    expect(message).not.toContain('agent-identity-escaped-pretty-id');
+    expect(message).not.toContain('agent-identity-escaped-whitespace-id');
+    expect(message).not.toContain('agent-identity-escaped-env-id');
+    expect(message).not.toContain('agent-identity-escaped-env-subject');
+    expect(message).not.toContain('agent-identity-object-id');
+    expect(message).not.toContain('agent-identity-object-subject');
+    expect(message).not.toContain('agent-identity-json-secret');
+    expect(message).not.toContain('agent-identity-escaped-json-id');
+    expect(message).not.toContain('agent-identity-escaped-json-subject');
+    expect(message).not.toContain('agent-identity-json-object-id');
+    expect(message).not.toContain('agent-identity-json-object-subject');
+    expect(message).not.toContain('agent-identity-colon-secret');
+    expect(message).not.toContain('agent identity colon spaced secret');
+    expect(message).not.toContain('agent-identity-colon-object-id');
+    expect(message).not.toContain('agent-identity-colon-object-subject');
     expect(message).not.toContain('sess-secret1234567890');
     expect(message).not.toContain('standalonesecret1234567890');
+  });
+
+  it('preserves diagnostics after delimiter-terminated escaped Agent Identity values', async () => {
+    const { result } = await runCloudPreflightWithCloudList({
+      environmentId: 'env-delimiter',
+      stderr:
+        'Error: environment env-delimiter not found CODEX_AGENT_IDENTITY=\\"agent identity delimiter secret\\"; forbidden for active account user@example.com CODEX_AGENT_IDENTITY=\\"agent identity bracket delimiter secret\\"] forbidden active profile CODEX_AGENT_IDENTITY=\\"agent identity colon delimiter secret\\": forbidden colon active profile CODEX_AGENT_IDENTITY=\\"{ \\"id\\" : \\"agent-identity-edge-brace\\\\"}\\", \\"tail\\" : \\"agent-identity-edge-brace-tail\\" }\\"} escaped brace tail remains visible CODEX_AGENT_IDENTITY=\\"[ \\"agent-identity-edge-bracket\\\\"]\\", \\"agent-identity-edge-bracket-tail\\" ]\\" ] escaped bracket tail remains visible',
+      exitCode: 1
+    });
+
+    expect(result.ok).toBe(false);
+    const message = result.issues.map((issue) => issue.message).join('\n');
+    expect(message).toContain('CODEX_AGENT_IDENTITY=<redacted>; forbidden for active account');
+    expect(message).toContain('forbidden active profile');
+    expect(message).toContain('CODEX_AGENT_IDENTITY=<redacted>: forbidden colon active profile');
+    expect(message).toContain('escaped brace tail remains visible');
+    expect(message).toContain('escaped bracket tail remains visible');
+    expect(message).toContain('<redacted-email>');
+    expect(message).not.toContain('agent identity delimiter secret');
+    expect(message).not.toContain('agent identity bracket delimiter secret');
+    expect(message).not.toContain('agent identity colon delimiter secret');
+    expect(message).not.toContain('agent-identity-edge-brace');
+    expect(message).not.toContain('agent-identity-edge-brace-tail');
+    expect(message).not.toContain('agent-identity-edge-bracket');
+    expect(message).not.toContain('agent-identity-edge-bracket-tail');
+    expect(message).not.toContain('user@example.com');
   });
 
   it('reports codex unavailable when spawning the Codex version check throws ETXTBSY synchronously', async () => {
