@@ -32,6 +32,7 @@ import {
   refreshProviderLinearWorkerProofSnapshot,
   transactProviderLinearWorkerChildLanes,
   type ProviderLinearWorkerChildLaneDecision,
+  type ProviderLinearWorkerChildLaneAcceptCurrentIssueSnapshot,
   type ProviderLinearWorkerChildLaneInFlightAction,
   type ProviderLinearWorkerChildLaneRecord,
   type ProviderLinearWorkerChildLaneScope,
@@ -176,6 +177,8 @@ interface ParentIssueSnapshot {
   issue_updated_at: string | null;
   issue_state: string | null;
   issue_state_type: string | null;
+  source: 'live_linear' | 'run_manifest_issue_updated_at' | 'unavailable';
+  unavailable_reason: string | null;
 }
 
 interface ProviderLinearChildLaneDirectoryEntry {
@@ -1009,7 +1012,9 @@ async function resolveChildLaneDecision(
   let currentIssue: ParentIssueSnapshot & { captured_at: string };
   try {
     currentHeadSha = await deps.readParentHeadSha(context.repoRoot);
-    currentIssue = await resolveParentSnapshot(context, params.env, deps);
+    currentIssue = await resolveParentSnapshot(context, params.env, deps, {
+      allowRunManifestIssueUpdatedAtFallback: false
+    });
   } catch (error) {
     try {
       await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
@@ -1020,13 +1025,46 @@ async function resolveChildLaneDecision(
     }
     throw error;
   }
-  const staleReason = resolveChildLaneStaleReason(target, currentHeadSha, currentIssue);
+  const acceptCurrentIssueSnapshot = buildAcceptCurrentIssueSnapshot(currentIssue);
+  const headStaleReason = resolveChildLaneHeadStaleReason(target, currentHeadSha);
+  if (headStaleReason) {
+    const invalidated = await finalizeClaimedChildLaneDecision({
+      context,
+      target,
+      decision: 'invalidated',
+      decisionReason: headStaleReason,
+      acceptCurrentIssueSnapshot,
+      deps,
+      now: deps.now()
+    });
+    await refreshProviderLinearChildLaneProofSnapshotBestEffort({
+      deps,
+      runDir: context.runDir,
+      auditPath: params.env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null,
+      env: params.env,
+      warningContext: `after invalidating stale child lane ${stream}`
+    });
+    return failureResult({
+      action: 'accept',
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream,
+      childRun: null,
+      childLane: invalidated ?? target,
+      code: 'provider_worker_child_lane_stale',
+      message: headStaleReason,
+      status: 409
+    });
+  }
+  const staleReason = resolveChildLaneIssueStaleReason(target, currentIssue);
   if (staleReason) {
     const invalidated = await finalizeClaimedChildLaneDecision({
       context,
       target,
       decision: 'invalidated',
       decisionReason: staleReason,
+      acceptCurrentIssueSnapshot,
       deps,
       now: deps.now()
     });
@@ -1047,6 +1085,34 @@ async function resolveChildLaneDecision(
       childLane: invalidated ?? target,
       code: 'provider_worker_child_lane_stale',
       message: staleReason,
+      status: 409
+    });
+  }
+  const currentIssueSnapshotFailure = resolveAcceptCurrentIssueSnapshotFailure(target, currentIssue);
+  if (currentIssueSnapshotFailure) {
+    const released = await releaseClaimedChildLaneAcceptance(
+      context.runDir,
+      target,
+      deps,
+      acceptCurrentIssueSnapshot
+    );
+    await refreshProviderLinearChildLaneProofSnapshotBestEffort({
+      deps,
+      runDir: context.runDir,
+      auditPath: params.env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null,
+      env: params.env,
+      warningContext: `after releasing retryable child lane ${stream} on current issue snapshot diagnostic`
+    });
+    return failureResult({
+      action: 'accept',
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream,
+      childRun: null,
+      childLane: released ?? target,
+      code: currentIssueSnapshotFailure.code,
+      message: currentIssueSnapshotFailure.message,
       status: 409
     });
   }
@@ -1256,6 +1322,7 @@ async function resolveChildLaneDecision(
     target,
     decision: 'accepted',
     decisionReason: normalizeOptionalString(params.reason) ?? defaultDecisionReason('accept', target),
+    acceptCurrentIssueSnapshot,
     deps,
     now: deps.now()
   });
@@ -1738,17 +1805,23 @@ async function repairPendingLaunchingChildLaneDecisionTarget(input: {
 async function releaseClaimedChildLaneAcceptance(
   runDir: string,
   target: ProviderLinearWorkerChildLaneRecord,
-  deps: ProviderLinearChildLaneShellDependencies
-): Promise<void> {
-  await deps.transactChildLanes(runDir, async (records) => {
-    const next = replaceChildLaneRecord(records, target, {
+  deps: ProviderLinearChildLaneShellDependencies,
+  acceptCurrentIssueSnapshot: ProviderLinearWorkerChildLaneAcceptCurrentIssueSnapshot | null = null
+): Promise<ProviderLinearWorkerChildLaneRecord | null> {
+  return await deps.transactChildLanes(runDir, async (records) => {
+    const replacement: ProviderLinearWorkerChildLaneRecord = {
       ...target,
+      ...(acceptCurrentIssueSnapshot
+        ? { accept_current_issue_snapshot: acceptCurrentIssueSnapshot }
+        : {}),
       in_flight_action: null,
       in_flight_started_at: null
-    });
+    };
+    const next = replaceChildLaneRecord(records, target, replacement);
+    const updated = next ? findChildLaneByIdentity(next, target) : null;
     return {
       records: next ?? records,
-      result: undefined
+      result: updated
     };
   });
 }
@@ -1758,12 +1831,16 @@ async function finalizeClaimedChildLaneDecision(input: {
   target: ProviderLinearWorkerChildLaneRecord;
   decision: 'accepted' | 'invalidated';
   decisionReason: string;
+  acceptCurrentIssueSnapshot?: ProviderLinearWorkerChildLaneAcceptCurrentIssueSnapshot | null;
   deps: ProviderLinearChildLaneShellDependencies;
   now: string;
 }): Promise<ProviderLinearWorkerChildLaneRecord | null> {
   return await input.deps.transactChildLanes(input.context.runDir, async (records) => {
     const next = replaceChildLaneRecord(records, input.target, {
       ...input.target,
+      ...(input.acceptCurrentIssueSnapshot
+        ? { accept_current_issue_snapshot: input.acceptCurrentIssueSnapshot }
+        : {}),
       decision: input.decision,
       in_flight_action: null,
       in_flight_started_at: null,
@@ -2717,17 +2794,58 @@ async function resolveAcceptedPatchDirtyConflict(
 async function resolveParentSnapshot(
   context: Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>,
   env: NodeJS.ProcessEnv,
-  deps: ProviderLinearChildLaneShellDependencies
+  deps: ProviderLinearChildLaneShellDependencies,
+  options: { allowRunManifestIssueUpdatedAtFallback?: boolean } = {}
 ): Promise<ParentIssueSnapshot & { captured_at: string }> {
-  const trackedIssue = await deps.readTrackedIssue({
-    issueId: context.issueId,
-    sourceSetup: context.sourceSetup,
-    env
-  });
+  const allowRunManifestIssueUpdatedAtFallback = options.allowRunManifestIssueUpdatedAtFallback ?? true;
+  let trackedIssue: LiveLinearTrackedIssue | null;
+  try {
+    trackedIssue = await deps.readTrackedIssue({
+      issueId: context.issueId,
+      sourceSetup: context.sourceSetup,
+      env
+    });
+  } catch (error) {
+    if (allowRunManifestIssueUpdatedAtFallback) {
+      throw error;
+    }
+    return {
+      issue_updated_at: null,
+      issue_state: null,
+      issue_state_type: null,
+      source: 'unavailable',
+      unavailable_reason: `live Linear issue lookup failed: ${formatErrorMessage(error)}`,
+      captured_at: deps.now()
+    };
+  }
+  if (trackedIssue) {
+    return {
+      issue_updated_at: trackedIssue.updated_at ?? null,
+      issue_state: trackedIssue.state ?? null,
+      issue_state_type: trackedIssue.state_type ?? null,
+      source: 'live_linear',
+      unavailable_reason: null,
+      captured_at: deps.now()
+    };
+  }
+  if (!allowRunManifestIssueUpdatedAtFallback) {
+    return {
+      issue_updated_at: null,
+      issue_state: null,
+      issue_state_type: null,
+      source: 'unavailable',
+      unavailable_reason: 'live Linear issue lookup returned no issue',
+      captured_at: deps.now()
+    };
+  }
   return {
-    issue_updated_at: trackedIssue?.updated_at ?? context.issueUpdatedAt ?? null,
-    issue_state: trackedIssue?.state ?? null,
-    issue_state_type: trackedIssue?.state_type ?? null,
+    issue_updated_at: context.issueUpdatedAt ?? null,
+    issue_state: null,
+    issue_state_type: null,
+    source: context.issueUpdatedAt ? 'run_manifest_issue_updated_at' : 'unavailable',
+    unavailable_reason: context.issueUpdatedAt
+      ? null
+      : 'live Linear issue lookup returned no issue and parent run manifest issue_updated_at is absent',
     captured_at: deps.now()
   };
 }
@@ -2779,18 +2897,53 @@ async function resolveCurrentChildLaneDecisionLineageBoundary(runDir: string): P
   }
 }
 
-function resolveChildLaneStaleReason(
+function resolveChildLaneHeadStaleReason(
   childLane: ProviderLinearWorkerChildLaneRecord,
-  currentHeadSha: string | null,
-  currentIssue: ParentIssueSnapshot
+  currentHeadSha: string | null
 ): string | null {
   if (childLane.parent_snapshot.base_sha && currentHeadSha && childLane.parent_snapshot.base_sha !== currentHeadSha) {
     return `Child lane ${childLane.stream} is stale because the parent workspace HEAD moved from ${childLane.parent_snapshot.base_sha} to ${currentHeadSha}.`;
   }
+  return null;
+}
+
+function resolveAcceptCurrentIssueSnapshotFailure(
+  childLane: ProviderLinearWorkerChildLaneRecord,
+  currentIssue: ParentIssueSnapshot
+): { code: string; message: string } | null {
+  if (currentIssue.source !== 'live_linear') {
+    return {
+      code: 'provider_worker_child_lane_current_issue_unavailable',
+      message: `Child lane ${childLane.stream} cannot be accepted because live/current issue truth is unavailable at accept time (source=${currentIssue.source}; reason=${currentIssue.unavailable_reason ?? 'unknown'}). Refusing to compare against parent run manifest issue_updated_at; retry accept after live Linear issue truth is available.`
+    };
+  }
+  if (childLane.parent_snapshot.issue_updated_at && !currentIssue.issue_updated_at) {
+    return {
+      code: 'provider_worker_child_lane_current_issue_unavailable',
+      message: `Child lane ${childLane.stream} cannot be accepted because live/current issue truth did not include issue_updated_at at accept time. Refusing to compare against parent run manifest issue_updated_at; retry accept after live Linear issue truth includes updated_at.`
+    };
+  }
+  const updatedAtComparison = compareIssueUpdatedAt(
+    currentIssue.issue_updated_at,
+    childLane.parent_snapshot.issue_updated_at
+  );
+  if (updatedAtComparison === 'older') {
+    return {
+      code: 'provider_worker_child_lane_current_issue_regressed',
+      message: `Child lane ${childLane.stream} cannot be marked stale because live/current issue updated_at moved backward from child snapshot ${childLane.parent_snapshot.issue_updated_at} to ${currentIssue.issue_updated_at}. Backwards timestamp inversion is not legitimate Linear freshness movement; leaving the child lane retryable.`
+    };
+  }
+  return null;
+}
+
+function resolveChildLaneIssueStaleReason(
+  childLane: ProviderLinearWorkerChildLaneRecord,
+  currentIssue: ParentIssueSnapshot
+): string | null {
   if (
     childLane.parent_snapshot.issue_updated_at &&
     currentIssue.issue_updated_at &&
-    childLane.parent_snapshot.issue_updated_at !== currentIssue.issue_updated_at
+    isIssueUpdatedAtNewerOrDifferent(currentIssue.issue_updated_at, childLane.parent_snapshot.issue_updated_at)
   ) {
     return `Child lane ${childLane.stream} is stale because the issue updated_at changed from ${childLane.parent_snapshot.issue_updated_at} to ${currentIssue.issue_updated_at}.`;
   }
@@ -2801,7 +2954,56 @@ function resolveChildLaneStaleReason(
   ) {
     return `Child lane ${childLane.stream} is stale because the issue state changed from ${childLane.parent_snapshot.issue_state} to ${currentIssue.issue_state}.`;
   }
+  if (
+    childLane.parent_snapshot.issue_state_type &&
+    currentIssue.issue_state_type &&
+    childLane.parent_snapshot.issue_state_type !== currentIssue.issue_state_type
+  ) {
+    return `Child lane ${childLane.stream} is stale because the issue state type changed from ${childLane.parent_snapshot.issue_state_type} to ${currentIssue.issue_state_type}.`;
+  }
   return null;
+}
+
+function buildAcceptCurrentIssueSnapshot(
+  currentIssue: ParentIssueSnapshot & { captured_at: string }
+): ProviderLinearWorkerChildLaneAcceptCurrentIssueSnapshot {
+  return {
+    source: currentIssue.source === 'live_linear' ? 'live_linear' : 'unavailable',
+    issue_updated_at: currentIssue.issue_updated_at,
+    issue_state: currentIssue.issue_state,
+    issue_state_type: currentIssue.issue_state_type,
+    captured_at: currentIssue.captured_at,
+    unavailable_reason: currentIssue.unavailable_reason
+  };
+}
+
+function isIssueUpdatedAtNewerOrDifferent(
+  currentIssueUpdatedAt: string,
+  childSnapshotIssueUpdatedAt: string
+): boolean {
+  const comparison = compareIssueUpdatedAt(currentIssueUpdatedAt, childSnapshotIssueUpdatedAt);
+  return comparison === 'newer' || (comparison === 'unknown' && currentIssueUpdatedAt !== childSnapshotIssueUpdatedAt);
+}
+
+function compareIssueUpdatedAt(
+  currentIssueUpdatedAt: string | null,
+  childSnapshotIssueUpdatedAt: string | null
+): 'older' | 'same' | 'newer' | 'unknown' {
+  if (!currentIssueUpdatedAt || !childSnapshotIssueUpdatedAt) {
+    return 'unknown';
+  }
+  const currentTimestamp = Date.parse(currentIssueUpdatedAt);
+  const childTimestamp = Date.parse(childSnapshotIssueUpdatedAt);
+  if (!Number.isFinite(currentTimestamp) || !Number.isFinite(childTimestamp)) {
+    return 'unknown';
+  }
+  if (currentTimestamp < childTimestamp) {
+    return 'older';
+  }
+  if (currentTimestamp > childTimestamp) {
+    return 'newer';
+  }
+  return 'same';
 }
 
 function normalizeChildLaneStreamName(value: string | null | undefined): string | null {
@@ -2810,6 +3012,10 @@ function normalizeChildLaneStreamName(value: string | null | undefined): string 
   }
   const normalized = slugify(value, '').toLowerCase();
   return normalized.length > 0 ? normalized : null;
+}
+
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function normalizeChildLaneScope(

@@ -269,6 +269,19 @@ export interface ProviderLinearWorkerChildLaneParentSnapshot {
   captured_at: string;
 }
 
+export type ProviderLinearWorkerChildLaneAcceptCurrentIssueSnapshotSource =
+  | 'live_linear'
+  | 'unavailable';
+
+export interface ProviderLinearWorkerChildLaneAcceptCurrentIssueSnapshot {
+  source: ProviderLinearWorkerChildLaneAcceptCurrentIssueSnapshotSource;
+  issue_updated_at: string | null;
+  issue_state: string | null;
+  issue_state_type: string | null;
+  captured_at: string;
+  unavailable_reason: string | null;
+}
+
 export type ProviderLinearWorkerChildLaneDecision =
   | 'pending'
   | 'accepted'
@@ -327,6 +340,7 @@ export interface ProviderLinearWorkerChildLaneRecord {
   instructions: string | null;
   scope: ProviderLinearWorkerChildLaneScope;
   parent_snapshot: ProviderLinearWorkerChildLaneParentSnapshot;
+  accept_current_issue_snapshot?: ProviderLinearWorkerChildLaneAcceptCurrentIssueSnapshot | null;
   decision_lineage?: ProviderLinearDecisionLineage | null;
   lane_workspace_path: string | null;
   patch_artifact_path: string | null;
@@ -9447,6 +9461,9 @@ function normalizeProviderLinearWorkerChildLaneRecord(
     instructions: normalizeOptionalString(value.instructions),
     scope,
     parent_snapshot: parentSnapshot,
+    accept_current_issue_snapshot: normalizeProviderLinearWorkerChildLaneAcceptCurrentIssueSnapshot(
+      value.accept_current_issue_snapshot
+    ),
     decision_lineage: normalizeProviderLinearDecisionLineage(value.decision_lineage),
     lane_workspace_path: normalizeOptionalString(value.lane_workspace_path),
     patch_artifact_path: normalizeOptionalString(value.patch_artifact_path),
@@ -9518,6 +9535,27 @@ function normalizeProviderLinearWorkerChildLaneParentSnapshot(
     issue_state: normalizeOptionalString(value.issue_state),
     issue_state_type: normalizeOptionalString(value.issue_state_type),
     captured_at: capturedAt
+  };
+}
+
+function normalizeProviderLinearWorkerChildLaneAcceptCurrentIssueSnapshot(
+  value: unknown
+): ProviderLinearWorkerChildLaneAcceptCurrentIssueSnapshot | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const source = normalizeOptionalString(value.source);
+  const capturedAt = normalizeOptionalString(value.captured_at);
+  if ((source !== 'live_linear' && source !== 'unavailable') || !capturedAt) {
+    return null;
+  }
+  return {
+    source,
+    issue_updated_at: normalizeOptionalString(value.issue_updated_at),
+    issue_state: normalizeOptionalString(value.issue_state),
+    issue_state_type: normalizeOptionalString(value.issue_state_type),
+    captured_at: capturedAt,
+    unavailable_reason: normalizeOptionalString(value.unavailable_reason)
   };
 }
 
