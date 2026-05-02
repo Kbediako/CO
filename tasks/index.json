@@ -1,6 +1,46 @@
 {
   "items": [
     {
+      "id": "20260502-linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f",
+      "title": "CO-493 clear stale review-promotion metadata after Rework branch conflicts",
+      "relates_to": "tasks/tasks-linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-02",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md",
+        "docs/TECH_SPEC-linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md",
+        "docs/ACTION_PLAN-linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md",
+        "tasks/specs/linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md",
+        "tasks/tasks-linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md",
+        ".agent/task/linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f-docs-packet-r2/cli/2026-05-02T17-56-08-642Z-79d69d05/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet-r2",
+          "date": "2026-05-02",
+          "status": "produced",
+          "manifest": ".runs/linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f-docs-packet-r2/cli/2026-05-02T17-56-08-642Z-79d69d05/manifest.json",
+          "source_anchor": "ctx:sha256:558ddb6b0f78a449dd5d0e36c33ef67727b03fc7811585678fd513ddefe17f17#chunk:c000001",
+          "canonical_owner_key": "control-host:rework-branch-conflict-stale-review-promotion",
+          "summary": "Docs-first packet created for CO-493 from the parent-provided child-lane brief, protected terms, and source anchor. The packet preserves Rework, branch_recovery_conflict, provider_issue_post_worker_exit_refresh_pending, provider_issue_review_promotion_action_required, review_promotion, handoff_failed, PR #751, CO-486, control-host recovery, and fresh Rework reset. It rejects parent-side PR #751 conflict edits, direct provider-linear-worker starts, supervisor-restart-only fixes, Linear timestamp games, broad provider-worker rewrites, and weakened review-promotion behavior for true In Review/Human Review failures. Parent verified the worker run source payload and reconciled the packet to the parent source anchor. Parent owns docs-review, source/test implementation, control-host recovery of CO-486, Linear/workpad state, PR lifecycle, and final patch integration."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md",
+        "task": "tasks/tasks-linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md",
+        "agent_task": ".agent/task/linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md",
+        "docs": "docs/TECH_SPEC-linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md"
+      }
+    },
+    {
       "id": "20260502-linear-34faa7f9-640b-494f-af58-47096b6d0541",
       "title": "CO-491 retained released/not_active canceled metadata refresh",
       "relates_to": "tasks/tasks-linear-34faa7f9-640b-494f-af58-47096b6d0541.md",

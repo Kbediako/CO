@@ -9270,7 +9270,8 @@ function buildProviderCompletedRunRehydrateState(input: {
   if (
     !input.claim.merge_closeout &&
     input.claim.review_promotion &&
-    resolveProviderReviewPromotionClaimState(input.claim.review_promotion) === 'handoff_failed'
+    resolveProviderReviewPromotionClaimState(input.claim.review_promotion) === 'handoff_failed' &&
+    !shouldSuppressActionRequiredReviewPromotionForActiveIssue(input.claim)
   ) {
     return {
       task_id: input.run.taskId,
@@ -9332,6 +9333,31 @@ function buildProviderCompletedRunRehydrateState(input: {
     run_manifest_path: input.run.manifestPath,
     ...queuedRetryFields
   };
+}
+
+function shouldSuppressActionRequiredReviewPromotionForActiveIssue(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_state' | 'issue_state_type' | 'issue_updated_at' | 'review_promotion'
+  >
+): boolean {
+  const reviewPromotion = claim.review_promotion ?? null;
+  if (!reviewPromotion || reviewPromotion.status !== 'action_required') {
+    return false;
+  }
+  if (
+    !classifyProviderLinearWorkflowState({
+      state: claim.issue_state,
+      state_type: claim.issue_state_type
+    }).isActive
+  ) {
+    return false;
+  }
+  const freshness = compareTrackedIssueUpdatedAt({
+    existingIssueUpdatedAt: reviewPromotion.issue_updated_at ?? null,
+    nextIssueUpdatedAt: claim.issue_updated_at ?? null
+  });
+  return freshness !== 'older';
 }
 
 type ProviderRetryDelayType = 'continuation' | 'failure';
