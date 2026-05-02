@@ -43,7 +43,7 @@ This file mirrors the canonical spec at `tasks/specs/linear-6d7e842c-b10a-42f5-a
 1. Verify live Linear truth before implementation: CO-468 must be treated as a Ready issue unless parent `issue-context` proves otherwise.
 2. Locate the control-host recovery, relaunch, and nudge paths that inspect provider-intake claims.
 3. Classify accepted/pending revalidation residue with `run_id=null`, `launch_token=null`, `run_manifest_path=null`, and no manifest as non-WIP recovery residue.
-4. Preserve WIP below cap truth and do not make no-run accepted claims consume WIP.
+4. Preserve WIP below the cap, and do not count no-run accepted claims toward WIP.
 5. Preserve duplicate/occupancy protection for claims with real run evidence, launch token evidence, or manifest evidence.
 6. Keep the `25s CLI recovery timeout` as an actionable operator result, not a healthy-manifest attach timeout.
 7. Preserve CO-404 and CO-406 as done-family references and reject CO-455, CO-459, and CO-453 scope absorption.
