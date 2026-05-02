@@ -44,8 +44,12 @@
 - Rationale: the external migration cap policy is already strict; the defect is a test harness shape that batches too much expensive setup under one Vitest timeout window.
 
 ## Acceptance Criteria
-- [ ] Reproduce the timeout with current evidence and identify the slow path.
-- [ ] Keep external-migration-cap policy assertions intact for false reviewer approval, negated external signals, and empty deprecation-plan labels.
-- [ ] Make the reduced spec-guard subset finish reliably on clean `origin/main`.
-- [ ] Make full `npm run test` no longer fail because of these spec-guard timeouts.
-- [ ] Record focused and full validation evidence in the workpad or task packet.
+- [x] Reproduce the timeout with current evidence and identify the slow path.
+- [x] Keep external-migration-cap policy assertions intact for false reviewer approval, negated external signals, and empty deprecation-plan labels.
+- [x] Make the reduced spec-guard subset finish reliably on clean `origin/main`.
+- [x] Make full `npm run test` no longer fail because of these spec-guard timeouts.
+- [x] Record focused and full validation evidence in the workpad or task packet.
+
+## Validation Evidence
+- 2026-05-02: after merging current `origin/main`, `npm run test:core -- tests/spec-guard.spec.ts -t "external migration cap"` passed with 37 passed / 92 skipped in 19.27s.
+- 2026-05-02: full `npm run test` passed on rerun with 358 files and 5235 tests passed; `tests/spec-guard.spec.ts` passed under full-suite load.
