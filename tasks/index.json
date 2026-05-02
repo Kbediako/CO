@@ -1,6 +1,43 @@
 {
   "items": [
     {
+      "id": "20260502-linear-34faa7f9-640b-494f-af58-47096b6d0541",
+      "title": "CO-491 retained released/not_active canceled metadata refresh",
+      "relates_to": "tasks/tasks-linear-34faa7f9-640b-494f-af58-47096b6d0541.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-02",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-34faa7f9-640b-494f-af58-47096b6d0541.md",
+        "docs/TECH_SPEC-linear-34faa7f9-640b-494f-af58-47096b6d0541.md",
+        "docs/ACTION_PLAN-linear-34faa7f9-640b-494f-af58-47096b6d0541.md",
+        "tasks/specs/linear-34faa7f9-640b-494f-af58-47096b6d0541.md",
+        "tasks/tasks-linear-34faa7f9-640b-494f-af58-47096b6d0541.md",
+        ".agent/task/linear-34faa7f9-640b-494f-af58-47096b6d0541.md",
+        "tasks/index.json",
+        ".runs/linear-34faa7f9-640b-494f-af58-47096b6d0541-docs-packet/cli/2026-05-02T15-18-12-353Z-e83426fb/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet",
+          "date": "2026-05-02",
+          "status": "accepted_parent_refreshed",
+          "manifest": ".runs/linear-34faa7f9-640b-494f-af58-47096b6d0541-docs-packet/cli/2026-05-02T15-18-12-353Z-e83426fb/manifest.json",
+          "source_anchor": "ctx:sha256:10648cc31b6c8a3312a310a70a91e0852a279546347dfdb5835865865caabb42#chunk:c000001",
+          "summary": "Bounded docs child lane produced the CO-491 packet and parent accepted it, then refreshed the packet against the live issue contract: CO-292 recurrence, CO-470 Duplicate/canceled incident, retained provider_issue_released:not_active row with stale Blocked/started metadata, fresh blocker-edge truth, and explicit non-goals for CO-459, CO-470 ownership, and CO-476 timeout scope."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-34faa7f9-640b-494f-af58-47096b6d0541.md",
+        "task": "tasks/tasks-linear-34faa7f9-640b-494f-af58-47096b6d0541.md",
+        "agent_task": ".agent/task/linear-34faa7f9-640b-494f-af58-47096b6d0541.md",
+        "docs": "docs/TECH_SPEC-linear-34faa7f9-640b-494f-af58-47096b6d0541.md"
+      }
+    },
+    {
       "id": "20260502-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf",
       "title": "CO-485 Codex CLI 0.128 permission-profile/trust-flow rebaseline",
       "relates_to": "tasks/tasks-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md",

@@ -28794,6 +28794,219 @@ describe('createProviderIssueHandoffService', () => {
     expect(publishRuntime).toHaveBeenCalledWith('provider-intake.refresh');
   });
 
+  it('refreshes canceled retained released not-active metadata from persisted dependent blocker truth', async () => {
+    const { paths } = await createHostPaths();
+    const co470CanceledBlockerSnapshot = {
+      id: 'lin-co-470',
+      identifier: 'CO-470',
+      state: 'Duplicate',
+      state_type: 'canceled'
+    };
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-470',
+      issue_identifier: 'CO-470',
+      issue_title: 'Cached retained row source issue',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-01T19:09:06.995Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-470-retained',
+      run_id: null,
+      run_manifest_path: null
+    }));
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-460',
+      issue_identifier: 'CO-460',
+      issue_title: 'Dependent issue already seeing canceled blocker truth',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-02T08:07:24.760Z',
+      issue_blocked_by: [co470CanceledBlockerSnapshot],
+      task_id: 'linear-lin-co-460-retained',
+      run_id: null,
+      run_manifest_path: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const publishRuntime = vi.fn();
+    const launcher = createCo202Launcher(
+      'run-co-470-should-not-start',
+      '/tmp/provider-run/co-470-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-co-470',
+        identifier: 'CO-470',
+        title: 'Live Duplicate title should refresh from issue-context',
+        state: 'Duplicate',
+        state_type: 'canceled',
+        updated_at: '2026-05-02T08:01:03.083Z',
+        blocked_by: []
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      publishRuntime,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-co-470'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-co-470')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_title: 'Live Duplicate title should refresh from issue-context',
+      issue_state: co470CanceledBlockerSnapshot.state,
+      issue_state_type: co470CanceledBlockerSnapshot.state_type,
+      issue_updated_at: '2026-05-02T08:01:03.083Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-470-retained',
+      run_id: null,
+      run_manifest_path: null
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-co-460')).toMatchObject({
+      issue_blocked_by: [co470CanceledBlockerSnapshot]
+    });
+    expect(persist).toHaveBeenCalled();
+    expect(publishRuntime).toHaveBeenCalledWith('provider-intake.refresh');
+  });
+
+  it('refetches persisted dependent blocker truth when the cached blocker still matches stale retained metadata', async () => {
+    const { paths } = await createHostPaths();
+    const staleCo470BlockerSnapshot = {
+      id: 'lin-co-470',
+      identifier: 'CO-470',
+      state: 'Blocked',
+      state_type: 'started'
+    };
+    const freshCo470BlockerSnapshot = {
+      id: 'lin-co-470',
+      identifier: 'CO-470',
+      state: 'Duplicate',
+      state_type: 'canceled'
+    };
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-470',
+      issue_identifier: 'CO-470',
+      issue_title: 'Cached retained row source issue',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-01T19:09:06.995Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-470-retained',
+      run_id: null,
+      run_manifest_path: null
+    }));
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-460',
+      issue_identifier: 'CO-460',
+      issue_title: 'Dependent issue still carrying stale blocker truth',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-02T08:07:24.760Z',
+      issue_blocked_by: [staleCo470BlockerSnapshot],
+      task_id: 'linear-lin-co-460-retained',
+      run_id: null,
+      run_manifest_path: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const publishRuntime = vi.fn();
+    const launcher = createCo202Launcher(
+      'run-co-470-should-not-start',
+      '/tmp/provider-run/co-470-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-co-470',
+        identifier: 'CO-470',
+        title: 'Live Duplicate title should refresh after blocker refetch',
+        state: 'Duplicate',
+        state_type: 'canceled',
+        updated_at: '2026-05-02T08:01:03.083Z',
+        blocked_by: []
+      })
+    }));
+    const refetchTrackedIssues = vi.fn(async (input?: { mode?: string }) => {
+      if (input?.mode !== 'fresh_discovery') {
+        return {
+          kind: 'ready' as const,
+          trackedIssues: []
+        };
+      }
+      return {
+        kind: 'ready' as const,
+        trackedIssues: [
+          createTrackedIssue({
+            id: 'lin-co-460',
+            identifier: 'CO-460',
+            title: 'Dependent issue now seeing canceled blocker truth',
+            state: 'Blocked',
+            state_type: 'started',
+            updated_at: '2026-05-02T08:07:24.760Z',
+            blocked_by: [freshCo470BlockerSnapshot]
+          })
+        ]
+      };
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      publishRuntime,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-co-470'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-co-470')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_title: 'Live Duplicate title should refresh after blocker refetch',
+      issue_state: freshCo470BlockerSnapshot.state,
+      issue_state_type: freshCo470BlockerSnapshot.state_type,
+      issue_updated_at: '2026-05-02T08:01:03.083Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-470-retained',
+      run_id: null,
+      run_manifest_path: null
+    });
+    expect(persist).toHaveBeenCalled();
+    expect(publishRuntime).toHaveBeenCalledWith('provider-intake.refresh');
+  });
+
   it('refetches steady-state blocker snapshots before refreshing retained released metadata', async () => {
     const { paths } = await createHostPaths();
     const co276BlockerSnapshot = {
