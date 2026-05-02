@@ -6,7 +6,7 @@ import type { ProviderIssueRecoveryAction } from './control/providerIssueHandoff
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
 const CSRF_HEADER = 'x-csrf-token';
-const DEFAULT_PROVIDER_WORKER_RECOVER_REQUEST_TIMEOUT_MS = 25_000;
+export const DEFAULT_PROVIDER_WORKER_RECOVER_REQUEST_TIMEOUT_MS = 120_000;
 
 export interface RunControlHostProviderWorkerRecoverCliShellParams {
   action: ProviderIssueRecoveryAction;
