@@ -34,6 +34,17 @@
 - [ ] `CO-455 timeout-only adjacency` remains out of scope and is not implemented through this lane.
 - [ ] Parent implementation does not use manual relaunch or destructive `provider-intake-state.json` cleanup as the primary repair.
 
+- Large-refactor check: not required while the existing runtime/read-model boundary can source top-level `provider_intake` from raw provider-intake authority.
+- Minor-seam decision: acceptable only as removal of stale cached-summary priority; do not add a new fallback, compatibility, or break-glass status path.
+
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| top-level `provider_intake` | stale summary/cache data can outrank a fresh raw provider-intake snapshot | remove fallback | CO-459 parent lane | raw `provider-intake-state.json` is fresher than cached summary data | pre-CO-459 | 2026-05-01 | immediate removal in CO-459 | top-level summary is rebuilt from or freshness-checked against raw state | focused status/API/UI stale-cache regression |
+| `provider-intake-state.json` | Contract name: provider-intake raw authority audit state. | justify retaining fallback | Owning surface: provider-intake control-host state. | Steady-state proof: raw state preserves selected issue, concurrent-claim truth, and active/running/released states. | existing provider-intake contract | 2026-05-02 | Non-expiring durable retention only with rationale. | Non-expiring rationale: raw provider-intake state is the durable audit authority, not temporary compatibility debt; remove only if a replacement preserves selected issue, claim counts, and lifecycle states. | Tests/docs: focused status/API/UI regressions plus docs packet prove raw-state authority and no destructive cleanup. |
+| `CO-455 timeout-only adjacency` | Contract name: CO-455 timeout-only issue boundary. | justify retaining fallback | Owning surface: CO-455 status timeout handling. | Steady-state proof: timeout-only classification remains separate while CO-459 reads raw provider-intake authority. | CO-455 | 2026-05-02 | Non-expiring durable retention only with rationale. | Non-expiring rationale: the issue boundary is a durable scope guard, not a temporary fallback; remove only if CO-455 supersedes timeout-only handling. | Tests/docs: source diff keeps timeout handling untouched and packet preserves CO-455 adjacency as a non-goal. |
+
 ## Validation
 - [x] Child scoped JSON parse check. Evidence: `node -e "JSON.parse(require('fs').readFileSync('tasks/index.json','utf8'));"`.
 - [x] Child scoped protected-term check over the packet and mirrors. Evidence: `rg -n "co-status --format json|/api/v1/state|/ui/data\\.json|provider_intake|provider-intake-state\\.json|stale summary/cache data|fresh raw provider-intake snapshot|selected issue|concurrent-claim truth|active/running/released states|CO-243 regression/follow-up|CO-455 timeout-only adjacency" docs/PRD-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md docs/TECH_SPEC-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md docs/ACTION_PLAN-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md tasks/specs/linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md tasks/tasks-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md .agent/task/linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md`.

@@ -32,6 +32,15 @@
 - Fallback / refactor decision: this task touches stale/cached behavior. Decision is `remove fallback` for stale summary/cache data outranking fresh raw provider-intake snapshot; `justify retaining fallback` for raw `provider-intake-state.json` as the durable audit/authority surface; and `justify retaining fallback` for the separate `CO-455 timeout-only adjacency` boundary.
 - Durable retention evidence: raw `provider-intake-state.json` remains retained because it preserves selected issue, concurrent-claim truth, and active/running/released states; the stale-cache priority is what must be removed.
 - Large-refactor check: parent should first attempt a bounded freshness authority fix. Escalate only if the existing runtime/read-model cache boundary cannot make stale summary/cache data subordinate to raw state.
+- Minor-seam decision: acceptable only as the bounded removal of stale cached-summary priority; do not add a new fallback, compatibility, or break-glass status path.
+
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| top-level `provider_intake` | stale summary/cache data can outrank a fresh raw provider-intake snapshot | remove fallback | CO-459 parent lane | raw `provider-intake-state.json` is fresher than cached summary data | pre-CO-459 | 2026-05-01 | immediate removal in CO-459 | top-level summary is rebuilt from or freshness-checked against raw state | focused status/API/UI stale-cache regression |
+| `provider-intake-state.json` | Contract name: provider-intake raw authority audit state. | justify retaining fallback | Owning surface: provider-intake control-host state. | Steady-state proof: raw state preserves selected issue, concurrent-claim truth, and active/running/released states. | existing provider-intake contract | 2026-05-02 | Non-expiring durable retention only with rationale. | Non-expiring rationale: raw provider-intake state is the durable audit authority, not temporary compatibility debt; remove only if a replacement preserves selected issue, claim counts, and lifecycle states. | Tests/docs: focused status/API/UI regressions plus docs packet prove raw-state authority and no destructive cleanup. |
+| `CO-455 timeout-only adjacency` | Contract name: CO-455 timeout-only issue boundary. | justify retaining fallback | Owning surface: CO-455 status timeout handling. | Steady-state proof: timeout-only classification remains separate while CO-459 reads raw provider-intake authority. | CO-455 | 2026-05-02 | Non-expiring durable retention only with rationale. | Non-expiring rationale: the issue boundary is a durable scope guard, not a temporary fallback; remove only if CO-455 supersedes timeout-only handling. | Tests/docs: source diff keeps timeout handling untouched and packet preserves CO-455 adjacency as a non-goal. |
 
 ## Milestones & Sequencing
 1. Create the CO-459 docs-first packet and checklist mirrors within the declared child-lane file scope.
