@@ -1,6 +1,45 @@
 {
   "items": [
     {
+      "id": "20260501-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442",
+      "title": "CO-468 control-host accepted no-run pending revalidation recovery",
+      "relates_to": "tasks/tasks-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-01",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
+        "docs/TECH_SPEC-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
+        "docs/ACTION_PLAN-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
+        "tasks/specs/linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
+        "tasks/tasks-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
+        ".agent/task/linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
+        "docs/TASKS.md",
+        "tasks/index.json",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet",
+          "date": "2026-05-01",
+          "status": "produced",
+          "manifest": ".runs/linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442-docs-packet/cli/2026-05-01T13-35-17-299Z-2f0bc220/manifest.json",
+          "source_anchor": "ctx:sha256:104e38bfcd8ab9bf6e53beda8a47ddf80474a965ab6a27ee6635a6b0495be6af#chunk:c000001",
+          "canonical_owner_key": "control-host-recovery:accepted-no-run-pending-revalidation:no-run-id-token-manifest",
+          "summary": "Created the CO-468 docs-first packet and registry mirrors only. The packet preserves control-host recovery/nudge/relaunch for a Ready issue with accepted/pending revalidation, run_id=null, launch_token=null, run_manifest_path=null, no manifest, WIP below cap, 25s CLI recovery timeout, and CO-404/CO-406 done family boundaries. It rejects CO-455 attach timeout with healthy manifests, CO-459 stale provider_intake projection, CO-453 child-lane tracker drift, and any request to make no-run accepted claims consume WIP."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
+        "task": "tasks/tasks-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
+        "agent_task": ".agent/task/linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
+        "docs": "docs/TECH_SPEC-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md"
+      }
+    },
+    {
       "id": "20260502-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392",
       "title": "CO-473 review-wrapper command-surface authoritative-gate env isolation",
       "relates_to": "tasks/tasks-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md",
