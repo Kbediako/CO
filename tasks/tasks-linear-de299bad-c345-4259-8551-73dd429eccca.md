@@ -22,7 +22,9 @@
 - [x] `node scripts/spec-guard.mjs --dry-run`.
 - [x] `npm run test` passed on the current post-`origin/main` merge branch with 359 files / 5250 tests in 388.80s; `tests/spec-guard.spec.ts` passed under full-suite load in 66.859s.
 - [x] Required repo validation passed: delegation guard, spec guard, build, lint, focused test, full test, docs check, docs freshness, repo stewardship, diff budget, and whitespace check.
-- [ ] Standalone review, elegance pass, PR checks, ready-review drain, and Linear handoff.
+- [x] Standalone review: `status=succeeded`, `review_outcome=bounded-success`, no actionable issues; evidence `.runs/linear-de299bad-c345-4259-8551-73dd429eccca/cli/2026-05-02T08-09-24-536Z-38ccebef/review/telemetry.json`.
+- [x] Elegance/minimality pass: `status=succeeded`, `review_outcome=bounded-success`, no actionable regressions; evidence `../../.runs/linear-de299bad-c345-4259-8551-73dd429eccca/cli/2026-05-02T07-35-07-503Z-4dd7c8f5/review/telemetry.json`.
+- [ ] PR checks, ready-review drain, and Linear handoff.
 
 ## Notes
 - The implementation changed test structure only; no `scripts/spec-guard.mjs` policy logic changed.

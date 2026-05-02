@@ -21,14 +21,15 @@
 - [x] Reduced external-migration-cap subset passes without skipped tests or timeout increases.
 - [x] Full `npm run test` no longer fails because of the CO-456 spec-guard timeout cluster.
 - [x] Provider-worker review env no longer breaks the existing command-surface handoff test during full `npm run test`.
-- [ ] Validation and review evidence recorded in the workpad.
+- [x] Validation and review evidence recorded in the workpad.
 
 ## Validation
 - [x] Child docs lane completed and was accepted: `.runs/linear-de299bad-c345-4259-8551-73dd429eccca-docs-packet/cli/2026-05-01T03-01-11-354Z-21ccbfb3/manifest.json`.
 - [x] Focused before/after `npm run test:core -- tests/spec-guard.spec.ts -t "external migration cap"`; current merged-branch pass was 37 passed / 92 skipped in 13.24s.
 - [x] Full `npm run test`; current post-`origin/main` merge run passed 359 files / 5250 tests in 388.80s.
 - [x] `node scripts/spec-guard.mjs --dry-run`.
-- [ ] Required repo validation and review handoff gates.
+- [x] Required repo validation, standalone review, and elegance pass.
+- [ ] PR checks, `pr ready-review`, and Linear review handoff.
 
 ## Risks
 - A timeout-only change could mask policy weakening; mitigated by keeping all assertion bodies unchanged.
