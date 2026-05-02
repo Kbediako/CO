@@ -537,6 +537,15 @@ export interface ControlProviderIntakePayload {
   updated_at: string;
 }
 
+export type ControlProviderIntakeUnavailableReason =
+  | 'raw_provider_intake_unavailable'
+  | 'raw_provider_intake_read_failed';
+
+export interface ControlProviderIntakeUnavailablePayload {
+  reason: ControlProviderIntakeUnavailableReason;
+  updated_at: string | null;
+}
+
 export interface ControlStatePayload {
   generated_at: string;
   counts: {
@@ -552,7 +561,8 @@ export interface ControlStatePayload {
   selected: ControlSelectedRunPayload | null;
   dispatch_pilot?: ControlDispatchPilotPayload;
   tracked?: ControlTrackedPayload;
-  provider_intake?: ControlProviderIntakePayload;
+  provider_intake?: ControlProviderIntakePayload | null;
+  provider_intake_unavailable?: ControlProviderIntakeUnavailablePayload;
   provider_workflow?: ControlProviderWorkflowPayload;
   polling?: ControlPollingHealthPayload | null;
   fallback_expiry?: ControlStatusFallbackExpiryMetadata[];
@@ -563,6 +573,7 @@ export interface ControlSelectedRunRuntimeSnapshot {
   dispatchPilot: ControlDispatchPilotPayload | null;
   tracked: ControlTrackedPayload | null;
   providerIntake?: ProviderIntakeSummaryPayload | null;
+  providerIntakeUnavailable?: ControlProviderIntakeUnavailablePayload | null;
   providerWorkflow?: ControlProviderWorkflowPayload | null;
   polling?: ControlPollingHealthPayload | null;
 }
@@ -579,6 +590,7 @@ export interface ControlCompatibilityRuntimeSnapshot {
   dispatchPilot: ControlDispatchPilotPayload | null;
   tracked: ControlTrackedPayload | null;
   providerIntake?: ProviderIntakeSummaryPayload | null;
+  providerIntakeUnavailable?: ControlProviderIntakeUnavailablePayload | null;
   providerWorkflow?: ControlProviderWorkflowPayload | null;
   polling?: ControlPollingHealthPayload | null;
 }
@@ -600,6 +612,7 @@ export interface ControlCompatibilityProjectionSnapshot {
   dispatchPilot: ControlDispatchPilotPayload | null;
   tracked: ControlTrackedPayload | null;
   providerIntake?: ProviderIntakeSummaryPayload | null;
+  providerIntakeUnavailable?: ControlProviderIntakeUnavailablePayload | null;
   providerWorkflow?: ControlProviderWorkflowPayload | null;
   polling?: ControlPollingHealthPayload | null;
   fallbackExpiry?: ControlStatusFallbackExpiryMetadata[];
@@ -893,9 +906,18 @@ export function buildSelectedRunRuntimeFingerprintInput(
   const dispatchPilot = snapshot.dispatchPilot ?? null;
   const trackedLinear = selected?.tracked?.linear ?? snapshot.tracked?.linear ?? null;
   const providerIntake = snapshot.providerIntake ?? null;
+  const providerIntakeUnavailable = snapshot.providerIntakeUnavailable ?? null;
   const providerWorkflow = snapshot.providerWorkflow ?? null;
   const questionSummary = selected?.questionSummary ?? null;
-  if (!selected && !trackedLinear && !dispatchPilot && !questionSummary && !providerIntake && !providerWorkflow) {
+  if (
+    !selected &&
+    !trackedLinear &&
+    !dispatchPilot &&
+    !questionSummary &&
+    !providerIntake &&
+    !providerIntakeUnavailable &&
+    !providerWorkflow
+  ) {
     return null;
   }
   return {
@@ -944,6 +966,7 @@ export function buildSelectedRunRuntimeFingerprintInput(
         }
       : null,
     provider_intake: providerIntake ? serializeProviderIntakeSummary(providerIntake) : null,
+    provider_intake_unavailable: providerIntakeUnavailable,
     provider_workflow: providerWorkflow
       ? {
           status: providerWorkflow.status,

@@ -235,6 +235,7 @@ export function buildCompatibilityProjectionSnapshot(
     dispatchPilot: snapshot.dispatchPilot,
     tracked: snapshot.tracked,
     providerIntake: snapshot.providerIntake,
+    providerIntakeUnavailable: snapshot.providerIntakeUnavailable,
     providerWorkflow: snapshot.providerWorkflow,
     polling: snapshot.polling,
     fallbackExpiry: buildControlHostStatusFallbackDecisionSet(

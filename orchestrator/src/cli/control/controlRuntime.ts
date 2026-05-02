@@ -23,6 +23,7 @@ import {
   type ControlCompatibilityProjectionSnapshot,
   type ControlCompatibilitySourceContext,
   type ControlCodexTotalsPayload,
+  type ControlProviderIntakeUnavailablePayload,
   type ControlProviderWorkflowPayload,
   type ControlProviderRetryState,
   type ControlPollingHealthPayload,
@@ -66,6 +67,7 @@ interface ControlRuntimeContext {
     stale_source?: unknown;
   };
   providerIntakeState?: ProviderIntakeState;
+  readPersistedProviderIntakeState?: () => ProviderIntakeState | null;
   providerWorkflowConfigStore?: ProviderWorkflowConfigStore;
   readProviderIssueHandoff?: () => ProviderIssueHandoffService | null;
   env?: NodeJS.ProcessEnv;
@@ -85,6 +87,11 @@ interface CompatibilityIdentitySource {
   providerLinearWorkerProof?: ControlCompatibilitySourceContext['providerLinearWorkerProof'];
   taskId: string | null;
   runId: string | null;
+}
+
+interface ProviderIntakeAuthoritySnapshot {
+  state: ProviderIntakeState | null;
+  unavailable: ControlProviderIntakeUnavailablePayload | null;
 }
 
 export interface ControlRuntimeSnapshot {
@@ -183,7 +190,8 @@ function createControlRuntimeSnapshot(
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
       const tracked = resolveRuntimeTrackedPayload(selected, context.linearAdvisoryState);
-      const providerIntake = buildProviderIntakeSummary(context.providerIntakeState);
+      const providerIntakeAuthority = readProviderIntakeAuthorityState(context);
+      const providerIntake = buildProviderIntakeSummary(providerIntakeAuthority.state);
       const providerWorkflow = context.providerWorkflowConfigStore
         ? await refreshProviderWorkflowStatusPayload(context.providerWorkflowConfigStore)
         : null;
@@ -192,6 +200,7 @@ function createControlRuntimeSnapshot(
         dispatchPilot: dispatchPilotSummary.configured ? dispatchPilotSummary : null,
         tracked,
         providerIntake,
+        providerIntakeUnavailable: providerIntakeAuthority.unavailable,
         providerWorkflow
       };
     })();
@@ -223,7 +232,8 @@ function createControlRuntimeSnapshot(
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
       const tracked = resolveRuntimeTrackedPayload(selected, context.linearAdvisoryState);
-      const providerIntake = buildProviderIntakeSummary(context.providerIntakeState);
+      const providerIntakeAuthority = readProviderIntakeAuthorityState(context);
+      const providerIntake = buildProviderIntakeSummary(providerIntakeAuthority.state);
       const polling = readProviderPollingSnapshot(context);
       const providerWorkflow = context.providerWorkflowConfigStore
         ? await refreshProviderWorkflowStatusPayload(context.providerWorkflowConfigStore)
@@ -266,6 +276,7 @@ function createControlRuntimeSnapshot(
         dispatchPilot: dispatchPilotSummary.configured ? dispatchPilotSummary : null,
         tracked,
         providerIntake,
+        providerIntakeUnavailable: providerIntakeAuthority.unavailable,
         providerWorkflow,
         polling
       };
@@ -278,6 +289,8 @@ function createControlRuntimeSnapshot(
     // Cache the stable projection shape once, but re-derive polling-backed rate limits on every
     // read so current Linear budget data is reflected without invalidating the rest of the snapshot.
     compatibilityProjectionPromise ??= Promise.resolve(buildCompatibilityProjectionSnapshot(runtimeSnapshot));
+    const providerIntakeAuthority = readProviderIntakeAuthorityState(context);
+    const providerIntake = buildProviderIntakeSummary(providerIntakeAuthority.state);
     const polling = readProviderPollingSnapshot(context);
     const telemetrySources = buildCompatibilityTelemetrySources({
       selected: runtimeSnapshot.selected,
@@ -288,7 +301,9 @@ function createControlRuntimeSnapshot(
     return {
       ...(await compatibilityProjectionPromise),
       rateLimits,
-      polling
+      polling,
+      providerIntake,
+      providerIntakeUnavailable: providerIntakeAuthority.unavailable
     };
   }
 
@@ -331,6 +346,37 @@ function createControlRuntimeSnapshot(
     async prime(): Promise<void> {
       await readSelectedRunSnapshot();
     }
+  };
+}
+
+function readProviderIntakeAuthorityState(
+  context: Pick<ControlRuntimeContext, 'providerIntakeState' | 'readPersistedProviderIntakeState'>
+): ProviderIntakeAuthoritySnapshot {
+  if (context.readPersistedProviderIntakeState) {
+    try {
+      const state = context.readPersistedProviderIntakeState();
+      return state
+        ? { state, unavailable: null }
+        : {
+            state: null,
+            unavailable: {
+              reason: 'raw_provider_intake_unavailable',
+              updated_at: null
+            }
+          };
+    } catch {
+      return {
+        state: null,
+        unavailable: {
+          reason: 'raw_provider_intake_read_failed',
+          updated_at: null
+        }
+      };
+    }
+  }
+  return {
+    state: context.providerIntakeState ?? null,
+    unavailable: null
   };
 }
 

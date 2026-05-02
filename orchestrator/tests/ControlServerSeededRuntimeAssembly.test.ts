@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import http from 'node:http';
 
 import { computeEffectiveDelegationConfig } from '../src/cli/config/delegationConfig.js';
+import { runCoStatusCliShell } from '../src/cli/coStatusCliShell.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 import {
   LINEAR_ADVISORY_STATE_FILE,
@@ -16,6 +18,9 @@ import type {
   ProviderIntakeClaimRecord,
   ProviderIntakeState
 } from '../src/cli/control/providerIntakeState.js';
+import { readUiDataset } from '../src/cli/control/operatorDashboardPresenter.js';
+import { readCompatibilityState } from '../src/cli/control/observabilitySurface.js';
+import { handleUiDataRequest } from '../src/cli/control/uiDataController.js';
 
 async function createRunRoot(taskId: string) {
   const root = await mkdtemp(join(tmpdir(), 'control-server-seeded-runtime-'));
@@ -679,6 +684,242 @@ describe('createControlServerSeededRuntimeAssembly', () => {
         advisory_updated_at: '2026-04-21T15:00:00.000Z'
       });
       expect(refreshedSnapshot.tracked?.linear ?? null).toBeNull();
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('sources top-level provider intake from fresh persisted raw state after projection cache is stale', async () => {
+    const { root, env, paths } = await createRunRoot('task-1084');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    let server: http.Server | null = null;
+
+    try {
+      const assembly = createControlServerSeededRuntimeAssembly({
+        runId: 'control-host',
+        token: 'control-token',
+        config,
+        paths,
+        sessionTtlMs: 60_000,
+        controlSeed: null,
+        confirmationsSeed: null,
+        questionsSeed: null,
+        delegationSeed: null,
+        linearAdvisorySeed: null,
+        providerIntakeSeed: {
+          schema_version: 1,
+          updated_at: '2026-05-01T02:10:46.790Z',
+          rehydrated_at: null,
+          latest_provider_key: 'linear:lin-issue-424',
+          latest_reason: 'stale cached provider-intake summary',
+          polling: null,
+          claims: [
+            co272ProviderIntakeClaim({
+              provider_key: 'linear:lin-issue-424',
+              issue_id: 'lin-issue-424',
+              issue_identifier: 'CO-424',
+              issue_title: 'Stale selected claim',
+              task_id: 'linear-co-424-stale',
+              run_id: 'stale-provider-run',
+              reason: 'stale cached provider-intake summary',
+              updated_at: '2026-05-01T02:10:46.790Z',
+              accepted_at: '2026-05-01T02:09:46.790Z',
+              issue_updated_at: '2026-05-01T02:10:00.000Z'
+            })
+          ]
+        }
+      });
+
+      await seedManifest(paths, {
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-424',
+        issue_identifier: 'CO-424',
+        updated_at: '2026-05-01T02:10:46.790Z'
+      });
+      await writeFile(join(paths.runDir, 'control_auth.json'), JSON.stringify({ token: 'snapshot-token' }), 'utf8');
+
+      const context = assembly.requestContextShared;
+      const readCompatibilityProjection = () =>
+        context.runtime.snapshot().readCompatibilityProjection();
+      const presenterContext = {
+        controlStore: context.controlStore,
+        paths: context.paths,
+        readCompatibilityProjection
+      };
+
+      const cachedProjection = await readCompatibilityProjection();
+      expect(cachedProjection.providerIntake?.selected_claim.issue_identifier).toBe('CO-424');
+      expect(cachedProjection.providerIntake?.updated_at).toBe('2026-05-01T02:10:46.790Z');
+
+      const providerIntakeState = context.providerIntakeState;
+      expect(providerIntakeState).toBeDefined();
+      if (!providerIntakeState) {
+        throw new Error('Expected provider intake state to be available');
+      }
+      providerIntakeState.updated_at = '2026-05-01T02:41:32.000Z';
+      providerIntakeState.latest_provider_key = 'linear:lin-issue-459';
+      providerIntakeState.latest_reason = 'fresh raw provider-intake snapshot';
+      providerIntakeState.claims = [
+        co272ProviderIntakeClaim({
+          provider_key: 'linear:lin-issue-459',
+          issue_id: 'lin-issue-459',
+          issue_identifier: 'CO-459',
+          issue_title: 'Fresh raw provider intake truth',
+          task_id: 'linear-co-459-fresh',
+          run_id: 'fresh-provider-run',
+          state: 'running',
+          reason: 'fresh raw provider-intake snapshot',
+          accepted_at: '2026-05-01T02:40:32.000Z',
+          updated_at: '2026-05-01T02:41:32.000Z',
+          issue_updated_at: '2026-05-01T02:41:00.000Z'
+        })
+      ];
+      await context.persist.providerIntake?.();
+
+      const apiPayload = await readCompatibilityState(presenterContext);
+      const uiPayload = await readUiDataset(presenterContext);
+
+      expect(apiPayload.provider_intake?.updated_at).toBe('2026-05-01T02:41:32.000Z');
+      expect(apiPayload.provider_intake?.selected_claim).toMatchObject({
+        issue_identifier: 'CO-459',
+        run_id: 'fresh-provider-run',
+        state: 'running'
+      });
+      expect(uiPayload.provider_intake?.updated_at).toBe('2026-05-01T02:41:32.000Z');
+      expect(uiPayload.provider_intake?.selected_claim).toMatchObject({
+        issue_identifier: 'CO-459',
+        run_id: 'fresh-provider-run',
+        state: 'running'
+      });
+
+      server = http.createServer(async (req, res) => {
+        const handled = await handleUiDataRequest({
+          req,
+          res,
+          presenterContext
+        });
+        if (!handled) {
+          res.writeHead(404).end();
+        }
+      });
+      await new Promise<void>((resolve) => {
+        server!.listen(0, '127.0.0.1', () => resolve());
+      });
+      const address = server.address();
+      if (!address || typeof address === 'string') {
+        throw new Error('Expected loopback server address');
+      }
+      await writeFile(
+        join(paths.runDir, 'control_endpoint.json'),
+        JSON.stringify({
+          base_url: `http://127.0.0.1:${address.port}`,
+          token_path: 'control_auth.json'
+        }),
+        'utf8'
+      );
+
+      const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      try {
+        await runCoStatusCliShell({
+          flags: {
+            format: 'json',
+            'run-dir': paths.runDir
+          },
+          printHelp: vi.fn()
+        });
+        const coStatusPayload = JSON.parse(String(log.mock.calls.at(-1)?.[0])) as {
+          provider_intake?: {
+            updated_at?: unknown;
+            selected_claim?: {
+              issue_identifier?: unknown;
+              run_id?: unknown;
+              state?: unknown;
+            };
+          };
+        };
+        expect(coStatusPayload.provider_intake?.updated_at).toBe('2026-05-01T02:41:32.000Z');
+        expect(coStatusPayload.provider_intake?.selected_claim).toMatchObject({
+          issue_identifier: 'CO-459',
+          run_id: 'fresh-provider-run',
+          state: 'running'
+        });
+      } finally {
+        log.mockRestore();
+      }
+    } finally {
+      if (server) {
+        await new Promise<void>((resolve) => server!.close(() => resolve()));
+      }
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('drops stale top-level provider intake when the fresh persisted raw state has no claims', async () => {
+    const { root, env, paths } = await createRunRoot('task-1084');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    try {
+      const assembly = createControlServerSeededRuntimeAssembly({
+        runId: 'control-host',
+        token: 'control-token',
+        config,
+        paths,
+        sessionTtlMs: 60_000,
+        controlSeed: null,
+        confirmationsSeed: null,
+        questionsSeed: null,
+        delegationSeed: null,
+        linearAdvisorySeed: null,
+        providerIntakeSeed: {
+          schema_version: 1,
+          updated_at: '2026-05-01T02:10:46.790Z',
+          rehydrated_at: null,
+          latest_provider_key: 'linear:lin-issue-424',
+          latest_reason: 'stale cached provider-intake summary',
+          polling: null,
+          claims: [
+            co272ProviderIntakeClaim({
+              provider_key: 'linear:lin-issue-424',
+              issue_id: 'lin-issue-424',
+              issue_identifier: 'CO-424',
+              issue_title: 'Stale selected claim',
+              task_id: 'linear-co-424-stale',
+              run_id: 'stale-provider-run',
+              reason: 'stale cached provider-intake summary',
+              updated_at: '2026-05-01T02:10:46.790Z'
+            })
+          ]
+        }
+      });
+
+      const context = assembly.requestContextShared;
+      const presenterContext = {
+        controlStore: context.controlStore,
+        paths: context.paths,
+        readCompatibilityProjection: () => context.runtime.snapshot().readCompatibilityProjection()
+      };
+
+      const cachedProjection = await presenterContext.readCompatibilityProjection();
+      expect(cachedProjection.providerIntake?.selected_claim.issue_identifier).toBe('CO-424');
+
+      const providerIntakeState = context.providerIntakeState;
+      expect(providerIntakeState).toBeDefined();
+      if (!providerIntakeState) {
+        throw new Error('Expected provider intake state to be available');
+      }
+      providerIntakeState.updated_at = '2026-05-01T02:41:32.000Z';
+      providerIntakeState.latest_provider_key = null;
+      providerIntakeState.latest_reason = null;
+      providerIntakeState.claims = [];
+      await context.persist.providerIntake?.();
+
+      const apiPayload = await readCompatibilityState(presenterContext);
+      const uiPayload = await readUiDataset(presenterContext);
+
+      expect(apiPayload).not.toHaveProperty('provider_intake');
+      expect(uiPayload).not.toHaveProperty('provider_intake');
     } finally {
       await rm(root, { recursive: true, force: true });
     }

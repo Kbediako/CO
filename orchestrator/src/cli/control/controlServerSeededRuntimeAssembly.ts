@@ -157,6 +157,7 @@ export function createControlServerSeededRuntimeAssembly(
     paths: options.paths,
     linearAdvisoryState,
     providerIntakeState,
+    readPersistedProviderIntakeState: () => cloneProviderIntakeState(persistedProviderIntakeState),
     providerWorkflowConfigStore: options.providerWorkflowConfigStore,
     readProviderIssueHandoff: () => providerIssueHandoff
   });

@@ -38,6 +38,7 @@ interface CreateFixtureOptions {
   featureToggles?: Record<string, unknown>;
   linearAdvisoryState?: Parameters<typeof createControlRuntime>[0]['linearAdvisoryState'];
   providerIntakeState?: ProviderIntakeState;
+  readPersistedProviderIntakeState?: () => ProviderIntakeState | null;
   questions?: QuestionRecord[];
   env?: NodeJS.ProcessEnv;
 }
@@ -81,6 +82,7 @@ async function createFixture(options: CreateFixtureOptions = {}): Promise<TestFi
     paths,
     linearAdvisoryState: options.linearAdvisoryState ?? { tracked_issue: null },
     providerIntakeState: options.providerIntakeState,
+    readPersistedProviderIntakeState: options.readPersistedProviderIntakeState,
     env: options.env
   });
 
@@ -6879,6 +6881,67 @@ describe('ControlRuntime', () => {
         state: 'running',
         run_id: 'run-child'
       }
+    });
+  });
+
+  it('fails closed with an unavailable reason when persisted provider intake authority cannot be read', async () => {
+    const providerIntakeState = createProviderIntakeState([
+      {
+        provider: 'linear',
+        provider_key: 'linear:lin-issue-424',
+        issue_id: 'lin-issue-424',
+        issue_identifier: 'CO-424',
+        issue_title: 'Stale selected claim',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-01T02:10:00.000Z',
+        task_id: 'linear-co-424-stale',
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'stale cached provider-intake summary',
+        accepted_at: '2026-05-01T02:09:46.790Z',
+        updated_at: '2026-05-01T02:10:46.790Z',
+        last_delivery_id: 'delivery-424',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_746_067_846_790,
+        run_id: 'stale-provider-run',
+        run_manifest_path: '/tmp/stale-provider-run/manifest.json',
+        launch_source: 'control-host',
+        launch_token: 'launch-424'
+      }
+    ]);
+    const fixture = await createFixture({
+      taskId: 'local-mcp',
+      providerIntakeState,
+      readPersistedProviderIntakeState: () => {
+        throw new Error('provider-intake-state.json unreadable');
+      }
+    });
+
+    const projection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const statePayload = await readCompatibilityState({
+      readCompatibilityProjection: async () => projection
+    });
+    const uiDataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-05-01T02:41:32.000Z'
+    });
+
+    expect(projection.providerIntake).toBeNull();
+    expect(projection.providerIntakeUnavailable).toEqual({
+      reason: 'raw_provider_intake_read_failed',
+      updated_at: null
+    });
+    expect(statePayload.provider_intake).toBeNull();
+    expect(statePayload.provider_intake_unavailable).toEqual({
+      reason: 'raw_provider_intake_read_failed',
+      updated_at: null
+    });
+    expect(uiDataset.provider_intake).toBeNull();
+    expect(uiDataset.provider_intake_unavailable).toEqual({
+      reason: 'raw_provider_intake_read_failed',
+      updated_at: null
     });
   });
 
