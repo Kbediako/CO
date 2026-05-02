@@ -3705,7 +3705,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBe(0);
     const normalizedHelp = result.stdout.replace(/\s+/g, ' ').trim();
     expect(normalizedHelp).toContain(
-      'Behavior: Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt and launch codex review without any prompt argument because current CLI still treats stdin (`-`) as [PROMPT]; reviewer-visible scoped context first rides on --title (user-provided when present, otherwise synthesized from NOTES + surface) with bounded no-validation guidance visible where the current Codex review surface honors titles. If Codex rejects a synthesized scoped title, the wrapper retries the same explicit scope without `--title` and falls back to artifact-only context. If bounded review blocks a validation command, the wrapper retries once with a reviewer-visible inline no-validation prompt that names the original scope and runs under a read-only sandbox override; successful retry preserves the command-intent boundary in telemetry as bounded-success.'
+      'Behavior: Explicit --uncommitted/--base/--commit wrapper runs keep prompt/context in review/prompt.txt and launch codex review without any prompt argument because current CLI still treats stdin (`-`) as [PROMPT]; reviewer-visible scoped context first rides on --title (user-provided when present, otherwise synthesized from NOTES + surface) with bounded no-validation guidance visible where the current Codex review surface honors titles. If Codex rejects a synthesized scoped title, the wrapper retries the same explicit scope without `--title` and falls back to artifact-only context. If bounded review blocks a validation command, the wrapper retries once with a reviewer-visible inline no-validation prompt that names the original scope and runs under a read-only permission-profile override, falling back to the legacy read-only sandbox override only when the active Codex CLI rejects `default_permissions`; successful retry preserves the command-intent boundary in telemetry as bounded-success.'
     );
     expect(normalizedHelp).toContain(
       'Explicit scoped wrapper runs Support only the default diff surface; audit/architecture still require prompt-capable unscoped review.'
@@ -6511,8 +6511,8 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
         'Surface: diff | Bounded: no validation; list follow-up commands only'
       );
       expect(reviewInvocations[1]).toContain('Strict bounded review retry.');
-      expect(reviewInvocations[1]).toContain('config=sandbox_mode="read-only"');
-      expect(reviewInvocations[0]).not.toContain('config=sandbox_mode="read-only"');
+      expect(reviewInvocations[1]).toContain('config=default_permissions=":read-only"');
+      expect(reviewInvocations[0]).not.toContain('config=default_permissions=":read-only"');
       const retryArgvLine = reviewInvocations[1].split('\n').find((line) => line.startsWith('argv=')) ?? '';
       expect(retryArgvLine).toContain('argv=review Strict bounded review retry.');
       for (const forbidden of ['argv=review --base', 'argv=review --commit', 'argv=review --uncommitted']) expect(retryArgvLine).not.toContain(forbidden);
