@@ -26,11 +26,12 @@
 
 ## Not Done If
 - The reduced command still times out.
-- The fix passes only because tests are skipped or policy assertions are weakened.
+- The fix passes only because tests are skipped, or policy assertions are weakened.
 - `npm run test` still cannot reach terminal evidence because of these spec-guard timeouts.
 - The work does not explain the slow path.
 
 ## Parity / Alignment Matrix
+
 | Surface | Current Truth | Reference Truth | Target Truth | Explicitly Out Of Scope |
 | --- | --- | --- | --- | --- |
 | `false reviewer-approval labels` | One `it` loops across many labels, paying repeated fixture and subprocess cost. | Each label must still prove the cap is not granted. | Each label remains asserted, but as separate bounded Vitest cases. | Treating false labels as valid reviewer approval. |

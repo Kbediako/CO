@@ -43,9 +43,10 @@
 - Required repo handoff gates before review state.
 
 ## Fallback Expiry / Refactor Decision
+
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `tests/spec-guard.spec.ts` external migration cap coverage | repeated git fixture and subprocess setup batched inside one Vitest test timeout | justify retaining fallback | CO-456 | `false reviewer-approval labels` and `deprecation-plan labels` assertions are expensive when batched | 2026-05-01 | 2026-05-01 | Retained policy, timeout seam removed in this issue | each label runs as its own bounded parameterized case | focused `tests/spec-guard.spec.ts`, `npm run test`, provider-worker validation gate |
+| `tests/spec-guard.spec.ts` external migration cap coverage | repeated git fixture and subprocess setup batched inside one Vitest test timeout | justify retaining fallback | CO-456 | `false reviewer-approval labels` and `deprecation-plan labels` assertions are expensive when batched | 2026-05-01 | 2026-05-01 | Retained policy, timeout seam removed in this issue | each label runs as its own parameterized test with bounded inputs | focused `tests/spec-guard.spec.ts`, `npm run test`, provider-worker validation gate |
 
 ## Open Questions
 - None. The current change is tests-only plus traceability docs.
