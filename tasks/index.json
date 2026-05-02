@@ -1,6 +1,82 @@
 {
   "items": [
     {
+      "id": "20260502-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392",
+      "title": "CO-473 review-wrapper command-surface authoritative-gate env isolation",
+      "relates_to": "tasks/tasks-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-02",
+      "status": "review_green_pre_pr",
+      "evidence": [
+        "docs/PRD-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md",
+        "docs/TECH_SPEC-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md",
+        "docs/ACTION_PLAN-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md",
+        "tasks/specs/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md",
+        "tasks/tasks-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md",
+        ".agent/task/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        "tests/cli-command-surface.spec.ts",
+        ".runs/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392-docs-packet/cli/2026-05-02T10-13-30-750Z-22643d24/manifest.json",
+        ".runs/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392/cli/2026-05-02T10-08-57-509Z-30f2a4c9/review/telemetry.json",
+        "out/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392/manual/elegance-review.md"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet",
+          "date": "2026-05-02",
+          "status": "produced",
+          "manifest": ".runs/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392-docs-packet/cli/2026-05-02T10-13-30-750Z-22643d24/manifest.json",
+          "patch": ".runs/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392-docs-packet/cli/2026-05-02T10-13-30-750Z-22643d24/provider-linear-child-lane.patch",
+          "source_anchor": "ctx:sha256:8605482f091c307d8fc7505b7287a4a4315a06964f7bd7a1789d330806a70534#chunk:c000001",
+          "summary": "Docs-first packet created for CO-473 from the parent-provided child-lane brief, protected terms, and source anchor. The packet preserves CODEX_REVIEW_AUTHORITATIVE_GATE=1, FORCE_CODEX_REVIEW=1, prompt-only noninteractive review handoff, command-surface regression, tests/cli-command-surface.spec.ts, review wrapper authoritative gate, provider-worker environment, and clean-main repro. It rejects CO-468 recovery changes, weakened authoritative-gate fail-closed semantics, treating prompt-only handoff as authoritative success, and deletion of equivalent regression coverage. Parent owns docs-review, any source/test closeout, Linear/workpad state, PR lifecycle, and final patch integration."
+        },
+        "current_main_focused_repro": {
+          "reviewer": "bounded same-issue child lane docs-packet",
+          "date": "2026-05-02",
+          "status": "passed",
+          "command": "CODEX_REVIEW_AUTHORITATIVE_GATE=1 npx vitest run tests/cli-command-surface.spec.ts -t \"launches review via the CLI shell in non-interactive handoff mode\"",
+          "summary": "Focused current-main repro passed with one test passed and 120 skipped under ambient CODEX_REVIEW_AUTHORITATIVE_GATE=1 because the command-surface test isolates CODEX_REVIEW_AUTHORITATIVE_GATE, FORCE_CODEX_REVIEW, and noninteractive review env inside the subprocess."
+        },
+        "parent_closeout_decision": {
+          "reviewer": "parent provider worker",
+          "date": "2026-05-02",
+          "status": "docs_evidence_only",
+          "summary": "Current main already isolates CODEX_REVIEW_AUTHORITATIVE_GATE, FORCE_CODEX_REVIEW, and noninteractive review env in tests/cli-command-surface.spec.ts, so CO-473 requires a traceability packet and validation evidence rather than another source/test patch."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-02",
+          "status": "bounded-success",
+          "telemetry": ".runs/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392/cli/2026-05-02T10-08-57-509Z-30f2a4c9/review/telemetry.json",
+          "summary": "Manifest-backed review completed with status=succeeded, review_outcome=bounded-success, termination_boundary.kind=command-intent, and no actionable regressions."
+        },
+        "elegance_review": {
+          "reviewer": "direct codex review prompt-only elegance pass",
+          "date": "2026-05-02",
+          "status": "passed",
+          "artifact": "out/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392/manual/elegance-review.md",
+          "summary": "No actionable minimality findings; mirror duplication matches repo conventions and no simplification patch was warranted."
+        },
+        "provider_worker_validation": {
+          "reviewer": "parent provider worker",
+          "date": "2026-05-02",
+          "status": "passed",
+          "summary": "Focused command-surface repro, authoritative-gate fail-closed regressions, delegation guard, spec guard, build, lint, full npm run test, docs:check, docs:freshness, repo:stewardship, diff-budget, git diff --check, and JSON parse checks passed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md",
+        "task": "tasks/tasks-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md",
+        "agent_task": ".agent/task/linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md",
+        "docs": "docs/TECH_SPEC-linear-dc1c7783-0307-4a0a-8dcf-2ede6a889392.md"
+      }
+    },
+    {
       "id": "20260501-linear-de299bad-c345-4259-8551-73dd429eccca",
       "title": "CO-456 spec-guard external migration cap timeout stabilization",
       "relates_to": "tasks/tasks-linear-de299bad-c345-4259-8551-73dd429eccca.md",
