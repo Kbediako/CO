@@ -4241,6 +4241,17 @@ export function createProviderIssueHandoffService(
               nextIssueUpdatedAt: input.trackedIssue.updated_at
             })
           ) {
+            const completedDuplicateRetryFields =
+              latestExisting?.retry_queued === true
+                ? buildQueuedProviderRetryFields({
+                    claim: latestExisting,
+                    previousRun: latestRun,
+                    error: null,
+                    preserveCurrentAttempt: true,
+                    preserveExistingDueAt: true,
+                    delayType: 'continuation'
+                  })
+                : clearProviderRetryFields();
             const claim = await upsertProviderClaimAndPersist({
               ...latestClaimBase,
               task_id: latestRun.taskId,
@@ -4250,6 +4261,7 @@ export function createProviderIssueHandoffService(
               run_id: latestRun.runId,
               run_manifest_path: latestRun.manifestPath,
               worker_host: latestRunWorkerHost,
+              ...completedDuplicateRetryFields
             });
             return { kind: 'ignored', reason: 'provider_issue_run_already_completed', claim };
           }

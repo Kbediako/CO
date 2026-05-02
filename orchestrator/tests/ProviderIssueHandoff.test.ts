@@ -20147,6 +20147,44 @@ describe('createProviderIssueHandoffService', () => {
     });
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
+
+    const queuedRetryDueAt = state.claims[0]?.retry_due_at;
+    const recoveryResult = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-486',
+        identifier: 'CO-486',
+        title: 'Persisted goal workflows as provider-worker run evidence',
+        state: 'Rework',
+        state_type: 'started',
+        updated_at: '2026-05-02T17:25:21.000Z'
+      }),
+      deliveryId: null,
+      event: 'control_host_provider_worker_recover',
+      action: 'recover',
+      webhookTimestamp: null
+    });
+
+    expect(recoveryResult).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_run_already_completed',
+      claim: {
+        state: 'completed',
+        reason: 'provider_issue_run_already_completed',
+        issue_state: 'Rework',
+        retry_queued: true,
+        retry_attempt: 1,
+        retry_due_at: queuedRetryDueAt,
+        retry_error: null
+      }
+    });
+    expect(state.claims[0]?.review_promotion).toMatchObject({
+      reason: 'branch_recovery_conflict',
+      branch_recovery: {
+        failure_kind: 'conflict'
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
   });
 
   it('rehydrates a completed run by promoting a fresh review handoff before falling back to completed state', async () => {
