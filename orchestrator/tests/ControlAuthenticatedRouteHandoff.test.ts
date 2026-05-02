@@ -298,10 +298,63 @@ describe('ControlAuthenticatedRouteHandoff', () => {
     })).toMatchObject({
       issue_id: 'co-404-id',
       issue_identifier: 'CO-404',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
       state: 'starting',
+      task_id: 'linear-co-404-id',
+      run_id: null,
+      run_manifest_path: null,
+      worker_host: null,
       launch_source: 'control-host',
       launch_token_present: true
     });
+    const noLaunchAcceptedClaim = {
+      ...acceptedClaim,
+      provider_key: 'linear:co-468-id',
+      issue_id: 'co-468-id',
+      issue_identifier: 'CO-468',
+      issue_title: 'Reject no-run recover acknowledgement',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      task_id: 'linear-co-468-id',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      updated_at: '2026-05-01T13:00:01.000Z',
+      last_action: 'recover',
+      run_id: null,
+      run_manifest_path: null,
+      worker_host: null,
+      launch_source: null,
+      launch_token: null,
+      launch_started_at: null
+    };
+    persistedProviderIntakeState.claims.push(noLaunchAcceptedClaim);
+    expect(assembled.readProviderWorkerRecoverAccepted?.({
+      provider: 'linear',
+      issueId: 'CO-468',
+      action: 'recover',
+      requestedAt: '2026-05-01T13:00:00.000Z'
+    })).toMatchObject({
+      issue_id: 'co-468-id',
+      issue_identifier: 'CO-468',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      task_id: 'linear-co-468-id',
+      run_id: null,
+      run_manifest_path: null,
+      worker_host: null,
+      launch_source: null,
+      launch_token_present: false,
+      updated_at: '2026-05-01T13:00:01.000Z'
+    });
+    expect(assembled.readProviderWorkerRecoverAccepted?.({
+      provider: 'linear',
+      issueId: 'CO-468',
+      action: 'recover',
+      requestedAt: '2026-05-01T13:00:02.000Z'
+    })).toBeNull();
   });
 
   it('returns a null task id when the manifest path does not live under a cli task root', () => {
