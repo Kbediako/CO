@@ -43,15 +43,30 @@ function reviewLaunchContext(
   options: {
     reviewerVisibleContextTransport?: 'inline-prompt' | 'scoped-title' | 'artifact-only';
     reviewerVisibleTitleSource?: 'user' | 'notes-surface' | null;
+    legacyFallback?: boolean;
   } = {}
 ) {
-  return {
+  const context = {
     scope_flag_mode: scopeFlagMode,
     prompt_delivery: promptDelivery,
     reviewer_visible_context_transport:
       options.reviewerVisibleContextTransport ??
       (scopeFlagMode === null ? 'inline-prompt' : 'artifact-only'),
     reviewer_visible_title_source: options.reviewerVisibleTitleSource ?? null
+  };
+  if (!options.legacyFallback) {
+    return context;
+  }
+  return {
+    ...context,
+    legacy_fallback_attempt: 'review-wrapper-read-only-sandbox-compatibility',
+    legacy_fallback_owner: 'CO-485',
+    legacy_fallback_trigger: 'active Codex CLI rejects default_permissions',
+    legacy_fallback_introduced_at: '2026-05-02',
+    legacy_fallback_review_at: '2026-05-02',
+    legacy_fallback_expires_at: '2026-06-01',
+    legacy_fallback_removal_condition:
+      'release-facing Codex CLI pins move beyond 0.125 or the pinned CLI accepts default_permissions'
   } as const;
 }
 
@@ -485,14 +500,16 @@ describe('review-launch-attempt', () => {
     expect(launchArgs[0]).toEqual(['review', '--uncommitted']);
     expect(launchArgs[1]?.slice(0, 3)).toEqual(['-c', 'default_permissions=":read-only"', 'review']);
     expect(launchArgs[2]?.slice(0, 3)).toEqual(['-c', 'sandbox_mode="read-only"', 'review']);
+    expect(launchArgs[2]?.[3]).toContain('Strict bounded review retry');
     expect(launchArgs[2]?.[3]).toContain('Retry review scope: --uncommitted.');
+    expect(launchArgs[2]?.[3]).toContain('Prompt body');
     expect(writeTelemetry).toHaveBeenCalledTimes(1);
     expect(writeTelemetry).toHaveBeenCalledWith(
       successState,
       'succeeded',
       null,
       commandIntentBoundary,
-      reviewLaunchContext(null)
+      reviewLaunchContext(null, 'inline', { legacyFallback: true })
     );
     expect(successState.buildOutputSummary()).toEqual(
       expect.objectContaining({

@@ -36,7 +36,7 @@
 3. Add docs freshness rows for all six packet/mirror files.
 4. Add a current CO-485 snapshot to `docs/TASKS.md`.
 5. Validate protected terms, JSON parsing, markdown diff hygiene, and scoped changed files.
-6. Leave child-lane changes uncommitted for parent patch export.
+6. In the child lane, keep local edits uncommitted and export a patch; the parent lane applies and commits the exported patch.
 
 ## Parent-Owned Follow-On Plan
 1. Reconcile this packet against authoritative CO-485 Linear issue/workpad truth.
@@ -63,6 +63,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `--full-auto` current guidance | Deprecated flag remains normal recommendation. | remove fallback | CO-485 | Current-facing docs/prompts recommend `--full-auto`. | pre-0.128 guidance | 2026-05-02 | N/A after removal | Current guidance uses permission profiles or marks historical examples as deprecated/migration-only. | Protected-term scan plus focused parent validation. |
 | Doctor/default setup drift | Profile-backed posture is checked through old fields only. | expire fallback | CO-485 | Active profile differs from expected sandbox profile config controls or cwd controls. | 2026-05-02 | 2026-05-02 | 2026-06-01 | Doctor/default setup reports active-profile metadata and drift. | Parent-owned focused test or live command evidence. |
+| Review-wrapper retry (0.124/0.125 compatibility) | Legacy `sandbox_mode="read-only"` retry after `default_permissions` rejection. | expire fallback | CO-485 | Active Codex CLI rejects `default_permissions` while release-facing pins remain at or below 0.125. | 2026-05-02 | 2026-05-02 | 2026-06-01 | Release-facing pins move beyond 0.125 or the pinned CLI accepts `default_permissions`. | Focused review-launch regression plus live 0.124/0.125 command evidence. |
 | Trust-flow shorthand | Cwd trust is treated as full permission posture. | remove fallback | CO-485 | Guidance conflates cwd controls, trust flows, permission profiles, and sandbox controls. | pre-0.128 guidance | 2026-05-02 | N/A after removal | Guidance separates the controls. | Parent-owned prompt/docs scan plus focused validation. |
 
 ## Validation

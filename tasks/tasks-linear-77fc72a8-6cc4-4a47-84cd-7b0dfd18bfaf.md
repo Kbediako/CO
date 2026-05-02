@@ -57,6 +57,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `--full-auto` current guidance | Deprecated flag remains normal recommendation. | remove fallback | CO-485 | Current-facing docs/prompts recommend `--full-auto`. | pre-0.128 guidance | 2026-05-02 | N/A after removal | Current guidance uses permission profiles or marks historical examples as deprecated/migration-only. | Protected-term scan plus focused parent validation. |
 | Doctor/default setup drift | Profile-backed posture is checked through old fields only. | expire fallback | CO-485 | Active profile differs from expected sandbox profile config controls or cwd controls. | 2026-05-02 | 2026-05-02 | 2026-06-01 | Doctor/default setup reports active-profile metadata and drift. | Parent-owned focused test or live command evidence. |
+| Review-wrapper retry (0.124/0.125 compatibility) | Legacy `sandbox_mode="read-only"` retry after `default_permissions` rejection. | expire fallback | CO-485 | Active Codex CLI rejects `default_permissions` while release-facing pins remain at or below 0.125. | 2026-05-02 | 2026-05-02 | 2026-06-01 | Release-facing pins move beyond 0.125 or the pinned CLI accepts `default_permissions`. | Focused review-launch regression plus live 0.124/0.125 command evidence. |
 | Trust-flow shorthand | Cwd trust is treated as full permission posture. | remove fallback | CO-485 | Guidance conflates cwd controls, trust flows, permission profiles, and sandbox controls. | pre-0.128 guidance | 2026-05-02 | N/A after removal | Guidance separates the controls. | Parent-owned prompt/docs scan plus focused validation. |
 
 ## Parent-Owned Implementation / Closeout
@@ -78,7 +79,7 @@
 - [x] Implementation-gate child stream completed. Evidence: `.runs/linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf-implementation-gate/cli/2026-05-02T12-47-23-409Z-5a389c34/manifest.json`; review telemetry reports `status=succeeded`, `review_outcome=clean-success`.
 - [x] Standalone review finding fixed. Evidence: review found normal doctor missed `default_permissions = ":danger-no-sandbox"`; parent added normal doctor `security_advisories`, warning status, summary output, and focused Doctor regression coverage.
 - [x] Full parent validation passed after the review fix. Evidence: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint` (3 pre-existing `DelegationMcpHealth.test.ts` warnings), `npm run test` (359 files, 5,253 tests), `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, `node scripts/diff-budget.mjs`, and `npm run pack:smoke`.
-- [x] Final standalone review completed cleanly. Evidence: `../../.runs/linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf/cli/2026-05-02T12-21-38-533Z-2304afcc/review/telemetry.json` reports `status=succeeded`, `review_outcome=clean-success`, `termination_boundary=null`.
+- [x] Final standalone review completed cleanly. Evidence: `.runs/linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf/cli/2026-05-02T12-21-38-533Z-2304afcc/review/telemetry.json` reports `status=succeeded`, `review_outcome=clean-success`, `termination_boundary=null`.
 - [x] Elegance/minimality pass completed. Evidence: `out/linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf/manual/elegance-review.md`; no simplification patch applied.
 
 ## Progress Log

@@ -55,6 +55,13 @@ task_checklists:
   - historical-spec churn unless current-facing guidance imports stale wording
   - `--full-auto` as normal recommended flow
   - permission profiles described only as generic sandbox/approval shorthand
+- Explicit non-goals:
+  - no broader Codex CLI 0.128.0 release-intake changes; `CO-466` remains the broad release-intake owner
+  - no portable `gpt-5.4` fallback default changes
+  - no automatic weakening of sandbox, approval, cwd, or trust safety
+  - no historical-spec churn unless current-facing guidance imports stale wording
+  - no reintroduction of `--full-auto` as recommended guidance for `CO-485`
+  - no canonical owner expansion beyond `codex-cli-0128:permission-profile-trust-flow-rebaseline`
 
 ## Parity / Alignment Matrix
 
@@ -109,6 +116,7 @@ task_checklists:
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `--full-auto` current guidance | Deprecated flag remains normal recommendation. | remove fallback | CO-485 | Current-facing docs/prompts recommend `--full-auto`. | pre-0.128 guidance | 2026-05-02 | N/A after removal | Current guidance uses permission profiles or marks historical examples as deprecated/migration-only. | Protected-term scan plus focused parent validation. |
 | Doctor/default setup drift | Profile-backed posture is checked through old fields only. | expire fallback | CO-485 | Active profile differs from expected sandbox profile config controls or cwd controls. | 2026-05-02 | 2026-05-02 | 2026-06-01 | Doctor/default setup reports active-profile metadata and drift. | Parent-owned focused test or live command evidence. |
+| Review-wrapper retry (0.124/0.125 compatibility) | Legacy `sandbox_mode="read-only"` retry after `default_permissions` rejection. | expire fallback | CO-485 | Active Codex CLI rejects `default_permissions` while release-facing pins remain at or below 0.125. | 2026-05-02 | 2026-05-02 | 2026-06-01 | Release-facing pins move beyond 0.125 or the pinned CLI accepts `default_permissions`. | Focused review-launch regression plus live 0.124/0.125 command evidence. |
 | Trust-flow shorthand | Cwd trust is treated as full permission posture. | remove fallback | CO-485 | Guidance conflates cwd controls, trust flows, permission profiles, and sandbox controls. | pre-0.128 guidance | 2026-05-02 | N/A after removal | Guidance separates the controls. | Parent-owned prompt/docs scan plus focused validation. |
 
 ## Validation Plan

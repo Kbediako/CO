@@ -30,6 +30,13 @@ export interface ReviewLaunchContext {
   prompt_delivery: 'inline' | 'artifact-only';
   reviewer_visible_context_transport: 'inline-prompt' | 'scoped-title' | 'artifact-only';
   reviewer_visible_title_source: 'user' | 'notes-surface' | null;
+  legacy_fallback_attempt?: 'review-wrapper-read-only-sandbox-compatibility';
+  legacy_fallback_owner?: 'CO-485';
+  legacy_fallback_trigger?: string;
+  legacy_fallback_introduced_at?: string;
+  legacy_fallback_review_at?: string;
+  legacy_fallback_expires_at?: string;
+  legacy_fallback_removal_condition?: string;
 }
 
 export interface BuildReviewTelemetryPayloadOptions {
