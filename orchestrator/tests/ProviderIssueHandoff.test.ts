@@ -19972,6 +19972,221 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('suppresses branch-recovery review-promotion action-required during completed-run rehydrate when Rework is current', async () => {
+    const { root, paths } = await createHostPaths();
+    const taskId = 'linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc';
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(
+      childEnv,
+      '2026-05-02T15-12-45-555Z-8bb96e84'
+    );
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: '2026-05-02T15-12-45-555Z-8bb96e84',
+        task_id: taskId,
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-486',
+        issue_identifier: 'CO-486',
+        issue_updated_at: '2026-05-02T17:20:00.000Z',
+        updated_at: '2026-05-02T17:21:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-486',
+      issue_id: 'lin-issue-486',
+      issue_identifier: 'CO-486',
+      issue_title: 'Persisted goal workflows as provider-worker run evidence',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-02T17:20:00.000Z',
+      issue_viewer_id: 'viewer-1',
+      issue_assignee_id: 'viewer-1',
+      issue_assignee_name: 'Codex',
+      task_id: taskId,
+      mapping_source: 'provider_id_fallback',
+      state: 'handoff_failed',
+      reason: 'provider_issue_review_promotion_action_required',
+      accepted_at: '2026-05-02T15:12:45.555Z',
+      updated_at: '2026-05-02T17:21:05.000Z',
+      last_delivery_id: 'delivery-co-486-branch-conflict',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_746_206_465_000,
+      run_id: '2026-05-02T15-12-45-555Z-8bb96e84',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      review_promotion: {
+        recorded_at: '2026-05-02T17:25:21.000Z',
+        issue_id: 'lin-issue-486',
+        issue_identifier: 'CO-486',
+        issue_state: 'Rework',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-02T17:25:21.000Z',
+        status: 'action_required',
+        reason: 'branch_recovery_conflict',
+        summary:
+          'Automatic conflict recovery hit a merge conflict for attached PR #751; moved the issue to Rework with exact recovery metadata recorded.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/751'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/751',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 751
+        },
+        snapshot: {
+          state: 'OPEN',
+          review_decision: 'APPROVED',
+          merge_state_status: 'DIRTY',
+          ready_to_merge: false,
+          gate_reasons: ['mergeStateStatus=DIRTY'],
+          action_required_reasons: ['mergeStateStatus=DIRTY'],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-05-02T17:24:30.000Z',
+          merged_at: null,
+          head_oid: 'a0ad27a5bd6029466ed77e23b8b5b3c3bbda742f'
+        },
+        branch_recovery: {
+          attempted_at: '2026-05-02T17:25:00.000Z',
+          head_oid: 'a0ad27a5bd6029466ed77e23b8b5b3c3bbda742f',
+          recovery_reason: 'merge_state=DIRTY',
+          command: 'gh',
+          args: ['pr', 'update-branch', '751', '--repo', 'asabeko/CO'],
+          exit_code: 1,
+          ok: false,
+          stdout: null,
+          stderr: 'merge conflict',
+          failure_kind: 'conflict'
+        },
+        linear_transition: {
+          status: 'transitioned',
+          attempted_at: '2026-05-02T17:25:21.000Z',
+          previous_state: 'In Review',
+          target_state: 'Rework',
+          issue_state: 'Rework',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-05-02T17:25:21.000Z',
+          error: null
+        }
+      }
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-486',
+          identifier: 'CO-486',
+          title: 'Persisted goal workflows as provider-worker run evidence',
+          state: 'Rework',
+          state_type: 'started',
+          updated_at: '2026-05-02T17:25:21.000Z'
+        })
+      })
+    });
+
+    await service.rehydrate();
+
+    expect(state.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      issue_state: 'Rework',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-02T17:25:21.000Z',
+      task_id: taskId,
+      run_id: '2026-05-02T15-12-45-555Z-8bb96e84',
+      run_manifest_path: childPaths.manifestPath,
+      retry_queued: true
+    });
+    expect(state.claims[0]?.review_promotion).toMatchObject({
+      status: 'action_required',
+      reason: 'branch_recovery_conflict',
+      branch_recovery: {
+        failure_kind: 'conflict',
+        recovery_reason: 'merge_state=DIRTY'
+      }
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      issue_state: 'Rework',
+      retry_queued: true
+    });
+    expect(getPersistedState().claims[0]?.review_promotion).toMatchObject({
+      reason: 'branch_recovery_conflict',
+      branch_recovery: {
+        failure_kind: 'conflict'
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+
+    const queuedRetryDueAt = state.claims[0]?.retry_due_at;
+    const recoveryResult = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-486',
+        identifier: 'CO-486',
+        title: 'Persisted goal workflows as provider-worker run evidence',
+        state: 'Rework',
+        state_type: 'started',
+        updated_at: '2026-05-02T17:25:21.000Z'
+      }),
+      deliveryId: null,
+      event: 'control_host_provider_worker_recover',
+      action: 'recover',
+      webhookTimestamp: null
+    });
+
+    expect(recoveryResult).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_run_already_completed',
+      claim: {
+        state: 'completed',
+        reason: 'provider_issue_run_already_completed',
+        issue_state: 'Rework',
+        retry_queued: true,
+        retry_attempt: 1,
+        retry_due_at: queuedRetryDueAt,
+        retry_error: null
+      }
+    });
+    expect(state.claims[0]?.review_promotion).toMatchObject({
+      reason: 'branch_recovery_conflict',
+      branch_recovery: {
+        failure_kind: 'conflict'
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
   it('rehydrates a completed run by promoting a fresh review handoff before falling back to completed state', async () => {
     const { root, paths } = await createHostPaths();
     const taskId = 'linear-lin-issue-1';

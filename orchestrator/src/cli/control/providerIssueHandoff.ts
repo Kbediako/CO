@@ -4241,6 +4241,17 @@ export function createProviderIssueHandoffService(
               nextIssueUpdatedAt: input.trackedIssue.updated_at
             })
           ) {
+            const completedDuplicateRetryFields =
+              latestExisting?.retry_queued === true
+                ? buildQueuedProviderRetryFields({
+                    claim: latestExisting,
+                    previousRun: latestRun,
+                    error: null,
+                    preserveCurrentAttempt: true,
+                    preserveExistingDueAt: true,
+                    delayType: 'continuation'
+                  })
+                : clearProviderRetryFields();
             const claim = await upsertProviderClaimAndPersist({
               ...latestClaimBase,
               task_id: latestRun.taskId,
@@ -4250,6 +4261,7 @@ export function createProviderIssueHandoffService(
               run_id: latestRun.runId,
               run_manifest_path: latestRun.manifestPath,
               worker_host: latestRunWorkerHost,
+              ...completedDuplicateRetryFields
             });
             return { kind: 'ignored', reason: 'provider_issue_run_already_completed', claim };
           }
@@ -9270,7 +9282,8 @@ function buildProviderCompletedRunRehydrateState(input: {
   if (
     !input.claim.merge_closeout &&
     input.claim.review_promotion &&
-    resolveProviderReviewPromotionClaimState(input.claim.review_promotion) === 'handoff_failed'
+    resolveProviderReviewPromotionClaimState(input.claim.review_promotion) === 'handoff_failed' &&
+    !shouldSuppressActionRequiredReviewPromotionForActiveIssue(input.claim)
   ) {
     return {
       task_id: input.run.taskId,
@@ -9332,6 +9345,31 @@ function buildProviderCompletedRunRehydrateState(input: {
     run_manifest_path: input.run.manifestPath,
     ...queuedRetryFields
   };
+}
+
+function shouldSuppressActionRequiredReviewPromotionForActiveIssue(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'issue_state' | 'issue_state_type' | 'issue_updated_at' | 'review_promotion'
+  >
+): boolean {
+  const reviewPromotion = claim.review_promotion ?? null;
+  if (!reviewPromotion || reviewPromotion.status !== 'action_required') {
+    return false;
+  }
+  if (
+    !classifyProviderLinearWorkflowState({
+      state: claim.issue_state,
+      state_type: claim.issue_state_type
+    }).isActive
+  ) {
+    return false;
+  }
+  const freshness = compareTrackedIssueUpdatedAt({
+    existingIssueUpdatedAt: reviewPromotion.issue_updated_at ?? null,
+    nextIssueUpdatedAt: claim.issue_updated_at ?? null
+  });
+  return freshness === 'equal' || freshness === 'newer';
 }
 
 type ProviderRetryDelayType = 'continuation' | 'failure';
