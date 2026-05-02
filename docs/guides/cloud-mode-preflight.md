@@ -23,6 +23,7 @@ Runtime compatibility:
   `docs/guides/fallback-expiry-and-refactor-policy.md` before changing the contract.
 - Cloud lanes should request `--runtime-mode cli` explicitly when deterministic contract testing is required.
 - Codex CLI `0.128.0` removed `js_repl` and `js_repl_tools_only`; do not set `CODEX_CLOUD_ENABLE_FEATURES` / `CODEX_CLOUD_DISABLE_FEATURES` to either `js_repl` or `js_repl_tools_only`, or run `codex features enable/disable js_repl` / `codex features enable/disable js_repl_tools_only`.
+- Codex CLI `0.128.0` also deprecates `--full-auto`; cloud/run guidance must use explicit permission profiles and trust flows instead of treating that flag as a normal path. Built-in config profile ids are `:read-only`, `:workspace`, and `:danger-no-sandbox`.
 - Keep enabled/disabled lanes separate for active non-removed features only (do not set the same feature in both lists for one run).
 - Check `codex features list` in version-audit lanes before naming feature flags in cloud contracts.
 
@@ -52,7 +53,7 @@ codex-orchestrator doctor --cloud-preflight
 codex-orchestrator doctor --cloud-preflight --format json
 ```
 
-`doctor --cloud-preflight` also reports local-only sandbox/security advisories, currently top-level `sandbox_mode = "danger-full-access"` and WSL1 bubblewrap posture, without converting those advisories into cloud blockers.
+`doctor --cloud-preflight` also reports local-only sandbox/security advisories, currently top-level `sandbox_mode = "danger-full-access"`, profile-backed `default_permissions = ":danger-no-sandbox"`, and WSL1 bubblewrap posture, without converting those advisories into cloud blockers.
 
 ## Codex 0.121 Sandbox/Security Classification
 
@@ -69,7 +70,7 @@ CO-199 classifies the `rust-v0.121.0` sandbox/security release deltas before any
 | Remote exec environment policy | cloud-only | Cloud lanes must keep remote execution policy behind cloud preflight and canary evidence. |
 | Websocket token hash auth | local-only | Applies to local app-server/control surfaces. `--execution-mode cloud --runtime-mode appserver` remains unsupported and fails fast. |
 | Pinned inputs | not applicable | Treat as release/build hygiene unless a future lane identifies a CO preflight dependency. |
-| `danger-full-access` behavior | local-only | `doctor --cloud-preflight` reports top-level `sandbox_mode = "danger-full-access"` as a local-only advisory; CO must not weaken defaults to restore removed behavior. |
+| `danger-full-access` / `:danger-no-sandbox` behavior | local-only | `doctor --cloud-preflight` reports top-level `sandbox_mode = "danger-full-access"` and profile-backed `default_permissions = ":danger-no-sandbox"` as local-only advisories; CO must not weaken defaults to restore no-sandbox behavior. |
 | `thread/shellCommand` sensitive surface | local-only | Keep out of the default provider-worker authority model unless a future cloud-bridge lane proves otherwise. |
 | MCP sandbox-state metadata | both | Metadata may be documented or consumed on local/cloud MCP surfaces, but it does not expand tool authority or replace cloud canary evidence. |
 

@@ -1,6 +1,63 @@
 {
   "items": [
     {
+      "id": "20260502-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf",
+      "title": "CO-485 Codex CLI 0.128 permission-profile/trust-flow rebaseline",
+      "relates_to": "tasks/tasks-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-02",
+      "status": "review_green_pre_pr",
+      "evidence": [
+        "docs/PRD-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md",
+        "docs/TECH_SPEC-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md",
+        "docs/ACTION_PLAN-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md",
+        "tasks/specs/linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md",
+        "tasks/tasks-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md",
+        ".agent/task/linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf-docs-packet-bootstrap/cli/2026-05-02T12-25-28-667Z-edf96fa7/manifest.json",
+        ".runs/linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf/cli/2026-05-02T12-21-38-533Z-2304afcc/review/telemetry.json",
+        "out/linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf/manual/elegance-review.md"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet-bootstrap",
+          "date": "2026-05-02",
+          "status": "produced",
+          "manifest": ".runs/linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf-docs-packet-bootstrap/cli/2026-05-02T12-25-28-667Z-edf96fa7/manifest.json",
+          "source_anchor": "ctx:sha256:7b8009ed1070b9651f8299646e34cc07a9edf0d71d948584365cd01269075452#chunk:c000001",
+          "canonical_owner_key": "codex-cli-0128:permission-profile-trust-flow-rebaseline",
+          "summary": "Docs-first packet created for CO-485 from the parent-provided child-lane brief, protected terms, and source anchor. The packet preserves Codex CLI 0.128.0, permission profiles, sandbox profile config controls, cwd controls, active-profile metadata, --full-auto deprecation, trust flows, doctor/default setup, and provider-worker prompts. It rejects broad 0.128 release-intake duplication, portable gpt-5.4 fallback default changes, automatic sandbox/approval safety weakening, and historical-spec churn unless current-facing guidance imports stale wording. Parent owns docs-review, implementation, focused tests or live command evidence, Linear/workpad state, PR lifecycle, and final patch integration."
+        },
+        "parent_final_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-02",
+          "status": "succeeded",
+          "manifest": ".runs/linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf/cli/2026-05-02T12-21-38-533Z-2304afcc/manifest.json",
+          "telemetry": ".runs/linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf/cli/2026-05-02T12-21-38-533Z-2304afcc/review/telemetry.json",
+          "summary": "Final standalone review completed with status=succeeded, review_outcome=clean-success, and termination_boundary=null after the normal doctor advisory fix."
+        },
+        "elegance_review": {
+          "reviewer": "parent manual elegance pass",
+          "date": "2026-05-02",
+          "status": "completed",
+          "evidence": "out/linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf/manual/elegance-review.md",
+          "summary": "No simplification patch applied; retained the narrow 0.124/0.125 compatibility fallback and local-only doctor advisory complexity intentionally."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md",
+        "task": "tasks/tasks-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md",
+        "agent_task": ".agent/task/linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md",
+        "docs": "docs/TECH_SPEC-linear-77fc72a8-6cc4-4a47-84cd-7b0dfd18bfaf.md"
+      }
+    },
+    {
       "id": "20260501-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442",
       "title": "CO-468 control-host accepted no-run pending revalidation recovery",
       "relates_to": "tasks/tasks-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",

@@ -208,6 +208,59 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     }
   }, 15000);
 
+  it('surfaces danger-no-sandbox permission profiles in normal doctor output', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-profile-advisory-'));
+    const codexHome = join(tempDir, 'codex-home');
+    await mkdir(codexHome, { recursive: true });
+    await writeFile(
+      join(codexHome, 'config.toml'),
+      [
+        'model = "gpt-5.5"',
+        'review_model = "gpt-5.5"',
+        'model_reasoning_effort = "xhigh"',
+        'default_permissions = ":danger-no-sandbox"',
+        '',
+        '[agents]',
+        'max_threads = 12',
+        'max_depth = 4'
+      ].join('\n'),
+      'utf8'
+    );
+    process.env.CODEX_HOME = codexHome;
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+
+    try {
+      const result = runDoctor(process.cwd());
+      const summary = formatDoctorSummary(result).join('\n');
+
+      expect(result.status).toBe('warning');
+      expect(result.security_advisories).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          code: 'codex_config_danger_no_sandbox_profile',
+          scope: 'local-only',
+          severity: 'warning',
+          details: expect.objectContaining({ default_permissions: ':danger-no-sandbox' })
+        })
+      ]));
+      expect(summary).toContain('Sandbox/security advisories: warning');
+      expect(summary).toContain('[codex_config_danger_no_sandbox_profile/local-only]');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('skips missing-config max_threads recommendation when Codex feature output enables multi_agent_v2', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const originalCodexCliBin = process.env.CODEX_CLI_BIN;
@@ -1863,6 +1916,40 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       ]));
       expect(formatDoctorCloudPreflightSummary(result).join('\n')).toContain(
         '[codex_config_danger_full_access/local-only]'
+      );
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('reports danger-no-sandbox permission profiles as local-only advisories without failing cloud preflight', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'doctor-cloud-preflight-profile-advisory-'));
+    const codexHome = join(tempDir, 'codex-home');
+    await mkdir(codexHome, { recursive: true });
+    await writeFile(join(codexHome, 'config.toml'), 'default_permissions = ":danger-no-sandbox"\n', 'utf8');
+    const fakeCodexBin = await writeFakeCodexBinary(tempDir, 'multi_agent experimental true');
+
+    try {
+      const result = await runDoctorCloudPreflight({
+        cwd: process.cwd(),
+        env: buildDoctorCloudEnv({
+          CODEX_CLI_BIN: fakeCodexBin,
+          CODEX_CLOUD_ENV_ID: 'env_123',
+          CODEX_HOME: codexHome
+        })
+      });
+      expect(result.ok).toBe(true);
+      expect(result.issues).toHaveLength(0);
+      expect(result.security_advisories).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          code: 'codex_config_danger_no_sandbox_profile',
+          scope: 'local-only',
+          severity: 'warning',
+          details: expect.objectContaining({ default_permissions: ':danger-no-sandbox' })
+        })
+      ]));
+      expect(formatDoctorCloudPreflightSummary(result).join('\n')).toContain(
+        '[codex_config_danger_no_sandbox_profile/local-only]'
       );
     } finally {
       await rm(tempDir, { recursive: true, force: true });
