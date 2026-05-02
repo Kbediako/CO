@@ -1026,6 +1026,8 @@ async function resolveChildLaneDecision(
     throw error;
   }
   const acceptCurrentIssueSnapshot = buildAcceptCurrentIssueSnapshot(currentIssue);
+  const releaseAcceptClaimWithSnapshot = async (): Promise<ProviderLinearWorkerChildLaneRecord | null> =>
+    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps, acceptCurrentIssueSnapshot);
   const headStaleReason = resolveChildLaneHeadStaleReason(target, currentHeadSha);
   if (headStaleReason) {
     const invalidated = await finalizeClaimedChildLaneDecision({
@@ -1117,7 +1119,7 @@ async function resolveChildLaneDecision(
     });
   }
   if (target.status !== 'succeeded' || !target.patch_artifact_path) {
-    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+    const released = await releaseAcceptClaimWithSnapshot();
     return failureResult({
       action: 'accept',
       issueId: context.issueId,
@@ -1125,7 +1127,7 @@ async function resolveChildLaneDecision(
       sourceSetup,
       stream,
       childRun: null,
-      childLane: target,
+      childLane: released ?? target,
       code: 'provider_worker_child_lane_patch_missing',
       message: 'Child lane has no accepted patch artifact to apply.',
       status: 409
@@ -1137,7 +1139,7 @@ async function resolveChildLaneDecision(
     target
   );
   if (!artifactRoot) {
-    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+    const released = await releaseAcceptClaimWithSnapshot();
     return failureResult({
       action: 'accept',
       issueId: context.issueId,
@@ -1145,7 +1147,7 @@ async function resolveChildLaneDecision(
       sourceSetup,
       stream,
       childRun: null,
-      childLane: target,
+      childLane: released ?? target,
       code: 'provider_worker_child_lane_patch_invalid',
       message: 'Child lane artifact root must stay anchored to the expected workspace-local child run directory before parent acceptance.',
       status: 409
@@ -1153,7 +1155,7 @@ async function resolveChildLaneDecision(
   }
   const patchArtifactPath = resolveAcceptedPatchArtifactPath(context.repoRoot, target, artifactRoot);
   if (!patchArtifactPath) {
-    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+    const released = await releaseAcceptClaimWithSnapshot();
     return failureResult({
       action: 'accept',
       issueId: context.issueId,
@@ -1161,7 +1163,7 @@ async function resolveChildLaneDecision(
       sourceSetup,
       stream,
       childRun: null,
-      childLane: target,
+      childLane: released ?? target,
       code: 'provider_worker_child_lane_patch_invalid',
       message: 'Child lane patch artifact must stay within the child lane artifact root before parent acceptance.',
       status: 409
@@ -1171,7 +1173,7 @@ async function resolveChildLaneDecision(
   const acceptedProof = await deps.readChildLaneProof(proofPath).catch(() => null);
   let acceptedProofScope: ProviderLinearWorkerChildLaneScope | null = null;
   if (!acceptedProof) {
-    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+    const released = await releaseAcceptClaimWithSnapshot();
     return failureResult({
       action: 'accept',
       issueId: context.issueId,
@@ -1179,7 +1181,7 @@ async function resolveChildLaneDecision(
       sourceSetup,
       stream,
       childRun: null,
-      childLane: target,
+      childLane: released ?? target,
       code: 'provider_worker_child_lane_proof_missing',
       message: 'Child lane acceptance requires a readable proof bundle before parent apply.',
       status: 409
@@ -1187,7 +1189,7 @@ async function resolveChildLaneDecision(
   }
   if (acceptedProof) {
     if (!acceptedProof.scope) {
-      await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+      const released = await releaseAcceptClaimWithSnapshot();
       return failureResult({
         action: 'accept',
         issueId: context.issueId,
@@ -1195,7 +1197,7 @@ async function resolveChildLaneDecision(
         sourceSetup,
         stream,
         childRun: null,
-        childLane: target,
+        childLane: released ?? target,
         code: 'provider_worker_child_lane_proof_invalid',
         message: 'Child lane proof is missing scope contract metadata.',
         status: 409
@@ -1210,7 +1212,7 @@ async function resolveChildLaneDecision(
       patchArtifactPath
     );
     if (proofViolation) {
-      await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+      const released = await releaseAcceptClaimWithSnapshot();
       return failureResult({
         action: 'accept',
         issueId: context.issueId,
@@ -1218,7 +1220,7 @@ async function resolveChildLaneDecision(
         sourceSetup,
         stream,
         childRun: null,
-        childLane: target,
+        childLane: released ?? target,
         code: 'provider_worker_child_lane_proof_invalid',
         message: proofViolation,
         status: 409
@@ -1230,7 +1232,7 @@ async function resolveChildLaneDecision(
   try {
     patchChangedPaths = await readPatchChangedPaths(patchArtifactPath);
   } catch (error) {
-    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+    const released = await releaseAcceptClaimWithSnapshot();
     return failureResult({
       action: 'accept',
       issueId: context.issueId,
@@ -1238,7 +1240,7 @@ async function resolveChildLaneDecision(
       sourceSetup,
       stream,
       childRun: null,
-      childLane: target,
+      childLane: released ?? target,
       code: 'provider_worker_child_lane_patch_invalid',
       message: `Child lane patch artifact could not be inspected before parent acceptance: ${error instanceof Error ? error.message : String(error)}`,
       status: 409
@@ -1250,7 +1252,7 @@ async function resolveChildLaneDecision(
     acceptedProofScope
   );
   if (patchScopeViolation) {
-    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+    const released = await releaseAcceptClaimWithSnapshot();
     return failureResult({
       action: 'accept',
       issueId: context.issueId,
@@ -1258,7 +1260,7 @@ async function resolveChildLaneDecision(
       sourceSetup,
       stream,
       childRun: null,
-      childLane: target,
+      childLane: released ?? target,
       code: isProofScopeViolation(patchScopeViolation)
         ? 'provider_worker_child_lane_proof_invalid'
         : 'provider_worker_child_lane_patch_scope_invalid',
@@ -1270,7 +1272,7 @@ async function resolveChildLaneDecision(
   try {
     dirtyPatchConflict = await resolveAcceptedPatchDirtyConflict(context.repoRoot, patchChangedPaths, deps);
   } catch (error) {
-    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+    const released = await releaseAcceptClaimWithSnapshot();
     return failureResult({
       action: 'accept',
       issueId: context.issueId,
@@ -1278,14 +1280,14 @@ async function resolveChildLaneDecision(
       sourceSetup,
       stream,
       childRun: null,
-      childLane: target,
+      childLane: released ?? target,
       code: 'provider_worker_child_lane_parent_dirty_check_failed',
       message: `Failed to inspect parent workspace state before accepting child lane: ${error instanceof Error ? error.message : String(error)}`,
       status: 502
     });
   }
   if (dirtyPatchConflict) {
-    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+    const released = await releaseAcceptClaimWithSnapshot();
     return failureResult({
       action: 'accept',
       issueId: context.issueId,
@@ -1293,7 +1295,7 @@ async function resolveChildLaneDecision(
       sourceSetup,
       stream,
       childRun: null,
-      childLane: target,
+      childLane: released ?? target,
       code: 'provider_worker_child_lane_parent_dirty',
       message: dirtyPatchConflict,
       status: 409
@@ -1302,7 +1304,7 @@ async function resolveChildLaneDecision(
   try {
     await deps.applyPatchArtifact(context.repoRoot, patchArtifactPath);
   } catch (error) {
-    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps);
+    const released = await releaseAcceptClaimWithSnapshot();
     return failureResult({
       action: 'accept',
       issueId: context.issueId,
@@ -1310,7 +1312,7 @@ async function resolveChildLaneDecision(
       sourceSetup,
       stream,
       childRun: null,
-      childLane: target,
+      childLane: released ?? target,
       code: 'provider_worker_child_lane_apply_failed',
       message: error instanceof Error ? error.message : String(error),
       status: 409
