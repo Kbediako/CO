@@ -52,7 +52,8 @@ vi.mock('../src/cli/control/controlServerStartupInputPreparation.js', () => ({
 }));
 
 vi.mock('../src/cli/control/controlHostOwnership.js', () => ({
-  acquireControlHostOwnership: vi.fn()
+  acquireControlHostOwnership: vi.fn(),
+  refreshControlHostOwnershipPollingPayload: vi.fn((payload) => payload)
 }));
 
 vi.mock('../src/cli/control/controlServerReadyInstanceLifecycle.js', () => ({
@@ -138,6 +139,7 @@ function buildMockControlHostOwnershipHandle(
       hostname: 'host',
       cwd: null,
       argv: [],
+      source_root_freshness: null,
       lock_dir: '/tmp/run/control-host-owner.lock',
       lock_owner_path: '/tmp/run/control-host-owner.lock/owner.json',
       owner_path: '/tmp/run/control-host-owner.json'
@@ -1220,7 +1222,7 @@ describe('startControlServerPublicLifecycle', () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
-  it('uses the stuck watchdog while explicit recovery waits on an active refresh', async () => {
+  it('uses a bounded explicit-recovery watchdog while waiting on an active refresh', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-30T12:00:00.000Z'));
 
@@ -1266,7 +1268,7 @@ describe('startControlServerPublicLifecycle', () => {
     await Promise.resolve();
     expect(providerIssueHandoff.recoverIssue).not.toHaveBeenCalled();
 
-    await vi.advanceTimersByTimeAsync(45_000);
+    await vi.advanceTimersByTimeAsync(10_000);
 
     await expect(inFlightRefresh).resolves.toMatchObject({
       stuck: true,

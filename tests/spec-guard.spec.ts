@@ -2619,35 +2619,39 @@ describe('spec-guard script', () => {
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
 
-  it('does not grant the external migration cap for negated external signals', async () => {
-    for (const trigger of [
-      'Local cleanup is not an external migration; it has a deprecation plan and reviewer approval granted.',
+  it.each([
+    [
+      'not external migration',
+      'Local cleanup is not an external migration; it has a deprecation plan and reviewer approval granted.'
+    ],
+    [
+      'not release compatibility bridge',
       'Local cleanup is not a release compatibility bridge; it has a deprecation plan and reviewer approval granted.'
-    ]) {
-      const repo = await initRepository();
-      const decisionBody = fallbackDecisionTable([
-        completeExpireFallbackRow({
-          surface: '`repo guards`',
-          fallback: 'General repo fallback retained during local cleanup.',
-          owner: 'CO-410',
-          trigger,
-          reviewDate: reviewDateDaysFromNow(30),
-          maximumLifetime: reviewDateDaysFromNow(90)
-        })
-      ]);
+    ]
+  ])('does not grant the external migration cap for negated external signals: %s', async (_label, trigger) => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([
+      completeExpireFallbackRow({
+        surface: '`repo guards`',
+        fallback: 'General repo fallback retained during local cleanup.',
+        owner: 'CO-410',
+        trigger,
+        reviewDate: reviewDateDaysFromNow(30),
+        maximumLifetime: reviewDateDaysFromNow(90)
+      })
+    ]);
 
-      await commitFallbackGuardChange(repo, { decisionBody });
+    await commitFallbackGuardChange(repo, { decisionBody });
 
-      const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
-        cwd: repo,
-        env: specGuardEnv()
-      });
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
 
-      expect(stdout).toContain('❌ Spec guard: issues detected');
-      expect(stdout).toContain('expire fallback maximum lifetime');
-      expect(stdout).toContain('general repo fallback cap');
-      expect(stdout).toContain('Dry run: exiting successfully despite failures.');
-    }
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain('expire fallback maximum lifetime');
+    expect(stdout).toContain('general repo fallback cap');
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
   });
 
   it('does not grant the external migration cap when deprecation-plan evidence is negated', async () => {

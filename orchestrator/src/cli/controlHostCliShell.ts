@@ -221,7 +221,11 @@ export async function runControlHostCliShell(
     controlHostOwnership: {
       repoRoot: env.repoRoot,
       taskId,
-      pipelineId: startPipelineId
+      pipelineId: startPipelineId,
+      cwd: process.cwd(),
+      argv: process.argv.slice(),
+      commandPath: cliEntrypoint,
+      packageRoot: resolveProviderOverridePackageRoot(cliEntrypoint)
     },
     providerWorkflowConfigStore,
     createProviderIssueHandoff: ({

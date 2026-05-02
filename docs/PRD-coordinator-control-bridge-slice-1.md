@@ -32,9 +32,17 @@
 ### What changed in CO since those docs (2026-02-24 / 2026-02-25)
 - Runtime defaults/policy changed: local default runtime is now `runtimeMode=appserver`, with `--runtime-mode cli` retained as break-glass.
 - Mode semantics are now explicit policy: `executionMode` and `runtimeMode` are orthogonal controls, and `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported/fail-fast.
-- Feature policy changed: `js_repl` is enabled by default globally (local and cloud lanes), with task-scoped enable/disable lanes used for deterministic cloud contracts.
+- Feature policy changed again in Codex CLI `0.128.0`: `js_repl` and `js_repl_tools_only` are removed, so control-bridge implementation must not rely on those feature gates or recommend task-scoped enable/disable lanes for them.
 - Delegation/process policy tightened: top-level task streams require manifest-backed delegation evidence by default, with explicit override rationale when unavailable.
 - These policy updates post-date the coordinator planning drafts and must be reflected before implementation work starts.
+
+## CO-382 Fallback Metadata
+- Large-refactor check: no large refactor is required because CO-452 only corrects a stale posture note inside this control-bridge planning PRD.
+- Minor-seam check: the bounded minor-seam correction is acceptable because control-bridge scope, auth, and runtime-mode semantics remain unchanged.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `js_repl` control-bridge policy note | implementation-prep doc that referenced enable/disable lanes for a now-removed feature | remove fallback | CO-452 | Codex CLI `0.128.0` removed `js_repl` | 2026-03-03 | 2026-05-01 | immediate removal | this PRD no longer recommends relying on `js_repl` gates for control-bridge implementation | `spec-guard`, docs checks |
 
 ### What must be updated before coding
 - Update bridge contract language to align with current runtime policy wording (appserver default, CLI break-glass) without changing the Coordinator-only control scope.

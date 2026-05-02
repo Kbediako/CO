@@ -1,10 +1,10 @@
 ---
 id: 20260401-linear-fdefaeca-8c14-4dc3-980e-cdc6cfa6d955
 title: CO: Stabilize implementation-gate when nested npm run test hangs after green tail
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-01
-last_review: 2026-04-01
+last_review: 2026-05-02
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-fdefaeca-8c14-4dc3-980e-cdc6cfa6d955.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-fdefaeca-8c14-4dc3-980e-cdc6cfa6d95
 related_tasks:
   - tasks/tasks-linear-fdefaeca-8c14-4dc3-980e-cdc6cfa6d955.md
 review_notes:
+  - 2026-05-02: CO-479 live Linear audit confirmed CO-57 is Done (state_type=completed, updated_at=2026-04-09T13:28:53.032Z) with merged PR #338 attached; this completed-lane spec is reclassified to inactive `done` under canonical owner key `spec-guard:active-specs:last_review=2026-04-01` so historical implementation evidence remains preserved without staying in active-spec freshness.
   - 2026-04-01: Opened from Linear issue `CO-57` in the provider-worker workspace using issue id `fdefaeca-8c14-4dc3-980e-cdc6cfa6d955`.
   - 2026-04-01: Live `linear issue-context` confirmed the CO workflow states (`Ready`, `In Progress`, `In Review`, `Merging`, `Rework`, `Done`), showed no attached PR and no existing workpad.
   - 2026-04-01: Packaged `linear transition --state "In Progress"` failed with `linear_rate_limited` at `2026-03-31T14:29Z`; the reported reset time is `2026-03-31T15:28:20.250Z`, so state and workpad sync are pending retry rather than assumed complete.
