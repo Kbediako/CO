@@ -521,6 +521,96 @@ describe('review-launch-attempt', () => {
     expect(logTerminationBoundaryFallback).not.toHaveBeenCalled();
   });
 
+  it('records legacy fallback telemetry when the compatibility retry fails', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const artifactPaths = await prepareReviewArtifacts(manifestPath, 'Prompt body', sandbox);
+    const launchArgs: string[][] = [];
+    const commandIntentFailureState = makeState(sandbox);
+    const legacyFailureState = makeState(sandbox);
+    const commandIntentBoundary = {
+      kind: 'command-intent',
+      provenance: 'validation-suite',
+      reason: 'bounded review command-intent boundary violated after 1000ms.',
+      sample: 'npm run test'
+    } as const;
+    commandIntentFailureState.observeChunk('thinking\nexec\n', 'stdout', 100);
+    commandIntentFailureState.observeChunk(`/bin/zsh -lc 'npm run test'\n`, 'stdout', 110);
+    const writeTelemetry = vi.fn().mockResolvedValue(null);
+    const logTerminationBoundaryFallback = vi.fn();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(
+      runReviewLaunchAttemptShell({
+        cliOptions: { task: 'sample-task', uncommitted: true },
+        prompt: 'Prompt body',
+        retryWithoutScopeFlagsGateError:
+          'explicit `--uncommitted` review scope must remain auditable; rerun without that flag only if you intentionally want the wrapper default working-tree review.',
+        runtimeContext: {} as any,
+        repoRoot: sandbox,
+        manifestPath,
+        artifactPaths,
+        autoIssueLogEnabled: false,
+        telemetryDebugEnabled: false,
+        telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY',
+        ensureReviewCommandAvailableFn: async () => {},
+        resolveReviewCommandFn: (reviewArgs) => ({ command: 'codex', args: reviewArgs }),
+        runReview: async (resolved) => {
+          launchArgs.push(resolved.args);
+          if (launchArgs.length === 1) {
+            throw new CodexReviewError(
+              'codex review crossed the bounded command-intent boundary (validation suite launch).',
+              {
+                exitCode: null,
+                signal: 'SIGTERM',
+                timedOut: false,
+                outputPreview: 'npm run test',
+                reviewState: commandIntentFailureState,
+                terminationBoundary: commandIntentBoundary
+              }
+            );
+          }
+          if (launchArgs.length === 2) {
+            throw new CodexReviewError('default_permissions requires a `[permissions]` table', {
+              exitCode: 1,
+              signal: null,
+              timedOut: false,
+              outputPreview: 'Error: default_permissions requires a `[permissions]` table',
+              reviewState: null
+            });
+          }
+          throw new CodexReviewError('legacy sandbox fallback failed', {
+            exitCode: 1,
+            signal: null,
+            timedOut: false,
+            outputPreview: 'legacy sandbox fallback failed',
+            reviewState: legacyFailureState,
+            terminationBoundary: commandIntentBoundary
+          });
+        },
+        writeTelemetry,
+        logTelemetrySummary: () => {
+          throw new Error('telemetry summary should not run when telemetry persistence returns null');
+        },
+        logTerminationBoundaryFallback
+      })
+    ).rejects.toThrow('legacy sandbox fallback failed');
+
+    expect(launchArgs).toHaveLength(3);
+    expect(launchArgs[0]).toEqual(['review', '--uncommitted']);
+    expect(launchArgs[1]?.slice(0, 3)).toEqual(['-c', 'default_permissions=":read-only"', 'review']);
+    expect(launchArgs[2]?.slice(0, 3)).toEqual(['-c', 'sandbox_mode="read-only"', 'review']);
+    expect(writeTelemetry).toHaveBeenCalledTimes(1);
+    expect(writeTelemetry).toHaveBeenCalledWith(
+      legacyFailureState,
+      'failed',
+      'legacy sandbox fallback failed',
+      commandIntentBoundary,
+      reviewLaunchContext(null, 'inline', { legacyFallback: true })
+    );
+  });
+
   it('carries explicit scope in an inline command-intent retry prompt under appserver runtime', async () => {
     const title =
       'Surface: diff | Bounded: no validation; list follow-up commands only | Goal: scoped transport';

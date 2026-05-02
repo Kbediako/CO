@@ -381,9 +381,12 @@ export async function runReviewLaunchAttemptShell(
       return true;
     } catch (retryError) {
       if (isDefaultPermissionsUnsupportedError(retryError)) {
+        const legacyRetryLaunchContext = withLegacyReadOnlySandboxFallbackContext(
+          commandIntentRetryLaunchContext
+        );
         const legacyFallbackExpiryError = buildLegacyReadOnlySandboxFallbackExpiryError();
         if (legacyFallbackExpiryError) {
-          await reportFailure(legacyFallbackExpiryError, commandIntentRetryLaunchContext);
+          await reportFailure(legacyFallbackExpiryError, legacyRetryLaunchContext);
           throw legacyFallbackExpiryError;
         }
         const legacyRetryArgs = buildCommandIntentRetryArgs(
@@ -399,9 +402,6 @@ export async function runReviewLaunchAttemptShell(
             if (commandIntentFailureState) {
               legacyRetryExecution.state.recordCommandIntentViolationsFrom(commandIntentFailureState);
             }
-            const legacyRetryLaunchContext = withLegacyReadOnlySandboxFallbackContext(
-              commandIntentRetryLaunchContext
-            );
             await reportSuccess(
               legacyRetryExecution,
               legacyRetryLaunchContext,
@@ -409,7 +409,7 @@ export async function runReviewLaunchAttemptShell(
             );
             return true;
           } catch (legacyRetryError) {
-            await reportFailure(legacyRetryError, commandIntentRetryLaunchContext);
+            await reportFailure(legacyRetryError, legacyRetryLaunchContext);
             throw legacyRetryError;
           }
         }
