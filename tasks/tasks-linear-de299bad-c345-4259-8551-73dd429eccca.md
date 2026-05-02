@@ -1,0 +1,31 @@
+# Task Checklist - CO-456
+
+## Docs-First
+- [x] PRD, canonical spec, TECH_SPEC mirror, action plan, task checklist, and agent mirror exist for `linear-de299bad-c345-4259-8551-73dd429eccca`.
+- [x] `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` register the docs-first packet.
+- [x] Protected terms are visible: `npm run test`, `tests/spec-guard.spec.ts`, `external migration cap`, `false reviewer-approval labels`, `deprecation-plan labels`, clean `origin/main`, and provider-worker validation gate.
+
+## Acceptance
+- [x] Timeout reproduced and slow path identified.
+- [x] External-migration-cap policy assertions remain intact for false reviewer approval, negated external signals, and empty deprecation-plan labels.
+- [x] Reduced external-migration-cap subset passes after the test-structure fix.
+- [x] Provider-worker review env is scrubbed in the existing command-surface handoff test so exact full-test validation can run.
+- [x] Full `npm run test` reaches a terminal result that is not blocked by the CO-456 spec-guard timeout cluster.
+- [ ] Repo gates, review, PR, ready-review, and Linear handoff are complete.
+
+## Validation
+- [x] Child docs lane JSON parse, protected-term scan, and `git diff --check`. Evidence: `.runs/linear-de299bad-c345-4259-8551-73dd429eccca-docs-packet/cli/2026-05-01T03-01-11-354Z-21ccbfb3/manifest.json`.
+- [x] Reproduced: `npm run test:core -- tests/spec-guard.spec.ts -t "external migration cap"` failed on two 5000ms timeouts.
+- [x] Focused pass after fix: `npm run test:core -- tests/spec-guard.spec.ts -t "external migration cap"` passed 36 tests in about 24s.
+- [x] Current merged-branch focused pass: `npm run test:core -- tests/spec-guard.spec.ts -t "external migration cap"` passed 37 tests / 92 skipped in 13.24s after splitting the temporary negated-external-signals timeout loop too.
+- [x] Targeted command-surface pass after env scrub: `npm run test:core -- tests/cli-command-surface.spec.ts -t "launches review via the CLI shell in non-interactive handoff mode"`.
+- [x] `node scripts/spec-guard.mjs --dry-run`.
+- [x] `npm run test` passed on the current post-`origin/main` merge branch with 359 files / 5250 tests in 388.80s; `tests/spec-guard.spec.ts` passed under full-suite load in 66.859s.
+- [x] Required repo validation passed: delegation guard, spec guard, build, lint, focused test, full test, docs check, docs freshness, repo stewardship, diff budget, and whitespace check.
+- [x] Standalone review: `status=succeeded`, `review_outcome=bounded-success`, no actionable issues; evidence `.runs/linear-de299bad-c345-4259-8551-73dd429eccca/cli/2026-05-02T08-09-24-536Z-38ccebef/review/telemetry.json`.
+- [x] Elegance/minimality pass: `status=succeeded`, `review_outcome=bounded-success`, no actionable regressions; evidence `.runs/linear-de299bad-c345-4259-8551-73dd429eccca/cli/2026-05-02T07-35-07-503Z-4dd7c8f5/review/telemetry.json`.
+- [ ] PR checks, ready-review drain, and Linear handoff.
+
+## Notes
+- The implementation changed test structure only; no `scripts/spec-guard.mjs` policy logic changed.
+- Full `npm run test` no longer times out in `tests/spec-guard.spec.ts`; the inherited provider review-env failure had already landed on current `origin/main`, and this branch's final diff is limited to the CO-456 packet plus `tests/spec-guard.spec.ts`.

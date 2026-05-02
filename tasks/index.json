@@ -1,6 +1,33 @@
 {
   "items": [
     {
+      "id": "20260501-linear-de299bad-c345-4259-8551-73dd429eccca",
+      "title": "CO-456 spec-guard external migration cap timeout stabilization",
+      "relates_to": "tasks/tasks-linear-de299bad-c345-4259-8551-73dd429eccca.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-02",
+      "evidence": [
+        ".runs/linear-de299bad-c345-4259-8551-73dd429eccca-docs-packet/cli/2026-05-01T03-01-11-354Z-21ccbfb3/manifest.json"
+      ],
+      "approvals": {
+        "traceability_packet": {
+          "reviewer": "bounded docs child lane",
+          "date": "2026-05-02",
+          "status": "prepared",
+          "summary": "CO-456 stabilizes tests/spec-guard.spec.ts external migration cap timeout coverage without weakening spec-guard. The focused timeout came from false reviewer-approval labels and empty deprecation-plan labels being asserted through repeated git fixture setup plus spec-guard subprocess runs inside single Vitest cases. The packet preserves npm run test, tests/spec-guard.spec.ts, external migration cap, false reviewer-approval labels, deprecation-plan labels, clean origin/main, and provider-worker validation gate."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-de299bad-c345-4259-8551-73dd429eccca.md",
+        "task": "tasks/tasks-linear-de299bad-c345-4259-8551-73dd429eccca.md",
+        "agent_task": ".agent/task/linear-de299bad-c345-4259-8551-73dd429eccca.md",
+        "docs": "docs/TECH_SPEC-linear-de299bad-c345-4259-8551-73dd429eccca.md"
+      }
+    },
+    {
       "id": "20260502-linear-88a7529f-c7fa-443d-8b64-87b6b45ef312",
       "title": "CO-479 active task specs April 1 Linear classification",
       "relates_to": "tasks/tasks-linear-88a7529f-c7fa-443d-8b64-87b6b45ef312.md",
