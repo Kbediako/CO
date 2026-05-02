@@ -79,8 +79,8 @@
 ## Progress Log
 - 2026-05-02: Bounded same-issue docs child lane created the CO-493 docs-first packet and registry mirrors from the parent-provided issue truth.
 - 2026-05-02: Parent verified the worker run source payload and reconciled packet content to the parent source anchor.
-- 2026-05-03: Parent implemented stale active-Rework review-promotion suppression, added focused provider handoff regression coverage, completed the full local validation chain, and recorded standalone review plus elegance evidence.
-- 2026-05-03: Live `CO-486` control-host recovery remains a post-merge step because the running supervised control host resolves to shared clean `main`, not this unmerged issue workspace patch.
+- 2026-05-02: Parent implemented stale active-Rework review-promotion suppression, added focused provider handoff regression coverage, completed the full local validation chain, and recorded standalone review plus elegance evidence.
+- 2026-05-02: Live `CO-486` control-host recovery remains a post-merge step because the running supervised control host resolves to shared clean `main`, not this unmerged issue workspace patch.
 
 ## Notes
 - Parent owns Linear state, workpad, docs-review, source implementation, validation, PR lifecycle, and recovery of `CO-486`.

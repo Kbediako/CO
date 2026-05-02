@@ -9357,7 +9357,7 @@ function shouldSuppressActionRequiredReviewPromotionForActiveIssue(
     existingIssueUpdatedAt: reviewPromotion.issue_updated_at ?? null,
     nextIssueUpdatedAt: claim.issue_updated_at ?? null
   });
-  return freshness !== 'older';
+  return freshness === 'equal' || freshness === 'newer';
 }
 
 type ProviderRetryDelayType = 'continuation' | 'failure';
