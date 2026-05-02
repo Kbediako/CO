@@ -4741,6 +4741,21 @@ export function createProviderIssueHandoffService(
           let trackedIssueBlockersByKey = pollInput
             ? buildTrackedIssuePollBlockerMap(pollInput.trackedIssues)
             : null;
+          const retainedClaimBlockersByKey = buildProviderIntakeClaimBlockerMap(
+            options.state.claims
+          );
+          if (retainedClaimBlockersByKey.size > 0) {
+            if (trackedIssueBlockersByKey) {
+              for (const [providerKey, blocker] of retainedClaimBlockersByKey.entries()) {
+                if (trackedIssueBlockersByKey.has(providerKey)) {
+                  continue;
+                }
+                trackedIssueBlockersByKey.set(providerKey, blocker);
+              }
+            } else {
+              trackedIssueBlockersByKey = retainedClaimBlockersByKey;
+            }
+          }
           const deferredRetainedReleasedBlockerRefreshProviderKeys = new Set<string>();
           const consumedTrackedIssueKeys = new Set<string>();
           if (!options.resolveTrackedIssue && !trackedIssuesByKey) {
@@ -9717,6 +9732,39 @@ function buildTrackedIssuePollBlockerMap(
         continue;
       }
       const providerKey = buildProviderIssueKey('linear', blocker.id);
+      if (blockersByKey.has(providerKey)) {
+        continue;
+      }
+      blockersByKey.set(providerKey, blocker);
+    }
+  }
+  return blockersByKey;
+}
+
+function buildProviderIntakeClaimBlockerMap(
+  claims: ProviderIntakeClaimRecord[]
+): Map<string, LiveLinearTrackedBlocker> {
+  const blockersByKey = new Map<string, LiveLinearTrackedBlocker>();
+  const claimsByProviderKey = new Map<string, ProviderIntakeClaimRecord>();
+  for (const claim of claims) {
+    claimsByProviderKey.set(buildProviderIssueKey(claim.provider, claim.issue_id), claim);
+  }
+  for (const claim of claims) {
+    for (const blocker of claim.issue_blocked_by ?? []) {
+      if (typeof blocker.id !== 'string' || blocker.id.length === 0) {
+        continue;
+      }
+      const providerKey = buildProviderIssueKey(claim.provider, blocker.id);
+      const blockedClaim = claimsByProviderKey.get(providerKey) ?? null;
+      if (
+        !blockedClaim ||
+        !shouldUseTrackedIssueBlockerSnapshotForRetainedReleasedNotActiveMetadataRefresh({
+          claim: blockedClaim,
+          blocker
+        })
+      ) {
+        continue;
+      }
       if (blockersByKey.has(providerKey)) {
         continue;
       }
