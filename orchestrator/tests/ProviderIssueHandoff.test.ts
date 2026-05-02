@@ -1001,6 +1001,120 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalled();
   });
 
+  it('keeps a stale manifestless explicit-recovery claim bound to an existing queued run', async () => {
+    const { root, paths } = await createHostPaths();
+    const queuedRunPaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'linear-lin-issue-470'
+      },
+      'run-co-470-queued-existing'
+    );
+    await mkdir(queuedRunPaths.runDir, { recursive: true });
+    await writeFile(
+      queuedRunPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-470-queued-existing',
+        task_id: 'linear-lin-issue-470',
+        pipeline_id: 'provider-linear-worker',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-470',
+        issue_identifier: 'CO-470',
+        issue_updated_at: '2026-05-01T17:21:00.000Z',
+        updated_at: '2026-05-01T17:21:02.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-470',
+      issue_identifier: 'CO-470',
+      issue_title: 'Review fixture env contamination',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-05-01T17:21:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-issue-470',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      accepted_at: '2026-05-01T17:18:00.000Z',
+      updated_at: '2026-05-01T17:20:01.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      launch_started_at: '2026-05-01T17:20:01.000Z',
+      launch_source: 'control-host',
+      launch_token: 'queued-run-launch-token',
+      retry_error: null
+    }));
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-470-duplicate-recovery',
+        manifestPath: join(paths.runDir, 'provider-run-co-470-duplicate-recovery.json')
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async ({ issueId }: { provider: 'linear'; issueId: string }) => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: issueId,
+        identifier: 'CO-470',
+        title: 'Review fixture env contamination',
+        state: 'Ready',
+        state_type: 'unstarted',
+        updated_at: '2026-05-01T17:21:00.000Z',
+        blocked_by: []
+      })
+    }));
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-05-01T17:21:00.000Z'));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    const result = await service.recoverIssue({
+      provider: 'linear',
+      issueId: 'lin-issue-470',
+      action: 'recover'
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_rehydrated_queued_run',
+      claim: {
+        state: 'starting',
+        reason: 'provider_issue_rehydrated_queued_run',
+        run_id: 'run-co-470-queued-existing',
+        run_manifest_path: queuedRunPaths.manifestPath,
+        launch_token_present: false
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_rehydrated_queued_run',
+      run_id: 'run-co-470-queued-existing',
+      run_manifest_path: queuedRunPaths.manifestPath,
+      last_event: 'control_host_provider_worker_recover',
+      last_action: 'recover'
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
   it.each(['recover', 'relaunch', 'nudge'] as const)(
     'relaunches through explicit %s when a completed duplicate claim already consumed active live issue truth',
     async (action) => {

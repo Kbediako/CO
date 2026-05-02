@@ -1406,6 +1406,79 @@ describe('startControlServerPublicLifecycle', () => {
     expect(resetStuckRefreshLifecycle).not.toHaveBeenCalled();
   });
 
+  it('waits on an active explicit recovery with the recovery budget before retrying', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-01T17:18:00.000Z'));
+
+    let recoverCalls = 0;
+    const resetStuckRefreshLifecycle = vi.fn();
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => undefined),
+      resetStuckRefreshLifecycle,
+      recoverIssue: vi.fn(async (input: {
+        provider: 'linear';
+        issueId: string;
+        action: 'recover' | 'relaunch' | 'nudge';
+      }) => {
+        recoverCalls += 1;
+        if (recoverCalls === 1) {
+          await new Promise<void>((resolve) => {
+            setTimeout(resolve, 25_000);
+          });
+        }
+        return {
+          provider: input.provider,
+          issue_id: input.issueId,
+          action: input.action,
+          kind: 'start' as const,
+          reason: 'provider_issue_start_launched',
+          claim: null
+        };
+      })
+    };
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 15_000,
+      stuckAfterMs: 45_000
+    });
+
+    const firstRecovery = runProviderIssueHandoffRecover(providerIssueHandoff, {
+      provider: 'linear',
+      issueId: 'lin-issue-470',
+      action: 'recover'
+    });
+    await Promise.resolve();
+    const secondRecovery = runProviderIssueHandoffRecover(providerIssueHandoff, {
+      provider: 'linear',
+      issueId: 'lin-issue-470',
+      action: 'recover'
+    });
+    await Promise.resolve();
+
+    await vi.advanceTimersByTimeAsync(24_000);
+    expect(providerIssueHandoff.recoverIssue).toHaveBeenCalledTimes(1);
+    expect(resetStuckRefreshLifecycle).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(firstRecovery).resolves.toMatchObject({
+      provider: 'linear',
+      issue_id: 'lin-issue-470',
+      action: 'recover',
+      kind: 'start',
+      reason: 'provider_issue_start_launched'
+    });
+    await expect(secondRecovery).resolves.toMatchObject({
+      provider: 'linear',
+      issue_id: 'lin-issue-470',
+      action: 'recover',
+      kind: 'start',
+      reason: 'provider_issue_start_launched'
+    });
+    expect(providerIssueHandoff.recoverIssue).toHaveBeenCalledTimes(2);
+    expect(resetStuckRefreshLifecycle).not.toHaveBeenCalled();
+  });
+
   it('fails fast when a retry would exceed the explicit recovery deadline', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-01T17:18:00.000Z'));

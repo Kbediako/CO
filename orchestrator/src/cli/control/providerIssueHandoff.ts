@@ -4305,6 +4305,8 @@ export function createProviderIssueHandoffService(
           > = lockedExisting ?? clearProviderRetryFields();
           const lockedActiveRun =
             lockedAttachableDiscoveredRuns.find((run) => run.status === 'in_progress') ?? null;
+          const lockedQueuedRun =
+            lockedAttachableDiscoveredRuns.find((run) => run.status === 'queued') ?? null;
           const lockedLatestRun = resolveLatestKnownProviderRun(lockedAttachableDiscoveredRuns);
           const lockedPreferredWorkerHost = resolvePreferredStartWorkerHost({
             claimWorkerHost: lockedExisting?.worker_host ?? null,
@@ -4375,6 +4377,34 @@ export function createProviderIssueHandoffService(
             return {
               kind: 'settled',
               result: { kind: 'ignored', reason: 'provider_issue_run_already_active', claim }
+            };
+          }
+
+          if (
+            explicitProviderWorkerRecovery &&
+            lockedExisting &&
+            lockedExistingManifestlessHandoff &&
+            lockedQueuedRun
+          ) {
+            const lockedWorkerHost = resolveRehydratedActiveRunWorkerHost(lockedQueuedRun, lockedExisting);
+            const claim = await upsertProviderClaimAndPersist({
+              ...lockedLatestClaimBase,
+              task_id: lockedQueuedRun.taskId,
+              mapping_source: mappingSource,
+              state: lockedExisting.state,
+              reason: 'provider_issue_rehydrated_queued_run',
+              run_id: lockedQueuedRun.runId,
+              run_manifest_path: lockedQueuedRun.manifestPath,
+              worker_host: lockedWorkerHost,
+              launch_source: null,
+              launch_token: null,
+              launch_started_at: null,
+              accepted_at: lockedExisting.accepted_at,
+              updated_at: lockedExisting.updated_at
+            });
+            return {
+              kind: 'settled',
+              result: { kind: 'ignored', reason: 'provider_issue_rehydrated_queued_run', claim }
             };
           }
 

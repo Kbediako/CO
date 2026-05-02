@@ -62,13 +62,17 @@ const PROVIDER_FULL_RECOVERY_SWEEP_INTERVAL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 15 * 60 * 1000;
 interface ProviderIssueHandoffOperationState {
   active: Promise<void> | null;
+  activeKind: ProviderIssueHandoffOperationKind | null;
   queuedRefresh: Promise<void> | null;
   stuckSignal: Promise<ProviderIssueHandoffRefreshRequestOutcome>;
   resolveStuckSignal: ((outcome: ProviderIssueHandoffRefreshRequestOutcome) => void) | null;
 }
 
+type ProviderIssueHandoffOperationKind = 'refresh' | 'recovery';
+
 interface ProviderIssueHandoffOperationHealthContext {
   mode: ControlPollingMode;
+  kind?: ProviderIssueHandoffOperationKind;
   completeOnSuccess?: boolean;
 }
 
@@ -361,6 +365,7 @@ export function runProviderIssueHandoffRefresh(
           detachProviderIssueHandoffPending(state.active);
           detachProviderIssueHandoffPending(state.queuedRefresh);
           state.active = null;
+          state.activeKind = null;
           state.queuedRefresh = null;
           providerIssueHandoff.resetStuckRefreshLifecycle?.();
           const activeRefresh = waitForProviderIssueHandoffPending(
@@ -454,6 +459,7 @@ export async function runProviderIssueHandoffRecover(
     detachProviderIssueHandoffPending(state.active);
     detachProviderIssueHandoffPending(state.queuedRefresh);
     state.active = null;
+    state.activeKind = null;
     state.queuedRefresh = null;
   };
   while (state.active || state.queuedRefresh) {
@@ -465,20 +471,28 @@ export async function runProviderIssueHandoffRecover(
       break;
     }
     try {
+      const activeRecovery = state.activeKind === 'recovery' ? state.active : null;
+      const pending = activeRecovery ?? state.queuedRefresh ?? state.active!;
+      const waitMs = activeRecovery
+        ? PROVIDER_WORKER_RECOVER_OPERATION_WAIT_MS
+        : PROVIDER_WORKER_RECOVER_ACTIVE_WAIT_MS;
+      const totalWaitMs = activeRecovery
+        ? PROVIDER_WORKER_RECOVER_OPERATION_TOTAL_WAIT_MS
+        : PROVIDER_WORKER_RECOVER_ACTIVE_TOTAL_WAIT_MS;
       await waitForProviderIssueHandoffPendingWithWatchdog(
         providerIssueHandoff,
-        state.queuedRefresh ?? state.active!,
+        pending,
         () => resolveProviderWorkerRecoverWatchdogDelayMs(
           providerIssueHandoff,
           activeWaitStartedAtMs,
-          PROVIDER_WORKER_RECOVER_ACTIVE_WAIT_MS,
-          PROVIDER_WORKER_RECOVER_ACTIVE_TOTAL_WAIT_MS
+          waitMs,
+          totalWaitMs
         ),
         { forceStuckOnWatchdog: true }
       );
       if (hasProviderWorkerRecoverDeadlineExpired(
         activeWaitStartedAtMs,
-        PROVIDER_WORKER_RECOVER_ACTIVE_TOTAL_WAIT_MS
+        totalWaitMs
       )) {
         captureRestartRequiredForRecoverySkip();
         abandonPriorOperationForRecovery();
@@ -512,12 +526,13 @@ export async function runProviderIssueHandoffRecover(
       async () => {
         recoveryResult = await providerIssueHandoff.recoverIssue(input);
       },
-      { mode: 'refresh', completeOnSuccess: false }
+      { mode: 'refresh', kind: 'recovery', completeOnSuccess: false }
     );
     const abandonRecoveryOperation = (): void => {
       detachProviderIssueHandoffPending(recoveryOperation);
       if (recoveryState.active === recoveryOperation) {
         recoveryState.active = null;
+        recoveryState.activeKind = null;
       }
       clearProviderIssueHandoffOperationState(providerIssueHandoff, recoveryState);
       providerIssueHandoff.resetStuckRefreshLifecycle?.();
@@ -1032,10 +1047,12 @@ function startProviderIssueHandoffOperation(
     .finally(() => {
       if (state.active === operationPromise) {
         state.active = null;
+        state.activeKind = null;
         clearProviderIssueHandoffOperationState(providerIssueHandoff, state);
       }
     });
   state.active = operationPromise;
+  state.activeKind = healthContext?.kind ?? 'refresh';
   return operationPromise;
 }
 
@@ -1164,6 +1181,7 @@ async function settleProviderIssueHandoffStuckPending(
   providerIssueHandoff.resetStuckRefreshLifecycle?.();
   if (state.active === pending) {
     state.active = null;
+    state.activeKind = null;
   }
   if (state.queuedRefresh === pending) {
     state.queuedRefresh = null;
@@ -1180,6 +1198,7 @@ function getProviderIssueHandoffOperationState(
   }
   const nextState: ProviderIssueHandoffOperationState = {
     active: null,
+    activeKind: null,
     queuedRefresh: null,
     ...createProviderIssueHandoffStuckSignal()
   };
