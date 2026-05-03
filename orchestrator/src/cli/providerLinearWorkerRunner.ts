@@ -8022,9 +8022,7 @@ async function readHydratedProviderLinearWorkerChildLanesAndRepairLedger(
       priorProofChildLanes,
       options
     );
-    const ledgerRecords = hydrated.map((childLane, index) =>
-      preserveProviderLinearWorkerLaunchReservationLedgerIdentity(existing[index] ?? null, childLane)
-    );
+    const ledgerRecords = hydrated;
     if (JSON.stringify(existing) !== JSON.stringify(ledgerRecords)) {
       await writeJsonAtomic(buildChildLanesPath(runDir), ledgerRecords);
     }
@@ -8054,30 +8052,6 @@ function findMatchingPriorHydratedProviderLinearWorkerChildLane(
         normalizeOptionalString(prior.run_id)?.startsWith('launching-') !== true
     ) ?? null
   );
-}
-
-function preserveProviderLinearWorkerLaunchReservationLedgerIdentity(
-  existing: ProviderLinearWorkerChildLaneRecord | null,
-  hydrated: ProviderLinearWorkerChildLaneRecord
-): ProviderLinearWorkerChildLaneRecord {
-  if (!existing) {
-    return hydrated;
-  }
-  const existingRunId = normalizeOptionalString(existing.run_id);
-  if (
-    existing.pipeline_id !== PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID ||
-    existing.decision !== 'pending' ||
-    !existingRunId?.startsWith('launching-') ||
-    existingRunId === hydrated.run_id ||
-    existing.stream !== hydrated.stream ||
-    existing.task_id !== hydrated.task_id
-  ) {
-    return hydrated;
-  }
-  if (hydrated.stale_invalidation_candidate) {
-    return hydrated;
-  }
-  return existing;
 }
 
 async function readProviderLinearWorkerParentManifestHydrationMetadata(

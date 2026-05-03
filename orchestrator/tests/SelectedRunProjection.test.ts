@@ -5017,9 +5017,11 @@ describe('SelectedRunProjection', () => {
       await readFile(join(childPaths.runDir, PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME), 'utf8')
     ) as Array<Record<string, unknown>>;
     expect(childLaneLedger[0]).toMatchObject({
-      run_id: 'launching-docs-packet',
-      status: 'launching',
-      summary: 'Child lane reserved before child run startup.'
+      run_id: '2026-04-17T00-34-04-191Z-44a13a0d',
+      status: 'in_progress',
+      summary: 'Child lane docs-packet is running.',
+      manifest_path: join(matchingChildRunDir, 'manifest.json'),
+      artifact_root: matchingChildRunDir
     });
 
     const hydratedChildLane = selected?.providerLinearWorkerProof?.child_lanes?.[0];

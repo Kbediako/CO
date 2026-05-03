@@ -6448,7 +6448,7 @@ for await (const line of rl) {
     });
   });
 
-  it('keeps reservation placeholders in scan mode while repairing the ledger', async () => {
+  it('reconciles reservation placeholders in the ledger after real child startup', async () => {
     const { runDir } = await createManifestRoot();
     const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
     await writeFile(
@@ -6626,9 +6626,13 @@ for await (const line of rl) {
       await readFile(join(runDir, PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME), 'utf8')
     ) as Array<Record<string, unknown>>;
     expect(ledger[0]).toMatchObject({
-      run_id: 'launching-docs-packet',
-      status: 'launching',
-      summary: 'Child lane reserved before child run startup.'
+      run_id: '2026-04-17T00-36-04-191Z-bbbbbbbb',
+      status: 'in_progress',
+      manifest_path: join(replacementChildRunDir, 'manifest.json'),
+      artifact_root: replacementChildRunDir,
+      log_path: join(replacementChildRunDir, 'runner.ndjson'),
+      summary: 'Child lane docs-packet is running. Installing dependencies',
+      summary_recorded_at: '2026-04-17T00:36:30.000Z'
     });
   });
 
