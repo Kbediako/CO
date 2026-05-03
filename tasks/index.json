@@ -1,6 +1,73 @@
 {
   "items": [
     {
+      "id": "20260501-linear-93785af4-9df9-4713-8a63-b0caddb5796f",
+      "title": "CO-460 stale tracked.linear advisory fallback regression",
+      "relates_to": "tasks/tasks-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-03",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+        "docs/TECH_SPEC-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+        "docs/ACTION_PLAN-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+        "tasks/specs/linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+        "tasks/tasks-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+        ".agent/task/linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-93785af4-9df9-4713-8a63-b0caddb5796f/cli/2026-05-01T04-35-42-108Z-11573cdd/manifest.json",
+        ".runs/linear-93785af4-9df9-4713-8a63-b0caddb5796f/cli/2026-05-01T04-35-42-108Z-11573cdd/review/telemetry.json",
+        ".runs/linear-93785af4-9df9-4713-8a63-b0caddb5796f-focused-regression-validation/cli/2026-05-03T04-05-31-099Z-ff3e0a6e/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_parent_lane": {
+          "reviewer": "provider worker",
+          "date": "2026-05-01",
+          "status": "created",
+          "manifest": ".runs/linear-93785af4-9df9-4713-8a63-b0caddb5796f/cli/2026-05-01T04-35-42-108Z-11573cdd/manifest.json",
+          "source_anchor": "ctx:sha256:7e2f368111d599f3b3737fa64148d04c895b885e7e81a638904b0d2da180485e#chunk:c000001",
+          "summary": "Created the CO-460 docs-first packet around the stale tracked.linear advisory fallback regression. The packet keeps co-status --format json, /api/v1/state, /ui/data.json, linear-advisory-state.json, provider_intake.updated_at, CO-1, CO-223, and CO-255 protected while separating provider-intake summary drift and binary/model provenance from this lane."
+        },
+        "implementation_validation": {
+          "reviewer": "provider worker",
+          "date": "2026-05-03",
+          "status": "validation-green-before-review",
+          "summary": "Implemented stale advisory fail-closed classification and restart regressions. The resumed branch is merged with current origin/main and required validation is green: delegation guard, spec-guard dry-run, build, lint, focused stale advisory regressions, nearby projection/API/UI regressions, npm run test (359 files / 5263 tests), docs:check, docs:freshness, repo:stewardship, diff budget, and pack:smoke."
+        },
+        "child_lane_validation": {
+          "reviewer": "provider worker",
+          "date": "2026-05-03",
+          "status": "succeeded-no-patch",
+          "manifest": ".runs/linear-93785af4-9df9-4713-8a63-b0caddb5796f-focused-regression-validation/cli/2026-05-03T04-05-31-099Z-ff3e0a6e/manifest.json",
+          "summary": "Same-issue child lane focused-regression-validation completed successfully with no patch output and validated the focused stale advisory regression tests."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-03",
+          "status": "pending-current-post-merge-review",
+          "telemetry": ".runs/linear-93785af4-9df9-4713-8a63-b0caddb5796f/cli/2026-05-01T04-35-42-108Z-11573cdd/review/telemetry.json",
+          "summary": "Prior May 1 forced standalone review reported review_outcome=bounded-success. A fresh post-merge forced standalone review is still required before PR handoff."
+        },
+        "elegance_pass": {
+          "reviewer": "provider worker",
+          "date": "2026-05-03",
+          "status": "pending-current-post-merge-review",
+          "summary": "Prior May 1 minimality pass found no simplification patch. A fresh post-merge elegance pass is still required after standalone review and before PR handoff."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+        "task": "tasks/tasks-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+        "agent_task": ".agent/task/linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+        "docs": "docs/TECH_SPEC-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md"
+      }
+    },
+    {
       "id": "20260502-linear-75023431-9350-4e9a-982e-71d244cbf204",
       "title": "CO-494 provider child-lane accept current issue snapshot",
       "relates_to": "tasks/tasks-linear-75023431-9350-4e9a-982e-71d244cbf204.md",
