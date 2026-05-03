@@ -777,16 +777,32 @@ describe('createControlServerSeededRuntimeAssembly', () => {
         })
       ];
       await context.persist.providerIntake?.();
+      await seedManifest(paths, {
+        run_id: 'fresh-provider-run',
+        task_id: 'linear-co-459-fresh',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-459',
+        issue_identifier: 'CO-459',
+        status: 'in_progress',
+        summary: 'Fresh raw provider intake truth',
+        updated_at: '2026-05-01T02:41:32.000Z'
+      });
 
       const apiPayload = await readCompatibilityState(presenterContext);
       const uiPayload = await readUiDataset(presenterContext);
 
+      expect(apiPayload.selected?.issue_identifier).toBe('CO-459');
+      expect(apiPayload.running_ids).toContain('CO-459');
+      expect(apiPayload.running_ids).not.toContain('CO-424');
       expect(apiPayload.provider_intake?.updated_at).toBe('2026-05-01T02:41:32.000Z');
       expect(apiPayload.provider_intake?.selected_claim).toMatchObject({
         issue_identifier: 'CO-459',
         run_id: 'fresh-provider-run',
         state: 'running'
       });
+      expect(uiPayload.selected_issue_identifier).toBe('CO-459');
+      expect(uiPayload.running.map((entry) => entry.issue_identifier)).toContain('CO-459');
+      expect(uiPayload.running.map((entry) => entry.issue_identifier)).not.toContain('CO-424');
       expect(uiPayload.provider_intake?.updated_at).toBe('2026-05-01T02:41:32.000Z');
       expect(uiPayload.provider_intake?.selected_claim).toMatchObject({
         issue_identifier: 'CO-459',
@@ -838,7 +854,12 @@ describe('createControlServerSeededRuntimeAssembly', () => {
               state?: unknown;
             };
           };
+          selected_issue_identifier?: unknown;
+          running?: Array<{ issue_identifier?: unknown }>;
         };
+        expect(coStatusPayload.selected_issue_identifier).toBe('CO-459');
+        expect(coStatusPayload.running?.map((entry) => entry.issue_identifier)).toContain('CO-459');
+        expect(coStatusPayload.running?.map((entry) => entry.issue_identifier)).not.toContain('CO-424');
         expect(coStatusPayload.provider_intake?.updated_at).toBe('2026-05-01T02:41:32.000Z');
         expect(coStatusPayload.provider_intake?.selected_claim).toMatchObject({
           issue_identifier: 'CO-459',

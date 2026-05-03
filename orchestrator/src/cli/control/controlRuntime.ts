@@ -172,28 +172,38 @@ function createControlRuntimeSnapshot(
   context: ControlRuntimeContext,
   liveLinearAdvisoryRuntime: ReturnType<typeof createLiveLinearAdvisoryRuntime>
 ): InternalControlRuntimeSnapshot {
-  const selectedRunProjection = createSelectedRunProjectionReader(context);
-  const compatibilityProjectionSource = createSelectedRunProjectionReader(context);
   let selectedRunSnapshotPromise: Promise<ControlSelectedRunRuntimeSnapshot> | null = null;
+  let selectedRunAuthorityFingerprint: string | null = null;
   let compatibilityRuntimeSnapshotPromise: Promise<ControlCompatibilityRuntimeSnapshot> | null = null;
   let compatibilityProjectionPromise: Promise<ControlCompatibilityProjectionSnapshot> | null = null;
+  let compatibilityAuthorityFingerprint: string | null = null;
   let dispatchEvaluationPromise: Promise<{
     issueIdentifier: string | null;
     evaluation: DispatchPilotEvaluation;
   }> | null = null;
 
   async function readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot> {
+    const providerIntakeAuthority = readProviderIntakeAuthorityState(context);
+    const authorityContext = buildProviderIntakeAuthorityContext(context, providerIntakeAuthority);
+    const authorityFingerprint = buildProviderIntakeAuthorityFingerprint(providerIntakeAuthority);
+    if (selectedRunSnapshotPromise && selectedRunAuthorityFingerprint === authorityFingerprint) {
+      return selectedRunSnapshotPromise;
+    }
+    selectedRunSnapshotPromise = null;
+    selectedRunAuthorityFingerprint = authorityFingerprint;
+    dispatchEvaluationPromise = null;
+
     selectedRunSnapshotPromise ??= (async () => {
+      const selectedRunProjection = createSelectedRunProjectionReader(authorityContext);
       const selected = enrichProjectionSourceWithProviderRetryState(
         suppressConflictingProjectionTrackedPayload(
           await selectedRunProjection.buildSelectedRunContext()
         ),
-        context.providerIntakeState
+        authorityContext.providerIntakeState
       );
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
       const tracked = resolveRuntimeTrackedPayload(selected, context.linearAdvisoryState);
-      const providerIntakeAuthority = readProviderIntakeAuthorityState(context);
       const providerIntake = buildProviderIntakeSummary(providerIntakeAuthority.state);
       const providerWorkflow = context.providerWorkflowConfigStore
         ? await refreshProviderWorkflowStatusPayload(context.providerWorkflowConfigStore)
@@ -211,49 +221,59 @@ function createControlRuntimeSnapshot(
   }
 
   async function readCompatibilityRuntimeSnapshot(): Promise<ControlCompatibilityRuntimeSnapshot> {
+    const providerIntakeAuthority = readProviderIntakeAuthorityState(context);
+    const authorityContext = buildProviderIntakeAuthorityContext(context, providerIntakeAuthority);
+    const authorityFingerprint = buildProviderIntakeAuthorityFingerprint(providerIntakeAuthority);
+    if (compatibilityRuntimeSnapshotPromise && compatibilityAuthorityFingerprint === authorityFingerprint) {
+      return compatibilityRuntimeSnapshotPromise;
+    }
+    compatibilityRuntimeSnapshotPromise = null;
+    compatibilityAuthorityFingerprint = authorityFingerprint;
+    compatibilityProjectionPromise = null;
+
     compatibilityRuntimeSnapshotPromise ??= (async () => {
+      const compatibilityProjectionSource = createSelectedRunProjectionReader(authorityContext);
       const selectedManifest = await compatibilityProjectionSource.readSelectedRunManifestSnapshot();
       const selected = enrichProjectionSourceWithProviderRetryState(
         suppressConflictingProjectionTrackedPayload(
           await compatibilityProjectionSource.buildCompatibilitySourceContext(selectedManifest)
         ),
-        context.providerIntakeState
+        authorityContext.providerIntakeState
       );
-      const discoveredCollections = await discoverCompatibilityCollectionContexts(context);
-      const authoritativeRetrying = (await discoverAuthoritativeRetryCollectionContexts(context))
+      const discoveredCollections = await discoverCompatibilityCollectionContexts(authorityContext);
+      const authoritativeRetrying = (await discoverAuthoritativeRetryCollectionContexts(authorityContext))
         .map((source) => suppressConflictingProjectionTrackedPayload(source))
         .filter((source): source is ControlCompatibilitySourceContext => source !== null);
       const discoveredSources = discoveredCollections.all
         .map((source) => suppressConflictingProjectionTrackedPayload(source))
-        .map((source) => enrichProjectionSourceWithProviderRetryState(source, context.providerIntakeState))
+        .map((source) => enrichProjectionSourceWithProviderRetryState(source, authorityContext.providerIntakeState))
         .filter((source): source is ControlCompatibilitySourceContext => source !== null);
       const fallbackRetrying = discoveredCollections.retrying
         .concat(isSelectedManifestRetryFallbackCandidate(selectedManifest, selected) ? [selected] : [])
         .map((source) => suppressConflictingProjectionTrackedPayload(source))
-        .map((source) => enrichProjectionSourceWithProviderRetryState(source, context.providerIntakeState))
+        .map((source) => enrichProjectionSourceWithProviderRetryState(source, authorityContext.providerIntakeState))
         .filter((source): source is ControlCompatibilitySourceContext => source !== null);
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
       const tracked = resolveRuntimeTrackedPayload(selected, context.linearAdvisoryState);
-      const providerIntakeAuthority = readProviderIntakeAuthorityState(context);
       const providerIntake = buildProviderIntakeSummary(providerIntakeAuthority.state);
       const polling = readProviderPollingSnapshot(context);
       const providerWorkflow = context.providerWorkflowConfigStore
         ? await refreshProviderWorkflowStatusPayload(context.providerWorkflowConfigStore)
         : null;
       const running = [
-        ...(isAuthoritativeSelectedCurrentRunningSource(selected, context.providerIntakeState)
+        ...(isAuthoritativeSelectedCurrentRunningSource(selected, authorityContext.providerIntakeState)
           ? [selected]
           : []),
         ...discoveredSources.filter((source) =>
           source.rawStatus === 'in_progress' &&
-          isAuthoritativeCurrentRunningSource(source, context.providerIntakeState)
+          isAuthoritativeCurrentRunningSource(source, authorityContext.providerIntakeState)
         )
       ].filter((entry, index, collection) =>
         collection.findIndex((candidate) => candidate.runId === entry.runId) === index
       );
       const retryingSource =
-        (context.providerIntakeState?.claims.length ?? 0) > 0 ? authoritativeRetrying : fallbackRetrying;
+        (authorityContext.providerIntakeState?.claims.length ?? 0) > 0 ? authoritativeRetrying : fallbackRetrying;
       const retrying = retryingSource.filter(
         (entry, index, collection) =>
           collection.findIndex((candidate) => candidate.issueIdentifier === entry.issueIdentifier) === index
@@ -292,8 +312,6 @@ function createControlRuntimeSnapshot(
     // Cache the stable projection shape once, but re-derive polling-backed rate limits on every
     // read so current Linear budget data is reflected without invalidating the rest of the snapshot.
     compatibilityProjectionPromise ??= Promise.resolve(buildCompatibilityProjectionSnapshot(runtimeSnapshot));
-    const providerIntakeAuthority = readProviderIntakeAuthorityState(context);
-    const providerIntake = buildProviderIntakeSummary(providerIntakeAuthority.state);
     const polling = readProviderPollingSnapshot(context);
     const telemetrySources = buildCompatibilityTelemetrySources({
       selected: runtimeSnapshot.selected,
@@ -305,8 +323,8 @@ function createControlRuntimeSnapshot(
       ...(await compatibilityProjectionPromise),
       rateLimits,
       polling,
-      providerIntake,
-      providerIntakeUnavailable: providerIntakeAuthority.unavailable
+      providerIntake: runtimeSnapshot.providerIntake,
+      providerIntakeUnavailable: runtimeSnapshot.providerIntakeUnavailable
     };
   }
 
@@ -350,6 +368,39 @@ function createControlRuntimeSnapshot(
       await readSelectedRunSnapshot();
     }
   };
+}
+
+function buildProviderIntakeAuthorityContext(
+  context: ControlRuntimeContext,
+  authority: ProviderIntakeAuthoritySnapshot
+): ControlRuntimeContext {
+  return {
+    ...context,
+    providerIntakeState: authority.state ?? undefined
+  };
+}
+
+function buildProviderIntakeAuthorityFingerprint(
+  authority: ProviderIntakeAuthoritySnapshot
+): string {
+  if (authority.unavailable) {
+    return JSON.stringify({ unavailable: authority.unavailable });
+  }
+  if (!authority.state) {
+    return 'provider-intake:null';
+  }
+  const claims = [...(authority.state.claims ?? [])].sort((left, right) =>
+    `${left.provider_key}\u0000${left.task_id}\u0000${left.run_id ?? ''}`.localeCompare(
+      `${right.provider_key}\u0000${right.task_id}\u0000${right.run_id ?? ''}`
+    )
+  );
+  return JSON.stringify({
+    schema_version: authority.state.schema_version,
+    rehydrated_at: authority.state.rehydrated_at,
+    latest_provider_key: authority.state.latest_provider_key,
+    latest_reason: authority.state.latest_reason,
+    claims
+  });
 }
 
 function readProviderIntakeAuthorityState(
