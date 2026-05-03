@@ -15,11 +15,75 @@ const doctor: DoctorResult = {
     config: { status: 'ok', path: '/tmp/config' },
     enablement: []
   },
+  checkout_posture: {
+    status: 'current',
+    repo_root: '/tmp/repo',
+    inside_git_worktree: true,
+    base_ref: 'origin/main',
+    ahead: 0,
+    behind: 0,
+    dirty: { status: 'clean', changed_paths: 0, detail: 'fixture' },
+    head: null,
+    upstream: null,
+    stale_docs_may_be: false,
+    posture_reference: {
+      status: 'unavailable',
+      commit: null,
+      issue_ids: [],
+      policy_lines: [],
+      paths: [],
+      detail: 'fixture'
+    },
+    guidance: [],
+    detail: 'fixture'
+  },
+  source_root_freshness: {
+    schema_version: 1,
+    status: 'current',
+    observed_at: '2026-05-03T00:00:00.000Z',
+    intended_repo_root: '/tmp/repo',
+    intended_repo_root_realpath: '/tmp/repo',
+    command_path: null,
+    command_path_realpath: null,
+    package_root: null,
+    package_root_realpath: null,
+    source_root: null,
+    source_root_realpath: null,
+    entrypoint_kind: 'unknown',
+    base_ref: 'origin/main',
+    source_checkout: null,
+    intended_checkout: null,
+    drift_classes: [],
+    provenance: {
+      command_path_source: 'unresolved',
+      package_root_source: 'unresolved',
+      source_root_source: 'unresolved',
+      command_path_inside_package: null,
+      package_root_matches_intended: null,
+      source_root_matches_intended: null,
+      source_entry_exists: null,
+      dist_entry_exists: null
+    },
+    guidance: [],
+    detail: 'fixture'
+  },
   codex_cli: {
-    active: { command: 'codex', managed_opt_in: false },
+    active: {
+      command: 'codex',
+      path: '/tmp/codex',
+      version: 'codex-cli fixture',
+      status: 'ok',
+      managed_opt_in: false
+    },
+    app_bundle: {
+      path: '/Applications/Codex.app/Contents/Resources/codex',
+      version: null,
+      status: 'absent'
+    },
+    version_drift: { status: 'not_applicable', message: null },
     managed: {
       status: 'missing',
-      config: { path: '/tmp/config.toml' },
+      config: { status: 'missing', path: '/tmp/config.toml' },
       binary: { status: 'missing', path: '/tmp/codex' },
       install: undefined
     }
@@ -29,6 +93,7 @@ const doctor: DoctorResult = {
     config: { path: '/tmp/config.toml', status: 'ok' },
     checks: {
       model: { status: 'ok', expected: 'gpt-5.3-codex', actual: 'gpt-5.3-codex' },
+      review_model: { status: 'ok', expected: 'gpt-5.3-codex', actual: 'gpt-5.3-codex' },
       model_reasoning_effort: { status: 'ok', expected_minimum: 'high', actual: 'xhigh' },
       max_threads: { status: 'ok', expected_minimum: 12, actual: 12 },
       max_depth: { status: 'ok', expected_minimum: 4, actual: 4 }
@@ -36,8 +101,74 @@ const doctor: DoctorResult = {
     guidance: []
   },
   collab: { status: 'ok', enabled: true, feature_key: 'multi_agent', enablement: [] },
-  cloud: { status: 'ok', env_id_configured: true, branch: null, fallback_policy: 'auto', enablement: [] },
-  delegation: { status: 'ok', config: { status: 'ok', path: '/tmp/config.toml' }, enablement: [] }
+  cloud: {
+    status: 'ok',
+    env_id_configured: true,
+    branch: null,
+    fallback_policy: 'auto',
+    fallback_policy_source: 'default',
+    fallback_policy_raw: null,
+    fallback_policy_error: null,
+    enablement: []
+  },
+  delegation: {
+    status: 'ok',
+    config: { status: 'ok', path: '/tmp/config.toml' },
+    transport: { status: 'safe', kind: 'direct-dist', command_line: 'node /tmp/dist.js', detail: 'fixture' },
+    startup: { status: 'ok', latency_ms: 1, threshold_ms: 1000, detail: 'fixture' },
+    processes: {
+      status: 'ok',
+      active_count: 0,
+      stale_count: 0,
+      active_pids: [],
+      stale_pids: [],
+      stale_rss_mb: 0,
+      threshold_minutes: 30,
+      detail: 'fixture',
+      details: []
+    },
+    enablement: []
+  },
+  providers: {
+    status: 'ok',
+    repo_examples: {
+      status: 'ok',
+      root: '/tmp/repo/.codex/providers',
+      paths: {
+        readme: '/tmp/repo/.codex/providers/README.md',
+        env_example: '/tmp/repo/.codex/providers/provider.env.example',
+        control_example: '/tmp/repo/.codex/providers/control.example.json'
+      },
+      missing: []
+    },
+    control_policy: {
+      status: 'ok',
+      path: '/tmp/repo/.codex/providers/control.example.json',
+      dispatch_pilot_enabled: true,
+      dispatch_pilot_provider: 'linear',
+      dispatch_pilot_source_setup: { workspace_id: 'workspace', team_id: 'team', project_id: 'project' },
+      transport_mutating_enabled: true,
+      telegram_transport_allowed: true
+    },
+    linear: {
+      status: 'ready',
+      credentials_present: true,
+      binding_present: true,
+      webhook_secret_present: true,
+      dispatch_pilot_enabled: true,
+      dispatch_pilot_provider: 'linear'
+    },
+    telegram: {
+      status: 'ready',
+      polling_enabled: true,
+      bot_token_present: true,
+      allowed_chat_ids: 1,
+      mutations_enabled: true,
+      push_enabled: true,
+      telegram_transport_allowed: true
+    },
+    guidance: []
+  }
 };
 
 describe('repro', () => {

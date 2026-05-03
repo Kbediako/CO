@@ -371,8 +371,8 @@ describe('runProviderLinearChildLaneShell', () => {
       parent_snapshot: {
         base_sha: 'parent-base-sha',
         issue_updated_at: '2026-03-30T07:10:00.000Z',
-        issue_state: 'In Progress',
-        issue_state_type: 'started',
+        issue_state: null,
+        issue_state_type: null,
         captured_at: '2026-03-30T07:11:00.000Z'
       },
       lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'impl-a-child-run-1'),
@@ -431,13 +431,9 @@ describe('runProviderLinearChildLaneShell', () => {
       {
         execRunner,
         now: () => '2026-03-30T07:11:30.000Z',
-        readTrackedIssue: vi.fn(async () => ({
-          id: ISSUE.issue_id,
-          identifier: ISSUE.issue_identifier,
-          updated_at: '2026-03-30T07:10:00.000Z',
-          state: 'In Progress',
-          state_type: 'started'
-        })) as never,
+        readTrackedIssue: vi.fn(async () => {
+          throw new Error('linear unavailable');
+        }) as never,
         readParentDirtyPaths: vi.fn(async () => []) as never,
         readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
         refreshProofSnapshot
@@ -494,6 +490,62 @@ describe('runProviderLinearChildLaneShell', () => {
         })
       })
     ]);
+  });
+
+  it('fails launch when live issue lookup errors and manifest issue_updated_at is absent', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>;
+    delete manifest.issue_updated_at;
+    await writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
+    const auditPath = join(tempRoot ?? '', 'provider-linear-audit.jsonl');
+    await appendProviderLinearAuditEntry(auditPath, {
+      recorded_at: '2026-03-30T07:11:30.000Z',
+      operation: 'parallelization',
+      ok: true,
+      issue_id: ISSUE.issue_id,
+      issue_identifier: ISSUE.issue_identifier,
+      source_setup: null,
+      action: 'parallelize_now',
+      via: 'Launch impl-a.',
+      state: 'independent_scope_available',
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
+      comment_id: null,
+      attachment_id: null,
+      decision_lineage: buildDecisionLineage(RUN_ID),
+      error_code: null,
+      error_message: null
+    });
+    const execRunner = vi.fn();
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'impl-a',
+        purpose: 'Implement bounded child lane support',
+        files: ['orchestrator/src/cli/providerLinearChildLaneShell.ts'],
+        env: buildProviderWorkerEnv(manifestPath, { [PROVIDER_LINEAR_AUDIT_ENV_VAR]: auditPath })
+      },
+      {
+        execRunner,
+        now: () => '2026-03-30T07:11:30.000Z',
+        readTrackedIssue: vi.fn(async () => {
+          throw new Error('linear unavailable');
+        }) as never,
+        readParentDirtyPaths: vi.fn(async () => []) as never
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'provider_worker_child_lane_current_issue_unavailable',
+        message: expect.stringContaining('parent run manifest issue_updated_at is absent')
+      }
+    });
+    expect(execRunner).not.toHaveBeenCalled();
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([]);
   });
 
   it('preserves child stdout guardrail truth when manifest parsing fails', async () => {
@@ -3780,6 +3832,375 @@ describe('runProviderLinearChildLaneShell', () => {
     ]);
   });
 
+  it('leaves accept retryable when live issue truth is unavailable instead of using the run manifest timestamp', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord();
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => null) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_current_issue_unavailable',
+        message: expect.stringContaining('Refusing to compare against parent run manifest issue_updated_at'),
+        status: 409
+      }
+    });
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: childLane.stream,
+        decision: 'pending',
+        in_flight_action: null,
+        accept_current_issue_snapshot: {
+          source: 'unavailable',
+          issue_updated_at: null,
+          issue_state: null,
+          issue_state_type: null,
+          captured_at: expect.any(String),
+          unavailable_reason: 'live Linear issue lookup returned no issue'
+        }
+      })
+    ]);
+  });
+
+  it('records accept snapshot evidence when a later accept validation releases the claim', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord({
+      patch_artifact_path: null
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    const refreshProofSnapshot = vi.fn(async () => undefined);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot
+      }
+    );
+
+    const acceptSnapshot = expect.objectContaining({
+      source: 'live_linear',
+      issue_updated_at: childLane.parent_snapshot.issue_updated_at,
+      unavailable_reason: null
+    });
+    expect(result.error.code).toBe('provider_worker_child_lane_patch_missing');
+    expect(result.child_lane).toEqual(expect.objectContaining({ accept_current_issue_snapshot: acceptSnapshot }));
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: childLane.stream,
+        decision: 'pending',
+        in_flight_action: null,
+        accept_current_issue_snapshot: acceptSnapshot
+      })
+    ]);
+    expect(refreshProofSnapshot).toHaveBeenCalledWith(runDir, null, expect.any(Object));
+  });
+
+  it.each([
+    {
+      label: 'CO-486 docs-packet-rebase-r2',
+      childSnapshot: '2026-05-02T19:45:40.664Z',
+      staleManifestSnapshot: '2026-05-02T17:48:50.190Z'
+    },
+    {
+      label: 'CO-493 docs-packet-r2',
+      childSnapshot: '2026-05-02T17:52:25.720Z',
+      staleManifestSnapshot: '2026-05-02T17:49:35.144Z'
+    }
+  ])(
+    'leaves accept retryable for the $label backward issue_updated_at inversion',
+    async ({ childSnapshot, staleManifestSnapshot }) => {
+      const { manifestPath, runDir } = await createProviderWorkerManifest();
+      const childLane = createLaneRecord({
+        parent_snapshot: {
+          base_sha: 'parent-base-sha',
+          issue_updated_at: childSnapshot,
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          captured_at: childSnapshot
+        }
+      });
+      await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+
+      const result = await runProviderLinearChildLaneShell(
+        {
+          action: 'accept',
+          streamName: childLane.stream,
+          env: buildProviderWorkerEnv(manifestPath)
+        },
+        {
+          readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+          readTrackedIssue: vi.fn(async () => ({
+            id: ISSUE.issue_id,
+            identifier: ISSUE.issue_identifier,
+            updated_at: staleManifestSnapshot,
+            state: childLane.parent_snapshot.issue_state,
+            state_type: childLane.parent_snapshot.issue_state_type
+          })) as never,
+          refreshProofSnapshot: vi.fn(async () => undefined)
+        }
+      );
+
+      expect(result).toMatchObject({
+        ok: false,
+        operation: 'child-lane',
+        action: 'accept',
+        error: {
+          code: 'provider_worker_child_lane_current_issue_regressed',
+          message: expect.stringContaining('Backwards timestamp inversion is not legitimate Linear freshness movement'),
+          status: 409
+        }
+      });
+      expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+        expect.objectContaining({
+          stream: childLane.stream,
+          decision: 'pending',
+          in_flight_action: null,
+          accept_current_issue_snapshot: {
+            source: 'live_linear',
+            issue_updated_at: staleManifestSnapshot,
+            issue_state: childLane.parent_snapshot.issue_state,
+            issue_state_type: childLane.parent_snapshot.issue_state_type,
+            captured_at: expect.any(String),
+            unavailable_reason: null
+          }
+        })
+      ]);
+    }
+  );
+
+  it('still invalidates accept when backward issue_updated_at comes with issue state drift', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord({
+      parent_snapshot: {
+        base_sha: 'parent-base-sha',
+        issue_updated_at: '2026-05-02T19:45:40.664Z',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        captured_at: '2026-05-02T19:45:40.664Z'
+      }
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-05-02T17:48:50.190Z',
+          state: 'In Review',
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_stale',
+        message: expect.stringContaining('issue state changed from In Progress to In Review'),
+        status: 409
+      }
+    });
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: childLane.stream,
+        decision: 'invalidated',
+        accept_current_issue_snapshot: {
+          source: 'live_linear',
+          issue_updated_at: '2026-05-02T17:48:50.190Z',
+          issue_state: 'In Review',
+          issue_state_type: childLane.parent_snapshot.issue_state_type,
+          captured_at: expect.any(String),
+          unavailable_reason: null
+        }
+      })
+    ]);
+  });
+
+  it('still invalidates accept when backward issue_updated_at comes with issue state type drift', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord({
+      parent_snapshot: {
+        base_sha: 'parent-base-sha',
+        issue_updated_at: '2026-05-02T19:45:40.664Z',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        captured_at: '2026-05-02T19:45:40.664Z'
+      }
+    });
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-05-02T17:48:50.190Z',
+          state: childLane.parent_snapshot.issue_state,
+          state_type: 'completed'
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_stale',
+        message: expect.stringContaining('issue state type changed from started to completed'),
+        status: 409
+      }
+    });
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: childLane.stream,
+        decision: 'invalidated',
+        accept_current_issue_snapshot: {
+          source: 'live_linear',
+          issue_updated_at: '2026-05-02T17:48:50.190Z',
+          issue_state: childLane.parent_snapshot.issue_state,
+          issue_state_type: 'completed',
+          captured_at: expect.any(String),
+          unavailable_reason: null
+        }
+      })
+    ]);
+  });
+
+  it('still invalidates accept when live Linear issue_updated_at moves forward', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord();
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: '2026-03-30T07:10:30.000Z',
+          state: childLane.parent_snapshot.issue_state,
+          state_type: childLane.parent_snapshot.issue_state_type
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_stale',
+        status: 409
+      }
+    });
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: childLane.stream,
+        decision: 'invalidated',
+        accept_current_issue_snapshot: expect.objectContaining({
+          source: 'live_linear',
+          issue_updated_at: '2026-03-30T07:10:30.000Z'
+        })
+      })
+    ]);
+  });
+
+  it('still invalidates accept when live Linear issue state changes', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const childLane = createLaneRecord();
+    await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'accept',
+        streamName: childLane.stream,
+        env: buildProviderWorkerEnv(manifestPath)
+      },
+      {
+        readParentHeadSha: vi.fn(async () => childLane.parent_snapshot.base_sha),
+        readTrackedIssue: vi.fn(async () => ({
+          id: ISSUE.issue_id,
+          identifier: ISSUE.issue_identifier,
+          updated_at: childLane.parent_snapshot.issue_updated_at,
+          state: 'In Review',
+          state_type: 'started'
+        })) as never,
+        refreshProofSnapshot: vi.fn(async () => undefined)
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'child-lane',
+      action: 'accept',
+      error: {
+        code: 'provider_worker_child_lane_stale',
+        status: 409
+      }
+    });
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
+      expect.objectContaining({
+        stream: childLane.stream,
+        decision: 'invalidated',
+        accept_current_issue_snapshot: expect.objectContaining({
+          source: 'live_linear',
+          issue_state: 'In Review'
+        })
+      })
+    ]);
+  });
+
   it('releases the accept claim when parent snapshot reads fail before stale checks', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childLane = createLaneRecord();
@@ -3913,6 +4334,11 @@ describe('runProviderLinearChildLaneShell', () => {
         stream: childLane.stream,
         decision: 'accepted',
         decision_reason: 'Parent integrated the bounded lane patch.',
+        accept_current_issue_snapshot: expect.objectContaining({
+          source: 'live_linear',
+          issue_updated_at: childLane.parent_snapshot.issue_updated_at,
+          unavailable_reason: null
+        }),
         in_flight_action: null
       })
     ]);

@@ -13,8 +13,12 @@ import {
 } from './utils/devtools.js';
 import {
   isManagedCodexCliEnabled,
+  inspectCodexCliBinaryProvenance,
   resolveCodexCliBin,
   resolveCodexCliReadiness,
+  type CodexAppBundleBinaryProbe,
+  type CodexCliBinaryProbe,
+  type CodexCliVersionDrift,
   type CodexCliReadiness
 } from './utils/codexCli.js';
 import {
@@ -169,8 +173,14 @@ export interface DoctorResult {
   codex_cli: {
     active: {
       command: string;
+      path: CodexCliBinaryProbe['path'];
+      version: CodexCliBinaryProbe['version'];
+      status: CodexCliBinaryProbe['status'];
+      error?: string;
       managed_opt_in: boolean;
     };
+    app_bundle: CodexAppBundleBinaryProbe;
+    version_drift: CodexCliVersionDrift;
     managed: CodexCliReadiness;
   };
   codex_defaults: DoctorCodexDefaultsAdvisory;
@@ -331,7 +341,10 @@ export interface DoctorSandboxSecurityAdvisory {
   };
 }
 
-export function runDoctor(cwd: string = process.cwd()): DoctorResult {
+export function runDoctor(
+  cwd: string = process.cwd(),
+  options: { codexAppBundlePath?: string } = {}
+): DoctorResult {
   const dependencies: DoctorDependencyStatus[] = OPTIONAL_DEPENDENCIES.map((entry) => {
     const resolved = resolveOptionalDependency(entry.name, cwd);
     if (resolved.path) {
@@ -394,6 +407,12 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
   const codexBin = resolveCodexCliBin(process.env);
   const managedOptIn = isManagedCodexCliEnabled(process.env);
   const managedCodex = resolveCodexCliReadiness(process.env);
+  const codexCliProvenance = inspectCodexCliBinaryProvenance({
+    command: codexBin,
+    env: process.env,
+    cwd: process.cwd(),
+    appBundlePath: options.codexAppBundlePath
+  });
   const featureProbe = readCodexFeatureProbe(codexBin, process.env);
   const features = featureProbe.flags;
   const codexDefaults = inspectCodexDefaultsAdvisory(process.env, codexBin, featureProbe);
@@ -476,7 +495,9 @@ export function runDoctor(cwd: string = process.cwd()): DoctorResult {
     dependencies,
     devtools,
     codex_cli: {
-      active: { command: codexBin, managed_opt_in: managedOptIn },
+      active: { ...codexCliProvenance.active, managed_opt_in: managedOptIn },
+      app_bundle: codexCliProvenance.app_bundle,
+      version_drift: codexCliProvenance.version_drift,
       managed: managedCodex
     },
     codex_defaults: codexDefaults,
@@ -861,6 +882,23 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
   }
 
   lines.push(`Codex CLI: ${result.codex_cli.active.command}`);
+  lines.push(`  - active path: ${result.codex_cli.active.path ?? '<unresolved>'}`);
+  lines.push(`  - active version: ${result.codex_cli.active.version ?? '<unavailable>'}`);
+  if (result.codex_cli.active.error) {
+    lines.push(`    active probe: ${result.codex_cli.active.error}`);
+  }
+  if (result.codex_cli.app_bundle.status !== 'absent') {
+    lines.push(`  - app bundle: ${result.codex_cli.app_bundle.status} (${result.codex_cli.app_bundle.path})`);
+    lines.push(`    version: ${result.codex_cli.app_bundle.version ?? '<unavailable>'}`);
+    if (result.codex_cli.app_bundle.error) {
+      lines.push(`    app bundle probe: ${result.codex_cli.app_bundle.error}`);
+    }
+  }
+  if (result.codex_cli.version_drift.status === 'advisory' && result.codex_cli.version_drift.message) {
+    lines.push(`  - binary provenance drift: advisory - ${result.codex_cli.version_drift.message}`);
+  } else if (result.codex_cli.version_drift.status === 'unknown' && result.codex_cli.version_drift.message) {
+    lines.push(`  - binary provenance drift: unknown - ${result.codex_cli.version_drift.message}`);
+  }
   lines.push(
     `  - managed opt-in: ${result.codex_cli.active.managed_opt_in ? 'enabled' : 'disabled'} (set CODEX_CLI_USE_MANAGED=1)`
   );
