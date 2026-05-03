@@ -6,7 +6,7 @@
 - Assumptions:
   - `review/telemetry.json` is authoritative only when it is present, parseable, successful, and not contradicted by wrapper errors.
   - The raw review output log remains visible.
-  - CO-442 is independent from the `CO-441` owner re-home lane.
+  - CO-442 is independent of the `CO-441` owner re-home lane.
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward:
