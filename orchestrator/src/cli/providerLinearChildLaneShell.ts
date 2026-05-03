@@ -1040,8 +1040,17 @@ async function resolveChildLaneDecision(
     throw error;
   }
   const acceptCurrentIssueSnapshot = buildAcceptCurrentIssueSnapshot(currentIssue);
-  const releaseAcceptClaimWithSnapshot = async (): Promise<ProviderLinearWorkerChildLaneRecord | null> =>
-    await releaseClaimedChildLaneAcceptance(context.runDir, target, deps, acceptCurrentIssueSnapshot);
+  const releaseAcceptClaimWithSnapshot = async (): Promise<ProviderLinearWorkerChildLaneRecord | null> => {
+    const released = await releaseClaimedChildLaneAcceptance(context.runDir, target, deps, acceptCurrentIssueSnapshot);
+    await refreshProviderLinearChildLaneProofSnapshotBestEffort({
+      deps,
+      runDir: context.runDir,
+      auditPath: params.env[PROVIDER_LINEAR_AUDIT_ENV_VAR] ?? null,
+      env: params.env,
+      warningContext: `after releasing retryable child lane ${stream}`
+    });
+    return released;
+  };
   const headStaleReason = resolveChildLaneHeadStaleReason(target, currentHeadSha);
   if (headStaleReason) {
     const invalidated = await finalizeClaimedChildLaneDecision({

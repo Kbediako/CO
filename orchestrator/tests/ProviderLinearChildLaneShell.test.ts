@@ -3883,6 +3883,7 @@ describe('runProviderLinearChildLaneShell', () => {
       patch_artifact_path: null
     });
     await appendProviderLinearWorkerChildLaneRecord(runDir, childLane);
+    const refreshProofSnapshot = vi.fn(async () => undefined);
 
     const result = await runProviderLinearChildLaneShell(
       {
@@ -3899,7 +3900,7 @@ describe('runProviderLinearChildLaneShell', () => {
           state: childLane.parent_snapshot.issue_state,
           state_type: childLane.parent_snapshot.issue_state_type
         })) as never,
-        refreshProofSnapshot: vi.fn(async () => undefined)
+        refreshProofSnapshot
       }
     );
 
@@ -3918,6 +3919,7 @@ describe('runProviderLinearChildLaneShell', () => {
         accept_current_issue_snapshot: acceptSnapshot
       })
     ]);
+    expect(refreshProofSnapshot).toHaveBeenCalledWith(runDir, null, expect.any(Object));
   });
 
   it.each([
