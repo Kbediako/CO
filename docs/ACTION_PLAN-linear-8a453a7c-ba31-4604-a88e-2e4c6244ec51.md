@@ -1,11 +1,11 @@
 # ACTION_PLAN - CO-442 classify Codex rollout-item thread-not-found review log noise
 
 ## Summary
-- Goal: create the CO-442 docs-first packet and traceability mirrors so the review-log classification work can leave Backlog with its guardrails intact.
-- Scope: packet docs, task mirrors, `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json`.
+- Goal: create the CO-442 docs-first packet and implement the narrow review-log classification so successful review telemetry is not overridden by Codex rollout-item cleanup noise.
+- Scope: packet docs, task mirrors, `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`, command-runner status annotation, and focused review telemetry regression coverage.
 - Assumptions:
   - `review/telemetry.json` is authoritative only when it is present, parseable, successful, and not contradicted by wrapper errors.
-  - The raw review output log remains visible.
+  - The raw review output log remains visible, and only emitted Codex session output-log lines with a log-level or timestamp prefix qualify for benign classification.
   - CO-442 is independent of the `CO-441` owner re-home lane.
 
 ## Issue Readiness Gate
@@ -43,7 +43,8 @@
 6. Record that the packet clears `backlog_head_follow_up_traceability_pending`.
 7. Run scoped packet validation: JSON parse, path scan, protected-term scan, docs checks where feasible.
 8. Re-check control-host queue state and keep provider intake under the active issue cap.
-9. Parent implementation follow-up adds fixture/parser coverage and status/workpad/handoff classification changes.
+9. Parent implementation adds command-runner status classification for the prefixed output-log noise, then accepts or rejects the tests-only child-lane fixture patch.
+10. Parent implementation preserves the explanatory noise note through provider-worker and selected-run terminal proof summaries, including failed terminal proof projections.
 
 ## Dependencies
 - Linear issue `CO-442` / `8a453a7c-ba31-4604-a88e-2e4c6244ec51`.
@@ -63,9 +64,17 @@
   - `npm run docs:check`
   - `npm run docs:freshness`
   - unresolved actionable review threads = 0 before merge, or an explicit waiver is recorded in the task checklist with owner, expiry, reason, and evidence
-  - focused parser/status tests after implementation begins
+  - focused parser/status tests for successful telemetry plus prefixed noisy output log, selected-run projection preservation, and missing/failed telemetry remaining blocking
+  - focused parser/status test for bare quoted, diff-shaped, or reviewer-output protected text remaining unclassified unless it appears as an actual prefixed output-log line
+  - `npx vitest run --config vitest.config.core.ts orchestrator/tests/CommandRunnerReviewEvidenceConsistency.test.ts orchestrator/tests/SelectedRunProjection.test.ts tests/review-execution-telemetry.spec.ts tests/run-review.spec.ts`
+  - `npm run build`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run repo:stewardship`
+  - `node scripts/diff-budget.mjs`
+  - `npm run pack:smoke`
 - Rollback plan:
-  - revert only the CO-442 packet files, task index item, task snapshot, and registry rows if the packet is rejected.
+  - revert only the CO-442 packet files, task index item, task snapshot, registry rows, command-runner annotation, and focused regression coverage if the packet or implementation is rejected.
 
 ## Risks & Mitigations
 - Risk: the line is treated as always benign.

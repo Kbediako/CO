@@ -15,6 +15,18 @@
           "date": "2026-05-03",
           "status": "produced",
           "summary": "Created the CO-442 docs-first packet and registry mirrors to clear backlog_head_follow_up_traceability_pending while preserving the codex_core::session failed-to-record-rollout-items thread-not-found log shape, review/telemetry.json authority, raw log visibility, and CO-441 non-goal boundary."
+        },
+        "implementation_recovery": {
+          "reviewer": "CO-442 implementation recovery branch",
+          "date": "2026-05-03",
+          "status": "in_progress",
+          "summary": "Recovery branch carries the provider-worker implementation that PR #760 did not include: prefixed emitted-log classification requires status=succeeded, matching clean/bounded review_outcome, and error=null; quoted/diff-shaped protected text stays unclassified; provider-worker and selected-run terminal proof summaries preserve the explanatory note."
+        },
+        "final_review_quota_blocker": {
+          "reviewer": "CO-442 implementation recovery branch",
+          "date": "2026-05-03",
+          "status": "blocked",
+          "summary": "Forced appserver standalone review launched on gpt-5.5/xhigh but Codex hit the account usage limit before findings; final review must be rerun before handoff or merge unless an explicit quota waiver is recorded."
         }
       },
       "paths": {

@@ -14,7 +14,7 @@ This mirror points to the canonical task spec at `tasks/specs/linear-8a453a7c-ba
 
 ## Implementation Summary
 - Create the CO-442 packet and registry mirrors for the recurring `codex_core::session` review log line.
-- Preserve the exact log shape: `failed to record rollout items` plus `thread not found`.
+- Preserve the exact emitted log shape: `failed to record rollout items` plus `thread not found` on a log-level or timestamp-prefixed Codex session output line.
 - Preserve `review/telemetry.json` as authoritative when `status=succeeded`, `review_outcome=clean-success` or `review_outcome=bounded-success`, and `error=null`.
 - Clear `backlog_head_follow_up_traceability_pending` through packet and mirror registration before active implementation begins.
 - Define the blocking boundary: telemetry missing, unreadable, failed, contradictory, or wrapper-error outcomes remain blocking.
@@ -24,6 +24,7 @@ This mirror points to the canonical task spec at `tasks/specs/linear-8a453a7c-ba
 ## Implementation Boundaries
 - Packet setup edits only the CO-442 packet files, task index, task snapshot, and docs-freshness registry rows.
 - Parent implementation may add parser/fixture/status projection coverage for review-log classification.
+- The active implementation seam is `orchestrator/src/cli/services/commandRunner.ts`, where command-stage summaries can annotate the noisy output-log line after successful telemetry is verified and the protected text appears as an actual Codex session log line with a log-level or timestamp prefix, not quoted review or diff text.
 - No `CO-441` owner metadata edits.
 - No raw log deletion, suppression, or redaction.
 - No standalone review or review-wrapper weakening.
@@ -36,7 +37,10 @@ This mirror points to the canonical task spec at `tasks/specs/linear-8a453a7c-ba
   - `docs/docs-freshness-registry.json` parses and contains six rows for the CO-442 packet/mirror docs
   - protected terms appear across packet and mirror surfaces
 - Implementation validation must show:
-  - fixture or parser coverage for the log shape
-  - successful telemetry keeps the review outcome non-blocking despite the log line
+  - fixture or parser coverage for the prefixed log shape
+  - successful telemetry keeps the review outcome non-blocking despite an actual output-log line
   - missing or failed telemetry remains blocking
+  - bare quoted, diff-shaped, or reviewer-output text containing the protected line does not create a benign-noise note
   - status, workpad, and handoff text do not flatten the case into a generic failed review
+  - provider-worker and selected-run terminal proof summaries preserve the explanatory note, including failed terminal proof projections
+  - raw `review/output.log` remains available; the classifier only adds an explanatory status note
