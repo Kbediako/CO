@@ -41,6 +41,7 @@ import {
   deriveDeterministicProviderMutationSuppressions,
   formatDeterministicProviderMutationDegradationSummary,
   isProviderLinearWorkerProofFreshForStage,
+  REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_NOISE_SUMMARY,
   resolveProviderLinearWorkerAttemptStartedAt,
   resolveProviderLinearWorkerTerminalReason,
   resolveProviderLinearWorkerTerminalStatus
@@ -55,6 +56,8 @@ const REVIEW_EVIDENCE_CONSISTENCY_ENV_KEY = 'CODEX_REVIEW_ENFORCE_EVIDENCE_CONSI
 const REVIEW_EVIDENCE_WAIVER_REASON_ENV_KEY = 'CODEX_REVIEW_EVIDENCE_WAIVER_REASON';
 const REVIEW_TELEMETRY_POLL_INTERVAL_MS = 50;
 const REVIEW_TELEMETRY_WAIT_TIMEOUT_MS = 2_000;
+const REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_LINE_PATTERN =
+  /^(?:(?:trace|debug|info|warn|error)\s+|\d{4}-\d{2}-\d{2}T[^\r\n]*?\s+(?:trace|debug|info|warn|error)\s+)codex_core::session:\s+failed to record rollout items:\s+thread\b[^\r\n]*\bnot found\b/iu;
 const REVIEW_OUTCOME_BOUNDARY_PRESENCE_SENTINEL = {
   kind: 'timeout',
   provenance: 'review-timeout',
@@ -101,6 +104,7 @@ interface ReviewTelemetryEvidencePayload {
   output_log_path?: unknown;
   status?: unknown;
   review_outcome?: unknown;
+  error?: unknown;
   termination_boundary?: unknown;
 }
 
@@ -418,6 +422,7 @@ export async function runCommandStage(
     let providerLinearWorkerTerminalStatus: string | null = null;
     let providerLinearWorkerTerminalReason: string | null = null;
     let providerLinearWorkerReviewOutcomeSummary: string | null = null;
+    let reviewOutputLogNoiseSummary: string | null = null;
 
     if (reviewEvidenceMismatch && enforceReviewEvidenceConsistency) {
       if (reviewEvidenceWaiverReason) {
@@ -451,6 +456,13 @@ export async function runCommandStage(
       if (reviewOutcomeSummary) {
         effectiveSummary = `${effectiveSummary} (${reviewOutcomeSummary})`;
       }
+      reviewOutputLogNoiseSummary = await formatReviewOutputLogNoiseSummary({
+        paths,
+        telemetry: providerLinearWorkerStage ? providerReviewTelemetry : reviewTelemetry
+      });
+      if (reviewOutputLogNoiseSummary) {
+        effectiveSummary = `${effectiveSummary} (${reviewOutputLogNoiseSummary})`;
+      }
     }
     if (providerLinearWorkerStage) {
       let providerLinearWorkerProof = await loadProviderLinearWorkerProof(
@@ -470,7 +482,8 @@ export async function runCommandStage(
         providerLinearWorkerFailureReason = 'provider_linear_worker_proof_missing_or_unreadable';
         effectiveSummary = buildProviderLinearWorkerTerminalSummary({
           status: 'failed',
-          endReason: 'provider_linear_worker_proof_missing_or_unreadable'
+          endReason: 'provider_linear_worker_proof_missing_or_unreadable',
+          reviewOutputLogNoiseSummary
         });
         forceProviderLinearWorkerFailure = true;
       }
@@ -498,6 +511,7 @@ export async function runCommandStage(
           status: 'failed',
           endReason: proofTerminalReason,
           reviewOutcomeSummary,
+          reviewOutputLogNoiseSummary,
           degradationSummary
         });
         forceProviderLinearWorkerFailure = true;
@@ -507,6 +521,7 @@ export async function runCommandStage(
           status: 'failed',
           endReason: null,
           reviewOutcomeSummary: reviewOutcomeSummary ?? 'review telemetry reported terminal failure',
+          reviewOutputLogNoiseSummary,
           degradationSummary
         });
         forceProviderLinearWorkerFailure = true;
@@ -515,6 +530,7 @@ export async function runCommandStage(
           status: 'succeeded',
           endReason: proofTerminalReason,
           reviewOutcomeSummary,
+          reviewOutputLogNoiseSummary,
           degradationSummary
         });
       } else if (degradationSummary) {
@@ -1031,6 +1047,10 @@ function coerceTelemetryStatusValue(value: unknown): 'succeeded' | 'failed' | nu
   return null;
 }
 
+function hasNullTelemetryError(telemetry: ReviewTelemetryEvidencePayload | null): boolean {
+  return telemetry?.error === null;
+}
+
 function coerceReviewOutcomeDisposition(value: unknown): ReviewOutcomeDisposition | null {
   switch (value) {
     case 'clean-success':
@@ -1104,6 +1124,37 @@ function formatReviewTelemetryOutcomeSummary(
     case 'failed-other':
       return 'review outcome: review command failed without termination-boundary classification; not an explicit wrapper-boundary failure';
   }
+}
+
+async function formatReviewOutputLogNoiseSummary(options: {
+  paths: RunPaths;
+  telemetry: ReviewTelemetryEvidencePayload | null;
+}): Promise<string | null> {
+  const explicitDisposition = coerceReviewOutcomeDisposition(options.telemetry?.review_outcome);
+  if (explicitDisposition !== 'clean-success' && explicitDisposition !== 'bounded-success') {
+    return null;
+  }
+  const disposition = resolveReviewTelemetryOutcomeDisposition(options.telemetry);
+  if (disposition !== explicitDisposition) {
+    return null;
+  }
+  if (!hasNullTelemetryError(options.telemetry)) {
+    return null;
+  }
+
+  try {
+    const outputLog = await readFile(join(options.paths.runDir, 'review', 'output.log'), 'utf8');
+    const observedCleanupNoise = outputLog
+      .split(/\r?\n/u)
+      .some((line) => REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_LINE_PATTERN.test(line));
+    if (!observedCleanupNoise) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+
+  return REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_NOISE_SUMMARY;
 }
 
 function delay(ms: number): Promise<void> {

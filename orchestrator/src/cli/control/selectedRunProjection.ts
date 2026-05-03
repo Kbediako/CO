@@ -50,6 +50,7 @@ import {
   formatDeterministicProviderMutationDegradationSummary,
   isAuxiliaryProviderProofHarnessManifest,
   isProviderLinearWorkerProofFreshForStage,
+  REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_NOISE_SUMMARY,
   resolveProviderLinearWorkerAttemptStartedAt,
   resolveProviderLinearWorkerTerminalReason,
   resolveProviderLinearWorkerTerminalStatus,
@@ -870,11 +871,16 @@ function buildProjectionContextFromParts(
   const proofAttemptStartedAt = useScopedTerminalProof
     ? resolveProviderLinearWorkerAttemptStartedAt(providerProofRecord)
     : null;
+  const proofReviewOutputLogNoiseSummary =
+    useScopedTerminalProof && proofTerminalStatus !== null
+      ? resolveProviderLinearWorkerReviewOutputLogNoiseSummary(manifestRecord)
+      : null;
   const proofSummary =
     useScopedTerminalProof && proofTerminalStatus
       ? buildProviderLinearWorkerTerminalSummary({
           status: proofTerminalStatus,
           endReason: resolveProviderLinearWorkerTerminalReason(providerProofRecord),
+          reviewOutputLogNoiseSummary: proofReviewOutputLogNoiseSummary,
           degradationSummary:
             proofAttemptStartedAt === null
               ? null
@@ -1518,6 +1524,31 @@ function manifestHasFailedCommands(manifestRecord: Record<string, unknown>): boo
     }
     return readStringValue(command as Record<string, unknown>, 'status') === 'failed';
   });
+}
+
+function resolveProviderLinearWorkerReviewOutputLogNoiseSummary(
+  manifestRecord: Record<string, unknown>
+): string | null {
+  const candidates = [readStringValue(manifestRecord, 'summary') ?? null];
+  const commands = manifestRecord.commands;
+  if (Array.isArray(commands)) {
+    for (const command of commands) {
+      if (!isRecord(command)) {
+        continue;
+      }
+      const id = readStringValue(command, 'id');
+      const title = readStringValue(command, 'title');
+      if (id !== PROVIDER_LINEAR_WORKER_PIPELINE_ID && title !== PROVIDER_LINEAR_WORKER_PIPELINE_TITLE) {
+        continue;
+      }
+      candidates.push(readStringValue(command, 'summary') ?? null);
+    }
+  }
+  return candidates.some((candidate) =>
+    Boolean(candidate?.includes(REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_NOISE_SUMMARY))
+  )
+    ? REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_NOISE_SUMMARY
+    : null;
 }
 
 function manifestHasFailedCommandsSince(

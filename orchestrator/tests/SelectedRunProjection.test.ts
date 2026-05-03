@@ -18,6 +18,7 @@ import {
   type ProviderLinearWorkerChildLaneRecord,
   type ProviderLinearWorkerProof
 } from '../src/cli/providerLinearWorkerRunner.js';
+import { REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_NOISE_SUMMARY } from '../src/cli/control/providerLinearWorkerTruth.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 
 const cleanupRoots: string[] = [];
@@ -3550,6 +3551,128 @@ describe('SelectedRunProjection', () => {
       summary: 'Provider linear worker reached review handoff.',
       lastError: null
     });
+  });
+
+  it('preserves provider-worker review log noise notes when terminal proof drives selected-run summary', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    const commandSummary = [
+      'Provider linear worker reached review handoff. (review outcome: bounded success via command-intent; not a wrapper failure;',
+      `${REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_NOISE_SUMMARY})`
+    ].join(' ');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Provider linear worker reached review handoff.',
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            title: 'Provider Linear Worker',
+            status: 'succeeded',
+            summary: commandSummary
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          owner_phase: 'ended',
+          owner_status: 'succeeded',
+          end_reason: 'issue_review_handoff',
+          updated_at: '2026-03-20T01:15:29.970Z'
+        })
+      ),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      rawStatus: 'succeeded',
+      lastError: null
+    });
+    expect(selected?.summary).toContain('Provider linear worker reached review handoff.');
+    expect(selected?.summary).toContain(REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_NOISE_SUMMARY);
+    expect(selected?.latestEvent.message).toContain(REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_NOISE_SUMMARY);
+  });
+
+  it('preserves provider-worker review log noise notes for failed terminal proof projections', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    const commandSummary = [
+      'Provider linear worker failed with Codex exit code 1.',
+      `(${REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_NOISE_SUMMARY})`
+    ].join(' ');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'failed',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        updated_at: '2026-03-20T01:15:28.970Z',
+        summary: 'Provider linear worker failed with Codex exit code 1.',
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            title: 'Provider Linear Worker',
+            status: 'failed',
+            summary: commandSummary
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          owner_phase: 'ended',
+          owner_status: 'failed',
+          end_reason: 'codex_exit_1',
+          updated_at: '2026-03-20T01:15:29.970Z'
+        })
+      ),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      rawStatus: 'failed'
+    });
+    expect(selected?.summary).toContain('Provider linear worker failed with Codex exit code 1.');
+    expect(selected?.summary).toContain(REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_NOISE_SUMMARY);
+    expect(selected?.lastError).toContain(REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_NOISE_SUMMARY);
+    expect(selected?.latestEvent?.message).toContain(
+      REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_NOISE_SUMMARY
+    );
   });
 
   it('ignores terminal proof rewritten from a prior attempt after a rerun starts', async () => {
