@@ -9549,13 +9549,33 @@ function normalizeProviderLinearWorkerChildLaneAcceptCurrentIssueSnapshot(
   if ((source !== 'live_linear' && source !== 'unavailable') || !capturedAt) {
     return null;
   }
+  const issueUpdatedAt = normalizeOptionalString(value.issue_updated_at);
+  const issueState = normalizeOptionalString(value.issue_state);
+  const issueStateType = normalizeOptionalString(value.issue_state_type);
+  const unavailableReason = normalizeOptionalString(value.unavailable_reason);
+  if (source === 'unavailable') {
+    if (issueUpdatedAt || issueState || issueStateType) {
+      return null;
+    }
+    return {
+      source,
+      issue_updated_at: null,
+      issue_state: null,
+      issue_state_type: null,
+      captured_at: capturedAt,
+      unavailable_reason: unavailableReason
+    };
+  }
+  if (unavailableReason) {
+    return null;
+  }
   return {
     source,
-    issue_updated_at: normalizeOptionalString(value.issue_updated_at),
-    issue_state: normalizeOptionalString(value.issue_state),
-    issue_state_type: normalizeOptionalString(value.issue_state_type),
+    issue_updated_at: issueUpdatedAt,
+    issue_state: issueState,
+    issue_state_type: issueStateType,
     captured_at: capturedAt,
-    unavailable_reason: normalizeOptionalString(value.unavailable_reason)
+    unavailable_reason: null
   };
 }
 

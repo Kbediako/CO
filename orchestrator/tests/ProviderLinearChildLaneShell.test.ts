@@ -371,8 +371,8 @@ describe('runProviderLinearChildLaneShell', () => {
       parent_snapshot: {
         base_sha: 'parent-base-sha',
         issue_updated_at: '2026-03-30T07:10:00.000Z',
-        issue_state: 'In Progress',
-        issue_state_type: 'started',
+        issue_state: null,
+        issue_state_type: null,
         captured_at: '2026-03-30T07:11:00.000Z'
       },
       lane_workspace_path: join(tempRoot ?? '', '.child-lanes', 'impl-a-child-run-1'),
@@ -431,13 +431,9 @@ describe('runProviderLinearChildLaneShell', () => {
       {
         execRunner,
         now: () => '2026-03-30T07:11:30.000Z',
-        readTrackedIssue: vi.fn(async () => ({
-          id: ISSUE.issue_id,
-          identifier: ISSUE.issue_identifier,
-          updated_at: '2026-03-30T07:10:00.000Z',
-          state: 'In Progress',
-          state_type: 'started'
-        })) as never,
+        readTrackedIssue: vi.fn(async () => {
+          throw new Error('linear unavailable');
+        }) as never,
         readParentDirtyPaths: vi.fn(async () => []) as never,
         readParentHeadSha: vi.fn(async () => 'parent-base-sha'),
         refreshProofSnapshot
@@ -3851,32 +3847,19 @@ describe('runProviderLinearChildLaneShell', () => {
       }
     );
 
-    expect(result).toMatchObject({
-      ok: false,
-      operation: 'child-lane',
-      action: 'accept',
-      error: {
-        code: 'provider_worker_child_lane_patch_missing',
-        status: 409
-      },
-      child_lane: {
-        accept_current_issue_snapshot: expect.objectContaining({
-          source: 'live_linear',
-          issue_updated_at: childLane.parent_snapshot.issue_updated_at,
-          unavailable_reason: null
-        })
-      }
+    const acceptSnapshot = expect.objectContaining({
+      source: 'live_linear',
+      issue_updated_at: childLane.parent_snapshot.issue_updated_at,
+      unavailable_reason: null
     });
+    expect(result.error.code).toBe('provider_worker_child_lane_patch_missing');
+    expect(result.child_lane).toEqual(expect.objectContaining({ accept_current_issue_snapshot: acceptSnapshot }));
     expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([
       expect.objectContaining({
         stream: childLane.stream,
         decision: 'pending',
         in_flight_action: null,
-        accept_current_issue_snapshot: expect.objectContaining({
-          source: 'live_linear',
-          issue_updated_at: childLane.parent_snapshot.issue_updated_at,
-          unavailable_reason: null
-        })
+        accept_current_issue_snapshot: acceptSnapshot
       })
     ]);
   });

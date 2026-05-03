@@ -2808,17 +2808,21 @@ async function resolveParentSnapshot(
       env
     });
   } catch (error) {
-    if (allowRunManifestIssueUpdatedAtFallback) {
-      throw error;
+    if (!allowRunManifestIssueUpdatedAtFallback) {
+      return {
+        issue_updated_at: null,
+        issue_state: null,
+        issue_state_type: null,
+        source: 'unavailable',
+        unavailable_reason: `live Linear issue lookup failed: ${formatErrorMessage(error)}`,
+        captured_at: deps.now()
+      };
     }
-    return {
-      issue_updated_at: null,
-      issue_state: null,
-      issue_state_type: null,
-      source: 'unavailable',
-      unavailable_reason: `live Linear issue lookup failed: ${formatErrorMessage(error)}`,
-      captured_at: deps.now()
-    };
+    return buildRunManifestIssueUpdatedAtSnapshot(
+      context,
+      deps.now(),
+      `live Linear issue lookup failed: ${formatErrorMessage(error)}`
+    );
   }
   if (trackedIssue) {
     return {
@@ -2840,15 +2844,25 @@ async function resolveParentSnapshot(
       captured_at: deps.now()
     };
   }
+  return buildRunManifestIssueUpdatedAtSnapshot(
+    context,
+    deps.now(),
+    'live Linear issue lookup returned no issue and parent run manifest issue_updated_at is absent'
+  );
+}
+
+function buildRunManifestIssueUpdatedAtSnapshot(
+  context: Pick<Awaited<ReturnType<typeof loadProviderLinearWorkerContext>>, 'issueUpdatedAt'>,
+  capturedAt: string,
+  unavailableReason: string
+): ParentIssueSnapshot & { captured_at: string } {
   return {
     issue_updated_at: context.issueUpdatedAt ?? null,
     issue_state: null,
     issue_state_type: null,
     source: context.issueUpdatedAt ? 'run_manifest_issue_updated_at' : 'unavailable',
-    unavailable_reason: context.issueUpdatedAt
-      ? null
-      : 'live Linear issue lookup returned no issue and parent run manifest issue_updated_at is absent',
-    captured_at: deps.now()
+    unavailable_reason: context.issueUpdatedAt ? null : unavailableReason,
+    captured_at: capturedAt
   };
 }
 
