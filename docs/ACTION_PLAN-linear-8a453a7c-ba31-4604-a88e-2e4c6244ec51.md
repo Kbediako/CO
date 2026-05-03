@@ -58,8 +58,8 @@
   - targeted path scan for `linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51` and `CO-442`
   - targeted protected-term scan for the log and telemetry contract
   - `node scripts/spec-guard.mjs --dry-run`
-  - `TASK=linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51 NOTES="Goal: verify CO-442 packet evidence | Summary: traceability packet only, raw logs preserved, successful telemetry authoritative | Risks: missing NOTES gate, scope bleed into CO-441" MANIFEST=<manifest-path> codex-orchestrator review --manifest <manifest-path>`
-  - record `<manifest-path>` plus review telemetry in the task checklist so the NOTES-backed gate remains auditable
+  - `TASK=linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51 NOTES="Goal: verify CO-442 packet evidence | Summary: traceability packet only, raw logs preserved, successful telemetry authoritative | Risks: missing NOTES gate, scope bleed into CO-441" MANIFEST=.runs/linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51/manual/20260503T115240Z-co-442-packet-review/manifest.json codex-orchestrator review --manifest .runs/linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51/manual/20260503T115240Z-co-442-packet-review/manifest.json`
+  - record `.runs/linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51/manual/20260503T115240Z-co-442-packet-review/manifest.json` plus review telemetry in the task checklist so the NOTES-backed gate remains auditable
   - `npm run docs:check`
   - `npm run docs:freshness`
   - unresolved actionable review threads = 0 before merge, or an explicit waiver is recorded in the task checklist with owner, expiry, reason, and evidence
