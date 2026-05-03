@@ -12,6 +12,8 @@ import {
 } from '../scripts/lib/review-execution-telemetry.js';
 
 const createdSandboxes: string[] = [];
+const THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE =
+  'codex_core::session: failed to record rollout items: thread 019de1d2-3b27-7193-8330-0ed726e28044 not found';
 
 async function makeSandbox(): Promise<string> {
   const sandbox = await mkdtemp(join(tmpdir(), 'review-execution-telemetry-'));
@@ -225,5 +227,88 @@ describe('review-execution-telemetry', () => {
     ).toBe(
       'review command failed without termination-boundary classification; not an explicit wrapper-boundary failure'
     );
+  });
+
+  it('requires successful telemetry before thread-not-found rollout log noise is non-blocking', async () => {
+    const sandbox = await makeSandbox();
+    await mkdir(join(sandbox, 'review'), { recursive: true });
+
+    const successCases = [
+      {
+        name: 'clean',
+        terminationBoundary: null,
+        expectedOutcome: 'clean-success',
+        expectedSummary: 'clean success'
+      },
+      {
+        name: 'bounded',
+        terminationBoundary: {
+          kind: 'relevant-reinspection-dwell',
+          provenance: 'post-startup-anchor',
+          reason: 'bounded review relevant-reinspection dwell boundary violated after 1s.',
+          sample: 'sed -n 1,20p file-1.py'
+        } as const,
+        expectedOutcome: 'bounded-success',
+        expectedSummary:
+          'bounded success via relevant-reinspection-dwell; not a wrapper failure'
+      }
+    ] as const;
+
+    for (const successCase of successCases) {
+      const state = new ReviewExecutionState({ repoRoot: sandbox });
+      state.observeChunk(`${THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}\n`, 'stderr');
+
+      const payload = await writeReviewExecutionTelemetry({
+        state,
+        status: 'succeeded',
+        terminationBoundary: successCase.terminationBoundary,
+        outputLogPath: join(sandbox, 'review', `${successCase.name}-output.log`),
+        repoRoot: sandbox,
+        telemetryPath: join(sandbox, 'review', `${successCase.name}-telemetry.json`),
+        includeRawTelemetry: true,
+        telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+      });
+
+      expect(payload?.status).toBe('succeeded');
+      expect(payload?.review_outcome).toBe(successCase.expectedOutcome);
+      expect(payload?.error).toBeNull();
+      expect(payload?.summary.lastLines).toContain(THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE);
+      expect(formatReviewOutcomeSummary(payload!)).toBe(successCase.expectedSummary);
+    }
+
+    const failedState = new ReviewExecutionState({ repoRoot: sandbox });
+    failedState.observeChunk(`${THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}\n`, 'stderr');
+    const failedPayload = await writeReviewExecutionTelemetry({
+      state: failedState,
+      status: 'failed',
+      error: 'codex review exited with code 2',
+      outputLogPath: join(sandbox, 'review', 'failed-output.log'),
+      repoRoot: sandbox,
+      telemetryPath: join(sandbox, 'review', 'failed-telemetry.json'),
+      includeRawTelemetry: true,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+    });
+
+    expect(failedPayload?.status).toBe('failed');
+    expect(failedPayload?.review_outcome).toBe('failed-other');
+    expect(failedPayload?.summary.lastLines).toContain(THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE);
+    expect(formatReviewOutcomeSummary(failedPayload!)).toBe(
+      'review command failed without termination-boundary classification; not an explicit wrapper-boundary failure'
+    );
+
+    const missingTelemetryState = new ReviewExecutionState({ repoRoot: sandbox });
+    missingTelemetryState.observeChunk(`${THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}\n`, 'stderr');
+    const missingTelemetryPayload = await writeReviewExecutionTelemetry({
+      state: missingTelemetryState,
+      status: 'succeeded',
+      outputLogPath: join(sandbox, 'review', 'missing-output.log'),
+      repoRoot: sandbox,
+      telemetryPath: join(sandbox, 'missing', 'telemetry.json'),
+      includeRawTelemetry: true,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY',
+      logPersistFailure: () => {}
+    });
+
+    expect(missingTelemetryPayload).toBeNull();
   });
 });

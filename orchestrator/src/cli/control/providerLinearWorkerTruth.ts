@@ -119,17 +119,25 @@ export function buildProviderLinearWorkerTerminalSummary(input: {
   status: TerminalStatus;
   endReason: string | null;
   reviewOutcomeSummary?: string | null;
+  reviewOutputLogNoiseSummary?: string | null;
   degradationSummary?: string | null;
 }): string {
   const baseSummary = formatProviderLinearWorkerTerminalBaseSummary(input.status, input.endReason);
-  const annotations = [input.reviewOutcomeSummary ?? null, input.degradationSummary ?? null].filter(
-    (value): value is string => Boolean(value)
-  );
+  const annotations = [
+    input.reviewOutcomeSummary ?? null,
+    input.reviewOutputLogNoiseSummary ?? null,
+    input.degradationSummary ?? null
+  ].filter((value): value is string => Boolean(value));
   if (annotations.length === 0) {
     return baseSummary;
   }
   return `${baseSummary} (${annotations.join('; ')})`;
 }
+
+export const REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_NOISE_SUMMARY = [
+  'review log note: Codex rollout-item thread-not-found session cleanup noise observed;',
+  'successful review telemetry remains authoritative'
+].join(' ');
 
 export function deriveDeterministicProviderMutationSuppressions(
   audit: ProviderLinearAuditSummary | null | undefined,

@@ -22,6 +22,9 @@ const RUN_REVIEW_HANGING_SUBPROCESS_TIMEOUT_MS = 15_000;
 const RUN_REVIEW_HANGING_SUBPROCESS_TEST_TIMEOUT_MS = 30_000;
 const RUN_REVIEW_MOCK_REAP_POLL_ATTEMPTS = 10;
 const RUN_REVIEW_MOCK_REAP_POLL_INTERVAL_MS = 50;
+const THREAD_NOT_FOUND_ROLLOUT_NOISE_MESSAGE =
+  'codex_core::session: failed to record rollout items: thread 019de1d2-3b27-7193-8330-0ed726e28044 not found';
+const THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE = `WARN ${THREAD_NOT_FOUND_ROLLOUT_NOISE_MESSAGE}`;
 
 interface RunReviewMockProcess {
   pid: number;
@@ -236,6 +239,21 @@ if [[ "\${1:-}" == "--help" ]]; then
 fi
   if [[ "\${1:-}" == "review" ]]; then
     mode="\${RUN_REVIEW_MODE:-ok}"
+    if [[ "$mode" == "thread-not-found-noise-ok" ]]; then
+      echo "${THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}" >&2
+      echo "stdout-ok"
+      echo "stderr-ok" >&2
+      exit 0
+    fi
+    if [[ "$mode" == "thread-not-found-noise-nonzero" ]]; then
+      echo "${THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}" >&2
+      echo "review failed after noisy session cleanup" >&2
+      exit 2
+    fi
+    if [[ "$mode" == "thread-not-found-noise-bounded" ]]; then
+      echo "${THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}" >&2
+      mode="relevant-reinspection-dwell"
+    fi
     if [[ "$mode" == "hang" ]]; then
       if [[ -n "\${RUN_REVIEW_HANG_MARKER:-}" ]]; then
         printf 'started\\n' > "$RUN_REVIEW_HANG_MARKER"
@@ -4933,6 +4951,101 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.maxInspectionTargetHits).toBeGreaterThanOrEqual(3);
     expect(telemetry.summary.metaSurfaceSignals).toBe(0);
     expect(telemetry.summary.concreteOutputSignals).toBe(0);
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('keeps thread-not-found rollout-item review log noise non-blocking when telemetry succeeds', async () => {
+    const cleanSandbox = await makeSandbox();
+    const cleanManifestPath = await makeManifest(cleanSandbox);
+    const cleanCodexBin = await makeFakeCodex(cleanSandbox);
+    const cleanResult = await runReviewCommand(cleanManifestPath, {
+      ...baseEnv(cleanSandbox, cleanCodexBin),
+      RUN_REVIEW_MODE: 'thread-not-found-noise-ok'
+    });
+
+    expect(cleanResult.exitCode).toBe(0);
+    expect(cleanResult.stdout).toContain('[run-review] review outcome: clean success.');
+    const cleanOutputLogPath = join(dirname(cleanManifestPath), 'review', 'output.log');
+    const cleanOutputLog = await readFile(cleanOutputLogPath, 'utf8');
+    expect(cleanOutputLog).toContain(THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE);
+    const cleanTelemetryPath = join(dirname(cleanManifestPath), 'review', 'telemetry.json');
+    const cleanTelemetry = JSON.parse(await readFile(cleanTelemetryPath, 'utf8')) as {
+      status: string;
+      review_outcome: ReviewOutcomeDisposition;
+      error: string | null;
+    };
+    expect(cleanTelemetry.status).toBe('succeeded');
+    expect(cleanTelemetry.review_outcome).toBe('clean-success');
+    expect(cleanTelemetry.error).toBeNull();
+
+    const boundedSandbox = await makeSandbox();
+    const boundedManifestPath = await makeManifest(boundedSandbox);
+    await initGitRepoWithTouchedPath(boundedSandbox, 'file-1.py');
+    const boundedCodexBin = await makeFakeCodex(boundedSandbox);
+    const boundedResult = await runReviewCommand(boundedManifestPath, {
+      ...baseEnv(boundedSandbox, boundedCodexBin),
+      RUN_REVIEW_MODE: 'thread-not-found-noise-bounded',
+      CODEX_REVIEW_LOW_SIGNAL_TIMEOUT_SECONDS: '1',
+      CODEX_REVIEW_STALL_TIMEOUT_SECONDS: '0',
+      CODEX_REVIEW_TIMEOUT_SECONDS: '60'
+    });
+
+    expect(boundedResult.exitCode).toBe(0);
+    expect(boundedResult.stdout).toContain(
+      '[run-review] review outcome: bounded success via relevant-reinspection-dwell; not a wrapper failure.'
+    );
+    const boundedOutputLogPath = join(dirname(boundedManifestPath), 'review', 'output.log');
+    const boundedOutputLog = await readFile(boundedOutputLogPath, 'utf8');
+    expect(boundedOutputLog).toContain(THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE);
+    const boundedTelemetryPath = join(dirname(boundedManifestPath), 'review', 'telemetry.json');
+    const boundedTelemetry = JSON.parse(await readFile(boundedTelemetryPath, 'utf8')) as {
+      status: string;
+      review_outcome: ReviewOutcomeDisposition;
+      error: string | null;
+      termination_boundary: {
+        kind: string;
+        provenance: string;
+      } | null;
+    };
+    expect(boundedTelemetry.status).toBe('succeeded');
+    expect(boundedTelemetry.review_outcome).toBe('bounded-success');
+    expect(boundedTelemetry.error).toBeNull();
+    expect(boundedTelemetry.termination_boundary).toEqual(
+      expect.objectContaining({
+        kind: 'relevant-reinspection-dwell',
+        provenance: 'post-startup-anchor'
+      })
+    );
+  }, LONG_WAIT_TEST_TIMEOUT_MS);
+
+  it('does not classify thread-not-found rollout-item review log noise as success when telemetry fails', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'thread-not-found-noise-nonzero'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stderr).toContain(
+      '[run-review] review outcome: review command failed without termination-boundary classification; not an explicit wrapper-boundary failure.'
+    );
+    const outputLogPath = join(dirname(manifestPath), 'review', 'output.log');
+    const outputLog = await readFile(outputLogPath, 'utf8');
+    expect(outputLog).toContain(THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE);
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status: string;
+      review_outcome: ReviewOutcomeDisposition;
+      error: string | null;
+      termination_boundary: {
+        kind: string;
+      } | null;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.review_outcome).toBe('failed-other');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.termination_boundary).toBeNull();
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
   it('fails when a bounded success stop is followed by a non-zero review exit', async () => {

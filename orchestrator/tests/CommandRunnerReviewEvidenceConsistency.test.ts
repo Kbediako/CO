@@ -64,6 +64,9 @@ const ORIGINAL_ENV = {
   out: process.env.CODEX_ORCHESTRATOR_OUT_DIR,
   task: process.env.MCP_RUNNER_TASK_ID
 };
+const THREAD_NOT_FOUND_ROLLOUT_NOISE_MESSAGE =
+  'codex_core::session: failed to record rollout items: thread 019de1d2-3b27-7193-8330-0ed726e28044 not found';
+const THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE = `WARN ${THREAD_NOT_FOUND_ROLLOUT_NOISE_MESSAGE}`;
 
 let workspaceRoot: string;
 
@@ -241,6 +244,169 @@ describe('runCommandStage review evidence consistency', () => {
     expect(manifest.commands[0]?.summary).toContain(
       'review outcome: bounded success via relevant-reinspection-dwell; not a wrapper failure'
     );
+  });
+
+  it('classifies rollout-item thread-not-found review log noise only after successful telemetry', async () => {
+    mockState.runImpl = async (input) => {
+      await writeReviewArtifacts(input, {
+        status: 'succeeded',
+        review_outcome: 'bounded-success',
+        outputLogContent: `review output\n${THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}\n`,
+        termination_boundary: {
+          kind: 'relevant-reinspection-dwell',
+          provenance: 'post-startup-anchor',
+          reason: 'bounded review relevant-reinspection dwell boundary violated after 1s.',
+          sample: null
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'review',
+      title: 'npm run review',
+      command: 'npm run review'
+    });
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toContain(
+      'review log note: Codex rollout-item thread-not-found session cleanup noise observed; successful review telemetry remains authoritative'
+    );
+    expect(manifest.commands[0]?.summary).toContain(
+      'review log note: Codex rollout-item thread-not-found session cleanup noise observed; successful review telemetry remains authoritative'
+    );
+
+    mockState.runImpl = async (input) => {
+      await writeReviewArtifacts(input, {
+        status: 'failed',
+        review_outcome: 'failed-other',
+        error: 'codex review exited with code 2',
+        outputLogContent: `review output\n${THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}\n`,
+        termination_boundary: null
+      });
+      return buildFailedExecResult('codex review exited with code 2\n', 2);
+    };
+
+    const failedContext = await bootstrapCommandStage({
+      id: 'review',
+      title: 'npm run review',
+      command: 'npm run review'
+    });
+    const failedResult = await runCommandStage({
+      env: failedContext.env,
+      paths: failedContext.paths,
+      manifest: failedContext.manifest,
+      stage: failedContext.stage,
+      index: 1
+    });
+
+    expect(failedResult.exitCode).toBe(2);
+    expect(failedResult.summary).not.toContain('thread-not-found session cleanup noise observed');
+    expect(failedContext.manifest.commands[0]?.summary).not.toContain(
+      'thread-not-found session cleanup noise observed'
+    );
+  });
+
+  it('does not classify rollout-item thread-not-found review log noise when successful telemetry has an error', async () => {
+    mockState.runImpl = async (input) => {
+      await writeReviewArtifacts(input, {
+        status: 'succeeded',
+        review_outcome: 'clean-success',
+        error: 'post-review artifact write failed',
+        outputLogContent: `review output\n${THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}\n`
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'review',
+      title: 'npm run review',
+      command: 'npm run review'
+    });
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toContain('review ok');
+    expect(result.summary).not.toContain('thread-not-found session cleanup noise observed');
+    expect(manifest.commands[0]?.summary).not.toContain(
+      'thread-not-found session cleanup noise observed'
+    );
+  });
+
+  it('does not classify rollout-item thread-not-found text quoted from review output', async () => {
+    mockState.runImpl = async (input) => {
+      await writeReviewArtifacts(input, {
+        status: 'succeeded',
+        review_outcome: 'clean-success',
+        outputLogContent: [
+          'review output',
+          THREAD_NOT_FOUND_ROLLOUT_NOISE_MESSAGE,
+          `+const THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE = '${THREAD_NOT_FOUND_ROLLOUT_NOISE_MESSAGE}';`,
+          `The reviewed diff contains ${THREAD_NOT_FOUND_ROLLOUT_NOISE_MESSAGE}`,
+          `  '${THREAD_NOT_FOUND_ROLLOUT_NOISE_MESSAGE}';`
+        ].join('\n')
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'review',
+      title: 'npm run review',
+      command: 'npm run review'
+    });
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toContain('review ok');
+    expect(result.summary).not.toContain('thread-not-found session cleanup noise observed');
+    expect(manifest.commands[0]?.summary).not.toContain(
+      'thread-not-found session cleanup noise observed'
+    );
+  });
+
+  it('does not classify rollout-item thread-not-found review log noise without explicit matching success outcome', async () => {
+    const cases = [
+      {
+        name: 'missing review_outcome',
+        telemetry: {
+          status: 'succeeded',
+          omitReviewOutcome: true
+        }
+      },
+      {
+        name: 'contradictory review_outcome',
+        telemetry: {
+          status: 'succeeded',
+          review_outcome: 'bounded-success',
+          termination_boundary: null
+        }
+      }
+    ] as const;
+
+    for (const testCase of cases) {
+      mockState.runImpl = async (input) => {
+        await writeReviewArtifacts(input, {
+          ...testCase.telemetry,
+          outputLogContent: `review output\n${THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}\n`
+        });
+        return buildSuccessfulExecResult();
+      };
+
+      const { manifest, stage, ...context } = await bootstrapCommandStage({
+        id: 'review',
+        title: `npm run review (${testCase.name})`,
+        command: 'npm run review'
+      });
+      const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.summary).toContain('review ok');
+      expect(result.summary).not.toContain('thread-not-found session cleanup noise observed');
+      expect(manifest.commands[0]?.summary).not.toContain(
+        'thread-not-found session cleanup noise observed'
+      );
+    }
   });
 
   it('annotates failed review summaries with classified review-wrapper failures', async () => {
@@ -600,6 +766,54 @@ describe('runCommandStage review evidence consistency', () => {
     expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
     expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_failed');
     expect(errorPayload.details?.command_exit_code).toBe(0);
+  });
+
+  it('preserves rollout-item thread-not-found review log noise notes in provider-worker terminal summaries', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(input, {
+        status: 'succeeded',
+        review_outcome: 'bounded-success',
+        outputLogContent: `review output\n${THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}\n`,
+        termination_boundary: {
+          kind: 'relevant-reinspection-dwell',
+          provenance: 'post-startup-anchor',
+          reason: 'bounded review relevant-reinspection dwell boundary violated after 1s.',
+          sample: null
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1'
+      }
+    );
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toContain('Provider linear worker reached review handoff.');
+    expect(result.summary).toContain(
+      'review outcome: bounded success via relevant-reinspection-dwell; not a wrapper failure'
+    );
+    expect(result.summary).toContain(
+      'review log note: Codex rollout-item thread-not-found session cleanup noise observed; successful review telemetry remains authoritative'
+    );
+    expect(manifest.commands[0]?.summary).toContain(
+      'review log note: Codex rollout-item thread-not-found session cleanup noise observed; successful review telemetry remains authoritative'
+    );
   });
 
   it('treats prior-attempt provider-worker proofs as missing authoritative proof', async () => {
@@ -1156,6 +1370,8 @@ async function writeReviewArtifacts(
     review_outcome: 'clean-success' | 'bounded-success' | 'failed-boundary' | 'failed-other';
     error: string | null;
     output_log_path: string;
+    outputLogContent: string;
+    omitReviewOutcome: boolean;
     termination_boundary: Record<string, unknown> | null;
   }>
 ): Promise<void> {
@@ -1164,12 +1380,18 @@ async function writeReviewArtifacts(
   const runDir = String(execEnv.CODEX_ORCHESTRATOR_RUN_DIR);
   const reviewDir = join(runDir, 'review');
   const outputLogPath = join(reviewDir, 'output.log');
+  const {
+    outputLogContent,
+    omitReviewOutcome,
+    review_outcome: overriddenReviewOutcome,
+    ...telemetryOverrides
+  } = overrides;
   await mkdir(reviewDir, { recursive: true });
-  await writeFile(outputLogPath, 'review output\n', 'utf8');
+  await writeFile(outputLogPath, outputLogContent ?? 'review output\n', 'utf8');
   const status = overrides.status ?? 'succeeded';
   const terminationBoundary = overrides.termination_boundary ?? null;
   const reviewOutcome =
-    overrides.review_outcome ??
+    overriddenReviewOutcome ??
     deriveReviewOutcomeDisposition({
       status,
       terminationBoundary
@@ -1181,7 +1403,7 @@ async function writeReviewArtifacts(
         version: 1,
         generated_at: new Date().toISOString(),
         status,
-        review_outcome: reviewOutcome,
+        ...(omitReviewOutcome === true ? {} : { review_outcome: reviewOutcome }),
         error: null,
         output_log_path: relative(repoRoot, outputLogPath),
         termination_boundary: terminationBoundary,
@@ -1219,7 +1441,7 @@ async function writeReviewArtifacts(
           shellProbeCount: 0,
           lastLines: []
         },
-        ...overrides
+        ...telemetryOverrides
       },
       null,
       2
