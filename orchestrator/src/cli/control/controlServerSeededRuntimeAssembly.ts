@@ -208,7 +208,11 @@ export function createControlServerSeededRuntimeAssembly(
     },
     providerIntake: async () =>
       await queueProviderIntakePersist(async () => {
-        clearProviderIntakeAuthority(providerIntakeState);
+        if (shouldTrustProviderIntakePersist(providerIntakeState, persistedProviderIntakeState)) {
+          clearProviderIntakeAuthority(providerIntakeState);
+        } else {
+          markProviderIntakeAuthorityUnavailable(providerIntakeState);
+        }
         await writeJsonAtomic(providerIntakeStatePath, providerIntakeState);
         persistedProviderIntakeState = cloneProviderIntakeState(providerIntakeState);
         const linearAdvisoryMarkedStale = markLinearAdvisoryStateStaleFromProviderIntake(
@@ -282,6 +286,20 @@ export function createControlServerSeededRuntimeAssembly(
   return {
     requestContextShared
   };
+}
+
+function shouldTrustProviderIntakePersist(
+  nextState: ProviderIntakeState,
+  persistedState: ProviderIntakeState | null
+): boolean {
+  if (
+    nextState.claims.length > 0 ||
+    nextState.latest_provider_key !== null ||
+    nextState.latest_reason !== null
+  ) {
+    return true;
+  }
+  return persistedState !== null && persistedState.authority?.status !== 'unavailable';
 }
 
 function cloneProviderIntakeState(state: ProviderIntakeState): ProviderIntakeState {

@@ -1829,6 +1829,49 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('suppresses synthetic Linear selected rows when raw provider intake is missing', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));
+    try {
+      const taskId = 'linear-0b49c08c-53a1-4225-8d09-28457165fbc8';
+      const fixture = await createFixture({
+        taskId,
+        readPersistedProviderIntakeState: () => null
+      });
+      await seedManifest(fixture.paths, {
+        task_id: taskId,
+        status: 'in_progress',
+        started_at: '2026-03-07T00:25:00.000Z',
+        updated_at: '2026-03-07T00:29:00.000Z',
+        summary: 'synthetic Linear fallback without raw provider intake'
+      });
+
+      const projection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const statePayload = await readCompatibilityState({
+        readCompatibilityProjection: async () => projection
+      });
+      const uiDataset = buildUiDataset({
+        projection,
+        generatedAt: '2026-03-07T00:30:00.000Z'
+      });
+
+      expect(projection.providerIntake).toBeNull();
+      expect(projection.providerIntakeUnavailable).toEqual({
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: null
+      });
+      expect(projection.running).toEqual([]);
+      expect(projection.issues).toEqual([]);
+      expect(projection.selected).toBeNull();
+      expect(statePayload.running_ids).toEqual([]);
+      expect(statePayload.selected).toBeNull();
+      expect(uiDataset.running).toEqual([]);
+      expect(uiDataset.selected_issue_identifier).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('rebinds selected synthetic linear task-id rows to the canonical claim-backed issue identity', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-07T00:30:00.000Z'));

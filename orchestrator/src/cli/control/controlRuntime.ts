@@ -759,6 +759,9 @@ function isProviderBoundCompatibilitySource(
 ): boolean {
   return (
     source.issueProvider === 'linear' ||
+    (source.issueProvider === null &&
+      source.taskId !== null &&
+      SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(source.taskId)) ||
     source.pipelineId === 'provider-linear-worker' ||
     source.pipelineTitle === 'Provider Linear Worker' ||
     source.providerLinearWorkerProof != null

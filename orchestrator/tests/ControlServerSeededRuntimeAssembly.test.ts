@@ -1080,6 +1080,33 @@ describe('createControlServerSeededRuntimeAssembly', () => {
       expect(uiPayload.selected_issue_identifier).not.toBe('CO-424');
       expect(uiPayload.running.map((entry) => entry.issue_identifier)).not.toContain('CO-424');
 
+      await context.persist.providerIntake?.();
+      const providerIntakeSnapshotAfterEmptyPersist = JSON.parse(
+        await readFile(join(paths.runDir, PROVIDER_INTAKE_STATE_FILE), 'utf8')
+      ) as ProviderIntakeState;
+      expect(providerIntakeSnapshotAfterEmptyPersist.authority).toEqual({
+        status: 'unavailable',
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: null
+      });
+      expect(providerIntakeSnapshotAfterEmptyPersist.claims).toEqual([]);
+      const apiPayloadAfterEmptyPersist = await readCompatibilityState(presenterContext);
+      const uiPayloadAfterEmptyPersist = await readUiDataset(presenterContext);
+      expect(apiPayloadAfterEmptyPersist.provider_intake).toBeNull();
+      expect(apiPayloadAfterEmptyPersist.provider_intake_unavailable).toEqual({
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: null
+      });
+      expect(apiPayloadAfterEmptyPersist.selected?.issue_identifier).not.toBe('CO-424');
+      expect(apiPayloadAfterEmptyPersist.running_ids).not.toContain('CO-424');
+      expect(uiPayloadAfterEmptyPersist.provider_intake).toBeNull();
+      expect(uiPayloadAfterEmptyPersist.provider_intake_unavailable).toEqual({
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: null
+      });
+      expect(uiPayloadAfterEmptyPersist.selected_issue_identifier).not.toBe('CO-424');
+      expect(uiPayloadAfterEmptyPersist.running.map((entry) => entry.issue_identifier)).not.toContain('CO-424');
+
       await context.persist.providerIntakePolling?.({
         enabled: true,
         checking: true
