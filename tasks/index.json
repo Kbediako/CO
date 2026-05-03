@@ -106,6 +106,45 @@
       }
     },
     {
+      "id": "20260503-linear-dc136145-8df0-49f7-af80-21148dc37351",
+      "title": "CO-453 provider child-lane tracker real-run reconciliation",
+      "relates_to": "tasks/tasks-linear-dc136145-8df0-49f7-af80-21148dc37351.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-03",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-dc136145-8df0-49f7-af80-21148dc37351.md",
+        "docs/TECH_SPEC-linear-dc136145-8df0-49f7-af80-21148dc37351.md",
+        "docs/ACTION_PLAN-linear-dc136145-8df0-49f7-af80-21148dc37351.md",
+        ".agent/task/linear-dc136145-8df0-49f7-af80-21148dc37351.md",
+        "tasks/specs/linear-dc136145-8df0-49f7-af80-21148dc37351.md",
+        "tasks/tasks-linear-dc136145-8df0-49f7-af80-21148dc37351.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-dc136145-8df0-49f7-af80-21148dc37351-docs-packet/cli/2026-05-03T12-07-21-112Z-a02619a1/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet",
+          "date": "2026-05-03",
+          "status": "produced",
+          "manifest": ".runs/linear-dc136145-8df0-49f7-af80-21148dc37351-docs-packet/cli/2026-05-03T12-07-21-112Z-a02619a1/manifest.json",
+          "source_anchor": "ctx:sha256:10210d74b1aeda6ff0cb3656c91e02bc36497974d4817a4a180e3739db3aa5a9#chunk:c000001",
+          "summary": "Created the CO-453 docs-first packet and declared mirrors only. The packet preserves provider-linear-worker-child-lanes.json, launching-*, real child run id/artifact paths, parent refresh/status logic, refresh request timeout, real child startup reconciliation, and CO-449 as related observed context only. It rejects CO-449 intake changes, broad recovery/freshness work, generic refresh-timeout remediation, dropping child-lane proof or decision evidence, and leaving placeholder paths as current authority after real startup."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-dc136145-8df0-49f7-af80-21148dc37351.md",
+        "task": "tasks/tasks-linear-dc136145-8df0-49f7-af80-21148dc37351.md",
+        "agent_task": ".agent/task/linear-dc136145-8df0-49f7-af80-21148dc37351.md",
+        "docs": "docs/TECH_SPEC-linear-dc136145-8df0-49f7-af80-21148dc37351.md"
+      }
+    },
+    {
       "id": "20260501-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba",
       "title": "CO-459 stale provider_intake summary versus fresh raw provider-intake-state authority",
       "relates_to": "tasks/tasks-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",

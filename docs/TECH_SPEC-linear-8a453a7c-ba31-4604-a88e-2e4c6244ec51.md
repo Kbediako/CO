@@ -30,6 +30,21 @@ This mirror points to the canonical task spec at `tasks/specs/linear-8a453a7c-ba
 - No standalone review or review-wrapper weakening.
 - No upstream Codex CLI patch unless local evidence proves CO-side classification cannot be safe.
 
+## Fallback Expiry / Refactor Decision
+- Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `Yes`.
+- Large-refactor decision: not required; the fix stays local to review evidence classification and provider-worker/selected-run summary projection.
+- Minor-seam decision: retain one durable classification contract for this externally emitted review cleanup log shape, with fail-closed telemetry and raw-log visibility preserved.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Codex rollout-item thread-not-found review-log classifier | External `codex_core::session` cleanup line can coexist with successful wrapper telemetry. | `justify retaining fallback` | CO-442 | Prefixed emitted review output contains `failed to record rollout items` and `thread not found` while telemetry succeeds. | observed 2026-04-17 | 2026-05-30 | Non-expiring durable classification contract with scheduled re-review | Remove only if upstream stops emitting the line or a stricter replacement classifier preserves telemetry fail-closed behavior and raw log visibility. | Focused command-runner, review telemetry, run-review, selected-run projection, and provider-worker summary regressions. |
+
+- Contract name: Codex rollout-item thread-not-found review-log classifier.
+- Owning surface: command-runner review evidence classification and provider-worker selected-run projection summaries.
+- Steady-state proof: successful telemetry remains authoritative only with `status=succeeded`, matching `review_outcome`, `error=null`, and a prefixed emitted output-log line; missing, failed, unreadable, or contradictory telemetry remains blocking.
+- Tests/docs: focused command-runner, selected-run projection, review telemetry, and run-review regressions plus CO-442 packet mirrors.
+- Non-expiring rationale: the classifier is a durable operator-truth contract for externally emitted review cleanup noise, not temporary masking; raw logs stay visible and telemetry still fails closed.
+
 ## Validation Contract
 - Packet setup validation must show:
   - all six packet/mirror files exist
