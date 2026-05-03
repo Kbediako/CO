@@ -152,7 +152,9 @@ describe('LinearWebhookController', () => {
           issue_id: 'lin-issue-272',
           issue_identifier: 'CO-272',
           issue_updated_at: '2026-04-21T16:00:00.000Z',
-          updated_at: '2026-04-21T16:00:00.000Z'
+          updated_at: '2026-04-21T16:00:00.000Z',
+          state: 'accepted',
+          reason: 'linear_delivery_accepted'
         })
       ]
     });
@@ -260,13 +262,13 @@ describe('LinearWebhookController', () => {
         rehydrated_at: '2026-05-01T02:52:40.455Z',
         claims: [
           createProviderIntakeClaim({
-            issue_id: 'lin-issue-1',
-            issue_identifier: 'CO-1',
-            issue_updated_at: '2026-03-01T02:52:40.455Z',
-            updated_at: '2026-03-01T02:52:40.455Z',
-            state: 'released',
-            reason: 'provider_issue_released:not_active'
-          }),
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-1',
+          issue_updated_at: '2026-05-01T02:52:40.455Z',
+          updated_at: '2026-05-01T02:52:40.455Z',
+          state: 'released',
+          reason: 'provider_issue_released:not_active'
+        }),
           createProviderIntakeClaim({
             issue_id: 'lin-issue-460',
             issue_identifier: 'CO-460',

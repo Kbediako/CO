@@ -431,7 +431,8 @@ function resolveProviderIntakeTruthUpdatedAt(
   trackedIssue: Pick<LiveLinearTrackedIssue, 'id' | 'identifier'>
 ): string | null {
   const matchingClaims = (providerIntakeState?.claims ?? []).filter((claim) =>
-    claim.issue_id === trackedIssue.id || claim.issue_identifier === trackedIssue.identifier
+    isActiveProviderIntakeClaim(claim) &&
+    (claim.issue_id === trackedIssue.id || claim.issue_identifier === trackedIssue.identifier)
   );
   if (matchingClaims.length === 0) {
     return null;
