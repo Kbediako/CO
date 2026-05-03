@@ -41,6 +41,151 @@
       }
     },
     {
+      "id": "20260503-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe",
+      "title": "CO-498 repo-wide spec-guard and docs freshness baseline debt",
+      "relates_to": "tasks/tasks-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-03",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
+        "docs/TECH_SPEC-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
+        "docs/ACTION_PLAN-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
+        "tasks/specs/linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
+        "tasks/tasks-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
+        ".agent/task/linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        "docs/docs-catalog.json",
+        "docs/guides/docs-freshness-cohorts.md",
+        ".runs/linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe-packet-docs/cli/2026-05-03T01-54-51-764Z-26d030bc/manifest.json"
+      ],
+      "approvals": {
+        "packet_docs_child_lane": {
+          "reviewer": "bounded same-issue child lane packet-docs",
+          "date": "2026-05-03",
+          "status": "accepted",
+          "run_id": "2026-05-03T01-54-51-764Z-26d030bc",
+          "manifest": ".runs/linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe-packet-docs/cli/2026-05-03T01-54-51-764Z-26d030bc/manifest.json",
+          "patch": ".runs/linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe-packet-docs/cli/2026-05-03T01-54-51-764Z-26d030bc/provider-linear-child-lane.patch",
+          "summary": "Child lane created the six-file CO-498 docs-first packet only. Parent accepted the patch after git apply --check succeeded against the repaired parent tree."
+        },
+        "source_classification": {
+          "reviewer": "CO-498 provider worker",
+          "date": "2026-05-03",
+          "status": "all_sources_terminal_reclassified_or_archived",
+          "summary": "Live Linear issue-context verified March 28 rolling cohort sources CO-14, CO-22, CO-24, CO-25, CO-31, and CO-33 plus April 2 packet/spec sources CO-50, CO-58, CO-60, CO-61, CO-64, CO-67, CO-69, CO-71, and CO-72 are Done/completed. The repair archives their docs-freshness registry rows and reclassifies terminal task specs to done without deleting historical packets or weakening validators."
+        },
+        "validation_current": {
+          "reviewer": "CO-498 provider worker",
+          "date": "2026-05-03",
+          "status": "focused_guard_freshness_clean",
+          "summary": "After metadata repair and review-finding cleanup, node scripts/delegation-guard.mjs, node scripts/spec-guard.mjs, node scripts/spec-guard.mjs --dry-run, npm run docs:freshness, npm run docs:check, npm run repo:stewardship, and node scripts/docs-freshness-maintain.mjs --check --format json passed; docs-freshness-maintain returned freshness_decision=clean, candidate_count=0, required_actions=0. Earlier full validation also passed build, lint, and test."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-03",
+          "status": "clean_success_after_p3_fixed",
+          "telemetry": ".runs/linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe/cli/2026-05-03T02-14-14-948Z-8ff67679/review/telemetry.json",
+          "summary": "Manifest-backed review completed with review_outcome=clean-success and one P3 mirror-status note; CO-498 synced the action plan and .agent mirror parent-owned completion checkboxes before handoff."
+        },
+        "elegance_review": {
+          "reviewer": "CO-498 provider worker",
+          "date": "2026-05-03",
+          "status": "no_simplification_patch_remaining",
+          "evidence": "out/linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe/manual/elegance-review.md",
+          "summary": "Manual minimality pass found the broad metadata diff necessary for 15 verified terminal source issues plus the CO-498 packet; no source/script/validator behavior was added."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
+        "task": "tasks/tasks-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
+        "agent_task": ".agent/task/linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
+        "docs": "docs/TECH_SPEC-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md"
+      }
+    },
+    {
+      "id": "20260501-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37",
+      "title": "CO-450 Codex binary provenance in doctor",
+      "relates_to": "tasks/tasks-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-03",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+        "docs/TECH_SPEC-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+        "docs/ACTION_PLAN-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+        "tasks/specs/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+        "tasks/tasks-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+        ".agent/task/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        "Linear workpad comment 54e50811-73ab-4d03-bade-01519d2324e6",
+        "orchestrator/src/cli/doctor.ts",
+        "orchestrator/src/cli/utils/codexCli.ts",
+        "orchestrator/tests/Doctor.test.ts",
+        "orchestrator/tests/_reproIssueLogTask.test.ts",
+        ".runs/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37-docs-review/cli/2026-05-01T01-07-21-018Z-af499409/manifest.json",
+        ".runs/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37/cli/2026-05-03T03-57-11-257Z-fb1eb1a7/review/telemetry.json",
+        "out/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37/manual/20260503T051500Z-elegance-review.md",
+        "CO-456 baseline follow-up for spec-guard external-migration cap timeout tests"
+      ],
+      "approvals": {
+        "issue_quality_review": {
+          "reviewer": "Codex provider worker",
+          "date": "2026-05-01",
+          "status": "approved-for-implementation",
+          "summary": "Linear issue intent checksum, wrong interpretations, non-goals, Not Done If clauses, checkout-posture lineage, and release-intake lineage are captured before source edits."
+        },
+        "focused_validation": {
+          "reviewer": "Codex provider worker",
+          "date": "2026-05-01",
+          "status": "focused-green",
+          "summary": "Build, lint, focused Doctor.test.ts, docs:check, repo:stewardship, git diff --check, diff-budget, live doctor JSON, and pack:smoke passed. Lint retains existing DelegationMcpHealth warnings only."
+        },
+        "validation_blockers": {
+          "reviewer": "Codex provider worker",
+          "date": "2026-05-03",
+          "status": "resolved-on-current-main",
+          "summary": "Historical baseline blockers from 2026-05-01 are no longer live for CO-450 after CO-456 landed and current docs-freshness is clean; current-head validation is green."
+        },
+        "current_main_refresh": {
+          "reviewer": "Codex provider worker",
+          "date": "2026-05-03",
+          "status": "validation-green",
+          "summary": "CO-450 resumed after CO-456 landed; provider worker fast-forwarded the branch to origin/main 0e71d3e13, preserved the advisory binary-provenance implementation, applied the post-elegance cache simplification, and passed delegation guard, spec guard, build, lint, focused doctor/repro tests, npm test, docs gates, stewardship, diff-budget, pack smoke, and live workspace doctor JSON proof."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-03",
+          "status": "bounded-success",
+          "evidence": ".runs/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37/cli/2026-05-03T03-57-11-257Z-fb1eb1a7/review/telemetry.json",
+          "summary": "Final manifest-backed standalone re-review completed via command-intent retry with no actionable diff-local regressions after the advisory-status fix, DoctorResult fixture update, and post-elegance probe-cache removal."
+        },
+        "elegance_review": {
+          "reviewer": "codex review prompt-only elegance pass",
+          "date": "2026-05-03",
+          "status": "p3-simplification-applied",
+          "evidence": "out/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37/manual/20260503T051500Z-elegance-review.md",
+          "summary": "Elegance review found and parent applied the small simplification to remove cross-run probe caches so doctor provenance remains fresh within long-lived processes."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+        "task": "tasks/tasks-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+        "agent_task": ".agent/task/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+        "docs": "docs/TECH_SPEC-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md"
+      }
+    },
+    {
       "id": "20260502-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc",
       "title": "CO-486 persisted goal evidence canary",
       "relates_to": "tasks/tasks-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md",
@@ -8334,12 +8479,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-02",
+      "last_review": "2026-05-03",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-04-02",
           "manifest": ".runs/linear-f3193657-a549-43a2-8cff-50c5284df986-co-67-docs-review/cli/2026-04-02T08-30-13-050Z-ea5f5a1d/manifest.json"
+        },
+        "co498_baseline_review": {
+          "reviewer": "CO-498 provider worker",
+          "date": "2026-05-03",
+          "status": "terminal_completed_reclassified",
+          "issue": "CO-67 / f3193657-a549-43a2-8cff-50c5284df986",
+          "linear_state": "Done",
+          "linear_state_type": "completed",
+          "attached_pr": "#349",
+          "summary": "Live Linear verification confirmed this April 2 source issue is terminal Done/completed, so task-index metadata is marked completed and related packet registry rows are archived without blind last_review bumps."
         }
       },
       "paths": {
@@ -8347,7 +8502,8 @@
         "task": "tasks/tasks-linear-f3193657-a549-43a2-8cff-50c5284df986.md",
         "agent_task": ".agent/task/linear-f3193657-a549-43a2-8cff-50c5284df986.md",
         "docs": "docs/TECH_SPEC-linear-f3193657-a549-43a2-8cff-50c5284df986.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260402-linear-6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5",
@@ -8357,12 +8513,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-02",
+      "last_review": "2026-05-03",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-04-02",
           "manifest": ".runs/linear-6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5-co-50-docs-review/cli/2026-04-02T08-32-47-430Z-05430a37/manifest.json"
+        },
+        "co498_baseline_review": {
+          "reviewer": "CO-498 provider worker",
+          "date": "2026-05-03",
+          "status": "terminal_completed_reclassified",
+          "issue": "CO-50 / 6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5",
+          "linear_state": "Done",
+          "linear_state_type": "completed",
+          "attached_pr": "#350",
+          "summary": "Live Linear verification confirmed this April 2 source issue is terminal Done/completed, so task-index metadata is marked completed and related packet registry rows are archived without blind last_review bumps."
         }
       },
       "paths": {
@@ -8370,7 +8536,8 @@
         "task": "tasks/tasks-linear-6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5.md",
         "agent_task": ".agent/task/linear-6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5.md",
         "docs": "docs/TECH_SPEC-linear-6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260402-linear-dbddac50-c205-4402-a7a5-e2325a9c4373",
@@ -8380,14 +8547,26 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-02",
-      "approvals": {},
+      "last_review": "2026-05-03",
+      "approvals": {
+        "co498_baseline_review": {
+          "reviewer": "CO-498 provider worker",
+          "date": "2026-05-03",
+          "status": "terminal_completed_reclassified",
+          "issue": "CO-69 / dbddac50-c205-4402-a7a5-e2325a9c4373",
+          "linear_state": "Done",
+          "linear_state_type": "completed",
+          "attached_pr": "#347",
+          "summary": "Live Linear verification confirmed this April 2 source issue is terminal Done/completed, so task-index metadata is marked completed and related packet registry rows are archived without blind last_review bumps."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md",
         "task": "tasks/tasks-linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md",
         "agent_task": ".agent/task/linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md",
         "docs": "docs/TECH_SPEC-linear-dbddac50-c205-4402-a7a5-e2325a9c4373.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260402-linear-f7b20174-c1f3-4277-a803-e22e643372f4",
@@ -8397,12 +8576,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-02",
+      "last_review": "2026-05-03",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-04-02",
           "manifest": ".runs/linear-f7b20174-c1f3-4277-a803-e22e643372f4-co-71-docs-review/cli/2026-04-02T11-53-37-507Z-d79adf56/manifest.json"
+        },
+        "co498_baseline_review": {
+          "reviewer": "CO-498 provider worker",
+          "date": "2026-05-03",
+          "status": "terminal_completed_reclassified",
+          "issue": "CO-71 / f7b20174-c1f3-4277-a803-e22e643372f4",
+          "linear_state": "Done",
+          "linear_state_type": "completed",
+          "attached_pr": "#348",
+          "summary": "Live Linear verification confirmed this April 2 source issue is terminal Done/completed, so task-index metadata is marked completed and related packet registry rows are archived without blind last_review bumps."
         }
       },
       "paths": {
@@ -8410,7 +8599,8 @@
         "task": "tasks/tasks-linear-f7b20174-c1f3-4277-a803-e22e643372f4.md",
         "agent_task": ".agent/task/linear-f7b20174-c1f3-4277-a803-e22e643372f4.md",
         "docs": "docs/TECH_SPEC-linear-f7b20174-c1f3-4277-a803-e22e643372f4.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260402-linear-88b95054-4f55-4d4d-94be-b491d9896b31",
@@ -8420,12 +8610,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-02",
+      "last_review": "2026-05-03",
       "paths": {
         "spec": "tasks/specs/linear-88b95054-4f55-4d4d-94be-b491d9896b31.md",
         "task": "tasks/tasks-linear-88b95054-4f55-4d4d-94be-b491d9896b31.md",
         "agent_task": ".agent/task/linear-88b95054-4f55-4d4d-94be-b491d9896b31.md",
         "docs": "docs/TECH_SPEC-linear-88b95054-4f55-4d4d-94be-b491d9896b31.md"
+      },
+      "status": "completed",
+      "approvals": {
+        "co498_baseline_review": {
+          "reviewer": "CO-498 provider worker",
+          "date": "2026-05-03",
+          "status": "terminal_completed_reclassified",
+          "issue": "CO-64 / 88b95054-4f55-4d4d-94be-b491d9896b31",
+          "linear_state": "Done",
+          "linear_state_type": "completed",
+          "attached_pr": "#343",
+          "summary": "Live Linear verification confirmed this April 2 source issue is terminal Done/completed, so task-index metadata is marked completed and related packet registry rows are archived without blind last_review bumps."
+        }
       }
     },
     {
@@ -8436,12 +8639,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-02",
+      "last_review": "2026-05-03",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-04-02",
           "manifest": ".runs/linear-52c05d00-d4a6-4768-ad86-8daaa7886ba1-co-58-docs-review/cli/2026-04-02T08-28-51-569Z-64402b50/manifest.json"
+        },
+        "co498_baseline_review": {
+          "reviewer": "CO-498 provider worker",
+          "date": "2026-05-03",
+          "status": "terminal_completed_reclassified",
+          "issue": "CO-58 / 52c05d00-d4a6-4768-ad86-8daaa7886ba1",
+          "linear_state": "Done",
+          "linear_state_type": "completed",
+          "attached_pr": "#346",
+          "summary": "Live Linear verification confirmed this April 2 source issue is terminal Done/completed, so task-index metadata is marked completed and related packet registry rows are archived without blind last_review bumps."
         }
       },
       "paths": {
@@ -8449,7 +8662,8 @@
         "task": "tasks/tasks-linear-52c05d00-d4a6-4768-ad86-8daaa7886ba1.md",
         "agent_task": ".agent/task/linear-52c05d00-d4a6-4768-ad86-8daaa7886ba1.md",
         "docs": "docs/TECH_SPEC-linear-52c05d00-d4a6-4768-ad86-8daaa7886ba1.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260402-linear-17c2a486-f5d8-4801-823e-edb8d9ec9936",
@@ -8459,13 +8673,23 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-02",
+      "last_review": "2026-05-03",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
           "date": "2026-04-02",
           "manifest": ".runs/linear-17c2a486-f5d8-4801-823e-edb8d9ec9936-docs-review/cli/2026-04-02T01-09-25-701Z-8d32f28f/manifest.json",
           "override_reason": "The child docs-review run failed only on unrelated repo-wide stale docs (`.agent/task/0101-slimdown-audit.md`, `docs/PRD-slimdown.md`, and `tasks/tasks-0101-slimdown-audit.md`) after `docs:check` passed and the child report showed no missing or invalid entries for the new CO-61 packet; see out/linear-17c2a486-f5d8-4801-823e-edb8d9ec9936/manual/20260402T011052Z-docs-review-fallback/00-docs-review-fallback.md."
+        },
+        "co498_baseline_review": {
+          "reviewer": "CO-498 provider worker",
+          "date": "2026-05-03",
+          "status": "terminal_completed_reclassified",
+          "issue": "CO-61 / 17c2a486-f5d8-4801-823e-edb8d9ec9936",
+          "linear_state": "Done",
+          "linear_state_type": "completed",
+          "attached_pr": "#345",
+          "summary": "Live Linear verification confirmed this April 2 source issue is terminal Done/completed, so task-index metadata is marked completed and related packet registry rows are archived without blind last_review bumps."
         }
       },
       "paths": {
@@ -8473,7 +8697,8 @@
         "task": "tasks/tasks-linear-17c2a486-f5d8-4801-823e-edb8d9ec9936.md",
         "agent_task": ".agent/task/linear-17c2a486-f5d8-4801-823e-edb8d9ec9936.md",
         "docs": "docs/TECH_SPEC-linear-17c2a486-f5d8-4801-823e-edb8d9ec9936.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260402-linear-69030f04-cfa5-491b-8928-8f325f00da8d",
@@ -8483,13 +8708,23 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-02",
+      "last_review": "2026-05-03",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
           "date": "2026-04-02",
           "manifest": ".runs/linear-69030f04-cfa5-491b-8928-8f325f00da8d-co-60-docs-review/cli/2026-04-02T01-07-36-992Z-0dc038b4/manifest.json",
           "override_reason": "The child docs-review run reached docs:freshness, but the failure came from three unrelated archived 0101 docs that aged past their 90-day cadence on 2026-04-02. The CO-60 packet itself is fully registered, docs:check passed, and the unrelated baseline is recorded in out/linear-69030f04-cfa5-491b-8928-8f325f00da8d/manual/20260402T010738Z-docs-review-fallback.md."
+        },
+        "co498_baseline_review": {
+          "reviewer": "CO-498 provider worker",
+          "date": "2026-05-03",
+          "status": "terminal_completed_reclassified",
+          "issue": "CO-60 / 69030f04-cfa5-491b-8928-8f325f00da8d",
+          "linear_state": "Done",
+          "linear_state_type": "completed",
+          "attached_pr": "#344",
+          "summary": "Live Linear verification confirmed this April 2 source issue is terminal Done/completed, so task-index metadata is marked completed and related packet registry rows are archived without blind last_review bumps."
         }
       },
       "paths": {
@@ -8497,7 +8732,8 @@
         "task": "tasks/tasks-linear-69030f04-cfa5-491b-8928-8f325f00da8d.md",
         "agent_task": ".agent/task/linear-69030f04-cfa5-491b-8928-8f325f00da8d.md",
         "docs": "docs/TECH_SPEC-linear-69030f04-cfa5-491b-8928-8f325f00da8d.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260402-linear-94e9697f-2424-4883-b408-a83233e360fa",
@@ -8507,12 +8743,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-02",
+      "last_review": "2026-05-03",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-04-02",
           "manifest": ".runs/linear-94e9697f-2424-4883-b408-a83233e360fa-co-72-docs-review-rerun/cli/2026-04-02T11-57-23-600Z-6682fb98/manifest.json"
+        },
+        "co498_baseline_review": {
+          "reviewer": "CO-498 provider worker",
+          "date": "2026-05-03",
+          "status": "terminal_completed_reclassified",
+          "issue": "CO-72 / 94e9697f-2424-4883-b408-a83233e360fa",
+          "linear_state": "Done",
+          "linear_state_type": "completed",
+          "attached_pr": "#351",
+          "summary": "Live Linear verification confirmed this April 2 source issue is terminal Done/completed, so task-index metadata is marked completed and related packet registry rows are archived without blind last_review bumps."
         }
       },
       "paths": {
@@ -8520,7 +8766,8 @@
         "task": "tasks/tasks-linear-94e9697f-2424-4883-b408-a83233e360fa.md",
         "agent_task": ".agent/task/linear-94e9697f-2424-4883-b408-a83233e360fa.md",
         "docs": "docs/TECH_SPEC-linear-94e9697f-2424-4883-b408-a83233e360fa.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260401-linear-95b040bc-b150-4c39-bc56-64b13f55579f",
@@ -9324,7 +9571,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-29",
+      "last_review": "2026-05-03",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
@@ -9337,6 +9584,16 @@
           "date": "2026-04-29",
           "status": "reviewed_refreshed",
           "summary": "Reread during PR #719 Core Lane spec-guard/docs:freshness triage; preserved original task scope and refreshed cadence metadata only under live docs:freshness:maintain owner CO-409."
+        },
+        "co498_baseline_review": {
+          "reviewer": "CO-498 provider worker",
+          "date": "2026-05-03",
+          "status": "terminal_completed_reclassified",
+          "issue": "CO-14 / 62527426-2f74-4134-98e0-bb50c3da7913",
+          "linear_state": "Done",
+          "linear_state_type": "completed",
+          "attached_pr": "#317",
+          "summary": "Live Linear verification confirmed this March 28 source issue is terminal Done/completed, so task-index metadata is marked completed and related packet registry rows are archived without blind last_review bumps."
         }
       },
       "paths": {
@@ -9355,12 +9612,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-28",
+      "last_review": "2026-05-03",
       "paths": {
         "spec": "tasks/specs/linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md",
         "task": "tasks/tasks-linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md",
         "agent_task": ".agent/task/linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md",
         "docs": "docs/TECH_SPEC-linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md"
+      },
+      "status": "completed",
+      "approvals": {
+        "co498_baseline_review": {
+          "reviewer": "CO-498 provider worker",
+          "date": "2026-05-03",
+          "status": "terminal_completed_reclassified",
+          "issue": "CO-33 / 9b2a195b-4603-4ed4-98c6-20eff87049e4",
+          "linear_state": "Done",
+          "linear_state_type": "completed",
+          "attached_pr": "#316",
+          "summary": "Live Linear verification confirmed this March 28 source issue is terminal Done/completed, so task-index metadata is marked completed and related packet registry rows are archived without blind last_review bumps."
+        }
       }
     },
     {
@@ -9371,12 +9641,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-28",
+      "last_review": "2026-05-03",
       "paths": {
         "spec": "tasks/specs/linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
         "task": "tasks/tasks-linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
         "agent_task": ".agent/task/linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md",
         "docs": "docs/TECH_SPEC-linear-4646e08c-5c53-4072-b09e-ec1aeff6fb21.md"
+      },
+      "status": "completed",
+      "approvals": {
+        "co498_baseline_review": {
+          "reviewer": "CO-498 provider worker",
+          "date": "2026-05-03",
+          "status": "terminal_completed_reclassified",
+          "issue": "CO-31 / 4646e08c-5c53-4072-b09e-ec1aeff6fb21",
+          "linear_state": "Done",
+          "linear_state_type": "completed",
+          "attached_pr": "#315",
+          "summary": "Live Linear verification confirmed this March 28 source issue is terminal Done/completed, so task-index metadata is marked completed and related packet registry rows are archived without blind last_review bumps."
+        }
       }
     },
     {
@@ -9387,12 +9670,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-28",
+      "last_review": "2026-05-03",
       "paths": {
         "spec": "tasks/specs/linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
         "task": "tasks/tasks-linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
         "agent_task": ".agent/task/linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
         "docs": "docs/TECH_SPEC-linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md"
+      },
+      "status": "completed",
+      "approvals": {
+        "co498_baseline_review": {
+          "reviewer": "CO-498 provider worker",
+          "date": "2026-05-03",
+          "status": "terminal_completed_reclassified",
+          "issue": "CO-24 / 723139d4-2d01-4022-aa09-e88bda7dfd89",
+          "linear_state": "Done",
+          "linear_state_type": "completed",
+          "attached_pr": "#314",
+          "summary": "Live Linear verification confirmed this March 28 source issue is terminal Done/completed, so task-index metadata is marked completed and related packet registry rows are archived without blind last_review bumps."
+        }
       }
     },
     {
@@ -9403,12 +9699,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-28",
+      "last_review": "2026-05-03",
       "paths": {
         "spec": "tasks/specs/linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",
         "task": "tasks/tasks-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",
         "agent_task": ".agent/task/linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md",
         "docs": "docs/TECH_SPEC-linear-156d7133-00ba-40be-bd35-67cd3ae46e21.md"
+      },
+      "status": "completed",
+      "approvals": {
+        "co498_baseline_review": {
+          "reviewer": "CO-498 provider worker",
+          "date": "2026-05-03",
+          "status": "terminal_completed_reclassified",
+          "issue": "CO-25 / 156d7133-00ba-40be-bd35-67cd3ae46e21",
+          "linear_state": "Done",
+          "linear_state_type": "completed",
+          "attached_pr": "#313",
+          "summary": "Live Linear verification confirmed this March 28 source issue is terminal Done/completed, so task-index metadata is marked completed and related packet registry rows are archived without blind last_review bumps."
+        }
       }
     },
     {
@@ -9419,12 +9728,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-28",
+      "last_review": "2026-05-03",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-03-28",
           "manifest": ".runs/linear-b8a32c11-cfc6-4556-b783-f59b290fe67d-docs-review/cli/2026-03-27T14-15-07-635Z-fe73e2e2/manifest.json"
+        },
+        "co498_baseline_review": {
+          "reviewer": "CO-498 provider worker",
+          "date": "2026-05-03",
+          "status": "terminal_completed_reclassified",
+          "issue": "CO-22 / b8a32c11-cfc6-4556-b783-f59b290fe67d",
+          "linear_state": "Done",
+          "linear_state_type": "completed",
+          "attached_pr": null,
+          "summary": "Live Linear verification confirmed this March 28 source issue is terminal Done/completed, so task-index metadata is marked completed and related packet registry rows are archived without blind last_review bumps."
         }
       },
       "paths": {
@@ -9432,7 +9751,8 @@
         "task": "tasks/tasks-linear-b8a32c11-cfc6-4556-b783-f59b290fe67d.md",
         "agent_task": ".agent/task/linear-b8a32c11-cfc6-4556-b783-f59b290fe67d.md",
         "docs": "docs/TECH_SPEC-linear-b8a32c11-cfc6-4556-b783-f59b290fe67d.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260327-linear-e52a7254-f277-4121-b9f9-bf4084c4a473",
