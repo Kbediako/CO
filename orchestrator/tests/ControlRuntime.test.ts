@@ -7086,6 +7086,50 @@ describe('ControlRuntime', () => {
     });
   });
 
+  it('keeps explicitly identified null-provider linear-looking task ids visible when raw intake is unavailable', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-01T02:41:32.000Z'));
+    try {
+      const fixture = await createFixture({
+        taskId: 'local-mcp',
+        readPersistedProviderIntakeState: () => null
+      });
+      await createSiblingRun(fixture.root, 'linear-custom-background-run', 'run-null-provider', {
+        manifest: {
+          issue_identifier: 'ISSUE-NULL-PROVIDER',
+          status: 'in_progress',
+          started_at: '2026-05-01T02:39:00.000Z',
+          updated_at: '2026-05-01T02:40:30.000Z',
+          summary: 'explicit null-provider run with a linear-looking task id'
+        }
+      });
+
+      const projection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const statePayload = await readCompatibilityState({
+        readCompatibilityProjection: async () => projection
+      });
+      const uiDataset = buildUiDataset({
+        projection,
+        generatedAt: '2026-05-01T02:41:32.000Z'
+      });
+
+      expect(projection.providerIntake).toBeNull();
+      expect(projection.providerIntakeUnavailable).toEqual({
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: null
+      });
+      expect(projection.running.map((entry) => entry.issue_identifier)).toContain(
+        'ISSUE-NULL-PROVIDER'
+      );
+      expect(statePayload.running_ids).toContain('ISSUE-NULL-PROVIDER');
+      expect(uiDataset.running.map((entry) => entry.issue_identifier)).toContain(
+        'ISSUE-NULL-PROVIDER'
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('preserves the accepted Linear advisory fallback after duplicate delivery when raw intake is unavailable', async () => {
     const fixture = await createFixture({
       taskId: 'local-mcp',

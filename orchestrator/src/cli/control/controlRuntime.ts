@@ -760,14 +760,22 @@ function suppressProviderIntakeUnavailableSource<
 function isProviderBoundCompatibilitySource(
   source: Pick<
     ControlCompatibilitySourceContext,
-    'issueProvider' | 'pipelineId' | 'pipelineTitle' | 'providerLinearWorkerProof' | 'taskId'
+    | 'issueId'
+    | 'issueIdentifier'
+    | 'issueProvider'
+    | 'pipelineId'
+    | 'pipelineTitle'
+    | 'providerLinearWorkerProof'
+    | 'runId'
+    | 'taskId'
   >
 ): boolean {
   return (
     source.issueProvider === 'linear' ||
     (source.issueProvider === null &&
       source.taskId !== null &&
-      SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(source.taskId)) ||
+      SYNTHETIC_LINEAR_TASK_ID_PATTERN.test(source.taskId) &&
+      !hasExplicitCompatibilityIssueIdentity(source)) ||
     source.pipelineId === 'provider-linear-worker' ||
     source.pipelineTitle === 'Provider Linear Worker' ||
     source.providerLinearWorkerProof != null
