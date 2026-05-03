@@ -68,6 +68,46 @@
       }
     },
     {
+      "id": "20260502-linear-75023431-9350-4e9a-982e-71d244cbf204",
+      "title": "CO-494 provider child-lane accept current issue snapshot",
+      "relates_to": "tasks/tasks-linear-75023431-9350-4e9a-982e-71d244cbf204.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-02",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-75023431-9350-4e9a-982e-71d244cbf204.md",
+        "docs/TECH_SPEC-linear-75023431-9350-4e9a-982e-71d244cbf204.md",
+        "docs/ACTION_PLAN-linear-75023431-9350-4e9a-982e-71d244cbf204.md",
+        "tasks/specs/linear-75023431-9350-4e9a-982e-71d244cbf204.md",
+        "tasks/tasks-linear-75023431-9350-4e9a-982e-71d244cbf204.md",
+        ".agent/task/linear-75023431-9350-4e9a-982e-71d244cbf204.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-75023431-9350-4e9a-982e-71d244cbf204-docs-packet/cli/2026-05-02T22-16-13-635Z-b4675fbf/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet",
+          "date": "2026-05-02",
+          "status": "produced",
+          "manifest": ".runs/linear-75023431-9350-4e9a-982e-71d244cbf204-docs-packet/cli/2026-05-02T22-16-13-635Z-b4675fbf/manifest.json",
+          "source_anchor": "ctx:sha256:e500e7455ea7c9d1082d90c60de24d55aa19a7408a3114422f97c23b62e8547d#chunk:c000001",
+          "canonical_owner_key": "provider-worker:child-lane-accept-current-issue-snapshot",
+          "summary": "Docs-first packet created for CO-494 from the parent-provided child-lane brief and source anchor. The packet preserves provider-linear-child-lane, linear child-lane --action accept, current issue snapshot, parent_snapshot, issue_updated_at, issue_state, issue_state_type, provider_worker_child_lane_stale, provider-linear-child-lane.patch, provider-linear-child-lane-proof.json, and same-issue child lane boundaries. It rejects accepting after parent HEAD moves, proof/scope/dirty violations, real semantic issue drift, child-side Linear/workpad/PR mutation, broad provider-worker redesign, and launch/reject/invalidate/cap behavior changes. Parent owns live Linear issue-context, docs-review, source/test implementation, validation, workpad state, PR lifecycle, and final patch integration."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-75023431-9350-4e9a-982e-71d244cbf204.md",
+        "task": "tasks/tasks-linear-75023431-9350-4e9a-982e-71d244cbf204.md",
+        "agent_task": ".agent/task/linear-75023431-9350-4e9a-982e-71d244cbf204.md",
+        "docs": "docs/TECH_SPEC-linear-75023431-9350-4e9a-982e-71d244cbf204.md"
+      }
+    },
+    {
       "id": "20260503-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe",
       "title": "CO-498 repo-wide spec-guard and docs freshness baseline debt",
       "relates_to": "tasks/tasks-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
