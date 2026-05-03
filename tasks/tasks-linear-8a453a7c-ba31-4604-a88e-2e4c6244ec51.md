@@ -43,6 +43,7 @@
 - [x] Targeted packet path scan for `linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51` and `CO-442`. Evidence: focused `rg` scan passed.
 - [x] Targeted protected-term scan for `codex_core::session`, `failed to record rollout items`, `thread not found`, `review/telemetry.json`, `review_outcome`, `clean-success`, `bounded-success`, `status=succeeded`, `error=null`, `CO-441`, and `backlog_head_follow_up_traceability_pending`. Evidence: focused `rg` scan passed.
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `Spec guard: OK`.
+- [x] Manifest-backed review with explicit `TASK`, `NOTES`, and `MANIFEST`. Evidence: `.runs/linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51/manual/20260503T115240Z-co-442-packet-review/manifest.json` and `.runs/linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51/manual/20260503T115240Z-co-442-packet-review/review/telemetry.json` reported `review_outcome=clean-success`.
 - [x] `npm run docs:check`. Evidence: passed after compacting the new CO-442 `docs/TASKS.md` snapshot to keep reserve headroom.
 - [x] `npm run docs:freshness`. Evidence: `docs:freshness OK - 5171 docs, 5174 registry entries`.
 

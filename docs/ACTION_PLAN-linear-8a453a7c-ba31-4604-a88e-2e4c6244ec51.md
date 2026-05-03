@@ -58,6 +58,8 @@
   - targeted path scan for `linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51` and `CO-442`
   - targeted protected-term scan for the log and telemetry contract
   - `node scripts/spec-guard.mjs --dry-run`
+  - `TASK=linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51 NOTES="Goal: verify CO-442 packet evidence | Summary: traceability packet only, raw logs preserved, successful telemetry authoritative | Risks: missing NOTES gate, scope bleed into CO-441" MANIFEST=<manifest-path> codex-orchestrator review --manifest <manifest-path>`
+  - record `<manifest-path>` plus review telemetry in the task checklist so the NOTES-backed gate remains auditable
   - `npm run docs:check`
   - `npm run docs:freshness`
   - focused parser/status tests after implementation begins
