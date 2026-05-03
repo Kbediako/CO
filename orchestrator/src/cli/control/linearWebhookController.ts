@@ -51,7 +51,9 @@ export interface LinearAdvisoryState {
 
 export interface LinearAdvisoryStaleSource {
   source: 'provider-intake';
-  reason: 'provider_intake_newer_than_linear_advisory';
+  reason:
+    | 'provider_intake_newer_than_linear_advisory'
+    | 'provider_intake_missing_tracked_issue_after_linear_advisory';
   marked_at: string;
   provider_intake_updated_at: string | null;
   advisory_updated_at: string | null;
@@ -343,15 +345,45 @@ export function markLinearAdvisoryStateStaleFromProviderIntake(
     state.tracked_issue
   );
   const advisoryUpdatedAt = resolveLinearAdvisoryTrackedIssueReferenceUpdatedAt(state);
-  if (!isIsoNewer(providerIntakeUpdatedAt, advisoryUpdatedAt)) {
-    return false;
+  if (isIsoNewer(providerIntakeUpdatedAt, advisoryUpdatedAt)) {
+    return markLinearAdvisoryStateStale(state, {
+      reason: 'provider_intake_newer_than_linear_advisory',
+      providerIntakeUpdatedAt,
+      advisoryUpdatedAt,
+      now: options.now
+    });
   }
+
+  if (
+    !hasProviderIntakeClaimForTrackedIssue(providerIntakeState, state.tracked_issue) &&
+    isIsoNewer(resolveProviderIntakeMissingIssueTruthUpdatedAt(providerIntakeState), advisoryUpdatedAt)
+  ) {
+    return markLinearAdvisoryStateStale(state, {
+      reason: 'provider_intake_missing_tracked_issue_after_linear_advisory',
+      providerIntakeUpdatedAt: resolveProviderIntakeMissingIssueTruthUpdatedAt(providerIntakeState),
+      advisoryUpdatedAt,
+      now: options.now
+    });
+  }
+
+  return false;
+}
+
+function markLinearAdvisoryStateStale(
+  state: LinearAdvisoryState,
+  input: {
+    reason: LinearAdvisoryStaleSource['reason'];
+    providerIntakeUpdatedAt: string | null;
+    advisoryUpdatedAt: string | null;
+    now?: () => string;
+  }
+): boolean {
   const nextStaleSource: LinearAdvisoryStaleSource = {
     source: 'provider-intake',
-    reason: 'provider_intake_newer_than_linear_advisory',
-    marked_at: options.now?.() ?? isoTimestamp(),
-    provider_intake_updated_at: providerIntakeUpdatedAt,
-    advisory_updated_at: advisoryUpdatedAt
+    reason: input.reason,
+    marked_at: input.now?.() ?? isoTimestamp(),
+    provider_intake_updated_at: input.providerIntakeUpdatedAt,
+    advisory_updated_at: input.advisoryUpdatedAt
   };
   if (
     state.stale_source?.source === nextStaleSource.source &&
@@ -363,6 +395,27 @@ export function markLinearAdvisoryStateStaleFromProviderIntake(
   }
   state.stale_source = nextStaleSource;
   return true;
+}
+
+function hasProviderIntakeClaimForTrackedIssue(
+  providerIntakeState:
+    | Pick<ProviderIntakeState, 'claims'>
+    | null
+    | undefined,
+  trackedIssue: Pick<LiveLinearTrackedIssue, 'id' | 'identifier'>
+): boolean {
+  return (providerIntakeState?.claims ?? []).some(
+    (claim) => claim.issue_id === trackedIssue.id || claim.issue_identifier === trackedIssue.identifier
+  );
+}
+
+function resolveProviderIntakeMissingIssueTruthUpdatedAt(
+  providerIntakeState:
+    | Pick<ProviderIntakeState, 'rehydrated_at'>
+    | null
+    | undefined
+): string | null {
+  return typeof providerIntakeState?.rehydrated_at === 'string' ? providerIntakeState.rehydrated_at : null;
 }
 
 function resolveProviderIntakeTruthUpdatedAt(
@@ -598,15 +651,20 @@ function normalizeLinearAdvisoryStaleSource(value: unknown): LinearAdvisoryStale
     return null;
   }
   const record = value as Record<string, unknown>;
+  const reason =
+    record.reason === 'provider_intake_newer_than_linear_advisory' ||
+    record.reason === 'provider_intake_missing_tracked_issue_after_linear_advisory'
+      ? record.reason
+      : null;
   if (
     record.source !== 'provider-intake' ||
-    record.reason !== 'provider_intake_newer_than_linear_advisory'
+    !reason
   ) {
     return null;
   }
   return {
     source: 'provider-intake',
-    reason: 'provider_intake_newer_than_linear_advisory',
+    reason,
     marked_at: typeof record.marked_at === 'string' ? record.marked_at : new Date(0).toISOString(),
     provider_intake_updated_at:
       typeof record.provider_intake_updated_at === 'string'

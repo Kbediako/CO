@@ -166,7 +166,7 @@ describe('LinearWebhookController', () => {
     });
   });
 
-  it('does not mark advisory state stale from unrelated provider-intake claims', () => {
+  it('does not mark advisory state stale from unrelated provider-intake claims without current rehydration truth', () => {
     const advisoryState = normalizeLinearAdvisoryState({
       schema_version: 1,
       updated_at: '2026-04-21T15:00:00.000Z',
@@ -203,13 +203,187 @@ describe('LinearWebhookController', () => {
     });
 
     const marked = markLinearAdvisoryStateStaleFromProviderIntake(advisoryState, {
-      rehydrated_at: '2026-04-21T17:00:00.000Z',
+      rehydrated_at: null,
       claims: [
         createProviderIntakeClaim({
           issue_id: 'lin-issue-other',
           issue_identifier: 'CO-999',
           issue_updated_at: '2026-04-21T17:00:00.000Z',
           updated_at: '2026-04-21T17:00:00.000Z'
+        })
+      ]
+    });
+
+    expect(marked).toBe(false);
+    expect(advisoryState.stale_source).toBeUndefined();
+  });
+
+  it('marks advisory state stale when fresh provider-intake truth no longer contains the tracked issue', () => {
+    const advisoryState = normalizeLinearAdvisoryState({
+      schema_version: 1,
+      updated_at: '2026-03-22T04:01:03.255Z',
+      latest_delivery_id: 'delivery-accepted',
+      latest_result: 'accepted',
+      latest_reason: 'linear_delivery_accepted',
+      latest_event: null,
+      latest_accepted_at: '2026-03-22T04:01:03.255Z',
+      tracked_issue: {
+        provider: 'linear',
+        id: 'lin-issue-1',
+        identifier: 'CO-1',
+        title: 'Stale retained advisory',
+        description: null,
+        url: null,
+        state: 'In Progress',
+        state_type: 'started',
+        archived_at: null,
+        trashed: false,
+        viewer_id: 'viewer-1',
+        assignee_id: 'viewer-1',
+        assignee_name: 'Codex',
+        workspace_id: 'workspace-1',
+        team_id: 'team-1',
+        team_key: 'CO',
+        team_name: 'CO',
+        project_id: 'project-1',
+        project_name: 'CO',
+        updated_at: '2026-03-22T04:01:03.255Z',
+        blocked_by: [],
+        recent_activity: []
+      },
+      seen_deliveries: []
+    });
+
+    const marked = markLinearAdvisoryStateStaleFromProviderIntake(
+      advisoryState,
+      {
+        updated_at: '2026-05-01T02:52:40.455Z',
+        rehydrated_at: '2026-05-01T02:52:40.455Z',
+        claims: [
+          createProviderIntakeClaim({
+            issue_id: 'lin-issue-460',
+            issue_identifier: 'CO-460',
+            issue_updated_at: '2026-05-01T02:52:40.455Z',
+            updated_at: '2026-05-01T02:52:40.455Z'
+          })
+        ]
+      },
+      {
+        now: () => '2026-05-01T02:52:52.000Z'
+      }
+    );
+
+    expect(marked).toBe(true);
+    expect(advisoryState.stale_source).toEqual({
+      source: 'provider-intake',
+      reason: 'provider_intake_missing_tracked_issue_after_linear_advisory',
+      marked_at: '2026-05-01T02:52:52.000Z',
+      provider_intake_updated_at: '2026-05-01T02:52:40.455Z',
+      advisory_updated_at: '2026-03-22T04:01:03.255Z'
+    });
+  });
+
+  it('marks advisory state stale when freshly rehydrated provider-intake truth has no claims', () => {
+    const advisoryState = normalizeLinearAdvisoryState({
+      schema_version: 1,
+      updated_at: '2026-03-22T04:01:03.255Z',
+      latest_delivery_id: 'delivery-accepted',
+      latest_result: 'accepted',
+      latest_reason: 'linear_delivery_accepted',
+      latest_event: null,
+      latest_accepted_at: '2026-03-22T04:01:03.255Z',
+      tracked_issue: {
+        provider: 'linear',
+        id: 'lin-issue-1',
+        identifier: 'CO-1',
+        title: 'Stale retained advisory',
+        description: null,
+        url: null,
+        state: 'In Progress',
+        state_type: 'started',
+        archived_at: null,
+        trashed: false,
+        viewer_id: 'viewer-1',
+        assignee_id: 'viewer-1',
+        assignee_name: 'Codex',
+        workspace_id: 'workspace-1',
+        team_id: 'team-1',
+        team_key: 'CO',
+        team_name: 'CO',
+        project_id: 'project-1',
+        project_name: 'CO',
+        updated_at: '2026-03-22T04:01:03.255Z',
+        blocked_by: [],
+        recent_activity: []
+      },
+      seen_deliveries: []
+    });
+
+    const marked = markLinearAdvisoryStateStaleFromProviderIntake(
+      advisoryState,
+      {
+        rehydrated_at: '2026-05-01T02:52:40.455Z',
+        claims: []
+      },
+      {
+        now: () => '2026-05-01T02:52:52.000Z'
+      }
+    );
+
+    expect(marked).toBe(true);
+    expect(advisoryState.stale_source).toEqual({
+      source: 'provider-intake',
+      reason: 'provider_intake_missing_tracked_issue_after_linear_advisory',
+      marked_at: '2026-05-01T02:52:52.000Z',
+      provider_intake_updated_at: '2026-05-01T02:52:40.455Z',
+      advisory_updated_at: '2026-03-22T04:01:03.255Z'
+    });
+  });
+
+  it('does not mark advisory state stale from polling-updated snapshots with unrelated claims', () => {
+    const advisoryState = normalizeLinearAdvisoryState({
+      schema_version: 1,
+      updated_at: '2026-04-21T15:00:00.000Z',
+      latest_delivery_id: 'delivery-accepted',
+      latest_result: 'accepted',
+      latest_reason: 'linear_delivery_accepted',
+      latest_event: null,
+      latest_accepted_at: '2026-04-21T15:00:00.000Z',
+      tracked_issue: {
+        provider: 'linear',
+        id: 'lin-issue-272',
+        identifier: 'CO-272',
+        title: 'Current retained advisory',
+        description: null,
+        url: null,
+        state: 'Blocked',
+        state_type: 'started',
+        archived_at: null,
+        trashed: false,
+        viewer_id: 'viewer-1',
+        assignee_id: 'viewer-1',
+        assignee_name: 'Codex',
+        workspace_id: 'workspace-1',
+        team_id: 'team-1',
+        team_key: 'CO',
+        team_name: 'CO',
+        project_id: 'project-1',
+        project_name: 'CO',
+        updated_at: '2026-04-21T15:00:00.000Z',
+        blocked_by: [],
+        recent_activity: []
+      },
+      seen_deliveries: []
+    });
+
+    const marked = markLinearAdvisoryStateStaleFromProviderIntake(advisoryState, {
+      rehydrated_at: null,
+      claims: [
+        createProviderIntakeClaim({
+          issue_id: 'lin-issue-other',
+          issue_identifier: 'CO-999',
+          issue_updated_at: '2026-04-21T14:00:00.000Z',
+          updated_at: '2026-04-21T14:30:00.000Z'
         })
       ]
     });

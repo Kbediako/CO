@@ -1,6 +1,69 @@
 {
   "items": [
     {
+      "id": "20260501-linear-93785af4-9df9-4713-8a63-b0caddb5796f",
+      "title": "CO-460 stale tracked.linear advisory fallback regression",
+      "relates_to": "tasks/tasks-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-03",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+        "docs/TECH_SPEC-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+        "docs/ACTION_PLAN-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+        "tasks/specs/linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+        "tasks/tasks-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+        ".agent/task/linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-93785af4-9df9-4713-8a63-b0caddb5796f/cli/2026-05-01T04-35-42-108Z-11573cdd/manifest.json",
+        ".runs/linear-93785af4-9df9-4713-8a63-b0caddb5796f/cli/2026-05-01T04-35-42-108Z-11573cdd/review/telemetry.json"
+      ],
+      "approvals": {
+        "docs_packet_parent_lane": {
+          "reviewer": "provider worker",
+          "date": "2026-05-01",
+          "status": "created",
+          "manifest": ".runs/linear-93785af4-9df9-4713-8a63-b0caddb5796f/cli/2026-05-01T04-35-42-108Z-11573cdd/manifest.json",
+          "source_anchor": "ctx:sha256:7e2f368111d599f3b3737fa64148d04c895b885e7e81a638904b0d2da180485e#chunk:c000001",
+          "summary": "Created the CO-460 docs-first packet around the stale tracked.linear advisory fallback regression. The packet keeps co-status --format json, /api/v1/state, /ui/data.json, linear-advisory-state.json, provider_intake.updated_at, CO-1, CO-223, and CO-255 protected while separating provider-intake summary drift and binary/model provenance from this lane."
+        },
+        "implementation_validation": {
+          "reviewer": "provider worker",
+          "date": "2026-05-03",
+          "status": "revalidation-in-progress",
+          "summary": "Implemented stale advisory fail-closed classification and restart regressions. Focused stale advisory regression tests pass in the resumed workspace; full repo validation and review handoff are being refreshed after CO-460 moved from Blocked back to In Progress."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-01",
+          "status": "bounded-success",
+          "telemetry": ".runs/linear-93785af4-9df9-4713-8a63-b0caddb5796f/cli/2026-05-01T04-35-42-108Z-11573cdd/review/telemetry.json",
+          "summary": "Manifest-backed forced standalone review executed under FORCE_CODEX_REVIEW=1. The final run reported no actionable findings and review_outcome=bounded-success."
+        },
+        "elegance_pass": {
+          "reviewer": "provider worker",
+          "date": "2026-05-01",
+          "status": "no-simplification-patch",
+          "summary": "Manual minimality pass kept the change scoped to stale-source classification plus regressions; no provider-intake summary, binary provenance, or broader projection refactor was added."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+        "task": "tasks/tasks-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+        "agent_task": ".agent/task/linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md"
+        }
+      }
+    },
+    {
       "id": "20260430-linear-033979b5-6903-4d5f-9c9b-41769aa69330",
       "title": "CO-447 ready-review CodeRabbit acknowledgement-only mention classification",
       "relates_to": "tasks/tasks-linear-033979b5-6903-4d5f-9c9b-41769aa69330.md",
