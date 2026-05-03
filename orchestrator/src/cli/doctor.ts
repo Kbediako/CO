@@ -410,7 +410,7 @@ export function runDoctor(
   const codexCliProvenance = inspectCodexCliBinaryProvenance({
     command: codexBin,
     env: process.env,
-    cwd,
+    cwd: process.cwd(),
     appBundlePath: options.codexAppBundlePath
   });
   const featureProbe = readCodexFeatureProbe(codexBin, process.env);

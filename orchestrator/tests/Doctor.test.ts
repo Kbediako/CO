@@ -209,11 +209,12 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const originalCodexCliBin = process.env.CODEX_CLI_BIN;
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-binary-provenance-'));
-    process.env.CODEX_HOME = tempHome;
-    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempHome, 'multi_agent stable true', {
+    const activeBin = await writeFakeCodexBinary(tempHome, 'multi_agent stable true', {
       version: 'codex-cli 0.128.0'
     });
     try {
+      process.env.CODEX_HOME = tempHome;
+      process.env.CODEX_CLI_BIN = activeBin;
       const missingAppBundle = join(tempHome, 'Applications', 'Codex.app', 'Contents', 'Resources', 'codex');
       const result = runDoctor(process.cwd(), { codexAppBundlePath: missingAppBundle });
       expect(result.codex_cli.active.path).toBe(process.env.CODEX_CLI_BIN);
@@ -248,12 +249,13 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-binary-match-'));
     const appBundleDir = join(tempHome, 'Applications', 'Codex.app', 'Contents', 'Resources');
     await mkdir(appBundleDir, { recursive: true });
-    process.env.CODEX_HOME = tempHome;
-    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempHome, 'multi_agent stable true', {
+    const activeBin = await writeFakeCodexBinary(tempHome, 'multi_agent stable true', {
       version: 'codex-cli 0.128.0'
     });
     const appBundlePath = await writeFakeCodexBinary(appBundleDir, '', { version: 'codex-cli 0.128.0' });
     try {
+      process.env.CODEX_HOME = tempHome;
+      process.env.CODEX_CLI_BIN = activeBin;
       const result = runDoctor(process.cwd(), { codexAppBundlePath: appBundlePath });
       expect(result.codex_cli.app_bundle.status).toBe('ok');
       expect(result.codex_cli.app_bundle.version).toBe('codex-cli 0.128.0');
@@ -284,12 +286,13 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-binary-drift-'));
     const appBundleDir = join(tempHome, 'Applications', 'Codex.app', 'Contents', 'Resources');
     await mkdir(appBundleDir, { recursive: true });
-    process.env.CODEX_HOME = tempHome;
-    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempHome, 'multi_agent stable true', {
+    const activeBin = await writeFakeCodexBinary(tempHome, 'multi_agent stable true', {
       version: 'codex-cli 0.128.0'
     });
     const appBundlePath = await writeFakeCodexBinary(appBundleDir, '', { version: 'codex-cli 0.128.0-alpha.1' });
     try {
+      process.env.CODEX_HOME = tempHome;
+      process.env.CODEX_CLI_BIN = activeBin;
       const missingAppBundle = join(tempHome, 'missing-app-bundle-codex');
       const baseline = runDoctor(process.cwd(), { codexAppBundlePath: missingAppBundle });
       const result = runDoctor(process.cwd(), { codexAppBundlePath: appBundlePath });
@@ -326,11 +329,11 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     const activeBin = await writeFakeCodexBinary(tempHome, 'multi_agent stable true', {
       version: 'codex-cli path-selected'
     });
-    process.env.CODEX_HOME = tempHome;
-    delete process.env.CODEX_CLI_BIN;
-    delete process.env.CODEX_CLI_USE_MANAGED;
-    process.env.PATH = originalPath ? `${tempHome}${delimiter}${originalPath}` : tempHome;
     try {
+      process.env.CODEX_HOME = tempHome;
+      delete process.env.CODEX_CLI_BIN;
+      delete process.env.CODEX_CLI_USE_MANAGED;
+      process.env.PATH = originalPath ? `${tempHome}${delimiter}${originalPath}` : tempHome;
       const result = runDoctor(process.cwd(), { codexAppBundlePath: join(tempHome, 'missing-app-codex') });
       expect(result.codex_cli.active.command).toBe('codex');
       expect(result.codex_cli.active.path).toBe(activeBin);
@@ -377,10 +380,10 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       version: 'codex-cli managed'
     });
     await writeManagedCodexConfig(tempHome, managedBin);
-    process.env.CODEX_HOME = tempHome;
-    process.env.CODEX_CLI_USE_MANAGED = '1';
-    process.env.CODEX_CLI_BIN = explicitBin;
     try {
+      process.env.CODEX_HOME = tempHome;
+      process.env.CODEX_CLI_USE_MANAGED = '1';
+      process.env.CODEX_CLI_BIN = explicitBin;
       const result = runDoctor(process.cwd(), { codexAppBundlePath: join(tempHome, 'missing-app-codex') });
       expect(result.codex_cli.active.command).toBe(explicitBin);
       expect(result.codex_cli.active.path).toBe(explicitBin);
@@ -402,6 +405,42 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
         delete process.env.CODEX_CLI_USE_MANAGED;
       } else {
         process.env.CODEX_CLI_USE_MANAGED = originalManagedFlag;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('probes relative CODEX_CLI_BIN from the process working directory', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-binary-relative-'));
+    const repoRoot = join(tempHome, 'repo-root');
+    const invocationRoot = join(tempHome, 'invocation-root');
+    const invocationBinDir = join(invocationRoot, 'bin');
+    await mkdir(repoRoot, { recursive: true });
+    await mkdir(invocationBinDir, { recursive: true });
+    const activeBin = await writeFakeCodexBinary(invocationBinDir, 'multi_agent stable true', {
+      version: 'codex-cli relative'
+    });
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(invocationRoot);
+    try {
+      process.env.CODEX_HOME = tempHome;
+      process.env.CODEX_CLI_BIN = join('bin', 'codex');
+      const result = runDoctor(repoRoot, { codexAppBundlePath: join(tempHome, 'missing-app-codex') });
+      expect(result.codex_cli.active.command).toBe(join('bin', 'codex'));
+      expect(result.codex_cli.active.path).toBe(activeBin);
+      expect(result.codex_cli.active.version).toBe('codex-cli relative');
+    } finally {
+      cwdSpy.mockRestore();
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
       }
       await rm(tempHome, { recursive: true, force: true });
     }
