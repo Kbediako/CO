@@ -492,6 +492,62 @@ describe('runProviderLinearChildLaneShell', () => {
     ]);
   });
 
+  it('fails launch when live issue lookup errors and manifest issue_updated_at is absent', async () => {
+    const { manifestPath, runDir } = await createProviderWorkerManifest();
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>;
+    delete manifest.issue_updated_at;
+    await writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
+    const auditPath = join(tempRoot ?? '', 'provider-linear-audit.jsonl');
+    await appendProviderLinearAuditEntry(auditPath, {
+      recorded_at: '2026-03-30T07:11:30.000Z',
+      operation: 'parallelization',
+      ok: true,
+      issue_id: ISSUE.issue_id,
+      issue_identifier: ISSUE.issue_identifier,
+      source_setup: null,
+      action: 'parallelize_now',
+      via: 'Launch impl-a.',
+      state: 'independent_scope_available',
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      failed_relation_type: null,
+      comment_id: null,
+      attachment_id: null,
+      decision_lineage: buildDecisionLineage(RUN_ID),
+      error_code: null,
+      error_message: null
+    });
+    const execRunner = vi.fn();
+
+    const result = await runProviderLinearChildLaneShell(
+      {
+        action: 'launch',
+        streamName: 'impl-a',
+        purpose: 'Implement bounded child lane support',
+        files: ['orchestrator/src/cli/providerLinearChildLaneShell.ts'],
+        env: buildProviderWorkerEnv(manifestPath, { [PROVIDER_LINEAR_AUDIT_ENV_VAR]: auditPath })
+      },
+      {
+        execRunner,
+        now: () => '2026-03-30T07:11:30.000Z',
+        readTrackedIssue: vi.fn(async () => {
+          throw new Error('linear unavailable');
+        }) as never,
+        readParentDirtyPaths: vi.fn(async () => []) as never
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'provider_worker_child_lane_current_issue_unavailable',
+        message: expect.stringContaining('parent run manifest issue_updated_at is absent')
+      }
+    });
+    expect(execRunner).not.toHaveBeenCalled();
+    expect(await readProviderLinearWorkerChildLanes(runDir)).toEqual([]);
+  });
+
   it('preserves child stdout guardrail truth when manifest parsing fails', async () => {
     const { manifestPath, runDir } = await createProviderWorkerManifest();
     const childRunDir = join(tempRoot ?? '', '.runs', `${TASK_ID}-guardrail-a`, 'cli', 'child-run-guardrail');

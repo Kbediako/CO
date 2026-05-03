@@ -495,6 +495,20 @@ async function launchChildLane(
   }
 
   const parentSnapshot = await resolveParentSnapshot(context, params.env, deps);
+  if (parentSnapshot.source === 'unavailable') {
+    return failureResult({
+      action: 'launch',
+      issueId: context.issueId,
+      issueIdentifier: context.issueIdentifier,
+      sourceSetup,
+      stream,
+      childRun: null,
+      childLane: null,
+      code: 'provider_worker_child_lane_current_issue_unavailable',
+      message: `Child lane ${stream} cannot be launched because live/current issue truth is unavailable (${parentSnapshot.unavailable_reason ?? 'unknown'}), and parent run manifest issue_updated_at is absent. Retry after live Linear issue truth is available.`,
+      status: 409
+    });
+  }
   const baseSha = await deps.readParentHeadSha(context.repoRoot);
   const decisionLineage = await resolveChildLaneParentDecisionLineage(context, params.env);
   const childTaskId = `${context.taskId}-${stream}`;
