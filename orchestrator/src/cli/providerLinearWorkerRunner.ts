@@ -36,6 +36,7 @@ import {
   classifyProviderLinearWorkerLifecycle,
 } from './control/providerLinearWorkflowStates.js';
 import {
+  readControlHostOwnerMetadata,
   readControlHostOwnershipDiagnosticSummary,
   readControlHostOwnershipOperatorHint,
   type ControlHostOwnershipPollingPayload
@@ -76,6 +77,10 @@ import {
 } from './run/runMemoryController.js';
 import { writeJsonAtomic } from './utils/fs.js';
 import { fingerprintAuthProvenanceValue } from './utils/authProvenanceFingerprint.js';
+import {
+  refreshSourceRootFreshnessInspection,
+  type SourceRootFreshnessInspection
+} from './utils/sourceRootFreshness.js';
 import {
   createRuntimeCodexCommandContext,
   formatRuntimeSelectionSummary,
@@ -459,6 +464,7 @@ export interface ProviderLinearWorkerProof {
   appserver_supervision?: ProviderLinearWorkerAppServerSupervisionProof | null;
   auth_provenance?: ProviderLinearWorkerAuthProvenance | null;
   worker_control?: ProviderLinearWorkerControlPlane | null;
+  source_root_freshness?: SourceRootFreshnessInspection | null;
   failure_diagnosis?: ProviderLinearWorkerFailureDiagnosis | null;
   owner_phase: string;
   owner_status: 'in_progress' | 'succeeded' | 'failed';
@@ -3667,6 +3673,7 @@ function findValueAtPath(input: Record<string, unknown>, path: string[]): unknow
 }
 
 const PROVIDER_WORKER_CREDENTIAL_SOURCE_LABELS = new Set([
+  'agent_identity',
   'api_key',
   'browser_login',
   'chatgpt_login',
@@ -3684,6 +3691,7 @@ const PROVIDER_WORKER_CREDENTIAL_SOURCE_LABELS = new Set([
 
 const PROVIDER_WORKER_CREDENTIAL_SOURCE_ENV_KEYS = new Set([
   'CHATGPT_AUTH_TOKEN',
+  'CODEX_AGENT_IDENTITY',
   'CODEX_API_KEY',
   'CODEX_AUTH_TOKEN',
   'OPENAI_API_KEY',
@@ -3885,18 +3893,80 @@ function isProviderWorkerAuthProvenanceCarrier(input: Record<string, unknown>): 
       ['authSource'],
       ['auth_freshness'],
       ['authFreshness'],
+      ['agentIdentity', 'credential_source'],
+      ['agentIdentity', 'credentialSource'],
+      ['agentIdentity', 'auth_source'],
+      ['agentIdentity', 'authSource'],
+      ['agentIdentity', 'auth_freshness'],
+      ['agentIdentity', 'authFreshness'],
+      ['agentIdentity', 'freshness'],
+      ['agent_identity', 'credential_source'],
+      ['agent_identity', 'credentialSource'],
+      ['agent_identity', 'auth_source'],
+      ['agent_identity', 'authSource'],
+      ['agent_identity', 'auth_freshness'],
+      ['agent_identity', 'authFreshness'],
+      ['agent_identity', 'freshness'],
       ['payload', 'credential_source'],
       ['payload', 'credentialSource'],
       ['payload', 'auth_source'],
       ['payload', 'authSource'],
       ['payload', 'auth_freshness'],
       ['payload', 'authFreshness'],
+      ['payload', 'agentIdentity', 'credential_source'],
+      ['payload', 'agentIdentity', 'credentialSource'],
+      ['payload', 'agentIdentity', 'auth_source'],
+      ['payload', 'agentIdentity', 'authSource'],
+      ['payload', 'agentIdentity', 'auth_freshness'],
+      ['payload', 'agentIdentity', 'authFreshness'],
+      ['payload', 'agentIdentity', 'freshness'],
+      ['payload', 'agent_identity', 'credential_source'],
+      ['payload', 'agent_identity', 'credentialSource'],
+      ['payload', 'agent_identity', 'auth_source'],
+      ['payload', 'agent_identity', 'authSource'],
+      ['payload', 'agent_identity', 'auth_freshness'],
+      ['payload', 'agent_identity', 'authFreshness'],
+      ['payload', 'agent_identity', 'freshness'],
       ['params', 'credential_source'],
       ['params', 'credentialSource'],
       ['params', 'auth_source'],
       ['params', 'authSource'],
       ['params', 'auth_freshness'],
-      ['params', 'authFreshness']
+      ['params', 'authFreshness'],
+      ['params', 'agentIdentity', 'credential_source'],
+      ['params', 'agentIdentity', 'credentialSource'],
+      ['params', 'agentIdentity', 'auth_source'],
+      ['params', 'agentIdentity', 'authSource'],
+      ['params', 'agentIdentity', 'auth_freshness'],
+      ['params', 'agentIdentity', 'authFreshness'],
+      ['params', 'agentIdentity', 'freshness'],
+      ['params', 'agent_identity', 'credential_source'],
+      ['params', 'agent_identity', 'credentialSource'],
+      ['params', 'agent_identity', 'auth_source'],
+      ['params', 'agent_identity', 'authSource'],
+      ['params', 'agent_identity', 'auth_freshness'],
+      ['params', 'agent_identity', 'authFreshness'],
+      ['params', 'agent_identity', 'freshness'],
+      ['payload', 'params', 'credential_source'],
+      ['payload', 'params', 'credentialSource'],
+      ['payload', 'params', 'auth_source'],
+      ['payload', 'params', 'authSource'],
+      ['payload', 'params', 'auth_freshness'],
+      ['payload', 'params', 'authFreshness'],
+      ['payload', 'params', 'agentIdentity', 'credential_source'],
+      ['payload', 'params', 'agentIdentity', 'credentialSource'],
+      ['payload', 'params', 'agentIdentity', 'auth_source'],
+      ['payload', 'params', 'agentIdentity', 'authSource'],
+      ['payload', 'params', 'agentIdentity', 'auth_freshness'],
+      ['payload', 'params', 'agentIdentity', 'authFreshness'],
+      ['payload', 'params', 'agentIdentity', 'freshness'],
+      ['payload', 'params', 'agent_identity', 'credential_source'],
+      ['payload', 'params', 'agent_identity', 'credentialSource'],
+      ['payload', 'params', 'agent_identity', 'auth_source'],
+      ['payload', 'params', 'agent_identity', 'authSource'],
+      ['payload', 'params', 'agent_identity', 'auth_freshness'],
+      ['payload', 'params', 'agent_identity', 'authFreshness'],
+      ['payload', 'params', 'agent_identity', 'freshness']
     ])
   ) {
     return true;
@@ -3945,6 +4015,12 @@ function extractProviderWorkerAuthProvenance(
       ['auth', 'profile'],
       ['auth', 'profile_id'],
       ['auth', 'profileId'],
+      ['agentIdentity', 'profile'],
+      ['agentIdentity', 'profile_id'],
+      ['agentIdentity', 'profileId'],
+      ['agent_identity', 'profile'],
+      ['agent_identity', 'profile_id'],
+      ['agent_identity', 'profileId'],
       ['params', 'auth_profile'],
       ['params', 'authProfile'],
       ['params', 'profile'],
@@ -3955,6 +4031,12 @@ function extractProviderWorkerAuthProvenance(
       ['params', 'auth', 'profile'],
       ['params', 'auth', 'profile_id'],
       ['params', 'auth', 'profileId'],
+      ['params', 'agentIdentity', 'profile'],
+      ['params', 'agentIdentity', 'profile_id'],
+      ['params', 'agentIdentity', 'profileId'],
+      ['params', 'agent_identity', 'profile'],
+      ['params', 'agent_identity', 'profile_id'],
+      ['params', 'agent_identity', 'profileId'],
       ['payload', 'auth_profile'],
       ['payload', 'authProfile'],
       ['payload', 'profile'],
@@ -3965,6 +4047,12 @@ function extractProviderWorkerAuthProvenance(
       ['payload', 'auth', 'profile'],
       ['payload', 'auth', 'profile_id'],
       ['payload', 'auth', 'profileId'],
+      ['payload', 'agentIdentity', 'profile'],
+      ['payload', 'agentIdentity', 'profile_id'],
+      ['payload', 'agentIdentity', 'profileId'],
+      ['payload', 'agent_identity', 'profile'],
+      ['payload', 'agent_identity', 'profile_id'],
+      ['payload', 'agent_identity', 'profileId'],
       ['payload', 'params', 'auth_profile'],
       ['payload', 'params', 'authProfile'],
       ['payload', 'params', 'profile'],
@@ -3974,7 +4062,13 @@ function extractProviderWorkerAuthProvenance(
       ['payload', 'params', 'auth', 'authProfile'],
       ['payload', 'params', 'auth', 'profile'],
       ['payload', 'params', 'auth', 'profile_id'],
-      ['payload', 'params', 'auth', 'profileId']
+      ['payload', 'params', 'auth', 'profileId'],
+      ['payload', 'params', 'agentIdentity', 'profile'],
+      ['payload', 'params', 'agentIdentity', 'profile_id'],
+      ['payload', 'params', 'agentIdentity', 'profileId'],
+      ['payload', 'params', 'agent_identity', 'profile'],
+      ['payload', 'params', 'agent_identity', 'profile_id'],
+      ['payload', 'params', 'agent_identity', 'profileId']
     ],
     env
   );
@@ -3998,6 +4092,24 @@ function extractProviderWorkerAuthProvenance(
       ['auth', 'organizationId'],
       ['auth', 'org_id'],
       ['auth', 'orgId'],
+      ['agentIdentity', 'account_id'],
+      ['agentIdentity', 'accountId'],
+      ['agentIdentity', 'account'],
+      ['agentIdentity', 'account', 'id'],
+      ['agentIdentity', 'account', 'email'],
+      ['agentIdentity', 'organization_id'],
+      ['agentIdentity', 'organizationId'],
+      ['agentIdentity', 'org_id'],
+      ['agentIdentity', 'orgId'],
+      ['agent_identity', 'account_id'],
+      ['agent_identity', 'accountId'],
+      ['agent_identity', 'account'],
+      ['agent_identity', 'account', 'id'],
+      ['agent_identity', 'account', 'email'],
+      ['agent_identity', 'organization_id'],
+      ['agent_identity', 'organizationId'],
+      ['agent_identity', 'org_id'],
+      ['agent_identity', 'orgId'],
       ['params', 'account_id'],
       ['params', 'accountId'],
       ['params', 'account'],
@@ -4016,6 +4128,24 @@ function extractProviderWorkerAuthProvenance(
       ['params', 'auth', 'organizationId'],
       ['params', 'auth', 'org_id'],
       ['params', 'auth', 'orgId'],
+      ['params', 'agentIdentity', 'account'],
+      ['params', 'agentIdentity', 'account', 'id'],
+      ['params', 'agentIdentity', 'account', 'email'],
+      ['params', 'agentIdentity', 'account_id'],
+      ['params', 'agentIdentity', 'accountId'],
+      ['params', 'agentIdentity', 'organization_id'],
+      ['params', 'agentIdentity', 'organizationId'],
+      ['params', 'agentIdentity', 'org_id'],
+      ['params', 'agentIdentity', 'orgId'],
+      ['params', 'agent_identity', 'account'],
+      ['params', 'agent_identity', 'account', 'id'],
+      ['params', 'agent_identity', 'account', 'email'],
+      ['params', 'agent_identity', 'account_id'],
+      ['params', 'agent_identity', 'accountId'],
+      ['params', 'agent_identity', 'organization_id'],
+      ['params', 'agent_identity', 'organizationId'],
+      ['params', 'agent_identity', 'org_id'],
+      ['params', 'agent_identity', 'orgId'],
       ['payload', 'account_id'],
       ['payload', 'accountId'],
       ['payload', 'account'],
@@ -4034,6 +4164,24 @@ function extractProviderWorkerAuthProvenance(
       ['payload', 'auth', 'organizationId'],
       ['payload', 'auth', 'org_id'],
       ['payload', 'auth', 'orgId'],
+      ['payload', 'agentIdentity', 'account_id'],
+      ['payload', 'agentIdentity', 'accountId'],
+      ['payload', 'agentIdentity', 'account'],
+      ['payload', 'agentIdentity', 'account', 'id'],
+      ['payload', 'agentIdentity', 'account', 'email'],
+      ['payload', 'agentIdentity', 'organization_id'],
+      ['payload', 'agentIdentity', 'organizationId'],
+      ['payload', 'agentIdentity', 'org_id'],
+      ['payload', 'agentIdentity', 'orgId'],
+      ['payload', 'agent_identity', 'account_id'],
+      ['payload', 'agent_identity', 'accountId'],
+      ['payload', 'agent_identity', 'account'],
+      ['payload', 'agent_identity', 'account', 'id'],
+      ['payload', 'agent_identity', 'account', 'email'],
+      ['payload', 'agent_identity', 'organization_id'],
+      ['payload', 'agent_identity', 'organizationId'],
+      ['payload', 'agent_identity', 'org_id'],
+      ['payload', 'agent_identity', 'orgId'],
       ['payload', 'params', 'account_id'],
       ['payload', 'params', 'accountId'],
       ['payload', 'params', 'account'],
@@ -4051,7 +4199,25 @@ function extractProviderWorkerAuthProvenance(
       ['payload', 'params', 'auth', 'organization_id'],
       ['payload', 'params', 'auth', 'organizationId'],
       ['payload', 'params', 'auth', 'org_id'],
-      ['payload', 'params', 'auth', 'orgId']
+      ['payload', 'params', 'auth', 'orgId'],
+      ['payload', 'params', 'agentIdentity', 'account'],
+      ['payload', 'params', 'agentIdentity', 'account', 'id'],
+      ['payload', 'params', 'agentIdentity', 'account', 'email'],
+      ['payload', 'params', 'agentIdentity', 'account_id'],
+      ['payload', 'params', 'agentIdentity', 'accountId'],
+      ['payload', 'params', 'agentIdentity', 'organization_id'],
+      ['payload', 'params', 'agentIdentity', 'organizationId'],
+      ['payload', 'params', 'agentIdentity', 'org_id'],
+      ['payload', 'params', 'agentIdentity', 'orgId'],
+      ['payload', 'params', 'agent_identity', 'account'],
+      ['payload', 'params', 'agent_identity', 'account', 'id'],
+      ['payload', 'params', 'agent_identity', 'account', 'email'],
+      ['payload', 'params', 'agent_identity', 'account_id'],
+      ['payload', 'params', 'agent_identity', 'accountId'],
+      ['payload', 'params', 'agent_identity', 'organization_id'],
+      ['payload', 'params', 'agent_identity', 'organizationId'],
+      ['payload', 'params', 'agent_identity', 'org_id'],
+      ['payload', 'params', 'agent_identity', 'orgId']
     ],
     env
   );
@@ -4066,6 +4232,14 @@ function extractProviderWorkerAuthProvenance(
         ['auth', 'credentialSource'],
         ['auth', 'auth_source'],
         ['auth', 'authSource'],
+        ['agentIdentity', 'credential_source'],
+        ['agentIdentity', 'credentialSource'],
+        ['agentIdentity', 'auth_source'],
+        ['agentIdentity', 'authSource'],
+        ['agent_identity', 'credential_source'],
+        ['agent_identity', 'credentialSource'],
+        ['agent_identity', 'auth_source'],
+        ['agent_identity', 'authSource'],
         ['params', 'credential_source'],
         ['params', 'credentialSource'],
         ['params', 'auth_source'],
@@ -4074,6 +4248,14 @@ function extractProviderWorkerAuthProvenance(
         ['params', 'auth', 'credentialSource'],
         ['params', 'auth', 'auth_source'],
         ['params', 'auth', 'authSource'],
+        ['params', 'agentIdentity', 'credential_source'],
+        ['params', 'agentIdentity', 'credentialSource'],
+        ['params', 'agentIdentity', 'auth_source'],
+        ['params', 'agentIdentity', 'authSource'],
+        ['params', 'agent_identity', 'credential_source'],
+        ['params', 'agent_identity', 'credentialSource'],
+        ['params', 'agent_identity', 'auth_source'],
+        ['params', 'agent_identity', 'authSource'],
         ['payload', 'credential_source'],
         ['payload', 'credentialSource'],
         ['payload', 'auth_source'],
@@ -4082,6 +4264,14 @@ function extractProviderWorkerAuthProvenance(
         ['payload', 'auth', 'credentialSource'],
         ['payload', 'auth', 'auth_source'],
         ['payload', 'auth', 'authSource'],
+        ['payload', 'agentIdentity', 'credential_source'],
+        ['payload', 'agentIdentity', 'credentialSource'],
+        ['payload', 'agentIdentity', 'auth_source'],
+        ['payload', 'agentIdentity', 'authSource'],
+        ['payload', 'agent_identity', 'credential_source'],
+        ['payload', 'agent_identity', 'credentialSource'],
+        ['payload', 'agent_identity', 'auth_source'],
+        ['payload', 'agent_identity', 'authSource'],
         ['payload', 'params', 'credential_source'],
         ['payload', 'params', 'credentialSource'],
         ['payload', 'params', 'auth_source'],
@@ -4089,7 +4279,15 @@ function extractProviderWorkerAuthProvenance(
         ['payload', 'params', 'auth', 'credential_source'],
         ['payload', 'params', 'auth', 'credentialSource'],
         ['payload', 'params', 'auth', 'auth_source'],
-        ['payload', 'params', 'auth', 'authSource']
+        ['payload', 'params', 'auth', 'authSource'],
+        ['payload', 'params', 'agentIdentity', 'credential_source'],
+        ['payload', 'params', 'agentIdentity', 'credentialSource'],
+        ['payload', 'params', 'agentIdentity', 'auth_source'],
+        ['payload', 'params', 'agentIdentity', 'authSource'],
+        ['payload', 'params', 'agent_identity', 'credential_source'],
+        ['payload', 'params', 'agent_identity', 'credentialSource'],
+        ['payload', 'params', 'agent_identity', 'auth_source'],
+        ['payload', 'params', 'agent_identity', 'authSource']
       ])
     ) ?? null;
   const authFreshness = normalizeProviderWorkerAuthFreshness(
@@ -4100,24 +4298,48 @@ function extractProviderWorkerAuthProvenance(
       ['auth', 'auth_freshness'],
       ['auth', 'authFreshness'],
       ['auth', 'freshness'],
+      ['agentIdentity', 'auth_freshness'],
+      ['agentIdentity', 'authFreshness'],
+      ['agentIdentity', 'freshness'],
+      ['agent_identity', 'auth_freshness'],
+      ['agent_identity', 'authFreshness'],
+      ['agent_identity', 'freshness'],
       ['params', 'auth_freshness'],
       ['params', 'authFreshness'],
       ['params', 'freshness'],
       ['params', 'auth', 'auth_freshness'],
       ['params', 'auth', 'authFreshness'],
       ['params', 'auth', 'freshness'],
+      ['params', 'agentIdentity', 'auth_freshness'],
+      ['params', 'agentIdentity', 'authFreshness'],
+      ['params', 'agentIdentity', 'freshness'],
+      ['params', 'agent_identity', 'auth_freshness'],
+      ['params', 'agent_identity', 'authFreshness'],
+      ['params', 'agent_identity', 'freshness'],
       ['payload', 'auth_freshness'],
       ['payload', 'authFreshness'],
       ['payload', 'freshness'],
       ['payload', 'auth', 'auth_freshness'],
       ['payload', 'auth', 'authFreshness'],
       ['payload', 'auth', 'freshness'],
+      ['payload', 'agentIdentity', 'auth_freshness'],
+      ['payload', 'agentIdentity', 'authFreshness'],
+      ['payload', 'agentIdentity', 'freshness'],
+      ['payload', 'agent_identity', 'auth_freshness'],
+      ['payload', 'agent_identity', 'authFreshness'],
+      ['payload', 'agent_identity', 'freshness'],
       ['payload', 'params', 'auth_freshness'],
       ['payload', 'params', 'authFreshness'],
       ['payload', 'params', 'freshness'],
       ['payload', 'params', 'auth', 'auth_freshness'],
       ['payload', 'params', 'auth', 'authFreshness'],
-      ['payload', 'params', 'auth', 'freshness']
+      ['payload', 'params', 'auth', 'freshness'],
+      ['payload', 'params', 'agentIdentity', 'auth_freshness'],
+      ['payload', 'params', 'agentIdentity', 'authFreshness'],
+      ['payload', 'params', 'agentIdentity', 'freshness'],
+      ['payload', 'params', 'agent_identity', 'auth_freshness'],
+      ['payload', 'params', 'agent_identity', 'authFreshness'],
+      ['payload', 'params', 'agent_identity', 'freshness']
     ])
   );
   if (
@@ -4220,8 +4442,181 @@ function redactProviderWorkerFreeFormPlanDetails(raw: string): string {
     );
 }
 
+function readProviderWorkerQuotedValueEnd(input: string, start: number, quote: string): number {
+  let escaped = false;
+  for (let index = start + 1; index < input.length; index += 1) {
+    const char = input[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (char === quote) {
+      return index + 1;
+    }
+  }
+  return input.length;
+}
+
+function isProviderWorkerEscapedQuoteBoundary(
+  input: string,
+  slashIndex: number,
+  quote: string
+): boolean {
+  if (input[slashIndex] !== '\\' || input[slashIndex + 1] !== quote) {
+    return false;
+  }
+  let backslashCount = 0;
+  for (let index = slashIndex; index >= 0 && input[index] === '\\'; index -= 1) {
+    backslashCount += 1;
+  }
+  return backslashCount % 2 === 1;
+}
+
+function readProviderWorkerEscapedQuotedBalancedValueEnd(
+  input: string,
+  start: number,
+  open: string,
+  close: string,
+  quote: string
+): number {
+  let depth = 0;
+  let quoted = false;
+  for (let index = start; index < input.length; index += 1) {
+    if (isProviderWorkerEscapedQuoteBoundary(input, index, quote)) {
+      quoted = !quoted;
+      index += 1;
+      continue;
+    }
+    if (quoted) {
+      continue;
+    }
+    if (input[index] === open) {
+      depth += 1;
+      continue;
+    }
+    if (input[index] === close) {
+      depth -= 1;
+      if (depth <= 0) {
+        return isProviderWorkerEscapedQuoteBoundary(input, index + 1, quote)
+          ? index + 3
+          : index + 1;
+      }
+    }
+  }
+  return input.length;
+}
+
+function readProviderWorkerEscapedQuotedValueEnd(input: string, start: number, quote: string): number {
+  let valueStart = start + 2;
+  while (/\s/u.test(input[valueStart] ?? '')) {
+    valueStart += 1;
+  }
+  const firstValue = input[valueStart];
+  if (firstValue === '{') {
+    return readProviderWorkerEscapedQuotedBalancedValueEnd(input, valueStart, '{', '}', quote);
+  }
+  if (firstValue === '[') {
+    return readProviderWorkerEscapedQuotedBalancedValueEnd(input, valueStart, '[', ']', quote);
+  }
+  for (let index = start + 2; index < input.length - 1; index += 1) {
+    if (!isProviderWorkerEscapedQuoteBoundary(input, index, quote)) {
+      continue;
+    }
+    return index + 2;
+  }
+  return input.length;
+}
+
+function readProviderWorkerBalancedValueEnd(
+  input: string,
+  start: number,
+  open: string,
+  close: string
+): number {
+  let depth = 0;
+  let quote: string | null = null;
+  let escaped = false;
+  for (let index = start; index < input.length; index += 1) {
+    const char = input[index];
+    if (quote) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (char === open) {
+      depth += 1;
+      continue;
+    }
+    if (char === close) {
+      depth -= 1;
+      if (depth <= 0) {
+        return index + 1;
+      }
+    }
+  }
+  return input.length;
+}
+
+function readProviderWorkerAgentIdentityValueEnd(input: string, start: number): number {
+  const first = input[start];
+  const escapedQuote = input[start + 1];
+  if (first === '\\' && (escapedQuote === '"' || escapedQuote === "'")) {
+    return readProviderWorkerEscapedQuotedValueEnd(input, start, escapedQuote);
+  }
+  if (first === '"' || first === "'") {
+    return readProviderWorkerQuotedValueEnd(input, start, first);
+  }
+  if (first === '{') {
+    return readProviderWorkerBalancedValueEnd(input, start, '{', '}');
+  }
+  if (first === '[') {
+    return readProviderWorkerBalancedValueEnd(input, start, '[', ']');
+  }
+  let index = start;
+  while (index < input.length && !/[\s,}]/u.test(input[index] ?? '')) {
+    index += 1;
+  }
+  return index;
+}
+
+function redactProviderWorkerAgentIdentityAssignments(raw: string): string {
+  const assignmentPattern =
+    /(["']?(?:CODEX_AGENT_IDENTITY|agent[_-]?identity|agent\s+identity)["']?)\s*[=:]\s*/giu;
+  let result = '';
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+  while ((match = assignmentPattern.exec(raw)) !== null) {
+    const label = match[1] ?? '';
+    const valueStart = assignmentPattern.lastIndex;
+    const valueEnd = readProviderWorkerAgentIdentityValueEnd(raw, valueStart);
+    result += raw.slice(cursor, match.index);
+    const quotedLabel = label.startsWith('"') || label.startsWith("'");
+    result += quotedLabel ? `${label}:"<redacted>"` : `${label}=<redacted>`;
+    cursor = valueEnd;
+    assignmentPattern.lastIndex = valueEnd;
+  }
+  return result + raw.slice(cursor);
+}
+
 function redactProviderWorkerDiagnosticText(raw: string): string {
-  return redactProviderWorkerFreeFormPlanDetails(raw)
+  return redactProviderWorkerAgentIdentityAssignments(redactProviderWorkerFreeFormPlanDetails(raw))
     .replace(/\bBearer\s+(?!token\b)[A-Za-z0-9._~+/=-]+/giu, 'Bearer <redacted>')
     .replace(/sk-[A-Za-z0-9_-]+/gu, 'sk-<redacted>')
     .replace(
@@ -5385,6 +5780,9 @@ function buildProviderWorkerSessionLogHydrationProofSignature(
     rate_limits: proof.rate_limits ?? null,
     auth_provenance: proof.auth_provenance ?? null,
     worker_control: proof.worker_control ?? null,
+    source_root_freshness: normalizeProviderLinearWorkerSourceRootFreshnessForProofComparison(
+      proof.source_root_freshness
+    ),
     failure_diagnosis: proof.failure_diagnosis ?? null
   });
 }
@@ -5796,6 +6194,9 @@ function normalizeProviderLinearWorkerProofForUpdatedAtComparison(
     auth_provenance: proof.auth_provenance ?? null,
     failure_diagnosis: proof.failure_diagnosis ?? null,
     worker_host: proof.worker_host ?? null,
+    source_root_freshness: normalizeProviderLinearWorkerSourceRootFreshnessForProofComparison(
+      proof.source_root_freshness
+    ),
     source_setup: proof.source_setup ?? null,
     linear_budget: proof.linear_budget ?? null,
     tracked_issue_error: proof.tracked_issue_error ?? null,
@@ -5803,6 +6204,18 @@ function normalizeProviderLinearWorkerProofForUpdatedAtComparison(
     parallelization: proof.parallelization ?? null,
     progress: null,
     updated_at: null
+  };
+}
+
+function normalizeProviderLinearWorkerSourceRootFreshnessForProofComparison(
+  sourceRootFreshness: ProviderLinearWorkerProof['source_root_freshness']
+): Record<string, unknown> | null {
+  if (!sourceRootFreshness) {
+    return null;
+  }
+  return {
+    ...sourceRootFreshness,
+    observed_at: null
   };
 }
 
@@ -5848,6 +6261,9 @@ function selectProviderLinearWorkerProofTelemetryFields(
     rate_limits: proof.rate_limits ?? null,
     auth_provenance: proof.auth_provenance ?? null,
     worker_control: proof.worker_control ?? null,
+    source_root_freshness: normalizeProviderLinearWorkerSourceRootFreshnessForProofComparison(
+      proof.source_root_freshness
+    ),
     failure_diagnosis: proof.failure_diagnosis ?? null,
     owner_phase: proof.owner_phase,
     owner_status: proof.owner_status,
@@ -6960,6 +7376,7 @@ function readProviderWorkerCredentialSourceFromEnv(env: NodeJS.ProcessEnv): stri
   for (const key of [
     'CODEX_API_KEY',
     'OPENAI_API_KEY',
+    'CODEX_AGENT_IDENTITY',
     'CODEX_AUTH_TOKEN',
     'OPENAI_AUTH_TOKEN',
     'CHATGPT_AUTH_TOKEN'
@@ -7090,6 +7507,117 @@ function applyProviderWorkerRuntimeSelectionToManifest(input: {
     provider_worker_control: input.manifest.provider_worker_control ?? null
   });
   return before !== after;
+}
+
+async function readProviderWorkerControlHostSourceRootFreshness(
+  context: Pick<
+    ProviderLinearWorkerContext,
+    | 'controlHostManifestPath'
+    | 'manifestPath'
+    | 'providerControlHostRunId'
+    | 'providerControlHostTaskId'
+    | 'runDir'
+  >
+): Promise<SourceRootFreshnessInspection | null> {
+  const controlHostRunDir = resolveProviderWorkerControlHostRunDir(context);
+  const runDirs = [
+    ...new Set(
+      [
+        controlHostRunDir,
+        dirname(context.controlHostManifestPath),
+        context.runDir
+      ].filter((entry): entry is string => Boolean(entry))
+    )
+  ];
+  for (const runDir of runDirs) {
+    const owner = await readControlHostOwnerMetadata(runDir).catch(() => null);
+    if (owner?.source_root_freshness) {
+      return refreshSourceRootFreshnessInspection(owner.source_root_freshness, owner.repo_root);
+    }
+  }
+  return null;
+}
+
+function resolveProviderWorkerControlHostRunDir(
+  context: Pick<
+    ProviderLinearWorkerContext,
+    | 'controlHostManifestPath'
+    | 'manifestPath'
+    | 'providerControlHostRunId'
+    | 'providerControlHostTaskId'
+  >
+): string | null {
+  if (!context.providerControlHostTaskId || !context.providerControlHostRunId) {
+    return null;
+  }
+  for (const manifestPath of [context.controlHostManifestPath, context.manifestPath]) {
+    const runsRoot = resolveRunsRootFromProviderWorkerManifestPath(manifestPath);
+    if (!runsRoot) {
+      continue;
+    }
+    try {
+      return join(
+        runsRoot,
+        sanitizeTaskId(context.providerControlHostTaskId),
+        'cli',
+        sanitizeRunId(context.providerControlHostRunId)
+      );
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function resolveRunsRootFromProviderWorkerManifestPath(manifestPath: string): string | null {
+  const resolvedManifestPath = resolve(manifestPath);
+  const runDir = dirname(resolvedManifestPath);
+  const cliDir = dirname(runDir);
+  const taskDir = dirname(cliDir);
+  const runsRoot = dirname(taskDir);
+  if (
+    basename(resolvedManifestPath) !== 'manifest.json' ||
+    basename(cliDir) !== 'cli'
+  ) {
+    return null;
+  }
+  return runsRoot;
+}
+
+async function refreshProviderWorkerProofSourceRootFreshness(
+  context: Pick<
+    ProviderLinearWorkerContext,
+    | 'controlHostManifestPath'
+    | 'manifestPath'
+    | 'providerControlHostRunId'
+    | 'providerControlHostTaskId'
+    | 'repoRoot'
+    | 'runDir'
+  >,
+  proof: ProviderLinearWorkerProof
+): Promise<ProviderLinearWorkerProof> {
+  const sourceRootFreshness = proof.source_root_freshness
+    ? refreshSourceRootFreshnessInspection(proof.source_root_freshness, context.repoRoot)
+    : await readProviderWorkerControlHostSourceRootFreshness(context);
+  return {
+    ...proof,
+    source_root_freshness: sourceRootFreshness
+  };
+}
+
+function refreshProviderWorkerProofSourceRootFreshnessFromPrior(
+  proof: ProviderLinearWorkerProof
+): ProviderLinearWorkerProof {
+  if (!proof.source_root_freshness) {
+    return proof;
+  }
+  return {
+    ...proof,
+    source_root_freshness: refreshSourceRootFreshnessInspection(
+      proof.source_root_freshness,
+      proof.workspace_path ?? null
+    )
+  };
 }
 
 async function persistProviderWorkerRuntimeSelectionToManifests(input: {
@@ -9737,23 +10265,33 @@ export async function refreshProviderLinearWorkerProofSnapshot(
         now
       })
     };
+    const hydratedWithFreshSourceRoot = refreshProviderWorkerProofSourceRootFreshnessFromPrior(
+      hydratedWithoutUpdatedAt
+    );
     const nextUpdatedAt = shouldAdvanceProviderLinearWorkerProofUpdatedAt(
       parsed,
-      hydratedWithoutUpdatedAt,
+      hydratedWithFreshSourceRoot,
       options.updatedAtComparisonScope ?? 'full'
     )
       ? now()
       : parsed.updated_at ?? null;
     const hydratedBase: ProviderLinearWorkerProof = {
-      ...hydratedWithoutUpdatedAt,
+      ...hydratedWithFreshSourceRoot,
       updated_at: nextUpdatedAt
     };
     const hydrated: ProviderLinearWorkerProof = {
       ...hydratedBase,
       appserver_supervision: buildProviderLinearWorkerAppServerSupervisionProofIfRelevant(hydratedBase)
     };
+    const hydrationState =
+      proofWithSessionTelemetryResult.hydrationState === null
+        ? null
+        : {
+            ...proofWithSessionTelemetryResult.hydrationState,
+            proof_signature: buildProviderWorkerSessionLogHydrationProofSignature(hydrated)
+          };
     await writeProof(proofPath, hydrated);
-    await writeProviderWorkerSessionLogHydrationState(runDir, proofWithSessionTelemetryResult.hydrationState);
+    await writeProviderWorkerSessionLogHydrationState(runDir, hydrationState);
     if (
       options.emitProgressEvent &&
       buildProviderLinearWorkerProgressSemanticSignature(parsed.progress ?? null)
@@ -9861,6 +10399,7 @@ export async function runProviderLinearWorker(
     runtime: runtimeContext.runtime,
     workerControl
   });
+  const sourceRootFreshness = await readProviderWorkerControlHostSourceRootFreshness(context);
   let finalProof: ProviderLinearWorkerProof = {
     issue_id: context.issueId,
     issue_identifier: context.issueIdentifier,
@@ -9893,6 +10432,7 @@ export async function runProviderLinearWorker(
       observedAt: attemptStartedAt
     }),
     worker_control: workerControl,
+    source_root_freshness: sourceRootFreshness,
     failure_diagnosis: null,
     owner_phase: 'bootstrapping',
     owner_status: 'in_progress',
@@ -9927,8 +10467,15 @@ export async function runProviderLinearWorker(
     );
   };
 
+  const writeFreshProofSnapshot = async (
+    nextProof: ProviderLinearWorkerProof
+  ): Promise<ProviderLinearWorkerProof> => {
+    const proofWithFreshSourceRoot = await refreshProviderWorkerProofSourceRootFreshness(context, nextProof);
+    return await writeProofSnapshot(deps, context.runDir, auditPath, proofWithFreshSourceRoot, childEnv);
+  };
+
   const persistProof = async (nextProof: ProviderLinearWorkerProof): Promise<ProviderLinearWorkerProof> => {
-    const hydratedProof = await writeProofSnapshot(deps, context.runDir, auditPath, nextProof, childEnv);
+    const hydratedProof = await writeFreshProofSnapshot(nextProof);
     emitSemanticProgressIfChanged(hydratedProof);
     await requestProviderControlHostRefresh({
       currentManifestPath: context.controlHostManifestPath,
@@ -10130,16 +10677,10 @@ export async function runProviderLinearWorker(
               if (liveRefreshClosed || !shouldKeepPollingLiveSemanticState(finalProof)) {
                 return;
               }
-              const hydratedProof = await writeProofSnapshot(
-                deps,
-                context.runDir,
-                auditPath,
-                {
-                  ...finalProof,
-                  updated_at: deps.now()
-                },
-                childEnv
-              );
+              const hydratedProof = await writeFreshProofSnapshot({
+                ...finalProof,
+                updated_at: deps.now()
+              });
               finalProof = hydratedProof;
               emitSemanticProgressIfChanged(hydratedProof);
               queueLiveRefresh(hydratedProof);
@@ -10250,7 +10791,7 @@ export async function runProviderLinearWorker(
         finalProof = nextProof;
         liveProofWrite = liveProofWrite
           .then(async () => {
-            const hydratedProof = await writeProofSnapshot(deps, context.runDir, auditPath, nextProof, childEnv);
+            const hydratedProof = await writeFreshProofSnapshot(nextProof);
             finalProof = hydratedProof;
             emitSemanticProgressIfChanged(hydratedProof);
             scheduleLiveSemanticStallRefresh(hydratedProof);
@@ -10343,17 +10884,13 @@ export async function runProviderLinearWorker(
       };
       const previousTurnProof = finalProof;
       const turnStartedAt = deps.now();
-      finalProof = await writeProofSnapshot(
-        deps,
-        context.runDir,
-        auditPath,
+      finalProof = await writeFreshProofSnapshot(
         buildProviderLinearWorkerTurnBootstrapProof(
           finalProof,
           turnNumber,
           turnStartedAt,
           resumeSourceThreadIdForTurn
-        ),
-        childEnv
+        )
       );
       const parallelizationDecisionCountBeforeTurn = readProviderLinearParallelizationSnapshots(
         finalProof.linear_audit,
@@ -10694,6 +11231,7 @@ export async function runProviderLinearWorker(
           parsed.authProvenance
         ),
         worker_control: finalProof.worker_control ?? workerControl,
+        source_root_freshness: finalProof.source_root_freshness ?? sourceRootFreshness,
         failure_diagnosis:
           (useAppServerControl ? stderrFailureDiagnosis : parsed.failureDiagnosis) ??
           (useAppServerControl ? parsed.failureDiagnosis : stderrFailureDiagnosis) ??

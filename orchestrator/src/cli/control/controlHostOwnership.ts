@@ -6,6 +6,12 @@ import process from 'node:process';
 
 import type { RunPaths } from '../run/runPaths.js';
 import { writeJsonAtomic } from '../utils/fs.js';
+import {
+  inspectSourceRootFreshness,
+  normalizeSourceRootFreshnessInspection,
+  refreshSourceRootFreshnessInspection,
+  type SourceRootFreshnessInspection
+} from '../utils/sourceRootFreshness.js';
 import { isoTimestamp } from '../utils/time.js';
 import {
   CONTROL_HOST_DUPLICATE_OWNER_FILE,
@@ -36,6 +42,7 @@ export interface ControlHostOwnerMetadata {
   hostname: string;
   cwd: string | null;
   argv: string[];
+  source_root_freshness: SourceRootFreshnessInspection | null;
   lock_dir: string;
   lock_owner_path: string;
   owner_path: string;
@@ -55,6 +62,7 @@ export interface ControlHostOwnerSummary {
   run_id: string;
   run_dir: string;
   pipeline_id: string | null;
+  source_root_freshness: SourceRootFreshnessInspection | null;
   lock_dir: string;
   owner_path: string;
 }
@@ -105,6 +113,8 @@ export interface AcquireControlHostOwnershipOptions {
   parentProcessId?: number | null;
   cwd?: string | null;
   argv?: string[];
+  commandPath?: string | null;
+  packageRoot?: string | null;
   host?: string;
   now?: () => string;
   isProcessAlive?: (pid: number) => boolean;
@@ -250,6 +260,23 @@ export function buildControlHostOwnershipPollingPayload(
   };
 }
 
+export function refreshControlHostOwnershipPollingPayload(
+  payload: ControlHostOwnershipPollingPayload | null
+): ControlHostOwnershipPollingPayload | null {
+  if (!payload) {
+    return null;
+  }
+  const attemptedOwner =
+    payload.attempted_owner === undefined
+      ? undefined
+      : refreshControlHostOwnerSummary(payload.attempted_owner);
+  return {
+    ...payload,
+    owner: refreshControlHostOwnerSummary(payload.owner),
+    ...(attemptedOwner !== undefined ? { attempted_owner: attemptedOwner } : {})
+  };
+}
+
 export async function readControlHostOwnershipDiagnosticSummary(
   runDir: string
 ): Promise<ControlHostOwnershipPollingPayload | null> {
@@ -339,6 +366,9 @@ function buildControlHostOwnerMetadata(
   paths: ControlHostOwnershipPaths,
   timestamp: string
 ): ControlHostOwnerMetadata {
+  const repoRoot = normalizeNullableString(options.repoRoot);
+  const cwd = options.cwd === undefined ? process.cwd() : options.cwd;
+  const argv = options.argv ?? process.argv.slice();
   return {
     schema_version: 1,
     status: 'owned',
@@ -346,7 +376,7 @@ function buildControlHostOwnerMetadata(
     acquired_at: timestamp,
     updated_at: timestamp,
     released_at: null,
-    repo_root: normalizeNullableString(options.repoRoot),
+    repo_root: repoRoot,
     task_id: normalizeNullableString(options.taskId),
     run_id: options.runId,
     run_dir: paths.runDir,
@@ -354,8 +384,16 @@ function buildControlHostOwnerMetadata(
     pid: options.processId ?? process.pid,
     ppid: options.parentProcessId === undefined ? process.ppid : options.parentProcessId,
     hostname: options.host ?? hostname(),
-    cwd: options.cwd === undefined ? process.cwd() : options.cwd,
-    argv: options.argv ?? process.argv.slice(),
+    cwd,
+    argv,
+    source_root_freshness: inspectSourceRootFreshness({
+      intendedRepoRoot: repoRoot,
+      argv,
+      commandPath: normalizeNullableString(options.commandPath),
+      cwd,
+      packageRoot: normalizeNullableString(options.packageRoot),
+      now: () => timestamp
+    }),
     lock_dir: paths.lockDir,
     lock_owner_path: paths.lockOwnerPath,
     owner_path: paths.ownerPath
@@ -541,6 +579,7 @@ function normalizeControlHostOwnerMetadata(value: unknown): ControlHostOwnerMeta
     argv: Array.isArray(value.argv)
       ? value.argv.filter((entry): entry is string => typeof entry === 'string')
       : [],
+    source_root_freshness: normalizeSourceRootFreshnessInspection(value.source_root_freshness),
     lock_dir: value.lock_dir,
     lock_owner_path: value.lock_owner_path,
     owner_path: value.owner_path
@@ -623,8 +662,22 @@ function summarizeControlHostOwner(
     run_id: metadata.run_id,
     run_dir: metadata.run_dir,
     pipeline_id: metadata.pipeline_id,
+    source_root_freshness: metadata.source_root_freshness,
     lock_dir: metadata.lock_dir,
     owner_path: metadata.owner_path
+  };
+}
+
+function refreshControlHostOwnerSummary(
+  summary: ControlHostOwnerSummary | null
+): ControlHostOwnerSummary | null {
+  const prior = summary?.source_root_freshness;
+  if (!summary || !prior) {
+    return summary;
+  }
+  return {
+    ...summary,
+    source_root_freshness: refreshSourceRootFreshnessInspection(prior, summary.repo_root)
   };
 }
 
@@ -661,6 +714,7 @@ function normalizeControlHostOwnerSummary(value: unknown): ControlHostOwnerSumma
     run_id: value.run_id,
     run_dir: value.run_dir,
     pipeline_id: typeof value.pipeline_id === 'string' ? value.pipeline_id : null,
+    source_root_freshness: normalizeSourceRootFreshnessInspection(value.source_root_freshness),
     lock_dir: value.lock_dir,
     owner_path: value.owner_path
   };

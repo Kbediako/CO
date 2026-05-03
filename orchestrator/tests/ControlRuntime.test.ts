@@ -1,5 +1,6 @@
+import { spawnSync } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, realpath, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -25,6 +26,8 @@ import {
   type ProviderLinearWorkerProof
 } from '../src/cli/providerLinearWorkerRunner.js';
 import { resolveRunPaths, type RunPaths } from '../src/cli/run/runPaths.js';
+import { refreshControlHostOwnershipPollingPayload } from '../src/cli/control/controlHostOwnership.js';
+import { inspectSourceRootFreshness } from '../src/cli/utils/sourceRootFreshness.js';
 
 interface TestFixture {
   root: string;
@@ -7224,6 +7227,7 @@ describe('ControlRuntime', () => {
           run_id: 'control-host',
           run_dir: '/repo/.runs/local-mcp/cli/control-host',
           pipeline_id: 'provider-linear-worker',
+          source_root_freshness: null,
           lock_dir: '/repo/.runs/local-mcp/cli/control-host/control-host-owner.lock',
           owner_path: '/repo/.runs/local-mcp/cli/control-host/control-host-owner.json'
         }
@@ -7246,6 +7250,300 @@ describe('ControlRuntime', () => {
         task_id: 'local-mcp',
         run_id: 'control-host',
         pipeline_id: 'provider-linear-worker'
+      }
+    });
+  });
+
+  it('refreshes control-host source-root freshness at runtime projection time', async () => {
+    const fixture = await createFixture();
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {}),
+      refresh: vi.fn(async () => {})
+    } as unknown as ProviderIssueHandoffService;
+    const repoRoot = await createSourceRootRepo('control-runtime-source-root-');
+
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 15000,
+      controlHostOwner: {
+        status: 'owned',
+        reason: null,
+        updated_at: '2026-05-01T00:00:00.000Z',
+        diagnostic_path: null,
+        lock_dir: join(repoRoot, '.runs', 'control-host-owner.lock'),
+        owner_path: join(repoRoot, '.runs', 'control-host-owner.json'),
+        owner: {
+          owner_token: 'owner-token',
+          status: 'owned',
+          pid: 123,
+          ppid: 1,
+          hostname: 'host.local',
+          acquired_at: '2026-05-01T00:00:00.000Z',
+          updated_at: '2026-05-01T00:00:00.000Z',
+          released_at: null,
+          repo_root: repoRoot,
+          task_id: 'local-mcp',
+          run_id: 'control-host',
+          run_dir: join(repoRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+          pipeline_id: 'provider-linear-worker',
+          source_root_freshness: inspectSourceRootFreshness({
+            intendedRepoRoot: repoRoot,
+            packageRoot: repoRoot,
+            argv: ['node', join(repoRoot, 'bin', 'codex-orchestrator.ts')],
+            cwd: repoRoot,
+            now: () => '2026-05-01T00:00:00.000Z'
+          }),
+          lock_dir: join(repoRoot, '.runs', 'control-host-owner.lock'),
+          owner_path: join(repoRoot, '.runs', 'control-host-owner.json')
+        }
+      }
+    });
+
+    const baseHash = git(repoRoot, ['rev-parse', 'HEAD']).stdout.trim();
+    await writeFile(join(repoRoot, 'README.md'), 'origin advanced\n', 'utf8');
+    git(repoRoot, ['add', '.']);
+    git(repoRoot, ['commit', '-m', 'origin advanced']);
+    git(repoRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    git(repoRoot, ['reset', '--hard', baseHash]);
+
+    const hotHealth = readProviderPollingHealth(providerIssueHandoff);
+    expect(hotHealth?.control_host_owner?.owner?.source_root_freshness).toMatchObject({
+      status: 'current'
+    });
+    expect(
+      refreshControlHostOwnershipPollingPayload(hotHealth?.control_host_owner ?? null)
+        ?.owner?.source_root_freshness
+    ).toMatchObject({
+      status: 'warning',
+      source_checkout: {
+        status: 'stale',
+        behind: 1
+      }
+    });
+
+    const runtime = createControlRuntime({
+      controlStore: fixture.controlStore,
+      questionQueue: { list: () => [] },
+      paths: fixture.paths,
+      linearAdvisoryState: { tracked_issue: null },
+      readProviderIssueHandoff: () => providerIssueHandoff
+    });
+
+    const compatibilityProjection = await runtime.snapshot().readCompatibilityProjection();
+    expect(
+      compatibilityProjection.polling?.control_host_owner?.owner?.source_root_freshness
+    ).toMatchObject({
+      status: 'warning',
+      drift_classes: ['shared_checkout_drift', 'supervised_source_root_drift'],
+      source_checkout: {
+        status: 'stale',
+        behind: 1
+      }
+    });
+  });
+
+  it('keeps startup realpaths when a global control-host launcher is retargeted', async () => {
+    const intendedRoot = await createSourceRootRepo('control-runtime-intended-root-');
+    const staleRoot = await createSourceRootRepo('control-runtime-stale-root-');
+    const staleBaseHash = git(staleRoot, ['rev-parse', 'HEAD']).stdout.trim();
+    await writeFile(join(staleRoot, 'README.md'), 'origin advanced\n', 'utf8');
+    git(staleRoot, ['add', '.']);
+    git(staleRoot, ['commit', '-m', 'origin advanced']);
+    git(staleRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    git(staleRoot, ['reset', '--hard', staleBaseHash]);
+    const globalRoot = await mkdtemp(join(tmpdir(), 'control-runtime-global-launcher-'));
+    cleanupRoots.push(globalRoot);
+    await mkdir(join(globalRoot, 'bin'), { recursive: true });
+    const commandPath = join(globalRoot, 'bin', 'codex-orchestrator');
+    const linkedPackageRoot = join(globalRoot, '@kbediako', 'codex-orchestrator');
+    await mkdir(join(globalRoot, '@kbediako'), { recursive: true });
+    await symlink(join(staleRoot, 'bin', 'codex-orchestrator.ts'), commandPath);
+    await symlink(staleRoot, linkedPackageRoot, 'dir');
+    const startupFreshness = inspectSourceRootFreshness({
+      intendedRepoRoot: intendedRoot,
+      packageRoot: linkedPackageRoot,
+      commandPath,
+      cwd: intendedRoot,
+      now: () => '2026-05-01T00:00:00.000Z'
+    });
+
+    await unlink(commandPath);
+    await unlink(linkedPackageRoot);
+    await symlink(join(intendedRoot, 'bin', 'codex-orchestrator.ts'), commandPath);
+    await symlink(intendedRoot, linkedPackageRoot, 'dir');
+
+    const refreshed = refreshControlHostOwnershipPollingPayload({
+      status: 'owned',
+      reason: null,
+      updated_at: '2026-05-01T00:00:00.000Z',
+      diagnostic_path: null,
+      lock_dir: join(intendedRoot, '.runs', 'control-host-owner.lock'),
+      owner_path: join(intendedRoot, '.runs', 'control-host-owner.json'),
+      owner: {
+        owner_token: 'owner-token',
+        status: 'owned',
+        pid: 123,
+        ppid: 1,
+        hostname: 'host.local',
+        acquired_at: '2026-05-01T00:00:00.000Z',
+        updated_at: '2026-05-01T00:00:00.000Z',
+        released_at: null,
+        repo_root: intendedRoot,
+        task_id: 'local-mcp',
+        run_id: 'control-host',
+        run_dir: join(intendedRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+        pipeline_id: 'provider-linear-worker',
+        source_root_freshness: startupFreshness,
+        lock_dir: join(intendedRoot, '.runs', 'control-host-owner.lock'),
+        owner_path: join(intendedRoot, '.runs', 'control-host-owner.json')
+      }
+    });
+
+    const freshness = refreshed?.owner?.source_root_freshness;
+    expect(freshness).toMatchObject({
+      status: 'warning',
+      command_path: commandPath,
+      command_path_realpath: await realpath(join(staleRoot, 'bin', 'codex-orchestrator.ts')),
+      package_root: linkedPackageRoot,
+      package_root_realpath: await realpath(staleRoot),
+      source_root_realpath: await realpath(staleRoot),
+      source_checkout: {
+        status: 'stale',
+        behind: 1
+      }
+    });
+    expect(freshness?.source_root_realpath).not.toBe(await realpath(intendedRoot));
+    expect(freshness?.drift_classes).toEqual(
+      expect.arrayContaining([
+        'supervised_source_root_drift',
+        'global_binary_package_provenance_drift'
+      ])
+    );
+  });
+
+  it('keeps a restarted live control-host owner while using persisted polling fields', async () => {
+    const fixture = await createFixture();
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {}),
+      refresh: vi.fn(async () => {})
+    } as unknown as ProviderIssueHandoffService;
+    const repoRoot = await createSourceRootRepo('control-runtime-restarted-owner-');
+    const liveFreshness = inspectSourceRootFreshness({
+      intendedRepoRoot: repoRoot,
+      packageRoot: repoRoot,
+      argv: ['node', join(repoRoot, 'bin', 'codex-orchestrator.ts')],
+      cwd: repoRoot,
+      now: () => '2026-05-01T00:00:00.000Z'
+    });
+    const persistedFreshness = {
+      ...liveFreshness,
+      status: 'warning' as const,
+      command_path: '/stale/bin/codex-orchestrator.ts',
+      command_path_realpath: '/stale/bin/codex-orchestrator.ts',
+      package_root: '/stale',
+      package_root_realpath: '/stale',
+      source_root: '/stale',
+      source_root_realpath: '/stale',
+      drift_classes: ['supervised_source_root_drift' as const]
+    };
+
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 15000,
+      stuckAfterMs: 45000,
+      skipInitialUpdate: true,
+      controlHostOwner: {
+        status: 'owned',
+        reason: null,
+        updated_at: '2026-05-01T00:00:00.000Z',
+        diagnostic_path: null,
+        lock_dir: join(repoRoot, '.runs', 'control-host-owner.lock'),
+        owner_path: join(repoRoot, '.runs', 'control-host-owner.json'),
+        owner: {
+          owner_token: 'live-owner-token',
+          status: 'owned',
+          pid: 123,
+          ppid: 1,
+          hostname: 'host.local',
+          acquired_at: '2026-05-01T00:00:00.000Z',
+          updated_at: '2026-05-01T00:00:00.000Z',
+          released_at: null,
+          repo_root: repoRoot,
+          task_id: 'local-mcp',
+          run_id: 'control-host',
+          run_dir: join(repoRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+          pipeline_id: 'provider-linear-worker',
+          source_root_freshness: liveFreshness,
+          lock_dir: join(repoRoot, '.runs', 'control-host-owner.lock'),
+          owner_path: join(repoRoot, '.runs', 'control-host-owner.json')
+        }
+      }
+    });
+
+    const runtime = createControlRuntime({
+      controlStore: fixture.controlStore,
+      questionQueue: { list: () => [] },
+      paths: fixture.paths,
+      linearAdvisoryState: { tracked_issue: null },
+      providerIntakeState: {
+        schema_version: 1,
+        updated_at: '2026-05-01T00:00:45.000Z',
+        rehydrated_at: null,
+        latest_provider_key: null,
+        latest_reason: null,
+        polling: {
+          enabled: true,
+          interval_ms: 15000,
+          checking: true,
+          queued: false,
+          last_mode: 'refresh',
+          updated_at: '2026-05-01T00:00:45.000Z',
+          control_host_owner: {
+            status: 'owned',
+            reason: null,
+            updated_at: '2026-04-30T00:00:00.000Z',
+            diagnostic_path: null,
+            lock_dir: '/stale/.runs/control-host-owner.lock',
+            owner_path: '/stale/.runs/control-host-owner.json',
+            owner: {
+              owner_token: 'persisted-owner-token',
+              status: 'owned',
+              pid: 999,
+              ppid: 1,
+              hostname: 'old-host.local',
+              acquired_at: '2026-04-30T00:00:00.000Z',
+              updated_at: '2026-04-30T00:00:00.000Z',
+              released_at: null,
+              repo_root: '/stale',
+              task_id: 'local-mcp',
+              run_id: 'control-host',
+              run_dir: '/stale/.runs/local-mcp/cli/control-host',
+              pipeline_id: 'provider-linear-worker',
+              source_root_freshness: persistedFreshness,
+              lock_dir: '/stale/.runs/control-host-owner.lock',
+              owner_path: '/stale/.runs/control-host-owner.json'
+            }
+          }
+        },
+        claims: []
+      },
+      readProviderIssueHandoff: () => providerIssueHandoff
+    });
+
+    const compatibilityProjection = await runtime.snapshot().readCompatibilityProjection();
+    expect(compatibilityProjection.polling).toMatchObject({
+      checking: true,
+      last_mode: 'refresh',
+      updated_at: '2026-05-01T00:00:45.000Z',
+      control_host_owner: {
+        owner: {
+          owner_token: 'live-owner-token',
+          pid: 123,
+          source_root_freshness: {
+            command_path: join(repoRoot, 'bin', 'codex-orchestrator.ts'),
+            status: 'current'
+          }
+        }
       }
     });
   });
@@ -7614,3 +7912,38 @@ describe('ControlRuntime', () => {
     }
   });
 });
+
+async function createSourceRootRepo(prefix: string): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), prefix));
+  cleanupRoots.push(root);
+  await mkdir(join(root, 'bin'), { recursive: true });
+  await writeFile(
+    join(root, 'package.json'),
+    `${JSON.stringify({ name: '@kbediako/codex-orchestrator' }, null, 2)}\n`,
+    'utf8'
+  );
+  await writeFile(join(root, 'bin', 'codex-orchestrator.ts'), 'console.log("source");\n', 'utf8');
+  git(root, ['init', '-b', 'main']);
+  git(root, ['add', '.']);
+  git(root, ['commit', '-m', 'base']);
+  git(root, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  return root;
+}
+
+function git(cwd: string, args: string[]): { stdout: string } {
+  const result = spawnSync(
+    'git',
+    ['-c', 'user.name=Codex Test', '-c', 'user.email=codex@example.test', ...args],
+    {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe']
+    }
+  );
+  if (result.error || result.status !== 0) {
+    throw new Error(
+      `git ${args.join(' ')} failed: ${result.stderr || result.error?.message || 'unknown error'}`
+    );
+  }
+  return { stdout: String(result.stdout ?? '') };
+}

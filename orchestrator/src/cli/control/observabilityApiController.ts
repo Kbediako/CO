@@ -17,6 +17,7 @@ import {
   type ObservabilitySurfaceResponse
 } from './observabilitySurface.js';
 import type {
+  ProviderIssueHandoffRecoveryClaim,
   ProviderIssueHandoffRecoveryResult,
   ProviderIssueRecoveryAction
 } from './providerIssueHandoff.js';
@@ -41,21 +42,36 @@ interface ProviderWorkerRecoverInFlight {
   promise: Promise<ProviderIssueHandoffRecoveryResult>;
   acceptanceObserver: ProviderWorkerRecoverAcceptanceObserver;
   accepted: ProviderWorkerRecoverAcceptedState | null;
+  noLaunchAccepted: ProviderWorkerRecoverAcceptedState | null;
   keys: Set<string>;
 }
 
 export interface ProviderWorkerRecoverAcceptedState {
   issue_id: string;
   issue_identifier: string | null;
+  issue_state: string | null;
+  issue_state_type: string | null;
   state: string;
   reason: string | null;
+  task_id: string | null;
+  run_id: string | null;
+  run_manifest_path: string | null;
+  worker_host: string | null;
   launch_source: string | null;
   launch_token_present: boolean;
   updated_at: string | null;
 }
 
+type ProviderWorkerRecoverAcceptanceResult =
+  | { kind: 'accepted'; accepted: ProviderWorkerRecoverAcceptedState }
+  | { kind: 'no_launch_evidence'; accepted: ProviderWorkerRecoverAcceptedState };
+
+interface ProviderWorkerRecoverReadAcceptedInput {
+  requestedAt: string;
+}
+
 interface ProviderWorkerRecoverAcceptanceObserver {
-  promise: Promise<ProviderWorkerRecoverAcceptedState>;
+  promise: Promise<ProviderWorkerRecoverAcceptanceResult>;
   stop(): void;
 }
 
@@ -286,12 +302,12 @@ export async function handleObservabilityApiRequest(
             issueId: request.issueId,
             action: request.action,
             requestedAt,
-            readAccepted: () =>
+            readAccepted: (acceptedInput) =>
               context.readProviderWorkerRecoverAccepted?.({
                 provider: 'linear',
                 issueId: request.issueId,
                 action: request.action,
-                requestedAt
+                requestedAt: acceptedInput.requestedAt
               }) ?? null,
             run: () =>
               requestProviderWorkerRecover({
@@ -378,12 +394,48 @@ function queueProviderWorkerRecover(input: {
   issueId: string;
   action: ProviderIssueRecoveryAction;
   requestedAt: string;
-  readAccepted?: (() => ProviderWorkerRecoverAcceptedState | null) | null;
+  readAccepted?: ((input: ProviderWorkerRecoverReadAcceptedInput) => ProviderWorkerRecoverAcceptedState | null) | null;
   run: () => Promise<ProviderIssueHandoffRecoveryResult>;
 }): Promise<ProviderWorkerRecoverRouteResult> {
   const key = buildProviderWorkerRecoverInFlightKey(input.runtimeKey, input.provider, input.issueId, input.action);
   const existing = providerWorkerRecoverInFlight.get(key);
   if (existing) {
+    if (existing.noLaunchAccepted) {
+      const latestAccepted = input.readAccepted?.({ requestedAt: existing.requestedAt }) ?? null;
+      if (latestAccepted && hasProviderWorkerRecoverLaunchEvidence(latestAccepted)) {
+        existing.accepted = latestAccepted;
+        existing.noLaunchAccepted = null;
+        registerProviderWorkerRecoverInFlightAliases({
+          runtimeKey: input.runtimeKey,
+          provider: input.provider,
+          inFlight: existing,
+          accepted: latestAccepted
+        });
+        return Promise.resolve(
+          buildProviderWorkerRecoverQueuedAcknowledgement({
+            provider: input.provider,
+            issueId: input.issueId,
+            action: input.action,
+            reason: 'provider_worker_recover_already_in_progress',
+            coalesced: true,
+            inFlightAction: existing.action,
+            inFlightRequestedAt: existing.requestedAt,
+            accepted: latestAccepted
+          })
+        );
+      }
+      return Promise.resolve(
+        buildProviderWorkerRecoverNoLaunchEvidenceAcknowledgement({
+          provider: input.provider,
+          issueId: input.issueId,
+          action: input.action,
+          coalesced: true,
+          inFlightAction: existing.action,
+          inFlightRequestedAt: existing.requestedAt,
+          accepted: existing.noLaunchAccepted
+        })
+      );
+    }
     if (existing.accepted) {
       return Promise.resolve(
         buildProviderWorkerRecoverQueuedAcknowledgement({
@@ -412,11 +464,14 @@ function queueProviderWorkerRecover(input: {
   }
 
   const acceptanceObserver = createProviderWorkerRecoverAcceptanceObserver({
-    readAccepted: input.readAccepted ?? null
+    readAccepted: input.readAccepted
+      ? () => input.readAccepted?.({ requestedAt: input.requestedAt }) ?? null
+      : null
   });
   const recoveryPromise = Promise.resolve()
     .then(input.run)
     .catch((error) => {
+      const reason = buildProviderWorkerRecoverFailureReason(error);
       logger.warn(
         `[observability-api] provider-worker ${input.action} background recovery failed for ${input.issueId}: ${
           (error as Error)?.message ?? String(error)
@@ -427,7 +482,7 @@ function queueProviderWorkerRecover(input: {
         issue_id: input.issueId,
         action: input.action,
         kind: 'skipped' as const,
-        reason: 'provider_worker_recover_failed',
+        reason,
         claim: null
       };
     });
@@ -436,15 +491,19 @@ function queueProviderWorkerRecover(input: {
       acceptanceObserver.stop();
       clearProviderWorkerRecoverInFlight(trackedPromise);
     });
-  acceptanceObserver.promise.then((accepted) => {
+  acceptanceObserver.promise.then((result) => {
     const inFlight = providerWorkerRecoverInFlight.get(key);
     if (inFlight?.promise === trackedPromise) {
-      inFlight.accepted = accepted;
+      if (result.kind === 'accepted') {
+        inFlight.accepted = result.accepted;
+      } else {
+        inFlight.noLaunchAccepted = result.accepted;
+      }
       registerProviderWorkerRecoverInFlightAliases({
         runtimeKey: input.runtimeKey,
         provider: input.provider,
         inFlight,
-        accepted
+        accepted: result.accepted
       });
     }
   }, () => undefined);
@@ -454,6 +513,7 @@ function queueProviderWorkerRecover(input: {
     promise: trackedPromise,
     acceptanceObserver,
     accepted: null,
+    noLaunchAccepted: null,
     keys: new Set([key])
   });
 
@@ -479,14 +539,14 @@ async function resolveProviderWorkerRecoverRouteResult(input: {
   inFlightAction: ProviderIssueRecoveryAction;
   inFlightRequestedAt: string;
   trackedPromise: Promise<ProviderIssueHandoffRecoveryResult>;
-  acceptancePromise: Promise<ProviderWorkerRecoverAcceptedState>;
+  acceptancePromise: Promise<ProviderWorkerRecoverAcceptanceResult>;
 }): Promise<ProviderWorkerRecoverRouteResult> {
   const completion = await Promise.race<
     | { kind: 'completed'; result: ProviderIssueHandoffRecoveryResult }
-    | { kind: 'accepted'; accepted: ProviderWorkerRecoverAcceptedState }
+    | ProviderWorkerRecoverAcceptanceResult
   >([
     input.trackedPromise.then((result) => ({ kind: 'completed' as const, result })),
-    input.acceptancePromise.then((accepted) => ({ kind: 'accepted' as const, accepted }))
+    input.acceptancePromise
   ]);
 
   if (completion.kind === 'completed') {
@@ -503,6 +563,18 @@ async function resolveProviderWorkerRecoverRouteResult(input: {
           }
         : {})
     };
+  }
+
+  if (completion.kind === 'no_launch_evidence') {
+    return buildProviderWorkerRecoverNoLaunchEvidenceAcknowledgement({
+      provider: input.provider,
+      issueId: input.issueId,
+      action: input.action,
+      coalesced: input.coalesced,
+      inFlightAction: input.inFlightAction,
+      inFlightRequestedAt: input.inFlightRequestedAt,
+      accepted: completion.accepted
+    });
   }
 
   return buildProviderWorkerRecoverQueuedAcknowledgement({
@@ -543,6 +615,34 @@ function buildProviderWorkerRecoverQueuedAcknowledgement(input: {
   };
 }
 
+function buildProviderWorkerRecoverNoLaunchEvidenceAcknowledgement(input: {
+  provider: 'linear';
+  issueId: string;
+  action: ProviderIssueRecoveryAction;
+  coalesced: boolean;
+  inFlightAction: ProviderIssueRecoveryAction;
+  inFlightRequestedAt: string;
+  accepted: ProviderWorkerRecoverAcceptedState;
+}): ProviderWorkerRecoverCompletedAcknowledgement {
+  return {
+    provider: input.provider,
+    issue_id: input.issueId,
+    action: input.action,
+    kind: 'skipped',
+    reason: 'provider_worker_recover_no_launch_evidence',
+    queued: false,
+    coalesced: input.coalesced,
+    async: false,
+    ...(input.coalesced
+      ? {
+          in_flight_action: input.inFlightAction,
+          in_flight_requested_at: input.inFlightRequestedAt
+        }
+      : {}),
+    claim: summarizeProviderWorkerRecoverAcceptedState(input.provider, input.accepted)
+  };
+}
+
 function createProviderWorkerRecoverAcceptanceObserver(input: {
   readAccepted: (() => ProviderWorkerRecoverAcceptedState | null) | null;
 }): ProviderWorkerRecoverAcceptanceObserver {
@@ -555,7 +655,7 @@ function createProviderWorkerRecoverAcceptanceObserver(input: {
       timer = null;
     }
   };
-  const promise = new Promise<ProviderWorkerRecoverAcceptedState>((resolve) => {
+  const promise = new Promise<ProviderWorkerRecoverAcceptanceResult>((resolve) => {
     const poll = (): void => {
       if (stopped || !input.readAccepted) {
         return;
@@ -563,7 +663,9 @@ function createProviderWorkerRecoverAcceptanceObserver(input: {
       const accepted = input.readAccepted();
       if (accepted) {
         stop();
-        resolve(accepted);
+        resolve(hasProviderWorkerRecoverLaunchEvidence(accepted)
+          ? { kind: 'accepted', accepted }
+          : { kind: 'no_launch_evidence', accepted });
         return;
       }
       timer = setTimeout(poll, PROVIDER_WORKER_RECOVER_ACCEPTANCE_POLL_MS);
@@ -571,6 +673,47 @@ function createProviderWorkerRecoverAcceptanceObserver(input: {
     poll();
   });
   return { promise, stop };
+}
+
+function hasProviderWorkerRecoverLaunchEvidence(accepted: ProviderWorkerRecoverAcceptedState): boolean {
+  return (
+    accepted.launch_token_present ||
+    readNonEmptyString(accepted.run_id) !== null ||
+    readNonEmptyString(accepted.run_manifest_path) !== null
+  );
+}
+
+function summarizeProviderWorkerRecoverAcceptedState(
+  provider: 'linear',
+  accepted: ProviderWorkerRecoverAcceptedState
+): ProviderIssueHandoffRecoveryClaim {
+  return {
+    provider,
+    issue_id: accepted.issue_id,
+    issue_identifier: accepted.issue_identifier,
+    issue_state: accepted.issue_state,
+    issue_state_type: accepted.issue_state_type,
+    state: accepted.state as ProviderIssueHandoffRecoveryClaim['state'],
+    reason: accepted.reason,
+    task_id: accepted.task_id,
+    run_id: accepted.run_id,
+    run_manifest_path: accepted.run_manifest_path,
+    worker_host: accepted.worker_host,
+    launch_source: accepted.launch_source as ProviderIssueHandoffRecoveryClaim['launch_source'],
+    launch_token_present: accepted.launch_token_present,
+    updated_at: accepted.updated_at
+  };
+}
+
+function buildProviderWorkerRecoverFailureReason(error: unknown): string {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : '';
+  const machineReason = message.match(/\bprovider_[a-z0-9_:-]+/u)?.[0] ?? null;
+  return `provider_worker_recover_failed:${machineReason ?? 'unexpected_error'}`;
 }
 
 function resolveProviderWorkerRecoverRuntimeKey(context: ObservabilityPresenterContext): string {

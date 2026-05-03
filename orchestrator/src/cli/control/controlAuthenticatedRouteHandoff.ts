@@ -153,8 +153,14 @@ function readProviderWorkerRecoverAcceptedClaim(
   return {
     issue_id: claim.issue_id,
     issue_identifier: normalizeOptionalString(claim.issue_identifier),
+    issue_state: normalizeOptionalString(claim.issue_state),
+    issue_state_type: normalizeOptionalString(claim.issue_state_type),
     state: claim.state,
     reason: normalizeOptionalString(claim.reason),
+    task_id: normalizeOptionalString(claim.task_id),
+    run_id: normalizeOptionalString(claim.run_id),
+    run_manifest_path: normalizeOptionalString(claim.run_manifest_path),
+    worker_host: normalizeOptionalString(claim.worker_host),
     launch_source: claim.launch_source ?? null,
     launch_token_present: normalizeOptionalString(claim.launch_token) !== null,
     updated_at: normalizeOptionalString(claim.updated_at)
@@ -168,6 +174,18 @@ function isFreshControlHostProviderWorkerRecoverClaim(
     requestedAt: string;
   }
 ): boolean {
+  if (compareOptionalIsoTimestamp(claim.updated_at, input.requestedAt) < 0) {
+    return false;
+  }
+  if (
+    claim.last_event !== 'control_host_provider_worker_recover' ||
+    claim.last_action !== input.action
+  ) {
+    return false;
+  }
+  if (!hasProviderWorkerRecoverClaimLaunchEvidence(claim)) {
+    return isProviderWorkerRecoverPendingRevalidationWithoutLaunchEvidence(claim);
+  }
   if (
     claim.state !== 'starting' &&
     claim.state !== 'resuming' &&
@@ -175,15 +193,24 @@ function isFreshControlHostProviderWorkerRecoverClaim(
   ) {
     return false;
   }
-  if (
-    claim.last_event !== 'control_host_provider_worker_recover' ||
-    claim.last_action !== input.action ||
-    claim.launch_source !== 'control-host' ||
-    normalizeOptionalString(claim.launch_token) === null
-  ) {
-    return false;
-  }
-  return compareOptionalIsoTimestamp(claim.updated_at, input.requestedAt) >= 0;
+  return claim.launch_source === 'control-host';
+}
+
+function hasProviderWorkerRecoverClaimLaunchEvidence(claim: ProviderIntakeClaimRecord): boolean {
+  return (
+    normalizeOptionalString(claim.launch_token) !== null ||
+    normalizeOptionalString(claim.run_id) !== null ||
+    normalizeOptionalString(claim.run_manifest_path) !== null
+  );
+}
+
+function isProviderWorkerRecoverPendingRevalidationWithoutLaunchEvidence(
+  claim: ProviderIntakeClaimRecord
+): boolean {
+  return (
+    claim.state === 'accepted' &&
+    normalizeOptionalString(claim.reason) === 'provider_issue_rehydration_pending_revalidation'
+  );
 }
 
 function compareOptionalIsoTimestamp(left: string | null | undefined, right: string): number {

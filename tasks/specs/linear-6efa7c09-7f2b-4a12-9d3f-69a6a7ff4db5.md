@@ -1,10 +1,10 @@
 ---
 id: 20260402-linear-6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5
 title: CO: Deduplicate trailing JSON-tail parsing across child-stream and delegation server
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-02
-last_review: 2026-04-03
+last_review: 2026-05-03
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db
 related_tasks:
   - tasks/tasks-linear-6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5.md
 review_notes:
+  - 2026-05-03: CO-498 live Linear baseline review verified CO-50 is Done/completed with merged PR #350; archived/reclassified this historical packet metadata without deleting packet evidence or weakening docs:freshness/spec-guard.
   - 2026-04-02: Opened from Linear issue `CO-50` in the provider-worker workspace using issue id `6efa7c09-7f2b-4a12-9d3f-69a6a7ff4db5`.
   - 2026-04-02: Live `linear issue-context` confirmed the CO workflow states (`Ready`, `In Progress`, `In Review`, `Merging`, `Rework`), showed no attached PR and no existing workpad, and the issue was transitioned from `Ready` to `In Progress` before active coding.
   - 2026-04-02: The workspace started detached at `1f28ecbf5`; branch `linear/co-50-deduplicate-json-tail-parser` was created before repo edits, and the single active workpad comment was created as `0d776a35-2857-4c4a-9542-561c8f58604d`.

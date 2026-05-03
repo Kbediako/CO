@@ -1,4 +1,4 @@
-import type { ChildProcess } from 'node:child_process';
+import { spawnSync, type ChildProcess } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import http from 'node:http';
@@ -46,10 +46,18 @@ import {
 import { recordLinearBudgetHeadersObservation } from '../src/cli/control/linearBudgetState.js';
 import {
   CONTROL_HOST_DUPLICATE_OWNER_FILE,
+  CONTROL_HOST_OWNER_FILE,
   CONTROL_HOST_STALE_OWNER_FILE
 } from '../src/cli/control/controlPersistenceFiles.js';
 import { resolveProviderLinearChildLaneScopeContract } from '../src/cli/providerLinearChildLanePhaseContract.js';
 import type { RuntimeCodexCommandContext } from '../src/cli/runtime/index.js';
+import {
+  PROVIDER_CONTROL_HOST_RUN_ID_ENV,
+  PROVIDER_CONTROL_HOST_TASK_ID_ENV,
+  PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
+  PROVIDER_LAUNCH_SOURCE_ENV
+} from '../../scripts/lib/provider-run-contract.js';
+import { inspectSourceRootFreshness } from '../src/cli/utils/sourceRootFreshness.js';
 
 let tempRoot: string | null = null;
 let extraTempRoots: string[] = [];
@@ -136,9 +144,12 @@ afterEach(async () => {
   extraTempRoots = [];
 });
 
-async function createManifestRoot() {
+async function createManifestRoot(
+  runsDirName = '.runs',
+  manifestOverrides: Record<string, unknown> = {}
+) {
   tempRoot = await mkdtemp(join(tmpdir(), 'provider-linear-worker-'));
-  const runDir = join(tempRoot, '.runs', 'linear-lin-issue-1', 'cli', 'run-child');
+  const runDir = join(tempRoot, runsDirName, 'linear-lin-issue-1', 'cli', 'run-child');
   await mkdir(runDir, { recursive: true });
   const manifestPath = join(runDir, 'manifest.json');
   await writeFile(
@@ -148,11 +159,115 @@ async function createManifestRoot() {
       task_id: 'linear-lin-issue-1',
       issue_id: 'lin-issue-1',
       issue_identifier: 'CO-2',
-      workspace_path: tempRoot
+      workspace_path: tempRoot,
+      ...manifestOverrides
     }),
     'utf8'
   );
   return { runDir, manifestPath };
+}
+
+function buildSourceRootFreshnessFixture(
+  overrides: Partial<NonNullable<ProviderLinearWorkerProof['source_root_freshness']>> = {}
+): NonNullable<ProviderLinearWorkerProof['source_root_freshness']> {
+  return {
+    schema_version: 1,
+    status: 'warning',
+    observed_at: '2026-05-01T00:00:00.000Z',
+    intended_repo_root: '/repo',
+    intended_repo_root_realpath: '/repo',
+    command_path: '/stale/bin/codex-orchestrator.ts',
+    command_path_realpath: '/stale/bin/codex-orchestrator.ts',
+    package_root: '/stale',
+    package_root_realpath: '/stale',
+    source_root: '/stale',
+    source_root_realpath: '/stale',
+    entrypoint_kind: 'source',
+    base_ref: 'origin/main',
+    source_checkout: null,
+    intended_checkout: null,
+    drift_classes: ['supervised_source_root_drift'],
+    provenance: {
+      command_path_source: 'explicit',
+      package_root_source: 'explicit',
+      source_root_source: 'package_root',
+      command_path_inside_package: true,
+      package_root_matches_intended: false,
+      source_root_matches_intended: false,
+      source_entry_exists: true,
+      dist_entry_exists: false
+    },
+    guidance: ['Restart or relaunch the supervised control-host from the intended current source root before trusting provider-worker posture.'],
+    detail: 'Detected source/root drift: supervised_source_root_drift.',
+    ...overrides
+  };
+}
+
+async function writeControlHostOwnerForProof(
+  runDir: string,
+  sourceRootFreshness: NonNullable<ProviderLinearWorkerProof['source_root_freshness']>
+): Promise<void> {
+  await writeFile(
+    join(runDir, CONTROL_HOST_OWNER_FILE),
+    JSON.stringify({
+      schema_version: 1,
+      status: 'owned',
+      owner_token: 'control-host-owner-token',
+      acquired_at: '2026-05-01T00:00:00.000Z',
+      updated_at: '2026-05-01T00:00:00.000Z',
+      released_at: null,
+      repo_root: tempRoot,
+      task_id: 'local-mcp',
+      run_id: 'control-host',
+      run_dir: runDir,
+      pipeline_id: 'provider-linear-worker',
+      pid: 123,
+      ppid: 1,
+      hostname: 'host.local',
+      cwd: tempRoot,
+      argv: ['node', '/stale/bin/codex-orchestrator.ts', 'control-host'],
+      source_root_freshness: sourceRootFreshness,
+      lock_dir: join(runDir, 'control-host-owner.lock'),
+      lock_owner_path: join(runDir, 'control-host-owner.lock', 'owner.json'),
+      owner_path: join(runDir, CONTROL_HOST_OWNER_FILE)
+    }),
+    'utf8'
+  );
+}
+
+async function createProviderWorkerSourceRootRepo(prefix: string): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), prefix));
+  extraTempRoots.push(root);
+  await mkdir(join(root, 'bin'), { recursive: true });
+  await writeFile(
+    join(root, 'package.json'),
+    `${JSON.stringify({ name: '@kbediako/codex-orchestrator' }, null, 2)}\n`,
+    'utf8'
+  );
+  await writeFile(join(root, 'bin', 'codex-orchestrator.ts'), 'console.log("source");\n', 'utf8');
+  git(root, ['init', '-b', 'main']);
+  git(root, ['add', '.']);
+  git(root, ['commit', '-m', 'base']);
+  git(root, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  return root;
+}
+
+function git(cwd: string, args: string[]): { stdout: string } {
+  const result = spawnSync(
+    'git',
+    ['-c', 'user.name=Codex Test', '-c', 'user.email=codex@example.test', ...args],
+    {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe']
+    }
+  );
+  if (result.error || result.status !== 0) {
+    throw new Error(
+      `git ${args.join(' ')} failed: ${result.stderr || result.error?.message || 'unknown error'}`
+    );
+  }
+  return { stdout: String(result.stdout ?? '') };
 }
 
 async function createControlEndpointServer(bindHost = '127.0.0.1'): Promise<{
@@ -2430,6 +2545,184 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     }
   });
 
+  it('extracts redacted auth provenance from Agent Identity containers', () => {
+    const cases: Array<{
+      event: Record<string, unknown>;
+      profile: string;
+      account: string;
+      email?: string;
+      credentialSource: string | null;
+      authFreshness: string;
+      observedAt: string;
+    }> = [
+      {
+        event: {
+          type: 'notification',
+          method: 'agentIdentity/auth/updated',
+          params: {
+            agentIdentity: {
+              profileId: 'agent-profile-raw-1',
+              account: {
+                id: 'agent-account-raw-1',
+                email: 'agent-operator@example.com'
+              },
+              credentialSource: 'agent_identity',
+              authFreshness: 'fresh'
+            }
+          },
+          timestamp: '2026-05-01T00:45:00.000Z'
+        },
+        profile: 'agent-profile-raw-1',
+        account: 'agent-account-raw-1',
+        email: 'agent-operator@example.com',
+        credentialSource: 'agent_identity',
+        authFreshness: 'fresh',
+        observedAt: '2026-05-01T00:45:00.000Z'
+      },
+      {
+        event: {
+          type: 'event_msg',
+          payload: {
+            type: 'agent_identity.auth.updated',
+            params: {
+              agent_identity: {
+                profile_id: 'agent-profile-raw-2',
+                account_id: 'agent-account-raw-2',
+                credential_source: 'Agent Identity',
+                auth_freshness: 'valid'
+              }
+            },
+            timestamp: '2026-05-01T00:45:01.000Z'
+          }
+        },
+        profile: 'agent-profile-raw-2',
+        account: 'agent-account-raw-2',
+        credentialSource: 'agent_identity',
+        authFreshness: 'valid',
+        observedAt: '2026-05-01T00:45:01.000Z'
+      },
+      {
+        event: {
+          type: 'event_msg',
+          payload: {
+            type: 'agent_identity.observed',
+            params: {
+              agent_identity: {
+                profile_id: 'agent-profile-raw-3',
+                account_id: 'agent-account-raw-3',
+                credential_source: 'Agent Identity',
+                auth_freshness: 'valid'
+              }
+            },
+            timestamp: '2026-05-01T00:45:02.000Z'
+          }
+        },
+        profile: 'agent-profile-raw-3',
+        account: 'agent-account-raw-3',
+        credentialSource: 'agent_identity',
+        authFreshness: 'valid',
+        observedAt: '2026-05-01T00:45:02.000Z'
+      },
+      {
+        event: {
+          type: 'event_msg',
+          payload: {
+            type: 'agent_identity.observed',
+            params: {
+              agentIdentity: {
+                profileId: 'agent-profile-raw-4',
+                account: {
+                  id: 'agent-account-raw-4'
+                },
+                freshness: 'valid'
+              }
+            },
+            timestamp: '2026-05-01T00:45:03.000Z'
+          }
+        },
+        profile: 'agent-profile-raw-4',
+        account: 'agent-account-raw-4',
+        credentialSource: null,
+        authFreshness: 'valid',
+        observedAt: '2026-05-01T00:45:03.000Z'
+      }
+    ];
+
+    for (const {
+      event,
+      profile,
+      account,
+      email,
+      credentialSource,
+      authFreshness,
+      observedAt
+    } of cases) {
+      const parsed = parseProviderLinearWorkerJsonl(JSON.stringify(event));
+      expect(parsed.authProvenance).toMatchObject({
+        provider_kind: 'codex',
+        active_profile_fingerprint: testFingerprint(profile),
+        active_account_fingerprint: testFingerprint(account),
+        credential_source: credentialSource,
+        auth_freshness: authFreshness,
+        observed_at: observedAt,
+        source: 'stdout_jsonl'
+      });
+      const serialized = JSON.stringify(parsed.authProvenance);
+      expect(serialized).not.toContain(profile);
+      expect(serialized).not.toContain(account);
+      if (email) {
+        expect(serialized).not.toContain(email);
+      }
+    }
+  });
+
+  it('ignores non-auth Agent Identity metadata when merging auth provenance', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        JSON.stringify({
+          type: 'notification',
+          method: 'agentIdentity/auth/updated',
+          params: {
+            agentIdentity: {
+              profileId: 'agent-auth-profile',
+              account: {
+                id: 'agent-auth-account'
+              },
+              credentialSource: 'agent_identity',
+              authFreshness: 'env_credential_present'
+            }
+          },
+          timestamp: '2026-05-01T00:45:00.000Z'
+        }),
+        JSON.stringify({
+          type: 'event_msg',
+          payload: {
+            type: 'agent_identity.metadata.observed',
+            params: {
+              agentIdentity: {
+                profileId: 'agent-metadata-profile',
+                account: {
+                  id: 'agent-metadata-account'
+                }
+              }
+            },
+            timestamp: '2026-05-01T00:46:00.000Z'
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.authProvenance).toMatchObject({
+      active_profile_fingerprint: testFingerprint('agent-auth-profile'),
+      active_account_fingerprint: testFingerprint('agent-auth-account'),
+      credential_source: 'agent_identity',
+      auth_freshness: 'env_credential_present',
+      observed_at: '2026-05-01T00:45:00.000Z'
+    });
+    expect(JSON.stringify(parsed.authProvenance)).not.toContain('agent-metadata-profile');
+    expect(JSON.stringify(parsed.authProvenance)).not.toContain('agent-metadata-account');
+  });
+
   it('does not let older auth provenance events overwrite newer fingerprints', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [
@@ -2587,7 +2880,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           credentialSource: 'operator@example.com',
           authFreshness: 'profile=personal-profile',
           message:
-            'profile mismatch for operator@example.com OPENAI_API_KEY=secret-openai-key "OPENAI_API_KEY":"secret-openai-json" oauth_refresh=secret-oauth-refresh oauth_access=secret-oauth-access {"profile_id":"personal-profile","account_id":"acct_raw_123","org_id":"org_raw_456","refresh_token":"secret-refresh-token"} profile id personal-profile account id acct-raw-123 organization id org-raw-456 user id user-raw-789 session id sess-secret-123 refresh token secret-refresh-token standalone acct-standalone-123 org-standalone-456 user-standalone-789 account id abc123 profile identifier xyz789 account id: acctcolon123 profile id: profilecolon123 organization id: orgcolon123 user id: usercolon123 session id: sesscolon123'
+            'profile mismatch for operator@example.com OPENAI_API_KEY=secret-openai-key "OPENAI_API_KEY":"secret-openai-json" CODEX_AGENT_IDENTITY=agent-identity-secret oauth_refresh=secret-oauth-refresh oauth_access=secret-oauth-access {"profile_id":"personal-profile","account_id":"acct_raw_123","org_id":"org_raw_456","refresh_token":"secret-refresh-token"} profile id personal-profile account id acct-raw-123 organization id org-raw-456 user id user-raw-789 session id sess-secret-123 refresh token secret-refresh-token standalone acct-standalone-123 org-standalone-456 user-standalone-789 account id abc123 profile identifier xyz789 account id: acctcolon123 profile id: profilecolon123 organization id: orgcolon123 user id: usercolon123 session id: sesscolon123'
         },
         timestamp: '2026-04-15T20:45:21.000Z'
       })
@@ -2612,18 +2905,93 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       'acctcolon123', 'profilecolon123', 'orgcolon123', 'usercolon123', 'sesscolon123',
       'operator@example.com', 'example.com', 'secret-refresh-token',
       'secret-oauth-refresh', 'secret-oauth-access', 'secret-openai-key',
-      'secret-openai-json', 'sess-secret-123'
+      'secret-openai-json', 'agent-identity-secret', 'sess-secret-123'
     ]) {
       expect(signal).not.toContain(fragment);
     }
     for (const fragment of [
       '<email-redacted>', 'OPENAI_API_KEY=<redacted>', '"OPENAI_API_KEY":"<redacted>"',
+      'CODEX_AGENT_IDENTITY=<redacted>',
       'oauth_refresh=<redacted>', 'oauth_access=<redacted>', '"refresh_token":"<redacted>"',
       'session id <redacted>', 'profile id <redacted>',
       'account id <redacted>', 'organization id <redacted>', 'user id <redacted>'
     ]) {
       expect(signal).toContain(fragment);
     }
+  });
+
+  it('redacts structured Agent Identity values from provider diagnostics', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'notification',
+        method: 'account/authProfile/mismatch',
+        params: {
+          message:
+            'agent identity probe CODEX_AGENT_IDENTITY={"id":"agent-identity-deep-id","account":{"owner":{"id":"agent-identity-deep-owner"}}} agent_identity: { "id": "agent-identity-pretty-id", "account": { "owner": { "id": "agent-identity-pretty-owner" } } } CODEX_AGENT_IDENTITY="agent identity spaced secret" CODEX_AGENT_IDENTITY=\\"agent identity escaped wrapper secret\\" CODEX_AGENT_IDENTITY=\\"{ \\"id\\" : \\"agent-identity-escaped-pretty-id\\" }\\" CODEX_AGENT_IDENTITY=\\" { \\"id\\" : \\"agent-identity-escaped-whitespace-id\\" }\\" CODEX_AGENT_IDENTITY="{\\"id\\":\\"agent-identity-escaped-env-id\\",\\"subject\\":\\"agent-identity-escaped-env-subject\\"}" CODEX_AGENT_IDENTITY={"id":"agent-identity-object-id","subject":"agent-identity-object-subject"} {"CODEX_AGENT_IDENTITY":"agent-identity-json-secret"} {"CODEX_AGENT_IDENTITY":"{\\"id\\":\\"agent-identity-escaped-json-id\\",\\"subject\\":\\"agent-identity-escaped-json-subject\\"}"} {"CODEX_AGENT_IDENTITY":{"id":"agent-identity-json-object-id","subject":"agent-identity-json-object-subject"}} agent_identity: agent-identity-colon-secret agent_identity: \'agent identity colon spaced secret\' agent_identity: {"id":"agent-identity-colon-object-id","subject":"agent-identity-colon-object-subject"}'
+        },
+        timestamp: '2026-05-01T00:46:00.000Z'
+      })
+    );
+
+    expect(parsed.failureDiagnosis).toMatchObject({
+      diagnostic_category: 'auth_mismatch',
+      source: 'stdout_jsonl'
+    });
+    const signal = parsed.failureDiagnosis?.signal ?? '';
+    expect(signal).toContain('"CODEX_AGENT_IDENTITY":"<redacted>"');
+    expect(signal).toContain('agent_identity=<redacted>');
+    expect(signal).not.toContain('agent-identity-deep-id');
+    expect(signal).not.toContain('agent-identity-deep-owner');
+    expect(signal).not.toContain('agent-identity-pretty-id');
+    expect(signal).not.toContain('agent-identity-pretty-owner');
+    expect(signal).not.toContain('agent identity spaced secret');
+    expect(signal).not.toContain('agent identity escaped wrapper secret');
+    expect(signal).not.toContain('agent-identity-escaped-pretty-id');
+    expect(signal).not.toContain('agent-identity-escaped-whitespace-id');
+    expect(signal).not.toContain('agent-identity-escaped-env-id');
+    expect(signal).not.toContain('agent-identity-escaped-env-subject');
+    expect(signal).not.toContain('agent-identity-object-id');
+    expect(signal).not.toContain('agent-identity-object-subject');
+    expect(signal).not.toContain('agent-identity-json-secret');
+    expect(signal).not.toContain('agent-identity-escaped-json-id');
+    expect(signal).not.toContain('agent-identity-escaped-json-subject');
+    expect(signal).not.toContain('agent-identity-json-object-id');
+    expect(signal).not.toContain('agent-identity-json-object-subject');
+    expect(signal).not.toContain('agent-identity-colon-secret');
+    expect(signal).not.toContain('agent identity colon spaced secret');
+    expect(signal).not.toContain('agent-identity-colon-object-id');
+    expect(signal).not.toContain('agent-identity-colon-object-subject');
+  });
+
+  it('preserves diagnostics after delimiter-terminated escaped Agent Identity values', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'notification',
+        params: {
+          message:
+            'CODEX_AGENT_IDENTITY=\\"agent identity delimiter secret\\"; auth profile mismatch for selected account CODEX_AGENT_IDENTITY=\\"agent identity brace delimiter secret\\"} active profile mismatch remains visible CODEX_AGENT_IDENTITY=\\"agent identity colon delimiter secret\\": auth profile colon mismatch remains visible CODEX_AGENT_IDENTITY=\\"{ \\"id\\" : \\"agent-identity-edge-brace\\\\"}\\", \\"tail\\" : \\"agent-identity-edge-brace-tail\\" }\\"} escaped brace tail remains visible CODEX_AGENT_IDENTITY=\\"[ \\"agent-identity-edge-bracket\\\\"]\\", \\"agent-identity-edge-bracket-tail\\" ]\\" ] escaped bracket tail remains visible'
+        },
+        timestamp: '2026-05-01T00:47:00.000Z'
+      })
+    );
+
+    expect(parsed.failureDiagnosis).toMatchObject({
+      diagnostic_category: 'auth_mismatch',
+      source: 'stdout_jsonl'
+    });
+    const signal = parsed.failureDiagnosis?.signal ?? '';
+    expect(signal).toContain('CODEX_AGENT_IDENTITY=<redacted>; auth profile mismatch');
+    expect(signal).toContain('active profile mismatch remains visible');
+    expect(signal).toContain('CODEX_AGENT_IDENTITY=<redacted>: auth profile colon mismatch remains visible');
+    expect(signal).toContain('escaped brace tail remains visible');
+    expect(signal).toContain('escaped bracket tail remains visible');
+    expect(signal).not.toContain('agent identity delimiter secret');
+    expect(signal).not.toContain('agent identity brace delimiter secret');
+    expect(signal).not.toContain('agent identity colon delimiter secret');
+    expect(signal).not.toContain('agent-identity-edge-brace');
+    expect(signal).not.toContain('agent-identity-edge-brace-tail');
+    expect(signal).not.toContain('agent-identity-edge-bracket');
+    expect(signal).not.toContain('agent-identity-edge-bracket-tail');
   });
 
   it('redacts app-server terminal turn error details before diagnostics are persisted', async () => {
@@ -3491,7 +3859,11 @@ for await (const line of rl) {
   });
 
   it('continues on the same thread across turns and writes a proof sidecar', async () => {
-    const { manifestPath, runDir } = await createManifestRoot();
+    const { manifestPath, runDir } = await createManifestRoot('co-runs', {
+      provider_launch_source: PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
+      provider_control_host_task_id: 'local-mcp',
+      provider_control_host_run_id: 'control-host'
+    });
     const readTrackedIssue = vi
       .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
       .mockResolvedValueOnce(createTrackedIssue())
@@ -3685,6 +4057,30 @@ for await (const line of rl) {
       warn: vi.fn(),
       error: vi.fn()
     };
+    const sourceRoot = await createProviderWorkerSourceRootRepo('provider-worker-control-host-source-');
+    const sourceRootRealpath = await realpath(sourceRoot);
+    const sourceEntrypoint = join(sourceRoot, 'bin', 'codex-orchestrator.ts');
+    const sourceRootFreshness = buildSourceRootFreshnessFixture({
+      status: 'current',
+      intended_repo_root: sourceRoot,
+      intended_repo_root_realpath: sourceRootRealpath,
+      command_path: sourceEntrypoint,
+      command_path_realpath: await realpath(sourceEntrypoint),
+      package_root: sourceRoot,
+      package_root_realpath: sourceRootRealpath,
+      source_root: sourceRoot,
+      source_root_realpath: sourceRootRealpath,
+      drift_classes: []
+    });
+    const controlHostRunDir = join(tempRoot ?? '', 'co-runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostRunDir, { recursive: true });
+    await writeControlHostOwnerForProof(controlHostRunDir, sourceRootFreshness);
+    const sourceBaseHash = git(sourceRoot, ['rev-parse', 'HEAD']).stdout.trim();
+    await writeFile(join(sourceRoot, 'README.md'), 'origin advanced\n', 'utf8');
+    git(sourceRoot, ['add', '.']);
+    git(sourceRoot, ['commit', '-m', 'origin advanced']);
+    git(sourceRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    git(sourceRoot, ['reset', '--hard', sourceBaseHash]);
 
     const proof = await runProviderLinearWorker(
       {
@@ -3693,7 +4089,10 @@ for await (const line of rl) {
         CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
         CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '3',
         CODEX_CLI_BIN: 'codex',
-        CODEX_HOME: tempRoot ?? undefined
+        CODEX_HOME: tempRoot ?? undefined,
+        [PROVIDER_LAUNCH_SOURCE_ENV]: PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
+        [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: 'local-mcp',
+        [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: 'control-host'
       },
       {
         readTrackedIssue,
@@ -3799,6 +4198,18 @@ for await (const line of rl) {
         total_tokens: 34
       },
       rate_limits: null,
+      source_root_freshness: {
+        status: 'warning',
+        command_path: sourceEntrypoint,
+        source_checkout: {
+          status: 'stale',
+          behind: 1
+        },
+        drift_classes: expect.arrayContaining([
+          'shared_checkout_drift',
+          'supervised_source_root_drift'
+        ])
+      },
       auth_provenance: expect.objectContaining({
         provider_kind: 'codex',
         runtime_mode: 'cli',
@@ -3860,6 +4271,18 @@ for await (const line of rl) {
         input_tokens: 21,
         output_tokens: 13,
         total_tokens: 34
+      },
+      source_root_freshness: {
+        status: 'warning',
+        command_path: sourceEntrypoint,
+        source_checkout: {
+          status: 'stale',
+          behind: 1
+        },
+        drift_classes: expect.arrayContaining([
+          'shared_checkout_drift',
+          'supervised_source_root_drift'
+        ])
       },
       auth_provenance: expect.objectContaining({
         provider_kind: 'codex',
@@ -3983,7 +4406,8 @@ for await (const line of rl) {
         CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
         CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
         CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
-        CODEX_CLOUD_ENV_ID: 'env-appserver-proof'
+        CODEX_CLOUD_ENV_ID: 'env-appserver-proof',
+        CODEX_AGENT_IDENTITY: 'agent-identity-runtime-raw'
       },
       {
         readTrackedIssue,
@@ -4015,6 +4439,10 @@ for await (const line of rl) {
           occurred: false
         }
       },
+      auth_provenance: expect.objectContaining({
+        credential_source: 'env:CODEX_AGENT_IDENTITY',
+        auth_freshness: 'env_credential_present'
+      }),
       appserver_supervision: {
         selected_runtime: {
           requested_mode: 'appserver',
@@ -4044,6 +4472,10 @@ for await (const line of rl) {
       await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
     ) as Record<string, unknown>;
     expect(written).toMatchObject({
+      auth_provenance: expect.objectContaining({
+        credential_source: 'env:CODEX_AGENT_IDENTITY',
+        auth_freshness: 'env_credential_present'
+      }),
       appserver_supervision: {
         sticky_environment_status: 'proven',
         turn_persistence_status: 'blocked',
@@ -4051,6 +4483,7 @@ for await (const line of rl) {
         fork_blocker: 'appserver_fork_probe_not_implemented'
       }
     });
+    expect(JSON.stringify(written)).not.toContain('agent-identity-runtime-raw');
   });
 
   it('preserves live session-log ids when final stdout parse supplies the turn', async () => {
@@ -5625,6 +6058,226 @@ for await (const line of rl) {
       issue_identifier: 'CO-2',
       updated_at: '2026-03-21T09:00:10.000Z'
     });
+  });
+
+  it('refreshes persisted source-root freshness while refreshing a provider proof snapshot', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const sourceRoot = await createProviderWorkerSourceRootRepo('provider-worker-refresh-source-');
+    const sourceEntrypoint = join(sourceRoot, 'bin', 'codex-orchestrator.ts');
+    const sourceBaseHash = git(sourceRoot, ['rev-parse', 'HEAD']).stdout.trim();
+    const sourceRootFreshness = inspectSourceRootFreshness({
+      intendedRepoRoot: sourceRoot,
+      argv: ['node', sourceEntrypoint],
+      cwd: sourceRoot,
+      now: () => '2026-05-01T00:00:00.000Z'
+    });
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          workspace_path: sourceRoot,
+          source_root_freshness: sourceRootFreshness
+        })
+      ),
+      'utf8'
+    );
+    await writeFile(join(sourceRoot, 'README.md'), 'origin advanced\n', 'utf8');
+    git(sourceRoot, ['add', '.']);
+    git(sourceRoot, ['commit', '-m', 'origin advanced']);
+    git(sourceRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    git(sourceRoot, ['reset', '--hard', sourceBaseHash]);
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:10.000Z'
+    );
+    const persisted = JSON.parse(await readFile(proofPath, 'utf8')) as ProviderLinearWorkerProof;
+
+    expect(refreshed?.updated_at).toBe('2026-03-21T09:00:10.000Z');
+    expect(refreshed?.source_root_freshness).toMatchObject({
+      status: 'warning',
+      observed_at: expect.not.stringMatching('2026-05-01T00:00:00.000Z'),
+      source_checkout: {
+        status: 'stale',
+        behind: 1
+      },
+      provenance: {
+        command_path_source: 'argv',
+        package_root_source: 'command_path',
+        source_root_source: 'package_root'
+      }
+    });
+    expect(persisted.source_root_freshness).toEqual(refreshed?.source_root_freshness);
+  });
+
+  it('does not advance proof updated_at when only source-root observed_at changes', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const sourceRoot = await createProviderWorkerSourceRootRepo('provider-worker-refresh-observed-at-');
+    const sourceEntrypoint = join(sourceRoot, 'bin', 'codex-orchestrator.ts');
+    const sourceRootFreshness = inspectSourceRootFreshness({
+      intendedRepoRoot: sourceRoot,
+      argv: ['node', sourceEntrypoint],
+      cwd: sourceRoot,
+      now: () => '2026-05-01T00:00:00.000Z'
+    });
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          current_turn_started_at: null,
+          session_log_thread_id: null,
+          session_log_turn_id: null,
+          session_log_session_id: null,
+          resume_source_thread_id: null,
+          last_message_source: null,
+          last_message_delta_key: null,
+          current_turn_activity: null,
+          runtime: null,
+          appserver_supervision: null,
+          auth_provenance: null,
+          worker_control: null,
+          source_root_freshness: sourceRootFreshness,
+          failure_diagnosis: null,
+          workspace_path: sourceRoot,
+          worker_host: null,
+          source_setup: null,
+          child_streams: [],
+          child_lanes: [],
+          parallelization: null,
+          progress: null,
+          linear_budget: null,
+          tracked_issue_error: null,
+          resident_session: null
+        })
+      ),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:10.000Z'
+    );
+    const persisted = JSON.parse(await readFile(proofPath, 'utf8')) as ProviderLinearWorkerProof;
+
+    expect(refreshed?.updated_at).toBe('2026-03-21T09:00:00.000Z');
+    expect(refreshed?.source_root_freshness?.observed_at).not.toBe(sourceRootFreshness.observed_at);
+    expect(refreshed?.source_root_freshness).toMatchObject({
+      status: 'current',
+      source_checkout: {
+        status: 'current',
+        behind: 0
+      }
+    });
+    expect(persisted.updated_at).toBe('2026-03-21T09:00:00.000Z');
+    expect(persisted.source_root_freshness).toEqual(refreshed?.source_root_freshness);
+  });
+
+  it('keeps session-log hydration signatures aligned after refreshing source-root freshness', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    const sourceRoot = await createProviderWorkerSourceRootRepo('provider-worker-refresh-source-hydration-');
+    const sourceEntrypoint = join(sourceRoot, 'bin', 'codex-orchestrator.ts');
+    const sourceBaseHash = git(sourceRoot, ['rev-parse', 'HEAD']).stdout.trim();
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-1.jsonl');
+    const sessionLog = [
+      JSON.stringify({
+        type: 'session_meta',
+        payload: {
+          id: 'thread-1',
+          cwd: sourceRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        }
+      }),
+      JSON.stringify({ type: 'turn_context', payload: { turn_id: 'turn-1' } }),
+      JSON.stringify({
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          info: {
+            total_token_usage: {
+              input_tokens: 4,
+              output_tokens: 5,
+              total_tokens: 9
+            }
+          }
+        }
+      })
+    ].join('\n');
+    const sourceRootFreshness = inspectSourceRootFreshness({
+      intendedRepoRoot: sourceRoot,
+      argv: ['node', sourceEntrypoint],
+      cwd: sourceRoot,
+      now: () => '2026-05-01T00:00:00.000Z'
+    });
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(sessionLogPath, sessionLog, 'utf8');
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          workspace_path: sourceRoot,
+          source_root_freshness: sourceRootFreshness
+        })
+      ),
+      'utf8'
+    );
+    await writeFile(join(sourceRoot, 'README.md'), 'origin advanced\n', 'utf8');
+    git(sourceRoot, ['add', '.']);
+    git(sourceRoot, ['commit', '-m', 'origin advanced']);
+    git(sourceRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    git(sourceRoot, ['reset', '--hard', sourceBaseHash]);
+
+    const firstRefresh = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:10.000Z',
+      undefined,
+      {
+        CODEX_HOME: tempRoot!
+      }
+    );
+    const firstHydration = await readPersistedSessionLogHydrationState(hydrationPath);
+
+    expect(firstRefresh?.source_root_freshness?.source_checkout).toMatchObject({
+      status: 'stale',
+      behind: 1
+    });
+    expect(firstHydration).toMatchObject({
+      path: sessionLogPath,
+      offset_bytes: Buffer.byteLength(sessionLog, 'utf8'),
+      bootstrap_pending: false,
+      proof_signature: expect.any(String)
+    });
+
+    const secondRefresh = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:00:20.000Z',
+      undefined,
+      {
+        CODEX_HOME: tempRoot!
+      }
+    );
+    const secondHydration = await readPersistedSessionLogHydrationState(hydrationPath);
+
+    expect(secondRefresh?.source_root_freshness?.source_checkout).toMatchObject({
+      status: 'stale',
+      behind: 1
+    });
+    expect(secondHydration).toMatchObject({
+      path: sessionLogPath,
+      offset_bytes: Buffer.byteLength(sessionLog, 'utf8'),
+      trailing_text: '',
+      bootstrap_pending: false,
+      proof_signature: expect.any(String)
+    });
+    expect(secondHydration.proof_signature).toBe(firstHydration.proof_signature);
   });
 
   it('recovers a stale proof lock before classifying active appserver proof telemetry', async () => {

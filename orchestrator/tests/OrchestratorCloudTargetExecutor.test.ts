@@ -168,8 +168,8 @@ describe('executeOrchestratorCloudTarget request shaping', () => {
       CODEX_CLOUD_STATUS_RETRY_LIMIT: '9',
       CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS: '2100',
       CODEX_CLOUD_BRANCH: ' refs/heads/feature/test ',
-      CODEX_CLOUD_ENABLE_FEATURES: 'js_repl, memories js_repl',
-      CODEX_CLOUD_DISABLE_FEATURES: 'audio, audio telemetry',
+      CODEX_CLOUD_ENABLE_FEATURES: 'apps, memories apps',
+      CODEX_CLOUD_DISABLE_FEATURES: 'browser_use, computer_use browser_use',
       CODEX_NON_INTERACTIVE: '0',
       CODEX_NO_INTERACTIVE: '0',
       CODEX_INTERACTIVE: '1',
@@ -190,8 +190,8 @@ describe('executeOrchestratorCloudTarget request shaping', () => {
     expect(captured?.statusRetryLimit).toBe(9);
     expect(captured?.statusRetryBackoffMs).toBe(2100);
     expect(captured?.branch).toBe('refs/heads/feature/test');
-    expect(captured?.enableFeatures).toEqual(['js_repl', 'memories']);
-    expect(captured?.disableFeatures).toEqual(['audio', 'telemetry']);
+    expect(captured?.enableFeatures).toEqual(['apps', 'memories']);
+    expect(captured?.disableFeatures).toEqual(['browser_use', 'computer_use']);
     expect(captured?.env?.CUSTOM_ENV).toBe('present');
     expect(captured?.env?.CODEX_NON_INTERACTIVE).toBe('0');
     expect(captured?.env?.CODEX_NO_INTERACTIVE).toBe('0');
@@ -360,8 +360,8 @@ describe('executeOrchestratorCloudTarget request shaping', () => {
     process.env.CODEX_CLOUD_STATUS_RETRY_LIMIT = '7';
     process.env.CODEX_CLOUD_STATUS_RETRY_BACKOFF_MS = '1750';
     process.env.CODEX_CLOUD_BRANCH = ' process-branch ';
-    process.env.CODEX_CLOUD_ENABLE_FEATURES = 'memories js_repl memories';
-    process.env.CODEX_CLOUD_DISABLE_FEATURES = 'audio';
+    process.env.CODEX_CLOUD_ENABLE_FEATURES = 'memories apps memories';
+    process.env.CODEX_CLOUD_DISABLE_FEATURES = 'browser_use';
     process.env.CODEX_NON_INTERACTIVE = '0';
     process.env.CODEX_NO_INTERACTIVE = '0';
     process.env.CODEX_INTERACTIVE = '1';
@@ -398,8 +398,8 @@ describe('executeOrchestratorCloudTarget request shaping', () => {
     expect(captured?.statusRetryLimit).toBe(7);
     expect(captured?.statusRetryBackoffMs).toBe(1750);
     expect(captured?.branch).toBe('process-branch');
-    expect(captured?.enableFeatures).toEqual(['memories', 'js_repl']);
-    expect(captured?.disableFeatures).toEqual(['audio']);
+    expect(captured?.enableFeatures).toEqual(['memories', 'apps']);
+    expect(captured?.disableFeatures).toEqual(['browser_use']);
     expect(captured?.env?.CODEX_NON_INTERACTIVE).toBe('0');
     expect(captured?.env?.CODEX_NO_INTERACTIVE).toBe('0');
     expect(captured?.env?.CODEX_INTERACTIVE).toBe('1');

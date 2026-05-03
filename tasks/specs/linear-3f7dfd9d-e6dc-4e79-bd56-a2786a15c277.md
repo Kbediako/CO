@@ -1,10 +1,10 @@
 ---
 id: 20260331-linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277
 title: CO Strengthen Autonomous Issue Understanding and Intent Capture for Follow-Up Work
-status: in_progress
+status: done
 owner: Codex
 created: 2026-03-31
-last_review: 2026-03-31
+last_review: 2026-05-01
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c27
 related_tasks:
   - tasks/tasks-linear-3f7dfd9d-e6dc-4e79-bd56-a2786a15c277.md
 review_notes:
+  - 2026-05-01: CO-454 live Linear audit confirmed CO-45 is `Done`; this completed-lane spec is reclassified to inactive `done` under canonical owner key `spec-guard:active-specs:last_review=2026-03-31` so historical implementation evidence remains preserved without staying in active-spec freshness. Evidence: `codex-orchestrator linear issue-context --issue-id 3f7dfd9d-e6dc-4e79-bd56-a2786a15c277 --format json`.
   - 2026-03-31: Opened from Linear issue `CO-45` in the provider-worker workspace using the issue id `3f7dfd9d-e6dc-4e79-bd56-a2786a15c277`.
   - 2026-03-31: Live `linear issue-context` confirmed the CO workflow states (`Ready`, `In Progress`, `In Review`, `Merging`, `Rework`), showed no attached PR and no existing workpad, and the issue was transitioned from `Ready` to `In Progress` before active work.
   - 2026-03-31: Root-cause audit confirms the issue text: `CO-7` allowed a web-first interpretation, `CO-26` restored the exact `CO STATUS` name and terminal medium but still narrowed parity to one renderer over existing data, and `CO-44` had to reopen the chain to recover true Symphony terminal parity scope.
