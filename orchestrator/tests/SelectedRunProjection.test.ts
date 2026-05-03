@@ -3670,6 +3670,9 @@ describe('SelectedRunProjection', () => {
     expect(selected?.summary).toContain('Provider linear worker failed with Codex exit code 1.');
     expect(selected?.summary).toContain(REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_NOISE_SUMMARY);
     expect(selected?.lastError).toContain(REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_NOISE_SUMMARY);
+    expect(selected?.latestEvent?.message).toContain(
+      REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_NOISE_SUMMARY
+    );
   });
 
   it('ignores terminal proof rewritten from a prior attempt after a rerun starts', async () => {

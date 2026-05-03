@@ -1380,13 +1380,18 @@ async function writeReviewArtifacts(
   const runDir = String(execEnv.CODEX_ORCHESTRATOR_RUN_DIR);
   const reviewDir = join(runDir, 'review');
   const outputLogPath = join(reviewDir, 'output.log');
-  const { outputLogContent, omitReviewOutcome, ...telemetryOverrides } = overrides;
+  const {
+    outputLogContent,
+    omitReviewOutcome,
+    review_outcome: overriddenReviewOutcome,
+    ...telemetryOverrides
+  } = overrides;
   await mkdir(reviewDir, { recursive: true });
   await writeFile(outputLogPath, outputLogContent ?? 'review output\n', 'utf8');
   const status = overrides.status ?? 'succeeded';
   const terminationBoundary = overrides.termination_boundary ?? null;
   const reviewOutcome =
-    overrides.review_outcome ??
+    overriddenReviewOutcome ??
     deriveReviewOutcomeDisposition({
       status,
       terminationBoundary
