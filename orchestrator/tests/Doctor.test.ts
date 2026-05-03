@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { chmod, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -312,6 +312,50 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
         delete process.env.CODEX_CLI_BIN;
       } else {
         process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('reports bare codex provenance through PATH resolution', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const originalManagedFlag = process.env.CODEX_CLI_USE_MANAGED;
+    const originalPath = process.env.PATH;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-binary-path-'));
+    const activeBin = await writeFakeCodexBinary(tempHome, 'multi_agent stable true', {
+      version: 'codex-cli path-selected'
+    });
+    process.env.CODEX_HOME = tempHome;
+    delete process.env.CODEX_CLI_BIN;
+    delete process.env.CODEX_CLI_USE_MANAGED;
+    process.env.PATH = originalPath ? `${tempHome}${delimiter}${originalPath}` : tempHome;
+    try {
+      const result = runDoctor(process.cwd(), { codexAppBundlePath: join(tempHome, 'missing-app-codex') });
+      expect(result.codex_cli.active.command).toBe('codex');
+      expect(result.codex_cli.active.path).toBe(activeBin);
+      expect(result.codex_cli.active.version).toBe('codex-cli path-selected');
+      expect(result.codex_cli.version_drift.status).toBe('not_applicable');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      if (originalManagedFlag === undefined) {
+        delete process.env.CODEX_CLI_USE_MANAGED;
+      } else {
+        process.env.CODEX_CLI_USE_MANAGED = originalManagedFlag;
+      }
+      if (originalPath === undefined) {
+        delete process.env.PATH;
+      } else {
+        process.env.PATH = originalPath;
       }
       await rm(tempHome, { recursive: true, force: true });
     }

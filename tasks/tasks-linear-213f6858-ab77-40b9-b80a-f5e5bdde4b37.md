@@ -29,6 +29,7 @@
 - 2026-05-03: Resumed after CO-456 landed, fast-forwarded the branch to `origin/main` `0e71d3e13`, replayed the existing CO-450 implementation without conflict, and completed current-head validation. Live workspace doctor JSON reports active `/opt/homebrew/bin/codex` as `codex-cli 0.128.0`, app bundle `/Applications/Codex.app/Contents/Resources/codex` as `codex-cli 0.128.0-alpha.1`, and advisory drift.
 - 2026-05-03: Standalone review completed with bounded-success telemetry after the command-intent retry and found no actionable diff-local regressions. The required elegance pass found one P3 simplification to remove module-level provenance probe caches; parent applied it so repeated in-process doctor calls stay fresh.
 - 2026-05-03: Post-elegance validation is green, live doctor proof still shows advisory active/app-bundle drift, and final manifest-backed standalone review found no actionable diff-local regressions.
+- 2026-05-03: PR #757 CodeRabbit feedback addressed: restored canonical `paths.docs`, added bare-`codex` PATH provenance coverage, and made the TECH_SPEC gate wording explicit.
 
 ## Parent Tasks
 1. Add doctor binary provenance probing.
@@ -42,11 +43,11 @@
 3. Add focused tests.
    - Files: `orchestrator/tests/Doctor.test.ts` or focused utility tests.
    - Acceptance: no app bundle, matching versions, divergent versions, and explicit `CODEX_CLI_BIN` override are covered.
-   - [x] Status: Complete - Evidence: `npm run test:core -- orchestrator/tests/Doctor.test.ts orchestrator/tests/_reproIssueLogTask.test.ts` passed with 71 tests.
+   - [x] Status: Complete - Evidence: `npm run test:core -- orchestrator/tests/Doctor.test.ts orchestrator/tests/_reproIssueLogTask.test.ts` passed with 72 tests.
 4. Run validation and handoff gates.
    - Files: validation/review artifacts.
    - Acceptance: required validation, standalone review, elegance review, PR attach, and ready-review drain are complete before review-state transition.
-   - [ ] Status: Validation, review, and elegance gates green; PR handoff pending - Evidence: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, focused doctor/repro tests, `npm run test` (359 files / 5262 tests), `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, `node scripts/diff-budget.mjs`, `npm run pack:smoke`, live doctor JSON proof, standalone review telemetry, and elegance artifact.
+   - [ ] Status: Validation, review, and elegance gates green; PR feedback fix pushed next, then ready-review drain pending - Evidence: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, focused doctor/repro tests, `npm run test` (359 files / 5262 tests), `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, `node scripts/diff-budget.mjs`, `npm run pack:smoke`, live doctor JSON proof, standalone review telemetry, elegance artifact, and PR #757 feedback-fix validation.
 
 ## Relevant Files
 - `docs/PRD-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md`

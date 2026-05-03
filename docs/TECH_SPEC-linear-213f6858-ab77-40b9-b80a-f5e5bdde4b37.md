@@ -36,8 +36,9 @@ last_review: 2026-05-01
   - no app bundle: app bundle status is absent and summary is non-noisy
   - matching versions: drift status ok and no advisory wording
   - divergent versions: drift status advisory and summary names both versions/paths
+  - bare `codex` on `PATH`: active audited path resolves through `command -v`
   - explicit `CODEX_CLI_BIN`: active audited path is the override and managed selection remains unchanged
-- Repo gates before handoff: delegation guard, spec guard, build, lint, test, docs:check, docs:freshness, repo:stewardship, diff-budget, standalone review, elegance review, pack smoke if downstream-facing CLI packaging paths require it.
+- Repo gates before handoff: delegation guard, spec guard, build, lint, test, docs:check, docs:freshness, repo:stewardship, diff-budget, `codex-orchestrator review`, elegance review, and `pack:smoke`.
 
 ## Lineage
 - Checkout-posture lineage: binary drift must stay separate from stale checkout warnings.
