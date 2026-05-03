@@ -68,6 +68,43 @@
       }
     },
     {
+      "id": "20260501-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba",
+      "title": "CO-459 stale provider_intake summary versus fresh raw provider-intake-state authority",
+      "relates_to": "tasks/tasks-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-01",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
+        "docs/TECH_SPEC-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
+        "docs/ACTION_PLAN-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
+        "tasks/specs/linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
+        "tasks/tasks-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
+        ".agent/task/linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
+        "tasks/index.json",
+        ".runs/linear-d536879d-3ddc-47b0-ae37-0ab657af18ba-docs-packet/cli/2026-05-01T03-01-30-233Z-69dd6493/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet",
+          "date": "2026-05-01",
+          "status": "produced",
+          "manifest": ".runs/linear-d536879d-3ddc-47b0-ae37-0ab657af18ba-docs-packet/cli/2026-05-01T03-01-30-233Z-69dd6493/manifest.json",
+          "source_anchor": "ctx:sha256:0601533a80ba224cdbbbb7e4622264b47264850eeeeda93cf956b12cebd305cb#chunk:c000001",
+          "summary": "Docs-first packet created for CO-459 from the explicit child-lane contract and current repo seam names. The supplied source payload contains run/source metadata rather than the full issue body. The packet preserves co-status --format json, /api/v1/state, /ui/data.json, provider_intake, provider-intake-state.json, stale summary/cache data, fresh raw provider-intake snapshot, selected issue, concurrent-claim truth, active/running/released states, CO-243 regression/follow-up, and CO-455 timeout-only adjacency. Parent owns source/tests, validation, Linear state, workpad, PR lifecycle, and review handoff."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
+        "task": "tasks/tasks-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
+        "agent_task": ".agent/task/linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
+        "docs": "docs/TECH_SPEC-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md"
+      }
+    },
+    {
       "id": "20260502-linear-75023431-9350-4e9a-982e-71d244cbf204",
       "title": "CO-494 provider child-lane accept current issue snapshot",
       "relates_to": "tasks/tasks-linear-75023431-9350-4e9a-982e-71d244cbf204.md",

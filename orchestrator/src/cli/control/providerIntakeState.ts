@@ -91,8 +91,19 @@ export interface ProviderIntakeState {
   rehydrated_at: string | null;
   latest_provider_key: string | null;
   latest_reason: string | null;
+  authority?: ProviderIntakeAuthorityMetadata | null;
   polling?: Record<string, unknown> | null;
   claims: ProviderIntakeClaimRecord[];
+}
+
+export type ProviderIntakeAuthorityUnavailableReason =
+  | 'raw_provider_intake_unavailable'
+  | 'raw_provider_intake_read_failed';
+
+export interface ProviderIntakeAuthorityMetadata {
+  status: 'unavailable';
+  reason: ProviderIntakeAuthorityUnavailableReason;
+  updated_at: string | null;
 }
 
 export interface ProviderIntakeRetrySummaryPayload {
@@ -156,6 +167,9 @@ export function normalizeProviderIntakeState(
     polling: null,
     claims: []
   };
+  const authority = normalizeProviderIntakeAuthority(
+    isRecordLike(state) ? state.authority : null
+  );
   return {
     schema_version: 1,
     updated_at:
@@ -166,6 +180,7 @@ export function normalizeProviderIntakeState(
     latest_provider_key:
       typeof state.latest_provider_key === 'string' ? state.latest_provider_key : null,
     latest_reason: typeof state.latest_reason === 'string' ? state.latest_reason : null,
+    ...(authority ? { authority } : {}),
     polling: isRecordLike(state.polling) ? { ...state.polling } : null,
     claims: Array.isArray(state.claims)
       ? state.claims
@@ -173,6 +188,36 @@ export function normalizeProviderIntakeState(
           .filter((claim): claim is ProviderIntakeClaimRecord => claim !== null)
           .slice(-PROVIDER_INTAKE_CLAIM_LIMIT)
       : []
+  };
+}
+
+export function markProviderIntakeAuthorityUnavailable(
+  state: ProviderIntakeState,
+  reason: ProviderIntakeAuthorityUnavailableReason = 'raw_provider_intake_unavailable'
+): void {
+  state.authority = {
+    status: 'unavailable',
+    reason,
+    updated_at: null
+  };
+}
+
+export function clearProviderIntakeAuthority(state: ProviderIntakeState): void {
+  delete state.authority;
+}
+
+function normalizeProviderIntakeAuthority(value: unknown): ProviderIntakeAuthorityMetadata | null {
+  if (!isRecordLike(value) || value.status !== 'unavailable') {
+    return null;
+  }
+  return {
+    status: 'unavailable',
+    reason:
+      value.reason === 'raw_provider_intake_unavailable' ||
+      value.reason === 'raw_provider_intake_read_failed'
+        ? value.reason
+        : 'raw_provider_intake_unavailable',
+    updated_at: typeof value.updated_at === 'string' ? value.updated_at : null
   };
 }
 
@@ -438,7 +483,7 @@ export function buildProviderIntakeSummary(
     selected_claim: selectedClaim,
     rehydrated_at: normalizedState.rehydrated_at,
     is_rehydrated: selectedClaim.freshness === 'rehydrated',
-    updated_at: selectedClaim.updated_at
+    updated_at: normalizedState.updated_at
   };
 }
 

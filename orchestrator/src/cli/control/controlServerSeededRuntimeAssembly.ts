@@ -34,8 +34,11 @@ import {
 } from './linearWebhookController.js';
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
 import {
+  clearProviderIntakeAuthority,
   isRecordLike,
+  markProviderIntakeAuthorityUnavailable,
   normalizeProviderIntakeState,
+  type ProviderIntakeAuthorityUnavailableReason,
   type ProviderIntakeState
 } from './providerIntakeState.js';
 import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
@@ -145,7 +148,9 @@ export function createControlServerSeededRuntimeAssembly(
   const sessionTokens = new SessionTokenStore(options.sessionTtlMs);
   const linearAdvisoryState = normalizeLinearAdvisoryState(options.linearAdvisorySeed);
   const providerIntakeState = normalizeProviderIntakeState(options.providerIntakeSeed);
-  let persistedProviderIntakeState = cloneProviderIntakeState(providerIntakeState);
+  let persistedProviderIntakeState = options.providerIntakeSeed
+    ? cloneProviderIntakeState(providerIntakeState)
+    : null;
   let linearAdvisoryStaleWritePending = markLinearAdvisoryStateStaleFromProviderIntake(
     linearAdvisoryState,
     providerIntakeState
@@ -157,6 +162,8 @@ export function createControlServerSeededRuntimeAssembly(
     paths: options.paths,
     linearAdvisoryState,
     providerIntakeState,
+    readPersistedProviderIntakeState: () =>
+      persistedProviderIntakeState ? cloneProviderIntakeState(persistedProviderIntakeState) : null,
     providerWorkflowConfigStore: options.providerWorkflowConfigStore,
     readProviderIssueHandoff: () => providerIssueHandoff
   });
@@ -202,6 +209,14 @@ export function createControlServerSeededRuntimeAssembly(
     },
     providerIntake: async () =>
       await queueProviderIntakePersist(async () => {
+        if (shouldTrustProviderIntakePersist(providerIntakeState, persistedProviderIntakeState)) {
+          clearProviderIntakeAuthority(providerIntakeState);
+        } else {
+          markProviderIntakeAuthorityUnavailable(
+            providerIntakeState,
+            resolveProviderIntakeUnavailableReason(providerIntakeState, persistedProviderIntakeState)
+          );
+        }
         await writeJsonAtomic(providerIntakeStatePath, providerIntakeState);
         persistedProviderIntakeState = cloneProviderIntakeState(providerIntakeState);
         const linearAdvisoryMarkedStale = markLinearAdvisoryStateStaleFromProviderIntake(
@@ -216,7 +231,13 @@ export function createControlServerSeededRuntimeAssembly(
       }),
     providerIntakePolling: async (polling, updatedAt) =>
       await queueProviderIntakePersist(async () => {
-        const nextState = (await readPersistedProviderIntakeState()) ?? normalizeProviderIntakeState(null);
+        const persistedState = persistedProviderIntakeState
+          ? cloneProviderIntakeState(persistedProviderIntakeState)
+          : await readPersistedProviderIntakeState();
+        const nextState = persistedState ?? normalizeProviderIntakeState(null);
+        if (!persistedState) {
+          markProviderIntakeAuthorityUnavailable(nextState);
+        }
         const nextPolling = isRecordLike(polling) ? { ...polling } : null;
         nextState.polling = nextPolling;
         const nextPollingUpdatedAt =
@@ -260,7 +281,8 @@ export function createControlServerSeededRuntimeAssembly(
     paths: options.paths,
     linearAdvisoryState,
     providerIntakeState,
-    readPersistedProviderIntakeState: () => cloneProviderIntakeState(persistedProviderIntakeState),
+    readPersistedProviderIntakeState: () =>
+      persistedProviderIntakeState ? cloneProviderIntakeState(persistedProviderIntakeState) : null,
     providerIssueHandoff,
     runtime: controlRuntime
   } satisfies ControlRequestSharedContext;
@@ -268,6 +290,33 @@ export function createControlServerSeededRuntimeAssembly(
   return {
     requestContextShared
   };
+}
+
+function shouldTrustProviderIntakePersist(
+  nextState: ProviderIntakeState,
+  persistedState: ProviderIntakeState | null
+): boolean {
+  if (
+    nextState.claims.length > 0 ||
+    nextState.latest_provider_key !== null ||
+    nextState.latest_reason !== null
+  ) {
+    return true;
+  }
+  return persistedState !== null && persistedState.authority?.status !== 'unavailable';
+}
+
+function resolveProviderIntakeUnavailableReason(
+  nextState: ProviderIntakeState,
+  persistedState: ProviderIntakeState | null
+): ProviderIntakeAuthorityUnavailableReason {
+  if (nextState.authority?.status === 'unavailable') {
+    return nextState.authority.reason;
+  }
+  if (persistedState?.authority?.status === 'unavailable') {
+    return persistedState.authority.reason;
+  }
+  return 'raw_provider_intake_unavailable';
 }
 
 function cloneProviderIntakeState(state: ProviderIntakeState): ProviderIntakeState {

@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import http from 'node:http';
 
 import { computeEffectiveDelegationConfig } from '../src/cli/config/delegationConfig.js';
+import { runCoStatusCliShell } from '../src/cli/coStatusCliShell.js';
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 import {
   LINEAR_ADVISORY_STATE_FILE,
@@ -18,6 +20,8 @@ import type {
   ProviderIntakeClaimRecord,
   ProviderIntakeState
 } from '../src/cli/control/providerIntakeState.js';
+import { readUiDataset } from '../src/cli/control/operatorDashboardPresenter.js';
+import { handleUiDataRequest } from '../src/cli/control/uiDataController.js';
 
 async function createRunRoot(taskId: string) {
   const root = await mkdtemp(join(tmpdir(), 'control-server-seeded-runtime-'));
@@ -857,6 +861,540 @@ describe('createControlServerSeededRuntimeAssembly', () => {
     }
   });
 
+  it('sources top-level provider intake from fresh persisted raw state after projection cache is stale', async () => {
+    const { root, env, paths } = await createRunRoot('task-1084');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    let server: http.Server | null = null;
+
+    try {
+      const assembly = createControlServerSeededRuntimeAssembly({
+        runId: 'control-host',
+        token: 'control-token',
+        config,
+        paths,
+        sessionTtlMs: 60_000,
+        controlSeed: null,
+        confirmationsSeed: null,
+        questionsSeed: null,
+        delegationSeed: null,
+        linearAdvisorySeed: null,
+        providerIntakeSeed: {
+          schema_version: 1,
+          updated_at: '2026-05-01T02:10:46.790Z',
+          rehydrated_at: null,
+          latest_provider_key: 'linear:lin-issue-424',
+          latest_reason: 'stale cached provider-intake summary',
+          polling: null,
+          claims: [
+            co272ProviderIntakeClaim({
+              provider_key: 'linear:lin-issue-424',
+              issue_id: 'lin-issue-424',
+              issue_identifier: 'CO-424',
+              issue_title: 'Stale selected claim',
+              task_id: 'linear-co-424-stale',
+              run_id: 'stale-provider-run',
+              reason: 'stale cached provider-intake summary',
+              updated_at: '2026-05-01T02:10:46.790Z',
+              accepted_at: '2026-05-01T02:09:46.790Z',
+              issue_updated_at: '2026-05-01T02:10:00.000Z'
+            })
+          ]
+        }
+      });
+
+      await seedManifest(paths, {
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-424',
+        issue_identifier: 'CO-424',
+        updated_at: '2026-05-01T02:10:46.790Z'
+      });
+      await writeFile(join(paths.runDir, 'control_auth.json'), JSON.stringify({ token: 'snapshot-token' }), 'utf8');
+
+      const context = assembly.requestContextShared;
+      const readCompatibilityProjection = () =>
+        context.runtime.snapshot().readCompatibilityProjection();
+      const presenterContext = {
+        controlStore: context.controlStore,
+        paths: context.paths,
+        readCompatibilityProjection
+      };
+
+      const cachedProjection = await readCompatibilityProjection();
+      expect(cachedProjection.providerIntake?.selected_claim.issue_identifier).toBe('CO-424');
+      expect(cachedProjection.providerIntake?.updated_at).toBe('2026-05-01T02:10:46.790Z');
+
+      const providerIntakeState = context.providerIntakeState;
+      expect(providerIntakeState).toBeDefined();
+      if (!providerIntakeState) {
+        throw new Error('Expected provider intake state to be available');
+      }
+      providerIntakeState.updated_at = '2026-05-01T02:41:32.000Z';
+      providerIntakeState.latest_provider_key = 'linear:lin-issue-459';
+      providerIntakeState.latest_reason = 'fresh raw provider-intake snapshot';
+      providerIntakeState.claims = [
+        co272ProviderIntakeClaim({
+          provider_key: 'linear:lin-issue-459',
+          issue_id: 'lin-issue-459',
+          issue_identifier: 'CO-459',
+          issue_title: 'Fresh raw provider intake truth',
+          task_id: 'linear-co-459-fresh',
+          run_id: 'fresh-provider-run',
+          state: 'running',
+          reason: 'fresh raw provider-intake snapshot',
+          accepted_at: '2026-05-01T02:40:32.000Z',
+          updated_at: '2026-05-01T02:41:32.000Z',
+          issue_updated_at: '2026-05-01T02:41:00.000Z'
+        })
+      ];
+      await context.persist.providerIntake?.();
+      await seedManifest(paths, {
+        run_id: 'fresh-provider-run',
+        task_id: 'linear-co-459-fresh',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-459',
+        issue_identifier: 'CO-459',
+        status: 'in_progress',
+        summary: 'Fresh raw provider intake truth',
+        updated_at: '2026-05-01T02:41:32.000Z'
+      });
+
+      const apiPayload = await readCompatibilityState(presenterContext);
+      const uiPayload = await readUiDataset(presenterContext);
+
+      expect(apiPayload.selected?.issue_identifier).toBe('CO-459');
+      expect(apiPayload.running_ids).toContain('CO-459');
+      expect(apiPayload.running_ids).not.toContain('CO-424');
+      expect(apiPayload.provider_intake?.updated_at).toBe('2026-05-01T02:41:32.000Z');
+      expect(apiPayload.provider_intake?.selected_claim).toMatchObject({
+        issue_identifier: 'CO-459',
+        run_id: 'fresh-provider-run',
+        state: 'running'
+      });
+      expect(uiPayload.selected_issue_identifier).toBe('CO-459');
+      expect(uiPayload.running.map((entry) => entry.issue_identifier)).toContain('CO-459');
+      expect(uiPayload.running.map((entry) => entry.issue_identifier)).not.toContain('CO-424');
+      expect(uiPayload.provider_intake?.updated_at).toBe('2026-05-01T02:41:32.000Z');
+      expect(uiPayload.provider_intake?.selected_claim).toMatchObject({
+        issue_identifier: 'CO-459',
+        run_id: 'fresh-provider-run',
+        state: 'running'
+      });
+
+      server = http.createServer(async (req, res) => {
+        const handled = await handleUiDataRequest({
+          req,
+          res,
+          presenterContext
+        });
+        if (!handled) {
+          res.writeHead(404).end();
+        }
+      });
+      await new Promise<void>((resolve) => {
+        server!.listen(0, '127.0.0.1', () => resolve());
+      });
+      const address = server.address();
+      if (!address || typeof address === 'string') {
+        throw new Error('Expected loopback server address');
+      }
+      await writeFile(
+        join(paths.runDir, 'control_endpoint.json'),
+        JSON.stringify({
+          base_url: `http://127.0.0.1:${address.port}`,
+          token_path: 'control_auth.json'
+        }),
+        'utf8'
+      );
+
+      const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      try {
+        await runCoStatusCliShell({
+          flags: {
+            format: 'json',
+            'run-dir': paths.runDir
+          },
+          printHelp: vi.fn()
+        });
+        const coStatusPayload = JSON.parse(String(log.mock.calls.at(-1)?.[0])) as {
+          provider_intake?: {
+            updated_at?: unknown;
+            selected_claim?: {
+              issue_identifier?: unknown;
+              run_id?: unknown;
+              state?: unknown;
+            };
+          };
+          selected_issue_identifier?: unknown;
+          running?: Array<{ issue_identifier?: unknown }>;
+        };
+        expect(coStatusPayload.selected_issue_identifier).toBe('CO-459');
+        expect(coStatusPayload.running?.map((entry) => entry.issue_identifier)).toContain('CO-459');
+        expect(coStatusPayload.running?.map((entry) => entry.issue_identifier)).not.toContain('CO-424');
+        expect(coStatusPayload.provider_intake?.updated_at).toBe('2026-05-01T02:41:32.000Z');
+        expect(coStatusPayload.provider_intake?.selected_claim).toMatchObject({
+          issue_identifier: 'CO-459',
+          run_id: 'fresh-provider-run',
+          state: 'running'
+        });
+      } finally {
+        log.mockRestore();
+      }
+    } finally {
+      if (server) {
+        await new Promise<void>((resolve) => server!.close(() => resolve()));
+      }
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('refreshes cached top-level provider intake when only the raw authority timestamp advances', async () => {
+    const { root, env, paths } = await createRunRoot('task-1084');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    try {
+      const assembly = createControlServerSeededRuntimeAssembly({
+        runId: 'control-host',
+        token: 'control-token',
+        config,
+        paths,
+        sessionTtlMs: 60_000,
+        controlSeed: null,
+        confirmationsSeed: null,
+        questionsSeed: null,
+        delegationSeed: null,
+        linearAdvisorySeed: null,
+        providerIntakeSeed: {
+          schema_version: 1,
+          updated_at: '2026-05-01T02:10:46.790Z',
+          rehydrated_at: null,
+          latest_provider_key: 'linear:lin-issue-459',
+          latest_reason: 'fresh raw provider-intake snapshot',
+          polling: null,
+          claims: [
+            co272ProviderIntakeClaim({
+              provider_key: 'linear:lin-issue-459',
+              issue_id: 'lin-issue-459',
+              issue_identifier: 'CO-459',
+              issue_title: 'Fresh raw provider intake truth',
+              task_id: 'linear-co-459-fresh',
+              run_id: 'fresh-provider-run',
+              state: 'running',
+              reason: 'fresh raw provider-intake snapshot',
+              accepted_at: '2026-05-01T02:09:46.790Z',
+              updated_at: '2026-05-01T02:10:46.790Z',
+              issue_updated_at: '2026-05-01T02:10:00.000Z'
+            })
+          ]
+        }
+      });
+
+      const context = assembly.requestContextShared;
+      const presenterContext = {
+        controlStore: context.controlStore,
+        paths: context.paths,
+        readCompatibilityProjection: () => context.runtime.snapshot().readCompatibilityProjection()
+      };
+
+      const cachedProjection = await presenterContext.readCompatibilityProjection();
+      expect(cachedProjection.providerIntake?.updated_at).toBe('2026-05-01T02:10:46.790Z');
+      expect(cachedProjection.providerIntake?.selected_claim.updated_at).toBe('2026-05-01T02:10:46.790Z');
+
+      const providerIntakeState = context.providerIntakeState;
+      expect(providerIntakeState).toBeDefined();
+      if (!providerIntakeState) {
+        throw new Error('Expected provider intake state to be available');
+      }
+      providerIntakeState.updated_at = '2026-05-01T02:41:32.000Z';
+      await context.persist.providerIntake?.();
+
+      const apiPayload = await readCompatibilityState(presenterContext);
+      const uiPayload = await readUiDataset(presenterContext);
+
+      expect(apiPayload.provider_intake?.updated_at).toBe('2026-05-01T02:41:32.000Z');
+      expect(apiPayload.provider_intake?.selected_claim.issue_identifier).toBe('CO-459');
+      expect(uiPayload.provider_intake?.updated_at).toBe('2026-05-01T02:41:32.000Z');
+      expect(uiPayload.provider_intake?.selected_claim.issue_identifier).toBe('CO-459');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('drops stale top-level provider intake when the fresh persisted raw state has no claims', async () => {
+    const { root, env, paths } = await createRunRoot('task-1084');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    try {
+      const assembly = createControlServerSeededRuntimeAssembly({
+        runId: 'control-host',
+        token: 'control-token',
+        config,
+        paths,
+        sessionTtlMs: 60_000,
+        controlSeed: null,
+        confirmationsSeed: null,
+        questionsSeed: null,
+        delegationSeed: null,
+        linearAdvisorySeed: null,
+        providerIntakeSeed: {
+          schema_version: 1,
+          updated_at: '2026-05-01T02:10:46.790Z',
+          rehydrated_at: null,
+          latest_provider_key: 'linear:lin-issue-424',
+          latest_reason: 'stale cached provider-intake summary',
+          polling: null,
+          claims: [
+            co272ProviderIntakeClaim({
+              provider_key: 'linear:lin-issue-424',
+              issue_id: 'lin-issue-424',
+              issue_identifier: 'CO-424',
+              issue_title: 'Stale selected claim',
+              task_id: 'linear-co-424-stale',
+              run_id: 'stale-provider-run',
+              reason: 'stale cached provider-intake summary',
+              updated_at: '2026-05-01T02:10:46.790Z'
+            })
+          ]
+        }
+      });
+
+      const context = assembly.requestContextShared;
+      const presenterContext = {
+        controlStore: context.controlStore,
+        paths: context.paths,
+        readCompatibilityProjection: () => context.runtime.snapshot().readCompatibilityProjection()
+      };
+
+      const cachedProjection = await presenterContext.readCompatibilityProjection();
+      expect(cachedProjection.providerIntake?.selected_claim.issue_identifier).toBe('CO-424');
+
+      const providerIntakeState = context.providerIntakeState;
+      expect(providerIntakeState).toBeDefined();
+      if (!providerIntakeState) {
+        throw new Error('Expected provider intake state to be available');
+      }
+      providerIntakeState.updated_at = '2026-05-01T02:41:32.000Z';
+      providerIntakeState.latest_provider_key = null;
+      providerIntakeState.latest_reason = null;
+      providerIntakeState.claims = [];
+      await context.persist.providerIntake?.();
+
+      const apiPayload = await readCompatibilityState(presenterContext);
+      const uiPayload = await readUiDataset(presenterContext);
+
+      expect(apiPayload).not.toHaveProperty('provider_intake');
+      expect(uiPayload).not.toHaveProperty('provider_intake');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed instead of discovering stale runs when raw provider intake is missing at startup', async () => {
+    const { root, env, paths } = await createRunRoot('task-1084');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    try {
+      const staleRunDir = join(root, '.runs', 'linear-co-424-stale', 'cli', 'stale-provider-run');
+      await mkdir(staleRunDir, { recursive: true });
+      await writeFile(
+        join(staleRunDir, 'manifest.json'),
+        JSON.stringify({
+          run_id: 'stale-provider-run',
+          task_id: 'linear-co-424-stale',
+          status: 'in_progress',
+          started_at: '2026-05-01T02:09:46.790Z',
+          updated_at: '2026-05-01T02:10:46.790Z',
+          completed_at: null,
+          summary: 'Stale selected claim',
+          issue_provider: 'linear',
+          issue_id: 'lin-issue-424',
+          issue_identifier: 'CO-424'
+        }),
+        'utf8'
+      );
+
+      const assembly = createControlServerSeededRuntimeAssembly({
+        runId: 'control-host',
+        token: 'control-token',
+        config,
+        paths,
+        sessionTtlMs: 60_000,
+        controlSeed: null,
+        confirmationsSeed: null,
+        questionsSeed: null,
+        delegationSeed: null,
+        linearAdvisorySeed: null,
+        providerIntakeSeed: null
+      });
+
+      const context = assembly.requestContextShared;
+      const presenterContext = {
+        controlStore: context.controlStore,
+        paths: context.paths,
+        readCompatibilityProjection: () => context.runtime.snapshot().readCompatibilityProjection()
+      };
+      const apiPayload = await readCompatibilityState(presenterContext);
+      const uiPayload = await readUiDataset(presenterContext);
+
+      expect(apiPayload.provider_intake).toBeNull();
+      expect(apiPayload.provider_intake_unavailable).toEqual({
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: null
+      });
+      expect(apiPayload.selected?.issue_identifier).not.toBe('CO-424');
+      expect(apiPayload.running_ids).not.toContain('CO-424');
+      expect(uiPayload.provider_intake).toBeNull();
+      expect(uiPayload.provider_intake_unavailable).toEqual({
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: null
+      });
+      expect(uiPayload.selected_issue_identifier).not.toBe('CO-424');
+      expect(uiPayload.running.map((entry) => entry.issue_identifier)).not.toContain('CO-424');
+
+      await context.persist.providerIntake?.();
+      const providerIntakeSnapshotAfterEmptyPersist = JSON.parse(
+        await readFile(join(paths.runDir, PROVIDER_INTAKE_STATE_FILE), 'utf8')
+      ) as ProviderIntakeState;
+      expect(providerIntakeSnapshotAfterEmptyPersist.authority).toEqual({
+        status: 'unavailable',
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: null
+      });
+      expect(providerIntakeSnapshotAfterEmptyPersist.claims).toEqual([]);
+      const apiPayloadAfterEmptyPersist = await readCompatibilityState(presenterContext);
+      const uiPayloadAfterEmptyPersist = await readUiDataset(presenterContext);
+      expect(apiPayloadAfterEmptyPersist.provider_intake).toBeNull();
+      expect(apiPayloadAfterEmptyPersist.provider_intake_unavailable).toEqual({
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: null
+      });
+      expect(apiPayloadAfterEmptyPersist.selected?.issue_identifier).not.toBe('CO-424');
+      expect(apiPayloadAfterEmptyPersist.running_ids).not.toContain('CO-424');
+      expect(uiPayloadAfterEmptyPersist.provider_intake).toBeNull();
+      expect(uiPayloadAfterEmptyPersist.provider_intake_unavailable).toEqual({
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: null
+      });
+      expect(uiPayloadAfterEmptyPersist.selected_issue_identifier).not.toBe('CO-424');
+      expect(uiPayloadAfterEmptyPersist.running.map((entry) => entry.issue_identifier)).not.toContain('CO-424');
+
+      await context.persist.providerIntakePolling?.({
+        enabled: true,
+        checking: true
+      });
+      const apiPayloadAfterPolling = await readCompatibilityState(presenterContext);
+      const uiPayloadAfterPolling = await readUiDataset(presenterContext);
+
+      expect(apiPayloadAfterPolling.provider_intake).toBeNull();
+      expect(apiPayloadAfterPolling.provider_intake_unavailable).toEqual({
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: null
+      });
+      expect(apiPayloadAfterPolling.selected?.issue_identifier).not.toBe('CO-424');
+      expect(apiPayloadAfterPolling.running_ids).not.toContain('CO-424');
+      expect(uiPayloadAfterPolling.provider_intake).toBeNull();
+      expect(uiPayloadAfterPolling.provider_intake_unavailable).toEqual({
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: null
+      });
+      expect(uiPayloadAfterPolling.selected_issue_identifier).not.toBe('CO-424');
+      expect(uiPayloadAfterPolling.running.map((entry) => entry.issue_identifier)).not.toContain('CO-424');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves unreadable raw provider intake authority across empty startup persist', async () => {
+    const { root, env, paths } = await createRunRoot('task-1084');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+
+    try {
+      const staleRunDir = join(root, '.runs', 'linear-co-424-stale', 'cli', 'stale-provider-run');
+      await mkdir(staleRunDir, { recursive: true });
+      await writeFile(
+        join(staleRunDir, 'manifest.json'),
+        JSON.stringify({
+          run_id: 'stale-provider-run',
+          task_id: 'linear-co-424-stale',
+          status: 'in_progress',
+          started_at: '2026-05-01T02:09:46.790Z',
+          updated_at: '2026-05-01T02:10:46.790Z',
+          completed_at: null,
+          summary: 'Stale selected claim',
+          issue_provider: 'linear',
+          issue_id: 'lin-issue-424',
+          issue_identifier: 'CO-424'
+        }),
+        'utf8'
+      );
+
+      const assembly = createControlServerSeededRuntimeAssembly({
+        runId: 'control-host',
+        token: 'control-token',
+        config,
+        paths,
+        sessionTtlMs: 60_000,
+        controlSeed: null,
+        confirmationsSeed: null,
+        questionsSeed: null,
+        delegationSeed: null,
+        linearAdvisorySeed: null,
+        providerIntakeSeed: {
+          schema_version: 1,
+          updated_at: '2026-05-01T02:10:46.790Z',
+          rehydrated_at: null,
+          latest_provider_key: null,
+          latest_reason: null,
+          authority: {
+            status: 'unavailable',
+            reason: 'raw_provider_intake_read_failed',
+            updated_at: null
+          },
+          polling: null,
+          claims: []
+        }
+      });
+
+      const context = assembly.requestContextShared;
+      const presenterContext = {
+        controlStore: context.controlStore,
+        paths: context.paths,
+        readCompatibilityProjection: () => context.runtime.snapshot().readCompatibilityProjection()
+      };
+
+      await context.persist.providerIntake?.();
+      const providerIntakeSnapshotAfterEmptyPersist = JSON.parse(
+        await readFile(join(paths.runDir, PROVIDER_INTAKE_STATE_FILE), 'utf8')
+      ) as ProviderIntakeState;
+      expect(providerIntakeSnapshotAfterEmptyPersist.authority).toEqual({
+        status: 'unavailable',
+        reason: 'raw_provider_intake_read_failed',
+        updated_at: null
+      });
+      expect(providerIntakeSnapshotAfterEmptyPersist.claims).toEqual([]);
+
+      const apiPayload = await readCompatibilityState(presenterContext);
+      const uiPayload = await readUiDataset(presenterContext);
+      expect(apiPayload.provider_intake).toBeNull();
+      expect(apiPayload.provider_intake_unavailable).toEqual({
+        reason: 'raw_provider_intake_read_failed',
+        updated_at: null
+      });
+      expect(apiPayload.selected?.issue_identifier).not.toBe('CO-424');
+      expect(apiPayload.running_ids).not.toContain('CO-424');
+      expect(uiPayload.provider_intake).toBeNull();
+      expect(uiPayload.provider_intake_unavailable).toEqual({
+        reason: 'raw_provider_intake_read_failed',
+        updated_at: null
+      });
+      expect(uiPayload.selected_issue_identifier).not.toBe('CO-424');
+      expect(uiPayload.running.map((entry) => entry.issue_identifier)).not.toContain('CO-424');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('persists polling snapshots without serializing unpersisted claim mutations', async () => {
     const { root, env, paths } = await createRunRoot('task-1084');
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
@@ -979,7 +1517,39 @@ describe('createControlServerSeededRuntimeAssembly', () => {
         enabled: true,
         checking: true
       });
+      expect(providerIntakeSnapshot.authority).toEqual({
+        status: 'unavailable',
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: null
+      });
       expect(providerIntakeSnapshot.claims).toEqual([]);
+
+      const context = assembly.requestContextShared;
+      const presenterContext = {
+        controlStore: context.controlStore,
+        paths: context.paths,
+        readCompatibilityProjection: () => context.runtime.snapshot().readCompatibilityProjection()
+      };
+      const apiPayload = await readCompatibilityState(presenterContext);
+      const uiPayload = await readUiDataset(presenterContext);
+      expect(apiPayload.provider_intake).toBeNull();
+      expect(apiPayload.provider_intake_unavailable).toEqual({
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: null
+      });
+      expect(apiPayload.polling).toMatchObject({
+        enabled: true,
+        checking: true
+      });
+      expect(uiPayload.provider_intake).toBeNull();
+      expect(uiPayload.provider_intake_unavailable).toEqual({
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: null
+      });
+      expect(uiPayload.polling).toMatchObject({
+        enabled: true,
+        checking: true
+      });
     } finally {
       vi.useRealTimers();
       await rm(root, { recursive: true, force: true });

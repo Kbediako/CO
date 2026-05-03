@@ -14,6 +14,7 @@ import type {
   ControlSelectedRunPayload,
   ControlStatusFallbackExpiryMetadata,
   ControlTrackedPayload,
+  ControlProviderIntakeUnavailablePayload,
   ControlProviderWorkflowPayload
 } from './observabilityReadModel.js';
 import { resolveProviderWorkerHost } from './observabilityReadModel.js';
@@ -147,7 +148,8 @@ export interface OperatorDashboardDataset {
   retrying: OperatorDashboardRetryPayload[];
   issues: OperatorDashboardIssuePayload[];
   provider_workflow?: ControlProviderWorkflowPayload;
-  provider_intake?: ProviderIntakeSummaryPayload;
+  provider_intake?: ProviderIntakeSummaryPayload | null;
+  provider_intake_unavailable?: ControlProviderIntakeUnavailablePayload;
   dispatch_pilot?: ControlDispatchPilotPayload;
   tracked?: ControlTrackedPayload | null;
   fallback_expiry?: ControlStatusFallbackExpiryMetadata[];
@@ -195,6 +197,12 @@ export function buildUiDataset(input: {
     ...(input.projection.fallbackExpiry ? { fallback_expiry: input.projection.fallbackExpiry } : {}),
     ...(input.projection.providerWorkflow ? { provider_workflow: input.projection.providerWorkflow } : {}),
     ...(input.projection.providerIntake ? { provider_intake: input.projection.providerIntake } : {}),
+    ...(input.projection.providerIntakeUnavailable
+      ? {
+          provider_intake: null,
+          provider_intake_unavailable: input.projection.providerIntakeUnavailable
+        }
+      : {}),
     ...(input.projection.dispatchPilot ? { dispatch_pilot: input.projection.dispatchPilot } : {}),
     ...(input.projection.tracked ? { tracked: input.projection.tracked } : {})
   };

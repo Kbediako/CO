@@ -36136,6 +36136,48 @@
       "status": "active",
       "last_review": "2026-05-03",
       "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-01",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-01",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-01",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-01",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-01",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-01",
+      "cadence_days": 30
     }
   ]
 }

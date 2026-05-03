@@ -343,6 +343,12 @@ export async function readCompatibilityState(
     ...(projection.providerIntake
       ? { provider_intake: serializeProviderIntakeSummary(projection.providerIntake) }
       : {}),
+    ...(projection.providerIntakeUnavailable
+      ? {
+          provider_intake: null,
+          provider_intake_unavailable: projection.providerIntakeUnavailable
+        }
+      : {}),
     ...(projection.providerWorkflow ? { provider_workflow: projection.providerWorkflow } : {}),
     ...(projection.polling ? { polling: projection.polling } : {}),
     ...(projection.dispatchPilot ? { dispatch_pilot: projection.dispatchPilot } : {}),

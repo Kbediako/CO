@@ -1019,7 +1019,7 @@ describe('buildProviderIntakeSummary', () => {
       active_claim_count: 2,
       running_claim_count: 0,
       active_issue_identifiers: ['CO-301', 'CO-302'],
-      updated_at: '2026-04-18T06:09:30.000Z',
+      updated_at: '2026-04-18T06:10:00.000Z',
       selected_claim: {
         issue_identifier: 'CO-301',
         state: 'handoff_failed'
