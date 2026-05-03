@@ -69,6 +69,87 @@
       }
     },
     {
+      "id": "20260501-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37",
+      "title": "CO-450 Codex binary provenance in doctor",
+      "relates_to": "tasks/tasks-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-03",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+        "docs/TECH_SPEC-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+        "docs/ACTION_PLAN-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+        "tasks/specs/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+        "tasks/tasks-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+        ".agent/task/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        "Linear workpad comment 54e50811-73ab-4d03-bade-01519d2324e6",
+        "orchestrator/src/cli/doctor.ts",
+        "orchestrator/src/cli/utils/codexCli.ts",
+        "orchestrator/tests/Doctor.test.ts",
+        "orchestrator/tests/_reproIssueLogTask.test.ts",
+        ".runs/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37-docs-review/cli/2026-05-01T01-07-21-018Z-af499409/manifest.json",
+        ".runs/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37/cli/2026-05-03T03-57-11-257Z-fb1eb1a7/review/telemetry.json",
+        "out/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37/manual/20260503T051500Z-elegance-review.md",
+        "CO-456 baseline follow-up for spec-guard external-migration cap timeout tests"
+      ],
+      "approvals": {
+        "issue_quality_review": {
+          "reviewer": "Codex provider worker",
+          "date": "2026-05-01",
+          "status": "approved-for-implementation",
+          "summary": "Linear issue intent checksum, wrong interpretations, non-goals, Not Done If clauses, checkout-posture lineage, and release-intake lineage are captured before source edits."
+        },
+        "focused_validation": {
+          "reviewer": "Codex provider worker",
+          "date": "2026-05-01",
+          "status": "focused-green",
+          "summary": "Build, lint, focused Doctor.test.ts, docs:check, repo:stewardship, git diff --check, diff-budget, live doctor JSON, and pack:smoke passed. Lint retains existing DelegationMcpHealth warnings only."
+        },
+        "validation_blockers": {
+          "reviewer": "Codex provider worker",
+          "date": "2026-05-03",
+          "status": "resolved-on-current-main",
+          "summary": "Historical baseline blockers from 2026-05-01 are no longer live for CO-450 after CO-456 landed and current docs-freshness is clean; current-head validation is green."
+        },
+        "current_main_refresh": {
+          "reviewer": "Codex provider worker",
+          "date": "2026-05-03",
+          "status": "validation-green",
+          "summary": "CO-450 resumed after CO-456 landed; provider worker fast-forwarded the branch to origin/main 0e71d3e13, preserved the advisory binary-provenance implementation, applied the post-elegance cache simplification, and passed delegation guard, spec guard, build, lint, focused doctor/repro tests, npm test, docs gates, stewardship, diff-budget, pack smoke, and live workspace doctor JSON proof."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-03",
+          "status": "bounded-success",
+          "evidence": ".runs/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37/cli/2026-05-03T03-57-11-257Z-fb1eb1a7/review/telemetry.json",
+          "summary": "Final manifest-backed standalone re-review completed via command-intent retry with no actionable diff-local regressions after the advisory-status fix, DoctorResult fixture update, and post-elegance probe-cache removal."
+        },
+        "elegance_review": {
+          "reviewer": "codex review prompt-only elegance pass",
+          "date": "2026-05-03",
+          "status": "p3-simplification-applied",
+          "evidence": "out/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37/manual/20260503T051500Z-elegance-review.md",
+          "summary": "Elegance review found and parent applied the small simplification to remove cross-run probe caches so doctor provenance remains fresh within long-lived processes."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+        "task": "tasks/tasks-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+        "agent_task": ".agent/task/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+        "docs": {
+          "PRD": "docs/PRD-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+          "TECH_SPEC": "docs/TECH_SPEC-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
+          "ACTION_PLAN": "docs/ACTION_PLAN-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md"
+        }
+      }
+    },
+    {
       "id": "20260502-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc",
       "title": "CO-486 persisted goal evidence canary",
       "relates_to": "tasks/tasks-linear-6a92b5d9-3293-4e27-9bc5-28c8c62becfc.md",
