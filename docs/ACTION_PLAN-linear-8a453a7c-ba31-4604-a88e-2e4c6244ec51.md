@@ -62,6 +62,7 @@
   - record `<manifest-path>` plus review telemetry in the task checklist so the NOTES-backed gate remains auditable
   - `npm run docs:check`
   - `npm run docs:freshness`
+  - unresolved actionable review threads = 0 before merge, or an explicit waiver is recorded in the task checklist with owner, expiry, reason, and evidence
   - focused parser/status tests after implementation begins
 - Rollback plan:
   - revert only the CO-442 packet files, task index item, task snapshot, and registry rows if the packet is rejected.

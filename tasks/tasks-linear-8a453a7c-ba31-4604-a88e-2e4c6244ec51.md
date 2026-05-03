@@ -3,7 +3,8 @@
 - Linear Issue: `CO-442` / `8a453a7c-ba31-4604-a88e-2e4c6244ec51`
 - Source Issue: `CO-441` / `b9e7583a-3051-40d3-a87f-0388faa9df61`
 - Primary PRD: `docs/PRD-linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51.md`
-- TECH_SPEC: `tasks/specs/linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51.md`
+- TECH_SPEC: `docs/TECH_SPEC-linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51.md`
+- Canonical spec: `tasks/specs/linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51.md`
 - Canonical registry id: `20260430-linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51`
 
@@ -44,6 +45,7 @@
 - [x] Targeted protected-term scan for `codex_core::session`, `failed to record rollout items`, `thread not found`, `review/telemetry.json`, `review_outcome`, `clean-success`, `bounded-success`, `status=succeeded`, `error=null`, `CO-441`, and `backlog_head_follow_up_traceability_pending`. Evidence: focused `rg` scan passed.
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `Spec guard: OK`.
 - [x] Manifest-backed review with explicit `TASK`, `NOTES`, and `MANIFEST`. Evidence: `.runs/linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51/manual/20260503T115240Z-co-442-packet-review/manifest.json` and `.runs/linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51/manual/20260503T115240Z-co-442-packet-review/review/telemetry.json` reported `review_outcome=clean-success`.
+- [ ] Unresolved actionable review threads = 0 before merge, or waiver recorded with owner, expiry, reason, and evidence. Evidence: final PR review-thread sweep after CodeRabbit review completes.
 - [x] `npm run docs:check`. Evidence: passed after compacting the new CO-442 `docs/TASKS.md` snapshot to keep reserve headroom.
 - [x] `npm run docs:freshness`. Evidence: `docs:freshness OK - 5171 docs, 5174 registry entries`.
 
