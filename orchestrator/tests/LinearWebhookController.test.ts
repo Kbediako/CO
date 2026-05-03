@@ -257,7 +257,6 @@ describe('LinearWebhookController', () => {
     const marked = markLinearAdvisoryStateStaleFromProviderIntake(
       advisoryState,
       {
-        updated_at: '2026-05-01T02:52:40.455Z',
         rehydrated_at: '2026-05-01T02:52:40.455Z',
         claims: [
           createProviderIntakeClaim({
