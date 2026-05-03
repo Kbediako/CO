@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { chmod, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -32,17 +32,18 @@ function testFingerprint(value: string): string {
 async function writeFakeCodexBinary(
   dir: string,
   featureLine: string,
-  options: { exitCode?: number; stderr?: string } = {}
+  options: { exitCode?: number; stderr?: string; version?: string } = {}
 ): Promise<string> {
   const binPath = join(dir, 'codex');
   const featureOutput = featureLine.length > 0 ? `  printf '%s\n' ${JSON.stringify(featureLine)}` : '';
   const stderrOutput = options.stderr ? `  printf '%s\n' ${JSON.stringify(options.stderr)} >&2` : '';
+  const version = options.version ?? 'codex 0.0.0-test';
   await writeFile(
     binPath,
     [
       '#!/bin/sh',
       'if [ "$1" = "--version" ]; then',
-      '  echo "codex 0.0.0-test"',
+      `  echo ${JSON.stringify(version)}`,
       '  exit 0',
       'fi',
       'if [ "$1" = "features" ] && [ "$2" = "list" ]; then',
@@ -63,6 +64,25 @@ async function writeFakeCodexBinary(
   );
   await chmod(binPath, 0o755);
   return binPath;
+}
+
+async function writeManagedCodexConfig(codexHome: string, binaryPath: string): Promise<void> {
+  const configDir = join(codexHome, 'orchestrator', 'codex-cli');
+  await mkdir(configDir, { recursive: true });
+  await writeFile(
+    join(configDir, 'codex-cli.json'),
+    JSON.stringify(
+      {
+        binary_path: binaryPath,
+        method: 'build',
+        installed_at: '2026-05-01T00:00:00.000Z',
+        version: 'codex-cli managed-test'
+      },
+      null,
+      2
+    ),
+    'utf8'
+  );
 }
 
 async function withMissingCodexHome(run: (tempHome: string) => Promise<void>): Promise<void> {
@@ -183,6 +203,247 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       base_ref: 'origin/main'
     });
     expect(formatDoctorSummary(result).join('\n')).toContain('Source root freshness:');
+  });
+
+  it('reports active Codex binary provenance without app bundle noise when the app binary is absent', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-binary-provenance-'));
+    const activeBin = await writeFakeCodexBinary(tempHome, 'multi_agent stable true', {
+      version: 'codex-cli 0.128.0'
+    });
+    try {
+      process.env.CODEX_HOME = tempHome;
+      process.env.CODEX_CLI_BIN = activeBin;
+      const missingAppBundle = join(tempHome, 'Applications', 'Codex.app', 'Contents', 'Resources', 'codex');
+      const result = runDoctor(process.cwd(), { codexAppBundlePath: missingAppBundle });
+      expect(result.codex_cli.active.path).toBe(process.env.CODEX_CLI_BIN);
+      expect(result.codex_cli.active.version).toBe('codex-cli 0.128.0');
+      expect(result.codex_cli.app_bundle.status).toBe('absent');
+      expect(result.codex_cli.version_drift.status).toBe('not_applicable');
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain(`Codex CLI: ${process.env.CODEX_CLI_BIN}`);
+      expect(summary).toContain(`  - active path: ${process.env.CODEX_CLI_BIN}`);
+      expect(summary).toContain('  - active version: codex-cli 0.128.0');
+      expect(summary).not.toContain('binary provenance drift');
+      expect(summary).not.toContain('app bundle:');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('reports matching app-bundle Codex versions without drift advisory', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-binary-match-'));
+    const appBundleDir = join(tempHome, 'Applications', 'Codex.app', 'Contents', 'Resources');
+    await mkdir(appBundleDir, { recursive: true });
+    const activeBin = await writeFakeCodexBinary(tempHome, 'multi_agent stable true', {
+      version: 'codex-cli 0.128.0'
+    });
+    const appBundlePath = await writeFakeCodexBinary(appBundleDir, '', { version: 'codex-cli 0.128.0' });
+    try {
+      process.env.CODEX_HOME = tempHome;
+      process.env.CODEX_CLI_BIN = activeBin;
+      const result = runDoctor(process.cwd(), { codexAppBundlePath: appBundlePath });
+      expect(result.codex_cli.app_bundle.status).toBe('ok');
+      expect(result.codex_cli.app_bundle.version).toBe('codex-cli 0.128.0');
+      expect(result.codex_cli.version_drift.status).toBe('ok');
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain(`  - app bundle: ok (${appBundlePath})`);
+      expect(summary).toContain('    version: codex-cli 0.128.0');
+      expect(summary).not.toContain('binary provenance drift: advisory');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('surfaces divergent active CLI and app-bundle versions as advisory drift', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-binary-drift-'));
+    const appBundleDir = join(tempHome, 'Applications', 'Codex.app', 'Contents', 'Resources');
+    await mkdir(appBundleDir, { recursive: true });
+    const activeBin = await writeFakeCodexBinary(tempHome, 'multi_agent stable true', {
+      version: 'codex-cli 0.128.0'
+    });
+    const appBundlePath = await writeFakeCodexBinary(appBundleDir, '', { version: 'codex-cli 0.128.0-alpha.1' });
+    try {
+      process.env.CODEX_HOME = tempHome;
+      process.env.CODEX_CLI_BIN = activeBin;
+      const missingAppBundle = join(tempHome, 'missing-app-bundle-codex');
+      const baseline = runDoctor(process.cwd(), { codexAppBundlePath: missingAppBundle });
+      const result = runDoctor(process.cwd(), { codexAppBundlePath: appBundlePath });
+      expect(result.codex_cli.version_drift.status).toBe('advisory');
+      expect(result.codex_cli.version_drift.message).toContain('codex-cli 0.128.0');
+      expect(result.codex_cli.version_drift.message).toContain('codex-cli 0.128.0-alpha.1');
+      expect(result.status).toBe(baseline.status);
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('binary provenance drift: advisory');
+      expect(summary).toContain(`(${process.env.CODEX_CLI_BIN})`);
+      expect(summary).toContain(`(${appBundlePath})`);
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('reports bare codex provenance through PATH resolution', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const originalManagedFlag = process.env.CODEX_CLI_USE_MANAGED;
+    const originalPath = process.env.PATH;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-binary-path-'));
+    const activeBin = await writeFakeCodexBinary(tempHome, 'multi_agent stable true', {
+      version: 'codex-cli path-selected'
+    });
+    try {
+      process.env.CODEX_HOME = tempHome;
+      delete process.env.CODEX_CLI_BIN;
+      delete process.env.CODEX_CLI_USE_MANAGED;
+      process.env.PATH = originalPath ? `${tempHome}${delimiter}${originalPath}` : tempHome;
+      const result = runDoctor(process.cwd(), { codexAppBundlePath: join(tempHome, 'missing-app-codex') });
+      expect(result.codex_cli.active.command).toBe('codex');
+      expect(result.codex_cli.active.path).toBe(activeBin);
+      expect(result.codex_cli.active.version).toBe('codex-cli path-selected');
+      expect(result.codex_cli.version_drift.status).toBe('not_applicable');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      if (originalManagedFlag === undefined) {
+        delete process.env.CODEX_CLI_USE_MANAGED;
+      } else {
+        process.env.CODEX_CLI_USE_MANAGED = originalManagedFlag;
+      }
+      if (originalPath === undefined) {
+        delete process.env.PATH;
+      } else {
+        process.env.PATH = originalPath;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps CODEX_CLI_BIN as the audited active binary when managed CLI is enabled', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const originalManagedFlag = process.env.CODEX_CLI_USE_MANAGED;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-binary-override-'));
+    const explicitDir = join(tempHome, 'explicit');
+    const managedDir = join(tempHome, 'managed');
+    await mkdir(explicitDir, { recursive: true });
+    await mkdir(managedDir, { recursive: true });
+    const explicitBin = await writeFakeCodexBinary(explicitDir, 'multi_agent stable true', {
+      version: 'codex-cli explicit'
+    });
+    const managedBin = await writeFakeCodexBinary(managedDir, 'multi_agent stable true', {
+      version: 'codex-cli managed'
+    });
+    await writeManagedCodexConfig(tempHome, managedBin);
+    try {
+      process.env.CODEX_HOME = tempHome;
+      process.env.CODEX_CLI_USE_MANAGED = '1';
+      process.env.CODEX_CLI_BIN = explicitBin;
+      const result = runDoctor(process.cwd(), { codexAppBundlePath: join(tempHome, 'missing-app-codex') });
+      expect(result.codex_cli.active.command).toBe(explicitBin);
+      expect(result.codex_cli.active.path).toBe(explicitBin);
+      expect(result.codex_cli.active.version).toBe('codex-cli explicit');
+      expect(result.codex_cli.active.managed_opt_in).toBe(true);
+      expect(result.codex_cli.managed.binary.path).toBe(managedBin);
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      if (originalManagedFlag === undefined) {
+        delete process.env.CODEX_CLI_USE_MANAGED;
+      } else {
+        process.env.CODEX_CLI_USE_MANAGED = originalManagedFlag;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('probes relative CODEX_CLI_BIN from the process working directory', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-binary-relative-'));
+    const repoRoot = join(tempHome, 'repo-root');
+    const invocationRoot = join(tempHome, 'invocation-root');
+    const invocationBinDir = join(invocationRoot, 'bin');
+    await mkdir(repoRoot, { recursive: true });
+    await mkdir(invocationBinDir, { recursive: true });
+    const activeBin = await writeFakeCodexBinary(invocationBinDir, 'multi_agent stable true', {
+      version: 'codex-cli relative'
+    });
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(invocationRoot);
+    try {
+      process.env.CODEX_HOME = tempHome;
+      process.env.CODEX_CLI_BIN = join('bin', 'codex');
+      const result = runDoctor(repoRoot, { codexAppBundlePath: join(tempHome, 'missing-app-codex') });
+      expect(result.codex_cli.active.command).toBe(join('bin', 'codex'));
+      expect(result.codex_cli.active.path).toBe(activeBin);
+      expect(result.codex_cli.active.version).toBe('codex-cli relative');
+    } finally {
+      cwdSpy.mockRestore();
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
   });
 
   it('reports missing devtools config and skill when absent', async () => {
