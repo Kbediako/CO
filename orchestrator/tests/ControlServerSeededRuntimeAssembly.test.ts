@@ -21,7 +21,6 @@ import type {
   ProviderIntakeState
 } from '../src/cli/control/providerIntakeState.js';
 import { readUiDataset } from '../src/cli/control/operatorDashboardPresenter.js';
-import { readCompatibilityState } from '../src/cli/control/observabilitySurface.js';
 import { handleUiDataRequest } from '../src/cli/control/uiDataController.js';
 
 async function createRunRoot(taskId: string) {
