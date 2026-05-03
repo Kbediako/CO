@@ -11,7 +11,10 @@ import {
 import { readControlServerSeeds } from './control/controlServerSeedLoading.js';
 import { ControlStateStore } from './control/controlState.js';
 import { createControlRuntime } from './control/controlRuntime.js';
-import { normalizeLinearAdvisoryState } from './control/linearWebhookController.js';
+import {
+  markLinearAdvisoryStateStaleFromProviderIntake,
+  normalizeLinearAdvisoryState
+} from './control/linearWebhookController.js';
 import {
   readUiDataset,
   type OperatorDashboardDataset,
@@ -722,11 +725,13 @@ async function readLocalUiDataset(target: CoStatusAttachTarget): Promise<{
     featureToggles: controlSeed?.feature_toggles ?? null,
     transportMutation: controlSeed?.transport_mutation ?? null
   });
+  const linearAdvisoryState = normalizeLinearAdvisoryState(linearAdvisorySeed);
+  markLinearAdvisoryStateStaleFromProviderIntake(linearAdvisoryState, providerIntakeState);
   const runtime = createControlRuntime({
     controlStore,
     questionQueue: { list: () => [] },
     paths,
-    linearAdvisoryState: normalizeLinearAdvisoryState(linearAdvisorySeed),
+    linearAdvisoryState,
     providerIntakeState
   });
   return {

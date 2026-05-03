@@ -9,7 +9,10 @@ import {
   type LiveLinearTrackedIssue
 } from './linearDispatchSource.js';
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
-import type { ProviderIntakeState } from './providerIntakeState.js';
+import {
+  isActiveProviderIntakeClaim,
+  type ProviderIntakeState
+} from './providerIntakeState.js';
 
 const LINEAR_WEBHOOK_MAX_AGE_MS = 5 * 60 * 1000;
 const LINEAR_ADVISORY_SEEN_DELIVERY_LIMIT = 100;
@@ -51,7 +54,9 @@ export interface LinearAdvisoryState {
 
 export interface LinearAdvisoryStaleSource {
   source: 'provider-intake';
-  reason: 'provider_intake_newer_than_linear_advisory';
+  reason:
+    | 'provider_intake_newer_than_linear_advisory'
+    | 'provider_intake_missing_tracked_issue_after_linear_advisory';
   marked_at: string;
   provider_intake_updated_at: string | null;
   advisory_updated_at: string | null;
@@ -343,15 +348,49 @@ export function markLinearAdvisoryStateStaleFromProviderIntake(
     state.tracked_issue
   );
   const advisoryUpdatedAt = resolveLinearAdvisoryTrackedIssueReferenceUpdatedAt(state);
-  if (!isIsoNewer(providerIntakeUpdatedAt, advisoryUpdatedAt)) {
-    return false;
+  if (isIsoNewer(providerIntakeUpdatedAt, advisoryUpdatedAt)) {
+    return markLinearAdvisoryStateStale(state, {
+      reason: 'provider_intake_newer_than_linear_advisory',
+      providerIntakeUpdatedAt,
+      advisoryUpdatedAt,
+      now: options.now
+    });
   }
+
+  const missingIssueTruthUpdatedAt = resolveProviderIntakeMissingIssueTruthUpdatedAt(
+    providerIntakeState,
+    state.tracked_issue
+  );
+  if (
+    !hasProviderIntakeClaimForTrackedIssue(providerIntakeState, state.tracked_issue) &&
+    isIsoNewer(missingIssueTruthUpdatedAt, advisoryUpdatedAt)
+  ) {
+    return markLinearAdvisoryStateStale(state, {
+      reason: 'provider_intake_missing_tracked_issue_after_linear_advisory',
+      providerIntakeUpdatedAt: missingIssueTruthUpdatedAt,
+      advisoryUpdatedAt,
+      now: options.now
+    });
+  }
+
+  return false;
+}
+
+function markLinearAdvisoryStateStale(
+  state: LinearAdvisoryState,
+  input: {
+    reason: LinearAdvisoryStaleSource['reason'];
+    providerIntakeUpdatedAt: string | null;
+    advisoryUpdatedAt: string | null;
+    now?: () => string;
+  }
+): boolean {
   const nextStaleSource: LinearAdvisoryStaleSource = {
     source: 'provider-intake',
-    reason: 'provider_intake_newer_than_linear_advisory',
-    marked_at: options.now?.() ?? isoTimestamp(),
-    provider_intake_updated_at: providerIntakeUpdatedAt,
-    advisory_updated_at: advisoryUpdatedAt
+    reason: input.reason,
+    marked_at: input.now?.() ?? isoTimestamp(),
+    provider_intake_updated_at: input.providerIntakeUpdatedAt,
+    advisory_updated_at: input.advisoryUpdatedAt
   };
   if (
     state.stale_source?.source === nextStaleSource.source &&
@@ -365,6 +404,44 @@ export function markLinearAdvisoryStateStaleFromProviderIntake(
   return true;
 }
 
+function hasProviderIntakeClaimForTrackedIssue(
+  providerIntakeState:
+    | Pick<ProviderIntakeState, 'claims'>
+    | null
+    | undefined,
+  trackedIssue: Pick<LiveLinearTrackedIssue, 'id' | 'identifier'>
+): boolean {
+  return (providerIntakeState?.claims ?? []).some(
+    (claim) =>
+      isActiveProviderIntakeClaim(claim) &&
+      isProviderIntakeClaimForTrackedIssue(claim, trackedIssue)
+  );
+}
+
+function resolveProviderIntakeMissingIssueTruthUpdatedAt(
+  providerIntakeState:
+    | Pick<ProviderIntakeState, 'rehydrated_at' | 'claims'>
+    | null
+    | undefined,
+  trackedIssue: Pick<LiveLinearTrackedIssue, 'id' | 'identifier'>
+): string | null {
+  let truthUpdatedAt =
+    typeof providerIntakeState?.rehydrated_at === 'string' ? providerIntakeState.rehydrated_at : null;
+  for (const claim of providerIntakeState?.claims ?? []) {
+    if (
+      isActiveProviderIntakeClaim(claim) ||
+      !isProviderIntakeClaimForTrackedIssue(claim, trackedIssue)
+    ) {
+      continue;
+    }
+    truthUpdatedAt = pickLatestIsoTimestamp(
+      pickLatestIsoTimestamp(truthUpdatedAt, claim.updated_at),
+      claim.issue_updated_at
+    );
+  }
+  return truthUpdatedAt;
+}
+
 function resolveProviderIntakeTruthUpdatedAt(
   providerIntakeState:
     | Pick<ProviderIntakeState, 'rehydrated_at' | 'claims'>
@@ -373,7 +450,7 @@ function resolveProviderIntakeTruthUpdatedAt(
   trackedIssue: Pick<LiveLinearTrackedIssue, 'id' | 'identifier'>
 ): string | null {
   const matchingClaims = (providerIntakeState?.claims ?? []).filter((claim) =>
-    claim.issue_id === trackedIssue.id || claim.issue_identifier === trackedIssue.identifier
+    isActiveProviderIntakeClaim(claim) && isProviderIntakeClaimForTrackedIssue(claim, trackedIssue)
   );
   if (matchingClaims.length === 0) {
     return null;
@@ -386,6 +463,13 @@ function resolveProviderIntakeTruthUpdatedAt(
     );
   }
   return truthUpdatedAt;
+}
+
+function isProviderIntakeClaimForTrackedIssue(
+  claim: Pick<ProviderIntakeState['claims'][number], 'issue_id' | 'issue_identifier'>,
+  trackedIssue: Pick<LiveLinearTrackedIssue, 'id' | 'identifier'>
+): boolean {
+  return claim.issue_id === trackedIssue.id || claim.issue_identifier === trackedIssue.identifier;
 }
 
 function resolveLinearAdvisoryTrackedIssueReferenceUpdatedAt(state: LinearAdvisoryState): string | null {
@@ -598,15 +682,20 @@ function normalizeLinearAdvisoryStaleSource(value: unknown): LinearAdvisoryStale
     return null;
   }
   const record = value as Record<string, unknown>;
+  const reason =
+    record.reason === 'provider_intake_newer_than_linear_advisory' ||
+    record.reason === 'provider_intake_missing_tracked_issue_after_linear_advisory'
+      ? record.reason
+      : null;
   if (
     record.source !== 'provider-intake' ||
-    record.reason !== 'provider_intake_newer_than_linear_advisory'
+    !reason
   ) {
     return null;
   }
   return {
     source: 'provider-intake',
-    reason: 'provider_intake_newer_than_linear_advisory',
+    reason,
     marked_at: typeof record.marked_at === 'string' ? record.marked_at : new Date(0).toISOString(),
     provider_intake_updated_at:
       typeof record.provider_intake_updated_at === 'string'

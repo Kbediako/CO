@@ -12,6 +12,8 @@ import {
   PROVIDER_INTAKE_STATE_FILE
 } from '../src/cli/control/controlPersistenceFiles.js';
 import { createControlServerSeededRuntimeAssembly } from '../src/cli/control/controlServerSeededRuntimeAssembly.js';
+import { buildUiDataset } from '../src/cli/control/operatorDashboardPresenter.js';
+import { readCompatibilityState } from '../src/cli/control/observabilitySurface.js';
 import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
 import type { LinearAdvisoryState } from '../src/cli/control/linearWebhookController.js';
 import type {
@@ -476,6 +478,177 @@ describe('createControlServerSeededRuntimeAssembly', () => {
         provider_intake_updated_at: '2026-04-21T16:00:00.000Z',
         advisory_updated_at: '2026-03-22T04:01:03.255Z'
       });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed after restart when fresh provider-intake truth no longer validates retained tracked.linear', async () => {
+    const { root, env, paths } = await createRunRoot('task-460');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const seededAdvisory = advisoryState(
+      '2026-03-22T04:01:03.255Z',
+      co272TrackedIssue({
+        id: 'lin-issue-1',
+        identifier: 'CO-1',
+        title: 'Stale retained CO-1 advisory',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-22T04:01:03.255Z'
+      }),
+      'delivery-co-1-stale'
+    );
+    const seededProviderIntake: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-05-01T02:52:40.455Z',
+      rehydrated_at: '2026-05-01T02:52:40.455Z',
+      latest_provider_key: null,
+      latest_reason: null,
+      claims: [
+        co272ProviderIntakeClaim({
+          provider_key: 'linear:lin-issue-460',
+          issue_id: 'lin-issue-460',
+          issue_identifier: 'CO-460',
+          issue_title: 'CO STATUS stale advisory fallback regression',
+          task_id: 'linear-93785af4-9df9-4713-8a63-b0caddb5796f',
+          issue_updated_at: '2026-05-01T02:52:40.455Z',
+          updated_at: '2026-05-01T02:52:40.455Z'
+        })
+      ]
+    };
+
+    try {
+      const assembly = createControlServerSeededRuntimeAssembly({
+        runId: 'run-1',
+        token: 'control-token',
+        config,
+        paths,
+        sessionTtlMs: 60_000,
+        controlSeed: null,
+        confirmationsSeed: null,
+        questionsSeed: null,
+        delegationSeed: null,
+        linearAdvisorySeed: seededAdvisory,
+        providerIntakeSeed: seededProviderIntake
+      });
+
+      await seedManifest(paths, {
+        task_id: 'local-mcp',
+        issue_provider: null,
+        issue_id: null,
+        issue_identifier: null,
+        summary: 'control host restarted with stale retained advisory',
+        updated_at: '2026-05-01T02:52:52.000Z'
+      });
+
+      const context = assembly.requestContextShared;
+      const selectedSnapshot = await context.runtime.snapshot().readSelectedRunSnapshot();
+      const compatibilityProjection = await context.runtime.snapshot().readCompatibilityProjection();
+      const apiState = await readCompatibilityState({
+        controlStore: context.controlStore,
+        paths: context.paths,
+        readCompatibilityProjection: async () => compatibilityProjection
+      });
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-05-01T02:52:52.000Z'
+      });
+
+      expect(context.linearAdvisoryState.stale_source).toMatchObject({
+        source: 'provider-intake',
+        reason: 'provider_intake_missing_tracked_issue_after_linear_advisory',
+        provider_intake_updated_at: '2026-05-01T02:52:40.455Z',
+        advisory_updated_at: '2026-03-22T04:01:03.255Z'
+      });
+      expect(selectedSnapshot.tracked?.linear ?? null).toBeNull();
+      expect(compatibilityProjection.tracked?.linear ?? null).toBeNull();
+      expect((apiState as { tracked?: { linear?: unknown } }).tracked?.linear ?? null).toBeNull();
+      expect((uiDataset as { tracked?: { linear?: unknown } }).tracked?.linear ?? null).toBeNull();
+
+      await context.persist.providerIntake?.();
+      const advisorySnapshot = JSON.parse(
+        await readFile(join(paths.runDir, LINEAR_ADVISORY_STATE_FILE), 'utf8')
+      ) as LinearAdvisoryState;
+      expect(advisorySnapshot.stale_source).toMatchObject({
+        reason: 'provider_intake_missing_tracked_issue_after_linear_advisory',
+        provider_intake_updated_at: '2026-05-01T02:52:40.455Z'
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed after restart when freshly rehydrated provider-intake truth has no active claims', async () => {
+    const { root, env, paths } = await createRunRoot('task-460-empty-intake');
+    const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
+    const seededAdvisory = advisoryState(
+      '2026-03-22T04:01:03.255Z',
+      co272TrackedIssue({
+        id: 'lin-issue-1',
+        identifier: 'CO-1',
+        title: 'Stale retained CO-1 advisory',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-03-22T04:01:03.255Z'
+      }),
+      'delivery-co-1-stale'
+    );
+    const seededProviderIntake: ProviderIntakeState = {
+      schema_version: 1,
+      updated_at: '2026-05-01T02:52:40.455Z',
+      rehydrated_at: '2026-05-01T02:52:40.455Z',
+      latest_provider_key: null,
+      latest_reason: null,
+      claims: []
+    };
+
+    try {
+      const assembly = createControlServerSeededRuntimeAssembly({
+        runId: 'run-1',
+        token: 'control-token',
+        config,
+        paths,
+        sessionTtlMs: 60_000,
+        controlSeed: null,
+        confirmationsSeed: null,
+        questionsSeed: null,
+        delegationSeed: null,
+        linearAdvisorySeed: seededAdvisory,
+        providerIntakeSeed: seededProviderIntake
+      });
+
+      await seedManifest(paths, {
+        task_id: 'local-mcp',
+        issue_provider: null,
+        issue_id: null,
+        issue_identifier: null,
+        summary: 'control host restarted with stale retained advisory and empty intake',
+        updated_at: '2026-05-01T02:52:52.000Z'
+      });
+
+      const context = assembly.requestContextShared;
+      const selectedSnapshot = await context.runtime.snapshot().readSelectedRunSnapshot();
+      const compatibilityProjection = await context.runtime.snapshot().readCompatibilityProjection();
+      const apiState = await readCompatibilityState({
+        controlStore: context.controlStore,
+        paths: context.paths,
+        readCompatibilityProjection: async () => compatibilityProjection
+      });
+      const uiDataset = buildUiDataset({
+        projection: compatibilityProjection,
+        generatedAt: '2026-05-01T02:52:52.000Z'
+      });
+
+      expect(context.linearAdvisoryState.stale_source).toMatchObject({
+        source: 'provider-intake',
+        reason: 'provider_intake_missing_tracked_issue_after_linear_advisory',
+        provider_intake_updated_at: '2026-05-01T02:52:40.455Z',
+        advisory_updated_at: '2026-03-22T04:01:03.255Z'
+      });
+      expect(selectedSnapshot.tracked?.linear ?? null).toBeNull();
+      expect(compatibilityProjection.tracked?.linear ?? null).toBeNull();
+      expect((apiState as { tracked?: { linear?: unknown } }).tracked?.linear ?? null).toBeNull();
+      expect((uiDataset as { tracked?: { linear?: unknown } }).tracked?.linear ?? null).toBeNull();
     } finally {
       await rm(root, { recursive: true, force: true });
     }
