@@ -357,13 +357,17 @@ export function markLinearAdvisoryStateStaleFromProviderIntake(
     });
   }
 
+  const missingIssueTruthUpdatedAt = resolveProviderIntakeMissingIssueTruthUpdatedAt(
+    providerIntakeState,
+    state.tracked_issue
+  );
   if (
     !hasProviderIntakeClaimForTrackedIssue(providerIntakeState, state.tracked_issue) &&
-    isIsoNewer(resolveProviderIntakeMissingIssueTruthUpdatedAt(providerIntakeState), advisoryUpdatedAt)
+    isIsoNewer(missingIssueTruthUpdatedAt, advisoryUpdatedAt)
   ) {
     return markLinearAdvisoryStateStale(state, {
       reason: 'provider_intake_missing_tracked_issue_after_linear_advisory',
-      providerIntakeUpdatedAt: resolveProviderIntakeMissingIssueTruthUpdatedAt(providerIntakeState),
+      providerIntakeUpdatedAt: missingIssueTruthUpdatedAt,
       advisoryUpdatedAt,
       now: options.now
     });
@@ -410,17 +414,32 @@ function hasProviderIntakeClaimForTrackedIssue(
   return (providerIntakeState?.claims ?? []).some(
     (claim) =>
       isActiveProviderIntakeClaim(claim) &&
-      (claim.issue_id === trackedIssue.id || claim.issue_identifier === trackedIssue.identifier)
+      isProviderIntakeClaimForTrackedIssue(claim, trackedIssue)
   );
 }
 
 function resolveProviderIntakeMissingIssueTruthUpdatedAt(
   providerIntakeState:
-    | Pick<ProviderIntakeState, 'rehydrated_at'>
+    | Pick<ProviderIntakeState, 'rehydrated_at' | 'claims'>
     | null
-    | undefined
+    | undefined,
+  trackedIssue: Pick<LiveLinearTrackedIssue, 'id' | 'identifier'>
 ): string | null {
-  return typeof providerIntakeState?.rehydrated_at === 'string' ? providerIntakeState.rehydrated_at : null;
+  let truthUpdatedAt =
+    typeof providerIntakeState?.rehydrated_at === 'string' ? providerIntakeState.rehydrated_at : null;
+  for (const claim of providerIntakeState?.claims ?? []) {
+    if (
+      isActiveProviderIntakeClaim(claim) ||
+      !isProviderIntakeClaimForTrackedIssue(claim, trackedIssue)
+    ) {
+      continue;
+    }
+    truthUpdatedAt = pickLatestIsoTimestamp(
+      pickLatestIsoTimestamp(truthUpdatedAt, claim.updated_at),
+      claim.issue_updated_at
+    );
+  }
+  return truthUpdatedAt;
 }
 
 function resolveProviderIntakeTruthUpdatedAt(
@@ -431,8 +450,7 @@ function resolveProviderIntakeTruthUpdatedAt(
   trackedIssue: Pick<LiveLinearTrackedIssue, 'id' | 'identifier'>
 ): string | null {
   const matchingClaims = (providerIntakeState?.claims ?? []).filter((claim) =>
-    isActiveProviderIntakeClaim(claim) &&
-    (claim.issue_id === trackedIssue.id || claim.issue_identifier === trackedIssue.identifier)
+    isActiveProviderIntakeClaim(claim) && isProviderIntakeClaimForTrackedIssue(claim, trackedIssue)
   );
   if (matchingClaims.length === 0) {
     return null;
@@ -445,6 +463,13 @@ function resolveProviderIntakeTruthUpdatedAt(
     );
   }
   return truthUpdatedAt;
+}
+
+function isProviderIntakeClaimForTrackedIssue(
+  claim: Pick<ProviderIntakeState['claims'][number], 'issue_id' | 'issue_identifier'>,
+  trackedIssue: Pick<LiveLinearTrackedIssue, 'id' | 'identifier'>
+): boolean {
+  return claim.issue_id === trackedIssue.id || claim.issue_identifier === trackedIssue.identifier;
 }
 
 function resolveLinearAdvisoryTrackedIssueReferenceUpdatedAt(state: LinearAdvisoryState): string | null {
