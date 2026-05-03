@@ -34,7 +34,9 @@ import {
 } from './linearWebhookController.js';
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
 import {
+  clearProviderIntakeAuthority,
   isRecordLike,
+  markProviderIntakeAuthorityUnavailable,
   normalizeProviderIntakeState,
   type ProviderIntakeState
 } from './providerIntakeState.js';
@@ -145,7 +147,9 @@ export function createControlServerSeededRuntimeAssembly(
   const sessionTokens = new SessionTokenStore(options.sessionTtlMs);
   const linearAdvisoryState = normalizeLinearAdvisoryState(options.linearAdvisorySeed);
   const providerIntakeState = normalizeProviderIntakeState(options.providerIntakeSeed);
-  let persistedProviderIntakeState = cloneProviderIntakeState(providerIntakeState);
+  let persistedProviderIntakeState = options.providerIntakeSeed
+    ? cloneProviderIntakeState(providerIntakeState)
+    : null;
   let linearAdvisoryStaleWritePending = markLinearAdvisoryStateStaleFromProviderIntake(
     linearAdvisoryState,
     providerIntakeState
@@ -157,7 +161,8 @@ export function createControlServerSeededRuntimeAssembly(
     paths: options.paths,
     linearAdvisoryState,
     providerIntakeState,
-    readPersistedProviderIntakeState: () => cloneProviderIntakeState(persistedProviderIntakeState),
+    readPersistedProviderIntakeState: () =>
+      persistedProviderIntakeState ? cloneProviderIntakeState(persistedProviderIntakeState) : null,
     providerWorkflowConfigStore: options.providerWorkflowConfigStore,
     readProviderIssueHandoff: () => providerIssueHandoff
   });
@@ -203,6 +208,7 @@ export function createControlServerSeededRuntimeAssembly(
     },
     providerIntake: async () =>
       await queueProviderIntakePersist(async () => {
+        clearProviderIntakeAuthority(providerIntakeState);
         await writeJsonAtomic(providerIntakeStatePath, providerIntakeState);
         persistedProviderIntakeState = cloneProviderIntakeState(providerIntakeState);
         const linearAdvisoryMarkedStale = markLinearAdvisoryStateStaleFromProviderIntake(
@@ -217,7 +223,13 @@ export function createControlServerSeededRuntimeAssembly(
       }),
     providerIntakePolling: async (polling, updatedAt) =>
       await queueProviderIntakePersist(async () => {
-        const nextState = (await readPersistedProviderIntakeState()) ?? normalizeProviderIntakeState(null);
+        const persistedState = persistedProviderIntakeState
+          ? cloneProviderIntakeState(persistedProviderIntakeState)
+          : await readPersistedProviderIntakeState();
+        const nextState = persistedState ?? normalizeProviderIntakeState(null);
+        if (!persistedState) {
+          markProviderIntakeAuthorityUnavailable(nextState);
+        }
         const nextPolling = isRecordLike(polling) ? { ...polling } : null;
         nextState.polling = nextPolling;
         const nextPollingUpdatedAt =
@@ -261,7 +273,8 @@ export function createControlServerSeededRuntimeAssembly(
     paths: options.paths,
     linearAdvisoryState,
     providerIntakeState,
-    readPersistedProviderIntakeState: () => cloneProviderIntakeState(persistedProviderIntakeState),
+    readPersistedProviderIntakeState: () =>
+      persistedProviderIntakeState ? cloneProviderIntakeState(persistedProviderIntakeState) : null,
     providerIssueHandoff,
     runtime: controlRuntime
   } satisfies ControlRequestSharedContext;

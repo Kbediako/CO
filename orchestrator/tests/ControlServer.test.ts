@@ -1636,13 +1636,17 @@ describe('ControlServer', () => {
         counts?: { running?: number; retrying?: number };
         running?: Array<{ issue_identifier?: string }>;
         selected?: { issue_identifier?: string } | null;
+        provider_intake?: unknown;
+        provider_intake_unavailable?: { reason?: string; updated_at?: string | null };
       };
-      expect(statePayload.counts).toEqual({ running: 2, retrying: 0 });
-      expect(statePayload.selected?.issue_identifier).toBe('ISSUE-CURRENT');
-      expect(statePayload.running?.map((entry) => entry.issue_identifier)).toEqual([
-        'ISSUE-CURRENT',
-        'ISSUE-NULL-PROVIDER'
-      ]);
+      expect(statePayload.counts).toEqual({ running: 1, retrying: 0 });
+      expect(statePayload.selected).toBeNull();
+      expect(statePayload.running?.map((entry) => entry.issue_identifier)).toEqual(['ISSUE-NULL-PROVIDER']);
+      expect(statePayload.provider_intake).toBeNull();
+      expect(statePayload.provider_intake_unavailable).toEqual({
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: null
+      });
 
       const issueRes = await fetch(new URL('/api/v1/ISSUE-NULL-PROVIDER', baseUrl), {
         headers: {
@@ -1762,10 +1766,17 @@ describe('ControlServer', () => {
         counts?: { running?: number; retrying?: number };
         running?: Array<{ issue_identifier?: string }>;
         selected?: { issue_identifier?: string } | null;
+        provider_intake?: unknown;
+        provider_intake_unavailable?: { reason?: string; updated_at?: string | null };
       };
-      expect(statePayload.counts).toEqual({ running: 1, retrying: 0 });
-      expect(statePayload.selected?.issue_identifier).toBe('ISSUE-CURRENT');
-      expect(statePayload.running?.map((entry) => entry.issue_identifier)).toEqual(['ISSUE-CURRENT']);
+      expect(statePayload.counts).toEqual({ running: 0, retrying: 0 });
+      expect(statePayload.selected).toBeNull();
+      expect(statePayload.running?.map((entry) => entry.issue_identifier)).toEqual([]);
+      expect(statePayload.provider_intake).toBeNull();
+      expect(statePayload.provider_intake_unavailable).toEqual({
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: null
+      });
 
       const issueRes = await fetch(new URL('/api/v1/rlm-CO', baseUrl), {
         headers: {
@@ -2952,6 +2963,7 @@ describe('ControlServer', () => {
   it('acknowledges read-only refresh requests without mutating control state', async () => {
     const { root, env, paths } = await createRunRoot('task-0940');
     await seedManifest(paths, { summary: 'task is running' });
+    await seedProviderIntakeState(paths, []);
     const config = computeEffectiveDelegationConfig({ repoRoot: env.repoRoot, layers: [] });
     const refreshProviderIssues = vi.fn(async () => ({
       queued: true,

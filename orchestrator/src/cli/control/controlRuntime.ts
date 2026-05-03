@@ -66,6 +66,10 @@ interface ControlRuntimeContext {
   };
   paths: Pick<RunPaths, 'manifestPath' | 'runDir' | 'logPath'>;
   linearAdvisoryState: {
+    latest_accepted_at?: unknown;
+    latest_delivery_id?: unknown;
+    latest_result?: unknown;
+    seen_deliveries?: Array<{ delivery_id?: unknown; outcome?: unknown }> | null;
     tracked_issue: LiveLinearTrackedIssue | null;
     stale_source?: unknown;
   };
@@ -194,16 +198,27 @@ function createControlRuntimeSnapshot(
     dispatchEvaluationPromise = null;
 
     selectedRunSnapshotPromise ??= (async () => {
-      const selectedRunProjection = createSelectedRunProjectionReader(authorityContext);
-      const selected = enrichProjectionSourceWithProviderRetryState(
-        suppressConflictingProjectionTrackedPayload(
-          await selectedRunProjection.buildSelectedRunContext()
+      const preserveAdvisoryFallback = shouldPreserveLinearAdvisoryFallback(
+        context,
+        providerIntakeAuthority
+      );
+      const selected = suppressProviderIntakeUnavailableSource(
+        enrichProjectionSourceWithProviderRetryState(
+          suppressConflictingProjectionTrackedPayload(
+            await createSelectedRunProjectionReader(authorityContext).buildSelectedRunContext()
+          ),
+          authorityContext.providerIntakeState
         ),
-        authorityContext.providerIntakeState
+        providerIntakeAuthority.unavailable,
+        { preserveAdvisoryFields: preserveAdvisoryFallback }
       );
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
-      const tracked = resolveRuntimeTrackedPayload(selected, context.linearAdvisoryState);
+      const tracked = resolveRuntimeTrackedPayload(
+        selected,
+        context.linearAdvisoryState,
+        { allowAdvisoryFallback: preserveAdvisoryFallback }
+      );
       const providerIntake = buildProviderIntakeSummary(providerIntakeAuthority.state);
       const providerWorkflow = context.providerWorkflowConfigStore
         ? await refreshProviderWorkflowStatusPayload(context.providerWorkflowConfigStore)
@@ -232,32 +247,47 @@ function createControlRuntimeSnapshot(
     compatibilityProjectionPromise = null;
 
     compatibilityRuntimeSnapshotPromise ??= (async () => {
+      const preserveAdvisoryFallback = shouldPreserveLinearAdvisoryFallback(
+        context,
+        providerIntakeAuthority
+      );
       const compatibilityProjectionSource = createSelectedRunProjectionReader(authorityContext);
       const selectedManifest = await compatibilityProjectionSource.readSelectedRunManifestSnapshot();
-      const selected = enrichProjectionSourceWithProviderRetryState(
-        suppressConflictingProjectionTrackedPayload(
-          await compatibilityProjectionSource.buildCompatibilitySourceContext(selectedManifest)
+      const selected = suppressProviderIntakeUnavailableSource(
+        enrichProjectionSourceWithProviderRetryState(
+          suppressConflictingProjectionTrackedPayload(
+            await compatibilityProjectionSource.buildCompatibilitySourceContext(selectedManifest)
+          ),
+          authorityContext.providerIntakeState
         ),
-        authorityContext.providerIntakeState
+        providerIntakeAuthority.unavailable,
+        { preserveAdvisoryFields: preserveAdvisoryFallback }
       );
       const discoveredCollections = await discoverCompatibilityCollectionContexts(authorityContext);
       const authoritativeRetrying = (await discoverAuthoritativeRetryCollectionContexts(authorityContext))
         .map((source) => suppressConflictingProjectionTrackedPayload(source))
+        .map((source) => suppressProviderIntakeUnavailableSource(source, providerIntakeAuthority.unavailable))
         .filter((source): source is ControlCompatibilitySourceContext => source !== null);
       const discoveredSources = discoveredCollections.all
         .map((source) => suppressConflictingProjectionTrackedPayload(source))
+        .map((source) => suppressProviderIntakeUnavailableSource(source, providerIntakeAuthority.unavailable))
         .map((source) => enrichProjectionSourceWithProviderRetryState(source, authorityContext.providerIntakeState))
         .filter((source): source is ControlCompatibilitySourceContext => source !== null);
       const fallbackRetrying = discoveredCollections.retrying
         .concat(isSelectedManifestRetryFallbackCandidate(selectedManifest, selected) ? [selected] : [])
         .map((source) => suppressConflictingProjectionTrackedPayload(source))
+        .map((source) => suppressProviderIntakeUnavailableSource(source, providerIntakeAuthority.unavailable))
         .map((source) => enrichProjectionSourceWithProviderRetryState(source, authorityContext.providerIntakeState))
         .filter((source): source is ControlCompatibilitySourceContext => source !== null);
       const issueIdentifier = selected?.issueIdentifier ?? selected?.taskId ?? selected?.runId ?? null;
       const dispatchPilotSummary = liveLinearAdvisoryRuntime.readSnapshotSummary(issueIdentifier);
-      const tracked = resolveRuntimeTrackedPayload(selected, context.linearAdvisoryState);
+      const tracked = resolveRuntimeTrackedPayload(
+        selected,
+        context.linearAdvisoryState,
+        { allowAdvisoryFallback: preserveAdvisoryFallback }
+      );
       const providerIntake = buildProviderIntakeSummary(providerIntakeAuthority.state);
-      const polling = readProviderPollingSnapshot(context);
+      const polling = readProviderPollingSnapshot(authorityContext);
       const providerWorkflow = context.providerWorkflowConfigStore
         ? await refreshProviderWorkflowStatusPayload(context.providerWorkflowConfigStore)
         : null;
@@ -312,7 +342,9 @@ function createControlRuntimeSnapshot(
     // Cache the stable projection shape once, but re-derive polling-backed rate limits on every
     // read so current Linear budget data is reflected without invalidating the rest of the snapshot.
     compatibilityProjectionPromise ??= Promise.resolve(buildCompatibilityProjectionSnapshot(runtimeSnapshot));
-    const polling = readProviderPollingSnapshot(context);
+    const providerIntakeAuthority = readProviderIntakeAuthorityState(context);
+    const authorityContext = buildProviderIntakeAuthorityContext(context, providerIntakeAuthority);
+    const polling = readProviderPollingSnapshot(authorityContext);
     const telemetrySources = buildCompatibilityTelemetrySources({
       selected: runtimeSnapshot.selected,
       running: runtimeSnapshot.running,
@@ -323,8 +355,8 @@ function createControlRuntimeSnapshot(
       ...(await compatibilityProjectionPromise),
       rateLimits,
       polling,
-      providerIntake: runtimeSnapshot.providerIntake,
-      providerIntakeUnavailable: runtimeSnapshot.providerIntakeUnavailable
+      providerIntake: buildProviderIntakeSummary(providerIntakeAuthority.state),
+      providerIntakeUnavailable: providerIntakeAuthority.unavailable
     };
   }
 
@@ -409,6 +441,15 @@ function readProviderIntakeAuthorityState(
   if (context.readPersistedProviderIntakeState) {
     try {
       const state = context.readPersistedProviderIntakeState();
+      if (state?.authority?.status === 'unavailable') {
+        return {
+          state: buildUnavailableProviderIntakeState(state),
+          unavailable: {
+            reason: state.authority.reason,
+            updated_at: state.authority.updated_at
+          }
+        };
+      }
       return state
         ? { state, unavailable: null }
         : {
@@ -432,6 +473,56 @@ function readProviderIntakeAuthorityState(
     state: context.providerIntakeState ?? null,
     unavailable: null
   };
+}
+
+function buildUnavailableProviderIntakeState(state: ProviderIntakeState): ProviderIntakeState {
+  return {
+    ...state,
+    latest_provider_key: null,
+    latest_reason: null,
+    claims: []
+  };
+}
+
+function shouldPreserveLinearAdvisoryFallback(
+  context: Pick<ControlRuntimeContext, 'linearAdvisoryState'>,
+  authority: ProviderIntakeAuthoritySnapshot
+): boolean {
+  if (!authority.unavailable) {
+    return true;
+  }
+  if (context.linearAdvisoryState.stale_source) {
+    return false;
+  }
+  return hasAcceptedLinearAdvisoryFallback(context.linearAdvisoryState);
+}
+
+function hasAcceptedLinearAdvisoryFallback(
+  advisoryState: Pick<
+    ControlRuntimeContext['linearAdvisoryState'],
+    'latest_accepted_at' | 'latest_delivery_id' | 'latest_result' | 'seen_deliveries' | 'tracked_issue'
+  >
+): boolean {
+  if (!advisoryState.tracked_issue) {
+    return false;
+  }
+  if (advisoryState.latest_result === 'accepted') {
+    return true;
+  }
+  if (advisoryState.latest_result !== 'duplicate') {
+    return false;
+  }
+  const latestDeliveryId =
+    typeof advisoryState.latest_delivery_id === 'string' ? advisoryState.latest_delivery_id : null;
+  if (latestDeliveryId) {
+    return (advisoryState.seen_deliveries ?? []).some(
+      (entry) => entry.delivery_id === latestDeliveryId && entry.outcome === 'accepted'
+    );
+  }
+  return (
+    typeof advisoryState.latest_accepted_at === 'string' &&
+    advisoryState.latest_accepted_at.trim().length > 0
+  );
 }
 
 async function refreshProviderWorkflowStatusPayload(
@@ -640,6 +731,56 @@ function normalizeLinearBudgetBucketSnapshot(value: unknown): LinearBudgetStatus
     limit,
     remaining,
     reset_at: resetAt
+  };
+}
+
+function suppressProviderIntakeUnavailableSource<
+  TSource extends SelectedRunContext | ControlCompatibilitySourceContext
+>(
+  source: TSource | null,
+  unavailable: ControlProviderIntakeUnavailablePayload | null,
+  options: { preserveAdvisoryFields?: boolean } = {}
+): TSource | null {
+  if (!source || !unavailable) {
+    return source;
+  }
+  return isProviderBoundCompatibilitySource(source)
+    ? null
+    : options.preserveAdvisoryFields === true
+      ? source
+      : clearAdvisoryDerivedProjectionFields(source);
+}
+
+function isProviderBoundCompatibilitySource(
+  source: Pick<
+    ControlCompatibilitySourceContext,
+    'issueProvider' | 'pipelineId' | 'pipelineTitle' | 'providerLinearWorkerProof' | 'taskId'
+  >
+): boolean {
+  return (
+    source.issueProvider === 'linear' ||
+    source.pipelineId === 'provider-linear-worker' ||
+    source.pipelineTitle === 'Provider Linear Worker' ||
+    source.providerLinearWorkerProof != null
+  );
+}
+
+function clearAdvisoryDerivedProjectionFields<
+  TSource extends SelectedRunContext | ControlCompatibilitySourceContext
+>(source: TSource): TSource {
+  const providerDebugSnapshot = clearProviderDebugLiveLinearState(source.providerDebugSnapshot ?? null);
+  const shouldResetDisplayStatus =
+    source.compatibilityState !== null &&
+    source.compatibilityState !== undefined &&
+    source.displayStatus === source.compatibilityState;
+  return {
+    ...source,
+    displayStatus: shouldResetDisplayStatus ? source.rawStatus : source.displayStatus,
+    statusReason: shouldResetDisplayStatus ? null : source.statusReason,
+    latestEvent: resetAdvisoryDerivedLatestEvent(source, providerDebugSnapshot),
+    tracked: null,
+    compatibilityState: null,
+    providerDebugSnapshot
   };
 }
 
@@ -1099,13 +1240,17 @@ function isFallbackCompatibilityIdentityAlias(
 
 function resolveRuntimeTrackedPayload(
   selected: SelectedRunContext | ControlCompatibilitySourceContext | null,
-  advisoryState: { tracked_issue: LiveLinearTrackedIssue | null; stale_source?: unknown }
+  advisoryState: { tracked_issue: LiveLinearTrackedIssue | null; stale_source?: unknown },
+  options: { allowAdvisoryFallback?: boolean } = {}
 ) {
   if (selected?.tracked) {
     if (linearTrackedIssueConflictsWithAuthoritativeIdentity(selected, selected.tracked.linear)) {
       return null;
     }
     return selected.tracked;
+  }
+  if (options.allowAdvisoryFallback === false) {
+    return null;
   }
   if (advisoryState.stale_source) {
     return null;
