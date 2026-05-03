@@ -824,6 +824,8 @@ function buildProjectionContextFromParts(
   }
   const { manifestRecord, taskId, runId } = snapshot;
   const issueProvider = snapshot.issueProvider ?? providerClaim?.provider ?? null;
+  const hasAuthoritativeIssueIdentity =
+    providerClaim !== null || hasAuthoritativeProjectionIssueIdentity(snapshot);
   const allowTrackedIssueFallbackIdentityRebinding = hasProviderLinearClaimBindingProvenance(
     snapshot,
     parts.providerLinearWorkerProof
@@ -832,7 +834,7 @@ function buildProjectionContextFromParts(
     snapshot,
     parts.trackedIssue,
     providerClaim,
-    allowTrackedIssueFallbackIdentityRebinding
+    allowTrackedIssueFallbackIdentityRebinding && !hasAuthoritativeIssueIdentity
   );
   const matchedTrackedIssue = resolveProjectionTrackedIssue(parts.trackedIssue, {
     issueIdentifier,
@@ -951,6 +953,7 @@ function buildProjectionContextFromParts(
     issueProvider,
     issueIdentifier,
     issueId,
+    hasAuthoritativeIssueIdentity,
     taskId,
     runId,
     lookupAliases,
@@ -3080,6 +3083,7 @@ async function buildProviderRetryContextFromClaim(
       issueProvider: claim.provider,
       issueIdentifier: claim.issue_identifier,
       issueId: claim.issue_id,
+      hasAuthoritativeIssueIdentity: true,
       taskId: claim.task_id,
       runId: claim.run_id,
       lookupAliases: buildProjectionLookupAliases({
@@ -3135,6 +3139,7 @@ async function buildProviderRetryContextFromClaim(
       issueProvider: claim.provider,
       issueIdentifier: claim.issue_identifier,
       issueId: claim.issue_id,
+      hasAuthoritativeIssueIdentity: true,
       taskId: claim.task_id,
       runId: claim.run_id,
       lookupAliases: buildProjectionLookupAliases({

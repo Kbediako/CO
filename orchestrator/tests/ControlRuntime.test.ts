@@ -7130,6 +7130,211 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('suppresses proof-bearing advisory-rebound rows when raw intake is unavailable', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-01T02:41:32.000Z'));
+    try {
+      const fixture = await createFixture({
+        taskId: 'local-mcp',
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'lin-issue-424',
+            identifier: 'CO-424',
+            title: 'Stale advisory provider worker issue',
+            updated_at: '2026-05-01T02:10:46.790Z'
+          })
+        },
+        readPersistedProviderIntakeState: () => null
+      });
+      await seedProviderLinearWorkerProof(fixture.paths, {
+        issue_id: 'lin-issue-424',
+        issue_identifier: 'CO-424',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_running',
+        last_message: 'stale provider worker proof',
+        last_event_at: '2026-05-01T02:40:30.000Z',
+        updated_at: '2026-05-01T02:40:30.000Z'
+      });
+
+      const projection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const statePayload = await readCompatibilityState({
+        readCompatibilityProjection: async () => projection
+      });
+      const uiDataset = buildUiDataset({
+        projection,
+        generatedAt: '2026-05-01T02:41:32.000Z'
+      });
+
+      expect(projection.providerIntake).toBeNull();
+      expect(projection.providerIntakeUnavailable).toEqual({
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: null
+      });
+      expect(projection.selected).toBeNull();
+      expect(projection.running.map((entry) => entry.issue_identifier)).not.toContain('CO-424');
+      expect(statePayload.selected).toBeNull();
+      expect(statePayload.running_ids).not.toContain('CO-424');
+      expect(uiDataset.selected_issue_identifier).toBeNull();
+      expect(uiDataset.running.map((entry) => entry.issue_identifier)).not.toContain('CO-424');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not fill partial explicit proof identities from advisory when raw intake is unavailable', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-01T02:41:32.000Z'));
+    try {
+      const issueIdOnly = await createFixture({
+        taskId: 'local-mcp',
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'lin-issue-424',
+            identifier: 'CO-424',
+            title: 'Stale advisory provider worker issue',
+            updated_at: '2026-05-01T02:10:46.790Z'
+          })
+        },
+        readPersistedProviderIntakeState: () => null
+      });
+      await seedManifest(issueIdOnly.paths, {
+        task_id: 'local-mcp',
+        issue_id: 'issue-explicit-id-only',
+        updated_at: '2026-05-01T02:40:30.000Z'
+      });
+      await seedProviderLinearWorkerProof(issueIdOnly.paths, {
+        issue_id: 'issue-explicit-id-only',
+        issue_identifier: 'CO-424',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_running',
+        last_message: 'stale provider worker proof',
+        last_event_at: '2026-05-01T02:40:30.000Z',
+        updated_at: '2026-05-01T02:40:30.000Z'
+      });
+
+      const issueIdOnlyProjection = await issueIdOnly.runtime.snapshot().readCompatibilityProjection();
+      const issueIdOnlyStatePayload = await readCompatibilityState({
+        readCompatibilityProjection: async () => issueIdOnlyProjection
+      });
+      const issueIdOnlyUiDataset = buildUiDataset({
+        projection: issueIdOnlyProjection,
+        generatedAt: '2026-05-01T02:41:32.000Z'
+      });
+
+      expect(issueIdOnlyProjection.providerIntake).toBeNull();
+      expect(issueIdOnlyProjection.selected?.issue_identifier).toBe('local-mcp');
+      expect(issueIdOnlyProjection.running.map((entry) => entry.issue_identifier)).not.toContain(
+        'CO-424'
+      );
+      expect(issueIdOnlyStatePayload.selected?.issue_identifier).toBe('local-mcp');
+      expect(issueIdOnlyStatePayload.running_ids).not.toContain('CO-424');
+      expect(issueIdOnlyUiDataset.selected_issue_identifier).toBe('local-mcp');
+      expect(issueIdOnlyUiDataset.running.map((entry) => entry.issue_identifier)).not.toContain(
+        'CO-424'
+      );
+
+      const issueIdentifierOnly = await createFixture({
+        taskId: 'local-mcp',
+        linearAdvisoryState: {
+          tracked_issue: createTrackedIssue({
+            id: 'lin-issue-424',
+            identifier: 'CO-424',
+            title: 'Stale advisory provider worker issue',
+            updated_at: '2026-05-01T02:10:46.790Z'
+          })
+        },
+        readPersistedProviderIntakeState: () => null
+      });
+      await seedManifest(issueIdentifierOnly.paths, {
+        task_id: 'local-mcp',
+        issue_identifier: 'CO-424',
+        updated_at: '2026-05-01T02:40:30.000Z'
+      });
+      await seedProviderLinearWorkerProof(issueIdentifierOnly.paths, {
+        issue_id: 'lin-issue-424',
+        issue_identifier: 'CO-424',
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        last_event: 'turn_running',
+        last_message: 'stale provider worker proof',
+        last_event_at: '2026-05-01T02:40:30.000Z',
+        updated_at: '2026-05-01T02:40:30.000Z'
+      });
+
+      const issueIdentifierOnlyProjection =
+        await issueIdentifierOnly.runtime.snapshot().readCompatibilityProjection();
+      const issueIdentifierOnlyStatePayload = await readCompatibilityState({
+        readCompatibilityProjection: async () => issueIdentifierOnlyProjection
+      });
+      const issueIdentifierOnlyUiDataset = buildUiDataset({
+        projection: issueIdentifierOnlyProjection,
+        generatedAt: '2026-05-01T02:41:32.000Z'
+      });
+
+      expect(issueIdentifierOnlyProjection.providerIntake).toBeNull();
+      expect(issueIdentifierOnlyProjection.selected?.issue_identifier).toBe('CO-424');
+      expect(issueIdentifierOnlyProjection.selected?.issue_id).not.toBe('lin-issue-424');
+      expect(issueIdentifierOnlyStatePayload.selected?.issue_identifier).toBe('CO-424');
+      expect(issueIdentifierOnlyStatePayload.selected?.issue_id).not.toBe('lin-issue-424');
+      expect(issueIdentifierOnlyUiDataset.selected_issue_identifier).toBe('CO-424');
+      expect(issueIdentifierOnlyUiDataset.selected?.issue_id).not.toBe('lin-issue-424');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps proof-bearing explicit null-provider rows visible when raw intake is unavailable', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-01T02:41:32.000Z'));
+    try {
+      const fixture = await createFixture({
+        taskId: 'local-mcp',
+        readPersistedProviderIntakeState: () => null
+      });
+      const proofRun = await createSiblingRun(fixture.root, 'task-proof-null-provider', 'run-proof', {
+        manifest: {
+          issue_id: 'issue-null-proof',
+          issue_identifier: 'ISSUE-NULL-PROOF',
+          status: 'in_progress',
+          started_at: '2026-05-01T02:39:00.000Z',
+          updated_at: '2026-05-01T02:40:30.000Z',
+          summary: 'explicit null-provider run with provider worker proof'
+        }
+      });
+      await seedProviderLinearWorkerProof(proofRun, {
+        issue_id: 'issue-null-proof',
+        issue_identifier: 'ISSUE-NULL-PROOF',
+        updated_at: '2026-05-01T02:40:30.000Z'
+      });
+
+      const projection = await fixture.runtime.snapshot().readCompatibilityProjection();
+      const statePayload = await readCompatibilityState({
+        readCompatibilityProjection: async () => projection
+      });
+      const uiDataset = buildUiDataset({
+        projection,
+        generatedAt: '2026-05-01T02:41:32.000Z'
+      });
+
+      expect(projection.providerIntake).toBeNull();
+      expect(projection.providerIntakeUnavailable).toEqual({
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: null
+      });
+      expect(projection.running.map((entry) => entry.issue_identifier)).toContain(
+        'ISSUE-NULL-PROOF'
+      );
+      expect(statePayload.running_ids).toContain('ISSUE-NULL-PROOF');
+      expect(uiDataset.running.map((entry) => entry.issue_identifier)).toContain(
+        'ISSUE-NULL-PROOF'
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('preserves the accepted Linear advisory fallback after duplicate delivery when raw intake is unavailable', async () => {
     const fixture = await createFixture({
       taskId: 'local-mcp',

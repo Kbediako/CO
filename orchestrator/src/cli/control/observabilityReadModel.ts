@@ -352,6 +352,7 @@ interface SharedSelectedProjectionFields {
   issueProvider: string | null;
   issueIdentifier: string;
   issueId: string | null;
+  hasAuthoritativeIssueIdentity?: boolean;
   taskId: string | null;
   runId: string | null;
   lookupAliases: string[];

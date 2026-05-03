@@ -88,6 +88,7 @@ const SYNTHETIC_LINEAR_TASK_ID_PATTERN =
 interface CompatibilityIdentitySource {
   issueIdentifier?: string | null;
   issueId?: string | null;
+  hasAuthoritativeIssueIdentity?: boolean;
   issueProvider: string | null;
   pipelineId?: string | null;
   pipelineTitle: string | null;
@@ -762,6 +763,7 @@ function isProviderBoundCompatibilitySource(
     ControlCompatibilitySourceContext,
     | 'issueId'
     | 'issueIdentifier'
+    | 'hasAuthoritativeIssueIdentity'
     | 'issueProvider'
     | 'pipelineId'
     | 'pipelineTitle'
@@ -778,7 +780,7 @@ function isProviderBoundCompatibilitySource(
       !hasExplicitCompatibilityIssueIdentity(source)) ||
     source.pipelineId === 'provider-linear-worker' ||
     source.pipelineTitle === 'Provider Linear Worker' ||
-    source.providerLinearWorkerProof != null
+    (source.providerLinearWorkerProof != null && !hasExplicitCompatibilityIssueIdentity(source))
   );
 }
 
@@ -1193,6 +1195,7 @@ function readAuthoritativeProviderIssueId(
   source: Pick<
     ControlCompatibilitySourceContext,
     | 'issueId'
+    | 'hasAuthoritativeIssueIdentity'
     | 'issueProvider'
     | 'pipelineId'
     | 'pipelineTitle'
@@ -1201,6 +1204,9 @@ function readAuthoritativeProviderIssueId(
     | 'runId'
   >
 ): string | null {
+  if (source.hasAuthoritativeIssueIdentity === false) {
+    return null;
+  }
   const issueId = source.issueId ?? null;
   if (!issueId) {
     return null;
@@ -1212,6 +1218,7 @@ function readAuthoritativeProviderIssueIdentifier(
   source: Pick<
     ControlCompatibilitySourceContext,
     | 'issueIdentifier'
+    | 'hasAuthoritativeIssueIdentity'
     | 'issueProvider'
     | 'pipelineId'
     | 'pipelineTitle'
@@ -1220,6 +1227,9 @@ function readAuthoritativeProviderIssueIdentifier(
     | 'runId'
   >
 ): string | null {
+  if (source.hasAuthoritativeIssueIdentity === false) {
+    return null;
+  }
   const issueIdentifier = source.issueIdentifier ?? null;
   if (!issueIdentifier) {
     return null;
@@ -1379,6 +1389,9 @@ function linearTrackedIssueConflictsWithAuthoritativeIdentity(
 function hasExplicitCompatibilityIssueIdentity(
   source: CompatibilityIdentitySource
 ): boolean {
+  if (source.hasAuthoritativeIssueIdentity === false) {
+    return false;
+  }
   if (
     source.issueIdentifier &&
     !isFallbackCompatibilityIdentityValue(source.issueIdentifier, source)
