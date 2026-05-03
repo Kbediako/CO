@@ -18,12 +18,13 @@
 - [x] `node scripts/spec-guard.mjs --dry-run`
 - [x] `npm run build`
 - [x] `npm run lint`
-- [ ] `npm run test` - pending resumed validation after CO-460 moved from Blocked back to In Progress.
+- [x] `npm run test`
 - [x] `npm run docs:check`
-- [ ] `npm run docs:freshness` - pending resumed validation after CO-460 moved from Blocked back to In Progress.
+- [x] `npm run docs:freshness`
 - [x] `npm run repo:stewardship`
 - [x] `node scripts/diff-budget.mjs`
-- [x] Manifest-backed standalone review and elegance pass.
+- [x] `npm run pack:smoke`
+- [ ] Current post-merge manifest-backed standalone review and elegance pass.
 - [ ] PR checks, ready-review drain, and Linear review handoff - pending resumed validation and PR creation.
 
 ## Notes
@@ -31,4 +32,4 @@ The implementation seam is the retained Linear advisory state path. Provider-int
 
 2026-05-01: Implementation was code-complete and review-clean locally, but the issue stopped at Blocked because `npm run test` was blocked by CO-470 and `npm run docs:freshness` was blocked by CO-444, both reproduced on clean `origin/main`.
 
-2026-05-03: CO-460 resumed after the blocker moved terminal and Linear returned the issue to Ready. Focused stale advisory regression tests pass in the resumed workspace; full validation, review, and PR handoff are being refreshed.
+2026-05-03: CO-460 resumed after the blocker moved terminal and Linear returned the issue to Ready. The branch has been refreshed with current `origin/main`; required validation is green, including `npm run test` (359 files / 5263 tests), `npm run docs:freshness`, and `npm run pack:smoke`. Current post-merge standalone review, elegance review, PR creation, PR checks, ready-review, and Linear handoff remain pending.
