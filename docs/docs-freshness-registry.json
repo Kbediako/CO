@@ -87,6 +87,13 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/linear-dc136145-8df0-49f7-af80-21148dc37351.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-03",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/ACTION_PLAN-linear-dc136145-8df0-49f7-af80-21148dc37351.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
