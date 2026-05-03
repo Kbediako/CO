@@ -7045,7 +7045,7 @@ describe('ControlRuntime', () => {
     });
 
     expect(projection.providerIntake).toBeNull();
-    expect(projection.selected?.issueIdentifier).not.toBe('CO-424');
+    expect(projection.selected?.issue_identifier).toBe('local-mcp');
     expect(projection.running.map((entry) => entry.issue_identifier)).not.toContain('CO-424');
     expect(projection.tracked).toBeNull();
     expect(projection.providerIntakeUnavailable).toEqual({
@@ -7055,6 +7055,7 @@ describe('ControlRuntime', () => {
     expect(statePayload.provider_intake).toBeNull();
     expect(statePayload.running_ids).not.toContain('CO-424');
     expect(statePayload.tracked).toBeUndefined();
+    expect(statePayload.selected?.issue_identifier).toBe('local-mcp');
     expect(statePayload.selected?.display_status).toBe('in_progress');
     expect(statePayload.selected?.latest_event?.source).toBe('run_summary');
     expect(statePayload.selected?.tracked.linear).toBeNull();
@@ -7070,6 +7071,7 @@ describe('ControlRuntime', () => {
     expect(uiDataset.provider_intake).toBeNull();
     expect(uiDataset.running.map((entry) => entry.issue_identifier)).not.toContain('CO-424');
     expect(uiDataset.tracked).toBeUndefined();
+    expect(uiDataset.selected_issue_identifier).toBe('local-mcp');
     expect(uiDataset.selected?.display_status).toBe('in_progress');
     expect(uiDataset.selected?.latest_event?.source).toBe('run_summary');
     expect(uiDataset.selected?.tracked.linear).toBeNull();

@@ -38,6 +38,7 @@ import {
   isRecordLike,
   markProviderIntakeAuthorityUnavailable,
   normalizeProviderIntakeState,
+  type ProviderIntakeAuthorityUnavailableReason,
   type ProviderIntakeState
 } from './providerIntakeState.js';
 import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
@@ -211,7 +212,10 @@ export function createControlServerSeededRuntimeAssembly(
         if (shouldTrustProviderIntakePersist(providerIntakeState, persistedProviderIntakeState)) {
           clearProviderIntakeAuthority(providerIntakeState);
         } else {
-          markProviderIntakeAuthorityUnavailable(providerIntakeState);
+          markProviderIntakeAuthorityUnavailable(
+            providerIntakeState,
+            resolveProviderIntakeUnavailableReason(providerIntakeState, persistedProviderIntakeState)
+          );
         }
         await writeJsonAtomic(providerIntakeStatePath, providerIntakeState);
         persistedProviderIntakeState = cloneProviderIntakeState(providerIntakeState);
@@ -300,6 +304,19 @@ function shouldTrustProviderIntakePersist(
     return true;
   }
   return persistedState !== null && persistedState.authority?.status !== 'unavailable';
+}
+
+function resolveProviderIntakeUnavailableReason(
+  nextState: ProviderIntakeState,
+  persistedState: ProviderIntakeState | null
+): ProviderIntakeAuthorityUnavailableReason {
+  if (nextState.authority?.status === 'unavailable') {
+    return nextState.authority.reason;
+  }
+  if (persistedState?.authority?.status === 'unavailable') {
+    return persistedState.authority.reason;
+  }
+  return 'raw_provider_intake_unavailable';
 }
 
 function cloneProviderIntakeState(state: ProviderIntakeState): ProviderIntakeState {

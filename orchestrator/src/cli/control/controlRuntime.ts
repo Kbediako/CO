@@ -101,6 +101,10 @@ interface ProviderIntakeAuthoritySnapshot {
   unavailable: ControlProviderIntakeUnavailablePayload | null;
 }
 
+interface InternalControlCompatibilityRuntimeSnapshot extends ControlCompatibilityRuntimeSnapshot {
+  providerIntakeAuthority: ProviderIntakeAuthoritySnapshot;
+}
+
 export interface ControlRuntimeSnapshot {
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
   readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot>;
@@ -178,7 +182,7 @@ function createControlRuntimeSnapshot(
 ): InternalControlRuntimeSnapshot {
   let selectedRunSnapshotPromise: Promise<ControlSelectedRunRuntimeSnapshot> | null = null;
   let selectedRunAuthorityFingerprint: string | null = null;
-  let compatibilityRuntimeSnapshotPromise: Promise<ControlCompatibilityRuntimeSnapshot> | null = null;
+  let compatibilityRuntimeSnapshotPromise: Promise<InternalControlCompatibilityRuntimeSnapshot> | null = null;
   let compatibilityProjectionPromise: Promise<ControlCompatibilityProjectionSnapshot> | null = null;
   let compatibilityAuthorityFingerprint: string | null = null;
   let dispatchEvaluationPromise: Promise<{
@@ -235,8 +239,9 @@ function createControlRuntimeSnapshot(
     return selectedRunSnapshotPromise;
   }
 
-  async function readCompatibilityRuntimeSnapshot(): Promise<ControlCompatibilityRuntimeSnapshot> {
-    const providerIntakeAuthority = readProviderIntakeAuthorityState(context);
+  async function readCompatibilityRuntimeSnapshot(
+    providerIntakeAuthority = readProviderIntakeAuthorityState(context)
+  ): Promise<InternalControlCompatibilityRuntimeSnapshot> {
     const authorityContext = buildProviderIntakeAuthorityContext(context, providerIntakeAuthority);
     const authorityFingerprint = buildProviderIntakeAuthorityFingerprint(providerIntakeAuthority);
     if (compatibilityRuntimeSnapshotPromise && compatibilityAuthorityFingerprint === authorityFingerprint) {
@@ -330,6 +335,7 @@ function createControlRuntimeSnapshot(
         tracked,
         providerIntake,
         providerIntakeUnavailable: providerIntakeAuthority.unavailable,
+        providerIntakeAuthority,
         providerWorkflow,
         polling
       };
@@ -338,11 +344,11 @@ function createControlRuntimeSnapshot(
   }
 
   async function readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot> {
-    const runtimeSnapshot = await readCompatibilityRuntimeSnapshot();
+    const providerIntakeAuthority = readProviderIntakeAuthorityState(context);
+    const runtimeSnapshot = await readCompatibilityRuntimeSnapshot(providerIntakeAuthority);
     // Cache the stable projection shape once, but re-derive polling-backed rate limits on every
     // read so current Linear budget data is reflected without invalidating the rest of the snapshot.
     compatibilityProjectionPromise ??= Promise.resolve(buildCompatibilityProjectionSnapshot(runtimeSnapshot));
-    const providerIntakeAuthority = readProviderIntakeAuthorityState(context);
     const authorityContext = buildProviderIntakeAuthorityContext(context, providerIntakeAuthority);
     const polling = readProviderPollingSnapshot(authorityContext);
     const telemetrySources = buildCompatibilityTelemetrySources({
