@@ -9,7 +9,10 @@ import {
   type LiveLinearTrackedIssue
 } from './linearDispatchSource.js';
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
-import type { ProviderIntakeState } from './providerIntakeState.js';
+import {
+  isActiveProviderIntakeClaim,
+  type ProviderIntakeState
+} from './providerIntakeState.js';
 
 const LINEAR_WEBHOOK_MAX_AGE_MS = 5 * 60 * 1000;
 const LINEAR_ADVISORY_SEEN_DELIVERY_LIMIT = 100;
@@ -405,7 +408,9 @@ function hasProviderIntakeClaimForTrackedIssue(
   trackedIssue: Pick<LiveLinearTrackedIssue, 'id' | 'identifier'>
 ): boolean {
   return (providerIntakeState?.claims ?? []).some(
-    (claim) => claim.issue_id === trackedIssue.id || claim.issue_identifier === trackedIssue.identifier
+    (claim) =>
+      isActiveProviderIntakeClaim(claim) &&
+      (claim.issue_id === trackedIssue.id || claim.issue_identifier === trackedIssue.identifier)
   );
 }
 

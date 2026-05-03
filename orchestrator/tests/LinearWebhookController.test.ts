@@ -218,7 +218,7 @@ describe('LinearWebhookController', () => {
     expect(advisoryState.stale_source).toBeUndefined();
   });
 
-  it('marks advisory state stale when fresh provider-intake truth no longer contains the tracked issue', () => {
+  it('marks advisory state stale when fresh provider-intake truth has no active claim for the tracked issue', () => {
     const advisoryState = normalizeLinearAdvisoryState({
       schema_version: 1,
       updated_at: '2026-03-22T04:01:03.255Z',
@@ -259,6 +259,14 @@ describe('LinearWebhookController', () => {
       {
         rehydrated_at: '2026-05-01T02:52:40.455Z',
         claims: [
+          createProviderIntakeClaim({
+            issue_id: 'lin-issue-1',
+            issue_identifier: 'CO-1',
+            issue_updated_at: '2026-03-01T02:52:40.455Z',
+            updated_at: '2026-03-01T02:52:40.455Z',
+            state: 'released',
+            reason: 'provider_issue_released:not_active'
+          }),
           createProviderIntakeClaim({
             issue_id: 'lin-issue-460',
             issue_identifier: 'CO-460',
@@ -434,7 +442,9 @@ describe('LinearWebhookController', () => {
           issue_id: 'lin-issue-272',
           issue_identifier: 'CO-272',
           issue_updated_at: '2026-04-21T14:00:00.000Z',
-          updated_at: '2026-04-21T14:30:00.000Z'
+          updated_at: '2026-04-21T14:30:00.000Z',
+          state: 'running',
+          reason: 'provider_issue_start_launched'
         })
       ]
     });

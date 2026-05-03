@@ -450,6 +450,61 @@ describe('runCoStatusCliShell', () => {
     );
   });
 
+  it('does not project stale retained tracked.linear advisory in local degraded json fallback', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    await writeLinearAdvisoryState(runDir);
+    await writeProviderIntakeState(runDir, {
+      claimState: 'running',
+      rehydratedAt: '2026-05-01T02:52:40.455Z',
+      claims: [
+        {
+          issueIdentifier: 'CO-460',
+          issueId: 'lin-issue-460',
+          issueTitle: 'CO STATUS stale advisory fallback regression',
+          runId: 'provider-run-460',
+          claimState: 'running',
+          updatedAtMsAgo: 1_000
+        }
+      ]
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(buildAbortError())
+      .mockRejectedValueOnce(buildAbortError());
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await runCoStatusCliShell({
+      flags: {
+        format: 'json',
+        'run-dir': runDir
+      },
+      printHelp: vi.fn()
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(log).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(String(log.mock.calls[0]?.[0])) as {
+      tracked?: { linear?: unknown };
+      selected_issue_identifier?: unknown;
+      provider_intake?: {
+        selected_claim?: {
+          issue_identifier?: unknown;
+        };
+      };
+    };
+    expect(payload.tracked?.linear ?? null).toBeNull();
+    expect(payload.selected_issue_identifier).toBe('CO-460');
+    expect(payload.provider_intake?.selected_claim).toMatchObject({
+      issue_identifier: 'CO-460'
+    });
+  });
+
   it('uses a direct json timeout budget that leaves room for degraded fallback before 15s monitors expire', async () => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
     tempDirs.push(root);
@@ -1625,6 +1680,47 @@ async function writeProviderIntakeState(
   );
 }
 
+async function writeLinearAdvisoryState(runDir: string): Promise<void> {
+  await writeFile(
+    join(runDir, 'linear-advisory-state.json'),
+    JSON.stringify({
+      schema_version: 1,
+      updated_at: '2026-03-22T04:01:03.255Z',
+      latest_delivery_id: 'delivery-co-1-stale',
+      latest_result: 'accepted',
+      latest_reason: 'linear_delivery_accepted',
+      latest_event: null,
+      latest_accepted_at: '2026-03-22T04:01:03.255Z',
+      tracked_issue: {
+        provider: 'linear',
+        id: 'lin-issue-1',
+        identifier: 'CO-1',
+        title: 'Stale retained CO-1 advisory',
+        description: null,
+        url: null,
+        state: 'In Progress',
+        state_type: 'started',
+        archived_at: null,
+        trashed: false,
+        viewer_id: 'viewer-1',
+        assignee_id: 'viewer-1',
+        assignee_name: 'Codex',
+        workspace_id: 'workspace-1',
+        team_id: 'team-1',
+        team_key: 'CO',
+        team_name: 'CO',
+        project_id: 'project-1',
+        project_name: 'CO',
+        updated_at: '2026-03-22T04:01:03.255Z',
+        blocked_by: [],
+        recent_activity: []
+      },
+      seen_deliveries: []
+    }),
+    'utf8'
+  );
+}
+
 async function writeProviderLinearWorkerProof(
   runDir: string,
   overrides: Record<string, unknown> = {}
@@ -1742,6 +1838,7 @@ function buildUiPayload(overrides: Record<string, unknown> = {}): Record<string,
 function buildProviderIntakeState(options: {
   claimState?: 'running' | 'stale' | 'completed';
   updatedAtMsAgo?: number;
+  rehydratedAt?: string | null;
   claims?: Array<{
     issueIdentifier: string;
     issueId: string;
@@ -1783,7 +1880,7 @@ function buildProviderIntakeState(options: {
   return {
     schema_version: 1,
     updated_at: updatedAt,
-    rehydrated_at: null,
+    rehydrated_at: options.rehydratedAt ?? null,
     latest_provider_key: `linear:${freshestClaim?.issueId ?? 'lin-issue-1'}`,
     latest_reason: freshestReason,
     polling: {
