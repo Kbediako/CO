@@ -7358,6 +7358,7 @@ function buildProviderLinearWorkerTurnBootstrapProof(
     current_turn_activity: null,
     tokens: buildEmptyProviderLinearWorkerTokenUsage(),
     rate_limits: null,
+    resolved_model_provenance: null,
     failure_diagnosis: null,
     owner_phase: 'turn_running',
     owner_status: 'in_progress',
@@ -11823,7 +11824,9 @@ export async function runProviderLinearWorker(
             liveParseState.authProvenance
           ),
           resolved_model_provenance: mergeProviderWorkerResolvedModelProvenance(
-            finalProof.resolved_model_provenance ?? null,
+            liveScopeChanged
+              ? turnResolvedModelProvenance
+              : finalProof.resolved_model_provenance ?? null,
             liveParseState.resolvedModelProvenance
           ),
           failure_diagnosis:
@@ -12319,7 +12322,9 @@ export async function runProviderLinearWorker(
           parsed.authProvenance
         ),
         resolved_model_provenance: mergeProviderWorkerResolvedModelProvenance(
-          finalProof.resolved_model_provenance ?? null,
+          parsedScopeChanged
+            ? turnResolvedModelProvenance
+            : finalProof.resolved_model_provenance ?? null,
           parsed.resolvedModelProvenance
         ),
         worker_control: finalProof.worker_control ?? workerControl,

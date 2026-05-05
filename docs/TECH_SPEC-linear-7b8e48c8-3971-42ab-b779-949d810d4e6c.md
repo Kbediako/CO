@@ -22,6 +22,7 @@ This mirror points to the canonical task spec at `tasks/specs/linear-7b8e48c8-39
 - Merge active Codex profile config over root defaults for config-derived provenance, including env/flag-selected profiles, root `profile = "..."`, and injected `-c profile=...` overrides.
 - Seed proof-side provenance from matching signed session-log hydration state when older proofs predate the proof field.
 - Do not preserve or re-sign hydration-state provenance when the current proof has no provenance.
+- When live session-log parsing or final stdout parsing switches thread/turn scope, merge model provenance from the current turn's command/config proof rather than carrying forward a previous scope's runtime-reported value.
 - Record source/confidence/degraded reason when runtime model metadata is missing.
 
 ## Implementation Boundaries
@@ -66,6 +67,7 @@ This mirror points to the canonical task spec at `tasks/specs/linear-7b8e48c8-39
   - active profile config merges over root defaults from env/flag selection, root `profile = "..."`, and injected `-c profile=...`, while requested missing profile config records degraded/unknown provenance
   - pre-existing signed session-log hydration state can backfill proof-side resolved model provenance while stale hydration signatures and skip-hydration re-signs are rejected
   - selected-run projection refreshes older proofs when hydration state can backfill missing model provenance
+  - live/final thread or turn scope changes clear stale runtime-reported provenance and fall back to current command/config evidence unless the new scope reports runtime metadata
   - explicit override path records override source when supported
   - missing runtime model metadata records degraded/unknown output
   - `CO STATUS` terminal frames and read-model payloads expose provenance without hiding degraded evidence

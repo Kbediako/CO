@@ -5855,6 +5855,11 @@ for await (const line of rl) {
         })
       );
     let currentNow = '2026-05-05T04:43:00.000Z';
+    const writtenProofs: ProviderLinearWorkerProof[] = [];
+    const writeProof = vi.fn(async (path: string, proof: ProviderLinearWorkerProof) => {
+      writtenProofs.push(proof);
+      await writeFile(path, JSON.stringify(proof, null, 2), 'utf8');
+    });
     const execRunner = vi
       .fn<
         (request: {
@@ -5913,6 +5918,7 @@ for await (const line of rl) {
           })
         ),
         execRunner,
+        writeProof,
         now: vi.fn(() => currentNow),
         log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
       }
@@ -5949,6 +5955,13 @@ for await (const line of rl) {
       latest_turn_id: 'turn-2',
       resolved_model_provenance: expectedResolvedModelProvenance
     });
+    expect(
+      writtenProofs.filter(
+        (writtenProof) =>
+          writtenProof.turn_count === 2 &&
+          writtenProof.resolved_model_provenance?.source === 'runtime_reported'
+      )
+    ).toEqual([]);
   });
 
   it('continues on the same thread across turns and writes a proof sidecar', async () => {
@@ -6685,6 +6698,161 @@ for await (const line of rl) {
         turn_persistence_source: 'session_log_hydration',
         turn_persistence_blocker: null
       }
+    });
+  });
+
+  it('clears live runtime model provenance when final stdout moves to a new turn without metadata', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent(
+      [
+        'model = "gpt-5.5"',
+        'review_model = "gpt-5.5"',
+        'model_reasoning_effort = "xhigh"',
+        ''
+      ].join('\n')
+    );
+    const sessionDir = join(codexHome, 'sessions', '2026', '03', '21');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-app.jsonl');
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Merging',
+          state_type: 'started',
+          assignee_id: null,
+          assignee_name: null
+        })
+      )
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed',
+          assignee_id: null,
+          assignee_name: null
+        })
+      );
+    let observedStaleLiveProvenance = false;
+    const execRunner = vi.fn();
+    const appServerTurnRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+        turnIndex: 1
+      });
+      await mkdir(sessionDir, { recursive: true });
+      await writeFile(
+        sessionLogPath,
+        [
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:00.000Z',
+            type: 'session_meta',
+            payload: {
+              id: 'thread-app',
+              cwd: tempRoot,
+              initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+            }
+          }),
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:00.050Z',
+            type: 'turn_context',
+            payload: {
+              turn_id: 'turn-app-1',
+              model: 'gpt-5.4',
+              model_reasoning_effort: 'high'
+            }
+          }),
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:01.000Z',
+            type: 'event_msg',
+            payload: { type: 'task_complete', turn_id: 'turn-app-1' }
+          })
+        ].join('\n'),
+        'utf8'
+      );
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        try {
+          const written = JSON.parse(
+            await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+          ) as Record<string, unknown>;
+          const provenance = written.resolved_model_provenance as Record<string, unknown> | null;
+          if (provenance?.runtime_model === 'gpt-5.4') {
+            observedStaleLiveProvenance = true;
+            break;
+          }
+        } catch {
+          // The proof may not exist yet while the live session-log tail catches up.
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-app"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-app-2"}}',
+          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-app-2"}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_CLOUD_ENV_ID: 'env-appserver-proof',
+        CODEX_HOME: codexHome
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () =>
+          createAppServerRuntimeContext({
+            runtime_session_id: 'appserver-run-child'
+          })
+        ),
+        execRunner,
+        appServerTurnRunner,
+        sleep: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+        },
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    const expectedResolvedModelProvenance = {
+      schema_version: 1,
+      model: 'gpt-5.5',
+      review_model: 'gpt-5.5',
+      model_reasoning_effort: 'xhigh',
+      source: 'config_default',
+      confidence: 'medium',
+      degraded_reason: 'runtime_model_unreported',
+      observed_at: '2026-03-21T09:00:01.000Z',
+      runtime_model: null,
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: null,
+      config_model: 'gpt-5.5',
+      config_review_model: 'gpt-5.5',
+      config_reasoning_effort: 'xhigh',
+      config_path: join(codexHome, 'config.toml')
+    };
+    expect(observedStaleLiveProvenance).toBe(true);
+    expect(proof).toMatchObject({
+      thread_id: 'thread-app',
+      latest_turn_id: 'turn-app-2',
+      resolved_model_provenance: expectedResolvedModelProvenance
+    });
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      latest_turn_id: 'turn-app-2',
+      resolved_model_provenance: expectedResolvedModelProvenance
     });
   });
 
