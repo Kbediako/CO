@@ -1,6 +1,32 @@
 {
   "items": [
     {
+      "id": "20260501-linear-7b8e48c8-3971-42ab-b779-949d810d4e6c",
+      "title": "CO-457 provider-worker resolved model provenance",
+      "relates_to": "tasks/tasks-linear-7b8e48c8-3971-42ab-b779-949d810d4e6c.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-03",
+      "approvals": {
+        "traceability_packet": {
+          "reviewer": "CO-457 traceability packet branch",
+          "date": "2026-05-03",
+          "status": "produced",
+          "summary": "Created the CO-457 docs-first packet and registry mirrors to clear backlog_head_follow_up_traceability_pending while preserving current local gpt-5.5/xhigh posture, portable gpt-5.4 fallback boundaries, provider-worker proof/read-model resolved model provenance requirements, degraded unknown provenance behavior, and CO-450/CO-451 non-goal boundaries."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-7b8e48c8-3971-42ab-b779-949d810d4e6c.md",
+        "task": "tasks/tasks-linear-7b8e48c8-3971-42ab-b779-949d810d4e6c.md",
+        "agent_task": ".agent/task/linear-7b8e48c8-3971-42ab-b779-949d810d4e6c.md",
+        "prd": "docs/PRD-linear-7b8e48c8-3971-42ab-b779-949d810d4e6c.md",
+        "docs": "docs/TECH_SPEC-linear-7b8e48c8-3971-42ab-b779-949d810d4e6c.md",
+        "action_plan": "docs/ACTION_PLAN-linear-7b8e48c8-3971-42ab-b779-949d810d4e6c.md"
+      }
+    },
+    {
       "id": "20260505-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36",
       "title": "CO-475 skills-release current-facing wording alignment",
       "relates_to": "tasks/tasks-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
