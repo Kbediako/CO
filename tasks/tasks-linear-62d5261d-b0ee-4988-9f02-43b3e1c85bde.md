@@ -41,7 +41,7 @@
 - [x] Repo stewardship passed. Evidence: `npm run repo:stewardship` reported 6361 tracked files and 0 action-required.
 - [x] Diff budget passed. Evidence: `node scripts/diff-budget.mjs` reported 9/25 files and 455/1200 lines after review/elegance evidence updates.
 - [x] Pack smoke passed. Evidence: `npm run pack:smoke`.
-- [x] Manifest-backed standalone review completed. Evidence: `../../.runs/linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde/cli/2026-05-05T20-39-32-939Z-e273dbf9/review/telemetry.json` reports `status=succeeded` and `review_outcome=clean-success`.
+- [x] Manifest-backed standalone review completed. Evidence: `.runs/linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde/cli/2026-05-05T20-39-32-939Z-e273dbf9/review/telemetry.json` reports `status=succeeded` and `review_outcome=clean-success`.
 - [x] Elegance/minimality review completed. Evidence: `out/linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde/manual/elegance-review.md`.
 - [ ] PR attached, checks green, actionable feedback handled, and ready-review drain clean. Evidence: pending.
 

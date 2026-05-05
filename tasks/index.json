@@ -45,7 +45,7 @@
           "reviewer": "codex-orchestrator review",
           "date": "2026-05-05",
           "status": "clean-success",
-          "telemetry": "../../.runs/linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde/cli/2026-05-05T20-39-32-939Z-e273dbf9/review/telemetry.json",
+          "telemetry": ".runs/linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde/cli/2026-05-05T20-39-32-939Z-e273dbf9/review/telemetry.json",
           "summary": "Manifest-backed standalone review found no discrete correctness, security, performance, or maintainability issues; marker matching remains exact while adding asterisk-bullet support."
         },
         "elegance_review": {
