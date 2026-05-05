@@ -497,6 +497,44 @@ describe('OperatorDashboardPresenter', () => {
     expect(dataset.issues.find((issue) => issue.issue_identifier === 'CO-7')?.tokens?.reasoning_output_tokens).toBe(17);
   });
 
+  it('preserves resolved model provenance on running and retry dashboard rows', () => {
+    const projection = buildProjection();
+    const resolvedModelProvenance = {
+      schema_version: 1,
+      model: 'gpt-5.5',
+      review_model: 'gpt-5.5',
+      model_reasoning_effort: 'xhigh',
+      source: 'config_default',
+      confidence: 'medium',
+      degraded_reason: 'runtime_model_unreported',
+      observed_at: '2026-05-05T04:41:00.000Z',
+      runtime_model: null,
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: null,
+      config_model: 'gpt-5.5',
+      config_review_model: 'gpt-5.5',
+      config_reasoning_effort: 'xhigh',
+      config_path: '/repo/.codex/config.toml'
+    } as const;
+    projection.running = projection.running.map((entry) => ({
+      ...entry,
+      resolved_model_provenance: resolvedModelProvenance
+    }));
+    projection.retrying = projection.retrying.map((entry) => ({
+      ...entry,
+      resolved_model_provenance: resolvedModelProvenance
+    }));
+
+    const dataset = buildUiDataset({
+      projection,
+      generatedAt: '2026-03-27T04:06:02.000Z'
+    });
+
+    expect(dataset.running[0]?.resolved_model_provenance).toEqual(resolvedModelProvenance);
+    expect(dataset.retrying[0]?.resolved_model_provenance).toEqual(resolvedModelProvenance);
+  });
+
   it('falls back to provider proof activity when manifest-backed latest-event data is absent', () => {
     const projection = buildProjection();
     const retryIssue = projection.issues.find((issue) => issue.issueIdentifier === 'CO-8');

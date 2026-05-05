@@ -696,6 +696,79 @@ describe('control status dashboard', () => {
     expect(plainFrame).toContain('worker-host-02 | rate limit exceeded');
   });
 
+  it('renders model provenance in full and compact CO STATUS frames', () => {
+    const baseDataset = buildDataset();
+    const runningModelProvenance = {
+      schema_version: 1,
+      model: 'gpt-5.5',
+      review_model: 'gpt-5.5',
+      model_reasoning_effort: 'xhigh',
+      source: 'config_default',
+      confidence: 'high',
+      degraded_reason: null,
+      observed_at: '2026-03-30T01:14:59.000Z',
+      runtime_model: null,
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: null,
+      config_model: 'gpt-5.5',
+      config_review_model: 'gpt-5.5',
+      config_reasoning_effort: 'xhigh',
+      config_path: '/Users/kbediako/.codex/config.toml'
+    } as const;
+    const retryModelProvenance = {
+      ...runningModelProvenance,
+      model: 'gpt-5.4',
+      source: 'runtime_reported',
+      confidence: 'medium',
+      degraded_reason: 'runtime_metadata_partial_config_backfill',
+      runtime_model: 'gpt-5.4'
+    } as const;
+    const dataset = buildDataset({
+      running: [
+        {
+          ...baseDataset.running[0],
+          resolved_model_provenance: runningModelProvenance
+        }
+      ],
+      retrying: [
+        {
+          ...baseDataset.retrying[0],
+          resolved_model_provenance: retryModelProvenance
+        }
+      ]
+    });
+    const commonInput = {
+      dataset,
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 180,
+      throughputTps: 1842.7
+    };
+
+    const fullFrame = stripAnsi(renderControlStatusFrame(commonInput));
+    expect(fullFrame).toContain(
+      '│   ↳ CO-26 model gpt-5.5 | review gpt-5.5 | reasoning xhigh | source config_default | confidence high'
+    );
+    expect(fullFrame).toContain(
+      '│   ↳ CO-27 model gpt-5.4 | review gpt-5.5 | reasoning xhigh | source runtime_reported | confidence medium | degraded runtime_metadata_partial_config_backfill'
+    );
+
+    const compactFrame = stripAnsi(
+      renderControlStatusFrame({
+        ...commonInput,
+        viewMode: 'compact'
+      })
+    );
+    expect(compactFrame).toContain('Running: CO-26 | running | model gpt-5.5 config_default/high |');
+    expect(compactFrame).toContain(
+      'Retry: CO-27 | retry scheduled in 1m | model gpt-5.4 runtime_reported/medium degraded runtime_metadata_partial_config_backfill |'
+    );
+  });
+
   it('labels live primary-screen renders as primary scrollback', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset(),

@@ -133,6 +133,59 @@ function buildExhaustedLinearPolling() {
 }
 
 describe('CompatibilityIssuePresenter', () => {
+  it('projects resolved model provenance into selected and running read-model payloads', () => {
+    const resolvedModelProvenance = {
+      schema_version: 1,
+      model: 'gpt-5.5',
+      review_model: 'gpt-5.5',
+      model_reasoning_effort: 'xhigh',
+      source: 'config_default',
+      confidence: 'medium',
+      degraded_reason: 'runtime_model_unreported',
+      observed_at: '2026-05-05T04:41:00.000Z',
+      runtime_model: null,
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: null,
+      config_model: 'gpt-5.5',
+      config_review_model: 'gpt-5.5',
+      config_reasoning_effort: 'xhigh',
+      config_path: '/repo/.codex/config.toml'
+    } as const;
+    const source = buildCompatibilitySource({
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress',
+      completedAt: null,
+      providerLinearWorkerProof: {
+        issue_id: 'issue-100',
+        issue_identifier: 'CO-100',
+        resolved_model_provenance: resolvedModelProvenance,
+        updated_at: '2026-05-05T04:41:00.000Z'
+      } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(source),
+      running: [source]
+    });
+
+    expect(projection.selected?.resolved_model_provenance).toEqual(resolvedModelProvenance);
+    expect(
+      projection.selected?.provider_linear_worker_proof?.resolved_model_provenance
+    ).toEqual(resolvedModelProvenance);
+    expect(projection.running[0]?.resolved_model_provenance).toEqual(
+      resolvedModelProvenance
+    );
+    const issuePayload = projection.issues.find((issue) => issue.issueIdentifier === 'CO-100')
+      ?.payload;
+    expect(issuePayload?.running?.resolved_model_provenance).toEqual(
+      resolvedModelProvenance
+    );
+    expect(issuePayload?.provider_linear_worker_proof?.resolved_model_provenance).toEqual(
+      resolvedModelProvenance
+    );
+  });
+
   it('ignores stale proof-derived worker_host values for the current attempt', () => {
     expect(
       resolveProviderWorkerHost({

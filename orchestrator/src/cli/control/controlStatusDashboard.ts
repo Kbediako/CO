@@ -47,6 +47,11 @@ interface SummarySegment {
   truncateMode?: 'end' | 'middle';
 }
 
+type DashboardResolvedModelProvenance = NonNullable<
+  | OperatorDashboardSessionPayload['resolved_model_provenance']
+  | OperatorDashboardRetryPayload['resolved_model_provenance']
+>;
+
 type DashboardViewMode = 'full' | 'compact';
 type DashboardSurfaceMode = 'primary' | 'alternate';
 
@@ -883,7 +888,7 @@ export function renderControlStatusFrame(input: RenderControlStatusFrameInput): 
     renderRunningSeparatorRow(runningColumns)
   ];
 
-  lines.push(...renderRunningRows(input.dataset.running, runningColumns, liveReferenceTime));
+  lines.push(...renderRunningRows(input.dataset.running, runningColumns, liveReferenceTime, terminalColumns));
   lines.push('│');
   lines.push(colorize('├─ Backoff queue', ANSI_BOLD));
   lines.push('│');
@@ -1214,6 +1219,7 @@ function renderCompactRunningLine(
       { text: ' | ', color: ANSI_GRAY },
       { text: sanitizeDisplayValue(entry.display_state), color: resolveRunningAccent(entry) },
       { text: ' | ', color: ANSI_GRAY },
+      ...buildCompactModelProvenanceSegments(entry.resolved_model_provenance),
       { text: summarizeRunningEvent(entry, referenceTime), color: ANSI_GRAY, truncateMode: 'end' }
     ],
     terminalColumns
@@ -1236,6 +1242,7 @@ function renderCompactRetryLine(
       { text: ' | ', color: ANSI_GRAY },
       { text: `${summarizeRetryHeadline(entry)} in ${formatRelativeDue(entry.due_at, referenceTime)}`, color: ANSI_CYAN },
       { text: ' | ', color: ANSI_GRAY },
+      ...buildCompactModelProvenanceSegments(entry.resolved_model_provenance),
       { text: summarizeRetryDetail(entry), color: ANSI_GRAY, truncateMode: 'end' }
     ],
     terminalColumns
@@ -1329,14 +1336,19 @@ function renderRunningSeparatorRow(columns: RunningColumn[]): string {
 function renderRunningRows(
   entries: OperatorDashboardSessionPayload[],
   columns: RunningColumn[],
-  referenceTime: Date
+  referenceTime: Date,
+  terminalColumns: number
 ): string[] {
   if (entries.length === 0) {
     return [`│  ${colorize('No active agents', ANSI_GRAY)}`];
   }
   return [...entries]
     .sort((left, right) => left.issue_identifier.localeCompare(right.issue_identifier))
-    .map((entry) => renderRunningRow(entry, columns, referenceTime));
+    .flatMap((entry) => {
+      const row = renderRunningRow(entry, columns, referenceTime);
+      const provenanceRow = renderRunningModelProvenanceRow(entry, terminalColumns);
+      return provenanceRow === null ? [row] : [row, provenanceRow];
+    });
 }
 
 function renderRunningRow(
@@ -1379,7 +1391,11 @@ function renderRetryRows(
   }
   return [...entries]
     .sort((left, right) => compareDueAt(left.due_at, right.due_at))
-    .map((entry) => renderRetryRow(entry, referenceTime, terminalColumns));
+    .flatMap((entry) => {
+      const row = renderRetryRow(entry, referenceTime, terminalColumns);
+      const provenanceRow = renderRetryModelProvenanceRow(entry, terminalColumns);
+      return provenanceRow === null ? [row] : [row, provenanceRow];
+    });
 }
 
 function renderRetryRow(
@@ -1407,6 +1423,117 @@ function renderRetryRow(
     segments.push({ text: detail, color: ANSI_GRAY, truncateMode: 'end' });
   }
   return coloredPrefix + colorizeSummarySegments(segments, Math.max(0, terminalColumns - plainPrefix.length));
+}
+
+function renderRunningModelProvenanceRow(
+  entry: OperatorDashboardSessionPayload,
+  terminalColumns: number
+): string | null {
+  return renderModelProvenanceDetailRow(
+    entry.issue_identifier,
+    entry.resolved_model_provenance,
+    terminalColumns
+  );
+}
+
+function renderRetryModelProvenanceRow(
+  entry: OperatorDashboardRetryPayload,
+  terminalColumns: number
+): string | null {
+  return renderModelProvenanceDetailRow(
+    entry.issue_identifier,
+    entry.resolved_model_provenance,
+    terminalColumns
+  );
+}
+
+function renderModelProvenanceDetailRow(
+  issueIdentifier: string,
+  provenance: DashboardResolvedModelProvenance | null | undefined,
+  terminalColumns: number
+): string | null {
+  const segments = buildModelProvenanceSegments(provenance);
+  if (!segments) {
+    return null;
+  }
+  const displayIssueIdentifier = sanitizeDisplayValue(issueIdentifier);
+  const plainPrefix = `│   ↳ ${displayIssueIdentifier} `;
+  const coloredPrefix = `│   ${colorize('↳', ANSI_CYAN)} ${colorize(displayIssueIdentifier, ANSI_CYAN)} `;
+  return coloredPrefix + colorizeSummarySegments(segments, Math.max(0, terminalColumns - plainPrefix.length));
+}
+
+function buildCompactModelProvenanceSegments(
+  provenance: DashboardResolvedModelProvenance | null | undefined
+): SummarySegment[] {
+  const summary = formatCompactModelProvenanceSummary(provenance);
+  if (!summary) {
+    return [];
+  }
+  return [
+    { text: summary, color: resolveModelProvenanceConfidenceColor(provenance?.confidence) },
+    { text: ' | ', color: ANSI_GRAY }
+  ];
+}
+
+function buildModelProvenanceSegments(
+  provenance: DashboardResolvedModelProvenance | null | undefined
+): SummarySegment[] | null {
+  if (!provenance) {
+    return null;
+  }
+  const confidenceColor = resolveModelProvenanceConfidenceColor(provenance.confidence);
+  const segments: SummarySegment[] = [
+    { text: `model ${sanitizeDisplayValue(provenance.model ?? 'unknown')}`, color: ANSI_CYAN },
+    { text: ' | ', color: ANSI_GRAY },
+    { text: `review ${sanitizeDisplayValue(provenance.review_model ?? 'unknown')}`, color: ANSI_CYAN },
+    { text: ' | ', color: ANSI_GRAY },
+    {
+      text: `reasoning ${sanitizeDisplayValue(provenance.model_reasoning_effort ?? 'unknown')}`,
+      color: ANSI_CYAN
+    },
+    { text: ' | ', color: ANSI_GRAY },
+    { text: `source ${sanitizeDisplayValue(provenance.source)}`, color: confidenceColor },
+    { text: ' | ', color: ANSI_GRAY },
+    { text: `confidence ${sanitizeDisplayValue(provenance.confidence)}`, color: confidenceColor }
+  ];
+  if (provenance.degraded_reason) {
+    segments.push({ text: ' | ', color: ANSI_GRAY });
+    segments.push({
+      text: `degraded ${sanitizeDisplayValue(provenance.degraded_reason)}`,
+      color: ANSI_RED
+    });
+  }
+  return segments;
+}
+
+function formatCompactModelProvenanceSummary(
+  provenance: DashboardResolvedModelProvenance | null | undefined
+): string | null {
+  if (!provenance) {
+    return null;
+  }
+  const model = sanitizeDisplayValue(provenance.model ?? 'unknown');
+  const source = sanitizeDisplayValue(provenance.source);
+  const confidence = sanitizeDisplayValue(provenance.confidence);
+  const degraded = provenance.degraded_reason
+    ? ` degraded ${sanitizeDisplayValue(provenance.degraded_reason)}`
+    : '';
+  return `model ${model} ${source}/${confidence}${degraded}`;
+}
+
+function resolveModelProvenanceConfidenceColor(
+  confidence: DashboardResolvedModelProvenance['confidence'] | null | undefined
+): string {
+  switch (confidence) {
+    case 'high':
+      return ANSI_GREEN;
+    case 'medium':
+      return ANSI_YELLOW;
+    case 'degraded':
+      return ANSI_RED;
+    default:
+      return ANSI_GRAY;
+  }
 }
 
 function resolveRunningAccent(entry: OperatorDashboardSessionPayload): string {

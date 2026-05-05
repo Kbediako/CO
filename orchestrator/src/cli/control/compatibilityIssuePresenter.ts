@@ -804,6 +804,9 @@ export function buildCompatibilityRunningEntry(
     status_reason: selected.statusReason,
     pid: selected.providerLinearWorkerProof?.pid ?? null,
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
+    ...(proof?.resolved_model_provenance
+      ? { resolved_model_provenance: proof.resolved_model_provenance }
+      : {}),
     session_id: useLegacyProofFallback
       ? normalizeCompatibilityMessage(proof?.latest_session_id)
       : proofCanonicalSessionId,
@@ -840,6 +843,9 @@ export function buildCompatibilityRetryEntry(selected: ControlCompatibilitySourc
     status_reason: selected.statusReason,
     session_id: proof?.latest_session_id ?? null,
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
+    ...(proof?.resolved_model_provenance
+      ? { resolved_model_provenance: proof.resolved_model_provenance }
+      : {}),
     thread_id: proof?.thread_id ?? null,
     turn_count: proof?.turn_count ?? null,
     workspace_path: selected.workspacePath,
