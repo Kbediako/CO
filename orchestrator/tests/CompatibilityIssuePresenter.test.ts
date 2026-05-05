@@ -304,6 +304,29 @@ describe('CompatibilityIssuePresenter', () => {
     expect(projection.issues[0]?.payload.workspace.path).toBe('/repo/.workspaces/current-co-100');
   });
 
+  it('keeps populated source workspace paths ahead of fresh proof workspace paths', () => {
+    const source = buildCompatibilitySource({
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress',
+      startedAt: '2026-04-06T02:00:00.000Z',
+      workspacePath: '/repo/.workspaces/current-co-100',
+      providerLinearWorkerProof: {
+        issue_id: 'issue-100',
+        issue_identifier: 'CO-100',
+        attempt_started_at: '2026-04-06T02:05:00.000Z',
+        workspace_path: '/repo/.workspaces/proof-co-100',
+        updated_at: '2026-04-06T02:06:00.000Z'
+      } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(source),
+      running: [source]
+    });
+
+    expect(projection.issues[0]?.payload.workspace.path).toBe('/repo/.workspaces/current-co-100');
+  });
+
   it('falls back to stage started_at when claim launch_started_at is malformed', () => {
     const proof = {
       issue_id: 'issue-100',
