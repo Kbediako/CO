@@ -30,6 +30,7 @@
           "manifest": ".runs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36-packet-docs/cli/2026-05-05T01-20-04-958Z-6c4f7a20/manifest.json",
           "source_anchor": "ctx:sha256:23a0a0b559a0999ec797dd49596f53c617a89966c7e89cdeaccb3af2fc580c6a#chunk:c000001",
           "canonical_owner_key": "codex-cli-0128-skills-release-current-wording",
+          "task_id_note": "The child-lane artifact path preserves the provider-worker helper-emitted task id `linear-9801241f-83b0-4f73-93f4-43eb62e3fe36-packet-docs`; the date-prefixed registry id remains `20260505-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36` and is not the artifact root naming authority.",
           "summary": "Created the CO-475 docs-first packet and registry mirrors only. The packet preserves parent ownership of docs/skills-release.md, current Codex CLI 0.128.0, gpt-5.5/xhigh, CO-466 release-intake done, the 0.125.0 release-facing hold, and the 0.124.0 cloud-canary hold. It rejects child-lane edits to docs/skills-release.md, broad release-intake reopening, version-pin promotion, cloud-canary promotion, model default changes, and lifecycle mutations."
         }
       },
