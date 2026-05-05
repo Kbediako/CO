@@ -12989,8 +12989,8 @@ describe('providerLinearWorkflowFacade', () => {
     const canonicalOwnerDescription = [
       'Apr 19 baseline owner.',
       '## Canonical Owner',
-      `- Canonical owner key: \`${canonicalOwnerKey}\``,
-      `- Canonical owner marker: \`${canonicalOwnerMarker}\``
+      `* Canonical owner key: \`${canonicalOwnerKey}\``,
+      `* Canonical owner marker: \`${canonicalOwnerMarker}\``
     ].join('\n');
     const calls: string[] = [];
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
