@@ -55,6 +55,8 @@
 - [x] `npm run docs:check`. Evidence: `docs:check: OK`.
 - [x] `npm run docs:freshness`. Evidence: `docs:freshness OK - 5231 docs, 5234 registry entries`.
 - [x] `codex-orchestrator start docs-review --task linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd`. Evidence: `.runs/linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd/cli/2026-05-05T17-17-24-275Z-e66407e3/manifest.json`; review ran on `gpt-5.5` / `xhigh` via appserver, no fallback, and completed with `review_outcome=clean-success`.
+- [x] Docs-review `NOTES` evidence recorded for the manifest-backed review gate. Evidence: `Goal: review CO-424 setup-only traceability packet against protected post-handoff closeout scope | Owner: parent orchestrator | Summary: clean-success on gpt-5.5/xhigh appserver with no fallback | Waiver: none; setup-only delegation override recorded in manifest`.
+- [ ] `unresolved-review-threads` gate verifies unresolved actionable review threads = `0` or documents an explicit waiver before merge/closeout. Evidence: pending PR `#764` current-head review rerun and `ready-review` quiet-window drain.
 
 ## Notes
 - This setup lane must not edit implementation source or tests.
