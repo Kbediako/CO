@@ -22,7 +22,7 @@
         "docs/docs-freshness-registry.json",
         ".runs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36-packet-docs-r2/cli/2026-05-05T02-46-27-119Z-bea486de/manifest.json",
         ".runs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36-docs-review-r2/cli/2026-05-05T02-59-11-866Z-ed99b582/manifest.json",
-        "../../.runs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36/cli/2026-05-05T02-42-10-734Z-93935e5f/review/telemetry.json"
+        ".runs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36/cli/2026-05-05T02-42-10-734Z-93935e5f/review/telemetry.json"
       ],
       "approvals": {
         "docs_packet_child_lane": {
@@ -39,7 +39,7 @@
           "date": "2026-05-05",
           "status": "validation-green-before-pr",
           "docs_review_manifest": ".runs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36-docs-review-r2/cli/2026-05-05T02-59-11-866Z-ed99b582/manifest.json",
-          "standalone_review_telemetry": "../../.runs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36/cli/2026-05-05T02-42-10-734Z-93935e5f/review/telemetry.json",
+          "standalone_review_telemetry": ".runs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36/cli/2026-05-05T02-42-10-734Z-93935e5f/review/telemetry.json",
           "summary": "Parent updated docs/skills-release.md line 9 from stale current-facing 0.125.0 wording to current local Codex CLI 0.128.0 with CO-local gpt-5.5/xhigh while preserving release-facing 0.125.0 and cloud-canary hold language. Validation is green through delegation guard, spec guard, build, lint, full npm run test, docs:check, docs:freshness, repo:stewardship, diff-budget, pack:smoke, manifest-backed standalone review bounded-success, and an explicit no-change elegance pass."
         }
       },
