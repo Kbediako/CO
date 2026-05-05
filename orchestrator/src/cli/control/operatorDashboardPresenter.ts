@@ -267,6 +267,9 @@ function buildIssuePayload(
     stageStartedAt,
     issue.provider_debug_snapshot ?? null
   );
+  const useProofWorkspacePath =
+    !issue.workspace.path ||
+    hasNonBlankText(stageStartedAt);
 
   return {
     issue_identifier: issue.issue_identifier,
@@ -280,7 +283,7 @@ function buildIssuePayload(
     title: trackedLinear?.title ?? null,
     url: trackedLinear?.url ?? null,
     workspace: {
-      path: proofWorkspacePath ?? issue.workspace.path ?? null,
+      path: (useProofWorkspacePath ? proofWorkspacePath : null) ?? issue.workspace.path ?? null,
       host: LOCAL_HOSTNAME
     },
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
@@ -336,6 +339,10 @@ function buildRunningSessionPayload(
     stageStartedAt,
     issue?.provider_debug_snapshot ?? null
   );
+  const issueWorkspacePath = issue?.workspace.path ?? null;
+  const useProofWorkspacePath =
+    !issueWorkspacePath ||
+    hasNonBlankText(stageStartedAt);
   const resolvedModelProvenance =
     entry.resolved_model_provenance ??
     issue?.running?.resolved_model_provenance ??
@@ -364,7 +371,7 @@ function buildRunningSessionPayload(
     session_id: proof?.latest_session_id ?? entry.session_id,
     thread_id: proof?.thread_id ?? null,
     turn_count: proof?.turn_count ?? entry.turn_count,
-    workspace_path: proofWorkspacePath ?? issue?.workspace.path ?? null,
+    workspace_path: (useProofWorkspacePath ? proofWorkspacePath : null) ?? issueWorkspacePath ?? null,
     host: LOCAL_HOSTNAME,
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
     ...(resolvedModelProvenance ? { resolved_model_provenance: resolvedModelProvenance } : {}),
@@ -488,6 +495,10 @@ function resolveCompatibilityAliases(input: {
   return Array.from(
     new Set(aliases.filter((alias): alias is string => typeof alias === 'string' && alias.length > 0))
   );
+}
+
+function hasNonBlankText(value: string | null | undefined): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function normalizeRecentAgentActivity(

@@ -1111,7 +1111,7 @@ function resolveSelectedRunWorkspacePath(input: {
   if (explicitWorkspacePath) {
     return explicitWorkspacePath;
   }
-  const proofWorkspacePath = input.providerLinearWorkerProof?.workspace_path ?? null;
+  const proofWorkspacePath = readNonBlankStringValue(input.providerLinearWorkerProof?.workspace_path);
   if (proofWorkspacePath) {
     return proofWorkspacePath;
   }
@@ -3276,7 +3276,7 @@ function resolveRetryWorkspacePath(
   controlWorkspacePath: string | null,
   source?: Pick<ControlCompatibilitySourceContext, 'workspacePath' | 'providerLinearWorkerProof'> | null
 ): string | null {
-  const proofWorkspacePath = source?.providerLinearWorkerProof?.workspace_path ?? null;
+  const proofWorkspacePath = readNonBlankStringValue(source?.providerLinearWorkerProof?.workspace_path);
   if (proofWorkspacePath) {
     return proofWorkspacePath;
   }
@@ -3307,6 +3307,10 @@ function readStringValue(record: Record<string, unknown>, ...keys: string[]): st
     }
   }
   return undefined;
+}
+
+function readNonBlankStringValue(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
 }
 
 function readValidTimestamp(value: string | null | undefined): string | null {

@@ -890,6 +890,9 @@ export function buildCompatibilityIssuePayload(input: {
     input.source.startedAt,
     input.source.providerDebugSnapshot
   );
+  const useProofWorkspacePath =
+    !input.source.workspacePath
+    || hasProviderProofWorkspaceFreshnessScope(input.source);
 
   return {
     issue_identifier: input.source.issueIdentifier,
@@ -901,7 +904,7 @@ export function buildCompatibilityIssuePayload(input: {
     display_status: input.source.displayStatus,
     status_reason: input.source.statusReason,
     workspace: {
-      path: proofWorkspacePath ?? input.source.workspacePath ?? null
+      path: (useProofWorkspacePath ? proofWorkspacePath : null) ?? input.source.workspacePath ?? null
     },
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
     attempts: buildCompatibilityIssueAttempts(input.source, retryPayload),
@@ -925,6 +928,19 @@ export function buildCompatibilityIssuePayload(input: {
       : {}),
     ...(input.dispatchPilotSummary ? { dispatch_pilot: input.dispatchPilotSummary } : {})
   };
+}
+
+function hasProviderProofWorkspaceFreshnessScope(
+  source: Pick<ControlCompatibilitySourceContext, 'startedAt' | 'providerDebugSnapshot'>
+): boolean {
+  return (
+    hasNonBlankText(source.startedAt) ||
+    hasNonBlankText(source.providerDebugSnapshot?.claim?.launch_started_at ?? null)
+  );
+}
+
+function hasNonBlankText(value: string | null | undefined): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function buildCompatibilityIssueAttempts(
