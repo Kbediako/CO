@@ -2697,6 +2697,13 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       latest_session_id: 'thread-1-turn-2'
     });
     expect(refreshed?.resolved_model_provenance ?? null).toBeNull();
+
+    const persisted = JSON.parse(await readFile(proofPath, 'utf8')) as Record<string, unknown>;
+    expect(persisted).toMatchObject({
+      latest_turn_id: 'turn-2',
+      latest_session_id: 'thread-1-turn-2'
+    });
+    expect(persisted.resolved_model_provenance ?? null).toBeNull();
   });
 
   it('prefers explicit runtime metadata over matching config values while merging sparse records', () => {
@@ -2777,7 +2784,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           params: {
             turn: {
               id: 'turn-1',
-              modelSlug: 'gpt-5.5',
+              modelSlug: 'gpt-5.6',
               modelReasoningEffort: 'xhigh'
             }
           }
