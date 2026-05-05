@@ -13650,7 +13650,7 @@ describe('providerLinearWorkflowFacade', () => {
     expect(calls).toEqual(['owner-search', 'create', 'update-description', 'owner-search', 'related-relation']);
   });
 
-  it('does not reuse a canonical owner marker that only has a prefix match', async () => {
+  it('does not reuse prefix matches or diff-style canonical owner marker additions', async () => {
     const canonicalOwnerKey = 'baseline_cohort_id:co-1';
     const longerCanonicalOwnerKey = 'baseline_cohort_id:co-10';
     const longerCanonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${longerCanonicalOwnerKey}`;
@@ -13681,6 +13681,22 @@ describe('providerLinearWorkflowFacade', () => {
                 '## Canonical Owner',
                 `- Canonical owner key: \`${longerCanonicalOwnerKey}\``,
                 `- Canonical owner marker: \`${longerCanonicalOwnerMarker}\``
+              ].join('\n'),
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            }),
+            buildCanonicalOwnerIssue({
+              id: 'lin-issue-11',
+              identifier: 'CO-11',
+              title: 'Patch example with marker',
+              description: [
+                'Patch excerpt, not an owner stamp.',
+                '```diff',
+                `+ Canonical owner marker: \`codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}\``,
+                '```'
               ].join('\n'),
               state: {
                 id: 'state-backlog',

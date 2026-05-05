@@ -3276,10 +3276,8 @@ function descriptionHasExactCanonicalOwnerMarker(description: string | null | un
   const markerLines = new Set([
     `- Canonical owner marker: \`${marker}\``,
     `* Canonical owner marker: \`${marker}\``,
-    `+ Canonical owner marker: \`${marker}\``,
     `- Canonical owner marker: ${marker}`,
-    `* Canonical owner marker: ${marker}`,
-    `+ Canonical owner marker: ${marker}`
+    `* Canonical owner marker: ${marker}`
   ]);
   return normalizeOptionalString(description)
     ?.split(/\r?\n/u)
