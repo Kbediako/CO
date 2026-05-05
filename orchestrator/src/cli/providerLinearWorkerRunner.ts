@@ -11327,11 +11327,15 @@ export async function refreshProviderLinearWorkerProofSnapshot(
         ? null
         : {
             ...proofWithSessionTelemetryResult.hydrationState,
-            proof_signature: buildProviderWorkerSessionLogHydrationProofSignature(hydrated),
-            ...(hydrated.resolved_model_provenance
-              ? { resolved_model_provenance: hydrated.resolved_model_provenance }
-              : {})
+            proof_signature: buildProviderWorkerSessionLogHydrationProofSignature(hydrated)
           };
+    if (hydrationState) {
+      if (hydrated.resolved_model_provenance) {
+        hydrationState.resolved_model_provenance = hydrated.resolved_model_provenance;
+      } else {
+        delete hydrationState.resolved_model_provenance;
+      }
+    }
     await writeProof(proofPath, hydrated);
     await writeProviderWorkerSessionLogHydrationState(runDir, hydrationState);
     if (

@@ -2870,6 +2870,90 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(persisted.resolved_model_provenance ?? null).toBeNull();
   });
 
+  it('does not re-sign skipped session-log hydration with stale model provenance', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '05', '05');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-05-05T04-40-00-thread-1.jsonl');
+    const rawSessionLog = [
+      JSON.stringify({
+        type: 'session_meta',
+        payload: {
+          id: 'thread-1',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        },
+        timestamp: '2026-05-05T04:40:00.000Z'
+      }),
+      JSON.stringify({
+        type: 'turn_context',
+        payload: {
+          turn_id: 'turn-1'
+        },
+        timestamp: '2026-05-05T04:40:01.000Z'
+      })
+    ].join('\n');
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(sessionLogPath, rawSessionLog, 'utf8');
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          latest_turn_id: 'turn-1',
+          latest_session_id: 'thread-1-turn-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          resolved_model_provenance: null,
+          workspace_path: tempRoot
+        })
+      ),
+      'utf8'
+    );
+    await writeFile(
+      hydrationPath,
+      JSON.stringify({
+        path: sessionLogPath,
+        offset_bytes: Buffer.byteLength(rawSessionLog),
+        trailing_text: '',
+        bootstrap_pending: false,
+        proof_signature: 'stale-proof-signature',
+        id_rewind_signature: null,
+        resolved_model_provenance: buildProviderLinearWorkerResolvedModelProvenance({
+          runtimeModel: 'gpt-5.4',
+          runtimeReasoningEffort: 'high',
+          observedAt: '2026-05-05T04:39:00.000Z'
+        })
+      }),
+      'utf8'
+    );
+
+    const skippedRefresh = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-05-05T04:40:30.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! },
+      { skipSessionLogHydration: true }
+    );
+    const skippedHydration = await readPersistedSessionLogHydrationState(hydrationPath);
+
+    expect(skippedRefresh?.resolved_model_provenance ?? null).toBeNull();
+    expect(skippedHydration.proof_signature).not.toBe('stale-proof-signature');
+    expect(skippedHydration.resolved_model_provenance).toBeUndefined();
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-05-05T04:41:00.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+    const persisted = JSON.parse(await readFile(proofPath, 'utf8')) as Record<string, unknown>;
+
+    expect(refreshed?.resolved_model_provenance ?? null).toBeNull();
+    expect(persisted.resolved_model_provenance ?? null).toBeNull();
+  });
+
   it('prefers explicit runtime metadata over matching config values while merging sparse records', () => {
     const current = {
       ...buildProviderLinearWorkerResolvedModelProvenance({
