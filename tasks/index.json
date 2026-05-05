@@ -1,6 +1,48 @@
 {
   "items": [
     {
+      "id": "20260505-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36",
+      "title": "CO-475 skills-release current-facing wording alignment",
+      "relates_to": "tasks/tasks-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-05",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "docs/TECH_SPEC-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "docs/ACTION_PLAN-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "tasks/specs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "tasks/tasks-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        ".agent/task/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36-packet-docs/cli/2026-05-05T01-20-04-958Z-6c4f7a20/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane packet-docs",
+          "date": "2026-05-05",
+          "status": "produced",
+          "manifest": ".runs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36-packet-docs/cli/2026-05-05T01-20-04-958Z-6c4f7a20/manifest.json",
+          "source_anchor": "ctx:sha256:23a0a0b559a0999ec797dd49596f53c617a89966c7e89cdeaccb3af2fc580c6a#chunk:c000001",
+          "canonical_owner_key": "codex-cli-0128-skills-release-current-wording",
+          "summary": "Created the CO-475 docs-first packet and registry mirrors only. The packet preserves parent ownership of docs/skills-release.md, current Codex CLI 0.128.0, gpt-5.5/xhigh, CO-466 release-intake done, the 0.125.0 release-facing hold, and the 0.124.0 cloud-canary hold. It rejects child-lane edits to docs/skills-release.md, broad release-intake reopening, version-pin promotion, cloud-canary promotion, model default changes, and lifecycle mutations."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "task": "tasks/tasks-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "agent_task": ".agent/task/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "prd": "docs/PRD-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "docs": "docs/TECH_SPEC-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "action_plan": "docs/ACTION_PLAN-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md"
+      }
+    },
+    {
       "id": "20260430-linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51",
       "title": "CO: classify Codex rollout-item thread-not-found review log noise",
       "relates_to": "tasks/tasks-linear-8a453a7c-ba31-4604-a88e-2e4c6244ec51.md",
