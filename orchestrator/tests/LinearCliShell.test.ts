@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -79,9 +79,7 @@ function buildParityMatrixMissingAuditEntry(overrides: Record<string, unknown> =
 }
 
 async function createSameAttemptFollowUpFixture(prefix: string, auditEntries: Record<string, unknown>[] = []) {
-  const tempDir = await mkdtemp(join(tmpdir(), prefix));
-  tempDirs.push(tempDir);
-  const auditPath = join(tempDir, 'provider-linear-audit.jsonl');
+  const { auditPath, tempDir } = await createProviderLinearAuditFixture(prefix);
   if (auditEntries.length > 0) {
     await writeFile(
       auditPath,
@@ -105,6 +103,29 @@ async function createSameAttemptFollowUpFixture(prefix: string, auditEntries: Re
         runDir: tempDir
       } as never);
   return { auditPath, loadProviderLinearWorkerContextMock };
+}
+
+async function createProviderLinearAuditFixture(prefix: string) {
+  const tempDir = await mkdtemp(join(tmpdir(), prefix));
+  tempDirs.push(tempDir);
+  return {
+    auditPath: join(tempDir, 'provider-linear-audit.jsonl'),
+    tempDir
+  };
+}
+
+async function readOptionalTextFile(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, 'utf8');
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error
+      ? (error as { code?: unknown }).code
+      : null;
+    if (code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
 }
 
 describe('runLinearCliShell', () => {
@@ -1475,6 +1496,7 @@ describe('runLinearCliShell', () => {
         printHelp: vi.fn()
       },
       {
+        getEnv: () => ({}),
         log,
         setExitCode
       }
@@ -1494,28 +1516,37 @@ describe('runLinearCliShell', () => {
   it('fails closed when create-follow-up marks a parity lane without a parity matrix', async () => {
     const log = vi.fn();
     const setExitCode = vi.fn();
+    const { auditPath } = await createProviderLinearAuditFixture('linear-cli-follow-up-parity-missing-');
+    const { auditPath: liveProviderAuditPath } =
+      await createProviderLinearAuditFixture('linear-cli-live-provider-audit-');
+    const originalProviderAuditPath = process.env.CODEX_PROVIDER_LINEAR_AUDIT_PATH;
 
-    await runLinearCliShell(
-      {
-        positionals: ['create-follow-up'],
-        flags: {
-          format: 'json',
-          'issue-id': 'lin-issue-1',
-          title: 'Parity follow-up',
-          description: 'Close the remaining parity gap.',
-          'intent-checksum': '- Preserve exact `CO STATUS` wording.',
-          'non-goals': '- [ ] Do not reopen the browser surface.',
-          'not-done-if': '- [ ] The issue still allows browser-first parity.',
-          'acceptance-criteria': '- [ ] Captured',
-          'parity-lane': true
+    try {
+      process.env.CODEX_PROVIDER_LINEAR_AUDIT_PATH = liveProviderAuditPath;
+
+      await runLinearCliShell(
+        {
+          positionals: ['create-follow-up'],
+          flags: buildParityFollowUpFlags(),
+          printHelp: vi.fn()
         },
-        printHelp: vi.fn()
-      },
-      {
-        log,
-        setExitCode
+        {
+          getEnv: () => ({
+            CO_LINEAR_API_TOKEN: 'lin-api-token',
+            CODEX_PROVIDER_LINEAR_AUDIT_PATH: auditPath
+          }),
+          now: () => '2026-04-22T08:05:00.000Z',
+          log,
+          setExitCode
+        }
+      );
+    } finally {
+      if (originalProviderAuditPath === undefined) {
+        delete process.env.CODEX_PROVIDER_LINEAR_AUDIT_PATH;
+      } else {
+        process.env.CODEX_PROVIDER_LINEAR_AUDIT_PATH = originalProviderAuditPath;
       }
-    );
+    }
 
     expect(setExitCode).toHaveBeenCalledWith(1);
     expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
@@ -1526,6 +1557,17 @@ describe('runLinearCliShell', () => {
         message: 'Parity/alignment follow-up issues require a parity matrix.',
         status: 422
       }
+    });
+    expect(await readOptionalTextFile(liveProviderAuditPath)).toBeNull();
+    const auditContents = await readOptionalTextFile(auditPath);
+    expect(auditContents).not.toBeNull();
+    expect(JSON.parse(auditContents ?? '')).toMatchObject({
+      recorded_at: '2026-04-22T08:05:00.000Z',
+      operation: 'create-follow-up',
+      ok: false,
+      issue_id: 'lin-issue-1',
+      error_code: 'linear_follow_up_parity_matrix_missing',
+      error_message: FOLLOW_UP_PARITY_MATRIX_MISSING_MESSAGE
     });
   });
 
