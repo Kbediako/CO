@@ -13,7 +13,7 @@ task_checklists:
 
 # TECH_SPEC - CO-499 classify terminal Codex connector failures in ready-review
 
-This mirror intentionally matches the canonical task spec at `tasks/specs/linear-07fdd989-5c10-4b24-ab5d-10fa9bf3732f.md`.
+This mirror summarizes the canonical task spec at `tasks/specs/linear-07fdd989-5c10-4b24-ab5d-10fa9bf3732f.md`.
 
 ## Summary
 - Objective: make `codex-orchestrator pr ready-review` classify terminal `chatgpt-codex-connector` failure comments distinctly from active pending Codex review requests.
@@ -92,6 +92,6 @@ This mirror intentionally matches the canonical task spec at `tasks/specs/linear
 - `npm run docs:check`.
 - Implementation lane to run broader gates before handoff.
 
-## Open Questions
-- Should terminal failure produce a blocking action-required reason until a manual retry occurs, or clear pending while requiring an explicit waiver?
-- Should the phrase matcher include only the observed failure or a bounded list of Codex connector terminal failure phrasings?
+## Decisions
+- Terminal failure produces a blocking action-required reason until a manual retry occurs or the operator records an explicit waiver.
+- The matcher uses a bounded list: the observed `Codex Review: Something went wrong... @codex review` failure family plus an `unknown error` / `@codex review` connector failure shape.
