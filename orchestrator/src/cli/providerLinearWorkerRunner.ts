@@ -385,16 +385,15 @@ export type ProviderLinearWorkerResolvedModelSource =
   | 'unknown';
 
 export type ProviderLinearWorkerResolvedModelConfidence =
-  | 'runtime_reported'
-  | 'command_override'
-  | 'config_inferred'
-  | 'unknown';
+  | 'high'
+  | 'medium'
+  | 'degraded';
 
 export interface ProviderLinearWorkerResolvedModelProvenance {
   schema_version: 1;
   model: string | null;
   review_model: string | null;
-  reasoning_effort: string | null;
+  model_reasoning_effort: string | null;
   source: ProviderLinearWorkerResolvedModelSource;
   confidence: ProviderLinearWorkerResolvedModelConfidence;
   degraded_reason: string | null;
@@ -1943,10 +1942,9 @@ function normalizeProviderWorkerResolvedModelProvenance(
     return null;
   }
   if (
-    confidence !== 'runtime_reported' &&
-    confidence !== 'command_override' &&
-    confidence !== 'config_inferred' &&
-    confidence !== 'unknown'
+    confidence !== 'high' &&
+    confidence !== 'medium' &&
+    confidence !== 'degraded'
   ) {
     return null;
   }
@@ -1954,7 +1952,9 @@ function normalizeProviderWorkerResolvedModelProvenance(
     schema_version: 1,
     model: normalizeProviderWorkerModelSlug(value.model),
     review_model: normalizeProviderWorkerModelSlug(value.review_model),
-    reasoning_effort: normalizeProviderWorkerReasoningEffortValue(value.reasoning_effort),
+    model_reasoning_effort:
+      normalizeProviderWorkerReasoningEffortValue(value.model_reasoning_effort) ??
+      normalizeProviderWorkerReasoningEffortValue(value.reasoning_effort),
     source,
     confidence,
     degraded_reason: normalizeOptionalString(value.degraded_reason),
@@ -1991,7 +1991,7 @@ function buildProviderWorkerResolvedModelProvenance(input: {
     schema_version: 1 as const,
     review_model:
       runtimeReviewModel ?? input.configDefaults.review_model ?? null,
-    reasoning_effort:
+    model_reasoning_effort:
       runtimeReasoningEffort ?? input.configDefaults.reasoning_effort ?? null,
     observed_at: observedAt,
     runtime_model: runtimeModel,
@@ -2008,7 +2008,7 @@ function buildProviderWorkerResolvedModelProvenance(input: {
       ...common,
       model: runtimeModel,
       source: 'runtime_reported',
-      confidence: 'runtime_reported',
+      confidence: 'high',
       degraded_reason: null
     };
   }
@@ -2017,8 +2017,8 @@ function buildProviderWorkerResolvedModelProvenance(input: {
       ...common,
       model: commandModel,
       source: 'command_override',
-      confidence: 'command_override',
-      degraded_reason: null
+      confidence: 'medium',
+      degraded_reason: 'runtime_model_unreported_command_override'
     };
   }
   if (input.configDefaults.model) {
@@ -2026,7 +2026,7 @@ function buildProviderWorkerResolvedModelProvenance(input: {
       ...common,
       model: input.configDefaults.model,
       source: 'config_default',
-      confidence: 'config_inferred',
+      confidence: 'medium',
       degraded_reason: 'runtime_model_unreported'
     };
   }
@@ -2034,7 +2034,7 @@ function buildProviderWorkerResolvedModelProvenance(input: {
     ...common,
     model: null,
     source: 'unknown',
-    confidence: 'unknown',
+    confidence: 'degraded',
     degraded_reason: 'runtime_model_unreported_config_default_unavailable'
   };
 }
@@ -2114,7 +2114,8 @@ function mergeProviderWorkerResolvedModelProvenance(
   return {
     ...selected,
     review_model: selected.review_model ?? secondary.review_model ?? null,
-    reasoning_effort: selected.reasoning_effort ?? secondary.reasoning_effort ?? null,
+    model_reasoning_effort:
+      selected.model_reasoning_effort ?? secondary.model_reasoning_effort ?? null,
     observed_at: selected.observed_at ?? secondary.observed_at ?? null,
     runtime_model: selected.runtime_model ?? secondary.runtime_model ?? null,
     runtime_review_model:
@@ -2135,7 +2136,7 @@ function formatProviderWorkerResolvedModelProvenanceSummary(
 ): string {
   const model = provenance.model ?? 'unknown';
   const reviewModel = provenance.review_model ?? 'unknown';
-  const reasoning = provenance.reasoning_effort ?? 'unknown';
+  const reasoning = provenance.model_reasoning_effort ?? 'unknown';
   const degraded = provenance.degraded_reason
     ? ` degraded_reason=${provenance.degraded_reason}`
     : '';
