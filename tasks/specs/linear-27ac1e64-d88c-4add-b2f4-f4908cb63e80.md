@@ -1,13 +1,16 @@
 ---
 id: 20260403-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80
 title: CO: Automate docs truthfulness and relevance across README, shipped skills, and agent-facing docs
+status: done
 relates_to: docs/PRD-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md
 related_prd: docs/PRD-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md
 related_action_plan: docs/ACTION_PLAN-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-03
+last_review: 2026-05-04
+review_notes:
+  - 2026-05-04: CO-444 parent-supplied live Linear evidence confirmed CO-75/27ac1e64 is `Done`/completed with PR #354; this completed-lane spec is reclassified to inactive terminal `done` under canonical owner key `spec-guard:active-specs:last_review=2026-04-03` so historical implementation evidence remains preserved without staying in active-spec freshness.
 ---
 
 ## Added by Bootstrap (refresh as needed)

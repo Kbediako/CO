@@ -409,3 +409,19 @@ CO-444 reproduced the owner blocker after CO-441 reached terminal `Done`:
 
 ### Rolling Disposition
 CO-444 re-homes only the live owner metadata for the existing March 28 rolling cohort. It keeps `docs:freshness:maintain` as the canonical owner key, preserves the `co-420-apr-28-march-28-task-packet-mirror` cohort identity, preserves CO-441 as historical terminal-owner evidence, and does not refresh `last_review` dates, delete historical packet evidence, widen CO-443 or other implementation lanes, or weaken `docs:freshness`.
+
+## May 4 April 3 Completed-Lane Residue Cleanup
+
+### Reproduction / Baseline Findings
+After CO-444 was reopened and returned to `In Progress`, `docs:freshness:maintain` stopped failing on terminal owner `CO-441` and verified `CO-444` as the live same-project non-terminal owner. The remaining failure changed shape to `freshness_decision=block_diff_local` with `owner_issue=CO-444`, `blocking_changed_paths=[]`, and seven April 3 residue cohorts: six `co-429-completed-lane-registry-residue` path-family cohorts plus one `co-428-stale-active-spec` cohort.
+
+Live Linear issue-context reads on 2026-05-04 confirmed the source issues behind that April 3 residue are terminal: `CO-68` (`11672de5-eb62-4942-bfdf-1d8282d786d2`), `CO-75` (`27ac1e64-d88c-4add-b2f4-f4908cb63e80`), `CO-76` (`44a18317-8afe-47e4-b4ba-5424aae86dc5`), `CO-73` (`6bed26fd-ea66-43c1-8324-b10871769435`), and `CO-74` (`c4c32123-af51-4552-b55a-03d17917659c`) are all `Done` / `completed`.
+
+### Rolling Disposition
+CO-444 preserves `docs:freshness:maintain`, the live owner marker, and the March 28 `co-420-apr-28-march-28-task-packet-mirror` rolling cohort. The April 3 residue is not a new active owner path: the affected task-packet rows are archived as completed-lane historical metadata, the stale active specs are reclassified to terminal `done`, and the task index records the live Linear terminal evidence instead of blindly bumping active freshness or widening product-scope implementation lanes.
+
+## May 4 Public / Bundled Skill Freshness Refresh
+
+After the April 3 packet residue was cleared, `docs:freshness:maintain` found no candidate cohorts and no changed-path blockers, but still reported ten hard-stale active public/skill docs. CO-444 reviewed `docs/public/downstream-setup.md`, `docs/public/provider-onboarding.md`, and the affected bundled skill docs (`chrome-devtools`, `collab-deliberation`, `collab-evals`, `collab-subagents-first`, `delegate-early`, `elegance-review`, and `land`) against the current CO-local Codex `0.128.0` / `gpt-5.5` posture, provider onboarding contract, and provider-worker lifecycle guidance.
+
+Those surfaces remain active guidance rather than rolling task-packet debt, so CO-444 refreshed only their registry `last_review` metadata. No public setup text, bundled skill behavior, `docs:freshness`, `docs:freshness:maintain`, or spec-guard policy was weakened.
