@@ -7,7 +7,7 @@
 
 ## Docs-First
 - [x] CO-424 packet drafted with protected terms, wrong interpretations, non-goals, Not Done If, and acceptance criteria.
-- [x] Packet states setup/traceability only; source fix remains future work.
+- [x] Packet refreshed to current implementation scope; source/test fix is in this lane.
 - [x] Registry mirrors updated in `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json`.
 
 ## Protected Terms
@@ -26,7 +26,8 @@
 
 ## Validation
 - [x] Current setup validation. Evidence: see canonical checklist `tasks/tasks-linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md`.
+- [x] Current implementation validation. Evidence: see canonical checklist `tasks/tasks-linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md`.
 
 ## Notes
 - This mirror intentionally stays concise. The canonical checklist is `tasks/tasks-linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md`.
-- No implementation source, tests, or source-fix PR lifecycle work belongs in this setup lane; packet PR/workpad attachment is allowed for traceability.
+- Implementation source/test work is bounded to the CO-424 provider-worker closeout fix and proof-lock diagnostic summary behavior.

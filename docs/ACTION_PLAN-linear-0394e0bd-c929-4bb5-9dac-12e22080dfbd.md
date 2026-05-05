@@ -1,12 +1,12 @@
 # ACTION_PLAN - CO-424 prevent provider-worker post-handoff closeout parallelization false failures
 
 ## Summary
-- Goal: create the CO-424 docs-first traceability packet and registry mirrors so the issue can leave Backlog later.
-- Scope: packet/setup only. No implementation source, tests, source-fix Linear/GitHub lifecycle, or source-fix PR work. Packet PR/workpad attachment is allowed for traceability.
+- Goal: implement CO-424 so provider-worker review/merge/Done closeout does not false-fail on stale parallelization invariants.
+- Scope: update the packet/mirrors, provider-worker closeout logic, focused provider-worker tests, and provider-worker command summary proof-lock diagnostic handling.
 - Assumptions:
   - `CO-423` and `PR #721` are trace anchors from the issue description.
-  - Future implementation will work in `provider-linear-worker` closeout logic and focused tests.
-  - This setup lane leaves a file-only diff for review or parent import.
+  - Active implementation turns must still fail closed for true missing decisions, missing `parallelize_now` launches, and same-decision serial/forbid child-lane launches.
+  - Proof-lock acquisition safety remains unchanged; only repeated stale-lock diagnostics are demoted when another provider-worker terminal cause exists.
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward:
@@ -23,23 +23,22 @@
   - `CO-423`
   - `PR #721`
 - Not done if:
-  - this lane edits implementation source or tests
   - the packet omits protected terms or registry mirrors
   - active-turn parallelization invariants are weakened
   - handoff closeout is fixed by requiring fake same-issue child lanes
   - `proof lock` safety is bypassed
-  - Linear or GitHub is mutated
+  - `CO-423` / `PR #721` content is mutated instead of used as evidence
 - Pre-implementation issue-quality review:
-  - 2026-05-04: CO-424 is not a source-fix lane yet; it is a setup/traceability lane so Backlog promotion later has exact scope and protected wording.
-  - 2026-05-04: the future fix is narrower than disabling `parallelization_serial_conflict` or `parallelization_decision_missing` and broader than a docs-only wording change.
-- Fallback / refactor decision: not applicable for this setup packet. Future implementation must record a separate decision if it adds or retains fallback/seam behavior.
+  - 2026-05-04: the fix is narrower than disabling `parallelization_serial_conflict` or `parallelization_decision_missing` and broader than a docs-only wording change.
+  - 2026-05-05: implementation keeps legacy timestamp fallback for no-lineage child-lane records but prefers decision lineage when present.
+- Fallback / refactor decision: retain legacy timestamp fallback for no-lineage child-lane records; owner CO-424; remove only after live child-lane records consistently carry lineage.
 
 ## Milestones & Sequencing
-1. Create PRD, TECH_SPEC mirror, ACTION_PLAN, canonical spec, task checklist, and `.agent` mirror.
-2. Register the packet in `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json`.
-3. Run lightweight file-only validation: status, protected-term/path checks, and JSON parse checks.
-4. Run `npm run docs:check` and `npm run docs:freshness` only if available without dependency setup.
-5. Stop with packet/setup complete; do not implement source or tests.
+1. Refresh PRD, TECH_SPEC mirror, ACTION_PLAN, canonical spec, task checklist, and `.agent` mirror for implementation scope.
+2. Implement lineage-aware child-lane filtering and lifecycle-closeout missing-decision handling in `providerLinearWorkerRunner.ts`.
+3. Add focused regressions for CO-423-style review handoff, post-merge/Done closeout, stale prior `parallelize_now` residue, and true same-decision serial/forbid violations.
+4. Demote repeated stale provider proof-lock diagnostics in command error details when authoritative provider-worker proof already exposes a separate terminal cause.
+5. Run focused validation, full repo gates, standalone review, elegance review, update PR #764, and drain `ready-review` before Linear review handoff.
 
 ## Dependencies
 - `orchestrator/src/cli/providerLinearWorkerRunner.ts`
@@ -60,8 +59,11 @@
   - JSON parse for `docs/docs-freshness-registry.json`
   - optional `npm run docs:check`
   - optional `npm run docs:freshness`
+  - focused `ProviderLinearWorkerRunner` tests for CO-424 closeout and invariant behavior
+  - focused `CommandRunnerReviewEvidenceConsistency` proof-lock diagnostic test
+  - full repo validation floor before handoff
 - Rollback plan:
-  - revert the six CO-424 packet files plus the three registry mirror edits. No source or external state rollback should be needed because this lane does not mutate source, Linear, or GitHub.
+  - revert the CO-424 source/test/doc diff on the PR branch; no historical `CO-423` / `PR #721` or shared-root rollback is expected because those surfaces are not mutated.
 
 ## Risks & Mitigations
 - Risk: packet wording weakens active-turn child-lane enforcement.
@@ -72,5 +74,5 @@
   - Mitigation: packet names `proof lock` safety as protected and out of scope for weakening.
 
 ## Approvals
-- Packet setup: current bounded worker lane refreshed by parent, 2026-05-04
-- Future implementation review: pending
+- Packet setup: completed by parent, 2026-05-04
+- Implementation review: pending

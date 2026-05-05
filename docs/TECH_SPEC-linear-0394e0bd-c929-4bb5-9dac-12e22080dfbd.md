@@ -13,40 +13,39 @@ last_review: 2026-05-05
 This mirror points to the canonical task spec at `tasks/specs/linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md`.
 
 ## Implementation Summary
-- Create the CO-424 docs-first traceability packet and registry mirrors only.
+- Keep the CO-424 docs-first traceability packet and registry mirrors current while landing the source/test fix.
 - Preserve the protected failure modes `parallelization_serial_conflict` and `parallelization_decision_missing`.
 - Preserve serial/no-parallel decisions `stay_serial` and `forbid_parallel`.
 - Preserve the exact lifecycle surfaces `review handoff`, `merge handoff`, and `post-merge/Done closeout`.
 - Preserve `same-issue child lanes`, `provider-linear-worker`, `proof lock`, `CO-423`, and `PR #721` as issue-shaping anchors.
-- Do not implement the source fix in this setup lane.
+- Implement lineage-aware child-lane filtering and lifecycle-closeout handling in `orchestrator/src/cli/providerLinearWorkerRunner.ts`.
+- Demote duplicate stale proof-lock diagnostics in provider-worker command closeout when another terminal cause exists.
 
-## Future Implementation Boundaries
-- Parent/future implementation owns source and test edits in:
+## Implementation Boundaries
+- Source and test edits are limited to:
   - `orchestrator/src/cli/providerLinearWorkerRunner.ts`
   - `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`
-- Future implementation must keep active-turn parallelization invariants strict:
+- Proof-lock diagnostic summary edits are limited to:
+  - `orchestrator/src/cli/services/commandRunner.ts`
+  - `orchestrator/tests/CommandRunnerReviewEvidenceConsistency.test.ts`
+- Implementation must keep active-turn parallelization invariants strict:
   - active turns still fail on true `parallelization_decision_missing`
   - active turns still fail on true `parallelization_serial_conflict`
   - active `parallelize_now` still requires successful current-turn same-issue child lanes or explicit recovered child-lane proof
-- Future implementation must prevent post-handoff closeout from being reclassified as an active implementation turn merely because the proof sidecars contain older or unrelated child-lane records.
-- Future implementation must not weaken `proof lock` safety or mutate historical `CO-423` / `PR #721` evidence.
+- Implementation prevents post-handoff closeout from being reclassified as an active implementation turn merely because proof sidecars contain older or unrelated child-lane records.
+- Implementation must not weaken `proof lock` safety or mutate historical `CO-423` / `PR #721` evidence.
 
-## Setup-Lane Validation Contract
+## Validation Contract
 - File scope:
-  - six packet/mirror files
-  - `tasks/index.json`
-  - `docs/TASKS.md`
-  - `docs/docs-freshness-registry.json`
-- Required lightweight checks:
-  - `git status --short --branch`
-  - protected-term `rg` over CO-424 packet and registry mirrors
-  - packet path `rg` over registry mirrors
-  - JSON parse for `tasks/index.json`
-  - JSON parse for `docs/docs-freshness-registry.json`
+  - packet/mirror files and registry mirrors
+  - provider-worker runner source and focused tests
+  - command-runner proof-lock diagnostic summary source and focused test
 - Required validation sequence before ready-review handoff:
-  - `node scripts/delegation-guard.mjs` or a documented setup-only delegation override
-  - `node scripts/spec-guard.mjs --dry-run`
+  - same-issue tests child-lane evidence or accepted/recorded parent import evidence
   - `npm run build`
+  - focused `ProviderLinearWorkerRunner` regression tests
+  - focused `CommandRunnerReviewEvidenceConsistency` proof-lock diagnostic test
+  - `node scripts/spec-guard.mjs --dry-run`
   - `npm run lint`
   - `npm run test`
   - `npm run docs:check`

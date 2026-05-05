@@ -1165,6 +1165,50 @@ describe('runCommandStage review evidence consistency', () => {
     expect(manifest.commands[0]?.status).toBe('failed');
   });
 
+  it('demotes repeated provider proof-lock diagnostics when terminal proof has a distinct failure cause', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'failed',
+        end_reason: 'parallelization_serial_conflict'
+      });
+      return buildFailedExecResult([
+        'provider-linear-worker recorded `stay_serial` for the current turn, but same-issue child lanes were still launched during that turn.',
+        'Failed to acquire provider-linear-worker proof lock after 2 attempts. [lock_diagnostics path=/tmp/run/provider-linear-worker-proof.json.lock owner_status=same_host_process_not_live recoverable=true]',
+        'Failed to acquire provider-linear-worker proof lock after 2 attempts. [lock_diagnostics path=/tmp/run/provider-linear-worker-proof.json.lock owner_status=same_host_process_not_live recoverable=true]'
+      ].join('\n'));
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage({
+      id: 'provider-linear-worker',
+      title: 'Run provider linear worker',
+      command: 'node providerLinearWorkerRunner.js',
+      summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    });
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed (parallelization_serial_conflict).');
+    expect(result.summary).not.toContain('proof lock');
+    expect(manifest.commands[0]?.status).toBe('failed');
+
+    const errorPayload = JSON.parse(
+      await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')
+    ) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('command-failed');
+    expect(errorPayload.details?.provider_linear_worker_end_reason).toBe('parallelization_serial_conflict');
+    expect(errorPayload.details?.stderr).toBe(
+      'provider-linear-worker recorded `stay_serial` for the current turn, but same-issue child lanes were still launched during that turn.'
+    );
+    expect(errorPayload.details?.stderr).not.toContain('proof lock');
+    expect(errorPayload.details?.secondary_diagnostics).toMatchObject({
+      provider_linear_worker_proof_lock: {
+        disposition: 'deduped_secondary',
+        count: 2
+      }
+    });
+  });
+
   it('does not use summary hints for failed provider-linear-worker stages', async () => {
     mockState.runImpl = async () => buildFailedExecResult('provider worker exited\n', 2);
 

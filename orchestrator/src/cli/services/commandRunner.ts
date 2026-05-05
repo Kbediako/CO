@@ -58,6 +58,8 @@ const REVIEW_TELEMETRY_POLL_INTERVAL_MS = 50;
 const REVIEW_TELEMETRY_WAIT_TIMEOUT_MS = 2_000;
 const REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_LINE_PATTERN =
   /^(?:(?:trace|debug|info|warn|error)\s+|\d{4}-\d{2}-\d{2}T[^\r\n]*?\s+(?:trace|debug|info|warn|error)\s+)codex_core::session:\s+failed to record rollout items:\s+thread\b[^\r\n]*\bnot found\b/iu;
+const PROVIDER_LINEAR_WORKER_PROOF_LOCK_DIAGNOSTIC_PATTERN =
+  /(?:Failed to acquire provider-linear-worker proof lock|\[lock_diagnostics\b[^\]\r\n]*provider-linear-worker-proof\.json\.lock[^\]\r\n]*\])/iu;
 const REVIEW_OUTCOME_BOUNDARY_PRESENCE_SENTINEL = {
   kind: 'timeout',
   provenance: 'review-timeout',
@@ -584,10 +586,14 @@ export async function runCommandStage(
 
     if (result.status !== 'succeeded') {
       const failureReason = timedOut ? 'timed_out' : 'command_failed';
+      const proofLockSecondaryDiagnostics =
+        providerLinearWorkerStage && providerLinearWorkerTerminalReason
+          ? extractSecondaryProviderProofLockDiagnostics(stderrText)
+          : null;
       const errorDetails: Record<string, unknown> = {
         exit_code: effectiveExitCode,
         sandbox_state: result.sandboxState,
-        stderr: stderrText,
+        stderr: proofLockSecondaryDiagnostics?.primaryStderr ?? stderrText,
         failure_reason: failureReason
       };
       if (effectiveExitCode !== normalizedExitCode) {
@@ -604,6 +610,24 @@ export async function runCommandStage(
       }
       if (entry.status === 'skipped') {
         errorDetails.non_fatal_fallback = true;
+      }
+      if (providerLinearWorkerTerminalStatus) {
+        errorDetails.provider_linear_worker_terminal_status = providerLinearWorkerTerminalStatus;
+      }
+      if (providerLinearWorkerTerminalReason) {
+        errorDetails.provider_linear_worker_end_reason = providerLinearWorkerTerminalReason;
+      }
+      if (providerLinearWorkerReviewOutcomeSummary) {
+        errorDetails.review_outcome_summary = providerLinearWorkerReviewOutcomeSummary;
+      }
+      if (proofLockSecondaryDiagnostics) {
+        errorDetails.secondary_diagnostics = {
+          provider_linear_worker_proof_lock: {
+            disposition: 'deduped_secondary',
+            count: proofLockSecondaryDiagnostics.count,
+            samples: proofLockSecondaryDiagnostics.samples
+          }
+        };
       }
       if (stdoutTruncated) {
         errorDetails.stdout_truncated = true;
@@ -1155,6 +1179,34 @@ async function formatReviewOutputLogNoiseSummary(options: {
   }
 
   return REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_NOISE_SUMMARY;
+}
+
+function extractSecondaryProviderProofLockDiagnostics(stderr: string): {
+  primaryStderr: string;
+  count: number;
+  samples: string[];
+} | null {
+  if (!stderr || !PROVIDER_LINEAR_WORKER_PROOF_LOCK_DIAGNOSTIC_PATTERN.test(stderr)) {
+    return null;
+  }
+  const primaryLines: string[] = [];
+  const diagnosticLines: string[] = [];
+  for (const line of stderr.split(/\r?\n/u)) {
+    if (PROVIDER_LINEAR_WORKER_PROOF_LOCK_DIAGNOSTIC_PATTERN.test(line)) {
+      diagnosticLines.push(line.trim());
+    } else {
+      primaryLines.push(line);
+    }
+  }
+  if (diagnosticLines.length === 0) {
+    return null;
+  }
+  const primaryStderr = primaryLines.join('\n').trim();
+  return {
+    primaryStderr: primaryStderr.length > 0 ? primaryStderr : stderr,
+    count: diagnosticLines.length,
+    samples: [...new Set(diagnosticLines.filter(Boolean))].slice(0, 3)
+  };
 }
 
 function delay(ms: number): Promise<void> {
