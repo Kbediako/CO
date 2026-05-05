@@ -53,8 +53,8 @@
 - [x] `git diff --check`. Evidence: clean.
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: `Spec guard: OK`.
 - [x] `npm run docs:check`. Evidence: `docs:check: OK`.
-- [x] `npm run docs:freshness`. Evidence: `docs:freshness OK - 5183 docs, 5186 registry entries`.
-- [ ] `codex-orchestrator start docs-review --task linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd`. Evidence: attempted with explicit delegation override in `.runs/linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd/cli/2026-05-03T15-14-06-188Z-beb6de00/manifest.json`; review launched as `gpt-5.5` / `xhigh` and failed on account usage limit with retry text `May 5th, 2026 5:52 PM`. Re-run before ready review or record an explicit quota waiver.
+- [x] `npm run docs:freshness`. Evidence: `docs:freshness OK - 5231 docs, 5234 registry entries`.
+- [x] `codex-orchestrator start docs-review --task linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd`. Evidence: `.runs/linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd/cli/2026-05-05T17-17-24-275Z-e66407e3/manifest.json`; review ran on `gpt-5.5` / `xhigh` via appserver, no fallback, and completed with `review_outcome=clean-success`.
 
 ## Notes
 - This setup lane must not edit implementation source or tests.

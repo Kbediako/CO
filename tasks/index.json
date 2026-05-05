@@ -30,11 +30,11 @@
         },
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
-          "date": "2026-05-04",
-          "status": "blocked_quota",
-          "manifest": ".runs/linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd/cli/2026-05-03T15-14-06-188Z-beb6de00/manifest.json",
-          "telemetry": ".runs/linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd/cli/2026-05-03T15-14-06-188Z-beb6de00/review/telemetry.json",
-          "summary": "Docs-review reached Codex review with model gpt-5.5 and reasoning effort xhigh, then failed on account usage limit with retry text May 5th, 2026 5:52 PM. Re-run before ready review or record an explicit waiver."
+          "date": "2026-05-05",
+          "status": "clean-success",
+          "manifest": ".runs/linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd/cli/2026-05-05T17-17-24-275Z-e66407e3/manifest.json",
+          "telemetry": ".runs/linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd/cli/2026-05-05T17-17-24-275Z-e66407e3/review/telemetry.json",
+          "summary": "Docs-review reran after the current-main packet refresh with model gpt-5.5, reasoning effort xhigh, runtime appserver, no fallback, and review_outcome=clean-success."
         }
       },
       "paths": {
