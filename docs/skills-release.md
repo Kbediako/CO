@@ -6,7 +6,7 @@ This guide defines how downstream users consume skills shipped with `@kbediako/c
 - Bundled skills are stored under `skills/` in this repository and included in npm package files.
 - Global user skills in `$CODEX_HOME/skills` should take precedence when present; bundled skills are fallback defaults.
 - CO-196 posture lineage remains unchanged: npm package delivery is the baseline, and Codex plugin marketplace registration is additive coverage for Codex CLI `0.122.0` and newer command surfaces.
-- Marketplace command transition: Codex CLI `0.121.0` accepts both `codex marketplace add` and `codex plugin marketplace add`; Codex CLI `0.122.0+` requires `codex plugin marketplace add`; current Codex CLI `0.125.0` also supports `codex plugin marketplace upgrade` and `remove`.
+- Marketplace command transition: Codex CLI `0.121.0` accepts both `codex marketplace add` and `codex plugin marketplace add`; Codex CLI `0.122.0+` requires `codex plugin marketplace add`; current local posture is Codex CLI `0.128.0` with CO-local `gpt-5.5` / `xhigh`, and that CLI still supports `codex plugin marketplace upgrade` and `remove`.
 
 ## Install / refresh downstream
 1. Install or upgrade package:
