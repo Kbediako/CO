@@ -3309,12 +3309,16 @@ function descriptionHasExactCanonicalOwnerMarker(description: string | null | un
     const headingMatch = structuralLine.match(/^[ ]{0,3}#{1,6}\s+(.+?)\s*$/u);
     if (headingMatch) {
       const headingTitle = headingMatch[1].replace(/\s+#+\s*$/u, '').trim();
-      activeSection = normalizeComparableValue(headingTitle);
+      activeSection = containerIndent === 0 ? normalizeComparableValue(headingTitle) : null;
       listContinuationIndents.length = 0;
       continue;
     }
 
-    if (activeSection === canonicalOwnerSectionTitle && markerLines.has(structuralLine.trim())) {
+    if (
+      activeSection === canonicalOwnerSectionTitle &&
+      containerIndent === 0 &&
+      markerLines.has(structuralLine.trim())
+    ) {
       return true;
     }
     recordMarkdownListContinuationIndent(listContinuationIndents, structuralLine, containerIndent);

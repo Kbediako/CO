@@ -13650,7 +13650,7 @@ describe('providerLinearWorkflowFacade', () => {
     expect(calls).toEqual(['owner-search', 'create', 'update-description', 'owner-search', 'related-relation']);
   });
 
-  it('does not reuse prefix matches, diff additions, or copied marker examples', async () => {
+  it('does not reuse prefix matches, diff additions, or copied/nested marker examples', async () => {
     const canonicalOwnerKey = 'baseline_cohort_id:co-1';
     const longerCanonicalOwnerKey = 'baseline_cohort_id:co-10';
     const longerCanonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${longerCanonicalOwnerKey}`;
@@ -13728,6 +13728,22 @@ describe('providerLinearWorkflowFacade', () => {
                 '## Canonical Owner',
                 `* Canonical owner marker: \`codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}\``,
                 '```'
+              ].join('\n'),
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            }),
+            buildCanonicalOwnerIssue({
+              id: 'lin-issue-14',
+              identifier: 'CO-14',
+              title: 'Nested owner marker example',
+              description: [
+                'Copied nested example, not an owner stamp.',
+                '## Canonical Owner',
+                '- Example:',
+                `  * Canonical owner marker: \`codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}\``
               ].join('\n'),
               state: {
                 id: 'state-backlog',
