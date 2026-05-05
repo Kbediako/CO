@@ -34,14 +34,23 @@
 - Fallback / refactor decision:
   - `remove fallback`: selected-run or last-row `workspace_path` reuse for neighboring running rows.
   - `justify retaining fallback`: source-labeled `provider_issue_rehydrated_active_run` proof and status provenance that cannot override row-local authority.
+
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `control-host status surfaces` | Selected-run or last-row `workspace_path` reused for a neighboring `.running[]` row. | remove fallback | CO-484 | A rehydrated running row lacks direct workspace authority and projection borrows selected/neighbor row data. | Observed 2026-05-02 | N/A after removal | N/A after removal | Row-local multi-run regression proves each `.running[]` row keeps its own `workspace_path`. | Focused status projection tests plus `co-status --format json` fixture. |
+| `control-host status surfaces` | `provider_issue_rehydrated_active_run` fallback rows and compatibility/proof provenance fields retain row-local audit evidence when live state is incomplete. | justify retaining fallback | CO-398 / CO-484 | Live provider state is incomplete but retained run/proof evidence exists. | CO-398 lineage, reviewed 2026-05-05 | 2026-05-26 | Non-expiring durable audit contract while source-labeled | Remove only if live authority fully replaces retained proof visibility with equivalent source-labeled row-local provenance. | JSON/API/UI projection tests preserve provenance and row-local coupling. |
+
 - Durable retention evidence:
-  - contract name: row-local status proof and source-label projection
-  - owning surface: `control-host status surfaces`
-  - steady-state proof expected from parent: live row identity, retained proof, source labels, degraded reasons, and `/ui/data.json` truth stay distinct
-- Large-refactor check:
-  - no large refactor in this packet lane
-  - parent may keep this as a focused repair if it removes cross-row workspace borrowing without adding another authority source
-  - parent should escalate only if a larger CO-398/CO-400 status-authority consolidation is required
+  - Contract name: row-local status proof and source-label projection.
+  - Owning surface: `control-host status surfaces`.
+  - Steady-state proof: retained run/proof data remains source-labeled row-local audit evidence and cannot override row `issue_id`, `task_id`, `run_id`, or `workspace_path`.
+  - Tests/docs: `orchestrator/tests/CoStatusCliShell.test.ts`, `orchestrator/tests/CompatibilityIssuePresenter.test.ts`, `orchestrator/tests/SelectedRunPresenter.test.ts`, `orchestrator/tests/SelectedRunProjection.test.ts`, this ACTION_PLAN, the PRD, TECH_SPEC, and task checklist.
+  - Non-expiring rationale: source-labeled proof retention is durable operator audit evidence, not a temporary compatibility bridge; replacement requires equivalent row-local authority and proof provenance.
+- Large-refactor check: no large refactor is required because CO-484 removes cross-row workspace borrowing within existing status projection helpers without adding another authority source.
+- Minor-seam decision: the retained proof/provenance path is a bounded durable audit seam only when source-labeled and subordinate to row-local live authority.
+- Escalation rule: parent should escalate only if a larger CO-398/CO-400 status-authority consolidation is required.
 
 ## Milestones & Sequencing
 1. Create the CO-484 PRD, canonical TECH_SPEC, TECH_SPEC mirror, ACTION_PLAN, task checklist, and `.agent` mirror.
