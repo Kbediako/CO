@@ -2557,6 +2557,43 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
+  it('downgrades runtime provenance when explicit overrides backfill runtime metadata', () => {
+    expect(
+      buildProviderLinearWorkerResolvedModelProvenance({
+        runtimeModel: 'gpt-5.5',
+        commandArgs: [
+          'exec',
+          '--model',
+          'gpt-5.5',
+          '-c',
+          'review_model="gpt-5.5-review"',
+          '-c',
+          'model_reasoning_effort="xhigh"',
+          '--json',
+          'prompt'
+        ],
+        observedAt: '2026-05-05T04:40:03.000Z'
+      })
+    ).toEqual({
+      schema_version: 1,
+      model: 'gpt-5.5',
+      review_model: 'gpt-5.5-review',
+      model_reasoning_effort: 'xhigh',
+      source: 'runtime_reported',
+      confidence: 'medium',
+      degraded_reason: 'runtime_metadata_partial_command_backfill',
+      observed_at: '2026-05-05T04:40:03.000Z',
+      runtime_model: 'gpt-5.5',
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: 'gpt-5.5',
+      config_model: null,
+      config_review_model: null,
+      config_reasoning_effort: null,
+      config_path: null
+    });
+  });
+
   it('resolves explicit --model overrides as command provenance', () => {
     expect(
       buildProviderLinearWorkerResolvedModelProvenance({
