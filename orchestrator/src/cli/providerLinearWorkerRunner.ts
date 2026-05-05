@@ -1923,10 +1923,14 @@ function extractProviderWorkerRuntimeReportedModel(
       ['params', 'model_slug'],
       ['params', 'modelSlug'],
       ['params', 'turn', 'model'],
+      ['params', 'turn', 'model_slug'],
+      ['params', 'turn', 'modelSlug'],
       ['payload', 'params', 'model'],
       ['payload', 'params', 'model_slug'],
       ['payload', 'params', 'modelSlug'],
       ['payload', 'params', 'turn', 'model'],
+      ['payload', 'params', 'turn', 'model_slug'],
+      ['payload', 'params', 'turn', 'modelSlug'],
       ['response', 'model'],
       ['payload', 'response', 'model'],
       ['params', 'response', 'model'],
@@ -7740,6 +7744,8 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     liveThreadId,
     liveTurnId
   });
+  const proofResolvedModelProvenanceForHydration =
+    liveScopeChanged && proof.latest_turn_id !== null ? null : proof.resolved_model_provenance ?? null;
   const hydratedProof: ProviderLinearWorkerProof = {
     ...proof,
     thread_id: liveThreadId,
@@ -7776,7 +7782,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
       parseState.authProvenance
     ),
     resolved_model_provenance: mergeProviderWorkerResolvedModelProvenance(
-      proof.resolved_model_provenance ?? null,
+      proofResolvedModelProvenanceForHydration,
       parseState.resolvedModelProvenance
     ),
     failure_diagnosis: parseState.failureDiagnosis ?? (liveTurnChanged ? null : proof.failure_diagnosis ?? null)
