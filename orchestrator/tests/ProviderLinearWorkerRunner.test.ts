@@ -15,6 +15,7 @@ import {
   appendProviderLinearWorkerChildStreamRecord,
   buildProviderLinearWorkerAppServerCallbackResponse,
   buildProviderLinearWorkerProgressSemanticSignature,
+  buildProviderLinearWorkerResolvedModelProvenance,
   buildProviderWorkerPrompt,
   defaultAppServerTurnRunner,
   loadProviderLinearWorkerContext,
@@ -2419,6 +2420,90 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(parsed.finalMessage).toBe('rate limits updated: 5-hour 12.5% / 300m; weekly 48% / 10080m');
   });
 
+  it('parses runtime-reported resolved model provenance from Codex JSONL', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        JSON.stringify({
+          type: 'session_meta',
+          payload: {
+            id: 'thread-1',
+            cwd: '/tmp/provider-worker',
+            model: 'gpt-5.5',
+            model_reasoning_effort: 'xhigh'
+          },
+          timestamp: '2026-05-05T04:40:00.000Z'
+        }),
+        JSON.stringify({
+          type: 'turn_context',
+          payload: {
+            turn_id: 'turn-1',
+            model: 'gpt-5.5',
+            model_reasoning_effort: 'xhigh'
+          },
+          timestamp: '2026-05-05T04:40:01.000Z'
+        }),
+        JSON.stringify({
+          type: 'event_msg',
+          payload: {
+            type: 'task_complete',
+            turn_id: 'turn-1'
+          },
+          timestamp: '2026-05-05T04:40:02.000Z'
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.resolvedModelProvenance).toEqual({
+      schema_version: 1,
+      model: 'gpt-5.5',
+      review_model: null,
+      reasoning_effort: 'xhigh',
+      source: 'runtime_reported',
+      confidence: 'runtime_reported',
+      degraded_reason: null,
+      observed_at: '2026-05-05T04:40:01.000Z',
+      runtime_model: 'gpt-5.5',
+      runtime_review_model: null,
+      runtime_reasoning_effort: 'xhigh',
+      command_model: null,
+      config_model: null,
+      config_review_model: null,
+      config_reasoning_effort: null,
+      config_path: null
+    });
+    expect(parsed.authProvenance ?? null).toBeNull();
+  });
+
+  it('resolves explicit --model overrides as command provenance', () => {
+    expect(
+      buildProviderLinearWorkerResolvedModelProvenance({
+        commandArgs: ['exec', '--model', 'gpt-5.4', '--json', 'prompt'],
+        configModel: 'gpt-5.5',
+        configReviewModel: 'gpt-5.5',
+        configReasoningEffort: 'xhigh',
+        configPath: '/tmp/codex-home/config.toml',
+        observedAt: '2026-05-05T04:40:03.000Z'
+      })
+    ).toEqual({
+      schema_version: 1,
+      model: 'gpt-5.4',
+      review_model: 'gpt-5.5',
+      reasoning_effort: 'xhigh',
+      source: 'command_override',
+      confidence: 'command_override',
+      degraded_reason: null,
+      observed_at: '2026-05-05T04:40:03.000Z',
+      runtime_model: null,
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: 'gpt-5.4',
+      config_model: 'gpt-5.5',
+      config_review_model: 'gpt-5.5',
+      config_reasoning_effort: 'xhigh',
+      config_path: '/tmp/codex-home/config.toml'
+    });
+  });
+
   it('preserves Codex 0.121 account/auth-profile provenance while redacting raw values', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [
@@ -3856,6 +3941,180 @@ for await (const line of rl) {
       vi.doUnmock('node:child_process');
       vi.resetModules();
     }
+  });
+
+  it('records inherited no-model config-default gpt-5.5/xhigh provenance in the worker proof', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent(
+      [
+        'model = "gpt-5.5"',
+        'review_model = "gpt-5.5"',
+        'model_reasoning_effort = "xhigh"',
+        ''
+      ].join('\n')
+    );
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(createTrackedIssue())
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed'
+        })
+      );
+    const execRunner = vi.fn(async (request) => {
+      expect(request.args).toEqual([
+        'exec',
+        '--json',
+        expect.stringContaining('full first-turn task prompt')
+      ]);
+      expect(request.args).not.toContain('--model');
+      expect(request.args).not.toContain('-m');
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+        turnIndex: 1
+      });
+      return {
+        exitCode: 0,
+        stdout: PROVIDER_WORKER_TASK_COMPLETE_STDOUT,
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_HOME: codexHome
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () =>
+          createRuntimeContext({
+            requested_mode: 'cli',
+            selected_mode: 'cli',
+            provider: 'CliRuntimeProvider'
+          })
+        ),
+        execRunner,
+        now: vi.fn().mockReturnValue('2026-05-05T04:41:00.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    const expectedResolvedModelProvenance = {
+      schema_version: 1,
+      model: 'gpt-5.5',
+      review_model: 'gpt-5.5',
+      reasoning_effort: 'xhigh',
+      source: 'config_default',
+      confidence: 'config_inferred',
+      degraded_reason: 'runtime_model_unreported',
+      observed_at: '2026-05-05T04:41:00.000Z',
+      runtime_model: null,
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: null,
+      config_model: 'gpt-5.5',
+      config_review_model: 'gpt-5.5',
+      config_reasoning_effort: 'xhigh',
+      config_path: join(codexHome, 'config.toml')
+    };
+    expect(proof as unknown as Record<string, unknown>).toMatchObject({
+      resolved_model_provenance: expectedResolvedModelProvenance,
+      auth_provenance: expect.objectContaining({
+        runtime_mode: 'cli',
+        runtime_provider: 'CliRuntimeProvider'
+      })
+    });
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      resolved_model_provenance: expectedResolvedModelProvenance
+    });
+    expect(JSON.stringify(written.auth_provenance ?? null)).not.toContain('gpt-5.5');
+  });
+
+  it('records degraded unknown resolved model provenance when runtime and config metadata are missing', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent('[agent]\nmax_turns = 1\n');
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(createTrackedIssue())
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed'
+        })
+      );
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+        turnIndex: 1
+      });
+      return {
+        exitCode: 0,
+        stdout: PROVIDER_WORKER_TASK_COMPLETE_STDOUT,
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_HOME: codexHome
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () =>
+          createRuntimeContext({
+            requested_mode: 'cli',
+            selected_mode: 'cli',
+            provider: 'CliRuntimeProvider'
+          })
+        ),
+        execRunner,
+        now: vi.fn().mockReturnValue('2026-05-05T04:42:00.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    const expectedResolvedModelProvenance = {
+      schema_version: 1,
+      model: null,
+      review_model: null,
+      reasoning_effort: null,
+      source: 'unknown',
+      confidence: 'unknown',
+      degraded_reason: 'runtime_model_unreported_config_default_unavailable',
+      observed_at: '2026-05-05T04:42:00.000Z',
+      runtime_model: null,
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: null,
+      config_model: null,
+      config_review_model: null,
+      config_reasoning_effort: null,
+      config_path: join(codexHome, 'config.toml')
+    };
+    expect(proof as unknown as Record<string, unknown>).toMatchObject({
+      resolved_model_provenance: expectedResolvedModelProvenance,
+      owner_status: 'succeeded',
+      end_reason: 'issue_inactive'
+    });
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      resolved_model_provenance: expectedResolvedModelProvenance
+    });
+    expect(JSON.stringify(written.auth_provenance ?? null)).not.toContain('gpt-5');
   });
 
   it('continues on the same thread across turns and writes a proof sidecar', async () => {

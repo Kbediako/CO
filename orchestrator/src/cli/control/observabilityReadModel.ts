@@ -8,7 +8,10 @@ import type {
   ProviderIntakeSummaryState
 } from './providerIntakeState.js';
 import type { QuestionUrgency } from './questions.js';
-import type { ProviderLinearWorkerProof } from '../providerLinearWorkerRunner.js';
+import type {
+  ProviderLinearWorkerProof,
+  ProviderLinearWorkerResolvedModelProvenance
+} from '../providerLinearWorkerRunner.js';
 import type {
   ControlProviderDebugSnapshot,
   ProviderIntakeClaimFreshness,
@@ -442,6 +445,7 @@ export interface ControlSelectedRunPayload {
     path: string | null;
   };
   worker_host?: string | null;
+  resolved_model_provenance?: ProviderLinearWorkerResolvedModelProvenance | null;
   question_summary: ControlQuestionSummaryPayload;
   tracked: ControlTrackedPayload;
   fallback_expiry?: ControlStatusFallbackExpiryMetadata[];
@@ -475,6 +479,7 @@ export interface ControlRunningPayload {
   status_reason: string | null;
   pid: string | null;
   worker_host?: string | null;
+  resolved_model_provenance?: ProviderLinearWorkerResolvedModelProvenance | null;
   session_id: string | null;
   turn_count: number | null;
   last_event: string | null;
@@ -500,6 +505,7 @@ export interface ControlRetryPayload {
   status_reason: string | null;
   session_id: string | null;
   worker_host?: string | null;
+  resolved_model_provenance?: ProviderLinearWorkerResolvedModelProvenance | null;
   thread_id?: string | null;
   turn_count?: number | null;
   workspace_path: string | null;
@@ -858,6 +864,12 @@ export function buildProjectionSelectedPayload(
       path: selected.workspacePath
     },
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
+    ...(selected.providerLinearWorkerProof?.resolved_model_provenance
+      ? {
+          resolved_model_provenance:
+            selected.providerLinearWorkerProof.resolved_model_provenance
+        }
+      : {}),
     question_summary: buildSelectedRunQuestionSummaryPayload(selected.questionSummary),
     tracked: buildTrackedPayloadEnvelope(selected.tracked),
     ...(selected.providerLinearWorkerProof

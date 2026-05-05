@@ -378,6 +378,37 @@ export interface ProviderLinearWorkerAuthProvenance {
   source: string | null;
 }
 
+export type ProviderLinearWorkerResolvedModelSource =
+  | 'runtime_reported'
+  | 'command_override'
+  | 'config_default'
+  | 'unknown';
+
+export type ProviderLinearWorkerResolvedModelConfidence =
+  | 'runtime_reported'
+  | 'command_override'
+  | 'config_inferred'
+  | 'unknown';
+
+export interface ProviderLinearWorkerResolvedModelProvenance {
+  schema_version: 1;
+  model: string | null;
+  review_model: string | null;
+  reasoning_effort: string | null;
+  source: ProviderLinearWorkerResolvedModelSource;
+  confidence: ProviderLinearWorkerResolvedModelConfidence;
+  degraded_reason: string | null;
+  observed_at: string | null;
+  runtime_model: string | null;
+  runtime_review_model: string | null;
+  runtime_reasoning_effort: string | null;
+  command_model: string | null;
+  config_model: string | null;
+  config_review_model: string | null;
+  config_reasoning_effort: string | null;
+  config_path: string | null;
+}
+
 export type ProviderLinearWorkerControlAuthority =
   | 'appserver'
   | 'legacy_cli_break_glass';
@@ -477,6 +508,7 @@ export interface ProviderLinearWorkerProof {
   runtime?: ProviderLinearWorkerRuntimeProof | null;
   appserver_supervision?: ProviderLinearWorkerAppServerSupervisionProof | null;
   auth_provenance?: ProviderLinearWorkerAuthProvenance | null;
+  resolved_model_provenance?: ProviderLinearWorkerResolvedModelProvenance | null;
   worker_control?: ProviderLinearWorkerControlPlane | null;
   source_root_freshness?: SourceRootFreshnessInspection | null;
   failure_diagnosis?: ProviderLinearWorkerFailureDiagnosis | null;
@@ -574,6 +606,7 @@ export interface ProviderLinearWorkerJsonlParseResult {
   tokens: ProviderLinearWorkerTokenUsage;
   rateLimits: Record<string, unknown> | null;
   authProvenance: ProviderLinearWorkerAuthProvenance | null;
+  resolvedModelProvenance: ProviderLinearWorkerResolvedModelProvenance | null;
   failureDiagnosis: ProviderLinearWorkerFailureDiagnosis | null;
 }
 
@@ -646,6 +679,7 @@ interface ProviderWorkerSessionLogHydrationState {
   bootstrap_pending: boolean;
   proof_signature: string;
   id_rewind_signature?: string | null;
+  resolved_model_provenance?: ProviderLinearWorkerResolvedModelProvenance | null;
 }
 
 interface ProviderControlHostManifestTarget {
@@ -1680,6 +1714,435 @@ function readAgentMaxTurnsFromToml(rawConfig: string, configPath: string): numbe
     }
   }
   return null;
+}
+
+interface ProviderWorkerConfigModelDefaults {
+  model: string | null;
+  review_model: string | null;
+  reasoning_effort: string | null;
+  config_path: string | null;
+}
+
+interface ProviderWorkerRuntimeReportedModel {
+  model: string;
+  review_model: string | null;
+  reasoning_effort: string | null;
+  observed_at: string | null;
+}
+
+async function readProviderWorkerConfigModelDefaults(
+  env: NodeJS.ProcessEnv,
+  readText: (path: string) => Promise<string> = async (path) => await readFile(path, 'utf8')
+): Promise<ProviderWorkerConfigModelDefaults> {
+  const configPath = join(resolveCodexHome(env), 'config.toml');
+  try {
+    const rawConfig = await readText(configPath);
+    return readProviderWorkerConfigModelDefaultsFromToml(rawConfig, configPath);
+  } catch {
+    return {
+      model: null,
+      review_model: null,
+      reasoning_effort: null,
+      config_path: configPath
+    };
+  }
+}
+
+function readProviderWorkerConfigModelDefaultsFromToml(
+  rawConfig: string,
+  configPath: string
+): ProviderWorkerConfigModelDefaults {
+  let currentTablePath: string[] = [];
+  let currentTableKind: 'table' | 'array' | null = null;
+  const scanState: TomlMultilineStringScanState = { delimiter: null };
+  const defaults: ProviderWorkerConfigModelDefaults = {
+    model: null,
+    review_model: null,
+    reasoning_effort: null,
+    config_path: configPath
+  };
+  for (const line of rawConfig.split(/\r?\n/u)) {
+    const trimmed = stripTomlComment(line, scanState).trim();
+    if (!trimmed) {
+      continue;
+    }
+    const tableHeader = parseTomlTableHeader(trimmed);
+    if (tableHeader) {
+      currentTablePath = tableHeader.path;
+      currentTableKind = tableHeader.kind;
+      continue;
+    }
+    if (currentTableKind !== null || currentTablePath.length !== 0) {
+      continue;
+    }
+    defaults.model =
+      normalizeProviderWorkerModelSlug(readTomlStringAssignment(trimmed, 'model')) ??
+      defaults.model;
+    defaults.review_model =
+      normalizeProviderWorkerModelSlug(readTomlStringAssignment(trimmed, 'review_model')) ??
+      defaults.review_model;
+    defaults.reasoning_effort =
+      normalizeProviderWorkerReasoningEffortValue(
+        readTomlStringAssignment(trimmed, 'model_reasoning_effort')
+      ) ?? defaults.reasoning_effort;
+  }
+  return defaults;
+}
+
+function readTomlStringAssignment(trimmedLine: string, key: string): string | null {
+  const separatorIndex = findTomlAssignmentSeparator(trimmedLine);
+  if (separatorIndex === -1) {
+    return null;
+  }
+  const rawKey = normalizeTomlKey(trimmedLine.slice(0, separatorIndex));
+  if (rawKey !== key) {
+    return null;
+  }
+  return parseTomlStringValue(trimmedLine.slice(separatorIndex + 1).trim());
+}
+
+function parseTomlStringValue(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith('\'') && trimmed.endsWith('\''))
+  ) {
+    return decodeTomlString(trimmed);
+  }
+  return /^[A-Za-z0-9_.:-]+$/u.test(trimmed) ? trimmed : null;
+}
+
+function normalizeProviderWorkerModelSlug(value: unknown): string | null {
+  const raw = normalizeOptionalString(value);
+  if (!raw || raw.length > 128) {
+    return null;
+  }
+  return /^[A-Za-z0-9][A-Za-z0-9_.:-]*$/u.test(raw) ? raw : null;
+}
+
+function normalizeProviderWorkerReasoningEffortValue(value: unknown): string | null {
+  const raw = normalizeOptionalString(value);
+  if (!raw || raw.length > 64) {
+    return null;
+  }
+  const normalized = raw.replace(/[-\s]+/gu, '_').toLowerCase();
+  return /^[a-z][a-z0-9_]*$/u.test(normalized) ? normalized : null;
+}
+
+function resolveProviderWorkerCommandModelOverride(args: string[]): string | null {
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === '--model') {
+      return normalizeProviderWorkerModelSlug(args[index + 1]);
+    }
+    if (arg.startsWith('--model=')) {
+      return normalizeProviderWorkerModelSlug(arg.slice('--model='.length));
+    }
+  }
+  return null;
+}
+
+function extractProviderWorkerRuntimeReportedModel(
+  input: Record<string, unknown>
+): ProviderWorkerRuntimeReportedModel | null {
+  const model = normalizeProviderWorkerModelSlug(
+    readFirstProviderWorkerStringAtPaths(input, [
+      ['model'],
+      ['model_slug'],
+      ['modelSlug'],
+      ['payload', 'model'],
+      ['payload', 'model_slug'],
+      ['payload', 'modelSlug'],
+      ['payload', 'info', 'model'],
+      ['payload', 'info', 'model_slug'],
+      ['payload', 'info', 'modelSlug'],
+      ['params', 'model'],
+      ['params', 'model_slug'],
+      ['params', 'modelSlug'],
+      ['params', 'turn', 'model'],
+      ['payload', 'params', 'model'],
+      ['payload', 'params', 'model_slug'],
+      ['payload', 'params', 'modelSlug'],
+      ['payload', 'params', 'turn', 'model'],
+      ['response', 'model'],
+      ['payload', 'response', 'model'],
+      ['params', 'response', 'model'],
+      ['session', 'model'],
+      ['payload', 'session', 'model'],
+      ['payload', 'params', 'session', 'model']
+    ])
+  );
+  if (!model) {
+    return null;
+  }
+  const reviewModel = normalizeProviderWorkerModelSlug(
+    readFirstProviderWorkerStringAtPaths(input, [
+      ['review_model'],
+      ['reviewModel'],
+      ['payload', 'review_model'],
+      ['payload', 'reviewModel'],
+      ['payload', 'info', 'review_model'],
+      ['payload', 'info', 'reviewModel'],
+      ['params', 'review_model'],
+      ['params', 'reviewModel'],
+      ['payload', 'params', 'review_model'],
+      ['payload', 'params', 'reviewModel']
+    ])
+  );
+  const reasoningEffort = normalizeProviderWorkerReasoningEffortValue(
+    readFirstProviderWorkerStringAtPaths(input, [
+      ['model_reasoning_effort'],
+      ['modelReasoningEffort'],
+      ['reasoning_effort'],
+      ['reasoningEffort'],
+      ['payload', 'model_reasoning_effort'],
+      ['payload', 'modelReasoningEffort'],
+      ['payload', 'reasoning_effort'],
+      ['payload', 'reasoningEffort'],
+      ['payload', 'info', 'model_reasoning_effort'],
+      ['payload', 'info', 'modelReasoningEffort'],
+      ['params', 'model_reasoning_effort'],
+      ['params', 'modelReasoningEffort'],
+      ['params', 'reasoning_effort'],
+      ['params', 'reasoningEffort'],
+      ['payload', 'params', 'model_reasoning_effort'],
+      ['payload', 'params', 'modelReasoningEffort'],
+      ['payload', 'params', 'reasoning_effort'],
+      ['payload', 'params', 'reasoningEffort']
+    ])
+  );
+  const payload = isRecord(input.payload) ? input.payload : null;
+  return {
+    model,
+    review_model: reviewModel,
+    reasoning_effort: reasoningEffort,
+    observed_at:
+      normalizeOptionalString(input.timestamp) ??
+      normalizeOptionalString(payload?.timestamp) ??
+      null
+  };
+}
+
+function normalizeProviderWorkerResolvedModelProvenance(
+  value: unknown
+): ProviderLinearWorkerResolvedModelProvenance | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const source = value.source;
+  const confidence = value.confidence;
+  if (
+    source !== 'runtime_reported' &&
+    source !== 'command_override' &&
+    source !== 'config_default' &&
+    source !== 'unknown'
+  ) {
+    return null;
+  }
+  if (
+    confidence !== 'runtime_reported' &&
+    confidence !== 'command_override' &&
+    confidence !== 'config_inferred' &&
+    confidence !== 'unknown'
+  ) {
+    return null;
+  }
+  return {
+    schema_version: 1,
+    model: normalizeProviderWorkerModelSlug(value.model),
+    review_model: normalizeProviderWorkerModelSlug(value.review_model),
+    reasoning_effort: normalizeProviderWorkerReasoningEffortValue(value.reasoning_effort),
+    source,
+    confidence,
+    degraded_reason: normalizeOptionalString(value.degraded_reason),
+    observed_at: normalizeOptionalString(value.observed_at),
+    runtime_model: normalizeProviderWorkerModelSlug(value.runtime_model),
+    runtime_review_model: normalizeProviderWorkerModelSlug(value.runtime_review_model),
+    runtime_reasoning_effort: normalizeProviderWorkerReasoningEffortValue(
+      value.runtime_reasoning_effort
+    ),
+    command_model: normalizeProviderWorkerModelSlug(value.command_model),
+    config_model: normalizeProviderWorkerModelSlug(value.config_model),
+    config_review_model: normalizeProviderWorkerModelSlug(value.config_review_model),
+    config_reasoning_effort: normalizeProviderWorkerReasoningEffortValue(
+      value.config_reasoning_effort
+    ),
+    config_path: normalizeOptionalString(value.config_path)
+  };
+}
+
+function buildProviderWorkerResolvedModelProvenance(input: {
+  runtimeReported?: ProviderWorkerRuntimeReportedModel | null;
+  commandArgs?: string[] | null;
+  configDefaults: ProviderWorkerConfigModelDefaults;
+  observedAt: string | null;
+}): ProviderLinearWorkerResolvedModelProvenance {
+  const commandModel = input.commandArgs
+    ? resolveProviderWorkerCommandModelOverride(input.commandArgs)
+    : null;
+  const runtimeModel = input.runtimeReported?.model ?? null;
+  const runtimeReviewModel = input.runtimeReported?.review_model ?? null;
+  const runtimeReasoningEffort = input.runtimeReported?.reasoning_effort ?? null;
+  const observedAt = input.runtimeReported?.observed_at ?? input.observedAt;
+  const common = {
+    schema_version: 1 as const,
+    review_model:
+      runtimeReviewModel ?? input.configDefaults.review_model ?? null,
+    reasoning_effort:
+      runtimeReasoningEffort ?? input.configDefaults.reasoning_effort ?? null,
+    observed_at: observedAt,
+    runtime_model: runtimeModel,
+    runtime_review_model: runtimeReviewModel,
+    runtime_reasoning_effort: runtimeReasoningEffort,
+    command_model: commandModel,
+    config_model: input.configDefaults.model,
+    config_review_model: input.configDefaults.review_model,
+    config_reasoning_effort: input.configDefaults.reasoning_effort,
+    config_path: input.configDefaults.config_path
+  };
+  if (runtimeModel) {
+    return {
+      ...common,
+      model: runtimeModel,
+      source: 'runtime_reported',
+      confidence: 'runtime_reported',
+      degraded_reason: null
+    };
+  }
+  if (commandModel) {
+    return {
+      ...common,
+      model: commandModel,
+      source: 'command_override',
+      confidence: 'command_override',
+      degraded_reason: null
+    };
+  }
+  if (input.configDefaults.model) {
+    return {
+      ...common,
+      model: input.configDefaults.model,
+      source: 'config_default',
+      confidence: 'config_inferred',
+      degraded_reason: 'runtime_model_unreported'
+    };
+  }
+  return {
+    ...common,
+    model: null,
+    source: 'unknown',
+    confidence: 'unknown',
+    degraded_reason: 'runtime_model_unreported_config_default_unavailable'
+  };
+}
+
+export function buildProviderLinearWorkerResolvedModelProvenance(input: {
+  runtimeModel?: string | null;
+  runtimeReviewModel?: string | null;
+  runtimeReasoningEffort?: string | null;
+  runtimeObservedAt?: string | null;
+  commandArgs?: string[] | null;
+  configModel?: string | null;
+  configReviewModel?: string | null;
+  configReasoningEffort?: string | null;
+  configPath?: string | null;
+  observedAt?: string | null;
+}): ProviderLinearWorkerResolvedModelProvenance {
+  const runtimeModel = normalizeProviderWorkerModelSlug(input.runtimeModel);
+  return buildProviderWorkerResolvedModelProvenance({
+    runtimeReported: runtimeModel
+      ? {
+          model: runtimeModel,
+          review_model: normalizeProviderWorkerModelSlug(input.runtimeReviewModel),
+          reasoning_effort: normalizeProviderWorkerReasoningEffortValue(
+            input.runtimeReasoningEffort
+          ),
+          observed_at:
+            normalizeOptionalString(input.runtimeObservedAt) ??
+            normalizeOptionalString(input.observedAt)
+        }
+      : null,
+    commandArgs: input.commandArgs ?? null,
+    configDefaults: {
+      model: normalizeProviderWorkerModelSlug(input.configModel),
+      review_model: normalizeProviderWorkerModelSlug(input.configReviewModel),
+      reasoning_effort: normalizeProviderWorkerReasoningEffortValue(
+        input.configReasoningEffort
+      ),
+      config_path: normalizeOptionalString(input.configPath)
+    },
+    observedAt: normalizeOptionalString(input.observedAt)
+  });
+}
+
+function rankProviderWorkerResolvedModelSource(
+  value: ProviderLinearWorkerResolvedModelProvenance | null | undefined
+): number {
+  switch (value?.source) {
+    case 'runtime_reported':
+      return 4;
+    case 'command_override':
+      return 3;
+    case 'config_default':
+      return 2;
+    case 'unknown':
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function mergeProviderWorkerResolvedModelProvenance(
+  current: ProviderLinearWorkerResolvedModelProvenance | null | undefined,
+  observed: ProviderLinearWorkerResolvedModelProvenance | null | undefined
+): ProviderLinearWorkerResolvedModelProvenance | null {
+  const normalizedCurrent = normalizeProviderWorkerResolvedModelProvenance(current);
+  const normalizedObserved = normalizeProviderWorkerResolvedModelProvenance(observed);
+  if (!normalizedCurrent) {
+    return normalizedObserved ?? null;
+  }
+  if (!normalizedObserved) {
+    return normalizedCurrent;
+  }
+  const currentRank = rankProviderWorkerResolvedModelSource(normalizedCurrent);
+  const observedRank = rankProviderWorkerResolvedModelSource(normalizedObserved);
+  const selected = observedRank >= currentRank ? normalizedObserved : normalizedCurrent;
+  const secondary = selected === normalizedObserved ? normalizedCurrent : normalizedObserved;
+  return {
+    ...selected,
+    review_model: selected.review_model ?? secondary.review_model ?? null,
+    reasoning_effort: selected.reasoning_effort ?? secondary.reasoning_effort ?? null,
+    observed_at: selected.observed_at ?? secondary.observed_at ?? null,
+    runtime_model: selected.runtime_model ?? secondary.runtime_model ?? null,
+    runtime_review_model:
+      selected.runtime_review_model ?? secondary.runtime_review_model ?? null,
+    runtime_reasoning_effort:
+      selected.runtime_reasoning_effort ?? secondary.runtime_reasoning_effort ?? null,
+    command_model: selected.command_model ?? secondary.command_model ?? null,
+    config_model: selected.config_model ?? secondary.config_model ?? null,
+    config_review_model: selected.config_review_model ?? secondary.config_review_model ?? null,
+    config_reasoning_effort:
+      selected.config_reasoning_effort ?? secondary.config_reasoning_effort ?? null,
+    config_path: selected.config_path ?? secondary.config_path ?? null
+  };
+}
+
+function formatProviderWorkerResolvedModelProvenanceSummary(
+  provenance: ProviderLinearWorkerResolvedModelProvenance
+): string {
+  const model = provenance.model ?? 'unknown';
+  const reviewModel = provenance.review_model ?? 'unknown';
+  const reasoning = provenance.reasoning_effort ?? 'unknown';
+  const degraded = provenance.degraded_reason
+    ? ` degraded_reason=${provenance.degraded_reason}`
+    : '';
+  return (
+    `model=${model} review_model=${reviewModel} reasoning_effort=${reasoning} ` +
+    `source=${provenance.source} confidence=${provenance.confidence}${degraded}`
+  );
 }
 
 function readTomlPositiveIntegerAssignment(
@@ -2850,6 +3313,7 @@ function snapshotProviderLinearWorkerPublicJsonlParseResult(
     tokens: state.tokens,
     rateLimits: state.rateLimits,
     authProvenance: state.authProvenance,
+    resolvedModelProvenance: state.resolvedModelProvenance,
     failureDiagnosis: state.failureDiagnosis
   }, state.finalMessageSource, state.finalMessageDeltaKey);
 }
@@ -2865,6 +3329,7 @@ function buildEmptyProviderLinearWorkerJsonlParseResult(): ProviderLinearWorkerJ
     tokens: buildEmptyProviderLinearWorkerTokenUsage(),
     rateLimits: null,
     authProvenance: null,
+    resolvedModelProvenance: null,
     failureDiagnosis: null
   });
 }
@@ -2874,6 +3339,13 @@ function initializeProviderLinearWorkerJsonlInternalState(
   finalMessageSource: ProviderLinearWorkerJsonlParseResult['finalMessageSource'] = null,
   finalMessageDeltaKey: string | null = null
 ): ProviderLinearWorkerJsonlParseResult {
+  const resolvedModelProvenance = state.resolvedModelProvenance ?? null;
+  Object.defineProperty(state, 'resolvedModelProvenance', {
+    value: resolvedModelProvenance,
+    writable: true,
+    enumerable: resolvedModelProvenance !== null,
+    configurable: true
+  });
   Object.defineProperty(state, 'finalMessageSource', {
     value: finalMessageSource,
     writable: true,
@@ -2991,6 +3463,28 @@ function applyProviderLinearWorkerJsonlRecord(
     if (nextTurnId && nextTurnId !== state.turnId) {
       resetProviderLinearWorkerTurnScopedTelemetry(state);
       state.turnId = nextTurnId;
+      changed = true;
+    }
+  }
+  const runtimeReportedModel = extractProviderWorkerRuntimeReportedModel(parsed);
+  if (runtimeReportedModel) {
+    const observedModelProvenance = buildProviderWorkerResolvedModelProvenance({
+      runtimeReported: runtimeReportedModel,
+      commandArgs: null,
+      configDefaults: {
+        model: null,
+        review_model: null,
+        reasoning_effort: null,
+        config_path: null
+      },
+      observedAt: runtimeReportedModel.observed_at
+    });
+    const mergedModelProvenance = mergeProviderWorkerResolvedModelProvenance(
+      state.resolvedModelProvenance,
+      observedModelProvenance
+    );
+    if (JSON.stringify(mergedModelProvenance) !== JSON.stringify(state.resolvedModelProvenance)) {
+      state.resolvedModelProvenance = mergedModelProvenance;
       changed = true;
     }
   }
@@ -5682,7 +6176,10 @@ function normalizeProviderWorkerSessionLogHydrationState(
   if (!path || offsetBytes === null) {
     return null;
   }
-  return {
+  const resolvedModelProvenance = normalizeProviderWorkerResolvedModelProvenance(
+    value.resolved_model_provenance
+  );
+  const normalized: ProviderWorkerSessionLogHydrationState = {
     path,
     offset_bytes: offsetBytes,
     trailing_text: typeof value.trailing_text === 'string' ? value.trailing_text : '',
@@ -5690,6 +6187,10 @@ function normalizeProviderWorkerSessionLogHydrationState(
     proof_signature: typeof value.proof_signature === 'string' ? value.proof_signature : '',
     id_rewind_signature: typeof value.id_rewind_signature === 'string' ? value.id_rewind_signature : null
   };
+  if (resolvedModelProvenance) {
+    normalized.resolved_model_provenance = resolvedModelProvenance;
+  }
+  return normalized;
 }
 
 function buildProviderWorkerSessionLogTailState(
@@ -6206,6 +6707,7 @@ function normalizeProviderLinearWorkerProofForUpdatedAtComparison(
         }
       : proof.appserver_supervision ?? null,
     auth_provenance: proof.auth_provenance ?? null,
+    resolved_model_provenance: proof.resolved_model_provenance ?? null,
     failure_diagnosis: proof.failure_diagnosis ?? null,
     worker_host: proof.worker_host ?? null,
     source_root_freshness: normalizeProviderLinearWorkerSourceRootFreshnessForProofComparison(
@@ -6274,6 +6776,7 @@ function selectProviderLinearWorkerProofTelemetryFields(
     tokens: proof.tokens,
     rate_limits: proof.rate_limits ?? null,
     auth_provenance: proof.auth_provenance ?? null,
+    resolved_model_provenance: proof.resolved_model_provenance ?? null,
     worker_control: proof.worker_control ?? null,
     source_root_freshness: normalizeProviderLinearWorkerSourceRootFreshnessForProofComparison(
       proof.source_root_freshness
@@ -6911,6 +7414,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
       tokens: proof.tokens ?? buildEmptyProviderLinearWorkerTokenUsage(),
       rateLimits: proof.rate_limits,
       authProvenance: proof.auth_provenance ?? null,
+      resolvedModelProvenance: proof.resolved_model_provenance ?? null,
       failureDiagnosis: proof.failure_diagnosis ?? null
     },
     selectProviderLinearWorkerProofFinalMessageSource(proof),
@@ -6928,6 +7432,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     parseState.agentMessageDeltaHydrationSeed = null;
     parseState.lastEventAt = proof.last_event_at;
     parseState.currentTurnActivity = proofCurrentTurnActivity;
+    parseState.resolvedModelProvenance = proof.resolved_model_provenance ?? null;
     parseState.failureDiagnosis = proof.failure_diagnosis ?? null;
   };
   let tailState = buildProviderWorkerSessionLogTailState(
@@ -7095,6 +7600,10 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
       proof.auth_provenance ?? null,
       parseState.authProvenance
     ),
+    resolved_model_provenance: mergeProviderWorkerResolvedModelProvenance(
+      proof.resolved_model_provenance ?? null,
+      parseState.resolvedModelProvenance
+    ),
     failure_diagnosis: parseState.failureDiagnosis ?? (liveTurnChanged ? null : proof.failure_diagnosis ?? null)
   };
   return {
@@ -7104,7 +7613,10 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
         ? null
         : {
             ...persistedTailState,
-            proof_signature: buildProviderWorkerSessionLogHydrationProofSignature(hydratedProof)
+            proof_signature: buildProviderWorkerSessionLogHydrationProofSignature(hydratedProof),
+            ...(hydratedProof.resolved_model_provenance
+              ? { resolved_model_provenance: hydratedProof.resolved_model_provenance }
+              : {})
           }
   };
 }
@@ -10320,7 +10832,10 @@ export async function refreshProviderLinearWorkerProofSnapshot(
         ? null
         : {
             ...proofWithSessionTelemetryResult.hydrationState,
-            proof_signature: buildProviderWorkerSessionLogHydrationProofSignature(hydrated)
+            proof_signature: buildProviderWorkerSessionLogHydrationProofSignature(hydrated),
+            ...(hydrated.resolved_model_provenance
+              ? { resolved_model_provenance: hydrated.resolved_model_provenance }
+              : {})
           };
     await writeProof(proofPath, hydrated);
     await writeProviderWorkerSessionLogHydrationState(runDir, hydrationState);
@@ -10422,6 +10937,17 @@ export async function runProviderLinearWorker(
   ensureProviderLinearWorkerAuthoritativeReviewNotes(childEnv, context);
 
   const attemptStartedAt = deps.now();
+  const configModelDefaults = await readProviderWorkerConfigModelDefaults(childEnv);
+  const initialResolvedModelProvenance = buildProviderWorkerResolvedModelProvenance({
+    commandArgs: null,
+    configDefaults: configModelDefaults,
+    observedAt: attemptStartedAt
+  });
+  deps.log.info(
+    `[provider-linear-worker-model] ${formatProviderWorkerResolvedModelProvenanceSummary(
+      initialResolvedModelProvenance
+    )}`
+  );
   const workerControl = buildProviderWorkerControlPlane({
     runtime: runtimeContext.runtime,
     observedAt: attemptStartedAt
@@ -10463,6 +10989,7 @@ export async function runProviderLinearWorker(
       sourceSetup: context.sourceSetup,
       observedAt: attemptStartedAt
     }),
+    resolved_model_provenance: initialResolvedModelProvenance,
     worker_control: workerControl,
     source_root_freshness: sourceRootFreshness,
     failure_diagnosis: null,
@@ -10786,6 +11313,10 @@ export async function runProviderLinearWorker(
             finalProof.auth_provenance ?? null,
             liveParseState.authProvenance
           ),
+          resolved_model_provenance: mergeProviderWorkerResolvedModelProvenance(
+            finalProof.resolved_model_provenance ?? null,
+            liveParseState.resolvedModelProvenance
+          ),
           failure_diagnosis:
             liveParseState.failureDiagnosis ?? (liveTurnChanged ? null : finalProof.failure_diagnosis ?? null),
           owner_phase: 'turn_running',
@@ -10812,6 +11343,7 @@ export async function runProviderLinearWorker(
           tokens: nextProof.tokens,
           rate_limits: nextProof.rate_limits,
           auth_provenance: nextProof.auth_provenance ?? null,
+          resolved_model_provenance: nextProof.resolved_model_provenance ?? null,
           failure_diagnosis: nextProof.failure_diagnosis ?? null,
           owner_phase: nextProof.owner_phase
         });
@@ -10916,13 +11448,29 @@ export async function runProviderLinearWorker(
       };
       const previousTurnProof = finalProof;
       const turnStartedAt = deps.now();
+      const turnResolvedModelProvenance = buildProviderWorkerResolvedModelProvenance({
+        commandArgs: args,
+        configDefaults: configModelDefaults,
+        observedAt: turnStartedAt
+      });
+      deps.log.info(
+        `[provider-linear-worker-model] turn=${turnNumber} ${formatProviderWorkerResolvedModelProvenanceSummary(
+          turnResolvedModelProvenance
+        )}`
+      );
       finalProof = await writeFreshProofSnapshot(
-        buildProviderLinearWorkerTurnBootstrapProof(
-          finalProof,
-          turnNumber,
-          turnStartedAt,
-          resumeSourceThreadIdForTurn
-        )
+        {
+          ...buildProviderLinearWorkerTurnBootstrapProof(
+            finalProof,
+            turnNumber,
+            turnStartedAt,
+            resumeSourceThreadIdForTurn
+          ),
+          resolved_model_provenance: mergeProviderWorkerResolvedModelProvenance(
+            finalProof.resolved_model_provenance ?? null,
+            turnResolvedModelProvenance
+          )
+        }
       );
       const parallelizationDecisionCountBeforeTurn = readProviderLinearParallelizationSnapshots(
         finalProof.linear_audit,
@@ -11261,6 +11809,10 @@ export async function runProviderLinearWorker(
         auth_provenance: mergeProviderWorkerAuthProvenance(
           finalProof.auth_provenance ?? null,
           parsed.authProvenance
+        ),
+        resolved_model_provenance: mergeProviderWorkerResolvedModelProvenance(
+          finalProof.resolved_model_provenance ?? null,
+          parsed.resolvedModelProvenance
         ),
         worker_control: finalProof.worker_control ?? workerControl,
         source_root_freshness: finalProof.source_root_freshness ?? sourceRootFreshness,
