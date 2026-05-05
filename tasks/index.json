@@ -1,6 +1,77 @@
 {
   "items": [
     {
+      "id": "20260505-linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe",
+      "title": "CO-462 run-review override-prefixed mock cleanup",
+      "relates_to": "tasks/tasks-linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-05",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
+        "docs/TECH_SPEC-linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
+        "docs/ACTION_PLAN-linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
+        "tasks/specs/linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
+        "tasks/tasks-linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
+        ".agent/task/linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe/cli/2026-05-05T04-30-40-349Z-d04f2132/memory/source-0/source.txt",
+        ".runs/linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe-co462-docs-review-r2/cli/2026-05-05T04-43-41-570Z-996ddd5c/manifest.json",
+        "tests/run-review.spec.ts",
+        ".runs/linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe/cli/2026-05-05T04-30-40-349Z-d04f2132/review/telemetry.json",
+        ".runs/pack-smoke/cli/2026-01-01T00-00-00-000Z-packsmoke/review/telemetry.json"
+      ],
+      "approvals": {
+        "docs_packet": {
+          "reviewer": "provider worker",
+          "date": "2026-05-05",
+          "status": "produced",
+          "source_anchor": "ctx:sha256:e3b40af6e404697c60cd43d7e91ea7a900dbdb13c2c2d451918c05e4ca044a3f#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-462 as a bounded CO-205 follow-up variant for override-prefixed run-review mock cleanup."
+        },
+        "docs_review_preimplementation": {
+          "reviewer": "codex-orchestrator docs-review child stream",
+          "date": "2026-05-05",
+          "status": "clean-success",
+          "manifest": ".runs/linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe-co462-docs-review-r2/cli/2026-05-05T04-43-41-570Z-996ddd5c/manifest.json",
+          "summary": "Initial docs-review P2 on over-broad approval-flag wording was fixed; rerun completed with telemetry status=succeeded and review_outcome=clean-success."
+        },
+        "implementation_validation": {
+          "reviewer": "provider worker",
+          "date": "2026-05-05",
+          "status": "local-validation-green-before-pr",
+          "summary": "Implemented exact fake-binary token matching for direct and config-override-prefixed run-review mock commands, added focused override-prefixed hang cleanup coverage, and passed delegation guard, spec guard, build, lint, default tests, docs checks, repo stewardship, diff budget, and pack smoke."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-05",
+          "status": "bounded-success",
+          "manifest": ".runs/linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe/cli/2026-05-05T04-30-40-349Z-d04f2132/manifest.json",
+          "telemetry": ".runs/linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe/cli/2026-05-05T04-30-40-349Z-d04f2132/review/telemetry.json",
+          "summary": "Manifest-backed uncommitted review executed under FORCE_CODEX_REVIEW=1, retried after command-intent boundary, and completed with status=succeeded, review_outcome=bounded-success, and no actionable issues."
+        },
+        "elegance_review": {
+          "reviewer": "provider worker",
+          "date": "2026-05-05",
+          "status": "no-change",
+          "summary": "Explicit minimality pass kept the local token-aware matcher and detached-process regression unchanged; no narrower implementation preserved the exact fake-binary cleanup boundary with less risk."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
+        "task": "tasks/tasks-linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
+        "agent_task": ".agent/task/linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
+        "prd": "docs/PRD-linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
+        "docs": "docs/TECH_SPEC-linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
+        "action_plan": "docs/ACTION_PLAN-linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md"
+      }
+    },
+    {
       "id": "20260501-linear-7b8e48c8-3971-42ab-b779-949d810d4e6c",
       "title": "CO-457 provider-worker resolved model provenance",
       "relates_to": "tasks/tasks-linear-7b8e48c8-3971-42ab-b779-949d810d4e6c.md",
