@@ -842,6 +842,11 @@ describe('createProviderIssueHandoffService', () => {
       action: 'recover'
     });
 
+    expect(resolveTrackedIssue).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-494'
+    });
     expect(result).toMatchObject({
       kind: 'skipped',
       reason: 'dispatch_source_provider_rate_limited',
