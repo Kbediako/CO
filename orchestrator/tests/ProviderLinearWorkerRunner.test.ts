@@ -2474,6 +2474,36 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(parsed.authProvenance ?? null).toBeNull();
   });
 
+  it('marks config backfilled runtime metadata as degraded provenance', () => {
+    expect(
+      buildProviderLinearWorkerResolvedModelProvenance({
+        runtimeModel: 'gpt-5.5',
+        configModel: 'gpt-5.5',
+        configReviewModel: 'gpt-5.5',
+        configReasoningEffort: 'xhigh',
+        configPath: '/tmp/codex-home/config.toml',
+        observedAt: '2026-05-05T04:40:03.000Z'
+      })
+    ).toEqual({
+      schema_version: 1,
+      model: 'gpt-5.5',
+      review_model: 'gpt-5.5',
+      model_reasoning_effort: 'xhigh',
+      source: 'runtime_reported',
+      confidence: 'medium',
+      degraded_reason: 'runtime_metadata_partial_config_backfill',
+      observed_at: '2026-05-05T04:40:03.000Z',
+      runtime_model: 'gpt-5.5',
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: null,
+      config_model: 'gpt-5.5',
+      config_review_model: 'gpt-5.5',
+      config_reasoning_effort: 'xhigh',
+      config_path: '/tmp/codex-home/config.toml'
+    });
+  });
+
   it('resolves explicit --model overrides as command provenance', () => {
     expect(
       buildProviderLinearWorkerResolvedModelProvenance({

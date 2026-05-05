@@ -163,6 +163,8 @@ const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_RETRY: LockRetryOptions = {
   // lossy concurrent ledger rewrites.
   maxDelayMs: 250
 };
+const PROVIDER_WORKER_RUNTIME_METADATA_PARTIAL_CONFIG_BACKFILL =
+  'runtime_metadata_partial_config_backfill';
 const PROVIDER_LINEAR_WORKER_PROOF_LOCK_RETRY: LockRetryOptions = {
   maxAttempts: 50,
   initialDelayMs: 10,
@@ -2004,12 +2006,17 @@ function buildProviderWorkerResolvedModelProvenance(input: {
     config_path: input.configDefaults.config_path
   };
   if (runtimeModel) {
+    const usesConfigMetadataBackfill =
+      (!runtimeReviewModel && Boolean(input.configDefaults.review_model)) ||
+      (!runtimeReasoningEffort && Boolean(input.configDefaults.reasoning_effort));
     return {
       ...common,
       model: runtimeModel,
       source: 'runtime_reported',
-      confidence: 'high',
-      degraded_reason: null
+      confidence: usesConfigMetadataBackfill ? 'medium' : 'high',
+      degraded_reason: usesConfigMetadataBackfill
+        ? PROVIDER_WORKER_RUNTIME_METADATA_PARTIAL_CONFIG_BACKFILL
+        : null
     };
   }
   if (commandModel) {
@@ -2111,11 +2118,23 @@ function mergeProviderWorkerResolvedModelProvenance(
   const observedRank = rankProviderWorkerResolvedModelSource(normalizedObserved);
   const selected = observedRank >= currentRank ? normalizedObserved : normalizedCurrent;
   const secondary = selected === normalizedObserved ? normalizedCurrent : normalizedObserved;
+  const reviewModel = selected.review_model ?? secondary.review_model ?? null;
+  const reasoningEffort =
+    selected.model_reasoning_effort ?? secondary.model_reasoning_effort ?? null;
+  const usesConfigMetadataBackfill =
+    selected.source === 'runtime_reported' &&
+    secondary.source === 'config_default' &&
+    ((selected.review_model === null && secondary.review_model !== null) ||
+      (selected.model_reasoning_effort === null &&
+        secondary.model_reasoning_effort !== null));
   return {
     ...selected,
-    review_model: selected.review_model ?? secondary.review_model ?? null,
-    model_reasoning_effort:
-      selected.model_reasoning_effort ?? secondary.model_reasoning_effort ?? null,
+    review_model: reviewModel,
+    model_reasoning_effort: reasoningEffort,
+    confidence: usesConfigMetadataBackfill ? 'medium' : selected.confidence,
+    degraded_reason: usesConfigMetadataBackfill
+      ? (selected.degraded_reason ?? PROVIDER_WORKER_RUNTIME_METADATA_PARTIAL_CONFIG_BACKFILL)
+      : selected.degraded_reason,
     observed_at: selected.observed_at ?? secondary.observed_at ?? null,
     runtime_model: selected.runtime_model ?? secondary.runtime_model ?? null,
     runtime_review_model:
