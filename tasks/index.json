@@ -1,6 +1,58 @@
 {
   "items": [
     {
+      "id": "20260505-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36",
+      "title": "CO-475 skills-release current-facing wording alignment",
+      "relates_to": "tasks/tasks-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-05",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "docs/TECH_SPEC-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "docs/ACTION_PLAN-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "tasks/specs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "tasks/tasks-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        ".agent/task/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36-packet-docs-r2/cli/2026-05-05T02-46-27-119Z-bea486de/manifest.json",
+        ".runs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36-docs-review-r2/cli/2026-05-05T02-59-11-866Z-ed99b582/manifest.json",
+        ".runs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36/cli/2026-05-05T02-42-10-734Z-93935e5f/review/telemetry.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane packet-docs-r2",
+          "date": "2026-05-05",
+          "status": "produced",
+          "manifest": ".runs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36-packet-docs-r2/cli/2026-05-05T02-46-27-119Z-bea486de/manifest.json",
+          "source_anchor": "ctx:sha256:5bf16edeb45d0a7711ece47e861a50043070bf47ef1945903a250342502ebd9c#chunk:c000001",
+          "canonical_owner_key": "codex-cli-0128-skills-release-current-wording",
+          "summary": "Recreated the CO-475 docs-first packet and registry mirrors only after Rework reset. The packet preserves parent ownership of docs/skills-release.md, current Codex CLI 0.128.0, gpt-5.5/xhigh, CO-466, release-intake done, the 0.125.0 release-facing hold, and the 0.124.0 cloud-canary hold. It rejects child-lane edits to docs/skills-release.md, reopening the full 0.128 release-intake lane, workflow pin changes, package/downstream smoke pin changes, cloud-canary hold or pin changes, model-default changes, broad README/book cleanup, historical 0.124/0.125 evidence weakening, and lifecycle mutations."
+        },
+        "parent_validation_review": {
+          "reviewer": "provider worker",
+          "date": "2026-05-05",
+          "status": "validation-green-before-pr",
+          "docs_review_manifest": ".runs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36-docs-review-r2/cli/2026-05-05T02-59-11-866Z-ed99b582/manifest.json",
+          "standalone_review_telemetry": ".runs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36/cli/2026-05-05T02-42-10-734Z-93935e5f/review/telemetry.json",
+          "summary": "Parent updated docs/skills-release.md line 9 from stale current-facing 0.125.0 wording to current local Codex CLI 0.128.0 with CO-local gpt-5.5/xhigh while preserving release-facing 0.125.0 and cloud-canary hold language. Validation is green through delegation guard, spec guard, build, lint, full npm run test, docs:check, docs:freshness, repo:stewardship, diff-budget, pack:smoke, manifest-backed standalone review bounded-success, and an explicit no-change elegance pass."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "task": "tasks/tasks-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "agent_task": ".agent/task/linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "prd": "docs/PRD-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "docs": "docs/TECH_SPEC-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md",
+        "action_plan": "docs/ACTION_PLAN-linear-9801241f-83b0-4f73-93f4-43eb62e3fe36.md"
+      }
+    },
+    {
       "id": "20260505-linear-217c6584-bb47-486a-9765-f24e8ed84fc0",
       "title": "CO-481 removed feature defaults after Codex CLI 0.128",
       "relates_to": "tasks/tasks-linear-217c6584-bb47-486a-9765-f24e8ed84fc0.md",
