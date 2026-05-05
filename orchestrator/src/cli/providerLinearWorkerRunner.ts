@@ -1726,6 +1726,17 @@ interface ProviderWorkerConfigModelDefaults {
   review_model: string | null;
   reasoning_effort: string | null;
   config_path: string | null;
+  root_model?: string | null;
+  root_review_model?: string | null;
+  root_reasoning_effort?: string | null;
+  active_profile?: string | null;
+  profiles?: Record<string, ProviderWorkerConfigModelProfileDefaults>;
+}
+
+interface ProviderWorkerConfigModelProfileDefaults {
+  model: string | null;
+  review_model: string | null;
+  reasoning_effort: string | null;
 }
 
 interface ProviderWorkerRuntimeReportedModel {
@@ -1739,6 +1750,7 @@ interface ProviderWorkerCommandModelOverrides {
   model: string | null;
   review_model: string | null;
   reasoning_effort: string | null;
+  profile: string | null;
 }
 
 async function readProviderWorkerConfigModelDefaults(
@@ -1748,7 +1760,11 @@ async function readProviderWorkerConfigModelDefaults(
   const configPath = join(resolveCodexHome(env), 'config.toml');
   try {
     const rawConfig = await readText(configPath);
-    return readProviderWorkerConfigModelDefaultsFromToml(rawConfig, configPath);
+    const defaults = readProviderWorkerConfigModelDefaultsFromToml(rawConfig, configPath);
+    return selectProviderWorkerConfigModelDefaultsForProfile(
+      defaults,
+      readProviderWorkerConfigProfileFromEnv(env)
+    );
   } catch {
     return {
       model: null,
@@ -1770,7 +1786,12 @@ function readProviderWorkerConfigModelDefaultsFromToml(
     model: null,
     review_model: null,
     reasoning_effort: null,
-    config_path: configPath
+    config_path: configPath,
+    root_model: null,
+    root_review_model: null,
+    root_reasoning_effort: null,
+    active_profile: null,
+    profiles: {}
   };
   for (const line of rawConfig.split(/\r?\n/u)) {
     const trimmed = stripTomlComment(line, scanState).trim();
@@ -1783,21 +1804,130 @@ function readProviderWorkerConfigModelDefaultsFromToml(
       currentTableKind = tableHeader.kind;
       continue;
     }
+    const profileName = readProviderWorkerConfigProfileTableName(
+      currentTableKind,
+      currentTablePath
+    );
+    if (profileName) {
+      const profiles = defaults.profiles ?? {};
+      const profileDefaults =
+        profiles[profileName] ?? createEmptyProviderWorkerConfigModelProfileDefaults();
+      if (isProviderWorkerConfigProfileRootTable(currentTableKind, currentTablePath)) {
+        mergeProviderWorkerConfigModelAssignment(profileDefaults, trimmed);
+      }
+      profiles[profileName] = profileDefaults;
+      defaults.profiles = profiles;
+      continue;
+    }
     if (currentTableKind !== null || currentTablePath.length !== 0) {
       continue;
     }
-    defaults.model =
-      normalizeProviderWorkerModelSlug(readTomlStringAssignment(trimmed, 'model')) ??
-      defaults.model;
-    defaults.review_model =
-      normalizeProviderWorkerModelSlug(readTomlStringAssignment(trimmed, 'review_model')) ??
-      defaults.review_model;
-    defaults.reasoning_effort =
-      normalizeProviderWorkerReasoningEffortValue(
-        readTomlStringAssignment(trimmed, 'model_reasoning_effort')
-      ) ?? defaults.reasoning_effort;
+    mergeProviderWorkerConfigModelAssignment(defaults, trimmed);
   }
+  defaults.root_model = defaults.model;
+  defaults.root_review_model = defaults.review_model;
+  defaults.root_reasoning_effort = defaults.reasoning_effort;
   return defaults;
+}
+
+function createEmptyProviderWorkerConfigModelProfileDefaults(): ProviderWorkerConfigModelProfileDefaults {
+  return {
+    model: null,
+    review_model: null,
+    reasoning_effort: null
+  };
+}
+
+function mergeProviderWorkerConfigModelAssignment(
+  current: ProviderWorkerConfigModelProfileDefaults,
+  trimmedLine: string
+): void {
+  current.model =
+    normalizeProviderWorkerModelSlug(readTomlStringAssignment(trimmedLine, 'model')) ??
+    current.model;
+  current.review_model =
+    normalizeProviderWorkerModelSlug(readTomlStringAssignment(trimmedLine, 'review_model')) ??
+    current.review_model;
+  current.reasoning_effort =
+    normalizeProviderWorkerReasoningEffortValue(
+      readTomlStringAssignment(trimmedLine, 'model_reasoning_effort')
+    ) ?? current.reasoning_effort;
+}
+
+function readProviderWorkerConfigProfileTableName(
+  kind: 'table' | 'array' | null,
+  path: string[]
+): string | null {
+  if (kind !== 'table' || path.length < 2) {
+    return null;
+  }
+  if (path[0] !== 'profile' && path[0] !== 'profiles') {
+    return null;
+  }
+  return normalizeProviderWorkerConfigProfileName(path[1]);
+}
+
+function isProviderWorkerConfigProfileRootTable(
+  kind: 'table' | 'array' | null,
+  path: string[]
+): boolean {
+  return kind === 'table' && path.length === 2 && (path[0] === 'profile' || path[0] === 'profiles');
+}
+
+function readProviderWorkerConfigProfileFromEnv(env: NodeJS.ProcessEnv): string | null {
+  return (
+    normalizeProviderWorkerConfigProfileName(env.CODEX_PROFILE) ??
+    normalizeProviderWorkerConfigProfileName(env.CODEX_CONFIG_PROFILE) ??
+    null
+  );
+}
+
+function normalizeProviderWorkerConfigProfileName(value: unknown): string | null {
+  const raw = normalizeOptionalString(value);
+  if (!raw || raw.length > 128) {
+    return null;
+  }
+  return /^[A-Za-z0-9][A-Za-z0-9_.:-]*$/u.test(raw) ? raw : null;
+}
+
+function selectProviderWorkerConfigModelDefaultsForProfile(
+  defaults: ProviderWorkerConfigModelDefaults,
+  rawProfile: string | null
+): ProviderWorkerConfigModelDefaults {
+  const activeProfile = normalizeProviderWorkerConfigProfileName(rawProfile);
+  if (!activeProfile) {
+    return defaults;
+  }
+  const rootDefaults = {
+    model: defaults.root_model ?? defaults.model,
+    review_model: defaults.root_review_model ?? defaults.review_model,
+    reasoning_effort: defaults.root_reasoning_effort ?? defaults.reasoning_effort
+  };
+  const profileDefaults = defaults.profiles?.[activeProfile];
+  if (!profileDefaults) {
+    return {
+      model: null,
+      review_model: null,
+      reasoning_effort: null,
+      config_path: defaults.config_path,
+      root_model: rootDefaults.model,
+      root_review_model: rootDefaults.review_model,
+      root_reasoning_effort: rootDefaults.reasoning_effort,
+      active_profile: activeProfile,
+      profiles: defaults.profiles
+    };
+  }
+  return {
+    model: profileDefaults.model ?? rootDefaults.model,
+    review_model: profileDefaults.review_model ?? rootDefaults.review_model,
+    reasoning_effort: profileDefaults.reasoning_effort ?? rootDefaults.reasoning_effort,
+    config_path: defaults.config_path,
+    root_model: rootDefaults.model,
+    root_review_model: rootDefaults.review_model,
+    root_reasoning_effort: rootDefaults.reasoning_effort,
+    active_profile: activeProfile,
+    profiles: defaults.profiles
+  };
 }
 
 function readTomlStringAssignment(trimmedLine: string, key: string): string | null {
@@ -1847,7 +1977,8 @@ function buildEmptyProviderWorkerCommandModelOverrides(): ProviderWorkerCommandM
   return {
     model: null,
     review_model: null,
-    reasoning_effort: null
+    reasoning_effort: null,
+    profile: null
   };
 }
 
@@ -1860,6 +1991,7 @@ function mergeProviderWorkerCommandConfigOverride(
   }
   const trimmed = rawOverride.trim();
   return {
+    ...current,
     model:
       normalizeProviderWorkerModelSlug(readTomlStringAssignment(trimmed, 'model')) ??
       current.model,
@@ -1888,6 +2020,22 @@ function resolveProviderWorkerCommandModelOverrides(args: string[]): ProviderWor
       overrides = {
         ...overrides,
         model: normalizeProviderWorkerModelSlug(arg.slice('--model='.length)) ?? overrides.model
+      };
+      continue;
+    }
+    if (arg === '--profile' || arg === '-p') {
+      overrides = {
+        ...overrides,
+        profile: normalizeProviderWorkerConfigProfileName(args[index + 1]) ?? overrides.profile
+      };
+      continue;
+    }
+    if (arg.startsWith('--profile=')) {
+      overrides = {
+        ...overrides,
+        profile:
+          normalizeProviderWorkerConfigProfileName(arg.slice('--profile='.length)) ??
+          overrides.profile
       };
       continue;
     }
@@ -2159,6 +2307,10 @@ function buildProviderWorkerResolvedModelProvenance(input: {
   const commandOverrides = input.commandArgs
     ? resolveProviderWorkerCommandModelOverrides(input.commandArgs)
     : buildEmptyProviderWorkerCommandModelOverrides();
+  const configDefaults = selectProviderWorkerConfigModelDefaultsForProfile(
+    input.configDefaults,
+    commandOverrides.profile
+  );
   const commandModel = commandOverrides.model;
   const hasCommandMetadataOverride = Boolean(
     commandOverrides.review_model || commandOverrides.reasoning_effort
@@ -2170,18 +2322,18 @@ function buildProviderWorkerResolvedModelProvenance(input: {
   const common = {
     schema_version: 1 as const,
     review_model:
-      runtimeReviewModel ?? commandOverrides.review_model ?? input.configDefaults.review_model ?? null,
+      runtimeReviewModel ?? commandOverrides.review_model ?? configDefaults.review_model ?? null,
     model_reasoning_effort:
-      runtimeReasoningEffort ?? commandOverrides.reasoning_effort ?? input.configDefaults.reasoning_effort ?? null,
+      runtimeReasoningEffort ?? commandOverrides.reasoning_effort ?? configDefaults.reasoning_effort ?? null,
     observed_at: observedAt,
     runtime_model: runtimeModel,
     runtime_review_model: runtimeReviewModel,
     runtime_reasoning_effort: runtimeReasoningEffort,
     command_model: commandModel,
-    config_model: input.configDefaults.model,
-    config_review_model: input.configDefaults.review_model,
-    config_reasoning_effort: input.configDefaults.reasoning_effort,
-    config_path: input.configDefaults.config_path
+    config_model: configDefaults.model,
+    config_review_model: configDefaults.review_model,
+    config_reasoning_effort: configDefaults.reasoning_effort,
+    config_path: configDefaults.config_path
   };
   if (runtimeModel) {
     const usesCommandMetadataBackfill =
@@ -2190,10 +2342,10 @@ function buildProviderWorkerResolvedModelProvenance(input: {
     const usesConfigMetadataBackfill =
       (!runtimeReviewModel &&
         !commandOverrides.review_model &&
-        Boolean(input.configDefaults.review_model)) ||
+        Boolean(configDefaults.review_model)) ||
       (!runtimeReasoningEffort &&
         !commandOverrides.reasoning_effort &&
-        Boolean(input.configDefaults.reasoning_effort));
+        Boolean(configDefaults.reasoning_effort));
     const missingRequiredRuntimeMetadata = runtimeReasoningEffort === null;
     const partialRuntimeMetadata =
       usesCommandMetadataBackfill ||
@@ -2216,19 +2368,19 @@ function buildProviderWorkerResolvedModelProvenance(input: {
   if (commandModel || hasCommandMetadataOverride) {
     return {
       ...common,
-      model: commandModel ?? input.configDefaults.model,
+      model: commandModel ?? configDefaults.model,
       source: 'command_override',
-      confidence: commandModel || input.configDefaults.model ? 'medium' : 'degraded',
+      confidence: commandModel || configDefaults.model ? 'medium' : 'degraded',
       degraded_reason:
-        commandModel || input.configDefaults.model
+        commandModel || configDefaults.model
           ? 'runtime_model_unreported_command_override'
           : 'runtime_model_unreported_command_override_config_default_unavailable'
     };
   }
-  if (input.configDefaults.model) {
+  if (configDefaults.model) {
     return {
       ...common,
-      model: input.configDefaults.model,
+      model: configDefaults.model,
       source: 'config_default',
       confidence: 'medium',
       degraded_reason: 'runtime_model_unreported'
@@ -2252,6 +2404,17 @@ export function buildProviderLinearWorkerResolvedModelProvenance(input: {
   configModel?: string | null;
   configReviewModel?: string | null;
   configReasoningEffort?: string | null;
+  configProfiles?: Record<
+    string,
+    {
+      model?: string | null;
+      review_model?: string | null;
+      reviewModel?: string | null;
+      reasoning_effort?: string | null;
+      model_reasoning_effort?: string | null;
+      modelReasoningEffort?: string | null;
+    }
+  >;
   configPath?: string | null;
   observedAt?: string | null;
 }): ProviderLinearWorkerResolvedModelProvenance {
@@ -2276,10 +2439,55 @@ export function buildProviderLinearWorkerResolvedModelProvenance(input: {
       reasoning_effort: normalizeProviderWorkerReasoningEffortValue(
         input.configReasoningEffort
       ),
-      config_path: normalizeOptionalString(input.configPath)
+      config_path: normalizeOptionalString(input.configPath),
+      root_model: normalizeProviderWorkerModelSlug(input.configModel),
+      root_review_model: normalizeProviderWorkerModelSlug(input.configReviewModel),
+      root_reasoning_effort: normalizeProviderWorkerReasoningEffortValue(
+        input.configReasoningEffort
+      ),
+      profiles: normalizeProviderWorkerConfigModelProfiles(input.configProfiles)
     },
     observedAt: normalizeOptionalString(input.observedAt)
   });
+}
+
+function normalizeProviderWorkerConfigModelProfiles(
+  profiles:
+    | Record<
+        string,
+        {
+          model?: string | null;
+          review_model?: string | null;
+          reviewModel?: string | null;
+          reasoning_effort?: string | null;
+          model_reasoning_effort?: string | null;
+          modelReasoningEffort?: string | null;
+        }
+      >
+    | undefined
+): Record<string, ProviderWorkerConfigModelProfileDefaults> | undefined {
+  if (!profiles) {
+    return undefined;
+  }
+  const normalized: Record<string, ProviderWorkerConfigModelProfileDefaults> = {};
+  for (const [rawName, rawProfile] of Object.entries(profiles)) {
+    const profileName = normalizeProviderWorkerConfigProfileName(rawName);
+    if (!profileName) {
+      continue;
+    }
+    normalized[profileName] = {
+      model: normalizeProviderWorkerModelSlug(rawProfile.model),
+      review_model: normalizeProviderWorkerModelSlug(
+        rawProfile.review_model ?? rawProfile.reviewModel
+      ),
+      reasoning_effort: normalizeProviderWorkerReasoningEffortValue(
+        rawProfile.reasoning_effort ??
+          rawProfile.model_reasoning_effort ??
+          rawProfile.modelReasoningEffort
+      )
+    };
+  }
+  return normalized;
 }
 
 function rankProviderWorkerResolvedModelSource(

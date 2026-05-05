@@ -3013,6 +3013,100 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
+  it('merges command-selected profile config over root config defaults', () => {
+    expect(
+      buildProviderLinearWorkerResolvedModelProvenance({
+        commandArgs: ['exec', '-p', 'worker', '--json', 'prompt'],
+        configModel: 'gpt-5.4',
+        configReviewModel: 'gpt-5.4',
+        configReasoningEffort: 'high',
+        configProfiles: {
+          worker: {
+            model: 'gpt-5.5',
+            review_model: 'gpt-5.5',
+            model_reasoning_effort: 'xhigh'
+          }
+        },
+        configPath: '/tmp/codex-home/config.toml',
+        observedAt: '2026-05-05T04:40:03.000Z'
+      })
+    ).toEqual({
+      schema_version: 1,
+      model: 'gpt-5.5',
+      review_model: 'gpt-5.5',
+      model_reasoning_effort: 'xhigh',
+      source: 'config_default',
+      confidence: 'medium',
+      degraded_reason: 'runtime_model_unreported',
+      observed_at: '2026-05-05T04:40:03.000Z',
+      runtime_model: null,
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: null,
+      config_model: 'gpt-5.5',
+      config_review_model: 'gpt-5.5',
+      config_reasoning_effort: 'xhigh',
+      config_path: '/tmp/codex-home/config.toml'
+    });
+  });
+
+  it('falls back to root config defaults when the selected profile has no model fields', () => {
+    expect(
+      buildProviderLinearWorkerResolvedModelProvenance({
+        commandArgs: ['exec', '--profile=worker', '--json', 'prompt'],
+        configModel: 'gpt-5.5',
+        configReviewModel: 'gpt-5.5',
+        configReasoningEffort: 'xhigh',
+        configProfiles: {
+          worker: {}
+        },
+        configPath: '/tmp/codex-home/config.toml',
+        observedAt: '2026-05-05T04:40:03.000Z'
+      })
+    ).toMatchObject({
+      model: 'gpt-5.5',
+      review_model: 'gpt-5.5',
+      model_reasoning_effort: 'xhigh',
+      source: 'config_default',
+      confidence: 'medium',
+      degraded_reason: 'runtime_model_unreported',
+      config_model: 'gpt-5.5',
+      config_review_model: 'gpt-5.5',
+      config_reasoning_effort: 'xhigh',
+      config_path: '/tmp/codex-home/config.toml'
+    });
+  });
+
+  it('degrades command-selected profile config when the profile table is missing', () => {
+    expect(
+      buildProviderLinearWorkerResolvedModelProvenance({
+        commandArgs: ['exec', '--profile=worker', '--json', 'prompt'],
+        configModel: 'gpt-5.4',
+        configReviewModel: 'gpt-5.4',
+        configReasoningEffort: 'high',
+        configPath: '/tmp/codex-home/config.toml',
+        observedAt: '2026-05-05T04:40:03.000Z'
+      })
+    ).toEqual({
+      schema_version: 1,
+      model: null,
+      review_model: null,
+      model_reasoning_effort: null,
+      source: 'unknown',
+      confidence: 'degraded',
+      degraded_reason: 'runtime_model_unreported_config_default_unavailable',
+      observed_at: '2026-05-05T04:40:03.000Z',
+      runtime_model: null,
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: null,
+      config_model: null,
+      config_review_model: null,
+      config_reasoning_effort: null,
+      config_path: '/tmp/codex-home/config.toml'
+    });
+  });
+
   it('preserves metadata-only command overrides as command provenance', () => {
     expect(
       buildProviderLinearWorkerResolvedModelProvenance({
@@ -4615,6 +4709,184 @@ for await (const line of rl) {
       resolved_model_provenance: expectedResolvedModelProvenance
     });
     expect(JSON.stringify(written.auth_provenance ?? null)).not.toContain('gpt-5.5');
+  });
+
+  it('records env-selected profile config-default provenance in the worker proof', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent(
+      [
+        'model = "gpt-5.4"',
+        'review_model = "gpt-5.4"',
+        'model_reasoning_effort = "high"',
+        '',
+        '[profile.worker]',
+        'model = "gpt-5.5"',
+        'review_model = "gpt-5.5"',
+        'model_reasoning_effort = "xhigh"',
+        ''
+      ].join('\n')
+    );
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(createTrackedIssue())
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed'
+        })
+      );
+    const execRunner = vi.fn(async (request) => {
+      expect(request.args).toEqual([
+        'exec',
+        '--json',
+        expect.stringContaining('full first-turn task prompt')
+      ]);
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+        turnIndex: 1
+      });
+      return {
+        exitCode: 0,
+        stdout: PROVIDER_WORKER_TASK_COMPLETE_STDOUT,
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_HOME: codexHome,
+        CODEX_PROFILE: 'worker'
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () =>
+          createRuntimeContext({
+            requested_mode: 'cli',
+            selected_mode: 'cli',
+            provider: 'CliRuntimeProvider'
+          })
+        ),
+        execRunner,
+        now: vi.fn().mockReturnValue('2026-05-05T04:41:10.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    const expectedResolvedModelProvenance = {
+      schema_version: 1,
+      model: 'gpt-5.5',
+      review_model: 'gpt-5.5',
+      model_reasoning_effort: 'xhigh',
+      source: 'config_default',
+      confidence: 'medium',
+      degraded_reason: 'runtime_model_unreported',
+      observed_at: '2026-05-05T04:41:10.000Z',
+      runtime_model: null,
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: null,
+      config_model: 'gpt-5.5',
+      config_review_model: 'gpt-5.5',
+      config_reasoning_effort: 'xhigh',
+      config_path: join(codexHome, 'config.toml')
+    };
+    expect(proof as unknown as Record<string, unknown>).toMatchObject({
+      resolved_model_provenance: expectedResolvedModelProvenance
+    });
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      resolved_model_provenance: expectedResolvedModelProvenance
+    });
+  });
+
+  it('degrades env-selected profile config provenance when the profile table is missing', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent(
+      [
+        'model = "gpt-5.4"',
+        'review_model = "gpt-5.4"',
+        'model_reasoning_effort = "high"',
+        ''
+      ].join('\n')
+    );
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(createTrackedIssue())
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed'
+        })
+      );
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+        turnIndex: 1
+      });
+      return {
+        exitCode: 0,
+        stdout: PROVIDER_WORKER_TASK_COMPLETE_STDOUT,
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_HOME: codexHome,
+        CODEX_PROFILE: 'worker'
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () =>
+          createRuntimeContext({
+            requested_mode: 'cli',
+            selected_mode: 'cli',
+            provider: 'CliRuntimeProvider'
+          })
+        ),
+        execRunner,
+        now: vi.fn().mockReturnValue('2026-05-05T04:41:20.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    const expectedResolvedModelProvenance = {
+      schema_version: 1,
+      model: null,
+      review_model: null,
+      model_reasoning_effort: null,
+      source: 'unknown',
+      confidence: 'degraded',
+      degraded_reason: 'runtime_model_unreported_config_default_unavailable',
+      observed_at: '2026-05-05T04:41:20.000Z',
+      runtime_model: null,
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: null,
+      config_model: null,
+      config_review_model: null,
+      config_reasoning_effort: null,
+      config_path: join(codexHome, 'config.toml')
+    };
+    expect(proof as unknown as Record<string, unknown>).toMatchObject({
+      resolved_model_provenance: expectedResolvedModelProvenance
+    });
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      resolved_model_provenance: expectedResolvedModelProvenance
+    });
   });
 
   it('records resolved command override provenance from injected config args', async () => {

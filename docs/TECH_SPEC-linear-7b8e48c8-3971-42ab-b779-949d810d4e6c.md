@@ -19,6 +19,7 @@ This mirror points to the canonical task spec at `tasks/specs/linear-7b8e48c8-39
 - Require structured provenance in `provider-linear-worker-proof.json` and `provider-linear-worker-session-log-hydration.json`.
 - Expose provenance through `CO STATUS` and read-model surfaces.
 - Prefer runtime-reported model/reasoning effort from `codex exec --json` and `codex exec resume --json` when available.
+- Merge active Codex profile config over root defaults for config-derived provenance.
 - Record source/confidence/degraded reason when runtime model metadata is missing.
 
 ## Implementation Boundaries
@@ -40,6 +41,7 @@ This mirror points to the canonical task spec at `tasks/specs/linear-7b8e48c8-39
   - degraded reason when source is not runtime authoritative
 - Runtime-reported metadata wins over config inference.
 - Explicit `--model` override, if supported in the parent implementation path, must be distinct from inherited default.
+- Active `--profile` / `CODEX_PROFILE` config must be distinct from root config defaults; a requested missing profile must degrade rather than claim root config truth.
 - Missing runtime metadata must not be recorded as authoritative model proof.
 
 ## CO-382 Fallback Decision Table
@@ -59,6 +61,7 @@ This mirror points to the canonical task spec at `tasks/specs/linear-7b8e48c8-39
   - protected terms appear across packet and mirror surfaces
 - Implementation validation must show:
   - no-`--model` inherited-config path records current local `gpt-5.5` truthfully without pretending runtime proof
+  - active profile config merges over root defaults, and requested missing profile config records degraded/unknown provenance
   - explicit override path records override source when supported
   - missing runtime model metadata records degraded/unknown output
   - `CO STATUS` and read-model expose provenance without hiding degraded evidence
