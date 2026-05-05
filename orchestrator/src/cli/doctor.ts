@@ -24,6 +24,7 @@ import {
 import {
   codexFeatureProbeDisablesMultiAgentV2,
   codexFeatureProbeRejectsAgentMaxThreads,
+  findConfiguredRemovedFeatureKeys,
   readCodexFeatureProbe,
   type CodexFeatureProbeResult
 } from './utils/codexFeatures.js';
@@ -64,6 +65,7 @@ import {
   BASELINE_MODEL,
   BASELINE_REVIEW_MODEL,
   BASELINE_REASONING_MINIMUM,
+  CO_MANAGED_REMOVED_FEATURE_KEYS,
   formatModelDefaultExpectation,
   isLocalModelOptIn
 } from './codexDefaultsSetup.js';
@@ -76,6 +78,7 @@ import type { TaskContext } from '../types.js';
 
 const require = createRequire(import.meta.url);
 let tomlParser: { parse: (source: string) => unknown } | null | undefined;
+const CO_MANAGED_REMOVED_FEATURE_KEY_SET = new Set<string>(CO_MANAGED_REMOVED_FEATURE_KEYS);
 
 const OPTIONAL_DEPENDENCIES = [
   {
@@ -162,6 +165,12 @@ export interface DoctorCodexDefaultsAdvisory {
     actual: number | null;
     detail: string;
   } | null;
+  removed_features: {
+    status: 'ok' | 'advisory' | 'unavailable';
+    configured: string[];
+    co_managed_cleanup: string[];
+    detail: string;
+  };
   guidance: string[];
 }
 
@@ -951,6 +960,11 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
       `  - legacy agents.max_spawn_depth: ${result.codex_defaults.legacy_max_spawn_depth.status} (actual: ${result.codex_defaults.legacy_max_spawn_depth.actual ?? '<unset>'}; ${result.codex_defaults.legacy_max_spawn_depth.detail})`
     );
   }
+  if (result.codex_defaults.removed_features.status !== 'ok') {
+    lines.push(
+      `  - removed feature keys: ${result.codex_defaults.removed_features.status} (${result.codex_defaults.removed_features.detail})`
+    );
+  }
   for (const line of result.codex_defaults.guidance) {
     lines.push(`  - ${line}`);
   }
@@ -1246,6 +1260,7 @@ function inspectCodexDefaultsAdvisory(
       status: 'advisory',
       config: { path: configPath, status: 'missing', detail: 'config.toml not found' },
       checks,
+      removed_features: inspectConfiguredRemovedFeatures(null, featureProbe),
       guidance
     };
   }
@@ -1267,6 +1282,7 @@ function inspectCodexDefaultsAdvisory(
         detail: error instanceof Error ? error.message : String(error)
       },
       checks,
+      removed_features: inspectConfiguredRemovedFeatures(null, featureProbe),
       guidance: [
         `Fix TOML syntax in ${configPath} first, then rerun \`codex-orchestrator codex defaults --yes\`.`,
         ...guidance
@@ -1320,6 +1336,28 @@ function inspectCodexDefaultsAdvisory(
     : 'advisory';
 
   const agents = isRecord(parsed.agents) ? parsed.agents : {};
+  const configuredRemovedFeatures = inspectConfiguredRemovedFeatures(
+    readRecordValue(parsed, 'features'),
+    featureProbe
+  );
+  if (configuredRemovedFeatures.status === 'advisory') {
+    guidance.push(
+      `Configured removed Codex feature keys detected in [features]: ${configuredRemovedFeatures.configured.join(', ')}.`
+    );
+    if (configuredRemovedFeatures.co_managed_cleanup.length > 0) {
+      guidance.push(
+        `Run \`codex-orchestrator codex defaults --yes\` to prune known CO-managed removed feature keys: ${configuredRemovedFeatures.co_managed_cleanup.join(', ')}.`
+      );
+    }
+    const preservedRemovedKeys = configuredRemovedFeatures.configured.filter(
+      (key) => !configuredRemovedFeatures.co_managed_cleanup.includes(key)
+    );
+    if (preservedRemovedKeys.length > 0) {
+      guidance.push(
+        `Inspect non-CO-managed removed feature keys manually; defaults cleanup preserves them: ${preservedRemovedKeys.join(', ')}.`
+      );
+    }
+  }
   const multiAgentV2Enabled =
     featureProbeIndicatesMultiAgentV2
     || (!featureProbeDisablesMultiAgentV2
@@ -1358,13 +1396,59 @@ function inspectCodexDefaultsAdvisory(
   const allChecksOk =
     Object.values(checks).every((check) => check.status === 'ok' || check.status === 'skipped')
     && unverifiedLocalModels.length === 0
-    && legacyMaxSpawnDepth?.status !== 'advisory';
+    && legacyMaxSpawnDepth?.status !== 'advisory'
+    && configuredRemovedFeatures.status !== 'advisory';
   return {
     status: allChecksOk ? 'ok' : 'advisory',
     config: { path: configPath, status: 'ok' },
     checks,
     legacy_max_spawn_depth: legacyMaxSpawnDepth,
+    removed_features: configuredRemovedFeatures,
     guidance
+  };
+}
+
+function inspectConfiguredRemovedFeatures(
+  configFeatures: Record<string, unknown> | null,
+  featureProbe: CodexFeatureProbeResult | null
+): DoctorCodexDefaultsAdvisory['removed_features'] {
+  if (!configFeatures || Object.keys(configFeatures).length === 0) {
+    return {
+      status: 'ok',
+      configured: [],
+      co_managed_cleanup: [],
+      detail: 'No configured Codex feature keys to inspect.'
+    };
+  }
+  if (!featureProbe || featureProbe.features === null) {
+    return {
+      status: 'unavailable',
+      configured: [],
+      co_managed_cleanup: [],
+      detail: 'Unable to inspect removed feature keys because `codex features list` was unavailable.'
+    };
+  }
+  const configured = findConfiguredRemovedFeatureKeys(configFeatures, featureProbe);
+  if (configured.length === 0) {
+    return {
+      status: 'ok',
+      configured: [],
+      co_managed_cleanup: [],
+      detail: 'No configured removed Codex feature keys detected.'
+    };
+  }
+  const coManagedCleanup = configured
+    .filter((key) => CO_MANAGED_REMOVED_FEATURE_KEY_SET.has(key))
+    .sort();
+  const cleanupDetail =
+    coManagedCleanup.length > 0
+      ? `; defaults cleanup will prune known CO-managed keys: ${coManagedCleanup.join(', ')}`
+      : '; defaults cleanup will preserve these keys for manual review';
+  return {
+    status: 'advisory',
+    configured,
+    co_managed_cleanup: coManagedCleanup,
+    detail: `configured removed keys: ${configured.join(', ')}${cleanupDetail}`
   };
 }
 

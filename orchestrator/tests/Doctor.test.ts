@@ -35,7 +35,13 @@ async function writeFakeCodexBinary(
   options: { exitCode?: number; stderr?: string; version?: string } = {}
 ): Promise<string> {
   const binPath = join(dir, 'codex');
-  const featureOutput = featureLine.length > 0 ? `  printf '%s\n' ${JSON.stringify(featureLine)}` : '';
+  const featureOutput =
+    featureLine.length > 0
+      ? featureLine
+          .split(/\r?\n/u)
+          .map((line) => `  printf '%s\\n' ${JSON.stringify(line)}`)
+          .join('\n')
+      : '';
   const stderrOutput = options.stderr ? `  printf '%s\n' ${JSON.stringify(options.stderr)} >&2` : '';
   const version = options.version ?? 'codex 0.0.0-test';
   await writeFile(
@@ -992,6 +998,72 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
 
       const summary = formatDoctorSummary(result).join('\n');
       expect(summary).toContain('features.multi_agent_v2=true; omit agents.max_threads');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('surfaces configured removed feature keys as Codex defaults advisory drift', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-removed-features-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(
+      tempHome,
+      [
+        'js_repl removed false',
+        'custom_removed removed false',
+        'multi_agent_v2 experimental false'
+      ].join('\n')
+    );
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[features]',
+          'js_repl = true',
+          'custom_removed = false',
+          'multi_agent_v2 = false',
+          '',
+          '[agents]',
+          'max_threads = 12',
+          'max_depth = 4'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.status).toBe('advisory');
+      expect(result.codex_defaults.removed_features).toEqual({
+        status: 'advisory',
+        configured: ['custom_removed', 'js_repl'],
+        co_managed_cleanup: ['js_repl'],
+        detail: 'configured removed keys: custom_removed, js_repl; defaults cleanup will prune known CO-managed keys: js_repl'
+      });
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('removed feature keys: advisory');
+      expect(summary).toContain('Configured removed Codex feature keys detected in [features]: custom_removed, js_repl.');
+      expect(summary).toContain(
+        'Run `codex-orchestrator codex defaults --yes` to prune known CO-managed removed feature keys: js_repl.'
+      );
+      expect(summary).toContain(
+        'Inspect non-CO-managed removed feature keys manually; defaults cleanup preserves them: custom_removed.'
+      );
     } finally {
       if (originalCodexHome === undefined) {
         delete process.env.CODEX_HOME;
