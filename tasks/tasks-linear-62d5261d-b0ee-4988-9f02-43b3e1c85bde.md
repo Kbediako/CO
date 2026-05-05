@@ -43,7 +43,7 @@
 - [x] Pack smoke passed. Evidence: `npm run pack:smoke`.
 - [x] Manifest-backed standalone review completed. Evidence: `.runs/linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde/cli/2026-05-05T20-39-32-939Z-e273dbf9/review/telemetry.json` reports `status=succeeded` and `review_outcome=clean-success`.
 - [x] Elegance/minimality review completed. Evidence: `out/linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde/manual/elegance-review.md`.
-- [ ] PR attached, checks green, actionable feedback handled, and ready-review drain clean. Evidence: pending.
+- [x] PR attached, checks green, actionable feedback handled, and ready-review drain clean. Evidence: PR #777, CodeRabbit requested-change threads fixed in `a85f6e80ce`, merge conflict recovery completed in `9d34d6184e`, and `codex-orchestrator pr ready-review --pr 777 --quiet-minutes 15` completed at 2026-05-05T22:13:03Z.
 
 ## Notes
 - Do not weaken `docs:freshness`, `docs:freshness:maintain`, or `spec-guard`.
