@@ -91,7 +91,7 @@
           "status": "produced",
           "manifest": ".runs/linear-74fe39e5-8c8e-445c-8f24-486446521f72-docs-owner-packet/cli/2026-05-05T20-42-38-589Z-33a6a232/manifest.json",
           "source_anchor": "ctx:sha256:cafa3aa8e1898c14e5381cfbd69be8f13187fd4f654ba30d8bf11c4d096f2137#chunk:c000001",
-          "source_payload": "../../.runs/linear-74fe39e5-8c8e-445c-8f24-486446521f72/cli/2026-05-05T20-38-59-460Z-7837199a/memory/source-0/source.txt",
+          "source_payload": ".runs/linear-74fe39e5-8c8e-445c-8f24-486446521f72/cli/2026-05-05T20-38-59-460Z-7837199a/memory/source-0/source.txt",
           "summary": "Created the CO-432 docs-first packet and task mirrors only. Parent reconciled source traceability to the supplied CO-432 worker prompt source anchor and verified the worker-run source payload path in the authoritative workspace; later review-wrapper source anchors are not the CO-432 worker prompt source. The packet preserves docs:freshness:maintain, canonical owner key, terminal-owner replacement, completed-lane registry residue, stale active-spec routing, baseline_cohort_id:co-175-apr-14-march-14-tasks-1164-1195, codex-orchestrator:canonical-owner-key=baseline_cohort_id:co-175-apr-14-march-14-tasks-1164-1195, co-175-apr-14-march-14-tasks-1164-1195, tasks/tasks-1164-historical.md, and CO-175. Parent owns implementation, validation, Linear state, workpad, PR lifecycle, and review handoff."
         }
       },
