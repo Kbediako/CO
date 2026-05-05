@@ -37,8 +37,15 @@ export interface PrWatchMergeBotRereviewRollupContext {
 export interface PrWatchMergeBotRereviewDiagnostics {
   rawPendingBots: string[];
   effectivePendingBots: string[];
+  rawTerminalFailureBots: string[];
+  effectiveTerminalFailureBots: string[];
   clearedPendingBots: string[];
   ignoredMentions: PrWatchMergeIgnoredBotRereviewMention[];
+  codex: {
+    latestRequestAtMs: number | null;
+    latestTerminalFailureAtMs: number | null;
+    terminalFailureSignal: string;
+  };
   coderabbit: {
     statusCheckRollup: {
       state: 'success' | 'pending' | 'failed' | 'missing' | string;
@@ -65,8 +72,17 @@ export interface PrWatchMergeBotRereviewSignals {
   fetchError: boolean;
   rateLimit?: PrWatchMergeGitHubRateLimitStatus | null;
   pendingBots: string[];
+  terminalFailureBots?: string[];
   inProgressBots: string[];
   requestTimesByBot?: Record<string, number>;
+  terminalFailuresByBot?: Record<
+    string,
+    {
+      requestAtMs: number;
+      terminalFailureAtMs: number;
+      signal: string;
+    }
+  >;
   ignoredMentions?: PrWatchMergeIgnoredBotRereviewMention[];
   coderabbit: PrWatchMergeCoderabbitReviewMeta;
 }
@@ -98,6 +114,7 @@ export interface PrWatchMergeSnapshot {
   botFeedbackFetchError: boolean;
   botRereviewFetchError: boolean;
   botRereviewPending: string[];
+  botRereviewTerminalFailures: string[];
   botRereviewInProgress: string[];
   botRereviewDiagnostics: PrWatchMergeBotRereviewDiagnostics;
   coderabbitReviewMeta: PrWatchMergeCoderabbitReviewMeta;
@@ -306,7 +323,9 @@ export function resolveBotRereviewTimingForKind(params: {
   requestAtMs: number;
   issueComments: Array<{
     user?: { login?: string | null } | null;
+    body?: string | null;
     created_at?: string | null;
+    updated_at?: string | null;
     commit_id?: string | null;
     __source?: 'issue' | 'pull' | 'review' | string | null;
   }>;
@@ -329,6 +348,7 @@ export function resolveBotRereviewTimingForKind(params: {
 }): {
   completeAtMs: number | null;
   inProgressAtMs: number | null;
+  terminalFailureAtMs: number | null;
 };
 
 export function fetchPrStatusSnapshot(input: PrWatchMergeSnapshotInput): Promise<PrWatchMergeSnapshot>;

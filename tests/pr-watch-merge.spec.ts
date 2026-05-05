@@ -241,6 +241,46 @@ describe('pr watch-merge required-check gating', () => {
     expect(snapshot.coderabbitReviewMeta.nitpickCount).toBe(3);
   });
 
+  it('classifies terminal Codex connector failures distinctly from pending rereview', () => {
+    const response = makeResponse([]);
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+
+    const snapshot = buildStatusSnapshot(response, requiredChecks, {
+      fetchError: false,
+      unacknowledgedCount: 0,
+      rereview: {
+        fetchError: false,
+        pendingBots: [],
+        terminalFailureBots: ['codex'],
+        inProgressBots: [],
+        requestTimesByBot: {
+          codex: Date.parse('2026-02-18T04:43:00.000Z')
+        },
+        terminalFailuresByBot: {
+          codex: {
+            requestAtMs: Date.parse('2026-02-18T04:43:00.000Z'),
+            terminalFailureAtMs: Date.parse('2026-02-18T04:44:00.000Z'),
+            signal: 'unknown_error;manual_retry=@codex_review'
+          }
+        },
+        coderabbit: {
+          actionableCount: 0,
+          outsideDiffCount: 0,
+          nitpickCount: 0
+        }
+      }
+    });
+
+    expect(snapshot.readyToMerge).toBe(false);
+    expect(snapshot.botRereviewPending).toEqual([]);
+    expect(snapshot.botRereviewTerminalFailures).toEqual(['codex']);
+    expect(snapshot.gateReasons).toContain(
+      'bot_rereview_terminal_failure=codex(unknown_error;manual_retry=@codex_review)'
+    );
+  });
+
   it('clears stale coderabbit rereview pending from an older completion when current-head rollup is successful', () => {
     const response = makeResponse([
       {
@@ -808,6 +848,46 @@ describe('resolveActionRequiredReasons', () => {
 
     expect(resolveActionRequiredReasons(snapshot, { readinessMode: 'review' }))
       .toContain('required_checks_query_failed');
+  });
+
+  it('classifies terminal Codex connector failures as action-required in ready-review mode', () => {
+    const response = makeResponse([]);
+    const requiredChecks = summarizeRequiredChecks([
+      { name: 'corelane', state: 'SUCCESS', bucket: 'pass', link: 'https://example.com/corelane' }
+    ]);
+    const snapshot = buildStatusSnapshot(
+      response,
+      requiredChecks,
+      {
+        fetchError: false,
+        unacknowledgedCount: 0,
+        rereview: {
+          fetchError: false,
+          pendingBots: [],
+          terminalFailureBots: ['codex'],
+          inProgressBots: [],
+          terminalFailuresByBot: {
+            codex: {
+              requestAtMs: Date.parse('2026-02-18T04:43:00.000Z'),
+              terminalFailureAtMs: Date.parse('2026-02-18T04:44:00.000Z'),
+              signal: 'unknown_error;manual_retry=@codex_review'
+            }
+          },
+          coderabbit: {
+            actionableCount: 0,
+            outsideDiffCount: 0,
+            nitpickCount: 0
+          }
+        }
+      },
+      {
+        readinessMode: 'review'
+      }
+    );
+
+    expect(resolveActionRequiredReasons(snapshot, { readinessMode: 'review' })).toContain(
+      'bot_rereview_terminal_failure=codex(unknown_error;manual_retry=@codex_review)'
+    );
   });
 
   it('classifies behind merge state as action-required', () => {
@@ -2214,6 +2294,51 @@ describe('resolveBotRereviewTimingForKind', () => {
 
     expect(result.inProgressAtMs).toBeNull();
     expect(result.completeAtMs).toBeNull();
+    expect(result.terminalFailureAtMs).toBeNull();
+  });
+
+  it('classifies Codex connector terminal failure comments after the rereview request', () => {
+    const result = resolveBotRereviewTimingForKind({
+      kind: 'codex',
+      requestAtMs,
+      issueComments: [
+        {
+          user: { login: 'chatgpt-codex-connector[bot]' },
+          body: 'Codex Review: Something went wrong. Try again later by commenting @codex review.',
+          created_at: '2026-02-18T04:45:00Z',
+          __source: 'issue'
+        }
+      ],
+      reviews: [],
+      issueReactions: [],
+      requestCommentReactions: [],
+      headOid: 'abc123'
+    });
+
+    expect(result.inProgressAtMs).toBeNull();
+    expect(result.completeAtMs).toBeNull();
+    expect(result.terminalFailureAtMs).toBe(Date.parse('2026-02-18T04:45:00Z'));
+  });
+
+  it('ignores Codex connector terminal failure comments older than the latest request', () => {
+    const result = resolveBotRereviewTimingForKind({
+      kind: 'codex',
+      requestAtMs,
+      issueComments: [
+        {
+          user: { login: 'chatgpt-codex-connector[bot]' },
+          body: 'Codex Review: Something went wrong. Try again later by commenting @codex review.',
+          created_at: '2026-02-18T04:42:00Z',
+          __source: 'issue'
+        }
+      ],
+      reviews: [],
+      issueReactions: [],
+      requestCommentReactions: [],
+      headOid: 'abc123'
+    });
+
+    expect(result.terminalFailureAtMs).toBeNull();
   });
 
   it('ignores reaction signals for coderabbit', () => {

@@ -21,6 +21,19 @@
           "date": "2026-05-05",
           "status": "confirmed-gap-on-main",
           "summary": "Current main treats Codex connector comments as non-completion signals, so a terminal failure comment can leave bot_rereview_pending=codex; no CO-499 implementation branch or merged code exists on current main."
+        },
+        "implementation_validation": {
+          "reviewer": "provider worker",
+          "date": "2026-05-05",
+          "status": "local-validation-green-before-pr-update",
+          "summary": "Implemented terminal Codex connector failure classification in pr ready-review, added bot_rereview_terminal_failure output/action-required state, preserved active Codex pending and independent hard gates, and passed focused pr-watch-merge tests plus build, lint, full core tests, docs checks, repo stewardship, diff budget, and pack smoke."
+        },
+        "implementation_review": {
+          "reviewer": "implementation-gate child stream",
+          "date": "2026-05-05",
+          "status": "clean-success",
+          "manifest": ".runs/linear-07fdd989-5c10-4b24-ab5d-10fa9bf3732f-implementation-gate/cli/2026-05-05T10-50-48-141Z-70c7ffa2/manifest.json",
+          "summary": "Manifest-backed implementation gate completed with review telemetry status=succeeded and review_outcome=clean-success."
         }
       },
       "paths": {

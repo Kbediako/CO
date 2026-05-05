@@ -42,6 +42,12 @@ const CODERABBIT_ISSUE_COMMENT_COMPLETION_PATTERNS = [
   /Everything is clean\b/iu,
   /PR is ready to merge\b/iu
 ];
+const CODEX_TERMINAL_FAILURE_COMMENT_PATTERNS = [
+  /Codex\s+Review:\s*Something\s+went\s+wrong\.\s*Try\s+again\s+later\s+by\s+commenting\s+@codex\s+review\./iu,
+  /Codex\s+Review:\s*Something\s+went\s+wrong\b/iu,
+  /\bunknown\s+error\b[\s\S]{0,240}\b@codex\s+review\b/iu
+];
+const CODEX_TERMINAL_FAILURE_SIGNAL = 'unknown_error;manual_retry=@codex_review';
 const CODEX_MENTION_PATTERN = /@(?:chatgpt-codex-connector|codex)(?![\w-])/giu;
 const CODERABBIT_MENTION_PATTERN = /@coderabbitai(?![\w-])/giu;
 const CODEX_MENTION_AT_START_PATTERN =
@@ -1201,14 +1207,17 @@ function resolveCoderabbitPendingBlockerSignal(coderabbitStatusCheckRollup, requ
 
 function resolveEffectiveBotRereviewSignals({
   pendingBots,
+  terminalFailureBots,
   coderabbitStatusCheckRollup,
   requestTimesByBot,
+  terminalFailuresByBot,
   ignoredMentions,
   hasUnresolvedThread,
   unacknowledgedBotFeedbackCount,
   botFeedbackFetchError
 }) {
   const rawPendingBots = Array.isArray(pendingBots) ? pendingBots : [];
+  const rawTerminalFailureBots = Array.isArray(terminalFailureBots) ? terminalFailureBots : [];
   const normalizedIgnoredMentions = Array.isArray(ignoredMentions)
     ? ignoredMentions
         .filter((mention) => mention && typeof mention === 'object')
@@ -1229,6 +1238,7 @@ function resolveEffectiveBotRereviewSignals({
         }))
     : [];
   const effectivePendingBots = [];
+  const effectiveTerminalFailureBots = [];
   const clearedPendingBots = [];
   const canTrustResolvedFeedbackTruth =
     !hasUnresolvedThread && unacknowledgedBotFeedbackCount === 0 && botFeedbackFetchError !== true;
@@ -1249,6 +1259,22 @@ function resolveEffectiveBotRereviewSignals({
     coderabbitRequestAtMs !== null &&
     coderabbitSuccessAtMs !== null &&
     coderabbitSuccessAtMs > coderabbitRequestAtMs;
+  const failureTimes =
+    terminalFailuresByBot && typeof terminalFailuresByBot === 'object' ? terminalFailuresByBot : {};
+  const codexFailure =
+    failureTimes[BOT_KIND_LABELS.codex] && typeof failureTimes[BOT_KIND_LABELS.codex] === 'object'
+      ? failureTimes[BOT_KIND_LABELS.codex]
+      : null;
+  const codexLatestTerminalFailureAtMs =
+    typeof codexFailure?.terminalFailureAtMs === 'number' &&
+    Number.isFinite(codexFailure.terminalFailureAtMs)
+      ? codexFailure.terminalFailureAtMs
+      : null;
+  const codexLatestRequestAtMs =
+    typeof requestTimes[BOT_KIND_LABELS.codex] === 'number' &&
+    Number.isFinite(requestTimes[BOT_KIND_LABELS.codex])
+      ? requestTimes[BOT_KIND_LABELS.codex]
+      : null;
   for (const bot of rawPendingBots) {
     const isCoderabbit = bot === BOT_KIND_LABELS.coderabbit;
     if (
@@ -1261,11 +1287,23 @@ function resolveEffectiveBotRereviewSignals({
     }
     effectivePendingBots.push(bot);
   }
+  for (const bot of rawTerminalFailureBots) {
+    if (bot === BOT_KIND_LABELS.codex) {
+      effectiveTerminalFailureBots.push(bot);
+    }
+  }
   return {
     rawPendingBots,
     effectivePendingBots,
+    rawTerminalFailureBots,
+    effectiveTerminalFailureBots,
     clearedPendingBots,
     ignoredMentions: normalizedIgnoredMentions,
+    codex: {
+      latestRequestAtMs: codexLatestRequestAtMs,
+      latestTerminalFailureAtMs: codexLatestTerminalFailureAtMs,
+      terminalFailureSignal: codexFailure?.signal ?? CODEX_TERMINAL_FAILURE_SIGNAL
+    },
     coderabbit: {
       statusCheckRollup: coderabbitStatusCheckRollup,
       stalePendingCleared: clearedPendingBots.includes(BOT_KIND_LABELS.coderabbit),
@@ -1288,6 +1326,16 @@ function formatBotRereviewPendingGateReason(pendingBots, diagnostics) {
     return bot;
   });
   return `bot_rereview_pending=${parts.join(',')}`;
+}
+
+function formatBotRereviewTerminalFailureGateReason(terminalFailureBots, diagnostics) {
+  const parts = terminalFailureBots.map((bot) => {
+    if (bot === BOT_KIND_LABELS.codex) {
+      return `${bot}(${diagnostics?.codex?.terminalFailureSignal ?? CODEX_TERMINAL_FAILURE_SIGNAL})`;
+    }
+    return bot;
+  });
+  return `bot_rereview_terminal_failure=${parts.join(',')}`;
 }
 
 export function summarizeRequiredChecks(entries) {
@@ -1426,6 +1474,12 @@ function isReusableBotFanoutClean(inlineBotFeedback, botRereviewSignals) {
   ) {
     return false;
   }
+  if (
+    Array.isArray(botRereviewSignals.terminalFailureBots) &&
+    botRereviewSignals.terminalFailureBots.length > 0
+  ) {
+    return false;
+  }
   return true;
 }
 
@@ -1490,6 +1544,9 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
     : null;
   const botRereviewFetchError = botRereview?.fetchError === true;
   const rawBotRereviewPending = Array.isArray(botRereview?.pendingBots) ? botRereview.pendingBots : [];
+  const rawBotRereviewTerminalFailures = Array.isArray(botRereview?.terminalFailureBots)
+    ? botRereview.terminalFailureBots
+    : [];
   const botRereviewInProgress = Array.isArray(botRereview?.inProgressBots) ? botRereview.inProgressBots : [];
   const requiredChecksQueryFailed = options.requiredChecksQueryFailed === true;
   const githubRateLimits = Array.isArray(options.githubRateLimits)
@@ -1509,14 +1566,17 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
   const isDraft = Boolean(pr.isDraft);
   const botRereviewDiagnostics = resolveEffectiveBotRereviewSignals({
     pendingBots: rawBotRereviewPending,
+    terminalFailureBots: rawBotRereviewTerminalFailures,
     coderabbitStatusCheckRollup,
     requestTimesByBot: botRereview?.requestTimesByBot,
+    terminalFailuresByBot: botRereview?.terminalFailuresByBot,
     ignoredMentions: botRereview?.ignoredMentions,
     hasUnresolvedThread,
     unacknowledgedBotFeedbackCount,
     botFeedbackFetchError
   });
   const botRereviewPending = botRereviewDiagnostics.effectivePendingBots;
+  const botRereviewTerminalFailures = botRereviewDiagnostics.effectiveTerminalFailureBots;
 
   const gateReasons = [];
   if (state !== 'OPEN') {
@@ -1561,6 +1621,11 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
   } else if (botRereviewPending.length > 0) {
     gateReasons.push(formatBotRereviewPendingGateReason(botRereviewPending, botRereviewDiagnostics));
   }
+  if (!botRereviewFetchError && botRereviewTerminalFailures.length > 0) {
+    gateReasons.push(
+      formatBotRereviewTerminalFailureGateReason(botRereviewTerminalFailures, botRereviewDiagnostics)
+    );
+  }
 
   return {
     number: Number(pr.number),
@@ -1578,6 +1643,7 @@ export function buildStatusSnapshot(response, requiredChecks = null, inlineBotFe
     botFeedbackFetchError,
     botRereviewFetchError,
     botRereviewPending,
+    botRereviewTerminalFailures,
     botRereviewInProgress,
     botRereviewDiagnostics,
     coderabbitReviewMeta,
@@ -1624,6 +1690,17 @@ export function resolveActionRequiredReasons(snapshot, options = {}) {
     && snapshot.unacknowledgedBotFeedbackCount > 0
   ) {
     reasons.push(`unacknowledged_bot_feedback=${snapshot.unacknowledgedBotFeedbackCount}`);
+  }
+  if (
+    Array.isArray(snapshot.botRereviewTerminalFailures) &&
+    snapshot.botRereviewTerminalFailures.length > 0
+  ) {
+    reasons.push(
+      formatBotRereviewTerminalFailureGateReason(
+        snapshot.botRereviewTerminalFailures,
+        snapshot.botRereviewDiagnostics
+      )
+    );
   }
   const requiredChecks =
     snapshot.requiredChecks && typeof snapshot.requiredChecks === 'object' ? snapshot.requiredChecks : null;
@@ -1800,6 +1877,7 @@ function formatStatusLine(snapshot, quietRemainingMs) {
     `bot_feedback_fetch_error=${snapshot.botFeedbackFetchError ? 'yes' : 'no'}`,
     `bot_rereview_fetch_error=${snapshot.botRereviewFetchError ? 'yes' : 'no'}`,
     `bot_rereview_pending=[${snapshot.botRereviewPending.join(', ') || '-'}]`,
+    `bot_rereview_terminal_failure=[${snapshot.botRereviewTerminalFailures.join(', ') || '-'}]`,
     `bot_rereview_in_progress=[${snapshot.botRereviewInProgress.join(', ') || '-'}]`,
     `bot_rereview_cleared=[${clearedRereviewPending}]`,
     `bot_rereview_ignored=[${ignoredRereviewMentions}]`,
@@ -2044,6 +2122,44 @@ function maxCommentTimestampForKind(issueComments, kind, requestAtMs, headOid) {
   return maxTimestamp(timestamps);
 }
 
+function isCodexTerminalFailureComment(comment) {
+  if (!comment || typeof comment !== 'object') {
+    return false;
+  }
+  if (resolveBotKindFromLogin(comment.user?.login) !== BOT_KIND_LABELS.codex) {
+    return false;
+  }
+  const body = typeof comment.body === 'string' ? comment.body : '';
+  return CODEX_TERMINAL_FAILURE_COMMENT_PATTERNS.some((pattern) => pattern.test(body));
+}
+
+function maxCodexTerminalFailureTimestamp(issueComments, requestAtMs, headOid) {
+  if (!Array.isArray(issueComments)) {
+    return null;
+  }
+  const timestamps = [];
+  for (const comment of issueComments) {
+    if (!isCodexTerminalFailureComment(comment)) {
+      continue;
+    }
+    if (comment.__source === 'pull') {
+      const commentCommitId = typeof comment.commit_id === 'string' ? comment.commit_id : null;
+      if (headOid && commentCommitId && commentCommitId !== headOid) {
+        continue;
+      }
+    }
+    const createdAtMs = parseTimestampMs(comment.created_at);
+    const updatedAtMs = parseTimestampMs(comment.updated_at);
+    const effectiveAtMs =
+      comment.__source === 'issue' ? maxTimestamp([createdAtMs, updatedAtMs]) : createdAtMs;
+    if (effectiveAtMs === null || effectiveAtMs <= requestAtMs) {
+      continue;
+    }
+    timestamps.push(effectiveAtMs);
+  }
+  return maxTimestamp(timestamps);
+}
+
 function maxReviewTimestampForKind(reviews, kind, requestAtMs, headOid) {
   if (!Array.isArray(reviews)) {
     return null;
@@ -2074,6 +2190,8 @@ export function resolveBotRereviewTimingForKind(params) {
   const useReactionSignals = kind === 'codex';
   const commentCompleteAtMs =
     kind === 'codex' ? null : maxCommentTimestampForKind(issueComments, kind, requestAtMs, headOid);
+  const terminalFailureAtMs =
+    kind === 'codex' ? maxCodexTerminalFailureTimestamp(issueComments, requestAtMs, headOid) : null;
   const completeAtMs = maxTimestamp([
     commentCompleteAtMs,
     maxReviewTimestampForKind(reviews, kind, requestAtMs, headOid),
@@ -2102,7 +2220,8 @@ export function resolveBotRereviewTimingForKind(params) {
     : null;
   return {
     completeAtMs,
-    inProgressAtMs
+    inProgressAtMs,
+    terminalFailureAtMs
   };
 }
 
@@ -2146,6 +2265,7 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
         fetchError: false,
         rateLimit: null,
         pendingBots: [],
+        terminalFailureBots: [],
         inProgressBots: [],
         ignoredMentions,
         coderabbit
@@ -2153,8 +2273,10 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
     }
 
     const pendingBots = [];
+    const terminalFailureBots = [];
     const inProgressBots = [];
     const requestTimesByBot = {};
+    const terminalFailuresByBot = {};
     let hadSignalFetchError = false;
     let signalRateLimit = null;
     for (const kind of requestedKinds) {
@@ -2177,7 +2299,7 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
           requestCommentReactions = [];
         }
       }
-      const { completeAtMs, inProgressAtMs } = resolveBotRereviewTimingForKind({
+      const { completeAtMs, inProgressAtMs, terminalFailureAtMs } = resolveBotRereviewTimingForKind({
         kind,
         requestAtMs: request.createdAtMs,
         issueComments: allComments,
@@ -2186,14 +2308,26 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
         requestCommentReactions,
         headOid
       });
+      const hasTerminalFailure =
+        terminalFailureAtMs !== null && (completeAtMs === null || terminalFailureAtMs > completeAtMs);
       const hasActiveInProgress =
-        inProgressAtMs !== null && (completeAtMs === null || inProgressAtMs > completeAtMs);
+        inProgressAtMs !== null
+        && (completeAtMs === null || inProgressAtMs > completeAtMs)
+        && (!hasTerminalFailure || inProgressAtMs > terminalFailureAtMs);
       const label = BOT_KIND_LABELS[kind] ?? kind;
       requestTimesByBot[label] = request.createdAtMs;
       if (hasActiveInProgress) {
         inProgressBots.push(label);
       }
-      if (completeAtMs === null || hasActiveInProgress) {
+      if (hasTerminalFailure && !hasActiveInProgress) {
+        terminalFailureBots.push(label);
+        terminalFailuresByBot[label] = {
+          requestAtMs: request.createdAtMs,
+          terminalFailureAtMs,
+          signal: label === BOT_KIND_LABELS.codex ? CODEX_TERMINAL_FAILURE_SIGNAL : 'terminal_failure'
+        };
+      }
+      if ((completeAtMs === null && !hasTerminalFailure) || hasActiveInProgress) {
         pendingBots.push(label);
       }
     }
@@ -2202,8 +2336,10 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
       fetchError: hadSignalFetchError,
       rateLimit: signalRateLimit,
       pendingBots,
+      terminalFailureBots,
       inProgressBots,
       requestTimesByBot,
+      terminalFailuresByBot,
       ignoredMentions,
       coderabbit
     };
@@ -2212,6 +2348,7 @@ async function fetchBotRereviewSignals(owner, repo, prNumber, headOid) {
       fetchError: true,
       rateLimit: resolveGitHubRateLimitStatus(error, { surface: 'rest' }),
       pendingBots: [],
+      terminalFailureBots: [],
       inProgressBots: [],
       coderabbit: {
         actionableCount: 0,

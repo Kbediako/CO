@@ -138,9 +138,9 @@
 - Durable retention evidence: `unacknowledged_bot_feedback`, unresolved review threads, required checks, merge state, CodeRabbit proof, and active Codex review state are retained readiness contracts, not temporary fallbacks.
 - Large-refactor check: this is a narrow classifier and output-state fix inside existing `ready-review`; a larger review-state authority refactor is deferred unless implementation shows Codex request/response state cannot be separated safely.
 
-## Open Questions
-- Should terminal Codex connector failure block as `action_required` until an operator manually pings `@codex review`, or should it clear `bot_rereview_pending` while still returning non-ready with a distinct waiver-needed reason? The implementation must choose one explicitly.
-- Should the known phrase set include only `Something went wrong. Try again later by commenting @codex review.` or a broader bounded connector-failure family?
+## Decisions
+- Terminal Codex connector failure blocks as action-required via `bot_rereview_terminal_failure=codex(unknown_error;manual_retry=@codex_review)` until an operator retries or explicitly waives the failed connector state.
+- The phrase set is bounded to the observed `Codex Review: Something went wrong... @codex review` family plus an `unknown error` / `@codex review` connector failure shape.
 
 ## Approvals
 - Product: Linear CO-499, pending
