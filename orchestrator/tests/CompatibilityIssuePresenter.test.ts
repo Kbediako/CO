@@ -311,6 +311,32 @@ describe('CompatibilityIssuePresenter', () => {
     ).toBeNull();
   });
 
+  it('fails closed when only a malformed stage started_at is available for proof freshness', () => {
+    const proof = {
+      issue_id: 'issue-100',
+      issue_identifier: 'CO-100',
+      attempt_started_at: '2026-04-06T02:00:00.000Z',
+      workspace_path: '/repo/.workspaces/stale-co-100',
+      worker_host: 'worker-host-stale'
+    } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']> & {
+      worker_host: string;
+    };
+
+    expect(
+      readProviderLinearWorkerWorkspacePath(
+        proof,
+        'not-a-date',
+        null
+      )
+    ).toBeNull();
+    expect(
+      resolveProviderWorkerHost({
+        providerLinearWorkerProof: proof,
+        stageStartedAt: 'not-a-date'
+      })
+    ).toBeNull();
+  });
+
   it('prefers claim launch_started_at over older started_at when filtering stale proof worker_host', () => {
     const source = buildCompatibilitySource({
       rawStatus: 'in_progress',

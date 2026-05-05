@@ -848,12 +848,16 @@ function buildProjectionContextFromParts(
   const manifestRawStatus = readStringValue(manifestRecord, 'status') ?? 'unknown';
   const startedAt = readStringValue(manifestRecord, 'started_at', 'startedAt') ?? null;
   const providerProofRecord = (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null;
-  const claimLaunchStartedAt = readValidTimestamp(providerClaim?.launch_started_at ?? null);
-  const proofFreshnessStageStartedAt = claimLaunchStartedAt ?? startedAt;
-  const proofIsFreshForStage = isProviderLinearWorkerProofFreshForStage(
-    providerProofRecord,
-    proofFreshnessStageStartedAt
+  const proofFreshnessStageStartedAt = resolveFreshnessStageStartedAt(
+    providerClaim?.launch_started_at ?? null,
+    startedAt
   );
+  const proofIsFreshForStage =
+    !proofFreshnessStageStartedAt.invalid
+    && isProviderLinearWorkerProofFreshForStage(
+      providerProofRecord,
+      proofFreshnessStageStartedAt.value
+    );
   const useTerminalProof = shouldUseProviderLinearWorkerTerminalProofForSelectedRun(manifestRecord, providerProofRecord);
   const useScopedTerminalProof = useTerminalProof && proofIsFreshForStage;
   const proofTerminalStatus = useScopedTerminalProof
@@ -3311,6 +3315,28 @@ function readValidTimestamp(value: string | null | undefined): string | null {
   }
   const trimmed = value.trim();
   return Number.isFinite(Date.parse(trimmed)) ? trimmed : null;
+}
+
+function hasTimestampText(value: string | null | undefined): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function resolveFreshnessStageStartedAt(
+  claimLaunchStartedAt: string | null | undefined,
+  stageStartedAt: string | null | undefined
+): { invalid: boolean; value: string | null } {
+  const validClaimLaunchStartedAt = readValidTimestamp(claimLaunchStartedAt);
+  if (validClaimLaunchStartedAt) {
+    return { invalid: false, value: validClaimLaunchStartedAt };
+  }
+  const validStageStartedAt = readValidTimestamp(stageStartedAt);
+  if (validStageStartedAt) {
+    return { invalid: false, value: validStageStartedAt };
+  }
+  return {
+    invalid: hasTimestampText(claimLaunchStartedAt) || hasTimestampText(stageStartedAt),
+    value: null
+  };
 }
 
 function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {

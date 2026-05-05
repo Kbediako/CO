@@ -738,11 +738,13 @@ export function readProviderLinearWorkerHost(
   proof: ProviderLinearWorkerProof | null | undefined,
   stageStartedAt: string | null | undefined
 ): ResolvedWorkerHost {
+  const proofStageStartedAt = resolveFreshnessStageStartedAt(null, stageStartedAt);
   if (
     !proof
+    || proofStageStartedAt.invalid
     || !isProviderLinearWorkerProofFreshForStage(
       proof as ProviderLinearWorkerProof & Record<string, unknown>,
-      stageStartedAt ?? null
+      proofStageStartedAt.value
     )
   ) {
     return { kind: 'missing' };
@@ -757,16 +759,16 @@ export function readProviderLinearWorkerWorkspacePath(
   stageStartedAt: string | null | undefined,
   providerDebugSnapshot?: ControlProviderDebugSnapshot | null | undefined
 ): string | null {
-  const claimLaunchStartedAt = readValidTimestamp(providerDebugSnapshot?.claim?.launch_started_at ?? null);
-  const proofStageStartedAt =
-    claimLaunchStartedAt
-    ?? stageStartedAt
-    ?? null;
+  const proofStageStartedAt = resolveFreshnessStageStartedAt(
+    providerDebugSnapshot?.claim?.launch_started_at ?? null,
+    stageStartedAt
+  );
   if (
     !proof ||
+    proofStageStartedAt.invalid ||
     !isProviderLinearWorkerProofFreshForStage(
       proof as ProviderLinearWorkerProof & Record<string, unknown>,
-      proofStageStartedAt
+      proofStageStartedAt.value
     )
   ) {
     return null;
@@ -784,11 +786,10 @@ export function resolveProviderWorkerHost(input: {
   issueId?: string | null | undefined;
   stageStartedAt?: string | null | undefined;
 }): string | null {
-  const claimLaunchStartedAt = readValidTimestamp(input.providerDebugSnapshot?.claim?.launch_started_at ?? null);
-  const stageStartedAt =
-    claimLaunchStartedAt
-    ?? input.stageStartedAt
-    ?? null;
+  const proofStageStartedAt = resolveFreshnessStageStartedAt(
+    input.providerDebugSnapshot?.claim?.launch_started_at ?? null,
+    input.stageStartedAt
+  );
   const claimHost = readResolvedWorkerHost(
     input.providerDebugSnapshot?.claim as Record<string, unknown> | null | undefined
   );
@@ -798,15 +799,17 @@ export function resolveProviderWorkerHost(input: {
   if (claimHost.kind === 'cleared') {
     return null;
   }
-  const proofHost = readProviderLinearWorkerHost(
-    input.providerLinearWorkerProof,
-    stageStartedAt
-  );
-  if (proofHost.kind === 'host') {
-    return proofHost.value;
-  }
-  if (proofHost.kind === 'cleared') {
-    return null;
+  if (!proofStageStartedAt.invalid) {
+    const proofHost = readProviderLinearWorkerHost(
+      input.providerLinearWorkerProof,
+      proofStageStartedAt.value
+    );
+    if (proofHost.kind === 'host') {
+      return proofHost.value;
+    }
+    if (proofHost.kind === 'cleared') {
+      return null;
+    }
   }
   const selectedClaim = input.providerIntake?.selected_claim ?? null;
   if (!selectedClaim) {
@@ -845,6 +848,28 @@ function readValidTimestamp(value: string | null | undefined): string | null {
   }
   const trimmed = value.trim();
   return Number.isFinite(Date.parse(trimmed)) ? trimmed : null;
+}
+
+function hasTimestampText(value: string | null | undefined): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function resolveFreshnessStageStartedAt(
+  claimLaunchStartedAt: string | null | undefined,
+  stageStartedAt: string | null | undefined
+): { invalid: boolean; value: string | null } {
+  const validClaimLaunchStartedAt = readValidTimestamp(claimLaunchStartedAt);
+  if (validClaimLaunchStartedAt) {
+    return { invalid: false, value: validClaimLaunchStartedAt };
+  }
+  const validStageStartedAt = readValidTimestamp(stageStartedAt);
+  if (validStageStartedAt) {
+    return { invalid: false, value: validStageStartedAt };
+  }
+  return {
+    invalid: hasTimestampText(claimLaunchStartedAt) || hasTimestampText(stageStartedAt),
+    value: null
+  };
 }
 
 function readResolvedWorkerHost(
