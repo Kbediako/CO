@@ -1,6 +1,39 @@
 {
   "items": [
     {
+      "id": "20260505-linear-6a0e9f8a-80e2-4513-a2e9-13493c19c0c8",
+      "title": "CO-500 repair current-main docs:check backticked workspace path failures",
+      "relates_to": "tasks/tasks-linear-6a0e9f8a-80e2-4513-a2e9-13493c19c0c8.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-05",
+      "status": "in_progress",
+      "approvals": {
+        "traceability_packet": {
+          "reviewer": "provider worker",
+          "date": "2026-05-05",
+          "status": "produced",
+          "summary": "Created the CO-500 docs-first packet and registry mirrors before historical packet implementation edits, preserving docs:check, backticked-path-missing, the three protected .workspaces paths, CO-294, CO-398, CO-406, and the current-main-only scope."
+        },
+        "issue_quality_review": {
+          "reviewer": "provider worker",
+          "date": "2026-05-05",
+          "status": "approved-for-narrow-repair",
+          "summary": "Issue scope is explicit and current-main reproducible; implementation is limited to backticking five historical packet path mentions without docs-hygiene, Codex CLI posture, workflow pin, or broad docs-freshness changes."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-6a0e9f8a-80e2-4513-a2e9-13493c19c0c8.md",
+        "task": "tasks/tasks-linear-6a0e9f8a-80e2-4513-a2e9-13493c19c0c8.md",
+        "agent_task": ".agent/task/linear-6a0e9f8a-80e2-4513-a2e9-13493c19c0c8.md",
+        "prd": "docs/PRD-linear-6a0e9f8a-80e2-4513-a2e9-13493c19c0c8.md",
+        "docs": "docs/TECH_SPEC-linear-6a0e9f8a-80e2-4513-a2e9-13493c19c0c8.md",
+        "action_plan": "docs/ACTION_PLAN-linear-6a0e9f8a-80e2-4513-a2e9-13493c19c0c8.md"
+      }
+    },
+    {
       "id": "20260505-linear-07fdd989-5c10-4b24-ab5d-10fa9bf3732f",
       "title": "CO-499 classify terminal Codex connector failures in ready-review",
       "relates_to": "tasks/tasks-linear-07fdd989-5c10-4b24-ab5d-10fa9bf3732f.md",
