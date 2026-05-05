@@ -1948,8 +1948,12 @@ function extractProviderWorkerRuntimeReportedModel(
       ['payload', 'info', 'reviewModel'],
       ['params', 'review_model'],
       ['params', 'reviewModel'],
+      ['params', 'turn', 'review_model'],
+      ['params', 'turn', 'reviewModel'],
       ['payload', 'params', 'review_model'],
-      ['payload', 'params', 'reviewModel']
+      ['payload', 'params', 'reviewModel'],
+      ['payload', 'params', 'turn', 'review_model'],
+      ['payload', 'params', 'turn', 'reviewModel']
     ])
   );
   const reasoningEffort = normalizeProviderWorkerReasoningEffortValue(
@@ -1968,10 +1972,18 @@ function extractProviderWorkerRuntimeReportedModel(
       ['params', 'modelReasoningEffort'],
       ['params', 'reasoning_effort'],
       ['params', 'reasoningEffort'],
+      ['params', 'turn', 'model_reasoning_effort'],
+      ['params', 'turn', 'modelReasoningEffort'],
+      ['params', 'turn', 'reasoning_effort'],
+      ['params', 'turn', 'reasoningEffort'],
       ['payload', 'params', 'model_reasoning_effort'],
       ['payload', 'params', 'modelReasoningEffort'],
       ['payload', 'params', 'reasoning_effort'],
-      ['payload', 'params', 'reasoningEffort']
+      ['payload', 'params', 'reasoningEffort'],
+      ['payload', 'params', 'turn', 'model_reasoning_effort'],
+      ['payload', 'params', 'turn', 'modelReasoningEffort'],
+      ['payload', 'params', 'turn', 'reasoning_effort'],
+      ['payload', 'params', 'turn', 'reasoningEffort']
     ])
   );
   const payload = isRecord(input.payload) ? input.payload : null;
@@ -2045,6 +2057,9 @@ function buildProviderWorkerResolvedModelProvenance(input: {
     ? resolveProviderWorkerCommandModelOverrides(input.commandArgs)
     : buildEmptyProviderWorkerCommandModelOverrides();
   const commandModel = commandOverrides.model;
+  const hasCommandMetadataOverride = Boolean(
+    commandOverrides.review_model || commandOverrides.reasoning_effort
+  );
   const runtimeModel = input.runtimeReported?.model ?? null;
   const runtimeReviewModel = input.runtimeReported?.review_model ?? null;
   const runtimeReasoningEffort = input.runtimeReported?.reasoning_effort ?? null;
@@ -2095,13 +2110,16 @@ function buildProviderWorkerResolvedModelProvenance(input: {
             : null
     };
   }
-  if (commandModel) {
+  if (commandModel || hasCommandMetadataOverride) {
     return {
       ...common,
-      model: commandModel,
+      model: commandModel ?? input.configDefaults.model,
       source: 'command_override',
-      confidence: 'medium',
-      degraded_reason: 'runtime_model_unreported_command_override'
+      confidence: commandModel || input.configDefaults.model ? 'medium' : 'degraded',
+      degraded_reason:
+        commandModel || input.configDefaults.model
+          ? 'runtime_model_unreported_command_override'
+          : 'runtime_model_unreported_command_override_config_default_unavailable'
     };
   }
   if (input.configDefaults.model) {

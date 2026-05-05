@@ -2514,6 +2514,36 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
+  it('parses turn-nested runtime resolved model metadata from appserver notifications', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'notification',
+        method: 'turn/started',
+        params: {
+          turn: {
+            id: 'turn-1',
+            model: 'gpt-5.5',
+            review_model: 'gpt-5.5-review',
+            model_reasoning_effort: 'xhigh'
+          }
+        },
+        timestamp: '2026-05-05T04:40:01.000Z'
+      })
+    );
+
+    expect(parsed.resolvedModelProvenance).toMatchObject({
+      model: 'gpt-5.5',
+      review_model: 'gpt-5.5-review',
+      model_reasoning_effort: 'xhigh',
+      source: 'runtime_reported',
+      confidence: 'high',
+      degraded_reason: null,
+      runtime_model: 'gpt-5.5',
+      runtime_review_model: 'gpt-5.5-review',
+      runtime_reasoning_effort: 'xhigh'
+    });
+  });
+
   it('marks config backfilled runtime metadata as degraded provenance', () => {
     expect(
       buildProviderLinearWorkerResolvedModelProvenance({
@@ -2657,6 +2687,36 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       runtime_review_model: null,
       runtime_reasoning_effort: null,
       command_model: 'gpt-5.4',
+      config_model: 'gpt-5.5',
+      config_review_model: 'gpt-5.5',
+      config_reasoning_effort: 'xhigh',
+      config_path: '/tmp/codex-home/config.toml'
+    });
+  });
+
+  it('preserves metadata-only command overrides as command provenance', () => {
+    expect(
+      buildProviderLinearWorkerResolvedModelProvenance({
+        commandArgs: ['-c', 'model_reasoning_effort="high"', 'exec', '--json', 'prompt'],
+        configModel: 'gpt-5.5',
+        configReviewModel: 'gpt-5.5',
+        configReasoningEffort: 'xhigh',
+        configPath: '/tmp/codex-home/config.toml',
+        observedAt: '2026-05-05T04:40:03.000Z'
+      })
+    ).toEqual({
+      schema_version: 1,
+      model: 'gpt-5.5',
+      review_model: 'gpt-5.5',
+      model_reasoning_effort: 'high',
+      source: 'command_override',
+      confidence: 'medium',
+      degraded_reason: 'runtime_model_unreported_command_override',
+      observed_at: '2026-05-05T04:40:03.000Z',
+      runtime_model: null,
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: null,
       config_model: 'gpt-5.5',
       config_review_model: 'gpt-5.5',
       config_reasoning_effort: 'xhigh',
