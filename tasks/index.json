@@ -58,7 +58,7 @@
           "reviewer": "codex-orchestrator review",
           "date": "2026-05-05",
           "status": "bounded-success",
-          "telemetry": "../../.runs/linear-217c6584-bb47-486a-9765-f24e8ed84fc0/cli/2026-05-05T01-51-40-570Z-26cc39cc/review/telemetry.json",
+          "telemetry": ".runs/linear-217c6584-bb47-486a-9765-f24e8ed84fc0/cli/2026-05-05T01-51-40-570Z-26cc39cc/review/telemetry.json",
           "summary": "Final forced standalone review after the implementation-gate P2 fixture fix reported status=succeeded and review_outcome=bounded-success."
         },
         "elegance_pass": {
