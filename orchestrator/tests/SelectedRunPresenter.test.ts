@@ -47,6 +47,9 @@ function buildIssueRecord(
       ...(payload.provider_linear_worker_proof
         ? { provider_linear_worker_proof: payload.provider_linear_worker_proof }
         : {}),
+      ...(payload.provider_debug_snapshot
+        ? { provider_debug_snapshot: payload.provider_debug_snapshot }
+        : {}),
       ...(payload.dispatch_pilot ? { dispatch_pilot: payload.dispatch_pilot } : {})
     }
   };
@@ -431,6 +434,108 @@ describe('OperatorDashboardPresenter', () => {
         patch_artifact_path: '/repo/.runs/linear-e52-presenter-proof/cli/child-run-1/provider-linear-child-lane.patch'
       })
     ]);
+  });
+
+  it('keeps stale proof workspace paths from overriding current dashboard rows', () => {
+    const staleProof = {
+      issue_id: 'issue-10',
+      issue_identifier: 'CO-10',
+      attempt_started_at: '2026-03-27T03:00:00.000Z',
+      thread_id: null,
+      latest_turn_id: null,
+      latest_session_id: null,
+      latest_session_id_source: null,
+      turn_count: 0,
+      last_event: 'turn_running',
+      last_message: 'stale proof',
+      last_event_at: '2026-03-27T03:05:00.000Z',
+      tokens: {
+        input_tokens: 0,
+        output_tokens: 0,
+        total_tokens: 0
+      },
+      rate_limits: null,
+      owner_phase: 'turn_running',
+      owner_status: 'in_progress',
+      workspace_path: '/repo/.workspaces/stale-co-10',
+      linear_audit: null,
+      progress: null,
+      tracked_issue_error: null,
+      end_reason: null,
+      updated_at: '2026-03-27T03:05:00.000Z'
+    } as NonNullable<ControlIssuePayload['provider_linear_worker_proof']>;
+    const issue = buildIssueRecord({
+      issue_identifier: 'CO-10',
+      issue_id: 'issue-10',
+      task_id: 'linear-co-10',
+      run_id: 'run-10',
+      workspace: {
+        path: '/repo/.workspaces/current-co-10'
+      },
+      running: {
+        issue_id: 'issue-10',
+        issue_identifier: 'CO-10',
+        state: 'running',
+        display_state: 'running',
+        status_reason: null,
+        session_id: null,
+        turn_count: null,
+        last_event: 'provider_intake_refresh',
+        last_message: 'current row',
+        started_at: '2026-03-27T03:00:00.000Z',
+        last_event_at: '2026-03-27T04:05:00.000Z',
+        tokens: {
+          input_tokens: null,
+          output_tokens: null,
+          total_tokens: null
+        }
+      },
+      provider_debug_snapshot: {
+        live_linear_state: {
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-03-27T04:05:00.000Z'
+        },
+        claim: {
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          updated_at: '2026-03-27T04:05:00.000Z',
+          run_id: 'run-10',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-03-27T04:05:00.000Z',
+          launch_source: 'control-host',
+          launch_started_at: '2026-03-27T04:00:00.000Z',
+          retry: null,
+          freshness: 'current',
+          is_rehydrated: true,
+          rehydrated_at: '2026-03-27T04:05:00.000Z'
+        },
+        worker: null,
+        parallelization: null,
+        pull_request: null,
+        progress: null,
+        last_audit_operation: null,
+        last_cross_issue_audit_operation: null,
+        last_semantic_progress_at: '2026-03-27T04:05:00.000Z',
+        stall_classification: null,
+        stall_reason: null,
+        recovery_recommendation: null
+      },
+      provider_linear_worker_proof: staleProof
+    });
+
+    const dataset = buildUiDataset({
+      projection: buildProjection({
+        selected: null,
+        running: [issue.payload.running!],
+        retrying: [],
+        issues: [issue]
+      })
+    });
+
+    expect(dataset.running[0]?.workspace_path).toBe('/repo/.workspaces/current-co-10');
+    expect(dataset.issues[0]?.workspace.path).toBe('/repo/.workspaces/current-co-10');
   });
 
   it('falls back to the latest event when no recent agent-activity list exists', () => {

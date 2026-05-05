@@ -12,6 +12,7 @@ import type {
 } from './observabilityReadModel.js';
 import {
   buildProjectionSelectedPayload,
+  readProviderLinearWorkerWorkspacePath,
   resolveProviderWorkerHost,
   buildTrackedPayloadEnvelope,
   buildSelectedRunLatestEventPayload
@@ -884,6 +885,11 @@ export function buildCompatibilityIssuePayload(input: {
     issueId: input.source.issueId,
     stageStartedAt: input.source.startedAt
   });
+  const proofWorkspacePath = readProviderLinearWorkerWorkspacePath(
+    input.source.providerLinearWorkerProof,
+    input.source.startedAt,
+    input.source.providerDebugSnapshot
+  );
 
   return {
     issue_identifier: input.source.issueIdentifier,
@@ -895,7 +901,7 @@ export function buildCompatibilityIssuePayload(input: {
     display_status: input.source.displayStatus,
     status_reason: input.source.statusReason,
     workspace: {
-      path: input.source.workspacePath ?? input.source.providerLinearWorkerProof?.workspace_path ?? null
+      path: input.source.workspacePath ?? proofWorkspacePath ?? null
     },
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
     attempts: buildCompatibilityIssueAttempts(input.source, retryPayload),

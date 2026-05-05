@@ -17,7 +17,10 @@ import type {
   ControlProviderIntakeUnavailablePayload,
   ControlProviderWorkflowPayload
 } from './observabilityReadModel.js';
-import { resolveProviderWorkerHost } from './observabilityReadModel.js';
+import {
+  readProviderLinearWorkerWorkspacePath,
+  resolveProviderWorkerHost
+} from './observabilityReadModel.js';
 import { isoTimestamp } from '../utils/time.js';
 
 const LOCAL_HOSTNAME = hostname();
@@ -259,6 +262,11 @@ function buildIssuePayload(
       providerDebugSnapshot: issue.provider_debug_snapshot ?? null,
       stageStartedAt
     });
+  const proofWorkspacePath = readProviderLinearWorkerWorkspacePath(
+    proof,
+    stageStartedAt,
+    issue.provider_debug_snapshot ?? null
+  );
 
   return {
     issue_identifier: issue.issue_identifier,
@@ -272,7 +280,7 @@ function buildIssuePayload(
     title: trackedLinear?.title ?? null,
     url: trackedLinear?.url ?? null,
     workspace: {
-      path: issue.workspace.path ?? proof?.workspace_path ?? null,
+      path: issue.workspace.path ?? proofWorkspacePath ?? null,
       host: LOCAL_HOSTNAME
     },
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
@@ -310,18 +318,25 @@ function buildRunningSessionPayload(
 ): OperatorDashboardSessionPayload {
   const issue = issueRecord?.payload ?? null;
   const proof = issue?.provider_linear_worker_proof ?? null;
+  const stageStartedAt =
+    entry.started_at ??
+    issue?.running?.started_at ??
+    issue?.provider_debug_snapshot?.claim?.launch_started_at ??
+    null;
   const workerHost =
     entry.worker_host ??
     issue?.worker_host ??
     resolveProviderWorkerHost({
       providerLinearWorkerProof: proof,
       providerDebugSnapshot: issue?.provider_debug_snapshot ?? null,
-      stageStartedAt:
-        entry.started_at ??
-        issue?.running?.started_at ??
-        issue?.provider_debug_snapshot?.claim?.launch_started_at ??
-        null
+      stageStartedAt
     });
+  const proofWorkspacePath = readProviderLinearWorkerWorkspacePath(
+    proof,
+    stageStartedAt,
+    issue?.provider_debug_snapshot ?? null
+  );
+  const issueWorkspacePath = issue?.workspace.path ?? null;
   const resolvedModelProvenance =
     entry.resolved_model_provenance ??
     issue?.running?.resolved_model_provenance ??
@@ -350,7 +365,7 @@ function buildRunningSessionPayload(
     session_id: proof?.latest_session_id ?? entry.session_id,
     thread_id: proof?.thread_id ?? null,
     turn_count: proof?.turn_count ?? entry.turn_count,
-    workspace_path: issue?.workspace.path ?? proof?.workspace_path ?? null,
+    workspace_path: issueWorkspacePath ?? proofWorkspacePath ?? null,
     host: LOCAL_HOSTNAME,
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
     ...(resolvedModelProvenance ? { resolved_model_provenance: resolvedModelProvenance } : {}),

@@ -1,6 +1,38 @@
 {
   "items": [
     {
+      "id": "20260505-linear-937a5264-87ce-47fa-a932-f940d70c6600",
+      "title": "CO-484 keep co-status running row workspace paths issue-local",
+      "relates_to": "tasks/tasks-linear-937a5264-87ce-47fa-a932-f940d70c6600.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-05",
+      "approvals": {
+        "traceability_packet": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-05",
+          "status": "produced",
+          "summary": "Created the CO-484 docs-first packet and registry mirrors before the issue leaves Backlog, preserving row-local co-status workspace_path authority, provider_issue_rehydrated_active_run provenance, CO-456/CO-474 incident truth, and CO-398 fallback lineage."
+        },
+        "issue_quality_review": {
+          "reviewer": "parent orchestrator plus read-only queue audit",
+          "date": "2026-05-05",
+          "status": "approved-for-packet-first-admission",
+          "summary": "Issue scope is explicit and unblocked, but the issue text requires packet and registry mirrors before leaving Backlog; implementation remains limited to row-local status projection authority and must not broaden into provider admission, queue selection, docs freshness, PR checks, or CO-456/CO-474 behavior."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-937a5264-87ce-47fa-a932-f940d70c6600.md",
+        "task": "tasks/tasks-linear-937a5264-87ce-47fa-a932-f940d70c6600.md",
+        "agent_task": ".agent/task/linear-937a5264-87ce-47fa-a932-f940d70c6600.md",
+        "prd": "docs/PRD-linear-937a5264-87ce-47fa-a932-f940d70c6600.md",
+        "docs": "docs/TECH_SPEC-linear-937a5264-87ce-47fa-a932-f940d70c6600.md",
+        "action_plan": "docs/ACTION_PLAN-linear-937a5264-87ce-47fa-a932-f940d70c6600.md"
+      }
+    },
+    {
       "id": "20260505-linear-6a0e9f8a-80e2-4513-a2e9-13493c19c0c8",
       "title": "CO-500 repair current-main docs:check backticked workspace path failures",
       "relates_to": "tasks/tasks-linear-6a0e9f8a-80e2-4513-a2e9-13493c19c0c8.md",

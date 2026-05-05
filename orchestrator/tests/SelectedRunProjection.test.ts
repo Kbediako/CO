@@ -4033,6 +4033,221 @@ describe('SelectedRunProjection', () => {
     expect(selected?.workspacePath).toBe(join(root, '.workspaces', 'linear-lin-issue-1'));
   });
 
+  it('uses provider claim launch time when filtering selected-run proof workspace paths', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        started_at: '2026-03-20T01:00:00.000Z',
+        updated_at: '2026-03-20T01:10:00.000Z',
+        summary: 'provider run active',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          workspace_path: join(root, '.workspaces', 'stale-proof-workspace'),
+          attempt_started_at: '2026-03-20T01:05:00.000Z',
+          updated_at: '2026-03-20T01:06:00.000Z'
+        })
+      ),
+      'utf8'
+    );
+    const providerIntakeState = createProviderIntakeState(childPaths.manifestPath);
+    providerIntakeState.claims = providerIntakeState.claims.map((claim) => ({
+      ...claim,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      launch_started_at: '2026-03-20T01:20:00.000Z'
+    }));
+
+    const selected = await createProjectionReader(
+      paths,
+      childPaths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected?.workspacePath).toBe(root);
+    expect(selected?.providerLinearWorkerProof?.workspace_path).toBe(
+      join(root, '.workspaces', 'stale-proof-workspace')
+    );
+  });
+
+  it('falls back to valid manifest started_at when claim launch time is malformed', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        started_at: '2026-03-20T01:00:00.000Z',
+        updated_at: '2026-03-20T01:25:00.000Z',
+        summary: 'provider run active',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          workspace_path: join(root, '.workspaces', 'stale-proof-workspace'),
+          attempt_started_at: '2026-03-20T01:05:00.000Z',
+          updated_at: '2026-03-20T01:06:00.000Z'
+        })
+      ),
+      'utf8'
+    );
+    const providerIntakeState = createProviderIntakeState(childPaths.manifestPath);
+    providerIntakeState.claims = providerIntakeState.claims.map((claim) => ({
+      ...claim,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      launch_started_at: 'not-a-date'
+    }));
+
+    const selected = await createProjectionReader(
+      paths,
+      childPaths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected?.workspacePath).toBe(join(root, '.workspaces', 'stale-proof-workspace'));
+    expect(selected?.providerLinearWorkerProof?.workspace_path).toBe(
+      join(root, '.workspaces', 'stale-proof-workspace')
+    );
+  });
+
+  it('ignores blank selected-run proof workspace paths', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        started_at: '2026-03-20T01:00:00.000Z',
+        updated_at: '2026-03-20T01:10:00.000Z',
+        summary: 'provider run active',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          workspace_path: '   ',
+          attempt_started_at: '2026-03-20T01:05:00.000Z',
+          updated_at: '2026-03-20T01:06:00.000Z'
+        })
+      ),
+      'utf8'
+    );
+
+    const selected = await createProjectionReader(paths, childPaths.manifestPath).buildSelectedRunContext();
+
+    expect(selected?.workspacePath).toBe(root);
+    expect(selected?.providerLinearWorkerProof?.workspace_path).toBe('   ');
+  });
+
+  it('rejects stale proof when malformed claim launch time falls back to newer manifest started_at', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-child');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        started_at: '2026-03-20T01:20:00.000Z',
+        updated_at: '2026-03-20T01:25:00.000Z',
+        summary: 'provider run active',
+        commands: []
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(childPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          workspace_path: join(root, '.workspaces', 'stale-proof-workspace'),
+          attempt_started_at: '2026-03-20T01:05:00.000Z',
+          updated_at: '2026-03-20T01:06:00.000Z'
+        })
+      ),
+      'utf8'
+    );
+    const providerIntakeState = createProviderIntakeState(childPaths.manifestPath);
+    providerIntakeState.claims = providerIntakeState.claims.map((claim) => ({
+      ...claim,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      launch_started_at: 'not-a-date'
+    }));
+
+    const selected = await createProjectionReader(
+      paths,
+      childPaths.manifestPath,
+      providerIntakeState
+    ).buildSelectedRunContext();
+
+    expect(selected?.workspacePath).toBe(root);
+    expect(selected?.providerLinearWorkerProof?.workspace_path).toBe(
+      join(root, '.workspaces', 'stale-proof-workspace')
+    );
+  });
+
   it('projects the control-host workspace for child CLI manifests under repo-local overridden runs roots', async () => {
     const { root, paths } = await createHostPaths((repoRoot) => join(repoRoot, 'custom-runs'));
     const childEnv = {
