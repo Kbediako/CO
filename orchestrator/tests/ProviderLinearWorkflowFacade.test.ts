@@ -13650,7 +13650,7 @@ describe('providerLinearWorkflowFacade', () => {
     expect(calls).toEqual(['owner-search', 'create', 'update-description', 'owner-search', 'related-relation']);
   });
 
-  it('does not reuse prefix matches or diff-style canonical owner marker additions', async () => {
+  it('does not reuse prefix matches, diff additions, or copied marker examples', async () => {
     const canonicalOwnerKey = 'baseline_cohort_id:co-1';
     const longerCanonicalOwnerKey = 'baseline_cohort_id:co-10';
     const longerCanonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${longerCanonicalOwnerKey}`;
@@ -13696,6 +13696,37 @@ describe('providerLinearWorkflowFacade', () => {
                 'Patch excerpt, not an owner stamp.',
                 '```diff',
                 `+ Canonical owner marker: \`codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}\``,
+                '```'
+              ].join('\n'),
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            }),
+            buildCanonicalOwnerIssue({
+              id: 'lin-issue-12',
+              identifier: 'CO-12',
+              title: 'Checklist copy with marker',
+              description: [
+                'Copied checklist, not an owner stamp.',
+                `* Canonical owner marker: \`codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}\``
+              ].join('\n'),
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            }),
+            buildCanonicalOwnerIssue({
+              id: 'lin-issue-13',
+              identifier: 'CO-13',
+              title: 'Fenced owner example',
+              description: [
+                'Copied example, not an owner stamp.',
+                '```md',
+                '## Canonical Owner',
+                `* Canonical owner marker: \`codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}\``,
                 '```'
               ].join('\n'),
               state: {
