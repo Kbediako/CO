@@ -2804,6 +2804,65 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
+  it('parses thread-nested runtime resolved model metadata from appserver notifications', () => {
+    const paramsParsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'notification',
+        method: 'thread/started',
+        params: {
+          thread: {
+            id: 'thread-1',
+            model_slug: 'gpt-5.5',
+            reviewModel: 'gpt-5.5-review',
+            reasoningEffort: 'xhigh'
+          }
+        },
+        timestamp: '2026-05-05T04:40:01.000Z'
+      })
+    );
+    const payloadParsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'notification',
+        method: 'thread/started',
+        payload: {
+          params: {
+            thread: {
+              id: 'thread-2',
+              modelSlug: 'gpt-5.5',
+              collaboration_mode: {
+                settings: {
+                  reasoning_effort: 'xhigh'
+                }
+              }
+            }
+          }
+        },
+        timestamp: '2026-05-05T04:40:02.000Z'
+      })
+    );
+
+    expect(paramsParsed.resolvedModelProvenance).toMatchObject({
+      model: 'gpt-5.5',
+      review_model: 'gpt-5.5-review',
+      model_reasoning_effort: 'xhigh',
+      source: 'runtime_reported',
+      confidence: 'high',
+      degraded_reason: null,
+      runtime_model: 'gpt-5.5',
+      runtime_review_model: 'gpt-5.5-review',
+      runtime_reasoning_effort: 'xhigh'
+    });
+    expect(payloadParsed.resolvedModelProvenance).toMatchObject({
+      model: 'gpt-5.5',
+      model_reasoning_effort: 'xhigh',
+      source: 'runtime_reported',
+      confidence: 'high',
+      degraded_reason: null,
+      runtime_model: 'gpt-5.5',
+      runtime_reasoning_effort: 'xhigh'
+    });
+  });
+
   it('marks config backfilled runtime metadata as degraded provenance', () => {
     expect(
       buildProviderLinearWorkerResolvedModelProvenance({

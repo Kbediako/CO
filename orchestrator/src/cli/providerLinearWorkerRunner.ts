@@ -1925,12 +1925,18 @@ function extractProviderWorkerRuntimeReportedModel(
       ['params', 'turn', 'model'],
       ['params', 'turn', 'model_slug'],
       ['params', 'turn', 'modelSlug'],
+      ['params', 'thread', 'model'],
+      ['params', 'thread', 'model_slug'],
+      ['params', 'thread', 'modelSlug'],
       ['payload', 'params', 'model'],
       ['payload', 'params', 'model_slug'],
       ['payload', 'params', 'modelSlug'],
       ['payload', 'params', 'turn', 'model'],
       ['payload', 'params', 'turn', 'model_slug'],
       ['payload', 'params', 'turn', 'modelSlug'],
+      ['payload', 'params', 'thread', 'model'],
+      ['payload', 'params', 'thread', 'model_slug'],
+      ['payload', 'params', 'thread', 'modelSlug'],
       ['response', 'model'],
       ['payload', 'response', 'model'],
       ['params', 'response', 'model'],
@@ -1954,10 +1960,14 @@ function extractProviderWorkerRuntimeReportedModel(
       ['params', 'reviewModel'],
       ['params', 'turn', 'review_model'],
       ['params', 'turn', 'reviewModel'],
+      ['params', 'thread', 'review_model'],
+      ['params', 'thread', 'reviewModel'],
       ['payload', 'params', 'review_model'],
       ['payload', 'params', 'reviewModel'],
       ['payload', 'params', 'turn', 'review_model'],
-      ['payload', 'params', 'turn', 'reviewModel']
+      ['payload', 'params', 'turn', 'reviewModel'],
+      ['payload', 'params', 'thread', 'review_model'],
+      ['payload', 'params', 'thread', 'reviewModel']
     ])
   );
   const reasoningEffort = normalizeProviderWorkerReasoningEffortValue(
@@ -2000,6 +2010,16 @@ function extractProviderWorkerRuntimeReportedModel(
       ['params', 'turn', 'collaboration_mode', 'settings', 'reasoning_effort'],
       ['params', 'turn', 'collaboration_mode', 'settings', 'reasoningEffort'],
       ['params', 'turn', 'collaboration_mode', 'settings', 'effort'],
+      ['params', 'thread', 'model_reasoning_effort'],
+      ['params', 'thread', 'modelReasoningEffort'],
+      ['params', 'thread', 'reasoning_effort'],
+      ['params', 'thread', 'reasoningEffort'],
+      ['params', 'thread', 'effort'],
+      ['params', 'thread', 'collaboration_mode', 'settings', 'model_reasoning_effort'],
+      ['params', 'thread', 'collaboration_mode', 'settings', 'modelReasoningEffort'],
+      ['params', 'thread', 'collaboration_mode', 'settings', 'reasoning_effort'],
+      ['params', 'thread', 'collaboration_mode', 'settings', 'reasoningEffort'],
+      ['params', 'thread', 'collaboration_mode', 'settings', 'effort'],
       ['payload', 'params', 'model_reasoning_effort'],
       ['payload', 'params', 'modelReasoningEffort'],
       ['payload', 'params', 'reasoning_effort'],
@@ -2028,7 +2048,45 @@ function extractProviderWorkerRuntimeReportedModel(
       ],
       ['payload', 'params', 'turn', 'collaboration_mode', 'settings', 'reasoning_effort'],
       ['payload', 'params', 'turn', 'collaboration_mode', 'settings', 'reasoningEffort'],
-      ['payload', 'params', 'turn', 'collaboration_mode', 'settings', 'effort']
+      ['payload', 'params', 'turn', 'collaboration_mode', 'settings', 'effort'],
+      ['payload', 'params', 'thread', 'model_reasoning_effort'],
+      ['payload', 'params', 'thread', 'modelReasoningEffort'],
+      ['payload', 'params', 'thread', 'reasoning_effort'],
+      ['payload', 'params', 'thread', 'reasoningEffort'],
+      ['payload', 'params', 'thread', 'effort'],
+      [
+        'payload',
+        'params',
+        'thread',
+        'collaboration_mode',
+        'settings',
+        'model_reasoning_effort'
+      ],
+      [
+        'payload',
+        'params',
+        'thread',
+        'collaboration_mode',
+        'settings',
+        'modelReasoningEffort'
+      ],
+      [
+        'payload',
+        'params',
+        'thread',
+        'collaboration_mode',
+        'settings',
+        'reasoning_effort'
+      ],
+      [
+        'payload',
+        'params',
+        'thread',
+        'collaboration_mode',
+        'settings',
+        'reasoningEffort'
+      ],
+      ['payload', 'params', 'thread', 'collaboration_mode', 'settings', 'effort']
     ])
   );
   const payload = isRecord(input.payload) ? input.payload : null;
