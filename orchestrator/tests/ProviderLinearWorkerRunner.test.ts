@@ -355,6 +355,7 @@ type PersistedSessionLogHydrationState = {
   bootstrap_pending: boolean;
   proof_signature: string;
   id_rewind_signature?: string | null;
+  resolved_model_provenance?: unknown;
 };
 
 function createTrackedIssue(overrides: Partial<LiveLinearTrackedIssue> = {}): LiveLinearTrackedIssue {
@@ -2703,6 +2704,169 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       latest_turn_id: 'turn-2',
       latest_session_id: 'thread-1-turn-2'
     });
+    expect(persisted.resolved_model_provenance ?? null).toBeNull();
+  });
+
+  it('seeds proof-side runtime model provenance from stored hydration state', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '05', '05');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-05-05T04-40-00-thread-1.jsonl');
+    const storedProvenance = buildProviderLinearWorkerResolvedModelProvenance({
+      runtimeModel: 'gpt-5.5',
+      runtimeReasoningEffort: 'xhigh',
+      observedAt: '2026-05-05T04:40:01.000Z'
+    });
+    const rawSessionLog = [
+      JSON.stringify({
+        type: 'session_meta',
+        payload: {
+          id: 'thread-1',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        },
+        timestamp: '2026-05-05T04:40:00.000Z'
+      }),
+      JSON.stringify({
+        type: 'turn_context',
+        payload: {
+          turn_id: 'turn-1',
+          model: 'gpt-5.5',
+          model_reasoning_effort: 'xhigh'
+        },
+        timestamp: '2026-05-05T04:40:01.000Z'
+      })
+    ].join('\n');
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(sessionLogPath, rawSessionLog, 'utf8');
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          latest_turn_id: 'turn-1',
+          latest_session_id: 'thread-1-turn-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          resolved_model_provenance: storedProvenance,
+          workspace_path: tempRoot
+        })
+      ),
+      'utf8'
+    );
+
+    await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-05-05T04:40:30.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+    const olderPersistedProof = JSON.parse(
+      await readFile(proofPath, 'utf8')
+    ) as Record<string, unknown>;
+    delete olderPersistedProof.resolved_model_provenance;
+    await writeFile(proofPath, JSON.stringify(olderPersistedProof), 'utf8');
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-05-05T04:41:00.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+
+    expect(refreshed?.resolved_model_provenance).toMatchObject({
+      model: 'gpt-5.5',
+      model_reasoning_effort: 'xhigh',
+      source: 'runtime_reported',
+      confidence: 'high',
+      runtime_model: 'gpt-5.5',
+      runtime_reasoning_effort: 'xhigh'
+    });
+
+    const persisted = JSON.parse(await readFile(proofPath, 'utf8')) as Record<string, unknown>;
+    expect(persisted.resolved_model_provenance).toMatchObject({
+      model: 'gpt-5.5',
+      model_reasoning_effort: 'xhigh',
+      source: 'runtime_reported'
+    });
+    const persistedHydration = await readPersistedSessionLogHydrationState(hydrationPath);
+    expect(persistedHydration.resolved_model_provenance).toMatchObject({
+      model: 'gpt-5.5',
+      model_reasoning_effort: 'xhigh',
+      source: 'runtime_reported'
+    });
+  });
+
+  it('does not seed proof-side runtime model provenance from stale hydration state', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '05', '05');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-05-05T04-40-00-thread-1.jsonl');
+    const rawSessionLog = [
+      JSON.stringify({
+        type: 'session_meta',
+        payload: {
+          id: 'thread-1',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        },
+        timestamp: '2026-05-05T04:40:00.000Z'
+      }),
+      JSON.stringify({
+        type: 'turn_context',
+        payload: {
+          turn_id: 'turn-1',
+          model: 'gpt-5.4',
+          model_reasoning_effort: 'high'
+        },
+        timestamp: '2026-05-05T04:40:01.000Z'
+      })
+    ].join('\n');
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(sessionLogPath, rawSessionLog, 'utf8');
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          latest_turn_id: 'turn-1',
+          latest_session_id: 'thread-1-turn-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          resolved_model_provenance: null,
+          workspace_path: tempRoot
+        })
+      ),
+      'utf8'
+    );
+    await writeFile(
+      hydrationPath,
+      JSON.stringify({
+        path: sessionLogPath,
+        offset_bytes: Buffer.byteLength(rawSessionLog),
+        trailing_text: '',
+        bootstrap_pending: false,
+        proof_signature: 'stale-proof-signature',
+        id_rewind_signature: null,
+        resolved_model_provenance: buildProviderLinearWorkerResolvedModelProvenance({
+          runtimeModel: 'gpt-5.4',
+          runtimeReasoningEffort: 'high',
+          observedAt: '2026-05-05T04:40:01.000Z'
+        })
+      }),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-05-05T04:41:00.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+
+    expect(refreshed?.resolved_model_provenance ?? null).toBeNull();
+    const persisted = JSON.parse(await readFile(proofPath, 'utf8')) as Record<string, unknown>;
     expect(persisted.resolved_model_provenance ?? null).toBeNull();
   });
 

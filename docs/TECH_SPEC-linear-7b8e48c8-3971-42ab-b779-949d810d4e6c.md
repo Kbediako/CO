@@ -20,6 +20,7 @@ This mirror points to the canonical task spec at `tasks/specs/linear-7b8e48c8-39
 - Expose provenance through `CO STATUS` and read-model surfaces.
 - Prefer runtime-reported model/reasoning effort from `codex exec --json` and `codex exec resume --json` when available.
 - Merge active Codex profile config over root defaults for config-derived provenance.
+- Seed proof-side provenance from matching signed session-log hydration state when older proofs predate the proof field.
 - Record source/confidence/degraded reason when runtime model metadata is missing.
 
 ## Implementation Boundaries
@@ -62,6 +63,8 @@ This mirror points to the canonical task spec at `tasks/specs/linear-7b8e48c8-39
 - Implementation validation must show:
   - no-`--model` inherited-config path records current local `gpt-5.5` truthfully without pretending runtime proof
   - active profile config merges over root defaults, and requested missing profile config records degraded/unknown provenance
+  - pre-existing signed session-log hydration state can backfill proof-side resolved model provenance while stale hydration signatures are rejected
+  - selected-run projection refreshes older proofs when hydration state can backfill missing model provenance
   - explicit override path records override source when supported
   - missing runtime model metadata records degraded/unknown output
   - `CO STATUS` and read-model expose provenance without hiding degraded evidence

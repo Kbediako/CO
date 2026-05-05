@@ -123,7 +123,7 @@ export const PROVIDER_LINEAR_CHILD_LANE_PIPELINE_ID = 'provider-linear-child-lan
 export const PROVIDER_LINEAR_CHILD_LANE_RESERVED_SUMMARY = 'Child lane reserved before child run startup.';
 export const PROVIDER_LINEAR_CHILD_LANE_DIAGNOSTICS_FILENAME = 'provider-linear-child-lane-diagnostics.json';
 const PROVIDER_LINEAR_CHILD_LANE_PROOF_FILENAME = 'provider-linear-child-lane-proof.json';
-const PROVIDER_LINEAR_WORKER_SESSION_LOG_HYDRATION_FILENAME =
+export const PROVIDER_LINEAR_WORKER_SESSION_LOG_HYDRATION_FILENAME =
   'provider-linear-worker-session-log-hydration.json';
 const PROVIDER_LINEAR_WORKER_PROOF_LOCK_FILENAME = `${PROVIDER_LINEAR_WORKER_PROOF_FILENAME}.lock`;
 const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_FILENAME = `${PROVIDER_LINEAR_WORKER_CHILD_STREAMS_FILENAME}.lock`;
@@ -7889,6 +7889,14 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
   }
 
   const proofCurrentTurnActivity = selectProviderLinearWorkerCurrentTurnActivity(proof);
+  const matchingHydrationState = hydrationState?.path === sessionLogPath ? hydrationState : null;
+  const proofSignature = buildProviderWorkerSessionLogHydrationProofSignature(proof);
+  const hydrationStateResolvedModelProvenance =
+    matchingHydrationState?.proof_signature === proofSignature
+      ? matchingHydrationState.resolved_model_provenance ?? null
+      : null;
+  const proofBaselineResolvedModelProvenance =
+    proof.resolved_model_provenance ?? hydrationStateResolvedModelProvenance;
   const parseState = initializeProviderLinearWorkerJsonlInternalState(
     {
       threadId: proof.thread_id,
@@ -7900,7 +7908,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
       tokens: proof.tokens ?? buildEmptyProviderLinearWorkerTokenUsage(),
       rateLimits: proof.rate_limits,
       authProvenance: proof.auth_provenance ?? null,
-      resolvedModelProvenance: proof.resolved_model_provenance ?? null,
+      resolvedModelProvenance: proofBaselineResolvedModelProvenance,
       failureDiagnosis: proof.failure_diagnosis ?? null
     },
     selectProviderLinearWorkerProofFinalMessageSource(proof),
@@ -7918,7 +7926,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     parseState.agentMessageDeltaHydrationSeed = null;
     parseState.lastEventAt = proof.last_event_at;
     parseState.currentTurnActivity = proofCurrentTurnActivity;
-    parseState.resolvedModelProvenance = proof.resolved_model_provenance ?? null;
+    parseState.resolvedModelProvenance = proofBaselineResolvedModelProvenance;
     parseState.failureDiagnosis = proof.failure_diagnosis ?? null;
   };
   let tailState = buildProviderWorkerSessionLogTailState(
@@ -7927,9 +7935,8 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     proof.current_turn_started_at ?? null
   );
   let preserveProofTelemetryFloor = false;
-  if (hydrationState && hydrationState.path === sessionLogPath) {
-    const proofSignature = buildProviderWorkerSessionLogHydrationProofSignature(proof);
-    if (hydrationState.proof_signature !== proofSignature) {
+  if (matchingHydrationState) {
+    if (matchingHydrationState.proof_signature !== proofSignature) {
       const fileStat = await stat(sessionLogPath).catch(() => null);
       if (!fileStat?.isFile()) {
         preserveProofTelemetryFloor = true;
@@ -8052,7 +8059,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     liveTurnId
   });
   const proofResolvedModelProvenanceForHydration =
-    liveScopeChanged && proof.latest_turn_id !== null ? null : proof.resolved_model_provenance ?? null;
+    liveScopeChanged && proof.latest_turn_id !== null ? null : proofBaselineResolvedModelProvenance;
   const hydratedProof: ProviderLinearWorkerProof = {
     ...proof,
     thread_id: liveThreadId,

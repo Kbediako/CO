@@ -16,6 +16,7 @@ import {
   PROVIDER_LINEAR_CHILD_LANE_RESERVED_SUMMARY,
   PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
+  PROVIDER_LINEAR_WORKER_SESSION_LOG_HYDRATION_FILENAME,
   refreshProviderLinearWorkerProofSnapshot,
   type ProviderLinearWorkerProof
 } from '../providerLinearWorkerRunner.js';
@@ -2554,17 +2555,26 @@ async function resolveProviderLinearWorkerProjectionProofRefreshPlan(
     hasProviderLinearWorkerProjectionRetiredChildLaneResidue(proof) ||
     (await hasProviderLinearWorkerProjectionRetiredChildLaneResidueInLedger(runDir));
   const telemetryGap = hasProviderLinearWorkerProjectionTelemetryGap(proof);
+  const resolvedModelProvenanceHydrationGap =
+    await hasProviderLinearWorkerProjectionResolvedModelProvenanceHydrationGap(runDir, proof);
   const canSkipSessionLogHydration = canSkipProviderLinearWorkerProjectionSessionLogHydration(
     proof,
-    telemetryGap
+    telemetryGap || resolvedModelProvenanceHydrationGap
   );
   if (!isProviderLinearWorkerProjectionRefreshEligible(proof)) {
-    return hasRetiredResidue
-      ? {
-          updatedAtComparisonScope: 'full',
-          skipSessionLogHydration: canSkipSessionLogHydration
-        }
-      : null;
+    if (hasRetiredResidue) {
+      return {
+        updatedAtComparisonScope: 'full',
+        skipSessionLogHydration: canSkipSessionLogHydration
+      };
+    }
+    if (resolvedModelProvenanceHydrationGap) {
+      return {
+        updatedAtComparisonScope: 'telemetry',
+        skipSessionLogHydration: false
+      };
+    }
+    return null;
   }
   if (hasRetiredResidue) {
     return {
@@ -2590,7 +2600,7 @@ async function resolveProviderLinearWorkerProjectionProofRefreshPlan(
       skipSessionLogHydration: canSkipSessionLogHydration
     };
   }
-  return telemetryGap
+  return telemetryGap || resolvedModelProvenanceHydrationGap
     ? {
         updatedAtComparisonScope: 'telemetry',
         skipSessionLogHydration: false
@@ -2642,6 +2652,19 @@ function hasProviderLinearWorkerProjectionTelemetryGap(
     hasProviderLinearWorkerProjectionSessionLogHydrationGap(proof) ||
     hasProviderLinearWorkerProjectionAppServerSupervisionGap(proof)
   );
+}
+
+async function hasProviderLinearWorkerProjectionResolvedModelProvenanceHydrationGap(
+  runDir: string,
+  proof: ProviderLinearWorkerProof
+): Promise<boolean> {
+  if (proof.resolved_model_provenance) {
+    return false;
+  }
+  const hydrationState = await readJsonFile<Record<string, unknown>>(
+    join(runDir, PROVIDER_LINEAR_WORKER_SESSION_LOG_HYDRATION_FILENAME)
+  );
+  return isRecord(hydrationState?.resolved_model_provenance);
 }
 
 function hasProviderLinearWorkerProjectionAppServerSupervisionGap(
