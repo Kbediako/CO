@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-7b8e48c8-3971-42ab-b779-949d810d4e6c.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-05-03
+last_review: 2026-05-05
 ---
 
 # TECH_SPEC - CO-457 provider-worker resolved model provenance
@@ -41,6 +41,15 @@ This mirror points to the canonical task spec at `tasks/specs/linear-7b8e48c8-39
 - Runtime-reported metadata wins over config inference.
 - Explicit `--model` override, if supported in the parent implementation path, must be distinct from inherited default.
 - Missing runtime metadata must not be recorded as authoritative model proof.
+
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Provider-worker resolved model provenance | Degraded proof path for missing runtime model or effort metadata | expire fallback | CO-457 | Codex JSONL omits runtime model metadata from provider-worker `codex exec --json` or resume output | 2026-05-05 | 2026-05-19 | 2026-06-04 | Codex runtime always emits authoritative model/reasoning metadata for provider-worker runs, or CO adopts a stronger proof source | Focused runtime-reported, inherited-config, command override, unknown/degraded, hydration, and read-model projection tests |
+
+- Large refactor decision: no large refactor is justified; this remains a narrow proof/hydration/status projection extension under existing provider-worker authority.
+- Minor seam decision: the temporary degraded-provenance seam is acceptable only with source, confidence, degraded reason, expiry metadata, and focused validation.
 
 ## Validation Contract
 - Packet setup validation must show:

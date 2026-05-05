@@ -8,13 +8,19 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-03",
+      "last_review": "2026-05-05",
       "approvals": {
         "traceability_packet": {
           "reviewer": "CO-457 traceability packet branch",
           "date": "2026-05-03",
           "status": "produced",
           "summary": "Created the CO-457 docs-first packet and registry mirrors to clear backlog_head_follow_up_traceability_pending while preserving current local gpt-5.5/xhigh posture, portable gpt-5.4 fallback boundaries, provider-worker proof/read-model resolved model provenance requirements, degraded unknown provenance behavior, and CO-450/CO-451 non-goal boundaries."
+        },
+        "implementation_schema_review": {
+          "reviewer": "CO-457 parent implementation lane",
+          "date": "2026-05-05",
+          "status": "approved",
+          "summary": "Aligned implementation schema with the packet: resolved_model_provenance carries model_reasoning_effort, source, high/medium/degraded confidence, and expiry-scoped degraded proof for missing runtime metadata without changing model defaults."
         }
       },
       "paths": {
