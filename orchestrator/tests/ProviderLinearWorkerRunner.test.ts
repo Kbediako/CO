@@ -19,6 +19,7 @@ import {
   buildProviderWorkerPrompt,
   defaultAppServerTurnRunner,
   loadProviderLinearWorkerContext,
+  mergeProviderWorkerResolvedModelProvenance,
   parseProviderLinearWorkerJsonl,
   PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV,
   ProviderLinearTrackedIssueReadError,
@@ -2549,6 +2550,38 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
+  it('prefers explicit runtime metadata over matching config values while merging sparse records', () => {
+    const current = {
+      ...buildProviderLinearWorkerResolvedModelProvenance({
+        runtimeModel: 'gpt-5.5',
+        runtimeReasoningEffort: 'xhigh',
+        configModel: 'gpt-5.5',
+        configReasoningEffort: 'xhigh',
+        configPath: '/tmp/codex-home/config.toml',
+        observedAt: '2026-05-05T04:40:01.000Z'
+      }),
+      source: 'command_override' as const,
+      confidence: 'medium' as const,
+      degraded_reason: 'runtime_model_unreported_command_override',
+      command_model: 'gpt-5.5'
+    };
+    const observed = buildProviderLinearWorkerResolvedModelProvenance({
+      runtimeModel: 'gpt-5.5',
+      observedAt: '2026-05-05T04:40:02.000Z'
+    });
+
+    expect(mergeProviderWorkerResolvedModelProvenance(current, observed)).toMatchObject({
+      model: 'gpt-5.5',
+      model_reasoning_effort: 'xhigh',
+      source: 'runtime_reported',
+      confidence: 'high',
+      degraded_reason: null,
+      runtime_model: 'gpt-5.5',
+      runtime_reasoning_effort: 'xhigh',
+      config_reasoning_effort: 'xhigh'
+    });
+  });
+
   it('parses turn-nested runtime resolved model metadata from appserver notifications', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       JSON.stringify({
@@ -4770,6 +4803,123 @@ for await (const line of rl) {
       resolved_model_provenance: expectedResolvedModelProvenance
     });
     expect(JSON.stringify(written.auth_provenance ?? null)).not.toContain('gpt-5');
+  });
+
+  it('resets runtime-reported model provenance at turn bootstrap until the current turn reports it', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent(
+      [
+        'model = "gpt-5.5"',
+        'review_model = "gpt-5.5"',
+        'model_reasoning_effort = "xhigh"',
+        ''
+      ].join('\n')
+    );
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(createTrackedIssue())
+      .mockResolvedValueOnce(createTrackedIssue())
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed'
+        })
+      );
+    let currentNow = '2026-05-05T04:43:00.000Z';
+    const execRunner = vi
+      .fn<
+        (request: {
+          command: string;
+          args: string[];
+          cwd: string;
+          env: NodeJS.ProcessEnv;
+          mirrorOutput: boolean;
+        }) => Promise<{ exitCode: number; stdout: string; stderr: string }>
+      >()
+      .mockImplementationOnce(async (request) => {
+        await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+          turnIndex: 1
+        });
+        currentNow = '2026-05-05T04:43:01.000Z';
+        return {
+          exitCode: 0,
+          stdout: [
+            '{"type":"thread.started","thread_id":"thread-1"}',
+            '{"type":"turn_context","payload":{"turn_id":"turn-1","model":"gpt-5.5","model_reasoning_effort":"xhigh"},"timestamp":"2026-05-05T04:43:00.500Z"}',
+            '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-05-05T04:43:00.600Z"}}'
+          ].join('\n'),
+          stderr: ''
+        };
+      })
+      .mockImplementationOnce(async (request) => {
+        await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+          turnIndex: 2
+        });
+        return {
+          exitCode: 0,
+          stdout: [
+            '{"type":"thread.started","thread_id":"thread-1"}',
+            '{"type":"turn_context","payload":{"turn_id":"turn-2"}}',
+            '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-2","timestamp":"2026-05-05T04:43:01.500Z"}}'
+          ].join('\n'),
+          stderr: ''
+        };
+      });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '2',
+        CODEX_HOME: codexHome
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () =>
+          createRuntimeContext({
+            requested_mode: 'cli',
+            selected_mode: 'cli',
+            provider: 'CliRuntimeProvider'
+          })
+        ),
+        execRunner,
+        now: vi.fn(() => currentNow),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    const expectedResolvedModelProvenance = {
+      schema_version: 1,
+      model: 'gpt-5.5',
+      review_model: 'gpt-5.5',
+      model_reasoning_effort: 'xhigh',
+      source: 'config_default',
+      confidence: 'medium',
+      degraded_reason: 'runtime_model_unreported',
+      observed_at: '2026-05-05T04:43:01.000Z',
+      runtime_model: null,
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: null,
+      config_model: 'gpt-5.5',
+      config_review_model: 'gpt-5.5',
+      config_reasoning_effort: 'xhigh',
+      config_path: join(codexHome, 'config.toml')
+    };
+    expect(proof).toMatchObject({
+      latest_turn_id: 'turn-2',
+      resolved_model_provenance: expectedResolvedModelProvenance
+    });
+    expect(execRunner).toHaveBeenCalledTimes(2);
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      latest_turn_id: 'turn-2',
+      resolved_model_provenance: expectedResolvedModelProvenance
+    });
   });
 
   it('continues on the same thread across turns and writes a proof sidecar', async () => {

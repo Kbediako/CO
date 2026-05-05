@@ -2196,7 +2196,7 @@ function rankProviderWorkerResolvedModelSource(
   }
 }
 
-function mergeProviderWorkerResolvedModelProvenance(
+export function mergeProviderWorkerResolvedModelProvenance(
   current: ProviderLinearWorkerResolvedModelProvenance | null | undefined,
   observed: ProviderLinearWorkerResolvedModelProvenance | null | undefined
 ): ProviderLinearWorkerResolvedModelProvenance | null {
@@ -2234,10 +2234,18 @@ function mergeProviderWorkerResolvedModelProvenance(
     selected.model_reasoning_effort === null &&
     secondaryModelMetadata !== null &&
     secondaryModelMetadata.model_reasoning_effort !== null;
+  const secondaryReviewModelFromRuntime =
+    secondary.runtime_review_model !== null &&
+    secondary.review_model === secondary.runtime_review_model;
+  const secondaryReasoningEffortFromRuntime =
+    secondary.runtime_reasoning_effort !== null &&
+    secondary.model_reasoning_effort === secondary.runtime_reasoning_effort;
   const secondaryReviewModelFromConfig =
+    !secondaryReviewModelFromRuntime &&
     secondary.config_review_model !== null &&
     secondary.review_model === secondary.config_review_model;
   const secondaryReasoningEffortFromConfig =
+    !secondaryReasoningEffortFromRuntime &&
     secondary.config_reasoning_effort !== null &&
     secondary.model_reasoning_effort === secondary.config_reasoning_effort;
   const usesConfigMetadataBackfill =
@@ -2250,8 +2258,12 @@ function mergeProviderWorkerResolvedModelProvenance(
   const usesCommandMetadataBackfill =
     selected.source === 'runtime_reported' &&
     secondary.source === 'command_override' &&
-    ((backfillsReviewModel && !secondaryReviewModelFromConfig) ||
-      (backfillsReasoningEffort && !secondaryReasoningEffortFromConfig));
+    ((backfillsReviewModel &&
+      !secondaryReviewModelFromRuntime &&
+      !secondaryReviewModelFromConfig) ||
+      (backfillsReasoningEffort &&
+        !secondaryReasoningEffortFromRuntime &&
+        !secondaryReasoningEffortFromConfig));
   const missingRequiredRuntimeMetadata =
     selected.source === 'runtime_reported' && runtimeReasoningEffort === null;
   const partialRuntimeMetadata =
@@ -11628,10 +11640,9 @@ export async function runProviderLinearWorker(
             turnStartedAt,
             resumeSourceThreadIdForTurn
           ),
-          resolved_model_provenance: mergeProviderWorkerResolvedModelProvenance(
-            finalProof.resolved_model_provenance ?? null,
-            turnResolvedModelProvenance
-          )
+          // Runtime-reported model provenance is turn-scoped; start each turn from
+          // current command/config evidence until this turn reports runtime metadata.
+          resolved_model_provenance: turnResolvedModelProvenance
         }
       );
       const parallelizationDecisionCountBeforeTurn = readProviderLinearParallelizationSnapshots(
