@@ -98,6 +98,12 @@ const doctor: DoctorResult = {
       max_threads: { status: 'ok', expected_minimum: 12, actual: 12 },
       max_depth: { status: 'ok', expected_minimum: 4, actual: 4 }
     },
+    removed_features: {
+      status: 'ok',
+      configured: [],
+      co_managed_cleanup: [],
+      detail: 'No configured removed Codex feature keys detected.'
+    },
     guidance: []
   },
   collab: { status: 'ok', enabled: true, feature_key: 'multi_agent', enablement: [] },
