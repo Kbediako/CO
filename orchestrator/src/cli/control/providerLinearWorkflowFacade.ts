@@ -3275,16 +3275,57 @@ async function findCanonicalFollowUpOwnerIssues(input: {
 function descriptionHasExactCanonicalOwnerMarker(description: string | null | undefined, marker: string): boolean {
   const markerLines = new Set([
     `- Canonical owner marker: \`${marker}\``,
-    `- Canonical owner marker: ${marker}`,
     `* Canonical owner marker: \`${marker}\``,
+    `- Canonical owner marker: ${marker}`,
     `* Canonical owner marker: ${marker}`
   ]);
-  return normalizeOptionalString(description)
-    ?.split(/\r?\n/u)
-    .some((line) => {
-      const normalized = line.trim();
-      return markerLines.has(normalized);
-    }) ?? false;
+  const normalizedDescription = normalizeOptionalString(description);
+  if (!normalizedDescription) {
+    return false;
+  }
+  const canonicalOwnerSectionTitle = normalizeComparableValue('Canonical Owner');
+  let activeSection: string | null = null;
+  let activeCodeFenceDelimiter: string | null = null;
+  let activeCodeFenceContainerIndent = 0;
+  const listContinuationIndents: number[] = [];
+
+  for (const line of normalizedDescription.split(/\r?\n/u)) {
+    const { containerIndent, structuralLine } = getMarkdownFenceAwareStructuralLine(
+      listContinuationIndents,
+      line,
+      activeCodeFenceDelimiter,
+      activeCodeFenceContainerIndent
+    );
+    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, structuralLine);
+    if (codeFenceTransition.isBoundary) {
+      activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
+      activeCodeFenceContainerIndent = activeCodeFenceDelimiter === null ? 0 : containerIndent;
+      continue;
+    }
+    if (activeCodeFenceDelimiter) {
+      continue;
+    }
+
+    const headingMatch = structuralLine.match(/^[ ]{0,3}#{1,6}\s+(.+?)\s*$/u);
+    if (headingMatch) {
+      const headingTitle = headingMatch[1].replace(/\s+#+\s*$/u, '').trim();
+      activeSection = containerIndent === 0 ? normalizeComparableValue(headingTitle) : null;
+      listContinuationIndents.length = 0;
+      continue;
+    }
+
+    if (
+      activeSection === canonicalOwnerSectionTitle &&
+      containerIndent === 0 &&
+      /^[ ]{0,3}[-*]\s+/u.test(structuralLine) &&
+      markerLines.has(structuralLine.trim())
+    ) {
+      return true;
+    }
+    recordMarkdownListContinuationIndent(listContinuationIndents, structuralLine, containerIndent);
+  }
+
+  return false;
 }
 
 function selectCanonicalOwnerIssue(issues: ProviderLinearCreatedIssue[]): ProviderLinearCreatedIssue | null {
