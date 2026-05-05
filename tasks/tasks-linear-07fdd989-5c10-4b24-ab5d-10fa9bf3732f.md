@@ -20,8 +20,9 @@
 - [x] Issue-quality review captured (pre-implementation) - Evidence: `tasks/specs/linear-07fdd989-5c10-4b24-ab5d-10fa9bf3732f.md` carries protected terms, wrong interpretations, explicit non-goals, parity matrix, and Not Done If clauses.
 - [x] Fallback / refactor decision captured (pre-implementation) - Evidence: `tasks/specs/linear-07fdd989-5c10-4b24-ab5d-10fa9bf3732f.md` removes terminal-failure-as-pending and retains manual retry and hard review gates as explicit contracts.
 - [x] Durable fallback retention evidence captured - Evidence: manual one-ping-per-head Codex retry and hard review gate separation are documented in the PRD, TECH_SPEC, and ACTION_PLAN.
-- [ ] Docs-review manifest captured - Evidence: pending.
+- [x] Docs-review manifest captured - Evidence: `.runs/linear-07fdd989-5c10-4b24-ab5d-10fa9bf3732f-docs-review/cli/2026-05-05T11-03-29-937Z-d6cbc9b2/manifest.json` and `review/telemetry.json` report `status=succeeded`, `review_outcome=clean-success`.
 - [x] Implementation review manifest captured - Evidence: `.runs/linear-07fdd989-5c10-4b24-ab5d-10fa9bf3732f-implementation-gate/cli/2026-05-05T10-50-48-141Z-70c7ffa2/manifest.json` and `review/telemetry.json` report `status=succeeded`, `review_outcome=clean-success`.
+- [x] Elegance / minimality pass captured - Evidence: parent pass kept the classifier inside existing ready-review signal helpers, retained the bounded phrase matcher, and made no extra code changes after clean standalone reviews.
 - [ ] PR review handoff evidence captured - Evidence: pending.
 
 ### Progress Log
@@ -30,6 +31,8 @@
 - 2026-05-05: Registered packet mirrors in `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json`; validation passed `git diff --check`, JSON parse, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, and `npm run docs:freshness`.
 - 2026-05-05: Implemented terminal Codex connector failure classification in `scripts/lib/pr-watch-merge.js`, surfaced `bot_rereview_terminal_failure=codex(unknown_error;manual_retry=@codex_review)`, updated declarations, and added focused regressions in `tests/pr-watch-merge.spec.ts`.
 - 2026-05-05: Focused and broad validation passed: `npm test -- tests/pr-watch-merge.spec.ts` (95 tests), `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `git diff --check`, `npm run build`, `npm run lint` (warnings only in pre-existing DelegationMcpHealth tests), `npm run test` (359 files / 5356 tests), `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, `node scripts/diff-budget.mjs`, and `npm run pack:smoke`.
+- 2026-05-05: Docs-review child stream completed cleanly with manifest `.runs/linear-07fdd989-5c10-4b24-ab5d-10fa9bf3732f-docs-review/cli/2026-05-05T11-03-29-937Z-d6cbc9b2/manifest.json`; parent minimality pass found no smaller safe change than the existing helper-local classifier and focused tests.
+- 2026-05-05: Implementation PR `#773` is the current Linear attachment; initial PR sweep found no inline review threads and only in-progress CodeRabbit/checks before the final ready-review drain.
 
 ## Parent Tasks
 1. Register traceability packet.
