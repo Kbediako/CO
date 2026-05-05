@@ -1731,6 +1731,12 @@ interface ProviderWorkerRuntimeReportedModel {
   observed_at: string | null;
 }
 
+interface ProviderWorkerCommandModelOverrides {
+  model: string | null;
+  review_model: string | null;
+  reasoning_effort: string | null;
+}
+
 async function readProviderWorkerConfigModelDefaults(
   env: NodeJS.ProcessEnv,
   readText: (path: string) => Promise<string> = async (path) => await readFile(path, 'utf8')
@@ -1833,17 +1839,66 @@ function normalizeProviderWorkerReasoningEffortValue(value: unknown): string | n
   return /^[a-z][a-z0-9_]*$/u.test(normalized) ? normalized : null;
 }
 
-function resolveProviderWorkerCommandModelOverride(args: string[]): string | null {
+function buildEmptyProviderWorkerCommandModelOverrides(): ProviderWorkerCommandModelOverrides {
+  return {
+    model: null,
+    review_model: null,
+    reasoning_effort: null
+  };
+}
+
+function mergeProviderWorkerCommandConfigOverride(
+  current: ProviderWorkerCommandModelOverrides,
+  rawOverride: string | undefined
+): ProviderWorkerCommandModelOverrides {
+  if (!rawOverride) {
+    return current;
+  }
+  const trimmed = rawOverride.trim();
+  return {
+    model:
+      normalizeProviderWorkerModelSlug(readTomlStringAssignment(trimmed, 'model')) ??
+      current.model,
+    review_model:
+      normalizeProviderWorkerModelSlug(readTomlStringAssignment(trimmed, 'review_model')) ??
+      current.review_model,
+    reasoning_effort:
+      normalizeProviderWorkerReasoningEffortValue(
+        readTomlStringAssignment(trimmed, 'model_reasoning_effort')
+      ) ?? current.reasoning_effort
+  };
+}
+
+function resolveProviderWorkerCommandModelOverrides(args: string[]): ProviderWorkerCommandModelOverrides {
+  let overrides = buildEmptyProviderWorkerCommandModelOverrides();
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
-    if (arg === '--model') {
-      return normalizeProviderWorkerModelSlug(args[index + 1]);
+    if (arg === '--model' || arg === '-m') {
+      overrides = {
+        ...overrides,
+        model: normalizeProviderWorkerModelSlug(args[index + 1]) ?? overrides.model
+      };
+      continue;
     }
     if (arg.startsWith('--model=')) {
-      return normalizeProviderWorkerModelSlug(arg.slice('--model='.length));
+      overrides = {
+        ...overrides,
+        model: normalizeProviderWorkerModelSlug(arg.slice('--model='.length)) ?? overrides.model
+      };
+      continue;
+    }
+    if (arg === '-c' || arg === '--config') {
+      overrides = mergeProviderWorkerCommandConfigOverride(overrides, args[index + 1]);
+      continue;
+    }
+    if (arg.startsWith('--config=')) {
+      overrides = mergeProviderWorkerCommandConfigOverride(
+        overrides,
+        arg.slice('--config='.length)
+      );
     }
   }
-  return null;
+  return overrides;
 }
 
 function extractProviderWorkerRuntimeReportedModel(
@@ -1982,9 +2037,10 @@ function buildProviderWorkerResolvedModelProvenance(input: {
   configDefaults: ProviderWorkerConfigModelDefaults;
   observedAt: string | null;
 }): ProviderLinearWorkerResolvedModelProvenance {
-  const commandModel = input.commandArgs
-    ? resolveProviderWorkerCommandModelOverride(input.commandArgs)
-    : null;
+  const commandOverrides = input.commandArgs
+    ? resolveProviderWorkerCommandModelOverrides(input.commandArgs)
+    : buildEmptyProviderWorkerCommandModelOverrides();
+  const commandModel = commandOverrides.model;
   const runtimeModel = input.runtimeReported?.model ?? null;
   const runtimeReviewModel = input.runtimeReported?.review_model ?? null;
   const runtimeReasoningEffort = input.runtimeReported?.reasoning_effort ?? null;
@@ -1992,9 +2048,9 @@ function buildProviderWorkerResolvedModelProvenance(input: {
   const common = {
     schema_version: 1 as const,
     review_model:
-      runtimeReviewModel ?? input.configDefaults.review_model ?? null,
+      runtimeReviewModel ?? commandOverrides.review_model ?? input.configDefaults.review_model ?? null,
     model_reasoning_effort:
-      runtimeReasoningEffort ?? input.configDefaults.reasoning_effort ?? null,
+      runtimeReasoningEffort ?? commandOverrides.reasoning_effort ?? input.configDefaults.reasoning_effort ?? null,
     observed_at: observedAt,
     runtime_model: runtimeModel,
     runtime_review_model: runtimeReviewModel,
@@ -11469,7 +11525,7 @@ export async function runProviderLinearWorker(
       const previousTurnProof = finalProof;
       const turnStartedAt = deps.now();
       const turnResolvedModelProvenance = buildProviderWorkerResolvedModelProvenance({
-        commandArgs: args,
+        commandArgs: resolved.args,
         configDefaults: configModelDefaults,
         observedAt: turnStartedAt
       });

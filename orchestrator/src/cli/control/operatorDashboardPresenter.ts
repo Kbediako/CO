@@ -47,6 +47,7 @@ export interface OperatorDashboardSessionPayload {
   host: string;
   worker_host?: string | null;
   worker_control?: NonNullable<ControlIssuePayload['provider_linear_worker_proof']>['worker_control'] | null;
+  resolved_model_provenance?: ControlRunningPayload['resolved_model_provenance'];
   last_event: string | null;
   last_message: string | null;
   display_event?: string | null;
@@ -75,6 +76,7 @@ export interface OperatorDashboardRetryPayload {
   workspace_path: string | null;
   host: string;
   worker_host?: string | null;
+  resolved_model_provenance?: ControlRetryPayload['resolved_model_provenance'];
   attempt: number | null;
   due_at: string | null;
   error: string | null;
@@ -320,6 +322,11 @@ function buildRunningSessionPayload(
         issue?.provider_debug_snapshot?.claim?.launch_started_at ??
         null
     });
+  const resolvedModelProvenance =
+    entry.resolved_model_provenance ??
+    issue?.running?.resolved_model_provenance ??
+    proof?.resolved_model_provenance ??
+    null;
   return {
     issue_identifier: entry.issue_identifier,
     issue_id: entry.issue_id,
@@ -346,6 +353,7 @@ function buildRunningSessionPayload(
     workspace_path: issue?.workspace.path ?? proof?.workspace_path ?? null,
     host: LOCAL_HOSTNAME,
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
+    ...(resolvedModelProvenance ? { resolved_model_provenance: resolvedModelProvenance } : {}),
     worker_control: proof?.worker_control ?? null,
     last_event: entry.last_event,
     last_message: entry.last_message,
@@ -375,6 +383,11 @@ function buildRetryQueuePayload(
         issue?.provider_debug_snapshot?.claim?.launch_started_at ??
         null
     });
+  const resolvedModelProvenance =
+    entry.resolved_model_provenance ??
+    issue?.retry?.resolved_model_provenance ??
+    proof?.resolved_model_provenance ??
+    null;
   return {
     issue_identifier: entry.issue_identifier,
     issue_id: entry.issue_id,
@@ -400,6 +413,7 @@ function buildRetryQueuePayload(
     workspace_path: entry.workspace_path ?? null,
     host: LOCAL_HOSTNAME,
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
+    ...(resolvedModelProvenance ? { resolved_model_provenance: resolvedModelProvenance } : {}),
     attempt: entry.attempt,
     due_at: entry.due_at,
     error: entry.error,

@@ -2534,6 +2534,46 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
+  it('resolves injected -c model overrides as command provenance', () => {
+    expect(
+      buildProviderLinearWorkerResolvedModelProvenance({
+        commandArgs: [
+          '-c',
+          'model="gpt-5.4"',
+          '-c',
+          'review_model="gpt-5.4"',
+          '-c',
+          'model_reasoning_effort="high"',
+          'exec',
+          '--json',
+          'prompt'
+        ],
+        configModel: 'gpt-5.5',
+        configReviewModel: 'gpt-5.5',
+        configReasoningEffort: 'xhigh',
+        configPath: '/tmp/codex-home/config.toml',
+        observedAt: '2026-05-05T04:40:03.000Z'
+      })
+    ).toEqual({
+      schema_version: 1,
+      model: 'gpt-5.4',
+      review_model: 'gpt-5.4',
+      model_reasoning_effort: 'high',
+      source: 'command_override',
+      confidence: 'medium',
+      degraded_reason: 'runtime_model_unreported_command_override',
+      observed_at: '2026-05-05T04:40:03.000Z',
+      runtime_model: null,
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: 'gpt-5.4',
+      config_model: 'gpt-5.5',
+      config_review_model: 'gpt-5.5',
+      config_reasoning_effort: 'xhigh',
+      config_path: '/tmp/codex-home/config.toml'
+    });
+  });
+
   it('preserves Codex 0.121 account/auth-profile provenance while redacting raw values', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [
@@ -4066,6 +4106,106 @@ for await (const line of rl) {
       resolved_model_provenance: expectedResolvedModelProvenance
     });
     expect(JSON.stringify(written.auth_provenance ?? null)).not.toContain('gpt-5.5');
+  });
+
+  it('records resolved command override provenance from injected config args', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent(
+      [
+        'model = "gpt-5.5"',
+        'review_model = "gpt-5.5"',
+        'model_reasoning_effort = "xhigh"',
+        ''
+      ].join('\n')
+    );
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(createTrackedIssue())
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed'
+        })
+      );
+    const execRunner = vi.fn(async (request) => {
+      expect(request.args).toEqual([
+        '-c',
+        'model="gpt-5.4"',
+        '-c',
+        'review_model="gpt-5.4"',
+        '-c',
+        'model_reasoning_effort="high"',
+        'exec',
+        '--json',
+        expect.stringContaining('full first-turn task prompt')
+      ]);
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+        turnIndex: 1
+      });
+      return {
+        exitCode: 0,
+        stdout: PROVIDER_WORKER_TASK_COMPLETE_STDOUT,
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_HOME: codexHome
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () =>
+          createRuntimeContext(
+            {
+              requested_mode: 'cli',
+              selected_mode: 'cli',
+              provider: 'CliRuntimeProvider'
+            },
+            {
+              CODEX_CONFIG_OVERRIDES:
+                'model="gpt-5.4";review_model="gpt-5.4";model_reasoning_effort="high"'
+            }
+          )
+        ),
+        execRunner,
+        now: vi.fn().mockReturnValue('2026-05-05T04:41:30.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    const expectedResolvedModelProvenance = {
+      schema_version: 1,
+      model: 'gpt-5.4',
+      review_model: 'gpt-5.4',
+      model_reasoning_effort: 'high',
+      source: 'command_override',
+      confidence: 'medium',
+      degraded_reason: 'runtime_model_unreported_command_override',
+      observed_at: '2026-05-05T04:41:30.000Z',
+      runtime_model: null,
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: 'gpt-5.4',
+      config_model: 'gpt-5.5',
+      config_review_model: 'gpt-5.5',
+      config_reasoning_effort: 'xhigh',
+      config_path: join(codexHome, 'config.toml')
+    };
+    expect(proof as unknown as Record<string, unknown>).toMatchObject({
+      resolved_model_provenance: expectedResolvedModelProvenance
+    });
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      resolved_model_provenance: expectedResolvedModelProvenance
+    });
   });
 
   it('records degraded unknown resolved model provenance when runtime and config metadata are missing', async () => {
