@@ -3273,13 +3273,17 @@ async function findCanonicalFollowUpOwnerIssues(input: {
 }
 
 function descriptionHasExactCanonicalOwnerMarker(description: string | null | undefined, marker: string): boolean {
-  const markerLine = `- Canonical owner marker: \`${marker}\``;
-  const unquotedMarkerLine = `- Canonical owner marker: ${marker}`;
+  const markerLines = new Set([
+    `- Canonical owner marker: \`${marker}\``,
+    `- Canonical owner marker: ${marker}`,
+    `* Canonical owner marker: \`${marker}\``,
+    `* Canonical owner marker: ${marker}`
+  ]);
   return normalizeOptionalString(description)
     ?.split(/\r?\n/u)
     .some((line) => {
       const normalized = line.trim();
-      return normalized === markerLine || normalized === unquotedMarkerLine;
+      return markerLines.has(normalized);
     }) ?? false;
 }
 
