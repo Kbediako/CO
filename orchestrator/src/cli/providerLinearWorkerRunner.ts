@@ -2197,20 +2197,34 @@ function mergeProviderWorkerResolvedModelProvenance(
   const reviewModel = selected.review_model ?? secondary.review_model ?? null;
   const reasoningEffort =
     selected.model_reasoning_effort ?? secondary.model_reasoning_effort ?? null;
+  const runtimeReviewModel =
+    selected.runtime_review_model ?? secondary.runtime_review_model ?? null;
+  const runtimeReasoningEffort =
+    selected.runtime_reasoning_effort ?? secondary.runtime_reasoning_effort ?? null;
+  const backfillsReviewModel = selected.review_model === null && secondary.review_model !== null;
+  const backfillsReasoningEffort =
+    selected.model_reasoning_effort === null &&
+    secondary.model_reasoning_effort !== null;
+  const secondaryReviewModelFromConfig =
+    secondary.config_review_model !== null &&
+    secondary.review_model === secondary.config_review_model;
+  const secondaryReasoningEffortFromConfig =
+    secondary.config_reasoning_effort !== null &&
+    secondary.model_reasoning_effort === secondary.config_reasoning_effort;
   const usesConfigMetadataBackfill =
     selected.source === 'runtime_reported' &&
-    secondary.source === 'config_default' &&
-    ((selected.review_model === null && secondary.review_model !== null) ||
-      (selected.model_reasoning_effort === null &&
-        secondary.model_reasoning_effort !== null));
+    ((secondary.source === 'config_default' &&
+      (backfillsReviewModel || backfillsReasoningEffort)) ||
+      (secondary.source === 'command_override' &&
+        ((backfillsReviewModel && secondaryReviewModelFromConfig) ||
+          (backfillsReasoningEffort && secondaryReasoningEffortFromConfig))));
   const usesCommandMetadataBackfill =
     selected.source === 'runtime_reported' &&
     secondary.source === 'command_override' &&
-    ((selected.review_model === null && secondary.review_model !== null) ||
-      (selected.model_reasoning_effort === null &&
-        secondary.model_reasoning_effort !== null));
+    ((backfillsReviewModel && !secondaryReviewModelFromConfig) ||
+      (backfillsReasoningEffort && !secondaryReasoningEffortFromConfig));
   const missingRequiredRuntimeMetadata =
-    selected.source === 'runtime_reported' && selected.runtime_reasoning_effort === null;
+    selected.source === 'runtime_reported' && runtimeReasoningEffort === null;
   const partialRuntimeMetadata =
     usesCommandMetadataBackfill ||
     usesConfigMetadataBackfill ||
@@ -2226,16 +2240,20 @@ function mergeProviderWorkerResolvedModelProvenance(
     ...selected,
     review_model: reviewModel,
     model_reasoning_effort: reasoningEffort,
-    confidence: partialRuntimeMetadata ? 'medium' : selected.confidence,
+    confidence: partialRuntimeMetadata
+      ? 'medium'
+      : selected.source === 'runtime_reported' && runtimeReasoningEffort !== null
+        ? 'high'
+        : selected.confidence,
     degraded_reason: partialRuntimeMetadata
       ? (degradedReason ?? selected.degraded_reason)
+      : selected.source === 'runtime_reported' && runtimeReasoningEffort !== null
+        ? null
       : selected.degraded_reason,
     observed_at: selected.observed_at ?? secondary.observed_at ?? null,
     runtime_model: selected.runtime_model ?? secondary.runtime_model ?? null,
-    runtime_review_model:
-      selected.runtime_review_model ?? secondary.runtime_review_model ?? null,
-    runtime_reasoning_effort:
-      selected.runtime_reasoning_effort ?? secondary.runtime_reasoning_effort ?? null,
+    runtime_review_model: runtimeReviewModel,
+    runtime_reasoning_effort: runtimeReasoningEffort,
     command_model: selected.command_model ?? secondary.command_model ?? null,
     config_model: selected.config_model ?? secondary.config_model ?? null,
     config_review_model: selected.config_review_model ?? secondary.config_review_model ?? null,
