@@ -16,7 +16,4 @@
 - Handoff requires attached PR, zero unresolved actionable review threads, green checks, and clean ready-review drain.
 
 ## Rollback
-Revert the CO-424 commit if the lineage or lifecycle closeout guard weakens active-turn enforcement. Do not mutate `CO-423` / `PR #721` history during rollback.
-
-## Notes
-Adjacent issues `CO-326`, `CO-403`, `CO-408`, and `CO-417` are trace context only.
+Revert the CO-424 commit if the lineage or lifecycle closeout guard weakens active-turn enforcement. Do not mutate `CO-423` / `PR #721`; adjacent issues `CO-326`, `CO-403`, `CO-408`, and `CO-417` are trace context only.

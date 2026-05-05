@@ -7417,10 +7417,7 @@ function childLaneLaunchBelongsToParallelizationDecision(input: {
       return false;
     }
     const childDecision = childLineage?.decision ?? null;
-    if (
-      childDecision === 'parallelize_now' &&
-      input.parallelization.decision !== 'parallelize_now'
-    ) {
+    if (childDecision && childDecision !== input.parallelization.decision) {
       return false;
     }
   }
@@ -7778,18 +7775,11 @@ function hasCurrentTurnLifecycleCloseoutAuditOnly(input: {
   });
 }
 
-function hasCurrentTurnNonLifecycleCloseoutAuditEntry(input: {
-  linearAudit: ProviderLinearAuditSummary | null | undefined;
-  currentTurnStartedAt: string | null | undefined;
-  issueId: string | null | undefined;
-}): boolean {
-  return selectCurrentTurnProviderLinearAuditEntries(input).some(
-    (entry) => !isLifecycleCloseoutAuditEntry(entry)
-  );
-}
-
 function providerLinearWorkerProofHasDirtySourceRoot(proof: ProviderLinearWorkerProof): boolean {
   const freshness = proof.source_root_freshness ?? null;
+  if (!freshness) {
+    return true;
+  }
   const sourceDirty = freshness?.source_checkout?.dirty?.status ?? null;
   const intendedDirty = freshness?.intended_checkout?.dirty?.status ?? null;
   return sourceDirty === 'dirty' || intendedDirty === 'dirty';
@@ -7858,17 +7848,6 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
     normalizeOptionalString(input.proof.current_turn_started_at) ??
     normalizeOptionalString(input.proof.attempt_started_at);
   if (currentTurnParallelizationDecisions.length === 0) {
-    if (
-      !hasCurrentTurnChildLaneLaunch(input.proof.child_lanes, currentTurnBoundary) &&
-      !providerLinearWorkerProofHasDirtySourceRoot(input.proof) &&
-      hasCurrentTurnLifecycleCloseoutAuditOnly({
-        linearAudit: input.proof.linear_audit,
-        currentTurnStartedAt: currentTurnBoundary,
-        issueId: input.proof.issue_id
-      })
-    ) {
-      return null;
-    }
     return {
       endReason: 'parallelization_decision_missing',
       message:
@@ -12563,7 +12542,7 @@ export async function runProviderLinearWorker(
           parallelizationFailure.endReason === 'parallelization_decision_missing' &&
           !hasCurrentTurnChildLaneLaunch(finalProof.child_lanes, currentTurnBoundary) &&
           !providerLinearWorkerProofHasDirtySourceRoot(finalProof) &&
-          !hasCurrentTurnNonLifecycleCloseoutAuditEntry({
+          hasCurrentTurnLifecycleCloseoutAuditOnly({
             linearAudit: finalProof.linear_audit,
             currentTurnStartedAt: currentTurnBoundary,
             issueId: finalProof.issue_id

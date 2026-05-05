@@ -7,37 +7,16 @@ Fix the `provider-linear-worker` closeout class exposed by `CO-423` / `PR #721`:
 `CO-423` reached review and later merged cleanly, but provider runs ended failed with `parallelization_serial_conflict` and then `parallelization_decision_missing`. The decisive evidence was a stale same-turn interpretation: earlier `same-issue child lanes` were counted against later `stay_serial` / `forbid_parallel` lifecycle decisions, and lifecycle-only Done bookkeeping still expected a fresh implementation-turn decision. Repeated stale `proof lock` diagnostics also made the terminal cause harder to read.
 
 ## Protected Terms
-- `parallelization_serial_conflict`
-- `parallelization_decision_missing`
-- `stay_serial`
-- `forbid_parallel`
-- `same-issue child lanes`
-- `review handoff`
-- `merge handoff`
-- `post-merge/Done closeout`
-- `provider-linear-worker`
-- `proof lock`
-- `CO-423`
-- `PR #721`
+`parallelization_serial_conflict`, `parallelization_decision_missing`, `stay_serial`, `forbid_parallel`, `same-issue child lanes`, `review handoff`, `merge handoff`, `post-merge/Done closeout`, `provider-linear-worker`, `proof lock`, `CO-423`, `PR #721`.
 
 ## Scope
-- Distinguish implementation child-lane lineage from later review/merge/Done closeout decisions.
-- Permit clean no-child lifecycle closeout turns to finish without a fresh implementation parallelization decision only when the current turn is closeout-only.
-- Keep real active-turn violations fail-closed, including same-decision serial/forbid launches, dirty source proof, blocked queued states, and non-closeout audit work such as `attach-pr`.
-- Deduplicate or demote proof-lock diagnostics when another provider-worker terminal cause exists.
+Distinguish implementation child-lane lineage from later review/merge/Done closeout decisions; permit clean no-child lifecycle closeout turns to finish without a fresh implementation decision only when the turn is closeout-only; keep real active-turn violations fail-closed, including same-decision serial/forbid launches, dirty source proof, blocked queued states, and non-closeout audit work such as `attach-pr`; deduplicate or demote proof-lock diagnostics when another provider-worker terminal cause exists.
 
 ## Non-Goals
-- No weakening of same-turn child-lane enforcement.
-- No retry scheduler rewrite.
-- No reopening `CO-326`, `CO-403`, `CO-408`, or `CO-417`.
-- No mutation of `CO-423` implementation or `PR #721` content.
-- No masking real child-lane launches that violate the active decision.
+No weakening of same-turn child-lane enforcement, retry scheduler rewrite, reopening `CO-326` / `CO-403` / `CO-408` / `CO-417`, mutation of `CO-423` or `PR #721`, or masking real child-lane launches that violate the active decision.
 
 ## Wrong Interpretations To Reject
-- Treating every `proof lock` diagnostic as the primary cause.
-- Making all `stay_serial` or `forbid_parallel` turns tolerant of child-lane launches.
-- Inventing child lanes for handoff/merge bookkeeping.
-- Broadening into durable lineage work beyond the fix needed here.
+Reject treating every `proof lock` diagnostic as primary, making all `stay_serial` or `forbid_parallel` turns child-lane tolerant, inventing child lanes for handoff/merge bookkeeping, or broadening into durable lineage work beyond the fix needed here.
 
 ## Acceptance Criteria
 - [ ] A CO-423-style successful `review handoff` followed by later serial/merge decision does not fail solely due to earlier child-lane history.

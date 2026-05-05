@@ -1207,6 +1207,15 @@ describe('runCommandStage review evidence consistency', () => {
         count: 2
       }
     });
+    const proofLockDiagnostics = (
+      errorPayload.details?.secondary_diagnostics as
+        | { provider_linear_worker_proof_lock?: { samples?: string[] } }
+        | undefined
+    )?.provider_linear_worker_proof_lock;
+    const samples = proofLockDiagnostics?.samples ?? [];
+    expect(samples.length).toBeLessThanOrEqual(3);
+    expect(new Set(samples).size).toBe(samples.length);
+    expect(samples.join('\n')).toContain('Failed to acquire provider-linear-worker proof lock');
   });
 
   it('does not use summary hints for failed provider-linear-worker stages', async () => {

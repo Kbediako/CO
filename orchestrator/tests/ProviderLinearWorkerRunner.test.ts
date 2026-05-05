@@ -17744,6 +17744,17 @@ for await (const line of rl) {
     };
   };
 
+  const writeCleanControlHostSourceProof = async () => {
+    const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostRunDir, { recursive: true });
+    await writeControlHostOwnerForProof(controlHostRunDir, buildSourceRootFreshnessFixture());
+    return {
+      [PROVIDER_LAUNCH_SOURCE_ENV]: PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
+      [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: 'local-mcp',
+      [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: 'control-host'
+    };
+  };
+
   it.each([
     {
       name: 'review handoff',
@@ -17761,6 +17772,7 @@ for await (const line of rl) {
     'does not require a fresh parallelization decision during CO-423-style $name after prior child-lane history',
     async ({ initialIssue, finalIssue, expectedEndReason }) => {
       const { manifestPath, runDir } = await createManifestRoot();
+      const sourceProofEnv = await writeCleanControlHostSourceProof();
       await appendProviderLinearWorkerChildLaneRecord(runDir, buildRetryRecoveryChildLane({
         stream: 'impl-a',
         run_id: 'child-run-accepted',
@@ -17777,22 +17789,45 @@ for await (const line of rl) {
         .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
         .mockResolvedValueOnce(createTrackedIssue(initialIssue))
         .mockResolvedValueOnce(createTrackedIssue(finalIssue));
-      const execRunner = vi.fn(async () => ({
-        exitCode: 0,
-        stdout: [
-          '{"type":"thread.started","thread_id":"thread-1"}',
-          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
-          '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:10:04.000Z"}}'
-        ].join('\n'),
-        stderr: ''
-      }));
+      const execRunner = vi.fn(async (request) => {
+        await appendProviderLinearAuditEntry(String(request.env[PROVIDER_LINEAR_AUDIT_ENV_VAR]), {
+          recorded_at: '2026-03-21T09:10:03.050Z',
+          operation: 'transition',
+          ok: true,
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          source_setup: null,
+          action: 'updated',
+          via: null,
+          state: finalIssue.state,
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
+          comment_id: null,
+          attachment_id: null,
+          target_state: finalIssue.state,
+          target_state_type: finalIssue.state_type,
+          error_code: null,
+          error_message: null
+        });
+        return {
+          exitCode: 0,
+          stdout: [
+            '{"type":"thread.started","thread_id":"thread-1"}',
+            '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+            '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:10:04.000Z"}}'
+          ].join('\n'),
+          stderr: ''
+        };
+      });
 
       const proof = await runProviderLinearWorker(
         {
           CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
           CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
           CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
-          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+          ...sourceProofEnv
         },
         {
           readTrackedIssue,
@@ -17837,7 +17872,7 @@ for await (const line of rl) {
 
   it.each([
     {
-      name: 'a blocked queued issue state',
+      name: 'a closeout audit whose live state is blocked queued',
       finalIssue: createTrackedIssue({
         state: 'Ready',
         state_type: 'unstarted',
@@ -17850,7 +17885,7 @@ for await (const line of rl) {
           }
         ]
       }),
-      appendAttachPrAudit: false,
+      auditKind: 'transition-closeout' as const,
       expectedIssueReads: 2
     },
     {
@@ -17859,15 +17894,16 @@ for await (const line of rl) {
         state: 'In Review',
         state_type: 'started'
       }),
-      appendAttachPrAudit: true,
+      auditKind: 'attach-pr' as const,
       expectedIssueReads: 1
     }
   ])('does not waive a missing parallelization decision for $name', async ({
     finalIssue,
-    appendAttachPrAudit,
+    auditKind,
     expectedIssueReads
   }) => {
     const { manifestPath, runDir } = await createManifestRoot();
+    const sourceProofEnv = await writeCleanControlHostSourceProof();
     const readTrackedIssue = vi
       .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
       .mockResolvedValueOnce(createTrackedIssue({
@@ -17882,13 +17918,14 @@ for await (const line of rl) {
           CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
           CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
           CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
-          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+          ...sourceProofEnv
         },
         {
           readTrackedIssue,
           resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
           execRunner: vi.fn(async (request) => {
-            if (appendAttachPrAudit) {
+            if (auditKind === 'attach-pr') {
               await appendProviderLinearAuditEntry(String(request.env[PROVIDER_LINEAR_AUDIT_ENV_VAR]), {
                 recorded_at: '2026-03-21T09:10:03.050Z',
                 operation: 'attach-pr',
@@ -17904,6 +17941,27 @@ for await (const line of rl) {
                 failed_relation_type: null,
                 comment_id: null,
                 attachment_id: 'attachment-1',
+                error_code: null,
+                error_message: null
+              });
+            } else {
+              await appendProviderLinearAuditEntry(String(request.env[PROVIDER_LINEAR_AUDIT_ENV_VAR]), {
+                recorded_at: '2026-03-21T09:10:03.050Z',
+                operation: 'transition',
+                ok: true,
+                issue_id: 'lin-issue-1',
+                issue_identifier: 'CO-2',
+                source_setup: null,
+                action: 'updated',
+                via: null,
+                state: 'In Review',
+                follow_up_issue_id: null,
+                follow_up_issue_identifier: null,
+                failed_relation_type: null,
+                comment_id: null,
+                attachment_id: null,
+                target_state: 'In Review',
+                target_state_type: 'started',
                 error_code: null,
                 error_message: null
               });
@@ -18159,14 +18217,6 @@ for await (const line of rl) {
 
   it('does not let mismatched child-lane lineage satisfy a current parallelize_now launch proof', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
-    const priorLineage = buildTestDecisionLineage({
-      parent_run_id: 'implementation-run',
-      parent_turn_started_at: '2026-03-21T09:08:00.000Z',
-      parent_turn_id: 'implementation-turn',
-      parent_turn_count: 1,
-      decision_id: 'provider-linear-parallelization:implementation-run:implementation-turn:2026-03-21T09_09_59.000Z',
-      decision_recorded_at: '2026-03-21T09:09:59.000Z'
-    });
     const currentLineage = buildTestDecisionLineage({
       parent_run_id: 'run-child',
       parent_turn_started_at: '2026-03-21T09:10:00.000Z',
@@ -18174,6 +18224,16 @@ for await (const line of rl) {
       parent_turn_count: 1,
       decision_id: 'provider-linear-parallelization:run-child:turn-1:2026-03-21T09_10_03.050Z',
       decision_recorded_at: '2026-03-21T09:10:03.050Z'
+    });
+    const mismatchedDecisionLineage = buildTestDecisionLineage({
+      parent_run_id: 'run-child',
+      parent_turn_started_at: '2026-03-21T09:10:00.000Z',
+      parent_turn_id: 'turn-1',
+      parent_turn_count: 1,
+      decision_id: null,
+      decision_recorded_at: '2026-03-21T09:10:03.050Z',
+      decision: 'stay_serial',
+      reason: 'single_bounded_change'
     });
 
     await expect(
@@ -18201,8 +18261,8 @@ for await (const line of rl) {
               task_id: 'linear-lin-issue-1-impl-a',
               status: 'succeeded',
               launched_at: '2026-03-21T09:10:03.150Z',
-              summary: 'current-turn child-lane record with mismatched prior decision lineage',
-              decision_lineage: priorLineage,
+              summary: 'current-turn child-lane record with mismatched serial decision lineage',
+              decision_lineage: mismatchedDecisionLineage,
               decision: 'pending',
               decision_at: null,
               decision_reason: null
@@ -18247,7 +18307,8 @@ for await (const line of rl) {
           run_id: 'child-run-prior-lineage',
           status: 'succeeded',
           decision_lineage: expect.objectContaining({
-            parent_run_id: 'implementation-run'
+            parent_run_id: 'run-child',
+            decision: 'stay_serial'
           })
         })
       ])
