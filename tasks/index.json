@@ -1,6 +1,70 @@
 {
   "items": [
     {
+      "id": "20260501-linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd",
+      "title": "CO-424 prevent provider-worker post-handoff closeout parallelization false failures",
+      "relates_to": "tasks/tasks-linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-05",
+      "status": "implementation",
+      "evidence": [
+        ".agent/task/linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md",
+        "docs/ACTION_PLAN-linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md",
+        "docs/PRD-linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md",
+        "docs/TECH_SPEC-linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md",
+        "tasks/specs/linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md",
+        "tasks/tasks-linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "traceability_packet": {
+          "reviewer": "kb/co-424-traceability-packet",
+          "date": "2026-05-05",
+          "status": "produced",
+          "summary": "Refreshed the CO-424 docs-first packet onto current origin/main at 40cb91ae after CO-484/CO-499 merged. The packet preserves post-handoff closeout false-failure scope for parallelization_serial_conflict and parallelization_decision_missing and keeps active-turn same-issue child lanes enforcement fail-closed."
+        },
+        "implementation": {
+          "reviewer": "provider worker",
+          "date": "2026-05-05",
+          "status": "complete",
+          "summary": "Implemented lineage-aware provider-worker closeout filtering, audit-scoped lifecycle missing-decision closeout handling, focused regressions, and secondary proof-lock diagnostic reporting while preserving true same-decision serial/forbid fail-closed behavior."
+        },
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-05-05",
+          "status": "clean-success",
+          "manifest": ".runs/linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd/cli/2026-05-05T17-17-24-275Z-e66407e3/manifest.json",
+          "telemetry": ".runs/linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd/cli/2026-05-05T17-17-24-275Z-e66407e3/review/telemetry.json",
+          "summary": "Docs-review reran after the current-main packet refresh with model gpt-5.5, reasoning effort xhigh, runtime appserver, no fallback, and review_outcome=clean-success."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-05",
+          "status": "bounded-success",
+          "telemetry": ".runs/linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd/cli/2026-05-05T17-34-04-030Z-d6775985/review/telemetry.json"
+        },
+        "elegance_review": {
+          "reviewer": "provider worker",
+          "date": "2026-05-05",
+          "status": "complete",
+          "evidence": "out/linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd/manual/elegance-review.md"
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md",
+        "task": "tasks/tasks-linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md",
+        "agent_task": ".agent/task/linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md",
+        "prd": "docs/PRD-linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md",
+        "docs": "docs/TECH_SPEC-linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md",
+        "action_plan": "docs/ACTION_PLAN-linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md"
+      }
+    },
+    {
       "id": "20260505-linear-937a5264-87ce-47fa-a932-f940d70c6600",
       "title": "CO-484 keep co-status running row workspace paths issue-local",
       "relates_to": "tasks/tasks-linear-937a5264-87ce-47fa-a932-f940d70c6600.md",

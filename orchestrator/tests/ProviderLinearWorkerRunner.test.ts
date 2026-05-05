@@ -17744,6 +17744,695 @@ for await (const line of rl) {
     };
   };
 
+  const writeCleanControlHostSourceProof = async () => {
+    const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostRunDir, { recursive: true });
+    await writeControlHostOwnerForProof(controlHostRunDir, buildSourceRootFreshnessFixture());
+    return {
+      [PROVIDER_LAUNCH_SOURCE_ENV]: PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
+      [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: 'local-mcp',
+      [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: 'control-host'
+    };
+  };
+
+  it.each([
+    {
+      name: 'review handoff',
+      initialIssue: { state: 'In Progress', state_type: 'started' },
+      finalIssue: { state: 'In Review', state_type: 'started' },
+      expectedEndReason: 'issue_review_handoff'
+    },
+    {
+      name: 'merge handoff',
+      initialIssue: { state: 'In Progress', state_type: 'started' },
+      finalIssue: { state: 'Merging', state_type: 'started' },
+      expectedEndReason: 'max_turns_reached_issue_still_active'
+    },
+    {
+      name: 'post-merge/Done closeout',
+      initialIssue: { state: 'Merging', state_type: 'started' },
+      finalIssue: { state: 'Done', state_type: 'completed' },
+      expectedEndReason: 'issue_inactive'
+    }
+  ])(
+    'does not require a fresh parallelization decision during CO-423-style $name after prior child-lane history',
+    async ({ initialIssue, finalIssue, expectedEndReason }) => {
+      const { manifestPath, runDir } = await createManifestRoot();
+      const sourceProofEnv = await writeCleanControlHostSourceProof();
+      await appendProviderLinearWorkerChildLaneRecord(runDir, buildRetryRecoveryChildLane({
+        stream: 'impl-a',
+        run_id: 'child-run-accepted',
+        task_id: 'linear-lin-issue-1-impl-a',
+        status: 'succeeded',
+        launched_at: '2026-03-21T09:04:00.000Z',
+        summary: 'earlier implementation child lane accepted before closeout',
+        decision: 'accepted',
+        decision_at: '2026-03-21T09:05:00.000Z',
+        decision_reason: 'Applied bounded implementation patch.'
+      }));
+
+      const readTrackedIssue = vi
+        .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+        .mockResolvedValueOnce(createTrackedIssue(initialIssue))
+        .mockResolvedValueOnce(createTrackedIssue(finalIssue));
+      const execRunner = vi.fn(async (request) => {
+        await appendProviderLinearAuditEntry(String(request.env[PROVIDER_LINEAR_AUDIT_ENV_VAR]), {
+          recorded_at: '2026-03-21T09:10:03.050Z',
+          operation: 'transition',
+          ok: true,
+          issue_id: 'lin-issue-1',
+          issue_identifier: 'CO-2',
+          source_setup: null,
+          action: 'updated',
+          via: null,
+          state: finalIssue.state,
+          follow_up_issue_id: null,
+          follow_up_issue_identifier: null,
+          failed_relation_type: null,
+          comment_id: null,
+          attachment_id: null,
+          target_state: finalIssue.state,
+          target_state_type: finalIssue.state_type,
+          error_code: null,
+          error_message: null
+        });
+        return {
+          exitCode: 0,
+          stdout: [
+            '{"type":"thread.started","thread_id":"thread-1"}',
+            '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+            '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:10:04.000Z"}}'
+          ].join('\n'),
+          stderr: ''
+        };
+      });
+
+      const proof = await runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+          ...sourceProofEnv
+        },
+        {
+          readTrackedIssue,
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner,
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:10:00.000Z')
+            .mockReturnValue('2026-03-21T09:10:03.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      );
+
+      expect(execRunner).toHaveBeenCalledTimes(1);
+      expect(readTrackedIssue).toHaveBeenCalledTimes(2);
+      expect(proof).toMatchObject({
+        latest_turn_id: 'turn-1',
+        owner_status: 'succeeded',
+        end_reason: expectedEndReason,
+        parallelization: null,
+        child_lanes: expect.arrayContaining([
+          expect.objectContaining({
+            stream: 'impl-a',
+            run_id: 'child-run-accepted',
+            status: 'succeeded',
+            decision: 'accepted'
+          })
+        ])
+      });
+
+      const written = JSON.parse(
+        await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+      ) as Record<string, unknown>;
+      expect(written).toMatchObject({
+        latest_turn_id: 'turn-1',
+        owner_status: 'succeeded',
+        end_reason: expectedEndReason,
+        parallelization: null
+      });
+    }
+  );
+
+  it.each([
+    {
+      name: 'a closeout audit whose live state is blocked queued',
+      finalIssue: createTrackedIssue({
+        state: 'Ready',
+        state_type: 'unstarted',
+        blocked_by: [
+          {
+            id: 'lin-issue-2',
+            identifier: 'CO-3',
+            state: 'In Progress',
+            state_type: 'started'
+          }
+        ]
+      }),
+      auditKind: 'transition-closeout' as const,
+      expectedIssueReads: 2
+    },
+    {
+      name: 'non-closeout audit work before review handoff',
+      finalIssue: createTrackedIssue({
+        state: 'In Review',
+        state_type: 'started'
+      }),
+      auditKind: 'attach-pr' as const,
+      expectedIssueReads: 1
+    }
+  ])('does not waive a missing parallelization decision for $name', async ({
+    finalIssue,
+    auditKind,
+    expectedIssueReads
+  }) => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const sourceProofEnv = await writeCleanControlHostSourceProof();
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(createTrackedIssue({
+        state: 'In Progress',
+        state_type: 'started'
+      }))
+      .mockResolvedValueOnce(finalIssue);
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+          ...sourceProofEnv
+        },
+        {
+          readTrackedIssue,
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner: vi.fn(async (request) => {
+            if (auditKind === 'attach-pr') {
+              await appendProviderLinearAuditEntry(String(request.env[PROVIDER_LINEAR_AUDIT_ENV_VAR]), {
+                recorded_at: '2026-03-21T09:10:03.050Z',
+                operation: 'attach-pr',
+                ok: true,
+                issue_id: 'lin-issue-1',
+                issue_identifier: 'CO-2',
+                source_setup: null,
+                action: 'attached',
+                via: 'https://github.com/example/repo/pull/721',
+                state: null,
+                follow_up_issue_id: null,
+                follow_up_issue_identifier: null,
+                failed_relation_type: null,
+                comment_id: null,
+                attachment_id: 'attachment-1',
+                error_code: null,
+                error_message: null
+              });
+            } else {
+              await appendProviderLinearAuditEntry(String(request.env[PROVIDER_LINEAR_AUDIT_ENV_VAR]), {
+                recorded_at: '2026-03-21T09:10:03.050Z',
+                operation: 'transition',
+                ok: true,
+                issue_id: 'lin-issue-1',
+                issue_identifier: 'CO-2',
+                source_setup: null,
+                action: 'updated',
+                via: null,
+                state: 'In Review',
+                follow_up_issue_id: null,
+                follow_up_issue_identifier: null,
+                failed_relation_type: null,
+                comment_id: null,
+                attachment_id: null,
+                target_state: 'In Review',
+                target_state_type: 'started',
+                error_code: null,
+                error_message: null
+              });
+            }
+            return {
+              exitCode: 0,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+                '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:10:04.000Z"}}'
+              ].join('\n'),
+              stderr: ''
+            };
+          }),
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:10:00.000Z')
+            .mockReturnValue('2026-03-21T09:10:03.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      )
+    ).rejects.toThrow(
+      'provider-linear-worker requires an explicit current-turn parallelization decision via `linear parallelization` before an active turn can complete.'
+    );
+
+    expect(readTrackedIssue).toHaveBeenCalledTimes(expectedIssueReads);
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      latest_turn_id: 'turn-1',
+      owner_phase: 'ended',
+      owner_status: 'failed',
+      end_reason: 'parallelization_decision_missing'
+    });
+  });
+
+  it('keeps missing-decision lifecycle closeout fail-closed when source proof is dirty', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const sourceRoot = await createProviderWorkerSourceRootRepo('provider-worker-dirty-closeout-');
+    const sourceEntrypoint = join(sourceRoot, 'bin', 'codex-orchestrator.ts');
+    await writeFile(join(sourceRoot, 'dirty-closeout.md'), 'dirty\n', 'utf8');
+    const sourceRootFreshness = inspectSourceRootFreshness({
+      intendedRepoRoot: sourceRoot,
+      argv: ['node', sourceEntrypoint],
+      cwd: sourceRoot,
+      now: () => '2026-03-21T09:10:00.000Z'
+    });
+    expect(sourceRootFreshness.source_checkout?.dirty.status).toBe('dirty');
+    const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(controlHostRunDir, { recursive: true });
+    await writeControlHostOwnerForProof(controlHostRunDir, sourceRootFreshness);
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+          [PROVIDER_LAUNCH_SOURCE_ENV]: PROVIDER_LAUNCH_SOURCE_CONTROL_HOST,
+          [PROVIDER_CONTROL_HOST_TASK_ID_ENV]: 'local-mcp',
+          [PROVIDER_CONTROL_HOST_RUN_ID_ENV]: 'control-host'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue({
+            state: 'In Progress',
+            state_type: 'started'
+          })),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner: vi.fn(async (request) => {
+            const auditPath = request.env[PROVIDER_LINEAR_AUDIT_ENV_VAR];
+            await appendProviderLinearAuditEntry(String(auditPath), {
+              recorded_at: '2026-03-21T09:10:03.050Z',
+              operation: 'transition',
+              ok: true,
+              issue_id: 'lin-issue-1',
+              issue_identifier: 'CO-2',
+              source_setup: null,
+              action: 'updated',
+              via: null,
+              state: 'In Review',
+              follow_up_issue_id: null,
+              follow_up_issue_identifier: null,
+              failed_relation_type: null,
+              comment_id: null,
+              attachment_id: null,
+              target_state: 'In Review',
+              target_state_type: 'started',
+              error_code: null,
+              error_message: null
+            });
+            return {
+              exitCode: 0,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+                '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:10:04.000Z"}}'
+              ].join('\n'),
+              stderr: ''
+            };
+          }),
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:10:00.000Z')
+            .mockReturnValue('2026-03-21T09:10:03.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      )
+    ).rejects.toThrow(
+      'provider-linear-worker requires an explicit current-turn parallelization decision via `linear parallelization` before an active turn can complete.'
+    );
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      latest_turn_id: 'turn-1',
+      owner_phase: 'ended',
+      owner_status: 'failed',
+      end_reason: 'parallelization_decision_missing',
+      source_root_freshness: {
+        source_checkout: {
+          dirty: {
+            status: 'dirty'
+          }
+        }
+      }
+    });
+  });
+
+  it.each([
+    {
+      decision: 'stay_serial' as const,
+      reason: 'single_bounded_change' as const,
+      summary: 'Close out the already-merged PR without launching new work.'
+    },
+    {
+      decision: 'forbid_parallel' as const,
+      reason: 'parent_only_mutation' as const,
+      summary: 'Close out merged PR state owned by the parent turn.'
+    }
+  ])(
+    'does not treat prior parallelize_now child-lane residue as a $decision closeout serial conflict',
+    async ({ decision, reason, summary }) => {
+      const { manifestPath, runDir } = await createManifestRoot();
+      const priorLineage = buildTestDecisionLineage({
+        parent_run_id: 'implementation-run',
+        parent_turn_started_at: '2026-03-21T09:08:00.000Z',
+        parent_turn_id: 'implementation-turn',
+        parent_turn_count: 1,
+        decision_id: 'provider-linear-parallelization:implementation-run:implementation-turn:2026-03-21T09_09_59.000Z',
+        decision_recorded_at: '2026-03-21T09:09:59.000Z'
+      });
+      const closeoutLineage = buildTestDecisionLineage({
+        parent_run_id: 'run-child',
+        parent_turn_started_at: '2026-03-21T09:10:00.000Z',
+        parent_turn_id: 'turn-1',
+        parent_turn_count: 1,
+        decision_id: `provider-linear-parallelization:run-child:turn-1:${decision}:2026-03-21T09_10_03.050Z`,
+        decision_recorded_at: '2026-03-21T09:10:03.050Z',
+        decision,
+        reason
+      });
+      await appendParallelizationDecisionAudit(runDir, {
+        decision: 'parallelize_now',
+        reason: 'independent_scope_available',
+        summary: 'Launch the implementation child lane.',
+        recordedAt: '2026-03-21T09:09:59.000Z',
+        decisionLineage: priorLineage
+      });
+
+      const proof = await runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+        },
+        {
+          readTrackedIssue: vi
+            .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+            .mockResolvedValueOnce(createTrackedIssue({
+              state: 'Merging',
+              state_type: 'started'
+            }))
+            .mockResolvedValueOnce(createTrackedIssue({
+              state: 'Done',
+              state_type: 'completed'
+            })),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner: vi.fn(async (request) => {
+            await appendParallelizationDecisionAuditForRequest(request, {
+              decision,
+              reason,
+              summary,
+              recordedAt: '2026-03-21T09:10:03.050Z',
+              decisionLineage: closeoutLineage
+            });
+            await appendProviderLinearWorkerChildLaneRecord(runDir, buildRetryRecoveryChildLane({
+              stream: 'impl-a',
+              run_id: 'child-run-prior',
+              task_id: 'linear-lin-issue-1-impl-a',
+              status: 'succeeded',
+              launched_at: '2026-03-21T09:10:03.150Z',
+              summary: 'implementation child-lane residue from the prior parallelize_now decision',
+              decision_lineage: priorLineage,
+              decision: 'accepted',
+              decision_at: '2026-03-21T09:10:03.200Z',
+              decision_reason: 'Accepted earlier implementation patch.'
+            }));
+            return {
+              exitCode: 0,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+                '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:10:04.000Z"}}'
+              ].join('\n'),
+              stderr: ''
+            };
+          }),
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:10:00.000Z')
+            .mockReturnValue('2026-03-21T09:10:03.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      );
+
+      expect(proof).toMatchObject({
+        latest_turn_id: 'turn-1',
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive',
+        parallelization: {
+          decision,
+          reason,
+          child_lane_count: 0
+        },
+        child_lanes: expect.arrayContaining([
+          expect.objectContaining({
+            stream: 'impl-a',
+            run_id: 'child-run-prior',
+            status: 'succeeded',
+            decision: 'accepted',
+            decision_lineage: expect.objectContaining({
+              decision: 'parallelize_now'
+            })
+          })
+        ])
+      });
+    }
+  );
+
+  it('does not let mismatched child-lane lineage satisfy a current parallelize_now launch proof', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const currentLineage = buildTestDecisionLineage({
+      parent_run_id: 'run-child',
+      parent_turn_started_at: '2026-03-21T09:10:00.000Z',
+      parent_turn_id: 'turn-1',
+      parent_turn_count: 1,
+      decision_id: 'provider-linear-parallelization:run-child:turn-1:2026-03-21T09_10_03.050Z',
+      decision_recorded_at: '2026-03-21T09:10:03.050Z'
+    });
+    const mismatchedDecisionLineage = buildTestDecisionLineage({
+      parent_run_id: 'run-child',
+      parent_turn_started_at: '2026-03-21T09:10:00.000Z',
+      parent_turn_id: 'turn-1',
+      parent_turn_count: 1,
+      decision_id: null,
+      decision_recorded_at: '2026-03-21T09:10:03.050Z',
+      decision: 'stay_serial',
+      reason: 'single_bounded_change'
+    });
+
+    await expect(
+      runProviderLinearWorker(
+        {
+          CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+          CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+          CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+          CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+        },
+        {
+          readTrackedIssue: vi.fn(async () => createTrackedIssue()),
+          resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+          execRunner: vi.fn(async (request) => {
+            await appendParallelizationDecisionAuditForRequest(request, {
+              decision: 'parallelize_now',
+              reason: 'independent_scope_available',
+              summary: 'Launch a current implementation child lane.',
+              recordedAt: '2026-03-21T09:10:03.050Z',
+              decisionLineage: currentLineage
+            });
+            await appendProviderLinearWorkerChildLaneRecord(runDir, buildRetryRecoveryChildLane({
+              stream: 'impl-a',
+              run_id: 'child-run-prior-lineage',
+              task_id: 'linear-lin-issue-1-impl-a',
+              status: 'succeeded',
+              launched_at: '2026-03-21T09:10:03.150Z',
+              summary: 'current-turn child-lane record with mismatched serial decision lineage',
+              decision_lineage: mismatchedDecisionLineage,
+              decision: 'pending',
+              decision_at: null,
+              decision_reason: null
+            }));
+            return {
+              exitCode: 0,
+              stdout: [
+                '{"type":"thread.started","thread_id":"thread-1"}',
+                '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+                '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:10:04.000Z"}}'
+              ].join('\n'),
+              stderr: ''
+            };
+          }),
+          now: vi
+            .fn()
+            .mockReturnValueOnce('2026-03-21T09:10:00.000Z')
+            .mockReturnValue('2026-03-21T09:10:03.000Z'),
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+        }
+      )
+    ).rejects.toThrow(
+      'provider-linear-worker recorded `parallelize_now` for the current turn, but no same-issue child lane launched during that turn completed successfully.'
+    );
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      latest_turn_id: 'turn-1',
+      owner_phase: 'ended',
+      owner_status: 'failed',
+      end_reason: 'parallelization_launch_missing',
+      parallelization: {
+        decision: 'parallelize_now',
+        reason: 'independent_scope_available',
+        child_lane_count: 0
+      },
+      child_lanes: expect.arrayContaining([
+        expect.objectContaining({
+          stream: 'impl-a',
+          run_id: 'child-run-prior-lineage',
+          status: 'succeeded',
+          decision_lineage: expect.objectContaining({
+            parent_run_id: 'run-child',
+            decision: 'stay_serial'
+          })
+        })
+      ])
+    });
+  });
+
+  it.each([
+    {
+      decision: 'stay_serial' as const,
+      reason: 'single_bounded_change' as const,
+      expectedMessage:
+        'provider-linear-worker recorded `stay_serial` for the current turn, but same-issue child lanes were still launched during that turn.'
+    },
+    {
+      decision: 'forbid_parallel' as const,
+      reason: 'parent_only_mutation' as const,
+      expectedMessage:
+        'provider-linear-worker recorded `forbid_parallel` for the current turn, but same-issue child lanes were still launched during that turn.'
+    }
+  ])(
+    'still fails closed when a $decision closeout turn launches a same-decision child lane',
+    async ({ decision, reason, expectedMessage }) => {
+      const { manifestPath, runDir } = await createManifestRoot();
+      const sameDecisionLineage = buildTestDecisionLineage({
+        parent_run_id: 'run-child',
+        parent_turn_started_at: '2026-03-21T09:10:00.000Z',
+        parent_turn_id: 'turn-1',
+        parent_turn_count: 1,
+        decision_id: `provider-linear-parallelization:run-child:turn-1:${decision}:2026-03-21T09_10_03.050Z`,
+        decision_recorded_at: '2026-03-21T09:10:03.050Z',
+        decision,
+        reason
+      });
+
+      await expect(
+        runProviderLinearWorker(
+          {
+            CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+            CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+            CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+            CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
+          },
+          {
+            readTrackedIssue: vi
+              .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+              .mockResolvedValueOnce(createTrackedIssue({
+                state: 'Merging',
+                state_type: 'started'
+              }))
+              .mockResolvedValueOnce(createTrackedIssue({
+                state: 'Done',
+                state_type: 'completed'
+              })),
+            resolveRuntimeContext: vi.fn(async () => createRuntimeContext()),
+            execRunner: vi.fn(async (request) => {
+              await appendParallelizationDecisionAuditForRequest(request, {
+                decision,
+                reason,
+                summary: 'Serial closeout must not launch a child lane.',
+                recordedAt: '2026-03-21T09:10:03.050Z',
+                decisionLineage: sameDecisionLineage
+              });
+              await appendProviderLinearWorkerChildLaneRecord(runDir, buildRetryRecoveryChildLane({
+                stream: 'impl-a',
+                run_id: 'child-run-current',
+                task_id: 'linear-lin-issue-1-impl-a',
+                status: 'succeeded',
+                launched_at: '2026-03-21T09:10:03.150Z',
+                summary: 'child lane launched under the same serial/no-go decision',
+                decision_lineage: sameDecisionLineage,
+                decision: 'pending',
+                decision_at: null,
+                decision_reason: null
+              }));
+              return {
+                exitCode: 0,
+                stdout: [
+                  '{"type":"thread.started","thread_id":"thread-1"}',
+                  '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+                  '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:10:04.000Z"}}'
+                ].join('\n'),
+                stderr: ''
+              };
+            }),
+            now: vi
+              .fn()
+              .mockReturnValueOnce('2026-03-21T09:10:00.000Z')
+              .mockReturnValue('2026-03-21T09:10:03.000Z'),
+            log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+          }
+        )
+      ).rejects.toThrow(expectedMessage);
+
+      const written = JSON.parse(
+        await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+      ) as Record<string, unknown>;
+      expect(written).toMatchObject({
+        latest_turn_id: 'turn-1',
+        owner_phase: 'ended',
+        owner_status: 'failed',
+        end_reason: 'parallelization_serial_conflict',
+        parallelization: {
+          decision,
+          reason
+        },
+        child_lanes: expect.arrayContaining([
+          expect.objectContaining({
+            stream: 'impl-a',
+            run_id: 'child-run-current',
+            decision_lineage: expect.objectContaining({
+              decision
+            })
+          })
+        ])
+      });
+    }
+  );
+
   it('recovers a prior-attempt child lane launched just before its ordinary decision lineage', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
     const targetLineage = buildTestDecisionLineage();

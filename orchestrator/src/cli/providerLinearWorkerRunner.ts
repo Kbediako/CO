@@ -34,6 +34,7 @@ import {
 import { readSharedLinearBudgetStatus, type LinearBudgetStatus } from './control/linearBudgetState.js';
 import {
   classifyProviderLinearWorkerLifecycle,
+  classifyProviderLinearWorkflowState,
 } from './control/providerLinearWorkflowStates.js';
 import {
   readControlHostOwnerMetadata,
@@ -52,6 +53,7 @@ import {
   summarizeProviderLinearAuditPath,
   type ProviderLinearDecisionLineage,
   type ProviderLinearParallelizationSnapshot,
+  type ProviderLinearAuditEntry,
   type ProviderLinearAuditSummary
 } from './control/providerLinearWorkflowAudit.js';
 import { deriveDeterministicProviderMutationSuppressions } from './control/providerLinearWorkerTruth.js';
@@ -7391,12 +7393,63 @@ function hasCurrentTurnChildLaneLaunch(
   return selectCurrentTurnChildLanes(childLanes, currentTurnStartedAt).length > 0;
 }
 
-function hasCurrentTurnSuccessfulChildLaneLaunch(
-  childLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined,
-  currentTurnStartedAt: string | null | undefined
-): boolean {
-  return selectCurrentTurnChildLanes(childLanes, currentTurnStartedAt).some(
-    (childLane) => isSuccessfulProviderLinearWorkerChildLaneStatus(childLane.status)
+function childLaneLaunchBelongsToParallelizationDecision(input: {
+  childLane: ProviderLinearWorkerChildLaneRecord;
+  parallelization: ProviderLinearParallelizationSnapshot;
+}): boolean {
+  const childLineage = input.childLane.decision_lineage ?? null;
+  const parallelizationLineage = input.parallelization.decision_lineage ?? null;
+  const lineageSupport = resolveChildLaneDecisionLineageSupport(
+    childLineage,
+    parallelizationLineage
+  );
+  if (lineageSupport === 'mismatched') {
+    return false;
+  }
+  if (lineageSupport === 'matched') {
+    const childDecisionId = normalizeOptionalString(childLineage?.decision_id);
+    const parallelizationDecisionId = normalizeOptionalString(parallelizationLineage?.decision_id);
+    if (
+      childDecisionId &&
+      parallelizationDecisionId &&
+      childDecisionId !== parallelizationDecisionId
+    ) {
+      return false;
+    }
+    const childDecision = childLineage?.decision ?? null;
+    if (childDecision && childDecision !== input.parallelization.decision) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function hasCurrentTurnChildLaneLaunchForParallelizationDecision(input: {
+  childLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined;
+  currentTurnStartedAt: string | null | undefined;
+  parallelization: ProviderLinearParallelizationSnapshot;
+}): boolean {
+  return selectCurrentTurnChildLanes(input.childLanes, input.currentTurnStartedAt).some(
+    (childLane) =>
+      childLaneLaunchBelongsToParallelizationDecision({
+        childLane,
+        parallelization: input.parallelization
+      })
+  );
+}
+
+function hasCurrentTurnSuccessfulChildLaneLaunchForParallelizationDecision(input: {
+  childLanes: ProviderLinearWorkerChildLaneRecord[] | null | undefined;
+  currentTurnStartedAt: string | null | undefined;
+  parallelization: ProviderLinearParallelizationSnapshot;
+}): boolean {
+  return selectCurrentTurnChildLanes(input.childLanes, input.currentTurnStartedAt).some(
+    (childLane) =>
+      isSuccessfulProviderLinearWorkerChildLaneStatus(childLane.status) &&
+      childLaneLaunchBelongsToParallelizationDecision({
+        childLane,
+        parallelization: input.parallelization
+      })
   );
 }
 
@@ -7620,9 +7673,17 @@ function selectEffectiveParallelizationChildLanes(input: {
   currentParallelization: ProviderLinearParallelizationSnapshot | null | undefined;
   priorParallelizations: ProviderLinearParallelizationSnapshot[] | null | undefined;
 }): ProviderLinearWorkerChildLaneRecord[] {
+  const currentParallelization = input.currentParallelization ?? null;
   const currentTurnChildLanes = selectCurrentTurnChildLanes(
     input.childLanes,
     input.currentTurnStartedAt
+  ).filter((childLane) =>
+    currentParallelization
+      ? childLaneLaunchBelongsToParallelizationDecision({
+          childLane,
+          parallelization: currentParallelization
+        })
+      : true
   );
   const recoveredChildLanes = selectRecoverablePriorAttemptSuccessfulChildLanes(input);
   if (currentTurnChildLanes.length === 0) {
@@ -7650,6 +7711,99 @@ function hasRecoverablePriorAttemptSuccessfulChildLaneLaunch(input: {
   priorParallelizations: ProviderLinearParallelizationSnapshot[] | null | undefined;
 }): boolean {
   return selectRecoverablePriorAttemptSuccessfulChildLanes(input).length > 0;
+}
+
+function selectProviderLinearAuditEntriesAtOrAfter(
+  linearAudit: ProviderLinearAuditSummary | null | undefined,
+  recordedAtNotBefore: string | null | undefined
+): ProviderLinearAuditEntry[] {
+  const boundary = normalizeOptionalString(recordedAtNotBefore);
+  const entries = Array.isArray(linearAudit?.entries) ? linearAudit.entries : [];
+  if (!boundary) {
+    return entries;
+  }
+  return entries.filter((entry) => compareIsoTimestamp(entry.recorded_at, boundary) >= 0);
+}
+
+function isLifecycleCloseoutAuditEntry(entry: ProviderLinearAuditEntry): boolean {
+  if (!entry.ok) {
+    return false;
+  }
+  if (entry.operation === 'upsert-workpad' || entry.operation === 'issue-context') {
+    return true;
+  }
+  if (entry.operation !== 'transition') {
+    return false;
+  }
+  const target = classifyProviderLinearWorkflowState({
+    state: entry.target_state ?? null,
+    state_type: entry.target_state_type ?? null
+  });
+  return target.isHandoff || target.isTerminal || isProviderLinearMergeHandoffWorkflowState(target);
+}
+
+function selectCurrentTurnProviderLinearAuditEntries(input: {
+  linearAudit: ProviderLinearAuditSummary | null | undefined;
+  currentTurnStartedAt: string | null | undefined;
+  issueId: string | null | undefined;
+}): ProviderLinearAuditEntry[] {
+  const issueId = normalizeOptionalString(input.issueId);
+  return selectProviderLinearAuditEntriesAtOrAfter(
+    input.linearAudit,
+    input.currentTurnStartedAt
+  ).filter((entry) => !issueId || entry.issue_id === issueId);
+}
+
+function hasCurrentTurnLifecycleCloseoutAuditOnly(input: {
+  linearAudit: ProviderLinearAuditSummary | null | undefined;
+  currentTurnStartedAt: string | null | undefined;
+  issueId: string | null | undefined;
+}): boolean {
+  const entries = selectCurrentTurnProviderLinearAuditEntries(input);
+  if (entries.length === 0) {
+    return false;
+  }
+  return entries.every(isLifecycleCloseoutAuditEntry) && entries.some((entry) => {
+    if (entry.operation !== 'transition') {
+      return false;
+    }
+    const target = classifyProviderLinearWorkflowState({
+      state: entry.target_state ?? null,
+      state_type: entry.target_state_type ?? null
+    });
+    return target.isHandoff || target.isTerminal || isProviderLinearMergeHandoffWorkflowState(target);
+  });
+}
+
+function providerLinearWorkerProofHasDirtySourceRoot(proof: ProviderLinearWorkerProof): boolean {
+  const freshness = proof.source_root_freshness ?? null;
+  if (!freshness) {
+    return true;
+  }
+  const sourceDirty = freshness?.source_checkout?.dirty?.status ?? null;
+  const intendedDirty = freshness?.intended_checkout?.dirty?.status ?? null;
+  return sourceDirty === 'dirty' || intendedDirty === 'dirty';
+}
+
+function isProviderLinearWorkerLifecycleCloseout(
+  lifecycle: ReturnType<typeof classifyProviderLinearWorkerLifecycle>
+): boolean {
+  return (
+    !lifecycle.isExecutionEligible &&
+    (lifecycle.workflowState.isHandoff || lifecycle.workflowState.isTerminal)
+  );
+}
+
+function isProviderLinearMergeHandoffWorkflowState(input: {
+  normalizedState: string | null;
+}): boolean {
+  return input.normalizedState === 'merging';
+}
+
+function isProviderLinearWorkerMergeHandoff(
+  lifecycle: ReturnType<typeof classifyProviderLinearWorkerLifecycle>
+): boolean {
+  return isProviderLinearMergeHandoffWorkflowState(lifecycle.workflowState);
 }
 
 function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {
@@ -7721,10 +7875,11 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
   }
   const parallelization = currentTurnParallelizationDecisions[0] ?? null;
   if (parallelization.decision !== 'parallelize_now') {
-    if (!hasCurrentTurnChildLaneLaunch(
-      input.proof.child_lanes,
-      currentTurnBoundary
-    )) {
+    if (!hasCurrentTurnChildLaneLaunchForParallelizationDecision({
+      childLanes: input.proof.child_lanes,
+      currentTurnStartedAt: currentTurnBoundary,
+      parallelization
+    })) {
       return null;
     }
     return {
@@ -7734,7 +7889,11 @@ function resolveProviderLinearWorkerParallelizationFailure(input: {
     };
   }
   if (
-    hasCurrentTurnSuccessfulChildLaneLaunch(input.proof.child_lanes, currentTurnBoundary) ||
+    hasCurrentTurnSuccessfulChildLaneLaunchForParallelizationDecision({
+      childLanes: input.proof.child_lanes,
+      currentTurnStartedAt: currentTurnBoundary,
+      parallelization
+    }) ||
     hasRecoverablePriorAttemptSuccessfulChildLaneLaunch({
       childLanes: input.proof.child_lanes,
       attemptStartedAt: input.proof.attempt_started_at,
@@ -12387,20 +12546,56 @@ export async function runProviderLinearWorker(
         proof: finalProof,
         parallelizationDecisionCountBeforeTurn
       });
+      let readLifecycleAfterParallelizationFailure = false;
       if (parallelizationFailure) {
-        finalProof = {
-          ...finalProof,
-          owner_phase: 'ended',
-          owner_status: 'failed',
-          end_reason: parallelizationFailure.endReason,
-          updated_at: deps.now()
-        };
-        finalProof = await persistProof(finalProof);
-        throw new Error(parallelizationFailure.message);
+        const currentTurnBoundary =
+          normalizeOptionalString(finalProof.current_turn_started_at) ??
+          normalizeOptionalString(finalProof.attempt_started_at);
+        let deferParallelizationFailureForLifecycleHandoff = false;
+        const canDeferMissingDecisionForLifecycleCloseout =
+          parallelizationFailure.endReason === 'parallelization_decision_missing' &&
+          !hasCurrentTurnChildLaneLaunch(finalProof.child_lanes, currentTurnBoundary) &&
+          !providerLinearWorkerProofHasDirtySourceRoot(finalProof) &&
+          hasCurrentTurnLifecycleCloseoutAuditOnly({
+            linearAudit: finalProof.linear_audit,
+            currentTurnStartedAt: currentTurnBoundary,
+            issueId: finalProof.issue_id
+          });
+        if (canDeferMissingDecisionForLifecycleCloseout) {
+          issue = await readTrackedIssueWithFailClosedProof();
+          lifecycle = classifyProviderLinearWorkerLifecycle(issue);
+          readLifecycleAfterParallelizationFailure = true;
+          if (isProviderLinearWorkerLifecycleCloseout(lifecycle)) {
+            finalProof = {
+              ...finalProof,
+              owner_phase: 'ended',
+              owner_status: 'succeeded',
+              end_reason: lifecycle.terminalReason,
+              updated_at: deps.now()
+            };
+            finalProof = await persistProof(finalProof);
+            return finalProof;
+          }
+          deferParallelizationFailureForLifecycleHandoff =
+            isProviderLinearWorkerMergeHandoff(lifecycle);
+        }
+        if (!deferParallelizationFailureForLifecycleHandoff) {
+          finalProof = {
+            ...finalProof,
+            owner_phase: 'ended',
+            owner_status: 'failed',
+            end_reason: parallelizationFailure.endReason,
+            updated_at: deps.now()
+          };
+          finalProof = await persistProof(finalProof);
+          throw new Error(parallelizationFailure.message);
+        }
       }
 
-      issue = await readTrackedIssueWithFailClosedProof();
-      lifecycle = classifyProviderLinearWorkerLifecycle(issue);
+      if (!readLifecycleAfterParallelizationFailure) {
+        issue = await readTrackedIssueWithFailClosedProof();
+        lifecycle = classifyProviderLinearWorkerLifecycle(issue);
+      }
       if (!lifecycle.isExecutionEligible) {
         finalProof = {
           ...finalProof,
