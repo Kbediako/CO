@@ -1,6 +1,38 @@
 {
   "items": [
     {
+      "id": "20260505-linear-07fdd989-5c10-4b24-ab5d-10fa9bf3732f",
+      "title": "CO-499 classify terminal Codex connector failures in ready-review",
+      "relates_to": "tasks/tasks-linear-07fdd989-5c10-4b24-ab5d-10fa9bf3732f.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-05",
+      "approvals": {
+        "traceability_packet": {
+          "reviewer": "CO-499 traceability packet branch",
+          "date": "2026-05-05",
+          "status": "produced",
+          "summary": "Created the CO-499 docs-first packet and registry mirrors to clear backlog_head_follow_up_traceability_pending while preserving terminal Codex connector failure classification, active Codex review waits, one manual @codex review ping per PR head, and independent CodeRabbit/check/thread/bot-feedback gates."
+        },
+        "bug_discovery_readonly": {
+          "reviewer": "bounded read-only subagent",
+          "date": "2026-05-05",
+          "status": "confirmed-gap-on-main",
+          "summary": "Current main treats Codex connector comments as non-completion signals, so a terminal failure comment can leave bot_rereview_pending=codex; no CO-499 implementation branch or merged code exists on current main."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-07fdd989-5c10-4b24-ab5d-10fa9bf3732f.md",
+        "task": "tasks/tasks-linear-07fdd989-5c10-4b24-ab5d-10fa9bf3732f.md",
+        "agent_task": ".agent/task/linear-07fdd989-5c10-4b24-ab5d-10fa9bf3732f.md",
+        "prd": "docs/PRD-linear-07fdd989-5c10-4b24-ab5d-10fa9bf3732f.md",
+        "docs": "docs/TECH_SPEC-linear-07fdd989-5c10-4b24-ab5d-10fa9bf3732f.md",
+        "action_plan": "docs/ACTION_PLAN-linear-07fdd989-5c10-4b24-ab5d-10fa9bf3732f.md"
+      }
+    },
+    {
       "id": "20260505-linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe",
       "title": "CO-462 run-review override-prefixed mock cleanup",
       "relates_to": "tasks/tasks-linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md",
