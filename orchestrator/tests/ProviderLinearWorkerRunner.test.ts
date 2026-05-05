@@ -2480,6 +2480,31 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(parsed.authProvenance ?? null).toBeNull();
   });
 
+  it('parses Codex runtime effort alias as resolved model provenance', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      JSON.stringify({
+        type: 'turn_context',
+        payload: {
+          turn_id: 'turn-1',
+          model: 'gpt-5.5',
+          effort: 'xhigh'
+        },
+        timestamp: '2026-05-05T04:40:01.000Z'
+      })
+    );
+
+    expect(parsed.resolvedModelProvenance).toMatchObject({
+      model: 'gpt-5.5',
+      model_reasoning_effort: 'xhigh',
+      source: 'runtime_reported',
+      confidence: 'high',
+      degraded_reason: null,
+      observed_at: '2026-05-05T04:40:01.000Z',
+      runtime_model: 'gpt-5.5',
+      runtime_reasoning_effort: 'xhigh'
+    });
+  });
+
   it('preserves earlier runtime effort when later runtime records only repeat the model', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [
