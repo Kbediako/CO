@@ -1822,6 +1822,9 @@ function readProviderWorkerConfigModelDefaultsFromToml(
     if (currentTableKind !== null || currentTablePath.length !== 0) {
       continue;
     }
+    defaults.active_profile =
+      normalizeProviderWorkerConfigProfileName(readTomlStringAssignment(trimmed, 'profile')) ??
+      defaults.active_profile;
     mergeProviderWorkerConfigModelAssignment(defaults, trimmed);
   }
   defaults.root_model = defaults.model;
@@ -1894,7 +1897,9 @@ function selectProviderWorkerConfigModelDefaultsForProfile(
   defaults: ProviderWorkerConfigModelDefaults,
   rawProfile: string | null
 ): ProviderWorkerConfigModelDefaults {
-  const activeProfile = normalizeProviderWorkerConfigProfileName(rawProfile);
+  const activeProfile =
+    normalizeProviderWorkerConfigProfileName(rawProfile) ??
+    normalizeProviderWorkerConfigProfileName(defaults.active_profile);
   if (!activeProfile) {
     return defaults;
   }
@@ -2001,7 +2006,10 @@ function mergeProviderWorkerCommandConfigOverride(
     reasoning_effort:
       normalizeProviderWorkerReasoningEffortValue(
         readTomlStringAssignment(trimmed, 'model_reasoning_effort')
-      ) ?? current.reasoning_effort
+      ) ?? current.reasoning_effort,
+    profile:
+      normalizeProviderWorkerConfigProfileName(readTomlStringAssignment(trimmed, 'profile')) ??
+      current.profile
   };
 }
 
@@ -2415,6 +2423,7 @@ export function buildProviderLinearWorkerResolvedModelProvenance(input: {
       modelReasoningEffort?: string | null;
     }
   >;
+  configActiveProfile?: string | null;
   configPath?: string | null;
   observedAt?: string | null;
 }): ProviderLinearWorkerResolvedModelProvenance {
@@ -2445,6 +2454,7 @@ export function buildProviderLinearWorkerResolvedModelProvenance(input: {
       root_reasoning_effort: normalizeProviderWorkerReasoningEffortValue(
         input.configReasoningEffort
       ),
+      active_profile: normalizeProviderWorkerConfigProfileName(input.configActiveProfile),
       profiles: normalizeProviderWorkerConfigModelProfiles(input.configProfiles)
     },
     observedAt: normalizeOptionalString(input.observedAt)

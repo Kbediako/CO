@@ -19,7 +19,7 @@ This mirror points to the canonical task spec at `tasks/specs/linear-7b8e48c8-39
 - Require structured provenance in `provider-linear-worker-proof.json` and `provider-linear-worker-session-log-hydration.json`.
 - Expose provenance through `CO STATUS` and read-model surfaces.
 - Prefer runtime-reported model/reasoning effort from `codex exec --json` and `codex exec resume --json` when available.
-- Merge active Codex profile config over root defaults for config-derived provenance.
+- Merge active Codex profile config over root defaults for config-derived provenance, including env/flag-selected profiles, root `profile = "..."`, and injected `-c profile=...` overrides.
 - Seed proof-side provenance from matching signed session-log hydration state when older proofs predate the proof field.
 - Do not preserve or re-sign hydration-state provenance when the current proof has no provenance.
 - Record source/confidence/degraded reason when runtime model metadata is missing.
@@ -63,9 +63,9 @@ This mirror points to the canonical task spec at `tasks/specs/linear-7b8e48c8-39
   - protected terms appear across packet and mirror surfaces
 - Implementation validation must show:
   - no-`--model` inherited-config path records current local `gpt-5.5` truthfully without pretending runtime proof
-  - active profile config merges over root defaults, and requested missing profile config records degraded/unknown provenance
+  - active profile config merges over root defaults from env/flag selection, root `profile = "..."`, and injected `-c profile=...`, while requested missing profile config records degraded/unknown provenance
   - pre-existing signed session-log hydration state can backfill proof-side resolved model provenance while stale hydration signatures and skip-hydration re-signs are rejected
   - selected-run projection refreshes older proofs when hydration state can backfill missing model provenance
   - explicit override path records override source when supported
   - missing runtime model metadata records degraded/unknown output
-  - `CO STATUS` and read-model expose provenance without hiding degraded evidence
+  - `CO STATUS` terminal frames and read-model payloads expose provenance without hiding degraded evidence
