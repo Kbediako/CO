@@ -200,6 +200,82 @@ describe('CompatibilityIssuePresenter', () => {
     ).toBeNull();
   });
 
+  it('keeps stale proof workspace paths from overriding current source paths', () => {
+    const source = buildCompatibilitySource({
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress',
+      startedAt: '2026-04-06T02:00:00.000Z',
+      workspacePath: '/repo/.workspaces/current-co-100',
+      providerLinearWorkerProof: {
+        issue_id: 'issue-100',
+        issue_identifier: 'CO-100',
+        attempt_started_at: '2026-04-06T02:00:00.000Z',
+        pid: null,
+        thread_id: null,
+        latest_turn_id: null,
+        latest_session_id: null,
+        latest_session_id_source: null,
+        turn_count: 0,
+        last_event: 'turn_running',
+        last_message: 'stale proof',
+        last_event_at: '2026-04-06T02:05:00.000Z',
+        tokens: {
+          input_tokens: 0,
+          output_tokens: 0,
+          total_tokens: 0
+        },
+        rate_limits: null,
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        workspace_path: '/repo/.workspaces/stale-co-100',
+        linear_audit: null,
+        progress: null,
+        tracked_issue_error: null,
+        end_reason: null,
+        updated_at: '2026-04-06T02:05:00.000Z'
+      } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>,
+      providerDebugSnapshot: {
+        live_linear_state: {
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-06T02:35:00.000Z'
+        },
+        claim: {
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          updated_at: '2026-04-06T02:35:00.000Z',
+          run_id: 'run-co-100',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-06T02:35:00.000Z',
+          launch_source: 'control-host',
+          launch_started_at: '2026-04-06T02:30:00.000Z',
+          retry: null,
+          freshness: 'current',
+          is_rehydrated: true,
+          rehydrated_at: '2026-04-06T02:35:00.000Z'
+        },
+        worker: null,
+        parallelization: null,
+        pull_request: null,
+        progress: null,
+        last_audit_operation: null,
+        last_cross_issue_audit_operation: null,
+        last_semantic_progress_at: '2026-04-06T02:35:00.000Z',
+        stall_classification: null,
+        stall_reason: null,
+        recovery_recommendation: null
+      } as NonNullable<ControlCompatibilitySourceContext['providerDebugSnapshot']>
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(source),
+      running: [source]
+    });
+
+    expect(projection.issues[0]?.payload.workspace.path).toBe('/repo/.workspaces/current-co-100');
+  });
+
   it('prefers claim launch_started_at over older started_at when filtering stale proof worker_host', () => {
     const source = buildCompatibilitySource({
       rawStatus: 'in_progress',

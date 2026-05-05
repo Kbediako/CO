@@ -848,7 +848,11 @@ function buildProjectionContextFromParts(
   const manifestRawStatus = readStringValue(manifestRecord, 'status') ?? 'unknown';
   const startedAt = readStringValue(manifestRecord, 'started_at', 'startedAt') ?? null;
   const providerProofRecord = (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null;
-  const proofIsFreshForStage = isProviderLinearWorkerProofFreshForStage(providerProofRecord, startedAt);
+  const proofFreshnessStageStartedAt = providerClaim?.launch_started_at ?? startedAt;
+  const proofIsFreshForStage = isProviderLinearWorkerProofFreshForStage(
+    providerProofRecord,
+    proofFreshnessStageStartedAt
+  );
   const useTerminalProof = shouldUseProviderLinearWorkerTerminalProofForSelectedRun(manifestRecord, providerProofRecord);
   const useScopedTerminalProof = useTerminalProof && proofIsFreshForStage;
   const proofTerminalStatus = useScopedTerminalProof
@@ -919,7 +923,8 @@ function buildProjectionContextFromParts(
     manifestRecord,
     manifestPath: snapshot.manifestPath,
     controlRunsRoot,
-    controlWorkspacePath
+    controlWorkspacePath,
+    providerLinearWorkerProof: proofIsFreshForStage ? parts.providerLinearWorkerProof : null
   });
   const questionSummary = buildSelectedRunQuestionSummary(parts.questions);
   const latestAction = control.latest_action?.action ?? null;
@@ -1095,10 +1100,15 @@ function resolveSelectedRunWorkspacePath(input: {
   manifestPath: string;
   controlRunsRoot: string | null;
   controlWorkspacePath: string | null;
+  providerLinearWorkerProof: ProviderLinearWorkerProof | null;
 }): string | null {
   const explicitWorkspacePath = resolveManifestWorkspacePath(input.manifestRecord);
   if (explicitWorkspacePath) {
     return explicitWorkspacePath;
+  }
+  const proofWorkspacePath = input.providerLinearWorkerProof?.workspace_path ?? null;
+  if (proofWorkspacePath) {
+    return proofWorkspacePath;
   }
   if (
     !input.controlRunsRoot ||

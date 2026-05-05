@@ -31,11 +31,12 @@ import {
   type ProviderIntakeClaimRecord,
   type ProviderIntakeState
 } from './control/providerIntakeState.js';
-import type {
-  ControlLatestEventPayload,
-  ControlRunningPayload,
-  ControlSelectedRunPayload,
-  ControlStatusFallbackExpiryMetadata
+import {
+  readProviderLinearWorkerWorkspacePath,
+  type ControlLatestEventPayload,
+  type ControlRunningPayload,
+  type ControlSelectedRunPayload,
+  type ControlStatusFallbackExpiryMetadata
 } from './control/observabilityReadModel.js';
 import type { RunPaths } from './run/runPaths.js';
 
@@ -283,10 +284,14 @@ function applyProviderIntakeTruthOverlay(
   const runningEntries = runningClaims.map((claim) => {
     const existingRunning =
       dataset.running.find((entry) => isDegradedMetadataPayloadMatchingClaim(entry, claim)) ?? null;
+    const existingIssue =
+      dataset.issues.find((entry) => isDegradedMetadataPayloadMatchingClaim(entry, claim)) ?? null;
+    const existingIssueMetadata = selectMatchingDegradedMetadataPayload(existingIssue, claim);
     const selectedClaimFallbackExpiry =
       isDegradedMetadataPayloadMatchingClaim(selected, claim) ? selected.fallback_expiry : undefined;
     const fallbackExpiry = mergeDegradedFallbackExpiry(
       existingRunning?.fallback_expiry,
+      existingIssueMetadata?.running?.fallback_expiry,
       selectedClaimFallbackExpiry,
       runningFallbackExpiry
     );
@@ -294,7 +299,9 @@ function applyProviderIntakeTruthOverlay(
       claim,
       selected,
       dataset.host,
-      fallbackExpiry
+      fallbackExpiry,
+      existingRunning,
+      existingIssueMetadata
     );
   });
   const synthesizedIssues = activeClaims.length > 0 ? activeClaims : [selectedClaim];
@@ -311,7 +318,8 @@ function applyProviderIntakeTruthOverlay(
         dataset.host,
         resolveDegradedClaimStatus(resolveDegradedClaimState(claim)),
         issueFallbackExpiry,
-        runningFallbackExpiry
+        runningFallbackExpiry,
+        dataset.running.find((entry) => isDegradedMetadataPayloadMatchingClaim(entry, claim)) ?? null
       );
     }),
     ...dataset.issues.filter(
@@ -501,7 +509,8 @@ function buildDegradedIssuePayload(
   host: string,
   status: { raw_status: string; display_status: string; issue_status: string },
   issueFallbackExpiry: ControlStatusFallbackExpiryMetadata[] | undefined,
-  runningFallbackExpiry: ControlStatusFallbackExpiryMetadata[] | undefined
+  runningFallbackExpiry: ControlStatusFallbackExpiryMetadata[] | undefined,
+  existingRunning: OperatorDashboardSessionPayload | null = null
 ): OperatorDashboardIssuePayload {
   const selectedClaimFallbackExpiry =
     isDegradedMetadataPayloadMatchingClaim(selected, claim) ? selected.fallback_expiry : undefined;
@@ -527,7 +536,12 @@ function buildDegradedIssuePayload(
     title: claim.issue_title,
     url: existing?.url ?? null,
     workspace: {
-      path: selected.workspace.path,
+      path: resolveDegradedClaimWorkspacePath({
+        claim,
+        selected,
+        existingIssue: existingMetadata,
+        existingRunning
+      }),
       host
     },
     ...(claim.worker_host !== undefined ? { worker_host: claim.worker_host ?? null } : {}),
@@ -599,7 +613,9 @@ function buildDegradedRunningSessionPayload(
   claim: ProviderIntakeClaimRecord,
   selected: ControlSelectedRunPayload,
   host: string,
-  fallbackExpiry: ControlStatusFallbackExpiryMetadata[] | undefined
+  fallbackExpiry: ControlStatusFallbackExpiryMetadata[] | undefined,
+  existingRunning: OperatorDashboardSessionPayload | null = null,
+  existingIssue: OperatorDashboardIssuePayload | null = null
 ): OperatorDashboardSessionPayload {
   return {
     issue_identifier: claim.issue_identifier,
@@ -618,7 +634,12 @@ function buildDegradedRunningSessionPayload(
     session_id: null,
     thread_id: null,
     turn_count: null,
-    workspace_path: selected.workspace.path,
+    workspace_path: resolveDegradedClaimWorkspacePath({
+      claim,
+      selected,
+      existingIssue,
+      existingRunning
+    }),
     host,
     ...(claim.worker_host !== undefined ? { worker_host: claim.worker_host ?? null } : {}),
     last_event: 'provider_intake_refresh',
@@ -633,6 +654,31 @@ function buildDegradedRunningSessionPayload(
     },
     ...resolveDegradedFallbackExpiry(fallbackExpiry)
   };
+}
+
+function resolveDegradedClaimWorkspacePath(input: {
+  claim: ProviderIntakeClaimRecord;
+  selected: ControlSelectedRunPayload;
+  existingIssue: OperatorDashboardIssuePayload | null;
+  existingRunning: OperatorDashboardSessionPayload | null;
+}): string | null {
+  if (input.existingRunning?.workspace_path) {
+    return input.existingRunning.workspace_path;
+  }
+  if (input.existingIssue?.workspace.path) {
+    return input.existingIssue.workspace.path;
+  }
+  const proofWorkspacePath = readProviderLinearWorkerWorkspacePath(
+    input.existingIssue?.provider_linear_worker_proof ?? null,
+    input.existingIssue?.running?.started_at ?? input.existingRunning?.started_at ?? null,
+    input.existingIssue?.provider_debug_snapshot ?? null
+  );
+  if (proofWorkspacePath) {
+    return proofWorkspacePath;
+  }
+  return isDegradedMetadataPayloadMatchingClaim(input.selected, input.claim)
+    ? input.selected.workspace.path
+    : null;
 }
 
 function resolveDegradedFallbackExpiry(
@@ -781,5 +827,6 @@ function findRunsRoot(runDir: string): string {
 
 export const __test__ = {
   DEFAULT_CO_STATUS_JSON_REQUEST_TIMEOUT_MS,
+  applyProviderIntakeTruthOverlay,
   isDegradedMetadataPayloadMatchingClaim
 };

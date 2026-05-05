@@ -752,6 +752,30 @@ export function readProviderLinearWorkerHost(
   );
 }
 
+export function readProviderLinearWorkerWorkspacePath(
+  proof: ProviderLinearWorkerProof | null | undefined,
+  stageStartedAt: string | null | undefined,
+  providerDebugSnapshot?: ControlProviderDebugSnapshot | null | undefined
+): string | null {
+  const claimLaunchStartedAt = providerDebugSnapshot?.claim?.launch_started_at ?? null;
+  const proofStageStartedAt =
+    claimLaunchStartedAt
+    ?? stageStartedAt
+    ?? null;
+  if (
+    !proof ||
+    !isProviderLinearWorkerProofFreshForStage(
+      proof as ProviderLinearWorkerProof & Record<string, unknown>,
+      proofStageStartedAt
+    )
+  ) {
+    return null;
+  }
+  return typeof proof.workspace_path === 'string' && proof.workspace_path.trim().length > 0
+    ? proof.workspace_path
+    : null;
+}
+
 export function resolveProviderWorkerHost(input: {
   providerLinearWorkerProof?: ProviderLinearWorkerProof | null | undefined;
   providerDebugSnapshot?: ControlProviderDebugSnapshot | null | undefined;
