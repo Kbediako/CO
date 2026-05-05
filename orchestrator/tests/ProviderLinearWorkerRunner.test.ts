@@ -2504,6 +2504,59 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
+  it('marks missing runtime reasoning effort as partial runtime provenance', () => {
+    expect(
+      buildProviderLinearWorkerResolvedModelProvenance({
+        runtimeModel: 'gpt-5.5',
+        observedAt: '2026-05-05T04:40:03.000Z'
+      })
+    ).toEqual({
+      schema_version: 1,
+      model: 'gpt-5.5',
+      review_model: null,
+      model_reasoning_effort: null,
+      source: 'runtime_reported',
+      confidence: 'medium',
+      degraded_reason: 'runtime_metadata_partial',
+      observed_at: '2026-05-05T04:40:03.000Z',
+      runtime_model: 'gpt-5.5',
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: null,
+      config_model: null,
+      config_review_model: null,
+      config_reasoning_effort: null,
+      config_path: null
+    });
+  });
+
+  it('marks command backfilled runtime effort as degraded provenance', () => {
+    expect(
+      buildProviderLinearWorkerResolvedModelProvenance({
+        runtimeModel: 'gpt-5.5',
+        commandArgs: ['-c', 'model_reasoning_effort="high"', 'exec', '--json', 'prompt'],
+        observedAt: '2026-05-05T04:40:03.000Z'
+      })
+    ).toEqual({
+      schema_version: 1,
+      model: 'gpt-5.5',
+      review_model: null,
+      model_reasoning_effort: 'high',
+      source: 'runtime_reported',
+      confidence: 'medium',
+      degraded_reason: 'runtime_metadata_partial_command_backfill',
+      observed_at: '2026-05-05T04:40:03.000Z',
+      runtime_model: 'gpt-5.5',
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: null,
+      config_model: null,
+      config_review_model: null,
+      config_reasoning_effort: null,
+      config_path: null
+    });
+  });
+
   it('resolves explicit --model overrides as command provenance', () => {
     expect(
       buildProviderLinearWorkerResolvedModelProvenance({

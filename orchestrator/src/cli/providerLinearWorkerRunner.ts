@@ -165,6 +165,10 @@ const PROVIDER_LINEAR_WORKER_CHILD_STREAMS_LOCK_RETRY: LockRetryOptions = {
 };
 const PROVIDER_WORKER_RUNTIME_METADATA_PARTIAL_CONFIG_BACKFILL =
   'runtime_metadata_partial_config_backfill';
+const PROVIDER_WORKER_RUNTIME_METADATA_PARTIAL_COMMAND_BACKFILL =
+  'runtime_metadata_partial_command_backfill';
+const PROVIDER_WORKER_RUNTIME_METADATA_PARTIAL =
+  'runtime_metadata_partial';
 const PROVIDER_LINEAR_WORKER_PROOF_LOCK_RETRY: LockRetryOptions = {
   maxAttempts: 50,
   initialDelayMs: 10,
@@ -2062,17 +2066,33 @@ function buildProviderWorkerResolvedModelProvenance(input: {
     config_path: input.configDefaults.config_path
   };
   if (runtimeModel) {
+    const usesCommandMetadataBackfill =
+      (!runtimeReviewModel && Boolean(commandOverrides.review_model)) ||
+      (!runtimeReasoningEffort && Boolean(commandOverrides.reasoning_effort));
     const usesConfigMetadataBackfill =
-      (!runtimeReviewModel && Boolean(input.configDefaults.review_model)) ||
-      (!runtimeReasoningEffort && Boolean(input.configDefaults.reasoning_effort));
+      (!runtimeReviewModel &&
+        !commandOverrides.review_model &&
+        Boolean(input.configDefaults.review_model)) ||
+      (!runtimeReasoningEffort &&
+        !commandOverrides.reasoning_effort &&
+        Boolean(input.configDefaults.reasoning_effort));
+    const missingRequiredRuntimeMetadata = runtimeReasoningEffort === null;
+    const partialRuntimeMetadata =
+      usesCommandMetadataBackfill ||
+      usesConfigMetadataBackfill ||
+      missingRequiredRuntimeMetadata;
     return {
       ...common,
       model: runtimeModel,
       source: 'runtime_reported',
-      confidence: usesConfigMetadataBackfill ? 'medium' : 'high',
-      degraded_reason: usesConfigMetadataBackfill
-        ? PROVIDER_WORKER_RUNTIME_METADATA_PARTIAL_CONFIG_BACKFILL
-        : null
+      confidence: partialRuntimeMetadata ? 'medium' : 'high',
+      degraded_reason: usesCommandMetadataBackfill
+        ? PROVIDER_WORKER_RUNTIME_METADATA_PARTIAL_COMMAND_BACKFILL
+        : usesConfigMetadataBackfill
+          ? PROVIDER_WORKER_RUNTIME_METADATA_PARTIAL_CONFIG_BACKFILL
+          : missingRequiredRuntimeMetadata
+            ? PROVIDER_WORKER_RUNTIME_METADATA_PARTIAL
+            : null
     };
   }
   if (commandModel) {
@@ -2183,13 +2203,32 @@ function mergeProviderWorkerResolvedModelProvenance(
     ((selected.review_model === null && secondary.review_model !== null) ||
       (selected.model_reasoning_effort === null &&
         secondary.model_reasoning_effort !== null));
+  const usesCommandMetadataBackfill =
+    selected.source === 'runtime_reported' &&
+    secondary.source === 'command_override' &&
+    ((selected.review_model === null && secondary.review_model !== null) ||
+      (selected.model_reasoning_effort === null &&
+        secondary.model_reasoning_effort !== null));
+  const missingRequiredRuntimeMetadata =
+    selected.source === 'runtime_reported' && selected.runtime_reasoning_effort === null;
+  const partialRuntimeMetadata =
+    usesCommandMetadataBackfill ||
+    usesConfigMetadataBackfill ||
+    missingRequiredRuntimeMetadata;
+  const degradedReason = usesCommandMetadataBackfill
+    ? PROVIDER_WORKER_RUNTIME_METADATA_PARTIAL_COMMAND_BACKFILL
+    : usesConfigMetadataBackfill
+      ? PROVIDER_WORKER_RUNTIME_METADATA_PARTIAL_CONFIG_BACKFILL
+      : missingRequiredRuntimeMetadata
+        ? PROVIDER_WORKER_RUNTIME_METADATA_PARTIAL
+        : null;
   return {
     ...selected,
     review_model: reviewModel,
     model_reasoning_effort: reasoningEffort,
-    confidence: usesConfigMetadataBackfill ? 'medium' : selected.confidence,
-    degraded_reason: usesConfigMetadataBackfill
-      ? (selected.degraded_reason ?? PROVIDER_WORKER_RUNTIME_METADATA_PARTIAL_CONFIG_BACKFILL)
+    confidence: partialRuntimeMetadata ? 'medium' : selected.confidence,
+    degraded_reason: partialRuntimeMetadata
+      ? (selected.degraded_reason ?? degradedReason)
       : selected.degraded_reason,
     observed_at: selected.observed_at ?? secondary.observed_at ?? null,
     runtime_model: selected.runtime_model ?? secondary.runtime_model ?? null,
