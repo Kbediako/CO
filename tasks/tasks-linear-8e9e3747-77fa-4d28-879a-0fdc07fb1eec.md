@@ -6,7 +6,7 @@
 - TECH_SPEC: `tasks/specs/linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md`
 - TECH_SPEC mirror: `docs/TECH_SPEC-linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md`
-- Worktree: `.workspaces/linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec`
+- Worktree: .workspaces/linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec
 - Branch: `linear/co-406-no-run-accepted-recover-capacity`
 
 ## Docs-First

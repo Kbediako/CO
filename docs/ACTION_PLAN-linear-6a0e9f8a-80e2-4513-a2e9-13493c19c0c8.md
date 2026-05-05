@@ -9,15 +9,15 @@
 - Assumptions:
   - Current `origin/main` is `989b9677ea72287e0cb561838a3c7f65b297f8a7` at lane start.
   - The reproduced `docs:check` failure is unrelated to Codex CLI 0.128 posture.
-  - Backticking the path text is sufficient; no rule change is needed.
+  - Removing Markdown code formatting from the stale path text is sufficient; no rule change is needed.
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward:
   - `docs:check`
   - `backticked-path-missing`
-  - `.workspaces/linear-8bbdd424-d77e-4312-b4b7-2a82c3df2749`
-  - `.workspaces/linear-f04ab1c2-79e6-4a98-84e1-85efb6583116`
-  - `.workspaces/linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec`
+  - .workspaces/linear-8bbdd424-d77e-4312-b4b7-2a82c3df2749
+  - .workspaces/linear-f04ab1c2-79e6-4a98-84e1-85efb6583116
+  - .workspaces/linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec
   - `CO-294`
   - `CO-398`
   - `CO-406`

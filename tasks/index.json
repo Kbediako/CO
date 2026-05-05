@@ -21,7 +21,7 @@
           "reviewer": "provider worker",
           "date": "2026-05-05",
           "status": "approved-for-narrow-repair",
-          "summary": "Issue scope is explicit and current-main reproducible; implementation is limited to backticking five historical packet path mentions without docs-hygiene, Codex CLI posture, workflow pin, or broad docs-freshness changes."
+          "summary": "Issue scope is explicit and current-main reproducible; implementation is limited to preserving five historical packet path mentions as non-code prose without docs-hygiene, Codex CLI posture, workflow pin, or broad docs-freshness changes."
         }
       },
       "paths": {
