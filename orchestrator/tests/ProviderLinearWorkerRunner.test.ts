@@ -2550,6 +2550,40 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
+  it('clears runtime model provenance when a sparse new turn starts', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        JSON.stringify({
+          type: 'turn_context',
+          payload: {
+            turn_id: 'turn-1',
+            model: 'gpt-5.5',
+            model_reasoning_effort: 'xhigh'
+          },
+          timestamp: '2026-05-05T04:40:01.000Z'
+        }),
+        JSON.stringify({
+          type: 'event_msg',
+          payload: {
+            type: 'task_complete',
+            turn_id: 'turn-1'
+          },
+          timestamp: '2026-05-05T04:40:02.000Z'
+        }),
+        JSON.stringify({
+          type: 'turn_context',
+          payload: {
+            turn_id: 'turn-2'
+          },
+          timestamp: '2026-05-05T04:40:03.000Z'
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.turnId).toBe('turn-2');
+    expect(parsed.resolvedModelProvenance).toBeNull();
+  });
+
   it('prefers explicit runtime metadata over matching config values while merging sparse records', () => {
     const current = {
       ...buildProviderLinearWorkerResolvedModelProvenance({

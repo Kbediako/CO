@@ -3792,6 +3792,7 @@ function resetProviderLinearWorkerTurnScopedTelemetry(
   state.agentMessageDeltaHydrationSeed = null;
   state.lastEventAt = null;
   state.currentTurnActivity = null;
+  state.resolvedModelProvenance = null;
   state.failureDiagnosis = null;
 }
 
