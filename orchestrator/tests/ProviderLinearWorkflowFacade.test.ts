@@ -13758,7 +13758,7 @@ describe('providerLinearWorkflowFacade', () => {
     expect(calls).toEqual(['owner-search', 'create', 'update-description', 'owner-search', 'related-relation']);
   });
 
-  it('does not reuse a canonical owner marker that only has a prefix match', async () => {
+  it('does not reuse prefix matches, diff additions, or copied/nested marker examples', async () => {
     const canonicalOwnerKey = 'baseline_cohort_id:co-1';
     const longerCanonicalOwnerKey = 'baseline_cohort_id:co-10';
     const longerCanonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${longerCanonicalOwnerKey}`;
@@ -13789,6 +13789,84 @@ describe('providerLinearWorkflowFacade', () => {
                 '## Canonical Owner',
                 `- Canonical owner key: \`${longerCanonicalOwnerKey}\``,
                 `- Canonical owner marker: \`${longerCanonicalOwnerMarker}\``
+              ].join('\n'),
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            }),
+            buildCanonicalOwnerIssue({
+              id: 'lin-issue-11',
+              identifier: 'CO-11',
+              title: 'Patch example with marker',
+              description: [
+                'Patch excerpt, not an owner stamp.',
+                '```diff',
+                `+ Canonical owner marker: \`codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}\``,
+                '```'
+              ].join('\n'),
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            }),
+            buildCanonicalOwnerIssue({
+              id: 'lin-issue-12',
+              identifier: 'CO-12',
+              title: 'Checklist copy with marker',
+              description: [
+                'Copied checklist, not an owner stamp.',
+                `* Canonical owner marker: \`codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}\``
+              ].join('\n'),
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            }),
+            buildCanonicalOwnerIssue({
+              id: 'lin-issue-13',
+              identifier: 'CO-13',
+              title: 'Fenced owner example',
+              description: [
+                'Copied example, not an owner stamp.',
+                '```md',
+                '## Canonical Owner',
+                `* Canonical owner marker: \`codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}\``,
+                '```'
+              ].join('\n'),
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            }),
+            buildCanonicalOwnerIssue({
+              id: 'lin-issue-14',
+              identifier: 'CO-14',
+              title: 'Nested owner marker example',
+              description: [
+                'Copied nested example, not an owner stamp.',
+                '## Canonical Owner',
+                '- Example:',
+                `  * Canonical owner marker: \`codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}\``
+              ].join('\n'),
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            }),
+            buildCanonicalOwnerIssue({
+              id: 'lin-issue-15',
+              identifier: 'CO-15',
+              title: 'Indented code owner marker example',
+              description: [
+                'Copied indented code example, not an owner stamp.',
+                '## Canonical Owner',
+                `    * Canonical owner marker: \`codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}\``
               ].join('\n'),
               state: {
                 id: 'state-backlog',

@@ -42,6 +42,66 @@
       }
     },
     {
+      "id": "20260505-linear-74fe39e5-8c8e-445c-8f24-486446521f72",
+      "title": "CO-432 preserve CO-175 baseline docs freshness owner contract",
+      "relates_to": "tasks/tasks-linear-74fe39e5-8c8e-445c-8f24-486446521f72.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-05",
+      "status": "in_progress",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=baseline_cohort_id:co-175-apr-14-march-14-tasks-1164-1195",
+      "evidence": [
+        "docs/PRD-linear-74fe39e5-8c8e-445c-8f24-486446521f72.md",
+        "docs/TECH_SPEC-linear-74fe39e5-8c8e-445c-8f24-486446521f72.md",
+        "docs/ACTION_PLAN-linear-74fe39e5-8c8e-445c-8f24-486446521f72.md",
+        "tasks/specs/linear-74fe39e5-8c8e-445c-8f24-486446521f72.md",
+        "tasks/tasks-linear-74fe39e5-8c8e-445c-8f24-486446521f72.md",
+        ".agent/task/linear-74fe39e5-8c8e-445c-8f24-486446521f72.md",
+        "tasks/index.json",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "docs_owner_packet_r2_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-owner-packet-r2",
+          "date": "2026-05-05",
+          "status": "produced",
+          "manifest": ".runs/linear-74fe39e5-8c8e-445c-8f24-486446521f72-docs-owner-packet-r2/cli/2026-05-05T22-45-07-835Z-d60d8311/manifest.json",
+          "source_anchor": "ctx:sha256:b859e8b6fd78c60747430df569cb4dc798c7665e357e8a61b577126ab5c29f67#chunk:c000001",
+          "summary": "Rebuilt the CO-432 docs-first packet and registry evidence on the fresh Rework branch. The packet preserves docs:freshness:maintain, canonical owner key, terminal-owner replacement, completed-lane registry residue, stale active-spec routing, baseline_cohort_id:co-175-apr-14-march-14-tasks-1164-1195, codex-orchestrator:canonical-owner-key=baseline_cohort_id:co-175-apr-14-march-14-tasks-1164-1195, co-175-apr-14-march-14-tasks-1164-1195, tasks/tasks-1164-historical.md, and CO-175. Parent owns source inspection, implementation, validation, Linear state, workpad, PR lifecycle, and review handoff."
+        },
+        "parent_validation": {
+          "reviewer": "parent provider worker",
+          "date": "2026-05-05",
+          "status": "validation-green-before-pr",
+          "summary": "create-follow-up reused CO-432 for the exact baseline canonical key; delegation guard, spec guard, build, lint, full test, docs:check, docs:freshness, docs:freshness:maintain, repo:stewardship, diff-budget, and pack:smoke passed. Lint reported only pre-existing DelegationMcpHealth.test.ts warnings."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-05",
+          "status": "bounded-success",
+          "telemetry": ".runs/linear-74fe39e5-8c8e-445c-8f24-486446521f72/cli/2026-05-05T20-38-59-460Z-7837199a/review/telemetry.json",
+          "summary": "Final manifest-backed standalone review completed as bounded success via command-intent retry after the reviewer attempted a validation command; read-only retry found no actionable issues."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-05-05",
+          "status": "no-simplification-needed",
+          "artifact": "out/linear-74fe39e5-8c8e-445c-8f24-486446521f72/manual/elegance-review.md",
+          "summary": "No simplification edits were needed; matcher changes stay local to existing markdown helpers and the residual diff size is from the required docs-first packet."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-74fe39e5-8c8e-445c-8f24-486446521f72.md",
+        "task": "tasks/tasks-linear-74fe39e5-8c8e-445c-8f24-486446521f72.md",
+        "agent_task": ".agent/task/linear-74fe39e5-8c8e-445c-8f24-486446521f72.md",
+        "prd": "docs/PRD-linear-74fe39e5-8c8e-445c-8f24-486446521f72.md",
+        "docs": "docs/TECH_SPEC-linear-74fe39e5-8c8e-445c-8f24-486446521f72.md",
+        "action_plan": "docs/ACTION_PLAN-linear-74fe39e5-8c8e-445c-8f24-486446521f72.md"
+      }
+    },
+    {
       "id": "20260505-linear-f88846f3-24be-48b6-a983-087613fd8f82",
       "title": "CO-426 isolate provider validation fixture audit rows",
       "relates_to": "tasks/tasks-linear-f88846f3-24be-48b6-a983-087613fd8f82.md",
