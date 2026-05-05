@@ -249,6 +249,7 @@ export interface ProviderIssueHandoffRecoveryResult {
   action: ProviderIssueRecoveryAction;
   kind: ProviderIssueHandoffResult['kind'] | 'released' | 'skipped';
   reason: string;
+  details?: Record<string, unknown>;
   claim: ProviderIssueHandoffRecoveryClaim | null;
 }
 
@@ -394,7 +395,7 @@ export interface ProviderIssueHandoffService {
 export type ProviderTrackedIssueRefreshResolution =
   | { kind: 'ready'; trackedIssue: LiveLinearTrackedIssue }
   | { kind: 'release'; reason: string }
-  | { kind: 'skip'; reason: string };
+  | { kind: 'skip'; reason: string; details?: Record<string, unknown> };
 
 export interface CreateProviderIssueHandoffServiceOptions {
   paths: Pick<RunPaths, 'runDir'> & { repoRoot: string };
@@ -6496,6 +6497,7 @@ export function createProviderIssueHandoffService(
                   action: input.action,
                   kind: 'skipped',
                   reason: resolution.reason,
+                  details: resolution.details,
                   claim: existingClaim
                 });
               }
@@ -7295,6 +7297,7 @@ function buildProviderIssueRecoveryResult(input: {
   action: ProviderIssueRecoveryAction;
   kind: ProviderIssueHandoffRecoveryResult['kind'];
   reason: string;
+  details?: Record<string, unknown>;
   claim: ProviderIntakeClaimRecord | null | undefined;
 }): ProviderIssueHandoffRecoveryResult {
   return {
@@ -7303,6 +7306,7 @@ function buildProviderIssueRecoveryResult(input: {
     action: input.action,
     kind: input.kind,
     reason: input.reason,
+    ...(input.details ? { details: input.details } : {}),
     claim: input.claim ? summarizeProviderIssueRecoveryClaim(input.claim) : null
   };
 }

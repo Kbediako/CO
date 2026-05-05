@@ -705,6 +705,167 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('uses targeted issue-by-id recovery when tracked-issues discovery is constrained for a stale Backlog ignored claim', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-494',
+      issue_identifier: 'CO-494',
+      issue_title: 'Provider child lane accept must not compare against stale run manifest',
+      issue_state: 'Backlog',
+      issue_state_type: 'backlog',
+      issue_updated_at: '2026-05-02T22:13:56.269Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-issue-494',
+      state: 'ignored',
+      reason: 'provider_issue_state_not_active',
+      accepted_at: null,
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    }));
+    const persist = vi.fn(async () => undefined);
+    const startedRun = {
+      runId: 'run-co-494-targeted-recover',
+      manifestPath: join(paths.runDir, 'provider-run-co-494-targeted-recover.json')
+    };
+    const launcher = { start: vi.fn(async () => startedRun), resume: vi.fn(async () => undefined) };
+    const resolveTrackedIssues = vi.fn(async () => ({
+      kind: 'skip' as const,
+      reason: 'dispatch_source_provider_rate_limited'
+    }));
+    const resolveTrackedIssue = vi.fn(async ({ issueId }: { provider: 'linear'; issueId: string }) => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: issueId,
+        identifier: 'CO-494',
+        title: 'Provider child lane accept must not compare against stale run manifest',
+        state: 'Ready',
+        state_type: 'unstarted',
+        updated_at: '2026-05-05T01:07:30.845Z',
+        blocked_by: []
+      })
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue,
+      resolveTrackedIssues,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      })
+    });
+
+    const result = await service.recoverIssue({
+      provider: 'linear',
+      issueId: 'lin-issue-494',
+      action: 'recover'
+    });
+
+    expect(resolveTrackedIssues).not.toHaveBeenCalled();
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-494'
+    });
+    expect(result).toMatchObject({
+      kind: 'start',
+      reason: 'provider_issue_start_launched',
+      claim: {
+        issue_id: 'lin-issue-494',
+        issue_identifier: 'CO-494',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        run_id: startedRun.runId,
+        run_manifest_path: startedRun.manifestPath,
+        launch_source: 'control-host',
+        launch_token_present: true
+      }
+    });
+    expect(state.claims[0]).toMatchObject({
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      last_event: 'control_host_provider_worker_recover',
+      last_action: 'recover'
+    });
+  });
+
+  it('preserves targeted issue-by-id rate-limit details when explicit recovery cannot resolve live issue truth', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-494',
+      issue_identifier: 'CO-494',
+      issue_state: 'Backlog',
+      issue_state_type: 'backlog',
+      state: 'ignored',
+      reason: 'provider_issue_state_not_active',
+      accepted_at: null,
+      run_id: null,
+      run_manifest_path: null
+    }));
+    const persist = vi.fn(async () => undefined);
+    const launcher = { start: vi.fn(async () => null), resume: vi.fn(async () => undefined) };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'skip' as const,
+      reason: 'dispatch_source_provider_rate_limited',
+      details: {
+        operation: 'dispatch_source_issue_by_id',
+        shared_budget_fail_fast: true,
+        request_headroom_reserve_bucket: 'requests',
+        request_headroom_remaining: 1,
+        request_headroom_reserve: 1,
+        request_headroom_usable_remaining: 0
+      }
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue
+    });
+
+    const result = await service.recoverIssue({
+      provider: 'linear',
+      issueId: 'lin-issue-494',
+      action: 'recover'
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-494'
+    });
+    expect(result).toMatchObject({
+      kind: 'skipped',
+      reason: 'dispatch_source_provider_rate_limited',
+      details: {
+        operation: 'dispatch_source_issue_by_id',
+        request_headroom_reserve_bucket: 'requests',
+        request_headroom_usable_remaining: 0
+      },
+      claim: {
+        issue_id: 'lin-issue-494',
+        issue_identifier: 'CO-494',
+        state: 'ignored',
+        reason: 'provider_issue_state_not_active'
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
   it.each(['recover', 'relaunch', 'nudge'] as const)(
     'reclaims a Ready released-pending-reopen no-run claim through explicit %s',
     async (action) => {

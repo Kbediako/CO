@@ -180,21 +180,21 @@ describe('docs freshness reporting', () => {
           path: 'README.md',
           owner: 'Codex',
           status: 'active',
-          last_review: '2026-04-03',
+          last_review: reviewDateDaysAgo(1),
           cadence_days: 30
         },
         {
           path: 'docs/README.md',
           owner: 'Codex',
           status: 'active',
-          last_review: '2026-04-03',
+          last_review: reviewDateDaysAgo(1),
           cadence_days: 30
         },
         {
           path: 'tasks/tasks-0906-docs.md',
           owner: 'Codex',
           status: 'active',
-          last_review: '2026-04-03',
+          last_review: reviewDateDaysAgo(1),
           cadence_days: 30
         }
       ],
@@ -289,14 +289,14 @@ describe('docs freshness reporting', () => {
           path: './README.md',
           owner: 'Codex',
           status: 'active',
-          last_review: '2026-04-03',
+          last_review: reviewDateDaysAgo(1),
           cadence_days: 30
         },
         {
           path: 'docs\\README.md',
           owner: 'Codex',
           status: 'active',
-          last_review: '2026-04-03',
+          last_review: reviewDateDaysAgo(1),
           cadence_days: 30
         }
       ],
@@ -418,7 +418,7 @@ describe('docs freshness reporting', () => {
           path: 'README.md',
           owner: 'Codex',
           status: 'active',
-          last_review: '2026-04-03',
+          last_review: reviewDateDaysAgo(1),
           cadence_days: 30
         }
       ],
@@ -462,7 +462,7 @@ describe('docs freshness reporting', () => {
           path: 'README.md',
           owner: 'Codex',
           status: 'active',
-          last_review: '2026-04-03',
+          last_review: reviewDateDaysAgo(1),
           cadence_days: 30
         },
         {

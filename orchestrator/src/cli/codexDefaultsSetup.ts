@@ -9,6 +9,7 @@ import { resolveCodexCliBin } from './utils/codexCli.js';
 import {
   codexFeatureProbeDisablesMultiAgentV2,
   codexFeatureProbeRejectsAgentMaxThreads,
+  findConfiguredRemovedFeatureKeys,
   readCodexFeatureProbe,
   type CodexFeatureProbeResult
 } from './utils/codexFeatures.js';
@@ -36,7 +37,9 @@ export const BASELINE_AGENTS = {
   max_depth: 4
 } as const;
 export const LOCAL_MODEL_OPT_INS = [CURRENT_CHATGPT_MODEL] as const;
+export const CO_MANAGED_REMOVED_FEATURE_KEYS = ['js_repl', 'js_repl_tools_only'] as const;
 const LOCAL_MODEL_OPT_IN_SET = new Set<string>(LOCAL_MODEL_OPT_INS);
+const CO_MANAGED_REMOVED_FEATURE_KEY_SET = new Set<string>(CO_MANAGED_REMOVED_FEATURE_KEYS);
 const CODEX_ORCHESTRATOR_CONFIG_KEY = 'codex_orchestrator';
 const LOCAL_MODEL_OPT_IN_CONFIG_KEY = 'local_model_opt_in';
 
@@ -159,6 +162,10 @@ export async function runCodexDefaultsSetup(
   const plan = buildPlan(env, force, authScope);
   const roleDefinitions = await loadRoleDefinitions();
   const featureProbe = readCodexFeatureProbe(resolveCodexCliBin(env), env);
+  const removedCoManagedFeatureKeys = findConfiguredCoManagedRemovedFeatureKeys(
+    configState.parsed,
+    featureProbe
+  );
   const nextConfig = mergeBaselineDefaults(
     configState.parsed,
     roleDefinitions,
@@ -166,7 +173,8 @@ export async function runCodexDefaultsSetup(
       topLevelLocalModelOptIn,
       reviewModelOptIn: roleAndReviewLocalModelOptIn,
       requestedAuthScope: options.authScope,
-      featureProbe
+      featureProbe,
+      removedCoManagedFeatureKeys
     }
   );
   const activeRoleDefinitions = buildActiveRoleDefinitions(
@@ -182,6 +190,7 @@ export async function runCodexDefaultsSetup(
       configPath: plan.configPath,
       configExists: configState.exists,
       configChanged,
+      removedCoManagedFeatureKeys,
       roleChanges
     });
     return {
@@ -201,9 +210,10 @@ export async function runCodexDefaultsSetup(
       name: 'config.toml',
       path: plan.configPath,
       status: configState.exists ? 'updated' : 'created',
-      detail: configState.exists
-        ? 'Updated CO-compatible baseline defaults and preserved unrelated keys.'
-        : 'Created config.toml with CO baseline defaults.'
+      detail: formatAppliedConfigChangeDetail({
+        configExists: configState.exists,
+        removedCoManagedFeatureKeys
+      })
     });
   } else {
     changes.push({
@@ -361,9 +371,11 @@ function mergeBaselineDefaults(
     reviewModelOptIn: (typeof LOCAL_MODEL_OPT_INS)[number] | null;
     requestedAuthScope?: CodexDefaultsAuthScope;
     featureProbe: CodexFeatureProbeResult;
+    removedCoManagedFeatureKeys: readonly string[];
   }
 ): Record<string, unknown> {
   const next = structuredClone(existing);
+  pruneCoManagedRemovedFeatureKeys(next, options.removedCoManagedFeatureKeys);
   next.model = resolveModelDefault(options.topLevelLocalModelOptIn, BASELINE_MODEL);
   next.review_model = resolveModelDefault(options.reviewModelOptIn, BASELINE_REVIEW_MODEL);
   next.model_reasoning_effort = BASELINE_REASONING;
@@ -657,6 +669,7 @@ function buildPlannedChanges(params: {
   configPath: string;
   configExists: boolean;
   configChanged: boolean;
+  removedCoManagedFeatureKeys: readonly string[];
   roleChanges: PlannedRoleChange[];
 }): CodexDefaultsSetupChange[] {
   const changes: CodexDefaultsSetupChange[] = [];
@@ -667,9 +680,10 @@ function buildPlannedChanges(params: {
     path: params.configPath,
     status: configStatus,
     detail: configStatus === 'pending'
-      ? params.configExists
-        ? 'Will update CO-compatible baseline defaults while preserving unrelated keys.'
-        : 'Will create config.toml with CO baseline defaults.'
+      ? formatPlannedConfigChangeDetail({
+        configExists: params.configExists,
+        removedCoManagedFeatureKeys: params.removedCoManagedFeatureKeys
+      })
       : 'CO baseline defaults already present.'
   });
 
@@ -684,6 +698,69 @@ function buildPlannedChanges(params: {
   }
 
   return changes;
+}
+
+export function findConfiguredCoManagedRemovedFeatureKeys(
+  config: Record<string, unknown>,
+  featureProbe: CodexFeatureProbeResult | null | undefined
+): string[] {
+  const configuredRemovedFeatureKeys = findConfiguredRemovedFeatureKeys(
+    isRecord(config.features) ? (config.features as Record<string, unknown>) : null,
+    featureProbe
+  );
+  return configuredRemovedFeatureKeys
+    .filter((key) => CO_MANAGED_REMOVED_FEATURE_KEY_SET.has(key))
+    .sort();
+}
+
+function pruneCoManagedRemovedFeatureKeys(
+  config: Record<string, unknown>,
+  removedCoManagedFeatureKeys: readonly string[]
+): void {
+  if (removedCoManagedFeatureKeys.length === 0 || !isRecord(config.features)) {
+    return;
+  }
+  const features = structuredClone(config.features as Record<string, unknown>);
+  for (const key of removedCoManagedFeatureKeys) {
+    delete features[key];
+  }
+  if (Object.keys(features).length === 0) {
+    delete config.features;
+  } else {
+    config.features = features;
+  }
+}
+
+function formatPlannedConfigChangeDetail(params: {
+  configExists: boolean;
+  removedCoManagedFeatureKeys: readonly string[];
+}): string {
+  if (!params.configExists) {
+    return 'Will create config.toml with CO baseline defaults.';
+  }
+  const cleanup = formatRemovedFeatureCleanupClause(params.removedCoManagedFeatureKeys);
+  return cleanup
+    ? `Will update CO-compatible baseline defaults, ${cleanup}, and preserve unrelated keys.`
+    : 'Will update CO-compatible baseline defaults while preserving unrelated keys.';
+}
+
+function formatAppliedConfigChangeDetail(params: {
+  configExists: boolean;
+  removedCoManagedFeatureKeys: readonly string[];
+}): string {
+  if (!params.configExists) {
+    return 'Created config.toml with CO baseline defaults.';
+  }
+  const cleanup = formatRemovedFeatureCleanupClause(params.removedCoManagedFeatureKeys);
+  return cleanup
+    ? `Updated CO-compatible baseline defaults, ${cleanup}, and preserved unrelated keys.`
+    : 'Updated CO-compatible baseline defaults and preserved unrelated keys.';
+}
+
+function formatRemovedFeatureCleanupClause(removedCoManagedFeatureKeys: readonly string[]): string | null {
+  return removedCoManagedFeatureKeys.length > 0
+    ? `pruned stale CO-managed removed feature keys: ${removedCoManagedFeatureKeys.join(', ')}`
+    : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

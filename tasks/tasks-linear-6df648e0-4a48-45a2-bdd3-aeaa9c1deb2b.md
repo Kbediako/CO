@@ -27,6 +27,15 @@
 - [x] Cohort lineage updated. Evidence: `docs/guides/docs-freshness-cohorts.md` records terminal `CO-441` and current live `CO-444`.
 - [x] Historical cohort preserved. Evidence: the March 28 rolling cohort remains `co-420-apr-28-march-28-task-packet-mirror` with no `last_review` refresh, row deletion, hiding, archive, or reclassification.
 
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `docs:freshness:maintain` | Completed-lane historical packet/spec freshness hold | `expire fallback` | CO-444 | Terminal Linear source issues left task-packet/spec metadata active past cadence | 2026-05-05 | 2026-05-05 | 2026-05-12 | Archive packet mirrors and reclassify specs under a live owner; otherwise block handoff | `docs:freshness:maintain -- --format json` |
+
+- Large refactor decision: bounded metadata cleanup under the existing `docs:freshness:maintain` owner; no runtime or policy authority split is added.
+- Minor seam decision: bounded temporary freshness-hold cleanup is acceptable; unresolved rows must be archived, reclassified, or blocked by 2026-05-12.
+
 ## Not Done If
 - CO-444 packet or mirrors omit `docs:freshness:maintain`, `canonical_owner_key=docs:freshness:maintain`, `terminal configured owner CO-441`, `block_unowned_repo_debt`, `co-420-apr-28-march-28-task-packet-mirror`, or `March 28 task-packet mirror rolling cohort`.
 - The live owner path still resolves only to terminal `CO-441`.

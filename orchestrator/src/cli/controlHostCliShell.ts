@@ -261,7 +261,11 @@ export async function runControlHostCliShell(
           if (shouldReleaseTrackedIssueClaim(resolution.reason)) {
             return { kind: 'release', reason: resolution.reason } as const;
           }
-          return { kind: 'skip', reason: resolution.reason } as const;
+          return {
+            kind: 'skip',
+            reason: resolution.reason,
+            ...(resolution.details ? { details: resolution.details } : {})
+          } as const;
         },
         resolveTrackedIssues: async (input) => {
           const runtimeEnv = process.env;

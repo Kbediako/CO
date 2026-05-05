@@ -2,9 +2,18 @@ import { spawnSync } from 'node:child_process';
 
 export interface CodexFeatureProbeResult {
   flags: Record<string, boolean> | null;
+  features: Record<string, CodexFeatureEntry> | null;
+  removed: string[];
   stderr: string;
   error: string | null;
   status: number | null;
+}
+
+export interface CodexFeatureEntry {
+  name: string;
+  status: string | null;
+  enabled: boolean;
+  removed: boolean;
 }
 
 export function readCodexFeatureProbe(
@@ -21,6 +30,8 @@ export function readCodexFeatureProbe(
   if (result.error || result.status !== 0) {
     return {
       flags: null,
+      features: null,
+      removed: [],
       stderr,
       error: result.error
         ? result.error.message
@@ -29,8 +40,14 @@ export function readCodexFeatureProbe(
     };
   }
   const stdout = String(result.stdout ?? '');
+  const features = parseCodexFeaturesFromText(stdout);
   return {
-    flags: parseFeatureFlagsFromText(stdout),
+    flags: parseFeatureFlagsFromEntries(features),
+    features,
+    removed: Object.values(features)
+      .filter((feature) => feature.removed)
+      .map((feature) => feature.name)
+      .sort(),
     stderr,
     error: null,
     status: result.status
@@ -47,8 +64,21 @@ export function codexFeatureProbeDisablesMultiAgentV2(probe: CodexFeatureProbeRe
   return probe.flags?.multi_agent_v2 === false;
 }
 
-function parseFeatureFlagsFromText(stdout: string): Record<string, boolean> {
-  const flags: Record<string, boolean> = {};
+export function findConfiguredRemovedFeatureKeys(
+  configFeatures: Record<string, unknown> | null | undefined,
+  probe: CodexFeatureProbeResult | null | undefined
+): string[] {
+  if (!configFeatures || !probe || probe.removed.length === 0) {
+    return [];
+  }
+  const removed = new Set(probe.removed);
+  return Object.keys(configFeatures)
+    .filter((key) => removed.has(key))
+    .sort();
+}
+
+export function parseCodexFeaturesFromText(stdout: string): Record<string, CodexFeatureEntry> {
+  const features: Record<string, CodexFeatureEntry> = {};
   for (const line of stdout.split(/\r?\n/u)) {
     const trimmed = line.trim();
     if (!trimmed) {
@@ -63,11 +93,25 @@ function parseFeatureFlagsFromText(stdout: string): Record<string, boolean> {
     if (!name) {
       continue;
     }
-    if (enabledToken === 'true') {
-      flags[name] = true;
-    } else if (enabledToken === 'false') {
-      flags[name] = false;
+    if (enabledToken !== 'true' && enabledToken !== 'false') {
+      continue;
     }
+    const statusTokens = tokens.slice(1, -1);
+    const status = statusTokens.length > 0 ? statusTokens.join(' ') : null;
+    features[name] = {
+      name,
+      status,
+      enabled: enabledToken === 'true',
+      removed: statusTokens.some((token) => token.toLowerCase() === 'removed')
+    };
+  }
+  return features;
+}
+
+function parseFeatureFlagsFromEntries(features: Record<string, CodexFeatureEntry>): Record<string, boolean> {
+  const flags: Record<string, boolean> = {};
+  for (const feature of Object.values(features)) {
+    flags[feature.name] = feature.enabled;
   }
   return flags;
 }
