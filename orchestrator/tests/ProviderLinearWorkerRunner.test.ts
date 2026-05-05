@@ -17763,6 +17763,12 @@ for await (const line of rl) {
       expectedEndReason: 'issue_review_handoff'
     },
     {
+      name: 'merge handoff',
+      initialIssue: { state: 'In Progress', state_type: 'started' },
+      finalIssue: { state: 'Merging', state_type: 'started' },
+      expectedEndReason: 'max_turns_reached_issue_still_active'
+    },
+    {
       name: 'post-merge/Done closeout',
       initialIssue: { state: 'Merging', state_type: 'started' },
       finalIssue: { state: 'Done', state_type: 'completed' },

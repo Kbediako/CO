@@ -1,30 +1,11 @@
 # PRD - CO-424 Provider-Worker Closeout Invariants
-
-## Request
-Fix the `provider-linear-worker` closeout class exposed by `CO-423` / `PR #721`: successful `review handoff`, `merge handoff`, or post-merge/Done bookkeeping must not be reported failed only because implementation-turn parallelization proof no longer maps to the closeout turn.
-
-## Problem
-`CO-423` reached review and later merged cleanly, but provider runs ended failed with `parallelization_serial_conflict` and then `parallelization_decision_missing`. The decisive evidence was a stale same-turn interpretation: earlier `same-issue child lanes` were counted against later `stay_serial` / `forbid_parallel` lifecycle decisions, and lifecycle-only Done bookkeeping still expected a fresh implementation-turn decision. Repeated stale `proof lock` diagnostics also made the terminal cause harder to read.
-
+## Request / Problem
+Fix the `CO-423` / `PR #721` closeout class: successful `review handoff`, `merge handoff`, and post-merge/Done bookkeeping must not fail as `parallelization_serial_conflict` or `parallelization_decision_missing` only because stale implementation-turn proof no longer maps to the closeout turn.
 ## Protected Terms
 `parallelization_serial_conflict`, `parallelization_decision_missing`, `stay_serial`, `forbid_parallel`, `same-issue child lanes`, `review handoff`, `merge handoff`, `post-merge/Done closeout`, `provider-linear-worker`, `proof lock`, `CO-423`, `PR #721`.
-
-## Scope
-Distinguish implementation child-lane lineage from later review/merge/Done closeout decisions; permit clean no-child lifecycle closeout turns to finish without a fresh implementation decision only when the turn is closeout-only; keep real active-turn violations fail-closed, including same-decision serial/forbid launches, dirty source proof, blocked queued states, and non-closeout audit work such as `attach-pr`; deduplicate or demote proof-lock diagnostics when another provider-worker terminal cause exists.
-
-## Non-Goals
-No weakening of same-turn child-lane enforcement, retry scheduler rewrite, reopening `CO-326` / `CO-403` / `CO-408` / `CO-417`, mutation of `CO-423` or `PR #721`, or masking real child-lane launches that violate the active decision.
-
-## Wrong Interpretations To Reject
-Reject treating every `proof lock` diagnostic as primary, making all `stay_serial` or `forbid_parallel` turns child-lane tolerant, inventing child lanes for handoff/merge bookkeeping, or broadening into durable lineage work beyond the fix needed here.
-
+## Scope / Non-Goals
+Separate implementation child-lane lineage from later closeout decisions; allow only clean no-child lifecycle-only handoff/merge/Done turns to skip a fresh implementation decision; keep same-decision serial/forbid launches, dirty source proof, blocked queued states, and non-closeout audit work fail-closed; demote duplicate proof-lock noise. No global bypass, retry scheduler rewrite, `CO-423` / `PR #721` mutation, or reopening `CO-326`, `CO-403`, `CO-408`, or `CO-417`.
 ## Acceptance Criteria
-- [ ] A CO-423-style successful `review handoff` followed by later serial/merge decision does not fail solely due to earlier child-lane history.
-- [ ] Post-merge/Done closeout bookkeeping does not require a fresh implementation-turn parallelization decision unless child lanes or repo artifact edits occur.
-- [ ] True same-decision `stay_serial` / `forbid_parallel` plus child-lane launches still fail closed.
-- [ ] Implementation lineage and review/merge closeout decisions are separated in provider-worker proof.
-- [ ] Stale `proof lock` diagnostics are secondary/deduped when another terminal cause exists.
-- [ ] Tests cover false-failure and true-violation shapes.
-
-## Prior Art
-Use `CO-326`, `CO-408`, `CO-403`, and `CO-417` as adjacent evidence only; do not reopen their scope.
+- [ ] CO-423-style `review handoff`, `merge handoff`, and Done closeout do not fail from earlier child-lane history.
+- [ ] True same-decision `stay_serial` / `forbid_parallel` child-lane launches still fail closed.
+- [ ] Implementation lineage, closeout decisions, and secondary proof-lock diagnostics are tested.

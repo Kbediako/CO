@@ -7739,7 +7739,7 @@ function isLifecycleCloseoutAuditEntry(entry: ProviderLinearAuditEntry): boolean
     state: entry.target_state ?? null,
     state_type: entry.target_state_type ?? null
   });
-  return target.isHandoff || target.isTerminal;
+  return target.isHandoff || target.isTerminal || isProviderLinearMergeHandoffWorkflowState(target);
 }
 
 function selectCurrentTurnProviderLinearAuditEntries(input: {
@@ -7771,7 +7771,7 @@ function hasCurrentTurnLifecycleCloseoutAuditOnly(input: {
       state: entry.target_state ?? null,
       state_type: entry.target_state_type ?? null
     });
-    return target.isHandoff || target.isTerminal;
+    return target.isHandoff || target.isTerminal || isProviderLinearMergeHandoffWorkflowState(target);
   });
 }
 
@@ -7792,6 +7792,18 @@ function isProviderLinearWorkerLifecycleCloseout(
     !lifecycle.isExecutionEligible &&
     (lifecycle.workflowState.isHandoff || lifecycle.workflowState.isTerminal)
   );
+}
+
+function isProviderLinearMergeHandoffWorkflowState(input: {
+  normalizedState: string | null;
+}): boolean {
+  return input.normalizedState === 'merging';
+}
+
+function isProviderLinearWorkerMergeHandoff(
+  lifecycle: ReturnType<typeof classifyProviderLinearWorkerLifecycle>
+): boolean {
+  return isProviderLinearMergeHandoffWorkflowState(lifecycle.workflowState);
 }
 
 function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {
@@ -12534,10 +12546,12 @@ export async function runProviderLinearWorker(
         proof: finalProof,
         parallelizationDecisionCountBeforeTurn
       });
+      let readLifecycleAfterParallelizationFailure = false;
       if (parallelizationFailure) {
         const currentTurnBoundary =
           normalizeOptionalString(finalProof.current_turn_started_at) ??
           normalizeOptionalString(finalProof.attempt_started_at);
+        let deferParallelizationFailureForLifecycleHandoff = false;
         const canDeferMissingDecisionForLifecycleCloseout =
           parallelizationFailure.endReason === 'parallelization_decision_missing' &&
           !hasCurrentTurnChildLaneLaunch(finalProof.child_lanes, currentTurnBoundary) &&
@@ -12550,6 +12564,7 @@ export async function runProviderLinearWorker(
         if (canDeferMissingDecisionForLifecycleCloseout) {
           issue = await readTrackedIssueWithFailClosedProof();
           lifecycle = classifyProviderLinearWorkerLifecycle(issue);
+          readLifecycleAfterParallelizationFailure = true;
           if (isProviderLinearWorkerLifecycleCloseout(lifecycle)) {
             finalProof = {
               ...finalProof,
@@ -12561,20 +12576,26 @@ export async function runProviderLinearWorker(
             finalProof = await persistProof(finalProof);
             return finalProof;
           }
+          deferParallelizationFailureForLifecycleHandoff =
+            isProviderLinearWorkerMergeHandoff(lifecycle);
         }
-        finalProof = {
-          ...finalProof,
-          owner_phase: 'ended',
-          owner_status: 'failed',
-          end_reason: parallelizationFailure.endReason,
-          updated_at: deps.now()
-        };
-        finalProof = await persistProof(finalProof);
-        throw new Error(parallelizationFailure.message);
+        if (!deferParallelizationFailureForLifecycleHandoff) {
+          finalProof = {
+            ...finalProof,
+            owner_phase: 'ended',
+            owner_status: 'failed',
+            end_reason: parallelizationFailure.endReason,
+            updated_at: deps.now()
+          };
+          finalProof = await persistProof(finalProof);
+          throw new Error(parallelizationFailure.message);
+        }
       }
 
-      issue = await readTrackedIssueWithFailClosedProof();
-      lifecycle = classifyProviderLinearWorkerLifecycle(issue);
+      if (!readLifecycleAfterParallelizationFailure) {
+        issue = await readTrackedIssueWithFailClosedProof();
+        lifecycle = classifyProviderLinearWorkerLifecycle(issue);
+      }
       if (!lifecycle.isExecutionEligible) {
         finalProof = {
           ...finalProof,
