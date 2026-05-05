@@ -72,6 +72,11 @@ const PROVIDER_WORKER_TASK_COMPLETE_STDOUT = [
   '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
   '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:00:04.000Z"}}'
 ].join('\n');
+const PROVIDER_WORKER_RUNTIME_MODEL_ONLY_TASK_COMPLETE_STDOUT = [
+  '{"type":"thread.started","thread_id":"thread-1"}',
+  '{"type":"turn_context","payload":{"turn_id":"turn-1","model":"gpt-5.5"}}',
+  '{"type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","timestamp":"2026-03-21T09:00:04.000Z"}}'
+].join('\n');
 let originalAuthProvenanceFingerprintKey: string | undefined;
 
 function testFingerprint(value: string): string {
@@ -4281,6 +4286,178 @@ for await (const line of rl) {
       runtime_review_model: null,
       runtime_reasoning_effort: null,
       command_model: 'gpt-5.4',
+      config_model: 'gpt-5.5',
+      config_review_model: 'gpt-5.5',
+      config_reasoning_effort: 'xhigh',
+      config_path: join(codexHome, 'config.toml')
+    };
+    expect(proof as unknown as Record<string, unknown>).toMatchObject({
+      resolved_model_provenance: expectedResolvedModelProvenance
+    });
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      resolved_model_provenance: expectedResolvedModelProvenance
+    });
+  });
+
+  it('keeps command backfill reason when runtime metadata is partial', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent(
+      [
+        'model = "gpt-5.5"',
+        'review_model = "gpt-5.5"',
+        'model_reasoning_effort = "xhigh"',
+        ''
+      ].join('\n')
+    );
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(createTrackedIssue())
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed'
+        })
+      );
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+        turnIndex: 1
+      });
+      return {
+        exitCode: 0,
+        stdout: PROVIDER_WORKER_RUNTIME_MODEL_ONLY_TASK_COMPLETE_STDOUT,
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_HOME: codexHome
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () =>
+          createRuntimeContext(
+            {
+              requested_mode: 'cli',
+              selected_mode: 'cli',
+              provider: 'CliRuntimeProvider'
+            },
+            {
+              CODEX_CONFIG_OVERRIDES:
+                'model="gpt-5.4";review_model="gpt-5.4";model_reasoning_effort="high"'
+            }
+          )
+        ),
+        execRunner,
+        now: vi.fn().mockReturnValue('2026-05-05T04:41:35.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    const expectedResolvedModelProvenance = {
+      schema_version: 1,
+      model: 'gpt-5.5',
+      review_model: 'gpt-5.4',
+      model_reasoning_effort: 'high',
+      source: 'runtime_reported',
+      confidence: 'medium',
+      degraded_reason: 'runtime_metadata_partial_command_backfill',
+      observed_at: '2026-05-05T04:41:35.000Z',
+      runtime_model: 'gpt-5.5',
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: 'gpt-5.4',
+      config_model: 'gpt-5.5',
+      config_review_model: 'gpt-5.5',
+      config_reasoning_effort: 'xhigh',
+      config_path: join(codexHome, 'config.toml')
+    };
+    expect(proof as unknown as Record<string, unknown>).toMatchObject({
+      resolved_model_provenance: expectedResolvedModelProvenance
+    });
+
+    const written = JSON.parse(
+      await readFile(join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME), 'utf8')
+    ) as Record<string, unknown>;
+    expect(written).toMatchObject({
+      resolved_model_provenance: expectedResolvedModelProvenance
+    });
+  });
+
+  it('keeps config backfill reason when runtime metadata is partial', async () => {
+    const { manifestPath, runDir } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent(
+      [
+        'model = "gpt-5.5"',
+        'review_model = "gpt-5.5"',
+        'model_reasoning_effort = "xhigh"',
+        ''
+      ].join('\n')
+    );
+    const readTrackedIssue = vi
+      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      .mockResolvedValueOnce(createTrackedIssue())
+      .mockResolvedValueOnce(
+        createTrackedIssue({
+          state: 'Done',
+          state_type: 'completed'
+        })
+      );
+    const execRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request, {
+        turnIndex: 1
+      });
+      return {
+        exitCode: 0,
+        stdout: PROVIDER_WORKER_RUNTIME_MODEL_ONLY_TASK_COMPLETE_STDOUT,
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_HOME: codexHome
+      },
+      {
+        readTrackedIssue,
+        resolveRuntimeContext: vi.fn(async () =>
+          createRuntimeContext({
+            requested_mode: 'cli',
+            selected_mode: 'cli',
+            provider: 'CliRuntimeProvider'
+          })
+        ),
+        execRunner,
+        now: vi.fn().mockReturnValue('2026-05-05T04:41:40.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    const expectedResolvedModelProvenance = {
+      schema_version: 1,
+      model: 'gpt-5.5',
+      review_model: 'gpt-5.5',
+      model_reasoning_effort: 'xhigh',
+      source: 'runtime_reported',
+      confidence: 'medium',
+      degraded_reason: 'runtime_metadata_partial_config_backfill',
+      observed_at: '2026-05-05T04:41:40.000Z',
+      runtime_model: 'gpt-5.5',
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: null,
       config_model: 'gpt-5.5',
       config_review_model: 'gpt-5.5',
       config_reasoning_effort: 'xhigh',

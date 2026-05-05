@@ -2228,7 +2228,7 @@ function mergeProviderWorkerResolvedModelProvenance(
     model_reasoning_effort: reasoningEffort,
     confidence: partialRuntimeMetadata ? 'medium' : selected.confidence,
     degraded_reason: partialRuntimeMetadata
-      ? (selected.degraded_reason ?? degradedReason)
+      ? (degradedReason ?? selected.degraded_reason)
       : selected.degraded_reason,
     observed_at: selected.observed_at ?? secondary.observed_at ?? null,
     runtime_model: selected.runtime_model ?? secondary.runtime_model ?? null,
