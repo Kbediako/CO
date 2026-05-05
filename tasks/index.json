@@ -66,6 +66,47 @@
       }
     },
     {
+      "id": "20260505-linear-f88846f3-24be-48b6-a983-087613fd8f82",
+      "title": "CO-426 isolate provider validation fixture audit rows",
+      "relates_to": "tasks/tasks-linear-f88846f3-24be-48b6-a983-087613fd8f82.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-05",
+      "status": "backlog_packet",
+      "approvals": {
+        "traceability_packet": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-05",
+          "status": "produced",
+          "summary": "Created the CO-426 docs-first packet and registry mirrors before the issue leaves Backlog, preserving live provider audit isolation for CODEX_PROVIDER_LINEAR_AUDIT_PATH, lin-issue-1 fixture rows, LinearCliShell create-follow-up parity failures, and co-status audit projection truth."
+        },
+        "issue_quality_review": {
+          "reviewer": "parent orchestrator plus read-only blocker validation",
+          "date": "2026-05-05",
+          "status": "approved-for-packet-first-admission",
+          "summary": "Issue scope is explicit and unblocked except for missing packet surfaces; implementation must stay limited to hermetic Linear CLI validation audit writes, real provider audit preservation, and honest co-status handling of mismatched fixture rows."
+        },
+        "docs_review": {
+          "reviewer": "codex-orchestrator docs-review",
+          "date": "2026-05-05",
+          "status": "clean-success",
+          "manifest": ".runs/linear-f88846f3-24be-48b6-a983-087613fd8f82-docs-review/cli/2026-05-05T20-30-30-374Z-31639208/manifest.json",
+          "telemetry": ".runs/linear-f88846f3-24be-48b6-a983-087613fd8f82-docs-review/cli/2026-05-05T20-30-30-374Z-31639208/review/telemetry.json",
+          "summary": "Docs-review completed with model gpt-5.5, reasoning effort xhigh, runtime appserver, no fallback, and review_outcome=clean-success."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-f88846f3-24be-48b6-a983-087613fd8f82.md",
+        "task": "tasks/tasks-linear-f88846f3-24be-48b6-a983-087613fd8f82.md",
+        "agent_task": ".agent/task/linear-f88846f3-24be-48b6-a983-087613fd8f82.md",
+        "prd": "docs/PRD-linear-f88846f3-24be-48b6-a983-087613fd8f82.md",
+        "docs": "docs/TECH_SPEC-linear-f88846f3-24be-48b6-a983-087613fd8f82.md",
+        "action_plan": "docs/ACTION_PLAN-linear-f88846f3-24be-48b6-a983-087613fd8f82.md"
+      }
+    },
+    {
       "id": "20260501-linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd",
       "title": "CO-424 prevent provider-worker post-handoff closeout parallelization false failures",
       "relates_to": "tasks/tasks-linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md",
