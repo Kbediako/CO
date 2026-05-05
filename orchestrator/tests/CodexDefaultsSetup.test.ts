@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { runCodexDefaultsSetup } from '../src/cli/codexDefaultsSetup.js';
+import { parseCodexFeaturesFromText } from '../src/cli/utils/codexFeatures.js';
 
 const require = createRequire(import.meta.url);
 const toml = require('@iarna/toml') as {
@@ -27,7 +28,13 @@ async function writeFakeCodexBinary(
   options: { exitCode?: number; stderr?: string } = {}
 ): Promise<string> {
   const binPath = join(dir, 'codex');
-  const featureOutput = featureLine.length > 0 ? `  printf '%s\n' ${JSON.stringify(featureLine)}` : '';
+  const featureOutput =
+    featureLine.length > 0
+      ? featureLine
+          .split(/\r?\n/u)
+          .map((line) => `  printf '%s\\n' ${JSON.stringify(line)}`)
+          .join('\n')
+      : '';
   const stderrOutput = options.stderr ? `  printf '%s\n' ${JSON.stringify(options.stderr)} >&2` : '';
   await writeFile(
     binPath,
@@ -123,6 +130,39 @@ Behavior rules:
 You must behave deterministically and conservatively.
 """
 `;
+
+describe('parseCodexFeaturesFromText', () => {
+  it('captures removed status without losing enabled flags', () => {
+    const features = parseCodexFeaturesFromText(
+      [
+        'js_repl removed false',
+        'multi_agent_v2 experimental true',
+        'custom_feature false',
+        'malformed_feature maybe'
+      ].join('\n')
+    );
+
+    expect(features.js_repl).toEqual({
+      name: 'js_repl',
+      status: 'removed',
+      enabled: false,
+      removed: true
+    });
+    expect(features.multi_agent_v2).toEqual({
+      name: 'multi_agent_v2',
+      status: 'experimental',
+      enabled: true,
+      removed: false
+    });
+    expect(features.custom_feature).toEqual({
+      name: 'custom_feature',
+      status: null,
+      enabled: false,
+      removed: false
+    });
+    expect(features.malformed_feature).toBeUndefined();
+  });
+});
 
 describe('runCodexDefaultsSetup', () => {
   it('returns a dry-run plan by default', async () => {
@@ -1039,6 +1079,92 @@ describe('runCodexDefaultsSetup', () => {
       };
 
       expect(parsed.agents?.max_threads).toBeUndefined();
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('reports and prunes only CO-managed removed feature keys through explicit apply', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-removed-features-'));
+    const configPath = join(tempHome, 'config.toml');
+    try {
+      await writeFile(
+        configPath,
+        [
+          'model = "legacy-model"',
+          '',
+          '[features]',
+          'js_repl = true',
+          'js_repl_tools_only = false',
+          'custom_removed = true',
+          'multi_agent_v2 = false',
+          '',
+          '[agents]',
+          'max_threads = 2',
+          'extra_agent_key = "keep"',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
+      const codexBin = await writeFakeCodexBinary(
+        tempHome,
+        [
+          'js_repl removed false',
+          'js_repl_tools_only removed false',
+          'custom_removed removed true',
+          'multi_agent_v2 experimental false'
+        ].join('\n')
+      );
+
+      const plan = await runCodexDefaultsSetup({
+        env: buildDefaultsEnv(tempHome, codexBin)
+      });
+      expect(plan.status).toBe('planned');
+      expect(plan.changes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            target: 'config',
+            status: 'pending',
+            detail: expect.stringContaining(
+              'pruned stale CO-managed removed feature keys: js_repl, js_repl_tools_only'
+            )
+          })
+        ])
+      );
+
+      let parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        features?: Record<string, unknown>;
+        agents?: Record<string, unknown>;
+      };
+      expect(parsed.features?.js_repl).toBe(true);
+      expect(parsed.features?.js_repl_tools_only).toBe(false);
+
+      const result = await runCodexDefaultsSetup({
+        apply: true,
+        env: buildDefaultsEnv(tempHome, codexBin)
+      });
+      expect(result.status).toBe('applied');
+      expect(result.changes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            target: 'config',
+            status: 'updated',
+            detail: expect.stringContaining(
+              'pruned stale CO-managed removed feature keys: js_repl, js_repl_tools_only'
+            )
+          })
+        ])
+      );
+
+      parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        features?: Record<string, unknown>;
+        agents?: Record<string, unknown>;
+      };
+      expect(parsed.features?.js_repl).toBeUndefined();
+      expect(parsed.features?.js_repl_tools_only).toBeUndefined();
+      expect(parsed.features?.custom_removed).toBe(true);
+      expect(parsed.features?.multi_agent_v2).toBe(false);
+      expect(parsed.agents?.extra_agent_key).toBe('keep');
     } finally {
       await rm(tempHome, { recursive: true, force: true });
     }

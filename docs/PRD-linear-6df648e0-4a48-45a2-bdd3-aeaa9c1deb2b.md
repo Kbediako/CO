@@ -142,6 +142,15 @@
 - Decision: this child lane does not add or extend fallback behavior. It records packet evidence for a parent-owned tactical live-owner re-home of existing rolling freshness cohort ownership.
 - Rationale: the current work is traceability and registry setup only; the parent lane must preserve `docs:freshness:maintain` fail-closed behavior and keep the retained rolling freshness cohort visible.
 
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `docs:freshness:maintain` | Completed-lane historical packet/spec freshness hold | `expire fallback` | CO-444 | Terminal Linear source issues left task-packet/spec metadata active past cadence | 2026-05-05 | 2026-05-05 | 2026-05-12 | Archive packet mirrors and reclassify specs under a live owner; otherwise block handoff | `docs:freshness:maintain -- --format json` |
+
+- Large refactor decision: bounded metadata cleanup under the existing `docs:freshness:maintain` owner; no runtime or policy authority split is added.
+- Minor seam decision: bounded temporary freshness-hold cleanup is acceptable; unresolved rows must be archived, reclassified, or blocked by 2026-05-12.
+
 ## Open Questions
 - None.
 

@@ -1,0 +1,144 @@
+---
+id: 20260505-linear-217c6584-bb47-486a-9765-f24e8ed84fc0
+title: "CO-481 removed feature defaults after Codex CLI 0.128"
+relates_to: docs/PRD-linear-217c6584-bb47-486a-9765-f24e8ed84fc0.md
+risk: medium
+owners:
+  - Codex
+last_review: 2026-05-05
+related_action_plan: docs/ACTION_PLAN-linear-217c6584-bb47-486a-9765-f24e8ed84fc0.md
+task_checklists:
+  - tasks/tasks-linear-217c6584-bb47-486a-9765-f24e8ed84fc0.md
+---
+
+## Canonical Reference
+- PRD: `docs/PRD-linear-217c6584-bb47-486a-9765-f24e8ed84fc0.md`
+- Canonical TECH_SPEC: `tasks/specs/linear-217c6584-bb47-486a-9765-f24e8ed84fc0.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-217c6584-bb47-486a-9765-f24e8ed84fc0.md`
+- Task checklist: `tasks/tasks-linear-217c6584-bb47-486a-9765-f24e8ed84fc0.md`
+- `.agent` mirror: `.agent/task/linear-217c6584-bb47-486a-9765-f24e8ed84fc0.md`
+- Source anchor: `ctx:sha256:65228e314b6bfafd429ea381e50f53c312b8a534372bf4d2d9d5567cafca1da8#chunk:c000001`
+- Canonical owner key: `codex-cli-0128:removed-feature-defaults`
+
+## Summary
+- Objective: define the CO-481 docs-first contract for removing removed feature keys from `codex-orchestrator doctor` advisories and `codex-orchestrator codex defaults` generation after Codex CLI 0.128.
+- Scope:
+  - CO-481 PRD, TECH_SPEC mirror, canonical task spec, ACTION_PLAN, task checklist, and `.agent` mirror
+  - `tasks/index.json` registration
+  - `docs/TASKS.md` snapshot
+  - `docs/docs-freshness-registry.json` rows for packet files
+  - parent-owned implementation guidance for doctor/default setup and focused validation
+- Constraints:
+  - child lane stays docs-only and does not edit implementation, tests, package, workflow, Linear, GitHub, workpad, PR, or lifecycle surfaces
+  - CO-452 remains the active `js_repl` posture retirement reference
+  - parent owns source payload reconciliation, docs-review, implementation, tests, validation, PR lifecycle, and Linear/workpad state
+
+## Issue-Shaping Contract
+- User-request translation carried forward: CO-481 is a narrow removed-feature defaults guardrail for Codex CLI 0.128. It must ensure `codex-orchestrator doctor` and `codex-orchestrator codex defaults` respect removed feature keys from `codex features list` and stop treating `js_repl` or `js_repl_tools_only` as valid current defaults.
+- Protected terms / exact artifact and surface names:
+  - Codex CLI 0.128
+  - codex features list
+  - js_repl
+  - js_repl_tools_only
+  - removed feature keys
+  - codex-orchestrator doctor
+  - codex-orchestrator codex defaults
+  - CO-452
+  - canonical owner key `codex-cli-0128:removed-feature-defaults`
+- Nearby wrong interpretations to reject:
+  - treating removed feature keys as disabled, experimental, or toggleable
+  - reintroducing active `js_repl` posture or canaries
+  - broad config generation rewrite
+  - unrelated feature flag cleanup
+  - runtime/provider-worker behavior changes
+  - model, release, or cloud posture changes
+- Explicit non-goals:
+  - no runtime/provider-worker behavior
+  - no js_repl canaries
+  - no broad config rewrite
+  - no unrelated feature flag cleanup
+  - no model/release/cloud posture change
+  - no Linear/GitHub/workpad/PR lifecycle mutation by this child lane
+
+## Parity / Alignment Matrix
+
+| Surface | Current truth | Reference truth | Target truth | Explicitly out-of-scope differences |
+| --- | --- | --- | --- | --- |
+| Feature-state authority | `codex features list` is the current CLI feature-state evidence surface. | Codex CLI 0.128 can mark feature keys as removed. | Removed state controls whether doctor/default setup may recommend or write keys. | No unrelated feature-flag catalog cleanup. |
+| CO-452 relationship | CO-452 retired current `js_repl` posture and canary guidance. | CO-452 is the reference for active `js_repl` retirement. | CO-481 references CO-452 but only changes removed defaults/advisories. | No CO-452 reopening and no js_repl canaries. |
+| Doctor advisory | `codex-orchestrator doctor` can produce remediation guidance. | Remediation must not ask operators to configure removed feature keys. | Doctor suppresses or explicitly classifies removed keys as unavailable. | No provider-worker/runtime behavior. |
+| Defaults generation | `codex-orchestrator codex defaults` can seed local config. | Removed feature keys are invalid current defaults. | Defaults output avoids `js_repl` and `js_repl_tools_only` under removed-feature truth. | No broad config rewrite and no model/release/cloud posture change. |
+
+## Readiness Gate
+- Not done if:
+  - `codex-orchestrator doctor` recommends configuring `js_repl`, `js_repl_tools_only`, or removed feature keys as current posture
+  - `codex-orchestrator codex defaults` writes `js_repl` or `js_repl_tools_only` under Codex CLI 0.128 removed-feature truth
+  - `codex features list` is ignored or replaced with stale hard-coded assumptions
+  - removed keys are treated as disabled, experimental, or break-glass toggleable
+  - validation lacks focused tests or live command evidence
+- Pre-implementation issue-quality review evidence:
+  - 2026-05-05: source payload path is absent in this child checkout; the parent issue contract and source anchor are authoritative for this packet.
+  - 2026-05-05: micro-task path is not appropriate because correctness depends on exact protected terms, removed-feature classification, and doctor/default setup validation evidence.
+- Safeguard ownership split:
+  - child lane owns only the declared docs and registry files
+  - parent owns issue body reconciliation, docs-review, implementation, tests, validation, PR lifecycle, and Linear/workpad state
+
+## Technical Requirements
+- Functional requirements:
+  1. Create the CO-481 PRD, TECH_SPEC mirror, canonical task spec, ACTION_PLAN, task checklist, and `.agent` mirror.
+  2. Register task id `20260505-linear-217c6584-bb47-486a-9765-f24e8ed84fc0` in `tasks/index.json`.
+  3. Add current CO-481 rows to `docs/TASKS.md` and `docs/docs-freshness-registry.json`.
+  4. Preserve all protected CO-481 terms exactly.
+  5. Use `codex features list` or a documented equivalent current feature-state parser as the removed-feature authority.
+  6. Require parent implementation to prevent `codex-orchestrator doctor` from recommending removed feature keys.
+  7. Require parent implementation to prevent `codex-orchestrator codex defaults` from writing `js_repl` or `js_repl_tools_only` under Codex CLI 0.128 removed-feature truth.
+  8. Keep CO-452 as the reference lane for active `js_repl` posture retirement.
+  9. Require focused tests or live command evidence for validation.
+- Non-functional requirements:
+  - wording must remain concise and implementation-facing
+  - no implementation drift outside declared docs scope
+  - no lifecycle mutations
+  - no broad posture changes outside removed feature defaults
+- Interfaces / contracts:
+  - `tasks/index.json` remains canonical under `items[]`
+  - `docs/TASKS.md` records the current task snapshot
+  - `docs/docs-freshness-registry.json` tracks packet files
+  - `codex-orchestrator doctor` and `codex-orchestrator codex defaults` are parent-owned implementation surfaces
+
+## Fallback / Refactor Decision
+- Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `Yes`.
+- Large-refactor decision: not required for this bounded removed-defaults guardrail; the lane removes stale default/advisory behavior instead of adding another compatibility layer.
+- Minor-seam decision: acceptable because the implementation target is limited to existing doctor/default setup surfaces.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Removed feature defaults | `js_repl`, `js_repl_tools_only`, or other removed feature keys are written as current defaults. | remove fallback | CO-481 | Codex CLI 0.128 `codex features list` reports a key as removed. | pre-0.128 guidance | 2026-05-05 | immediate removal | defaults setup no longer writes removed feature keys as current config. | Focused defaults test or live `codex-orchestrator codex defaults` evidence. |
+| Removed feature advisories | Doctor recommends configuring removed feature keys. | remove fallback | CO-481 | Doctor/default setup sees removed feature-state evidence. | pre-0.128 guidance | 2026-05-05 | immediate removal | doctor reports removed keys as unavailable or suppresses remediation. | Focused doctor test or live `codex-orchestrator doctor` evidence. |
+
+## Validation Plan
+- Child-lane checks:
+  - protected-term scan across CO-481 packet files
+  - JSON parse check for `tasks/index.json` and `docs/docs-freshness-registry.json`
+  - scoped `git diff --check --` over declared files
+  - scoped changed-file review
+- Parent-owned checks:
+  - docs-review before implementation
+  - focused tests or live command evidence for `codex-orchestrator doctor`, `codex-orchestrator codex defaults`, and removed-feature parsing
+  - normal parent validation floor before PR handoff
+
+## Risks
+- CO-481 reopens CO-452.
+  - Mitigation: packet keeps CO-452 as reference-only and blocks js_repl canaries.
+- Removed keys remain in generated defaults.
+  - Mitigation: Not Done If blocks defaults output that writes `js_repl` or `js_repl_tools_only`.
+- Doctor guidance remains stale.
+  - Mitigation: Not Done If blocks doctor recommendations for removed feature keys.
+- Scope drifts into broad posture work.
+  - Mitigation: explicit non-goals reject runtime/provider-worker behavior, broad config rewrite, unrelated feature flag cleanup, and model/release/cloud posture changes.
+
+## Completion Criteria
+- CO-481 packet and mirrors exist in declared paths.
+- `tasks/index.json` and `docs/docs-freshness-registry.json` parse as JSON.
+- Protected-term scan confirms all requested terms and canonical owner key are present.
+- Scoped diff review shows no edits outside declared file scope.
+- Parent can continue with docs-review, implementation, focused validation, and lifecycle work.

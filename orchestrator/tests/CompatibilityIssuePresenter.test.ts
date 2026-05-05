@@ -9,7 +9,10 @@ import type {
   ControlCompatibilityRuntimeSnapshot,
   ControlCompatibilitySourceContext
 } from '../src/cli/control/observabilityReadModel.js';
-import { resolveProviderWorkerHost } from '../src/cli/control/observabilityReadModel.js';
+import {
+  readProviderLinearWorkerWorkspacePath,
+  resolveProviderWorkerHost
+} from '../src/cli/control/observabilityReadModel.js';
 
 function buildCompatibilitySource(
   overrides: Partial<ControlCompatibilitySourceContext> = {}
@@ -133,6 +136,59 @@ function buildExhaustedLinearPolling() {
 }
 
 describe('CompatibilityIssuePresenter', () => {
+  it('projects resolved model provenance into selected and running read-model payloads', () => {
+    const resolvedModelProvenance = {
+      schema_version: 1,
+      model: 'gpt-5.5',
+      review_model: 'gpt-5.5',
+      model_reasoning_effort: 'xhigh',
+      source: 'config_default',
+      confidence: 'medium',
+      degraded_reason: 'runtime_model_unreported',
+      observed_at: '2026-05-05T04:41:00.000Z',
+      runtime_model: null,
+      runtime_review_model: null,
+      runtime_reasoning_effort: null,
+      command_model: null,
+      config_model: 'gpt-5.5',
+      config_review_model: 'gpt-5.5',
+      config_reasoning_effort: 'xhigh',
+      config_path: '/repo/.codex/config.toml'
+    } as const;
+    const source = buildCompatibilitySource({
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress',
+      completedAt: null,
+      providerLinearWorkerProof: {
+        issue_id: 'issue-100',
+        issue_identifier: 'CO-100',
+        resolved_model_provenance: resolvedModelProvenance,
+        updated_at: '2026-05-05T04:41:00.000Z'
+      } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(source),
+      running: [source]
+    });
+
+    expect(projection.selected?.resolved_model_provenance).toEqual(resolvedModelProvenance);
+    expect(
+      projection.selected?.provider_linear_worker_proof?.resolved_model_provenance
+    ).toEqual(resolvedModelProvenance);
+    expect(projection.running[0]?.resolved_model_provenance).toEqual(
+      resolvedModelProvenance
+    );
+    const issuePayload = projection.issues.find((issue) => issue.issueIdentifier === 'CO-100')
+      ?.payload;
+    expect(issuePayload?.running?.resolved_model_provenance).toEqual(
+      resolvedModelProvenance
+    );
+    expect(issuePayload?.provider_linear_worker_proof?.resolved_model_provenance).toEqual(
+      resolvedModelProvenance
+    );
+  });
+
   it('ignores stale proof-derived worker_host values for the current attempt', () => {
     expect(
       resolveProviderWorkerHost({
@@ -143,6 +199,188 @@ describe('CompatibilityIssuePresenter', () => {
           worker_host: 'worker-host-stale'
         },
         stageStartedAt: '2026-04-06T02:30:00.000Z'
+      })
+    ).toBeNull();
+  });
+
+  it('keeps stale proof workspace paths from overriding current source paths', () => {
+    const source = buildCompatibilitySource({
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress',
+      startedAt: '2026-04-06T02:00:00.000Z',
+      workspacePath: '/repo/.workspaces/current-co-100',
+      providerLinearWorkerProof: {
+        issue_id: 'issue-100',
+        issue_identifier: 'CO-100',
+        attempt_started_at: '2026-04-06T02:00:00.000Z',
+        pid: null,
+        thread_id: null,
+        latest_turn_id: null,
+        latest_session_id: null,
+        latest_session_id_source: null,
+        turn_count: 0,
+        last_event: 'turn_running',
+        last_message: 'stale proof',
+        last_event_at: '2026-04-06T02:05:00.000Z',
+        tokens: {
+          input_tokens: 0,
+          output_tokens: 0,
+          total_tokens: 0
+        },
+        rate_limits: null,
+        owner_phase: 'turn_running',
+        owner_status: 'in_progress',
+        workspace_path: '/repo/.workspaces/stale-co-100',
+        linear_audit: null,
+        progress: null,
+        tracked_issue_error: null,
+        end_reason: null,
+        updated_at: '2026-04-06T02:05:00.000Z'
+      } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>,
+      providerDebugSnapshot: {
+        live_linear_state: {
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-04-06T02:35:00.000Z'
+        },
+        claim: {
+          state: 'running',
+          reason: 'provider_issue_rehydrated_active_run',
+          updated_at: '2026-04-06T02:35:00.000Z',
+          run_id: 'run-co-100',
+          issue_state: 'In Progress',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-04-06T02:35:00.000Z',
+          launch_source: 'control-host',
+          launch_started_at: '2026-04-06T02:30:00.000Z',
+          retry: null,
+          freshness: 'current',
+          is_rehydrated: true,
+          rehydrated_at: '2026-04-06T02:35:00.000Z'
+        },
+        worker: null,
+        parallelization: null,
+        pull_request: null,
+        progress: null,
+        last_audit_operation: null,
+        last_cross_issue_audit_operation: null,
+        last_semantic_progress_at: '2026-04-06T02:35:00.000Z',
+        stall_classification: null,
+        stall_reason: null,
+        recovery_recommendation: null
+      } as NonNullable<ControlCompatibilitySourceContext['providerDebugSnapshot']>
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(source),
+      running: [source]
+    });
+
+    expect(projection.issues[0]?.payload.workspace.path).toBe('/repo/.workspaces/current-co-100');
+  });
+
+  it('keeps source workspace paths when proof freshness has no scoped timestamp', () => {
+    const proof = {
+      issue_id: 'issue-100',
+      issue_identifier: 'CO-100',
+      attempt_started_at: '2026-04-06T02:00:00.000Z',
+      workspace_path: '/repo/.workspaces/stale-co-100',
+      updated_at: '2026-04-06T02:05:00.000Z'
+    } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>;
+    const source = buildCompatibilitySource({
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress',
+      startedAt: null,
+      workspacePath: '/repo/.workspaces/current-co-100',
+      providerLinearWorkerProof: proof,
+      providerDebugSnapshot: null
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(source),
+      running: [source]
+    });
+
+    expect(projection.issues[0]?.payload.workspace.path).toBe('/repo/.workspaces/current-co-100');
+  });
+
+  it('keeps populated source workspace paths ahead of fresh proof workspace paths', () => {
+    const source = buildCompatibilitySource({
+      rawStatus: 'in_progress',
+      displayStatus: 'In Progress',
+      startedAt: '2026-04-06T02:00:00.000Z',
+      workspacePath: '/repo/.workspaces/current-co-100',
+      providerLinearWorkerProof: {
+        issue_id: 'issue-100',
+        issue_identifier: 'CO-100',
+        attempt_started_at: '2026-04-06T02:05:00.000Z',
+        workspace_path: '/repo/.workspaces/proof-co-100',
+        updated_at: '2026-04-06T02:06:00.000Z'
+      } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']>
+    });
+
+    const projection = buildCompatibilityProjectionSnapshot({
+      ...buildCompatibilityRuntime(source),
+      running: [source]
+    });
+
+    expect(projection.issues[0]?.payload.workspace.path).toBe('/repo/.workspaces/current-co-100');
+  });
+
+  it('falls back to stage started_at when claim launch_started_at is malformed', () => {
+    const proof = {
+      issue_id: 'issue-100',
+      issue_identifier: 'CO-100',
+      attempt_started_at: '2026-04-06T02:00:00.000Z',
+      workspace_path: '/repo/.workspaces/stale-co-100',
+      worker_host: 'worker-host-stale'
+    } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']> & {
+      worker_host: string;
+    };
+    const providerDebugSnapshot = {
+      claim: {
+        launch_started_at: 'not-a-date'
+      }
+    } as NonNullable<ControlCompatibilitySourceContext['providerDebugSnapshot']>;
+
+    expect(
+      readProviderLinearWorkerWorkspacePath(
+        proof,
+        '2026-04-06T02:30:00.000Z',
+        providerDebugSnapshot
+      )
+    ).toBeNull();
+    expect(
+      resolveProviderWorkerHost({
+        providerLinearWorkerProof: proof,
+        providerDebugSnapshot,
+        stageStartedAt: '2026-04-06T02:30:00.000Z'
+      })
+    ).toBeNull();
+  });
+
+  it('fails closed when only a malformed stage started_at is available for proof freshness', () => {
+    const proof = {
+      issue_id: 'issue-100',
+      issue_identifier: 'CO-100',
+      attempt_started_at: '2026-04-06T02:00:00.000Z',
+      workspace_path: '/repo/.workspaces/stale-co-100',
+      worker_host: 'worker-host-stale'
+    } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']> & {
+      worker_host: string;
+    };
+
+    expect(
+      readProviderLinearWorkerWorkspacePath(
+        proof,
+        'not-a-date',
+        null
+      )
+    ).toBeNull();
+    expect(
+      resolveProviderWorkerHost({
+        providerLinearWorkerProof: proof,
+        stageStartedAt: 'not-a-date'
       })
     ).toBeNull();
   });

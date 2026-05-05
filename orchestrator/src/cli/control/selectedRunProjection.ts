@@ -16,6 +16,7 @@ import {
   PROVIDER_LINEAR_CHILD_LANE_RESERVED_SUMMARY,
   PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
+  PROVIDER_LINEAR_WORKER_SESSION_LOG_HYDRATION_FILENAME,
   refreshProviderLinearWorkerProofSnapshot,
   type ProviderLinearWorkerProof
 } from '../providerLinearWorkerRunner.js';
@@ -847,7 +848,16 @@ function buildProjectionContextFromParts(
   const manifestRawStatus = readStringValue(manifestRecord, 'status') ?? 'unknown';
   const startedAt = readStringValue(manifestRecord, 'started_at', 'startedAt') ?? null;
   const providerProofRecord = (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null;
-  const proofIsFreshForStage = isProviderLinearWorkerProofFreshForStage(providerProofRecord, startedAt);
+  const proofFreshnessStageStartedAt = resolveFreshnessStageStartedAt(
+    providerClaim?.launch_started_at ?? null,
+    startedAt
+  );
+  const proofIsFreshForStage =
+    !proofFreshnessStageStartedAt.invalid
+    && isProviderLinearWorkerProofFreshForStage(
+      providerProofRecord,
+      proofFreshnessStageStartedAt.value
+    );
   const useTerminalProof = shouldUseProviderLinearWorkerTerminalProofForSelectedRun(manifestRecord, providerProofRecord);
   const useScopedTerminalProof = useTerminalProof && proofIsFreshForStage;
   const proofTerminalStatus = useScopedTerminalProof
@@ -918,7 +928,8 @@ function buildProjectionContextFromParts(
     manifestRecord,
     manifestPath: snapshot.manifestPath,
     controlRunsRoot,
-    controlWorkspacePath
+    controlWorkspacePath,
+    providerLinearWorkerProof: proofIsFreshForStage ? parts.providerLinearWorkerProof : null
   });
   const questionSummary = buildSelectedRunQuestionSummary(parts.questions);
   const latestAction = control.latest_action?.action ?? null;
@@ -1094,10 +1105,15 @@ function resolveSelectedRunWorkspacePath(input: {
   manifestPath: string;
   controlRunsRoot: string | null;
   controlWorkspacePath: string | null;
+  providerLinearWorkerProof: ProviderLinearWorkerProof | null;
 }): string | null {
   const explicitWorkspacePath = resolveManifestWorkspacePath(input.manifestRecord);
   if (explicitWorkspacePath) {
     return explicitWorkspacePath;
+  }
+  const proofWorkspacePath = readNonBlankStringValue(input.providerLinearWorkerProof?.workspace_path);
+  if (proofWorkspacePath) {
+    return proofWorkspacePath;
   }
   if (
     !input.controlRunsRoot ||
@@ -2554,17 +2570,26 @@ async function resolveProviderLinearWorkerProjectionProofRefreshPlan(
     hasProviderLinearWorkerProjectionRetiredChildLaneResidue(proof) ||
     (await hasProviderLinearWorkerProjectionRetiredChildLaneResidueInLedger(runDir));
   const telemetryGap = hasProviderLinearWorkerProjectionTelemetryGap(proof);
+  const resolvedModelProvenanceHydrationGap =
+    await hasProviderLinearWorkerProjectionResolvedModelProvenanceHydrationGap(runDir, proof);
   const canSkipSessionLogHydration = canSkipProviderLinearWorkerProjectionSessionLogHydration(
     proof,
-    telemetryGap
+    telemetryGap || resolvedModelProvenanceHydrationGap
   );
   if (!isProviderLinearWorkerProjectionRefreshEligible(proof)) {
-    return hasRetiredResidue
-      ? {
-          updatedAtComparisonScope: 'full',
-          skipSessionLogHydration: canSkipSessionLogHydration
-        }
-      : null;
+    if (hasRetiredResidue) {
+      return {
+        updatedAtComparisonScope: 'full',
+        skipSessionLogHydration: canSkipSessionLogHydration
+      };
+    }
+    if (resolvedModelProvenanceHydrationGap) {
+      return {
+        updatedAtComparisonScope: 'telemetry',
+        skipSessionLogHydration: false
+      };
+    }
+    return null;
   }
   if (hasRetiredResidue) {
     return {
@@ -2590,7 +2615,7 @@ async function resolveProviderLinearWorkerProjectionProofRefreshPlan(
       skipSessionLogHydration: canSkipSessionLogHydration
     };
   }
-  return telemetryGap
+  return telemetryGap || resolvedModelProvenanceHydrationGap
     ? {
         updatedAtComparisonScope: 'telemetry',
         skipSessionLogHydration: false
@@ -2642,6 +2667,19 @@ function hasProviderLinearWorkerProjectionTelemetryGap(
     hasProviderLinearWorkerProjectionSessionLogHydrationGap(proof) ||
     hasProviderLinearWorkerProjectionAppServerSupervisionGap(proof)
   );
+}
+
+async function hasProviderLinearWorkerProjectionResolvedModelProvenanceHydrationGap(
+  runDir: string,
+  proof: ProviderLinearWorkerProof
+): Promise<boolean> {
+  if (proof.resolved_model_provenance) {
+    return false;
+  }
+  const hydrationState = await readJsonFile<Record<string, unknown>>(
+    join(runDir, PROVIDER_LINEAR_WORKER_SESSION_LOG_HYDRATION_FILENAME)
+  );
+  return isRecord(hydrationState?.resolved_model_provenance);
 }
 
 function hasProviderLinearWorkerProjectionAppServerSupervisionGap(
@@ -3238,7 +3276,7 @@ function resolveRetryWorkspacePath(
   controlWorkspacePath: string | null,
   source?: Pick<ControlCompatibilitySourceContext, 'workspacePath' | 'providerLinearWorkerProof'> | null
 ): string | null {
-  const proofWorkspacePath = source?.providerLinearWorkerProof?.workspace_path ?? null;
+  const proofWorkspacePath = readNonBlankStringValue(source?.providerLinearWorkerProof?.workspace_path);
   if (proofWorkspacePath) {
     return proofWorkspacePath;
   }
@@ -3269,6 +3307,40 @@ function readStringValue(record: Record<string, unknown>, ...keys: string[]): st
     }
   }
   return undefined;
+}
+
+function readNonBlankStringValue(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+function readValidTimestamp(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  return Number.isFinite(Date.parse(trimmed)) ? trimmed : null;
+}
+
+function hasTimestampText(value: string | null | undefined): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function resolveFreshnessStageStartedAt(
+  claimLaunchStartedAt: string | null | undefined,
+  stageStartedAt: string | null | undefined
+): { invalid: boolean; value: string | null } {
+  const validClaimLaunchStartedAt = readValidTimestamp(claimLaunchStartedAt);
+  if (validClaimLaunchStartedAt) {
+    return { invalid: false, value: validClaimLaunchStartedAt };
+  }
+  const validStageStartedAt = readValidTimestamp(stageStartedAt);
+  if (validStageStartedAt) {
+    return { invalid: false, value: validStageStartedAt };
+  }
+  return {
+    invalid: hasTimestampText(claimLaunchStartedAt) || hasTimestampText(stageStartedAt),
+    value: null
+  };
 }
 
 function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {

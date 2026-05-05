@@ -1051,6 +1051,322 @@ describe('runCoStatusCliShell', () => {
     expect(payload.issues?.map((entry) => entry.issue_identifier)).toEqual(['CO-302', 'CO-299', 'CO-295']);
   });
 
+  it('keeps degraded running row workspace paths coupled to each provider claim', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const selectedTaskId = 'linear-de299bad-c345-4259-8551-73dd429eccca';
+    const rehydratedTaskId = 'linear-7badbb88-ab4b-4091-9cd1-5d74643b6443';
+    const selectedRunId = '2026-05-02T04-10-00-000Z-selected';
+    const rehydratedRunId = '2026-05-02T04-11-22-464Z-6262fa47';
+    const selectedWorkspacePath = join(root, '.workspaces', selectedTaskId);
+    const rehydratedWorkspacePath = join(root, '.workspaces', rehydratedTaskId);
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeFile(
+      join(runDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        status: 'in_progress',
+        workspace_path: selectedWorkspacePath
+      }),
+      'utf8'
+    );
+
+    await writeProviderRunArtifacts(root, {
+      taskId: selectedTaskId,
+      runId: selectedRunId,
+      issueId: 'de299bad-c345-4259-8551-73dd429eccca',
+      issueIdentifier: 'CO-456',
+      workspacePath: selectedWorkspacePath
+    });
+    await writeProviderRunArtifacts(root, {
+      taskId: rehydratedTaskId,
+      runId: rehydratedRunId,
+      issueId: '7badbb88-ab4b-4091-9cd1-5d74643b6443',
+      issueIdentifier: 'CO-474',
+      workspacePath: rehydratedWorkspacePath
+    });
+
+    const staleServer = await startUiServer();
+    await closeServer(staleServer.instance);
+    await writeControlEndpointArtifacts(runDir, staleServer.baseUrl);
+    await writeProviderIntakeState(runDir, {
+      rehydratedAt: '2026-05-02T04:12:00.000Z',
+      claims: [
+        {
+          issueIdentifier: 'CO-456',
+          issueId: 'de299bad-c345-4259-8551-73dd429eccca',
+          issueTitle: 'Selected provider worker',
+          taskId: selectedTaskId,
+          runId: selectedRunId,
+          reason: 'provider_issue_running',
+          updatedAtMsAgo: 1_000
+        },
+        {
+          issueIdentifier: 'CO-474',
+          issueId: '7badbb88-ab4b-4091-9cd1-5d74643b6443',
+          issueTitle: 'Rehydrated provider worker',
+          taskId: rehydratedTaskId,
+          runId: rehydratedRunId,
+          reason: 'provider_issue_rehydrated_active_run',
+          updatedAtMsAgo: 2_000
+        }
+      ]
+    });
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await runCoStatusCliShell({
+      flags: {
+        format: 'json',
+        'run-dir': runDir
+      },
+      printHelp: vi.fn()
+    });
+
+    const payload = JSON.parse(String(log.mock.calls[0]?.[0])) as {
+      running?: Array<{
+        issue_id?: unknown;
+        issue_identifier?: unknown;
+        task_id?: unknown;
+        run_id?: unknown;
+        workspace_path?: unknown;
+        fallback_expiry?: Array<Record<string, unknown>>;
+      }>;
+      issues?: Array<{
+        issue_id?: unknown;
+        issue_identifier?: unknown;
+        task_id?: unknown;
+        run_id?: unknown;
+        workspace?: {
+          path?: unknown;
+        };
+        provider_linear_worker_proof?: {
+          workspace_path?: unknown;
+        } | null;
+        running?: {
+          fallback_expiry?: Array<Record<string, unknown>>;
+        } | null;
+        fallback_expiry?: Array<Record<string, unknown>>;
+      }>;
+    };
+    const selectedRunning = payload.running?.find((entry) => entry.issue_identifier === 'CO-456');
+    const rehydratedRunning = payload.running?.find((entry) => entry.issue_identifier === 'CO-474');
+    const selectedIssue = payload.issues?.find((entry) => entry.issue_identifier === 'CO-456');
+    const rehydratedIssue = payload.issues?.find((entry) => entry.issue_identifier === 'CO-474');
+    const fallbackNames = (entries: Array<Record<string, unknown>> | undefined): unknown[] =>
+      entries?.map((entry) => entry.fallback) ?? [];
+
+    expect(payload.running?.map((entry) => entry.issue_identifier)).toEqual(['CO-456', 'CO-474']);
+    expect(selectedRunning).toMatchObject({
+      issue_id: 'de299bad-c345-4259-8551-73dd429eccca',
+      task_id: selectedTaskId,
+      run_id: selectedRunId,
+      workspace_path: selectedWorkspacePath
+    });
+    expect(rehydratedRunning).toMatchObject({
+      issue_id: '7badbb88-ab4b-4091-9cd1-5d74643b6443',
+      task_id: rehydratedTaskId,
+      run_id: rehydratedRunId,
+      workspace_path: rehydratedWorkspacePath
+    });
+    expect(rehydratedRunning?.workspace_path).not.toBe(selectedWorkspacePath);
+    expect(selectedIssue?.workspace?.path).toBe(selectedWorkspacePath);
+    expect(rehydratedIssue?.workspace?.path).toBe(rehydratedWorkspacePath);
+    expect(rehydratedIssue?.provider_linear_worker_proof?.workspace_path).toBe(rehydratedWorkspacePath);
+    expect(fallbackNames(rehydratedRunning?.fallback_expiry)).toEqual(
+      expect.arrayContaining([
+        'selected-run projection fallback',
+        'CLI/API/UI /ui/data.json source labels and authority/proof split'
+      ])
+    );
+    expect(fallbackNames(rehydratedIssue?.fallback_expiry)).toEqual(
+      expect.arrayContaining([
+        'compatibility issue projection fallback',
+        'CLI/API/UI /ui/data.json source labels and authority/proof split'
+      ])
+    );
+    expect(fallbackNames(rehydratedIssue?.running?.fallback_expiry)).toEqual(
+      expect.arrayContaining([
+        'selected-run projection fallback',
+        'CLI/API/UI /ui/data.json source labels and authority/proof split'
+      ])
+    );
+  });
+
+  it('uses matching issue proof paths for synthesized degraded running rows', () => {
+    const selectedTaskId = 'linear-de299bad-c345-4259-8551-73dd429eccca';
+    const rehydratedTaskId = 'linear-7badbb88-ab4b-4091-9cd1-5d74643b6443';
+    const selectedRunId = '2026-05-02T04-10-00-000Z-selected';
+    const rehydratedRunId = '2026-05-02T04-11-22-464Z-6262fa47';
+    const selectedWorkspacePath = '/repo/.workspaces/linear-de299bad-c345-4259-8551-73dd429eccca';
+    const rehydratedWorkspacePath =
+      '/repo/.workspaces/linear-7badbb88-ab4b-4091-9cd1-5d74643b6443';
+
+    const payload = coStatusCliShellTest.applyProviderIntakeTruthOverlay(
+      buildUiPayload({
+        selected_issue_identifier: 'CO-456',
+        selected: buildSelectedStatusPayload({
+          issueIdentifier: 'CO-456',
+          issueId: 'de299bad-c345-4259-8551-73dd429eccca',
+          taskId: selectedTaskId,
+          runId: selectedRunId,
+          workspacePath: selectedWorkspacePath
+        }),
+        running: [
+          {
+            issue_identifier: 'CO-456',
+            issue_id: 'de299bad-c345-4259-8551-73dd429eccca',
+            task_id: selectedTaskId,
+            run_id: selectedRunId,
+            workspace_path: selectedWorkspacePath
+          }
+        ],
+        issues: [
+          buildIssueStatusPayload({
+            issueIdentifier: 'CO-456',
+            issueId: 'de299bad-c345-4259-8551-73dd429eccca',
+            taskId: selectedTaskId,
+            runId: selectedRunId,
+            workspacePath: selectedWorkspacePath
+          }),
+          buildIssueStatusPayload({
+            issueIdentifier: 'CO-474',
+            issueId: '7badbb88-ab4b-4091-9cd1-5d74643b6443',
+            taskId: rehydratedTaskId,
+            runId: rehydratedRunId,
+            workspacePath: null,
+            proofWorkspacePath: rehydratedWorkspacePath
+          })
+        ]
+      }) as never,
+      {
+        manifestPath: '/repo/.runs/local-mcp/cli/control-host/manifest.json',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        workspaceRoot: selectedWorkspacePath,
+        baseUrl: new URL('http://127.0.0.1:1'),
+        token: 'snapshot-token'
+      },
+      buildProviderIntakeState({
+        rehydratedAt: '2026-05-02T04:12:00.000Z',
+        claims: [
+          {
+            issueIdentifier: 'CO-456',
+            issueId: 'de299bad-c345-4259-8551-73dd429eccca',
+            issueTitle: 'Selected provider worker',
+            taskId: selectedTaskId,
+            runId: selectedRunId,
+            reason: 'provider_issue_running',
+            updatedAtMsAgo: 1_000
+          },
+          {
+            issueIdentifier: 'CO-474',
+            issueId: '7badbb88-ab4b-4091-9cd1-5d74643b6443',
+            issueTitle: 'Rehydrated provider worker',
+            taskId: rehydratedTaskId,
+            runId: rehydratedRunId,
+            reason: 'provider_issue_rehydrated_active_run',
+            updatedAtMsAgo: 2_000
+          }
+        ]
+      }) as never
+    ) as {
+      running?: Array<{
+        issue_identifier?: unknown;
+        workspace_path?: unknown;
+      }>;
+      issues?: Array<{
+        issue_identifier?: unknown;
+        workspace?: {
+          path?: unknown;
+        };
+      }>;
+    };
+
+    const rehydratedRunning = payload.running?.find((entry) => entry.issue_identifier === 'CO-474');
+    const rehydratedIssue = payload.issues?.find((entry) => entry.issue_identifier === 'CO-474');
+
+    expect(rehydratedRunning?.workspace_path).toBe(rehydratedWorkspacePath);
+    expect(rehydratedIssue?.workspace?.path).toBe(rehydratedWorkspacePath);
+  });
+
+  it('preserves resolved row workspace paths ahead of retained raw proof paths in degraded rows', () => {
+    const selectedTaskId = 'linear-de299bad-c345-4259-8551-73dd429eccca';
+    const rehydratedTaskId = 'linear-7badbb88-ab4b-4091-9cd1-5d74643b6443';
+    const selectedWorkspacePath = '/repo/.workspaces/linear-de299bad-c345-4259-8551-73dd429eccca';
+    const rehydratedWorkspacePath =
+      '/repo/.workspaces/linear-7badbb88-ab4b-4091-9cd1-5d74643b6443';
+    const retainedProofWorkspacePath = '/repo/.workspaces/stale-retained-proof';
+
+    const payload = coStatusCliShellTest.applyProviderIntakeTruthOverlay(
+      buildUiPayload({
+        selected_issue_identifier: 'CO-456',
+        selected: buildSelectedStatusPayload({
+          issueIdentifier: 'CO-456',
+          issueId: 'de299bad-c345-4259-8551-73dd429eccca',
+          taskId: selectedTaskId,
+          runId: 'selected-run',
+          workspacePath: selectedWorkspacePath
+        }),
+        running: [],
+        issues: [
+          buildIssueStatusPayload({
+            issueIdentifier: 'CO-474',
+            issueId: '7badbb88-ab4b-4091-9cd1-5d74643b6443',
+            taskId: rehydratedTaskId,
+            runId: 'rehydrated-run',
+            workspacePath: rehydratedWorkspacePath,
+            proofWorkspacePath: retainedProofWorkspacePath
+          })
+        ]
+      }) as never,
+      {
+        manifestPath: '/repo/.runs/local-mcp/cli/control-host/manifest.json',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        runDir: '/repo/.runs/local-mcp/cli/control-host',
+        workspaceRoot: selectedWorkspacePath,
+        baseUrl: new URL('http://127.0.0.1:1'),
+        token: 'snapshot-token'
+      },
+      buildProviderIntakeState({
+        claims: [
+          {
+            issueIdentifier: 'CO-474',
+            issueId: '7badbb88-ab4b-4091-9cd1-5d74643b6443',
+            issueTitle: 'Rehydrated provider worker',
+            taskId: rehydratedTaskId,
+            runId: 'rehydrated-run',
+            reason: 'provider_issue_rehydrated_active_run'
+          }
+        ]
+      }) as never
+    ) as {
+      running?: Array<{
+        issue_identifier?: unknown;
+        workspace_path?: unknown;
+      }>;
+      issues?: Array<{
+        issue_identifier?: unknown;
+        workspace?: {
+          path?: unknown;
+        };
+      }>;
+    };
+
+    const rehydratedRunning = payload.running?.find((entry) => entry.issue_identifier === 'CO-474');
+    const rehydratedIssue = payload.issues?.find((entry) => entry.issue_identifier === 'CO-474');
+
+    expect(rehydratedRunning?.workspace_path).toBe(rehydratedWorkspacePath);
+    expect(rehydratedIssue?.workspace?.path).toBe(rehydratedWorkspacePath);
+    expect(rehydratedRunning?.workspace_path).not.toBe(retainedProofWorkspacePath);
+  });
+
   it('falls back to active provider-intake projection when the current endpoint is dead without rotation', async () => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
     tempDirs.push(root);
@@ -1757,6 +2073,51 @@ async function writeProviderLinearWorkerProof(
   );
 }
 
+async function writeProviderRunArtifacts(
+  root: string,
+  input: {
+    taskId: string;
+    runId: string;
+    issueId: string;
+    issueIdentifier: string;
+    workspacePath: string;
+  }
+): Promise<void> {
+  const runDir = join(root, '.runs', input.taskId, 'cli', input.runId);
+  const startedAt = '2026-05-02T04:10:00.000Z';
+  const updatedAt = '2026-05-02T04:12:00.000Z';
+  await mkdir(runDir, { recursive: true });
+  await writeFile(
+    join(runDir, 'manifest.json'),
+    JSON.stringify({
+      run_id: input.runId,
+      task_id: input.taskId,
+      status: 'in_progress',
+      pipeline_id: 'provider-linear-worker',
+      pipeline_title: 'Provider Linear Worker',
+      issue_provider: 'linear',
+      issue_id: input.issueId,
+      issue_identifier: input.issueIdentifier,
+      started_at: startedAt,
+      updated_at: updatedAt,
+      summary: `${input.issueIdentifier} provider worker still running`,
+      commands: []
+    }),
+    'utf8'
+  );
+  await writeProviderLinearWorkerProof(runDir, {
+    issue_id: input.issueId,
+    issue_identifier: input.issueIdentifier,
+    task_id: input.taskId,
+    run_id: input.runId,
+    workspace_path: input.workspacePath,
+    owner_phase: 'turn_running',
+    owner_status: 'running',
+    last_event_at: updatedAt,
+    updated_at: updatedAt
+  });
+}
+
 async function closeServer(server: http.Server): Promise<void> {
   await new Promise<void>((resolve) => {
     try {
@@ -1835,6 +2196,100 @@ function buildUiPayload(overrides: Record<string, unknown> = {}): Record<string,
   };
 }
 
+function buildSelectedStatusPayload(input: {
+  issueIdentifier: string;
+  issueId: string;
+  taskId: string;
+  runId: string;
+  workspacePath: string;
+}): Record<string, unknown> {
+  return {
+    issue_id: input.issueId,
+    issue_identifier: input.issueIdentifier,
+    task_id: input.taskId,
+    run_id: input.runId,
+    raw_status: 'in_progress',
+    display_status: 'In Progress',
+    status_reason: null,
+    started_at: '2026-05-02T04:10:00.000Z',
+    updated_at: '2026-05-02T04:12:00.000Z',
+    completed_at: null,
+    summary: `${input.issueIdentifier} provider worker`,
+    last_error: null,
+    latest_action: null,
+    latest_event: null,
+    workspace: {
+      path: input.workspacePath
+    },
+    question_summary: {
+      queued_count: 0,
+      latest_question: null
+    },
+    tracked: {
+      linear: null
+    }
+  };
+}
+
+function buildIssueStatusPayload(input: {
+  issueIdentifier: string;
+  issueId: string;
+  taskId: string;
+  runId: string;
+  workspacePath: string | null;
+  proofWorkspacePath?: string | null;
+}): Record<string, unknown> {
+  return {
+    issue_identifier: input.issueIdentifier,
+    issue_id: input.issueId,
+    task_id: input.taskId,
+    run_id: input.runId,
+    status: 'in_progress',
+    raw_status: 'in_progress',
+    display_status: 'In Progress',
+    status_reason: null,
+    title: `${input.issueIdentifier} provider worker`,
+    url: null,
+    workspace: {
+      path: input.workspacePath,
+      host: 'test-host'
+    },
+    session: {
+      session_id: null,
+      thread_id: null,
+      turn_count: null
+    },
+    owner: {
+      phase: null,
+      status: null
+    },
+    tokens: null,
+    rate_limits: null,
+    summary: `${input.issueIdentifier} provider worker`,
+    last_error: null,
+    latest_event: null,
+    recent_agent_activity: [],
+    linear_activity: [],
+    running: null,
+    retry: null,
+    attempts: {
+      restart_count: null,
+      current_retry_attempt: null
+    },
+    tracked: {
+      linear: null
+    },
+    provider_linear_worker_proof: {
+      issue_id: input.issueId,
+      issue_identifier: input.issueIdentifier,
+      task_id: input.taskId,
+      run_id: input.runId,
+      workspace_path: input.proofWorkspacePath ?? input.workspacePath
+    },
+    provider_debug_snapshot: null
+  };
+}
+
 function buildProviderIntakeState(options: {
   claimState?: 'running' | 'stale' | 'completed';
   updatedAtMsAgo?: number;
@@ -1843,6 +2298,7 @@ function buildProviderIntakeState(options: {
     issueIdentifier: string;
     issueId: string;
     issueTitle: string;
+    taskId?: string;
     runId: string;
     claimState?: 'running' | 'stale' | 'completed';
     issueState?: string;
@@ -1904,7 +2360,7 @@ function buildProviderIntakeState(options: {
         issue_state: claim.issueState ?? (state === 'completed' ? 'Done' : 'In Progress'),
         issue_state_type: claim.issueStateType ?? (state === 'completed' ? 'completed' : 'started'),
         issue_updated_at: new Date(Date.now() - claimUpdatedAtMsAgo - 5_000).toISOString(),
-        task_id: 'local-mcp',
+        task_id: claim.taskId ?? 'local-mcp',
         mapping_source: 'provider_id_fallback',
         state,
         reason:

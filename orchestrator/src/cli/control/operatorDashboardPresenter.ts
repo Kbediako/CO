@@ -17,7 +17,10 @@ import type {
   ControlProviderIntakeUnavailablePayload,
   ControlProviderWorkflowPayload
 } from './observabilityReadModel.js';
-import { resolveProviderWorkerHost } from './observabilityReadModel.js';
+import {
+  readProviderLinearWorkerWorkspacePath,
+  resolveProviderWorkerHost
+} from './observabilityReadModel.js';
 import { isoTimestamp } from '../utils/time.js';
 
 const LOCAL_HOSTNAME = hostname();
@@ -47,6 +50,7 @@ export interface OperatorDashboardSessionPayload {
   host: string;
   worker_host?: string | null;
   worker_control?: NonNullable<ControlIssuePayload['provider_linear_worker_proof']>['worker_control'] | null;
+  resolved_model_provenance?: ControlRunningPayload['resolved_model_provenance'];
   last_event: string | null;
   last_message: string | null;
   display_event?: string | null;
@@ -75,6 +79,7 @@ export interface OperatorDashboardRetryPayload {
   workspace_path: string | null;
   host: string;
   worker_host?: string | null;
+  resolved_model_provenance?: ControlRetryPayload['resolved_model_provenance'];
   attempt: number | null;
   due_at: string | null;
   error: string | null;
@@ -257,6 +262,11 @@ function buildIssuePayload(
       providerDebugSnapshot: issue.provider_debug_snapshot ?? null,
       stageStartedAt
     });
+  const proofWorkspacePath = readProviderLinearWorkerWorkspacePath(
+    proof,
+    stageStartedAt,
+    issue.provider_debug_snapshot ?? null
+  );
 
   return {
     issue_identifier: issue.issue_identifier,
@@ -270,7 +280,7 @@ function buildIssuePayload(
     title: trackedLinear?.title ?? null,
     url: trackedLinear?.url ?? null,
     workspace: {
-      path: issue.workspace.path ?? proof?.workspace_path ?? null,
+      path: issue.workspace.path ?? proofWorkspacePath ?? null,
       host: LOCAL_HOSTNAME
     },
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
@@ -308,18 +318,30 @@ function buildRunningSessionPayload(
 ): OperatorDashboardSessionPayload {
   const issue = issueRecord?.payload ?? null;
   const proof = issue?.provider_linear_worker_proof ?? null;
+  const stageStartedAt =
+    entry.started_at ??
+    issue?.running?.started_at ??
+    issue?.provider_debug_snapshot?.claim?.launch_started_at ??
+    null;
   const workerHost =
     entry.worker_host ??
     issue?.worker_host ??
     resolveProviderWorkerHost({
       providerLinearWorkerProof: proof,
       providerDebugSnapshot: issue?.provider_debug_snapshot ?? null,
-      stageStartedAt:
-        entry.started_at ??
-        issue?.running?.started_at ??
-        issue?.provider_debug_snapshot?.claim?.launch_started_at ??
-        null
+      stageStartedAt
     });
+  const proofWorkspacePath = readProviderLinearWorkerWorkspacePath(
+    proof,
+    stageStartedAt,
+    issue?.provider_debug_snapshot ?? null
+  );
+  const issueWorkspacePath = issue?.workspace.path ?? null;
+  const resolvedModelProvenance =
+    entry.resolved_model_provenance ??
+    issue?.running?.resolved_model_provenance ??
+    proof?.resolved_model_provenance ??
+    null;
   return {
     issue_identifier: entry.issue_identifier,
     issue_id: entry.issue_id,
@@ -343,9 +365,10 @@ function buildRunningSessionPayload(
     session_id: proof?.latest_session_id ?? entry.session_id,
     thread_id: proof?.thread_id ?? null,
     turn_count: proof?.turn_count ?? entry.turn_count,
-    workspace_path: issue?.workspace.path ?? proof?.workspace_path ?? null,
+    workspace_path: issueWorkspacePath ?? proofWorkspacePath ?? null,
     host: LOCAL_HOSTNAME,
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
+    ...(resolvedModelProvenance ? { resolved_model_provenance: resolvedModelProvenance } : {}),
     worker_control: proof?.worker_control ?? null,
     last_event: entry.last_event,
     last_message: entry.last_message,
@@ -375,6 +398,11 @@ function buildRetryQueuePayload(
         issue?.provider_debug_snapshot?.claim?.launch_started_at ??
         null
     });
+  const resolvedModelProvenance =
+    entry.resolved_model_provenance ??
+    issue?.retry?.resolved_model_provenance ??
+    proof?.resolved_model_provenance ??
+    null;
   return {
     issue_identifier: entry.issue_identifier,
     issue_id: entry.issue_id,
@@ -400,6 +428,7 @@ function buildRetryQueuePayload(
     workspace_path: entry.workspace_path ?? null,
     host: LOCAL_HOSTNAME,
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
+    ...(resolvedModelProvenance ? { resolved_model_provenance: resolvedModelProvenance } : {}),
     attempt: entry.attempt,
     due_at: entry.due_at,
     error: entry.error,

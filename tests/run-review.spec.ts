@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { chmod, mkdtemp, mkdir, readFile, realpath, rm, symlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative } from 'node:path';
@@ -33,6 +33,69 @@ interface RunReviewMockProcess {
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForFileContents(
+  filePath: string,
+  expected: string,
+  options: { attempts?: number; intervalMs?: number } = {}
+): Promise<void> {
+  const attempts = options.attempts ?? 60;
+  const intervalMs = options.intervalMs ?? 50;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const contents = await readFile(filePath, 'utf8');
+      if (contents === expected) {
+        return;
+      }
+    } catch {
+      // The fake review command writes the marker only after reaching hang mode.
+    }
+    await delay(intervalMs);
+  }
+  throw new Error(`Timed out waiting for ${filePath} to contain ${JSON.stringify(expected)}`);
+}
+
+function isCommandTokenBoundary(value: string | undefined): boolean {
+  return value === undefined || /\s/u.test(value);
+}
+
+function findCommandTokenStart(command: string, token: string): number {
+  let start = command.indexOf(token);
+  while (start !== -1) {
+    const before = start === 0 ? undefined : command[start - 1];
+    const after = command[start + token.length];
+    if (isCommandTokenBoundary(before) && isCommandTokenBoundary(after)) {
+      return start;
+    }
+    start = command.indexOf(token, start + 1);
+  }
+  return -1;
+}
+
+function commandInvokesRunReviewMock(command: string, codexBin: string): boolean {
+  const commandStart = findCommandTokenStart(command, codexBin);
+  if (commandStart === -1) {
+    return false;
+  }
+
+  const tokens = command
+    .slice(commandStart + codexBin.length)
+    .trim()
+    .split(/\s+/u)
+    .filter((token) => token.length > 0);
+  let index = 0;
+  while (tokens[index] === '-c' || tokens[index] === '--config') {
+    if (!tokens[index + 1]) {
+      return false;
+    }
+    index += 2;
+  }
+  return tokens[index] === 'review';
 }
 
 async function makeSandbox(): Promise<string> {
@@ -1289,7 +1352,6 @@ async function findRunReviewMockProcesses(
       maxBuffer: 4 * 1024 * 1024,
       timeout: 2000
     });
-    const needle = `${codexBin} review`;
     return String(stdout ?? '')
       .split('\n')
       .flatMap((line) => {
@@ -1298,7 +1360,7 @@ async function findRunReviewMockProcesses(
           return [];
         }
         const command = match[3] ?? '';
-        if (!command.includes(needle)) {
+        if (!commandInvokesRunReviewMock(command, codexBin)) {
           return [];
         }
         const pid = Number.parseInt(match[1] ?? '', 10);
@@ -2581,6 +2643,34 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.summary.heavyCommandStarts[0]).toContain('[redacted heavy-command');
   }, LONG_WAIT_TEST_TIMEOUT_MS);
 
+  it('matches only exact fake Codex review commands with optional config overrides', () => {
+    const codexBin = '/tmp/run-review-abc/codex-mock.sh';
+
+    expect(commandInvokesRunReviewMock(`${codexBin} review Review task: sample-task`, codexBin)).toBe(
+      true
+    );
+    expect(
+      commandInvokesRunReviewMock(
+        `${codexBin} -c mcp_servers.delegation.enabled=true review Review task: sample-task`,
+        codexBin
+      )
+    ).toBe(true);
+    expect(
+      commandInvokesRunReviewMock(
+        `${codexBin} --config mcp_servers.delegation.enabled=true -c default_permissions=":read-only" review`,
+        codexBin
+      )
+    ).toBe(true);
+    expect(
+      commandInvokesRunReviewMock(
+        `${codexBin} --ask-for-approval never review Review task: sample-task`,
+        codexBin
+      )
+    ).toBe(false);
+    expect(commandInvokesRunReviewMock(`${codexBin}.bak -c value review`, codexBin)).toBe(false);
+    expect(commandInvokesRunReviewMock(`${codexBin} -c value exec`, codexBin)).toBe(false);
+  });
+
   it('reaps hanging fake Codex subprocesses after a subprocess harness timeout', async () => {
     if (process.platform === 'win32') {
       return;
@@ -2613,6 +2703,42 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.exitCode).toBeGreaterThan(0);
     await expect(readFile(hangMarker, 'utf8')).resolves.toBe('started\n');
     expect(await findRunReviewMockPids(codexBin, { strict: true })).toEqual(beforePids);
+  }, RUN_REVIEW_HANGING_SUBPROCESS_TEST_TIMEOUT_MS);
+
+  it('reaps override-prefixed fake Codex review subprocesses', async () => {
+    if (process.platform === 'win32') {
+      return;
+    }
+
+    const sandbox = await makeSandbox();
+    const codexBin = await makeFakeCodex(sandbox);
+    const hangMarker = join(sandbox, 'override-hang-started.txt');
+    const beforePids = await findRunReviewMockPids(codexBin, { strict: true });
+    const child = spawn(
+      codexBin,
+      ['-c', 'mcp_servers.delegation.enabled=true', 'review', 'Review task: sample-task'],
+      {
+        detached: true,
+        env: {
+          ...baseEnv(sandbox, codexBin),
+          RUN_REVIEW_MODE: 'hang',
+          RUN_REVIEW_HANG_MARKER: hangMarker
+        },
+        stdio: 'ignore'
+      }
+    );
+    child.unref();
+
+    try {
+      await waitForFileContents(hangMarker, 'started\n');
+      expect(await findRunReviewMockPids(codexBin, { strict: true })).toContain(child.pid);
+      await cleanupRunReviewMockProcesses(codexBin);
+      expect(await findRunReviewMockPids(codexBin, { strict: true })).toEqual(beforePids);
+    } finally {
+      if (typeof child.pid === 'number') {
+        await terminateRunReviewMockProcess({ pid: child.pid, pgid: child.pid }, 'SIGKILL');
+      }
+    }
   }, RUN_REVIEW_HANGING_SUBPROCESS_TEST_TIMEOUT_MS);
 
   it('persists telemetry when review launch fails after the command probe', async () => {

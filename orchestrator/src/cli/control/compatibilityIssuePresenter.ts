@@ -12,6 +12,7 @@ import type {
 } from './observabilityReadModel.js';
 import {
   buildProjectionSelectedPayload,
+  readProviderLinearWorkerWorkspacePath,
   resolveProviderWorkerHost,
   buildTrackedPayloadEnvelope,
   buildSelectedRunLatestEventPayload
@@ -804,6 +805,9 @@ export function buildCompatibilityRunningEntry(
     status_reason: selected.statusReason,
     pid: selected.providerLinearWorkerProof?.pid ?? null,
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
+    ...(proof?.resolved_model_provenance
+      ? { resolved_model_provenance: proof.resolved_model_provenance }
+      : {}),
     session_id: useLegacyProofFallback
       ? normalizeCompatibilityMessage(proof?.latest_session_id)
       : proofCanonicalSessionId,
@@ -840,6 +844,9 @@ export function buildCompatibilityRetryEntry(selected: ControlCompatibilitySourc
     status_reason: selected.statusReason,
     session_id: proof?.latest_session_id ?? null,
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
+    ...(proof?.resolved_model_provenance
+      ? { resolved_model_provenance: proof.resolved_model_provenance }
+      : {}),
     thread_id: proof?.thread_id ?? null,
     turn_count: proof?.turn_count ?? null,
     workspace_path: selected.workspacePath,
@@ -878,6 +885,11 @@ export function buildCompatibilityIssuePayload(input: {
     issueId: input.source.issueId,
     stageStartedAt: input.source.startedAt
   });
+  const proofWorkspacePath = readProviderLinearWorkerWorkspacePath(
+    input.source.providerLinearWorkerProof,
+    input.source.startedAt,
+    input.source.providerDebugSnapshot
+  );
 
   return {
     issue_identifier: input.source.issueIdentifier,
@@ -889,7 +901,7 @@ export function buildCompatibilityIssuePayload(input: {
     display_status: input.source.displayStatus,
     status_reason: input.source.statusReason,
     workspace: {
-      path: input.source.workspacePath ?? input.source.providerLinearWorkerProof?.workspace_path ?? null
+      path: input.source.workspacePath ?? proofWorkspacePath ?? null
     },
     ...(workerHost !== null ? { worker_host: workerHost } : {}),
     attempts: buildCompatibilityIssueAttempts(input.source, retryPayload),
