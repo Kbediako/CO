@@ -1,13 +1,17 @@
 ---
 id: 20260403-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80
 title: CO: Automate docs truthfulness and relevance across README, shipped skills, and agent-facing docs
+status: done
 relates_to: docs/PRD-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md
 related_prd: docs/PRD-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md
 related_action_plan: docs/ACTION_PLAN-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-03
+last_review: 2026-05-05
+review_notes:
+  - 2026-05-05: CO-444 rollover review added fallback decision evidence for the completed-lane historical packet/spec freshness hold; metadata last_review now matches the table review date.
+  - 2026-05-04: CO-444 parent-supplied live Linear evidence confirmed CO-75/27ac1e64 is `Done`/completed with PR #354; this completed-lane spec is reclassified to inactive terminal `done` under canonical owner key `spec-guard:active-specs:last_review=2026-04-03` so historical implementation evidence remains preserved without staying in active-spec freshness.
 ---
 
 ## Added by Bootstrap (refresh as needed)
@@ -144,3 +148,13 @@ last_review: 2026-04-03
 ## Approvals
 - Reviewer: pending docs-review
 - Date: 2026-04-03
+
+
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `docs:freshness:maintain` | Completed-lane historical packet/spec freshness hold | `expire fallback` | CO-444 | Terminal Linear source issues left task-packet/spec metadata active past cadence | 2026-05-05 | 2026-05-05 | 2026-05-12 | Archive packet mirrors and reclassify specs under a live owner; otherwise block handoff | `docs:freshness:maintain -- --format json` |
+
+- Large refactor decision: bounded metadata cleanup under the existing `docs:freshness:maintain` owner; no runtime or policy authority split is added.
+- Minor seam decision: bounded temporary freshness-hold cleanup is acceptable; unresolved rows must be archived, reclassified, or blocked by 2026-05-12.

@@ -125,9 +125,10 @@ canonical_owner_marker: codex-orchestrator:canonical-owner-key=docs:freshness:ma
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `docs:freshness:maintain` owner packet | Existing rolling freshness cohort owner hold | `expire fallback` | CO-444 | Terminal configured owner `CO-441` evidence | 2026-04-30 | 2026-04-30 | Existing rolling window ending 2026-05-04 | Live owner repair or explicit blocker recorded by owner | `docs:freshness:maintain -- --format json` |
+| `docs:freshness:maintain` | Completed-lane historical packet/spec freshness hold | `expire fallback` | CO-444 | Terminal configured owner and completed-lane cohort evidence | 2026-05-05 | 2026-05-05 | 2026-05-12 | Archive packet mirrors and reclassify specs under a live owner; otherwise block handoff | `docs:freshness:maintain -- --format json` |
 
-- Large-refactor check: this lane does not add a new seam. It records the recurring tactical owner handoff while preserving existing fail-closed policy behavior.
+- Large refactor decision: bounded metadata cleanup under the existing `docs:freshness:maintain` owner; no runtime or policy authority split is added.
+- Minor seam decision: bounded temporary freshness-hold cleanup is acceptable; unresolved rows must be archived, reclassified, or blocked by 2026-05-12.
 
 ## Acceptance Criteria
 - CO-444 packet docs are created in the declared file scope.
