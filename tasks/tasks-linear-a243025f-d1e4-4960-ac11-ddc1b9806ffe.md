@@ -61,3 +61,4 @@
 
 ## Notes
 - Goal: clean up run-review mock processes with config overrides before review. | Summary: keep the fix in `tests/run-review.spec.ts` unless source inspection proves another owner, and preserve exact-path process cleanup. | Risks: process overmatch and provider-worker scope drift.
+- Agent mirror status: `.agent/task/linear-a243025f-d1e4-4960-ac11-ddc1b9806ffe.md` is an abbreviated mirror that carries Docs-First, Acceptance Criteria, Validation, and approval status. It intentionally omits this task file's Non-Goals, fallback/refactor table, and Progress Log; this task file remains canonical for those expanded sections.
