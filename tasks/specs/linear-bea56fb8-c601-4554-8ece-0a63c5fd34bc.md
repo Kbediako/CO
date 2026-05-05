@@ -1,10 +1,10 @@
 ---
 id: 20260404-linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc
 title: CO STATUS: restore truthful default operator telemetry and Symphony parity
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-04
-last_review: 2026-04-04
+last_review: 2026-05-05
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc.md
@@ -18,7 +18,17 @@ review_notes:
   - 2026-04-04: Pre-implementation audit identified the active CO rendering seam in `orchestrator/src/cli/control/controlStatusDashboard.ts` with focused regression coverage in `orchestrator/tests/ControlStatusDashboard.test.ts`, and the detailed Symphony reference in `/Users/kbediako/Code/symphony/elixir/lib/symphony_elixir/status_dashboard.ex` plus `/Users/kbediako/Code/symphony/elixir/test/symphony_elixir/orchestrator_status_test.exs`.
   - 2026-04-04: Issue-quality review approves one bounded lane over the full visible default CO STATUS contract: default launch behavior, header telemetry, rate-limit presentation, running-row semantics, degraded/idle states, and real-device screenshot proof. Narrow single-field fixes, dashboard redesign, and unrelated control-host refactors remain out of scope.
   - 2026-04-04: Audited `codex-orchestrator docs-review` child stream completed with `status: succeeded`, `review_outcome: clean-success`, and no blocking findings. Evidence: `.runs/linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc-co-78-docs-review/cli/2026-04-03T23-02-25-401Z-e6287e4b/manifest.json`, `.runs/linear-bea56fb8-c601-4554-8ece-0a63c5fd34bc-co-78-docs-review/cli/2026-04-03T23-02-25-401Z-e6287e4b/review/telemetry.json`.
+  - 2026-05-05: CO-444 live docs-freshness audit confirmed CO-78 is Done/completed (updated_at=2026-04-14T05:06:42.419Z, #359 lineage); reclassified this April 4 task packet/spec mirror as completed-lane historical metadata under live `docs:freshness:maintain` owner CO-444 without weakening docs-freshness or deleting historical evidence.
 ---
+
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `docs:freshness:maintain` | Completed-lane historical packet/spec freshness hold | `expire fallback` | CO-444 | Terminal Linear source issues left task-packet/spec metadata active past cadence | 2026-05-05 | 2026-05-05 | 2026-05-12 | Archive packet mirrors and reclassify specs under a live owner; otherwise block handoff | `docs:freshness:maintain -- --format json` |
+
+- Large refactor decision: bounded metadata cleanup under the existing `docs:freshness:maintain` owner; no runtime or policy authority split is added.
+- Minor seam decision: bounded temporary freshness-hold cleanup is acceptable; unresolved rows must be archived, reclassified, or blocked by 2026-05-12.
 
 # Technical Specification
 

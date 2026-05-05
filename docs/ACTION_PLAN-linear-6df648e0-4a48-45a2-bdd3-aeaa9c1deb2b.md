@@ -35,7 +35,16 @@
   - 2026-04-30: bounded child lane owns packet setup; parent owns owner re-home, validation, PR lifecycle, and Linear state.
 - Fallback / refactor decision: no new fallback behavior is introduced. The lane preserves existing `docs:freshness:maintain` fail-closed behavior and rolling freshness cohort visibility.
 - Durable retention evidence: the retained cohort remains governed by the existing rolling window and expires after `2026-05-04` unless refreshed, archived, reclassified, or re-homed through a live owner.
-- Large-refactor check: not applicable; the repair is a docs/config owner metadata update.
+- Large refactor decision: bounded metadata cleanup under the existing `docs:freshness:maintain` owner; no runtime or policy authority split is added.
+
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `docs:freshness:maintain` | Completed-lane historical packet/spec freshness hold | `expire fallback` | CO-444 | Terminal Linear source issues left task-packet/spec metadata active past cadence | 2026-05-05 | 2026-05-05 | 2026-05-12 | Archive packet mirrors and reclassify specs under a live owner; otherwise block handoff | `docs:freshness:maintain -- --format json` |
+
+- Large refactor decision: bounded metadata cleanup under the existing `docs:freshness:maintain` owner; no runtime or policy authority split is added.
+- Minor seam decision: bounded temporary freshness-hold cleanup is acceptable; unresolved rows must be archived, reclassified, or blocked by 2026-05-12.
 
 ## Milestones & Sequencing
 1. Inspect live Linear context and move from queued state into started state.

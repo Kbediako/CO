@@ -425,3 +425,15 @@ CO-444 preserves `docs:freshness:maintain`, the live owner marker, and the March
 After the April 3 packet residue was cleared, `docs:freshness:maintain` found no candidate cohorts and no changed-path blockers, but still reported ten hard-stale active public/skill docs. CO-444 reviewed `docs/public/downstream-setup.md`, `docs/public/provider-onboarding.md`, and the affected bundled skill docs (`chrome-devtools`, `collab-deliberation`, `collab-evals`, `collab-subagents-first`, `delegate-early`, `elegance-review`, and `land`) against the current CO-local Codex `0.128.0` / `gpt-5.5` posture, provider onboarding contract, and provider-worker lifecycle guidance.
 
 Those surfaces remain active guidance rather than rolling task-packet debt, so CO-444 refreshed only their registry `last_review` metadata. No public setup text, bundled skill behavior, `docs:freshness`, `docs:freshness:maintain`, or spec-guard policy was weakened.
+
+## May 5 April 4 Completed-Lane Residue Cleanup
+
+### Reproduction / Baseline Findings
+After the May 4 cleanup, the calendar rollover to 2026-05-05 exposed the next rolling task-packet cohort. `docs:freshness:maintain` verified CO-444 as the live same-project owner, then failed with `freshness_decision=block_diff_local`, `blocking_changed_paths=[]`, and six April 4 `co-429-completed-lane-registry-residue` cohorts plus one `co-428-stale-active-spec` cohort.
+
+Live Linear issue-context reads on 2026-05-05 confirmed the source issues behind the April 4 residue are terminal: `CO-79` (`486fd104-53d7-4657-b26f-c477f7e730a3`), `CO-81` (`529457d9-5636-4394-a21e-b96e4f4fae74`), `CO-78` (`bea56fb8-c601-4554-8ece-0a63c5fd34bc`), and `CO-77` (`da28812d-8367-4d94-a273-d0652535f818`) are all `Done` / `completed`.
+
+### Rolling Disposition
+CO-444 keeps `docs:freshness:maintain` and the live owner marker unchanged. The April 4 residue is not a new product implementation lane: the affected task-packet rows are archived as completed-lane historical metadata, stale active specs are reclassified to terminal `done`, and `tasks/index.json` records the live Linear terminal evidence. This follows the same owner-renewal rule as the April 3 cleanup: preserve historical evidence, avoid blind active `last_review` bumps, and keep product-scope implementation lanes out of recurring docs-freshness maintenance.
+
+After the April 4 packet residue was cleared, the only remaining hard-stale row was active seeded template guidance in `templates/README.md`. CO-444 reviewed it as current initializer guidance and refreshed only the registry `last_review` metadata; no template behavior or public docs policy changed.
