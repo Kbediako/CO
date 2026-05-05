@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-04
+last_review: 2026-05-05
 ---
 
 # TECH_SPEC - CO-424 prevent provider-worker post-handoff closeout parallelization false failures
@@ -43,4 +43,11 @@ This mirror points to the canonical task spec at `tasks/specs/linear-0394e0bd-c9
   - packet path `rg` over registry mirrors
   - JSON parse for `tasks/index.json`
   - JSON parse for `docs/docs-freshness-registry.json`
-  - `npm run docs:check` and `npm run docs:freshness` only if available without dependency setup
+- Required validation sequence before ready-review handoff:
+  - `node scripts/delegation-guard.mjs` or a documented setup-only delegation override
+  - `node scripts/spec-guard.mjs --dry-run`
+  - `npm run build`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run docs:check`
+  - `npm run docs:freshness`

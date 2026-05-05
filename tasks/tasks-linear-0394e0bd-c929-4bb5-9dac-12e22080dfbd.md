@@ -46,7 +46,7 @@
 - [ ] Future lane validates the CO-423 / PR #721 style closeout no longer false-fails.
 
 ## Validation
-- [x] `git status --short --branch`. Evidence: branch `kb/co-424-traceability-packet` refreshed onto `origin/main`; packet diff remains local pending commit/PR.
+- [x] `git status --short --branch`. Evidence: branch `kb/co-424-traceability-packet` refreshed onto `origin/main` and included in PR `#764`.
 - [x] Protected-term and packet-path `rg` checks. Evidence: protected terms and six packet paths found across packet files, `docs/TASKS.md`, `tasks/index.json`, and `docs/docs-freshness-registry.json`.
 - [x] JSON parse for `tasks/index.json`. Evidence: `json ok`.
 - [x] JSON parse for `docs/docs-freshness-registry.json`. Evidence: `json ok`.

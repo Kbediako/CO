@@ -4,7 +4,7 @@ title: CO-424 prevent provider-worker post-handoff closeout parallelization fals
 status: packet_setup
 owner: Codex
 created: 2026-05-01
-last_review: 2026-05-04
+last_review: 2026-05-05
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-0394e0bd-c929-4bb5-9dac-12e22080dfbd.md
@@ -138,8 +138,14 @@ review_notes:
   - packet-path scan with `rg`
   - JSON parse for `tasks/index.json`
   - JSON parse for `docs/docs-freshness-registry.json`
-  - `npm run docs:check` if available without setup
-  - `npm run docs:freshness` if available without setup
+  - required validation sequence before ready-review handoff:
+    - `node scripts/delegation-guard.mjs` or a documented setup-only delegation override
+    - `node scripts/spec-guard.mjs --dry-run`
+    - `npm run build`
+    - `npm run lint`
+    - `npm run test`
+    - `npm run docs:check`
+    - `npm run docs:freshness`
 - Future implementation lane:
   - focused provider worker regressions for post-handoff false failures
   - focused active-turn invariant regressions remain green
