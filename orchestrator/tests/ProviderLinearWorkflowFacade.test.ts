@@ -12699,6 +12699,114 @@ describe('providerLinearWorkflowFacade', () => {
     expect(calls).not.toContain('create');
   });
 
+  it('reuses an asterisk-bulleted oversized canonical owner marker without creating a duplicate', async () => {
+    const canonicalOwnerKey =
+      'baseline_cohort_id_sha256:8fe99c9bccb9aba10ce27a2ac178403a2f26b80a4445c8279f52b01da699ae2d';
+    const canonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
+    const canonicalOwnerDescription = [
+      'Oversized baseline cohort owner.',
+      '## Canonical Owner',
+      `* Canonical owner key: \`${canonicalOwnerKey}\``,
+      `* Canonical owner marker: \`${canonicalOwnerMarker}\``
+    ].join('\n');
+    const calls: string[] = [];
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, unknown>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(
+          buildIssueContextBody({
+            id: 'lin-source-issue',
+            identifier: 'CO-498',
+            url: 'https://linear.app/example/issue/CO-498'
+          })
+        );
+      }
+      if (body.query?.includes('ProviderLinearCanonicalFollowUpOwners')) {
+        calls.push('owner-search');
+        expect(body.variables).toMatchObject({
+          teamId: 'lin-team-1',
+          projectId: 'lin-project-1',
+          marker: canonicalOwnerMarker
+        });
+        return jsonResponse(
+          buildCanonicalOwnerIssuesBody([
+            buildCanonicalOwnerIssue({
+              id: 'lin-owner-issue',
+              identifier: 'CO-434',
+              title: 'CO: docs freshness owner for oversized baseline cohort',
+              description: canonicalOwnerDescription,
+              state: {
+                id: 'state-in-progress',
+                name: 'In Progress',
+                type: 'started'
+              }
+            })
+          ])
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        calls.push('create');
+        throw new Error('asterisk-bulleted canonical owner reuse must not create a duplicate');
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        calls.push('related-relation');
+        expect(body.variables).toMatchObject({
+          input: {
+            type: 'related',
+            issueId: 'lin-source-issue',
+            relatedIssueId: 'lin-owner-issue'
+          }
+        });
+        return jsonResponse({
+          data: {
+            issueRelationCreate: {
+              success: true,
+              issueRelation: {
+                id: 'relation-related',
+                type: 'related'
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-source-issue',
+      title: 'CO: docs freshness owner for oversized baseline cohort',
+      description: 'Keep the oversized baseline cohort on one stamped owner.',
+      intentChecksum: '- Preserve exact oversized baseline canonical owner routing.',
+      nonGoals: '- [ ] Do not create duplicate oversized owner issues.',
+      notDoneIf: '- [ ] A repeated lane creates a new owner.',
+      acceptanceCriteria: '- [ ] Repeated lanes reuse the stamped owner.',
+      canonicalOwnerKey,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'create-follow-up',
+      action: 'reused',
+      follow_up_issue: {
+        id: 'lin-owner-issue',
+        identifier: 'CO-434',
+        description: canonicalOwnerDescription
+      },
+      canonical_owner: {
+        key: canonicalOwnerKey,
+        marker: canonicalOwnerMarker
+      }
+    });
+    expect(calls).toEqual(['owner-search', 'related-relation']);
+  });
+
   it('pages through canonical owner search results before selecting a reusable owner', async () => {
     const canonicalOwnerKey = 'baseline_cohort_id:apr-19-docs-freshness';
     const canonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
