@@ -299,6 +299,46 @@
       }
     },
     {
+      "id": "20260505-linear-7e4ab467-3252-417b-8832-21d6f9b49b18",
+      "title": "CO-495 targeted issue-by-id recovery ignores stale Backlog intake",
+      "relates_to": "tasks/tasks-linear-7e4ab467-3252-417b-8832-21d6f9b49b18.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-05",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-7e4ab467-3252-417b-8832-21d6f9b49b18.md",
+        "docs/TECH_SPEC-linear-7e4ab467-3252-417b-8832-21d6f9b49b18.md",
+        "docs/ACTION_PLAN-linear-7e4ab467-3252-417b-8832-21d6f9b49b18.md",
+        "tasks/specs/linear-7e4ab467-3252-417b-8832-21d6f9b49b18.md",
+        "tasks/tasks-linear-7e4ab467-3252-417b-8832-21d6f9b49b18.md",
+        ".agent/task/linear-7e4ab467-3252-417b-8832-21d6f9b49b18.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-7e4ab467-3252-417b-8832-21d6f9b49b18-docs-packet/cli/2026-05-05T01-14-08-731Z-7db59529/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet",
+          "date": "2026-05-05",
+          "status": "produced",
+          "manifest": ".runs/linear-7e4ab467-3252-417b-8832-21d6f9b49b18-docs-packet/cli/2026-05-05T01-14-08-731Z-7db59529/manifest.json",
+          "source_anchor": "ctx:sha256:43078a1efcabc841a21cfe6b390deb9585c2ace376900098fe62286f60457b9b#chunk:c000001",
+          "canonical_owner_key": "control-host:explicit-recover-targeted-issue-by-id-rate-limit",
+          "summary": "Docs-first packet created for CO-495 from the parent-provided child-lane brief and source anchor. The packet preserves control-host recover --issue-id, targeted issue-by-id, dispatch_source_issue_by_id, tracked-issues discovery constrained, stale Backlog ignored provider-intake claim, provider-intake-state.json, provider-linear-worker, control-host recovery, and Linear budget boundaries. It rejects CO-281 normal Backlog reclaim, CO-493 Rework metadata recovery, broad rate-limit policy removal, Linear budget bypass, manual provider-intake editing, generic provider-intake cleanup, and unrestricted tracked-issues discovery. Parent owns live Linear issue-context, docs-review, source/test implementation, validation, workpad state, PR lifecycle, and final patch integration."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-7e4ab467-3252-417b-8832-21d6f9b49b18.md",
+        "task": "tasks/tasks-linear-7e4ab467-3252-417b-8832-21d6f9b49b18.md",
+        "agent_task": ".agent/task/linear-7e4ab467-3252-417b-8832-21d6f9b49b18.md",
+        "docs": "docs/TECH_SPEC-linear-7e4ab467-3252-417b-8832-21d6f9b49b18.md"
+      }
+    },
+    {
       "id": "20260503-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe",
       "title": "CO-498 repo-wide spec-guard and docs freshness baseline debt",
       "relates_to": "tasks/tasks-linear-46287ca7-10c3-4ad3-b8a5-9b3ba96059fe.md",
