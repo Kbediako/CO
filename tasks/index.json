@@ -19180,6 +19180,79 @@
         "docs": "docs/TECH_SPEC-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
         "action_plan": "docs/ACTION_PLAN-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md"
       }
+    },
+    {
+      "id": "20260505-linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde",
+      "title": "CO-434 oversized docs-freshness canonical owner reuse",
+      "status": "in_progress",
+      "relates_to": "tasks/tasks-linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-05",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=baseline_cohort_id_sha256:8fe99c9bccb9aba10ce27a2ac178403a2f26b80a4445c8279f52b01da699ae2d",
+      "evidence": [
+        "docs/PRD-linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde.md",
+        "docs/TECH_SPEC-linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde.md",
+        "docs/ACTION_PLAN-linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde.md",
+        "tasks/specs/linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde.md",
+        "tasks/tasks-linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde.md",
+        ".agent/task/linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde.md",
+        "orchestrator/src/cli/control/providerLinearWorkflowFacade.ts",
+        "orchestrator/tests/ProviderLinearWorkflowFacade.test.ts",
+        "out/linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde/docs-freshness-maintenance.json"
+      ],
+      "approvals": {
+        "pre_implementation_issue_quality_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-05-05",
+          "status": "approved",
+          "summary": "CO-434 is a narrow duplicate-prevention repair for exact canonical owner marker reuse on an oversized docs-freshness owner key; current maintenance output is clean, so no stale-doc refresh or gate weakening is in scope."
+        },
+        "focused_validation": {
+          "reviewer": "parent provider worker",
+          "date": "2026-05-05",
+          "status": "focused-test-green",
+          "summary": "Focused ProviderLinearWorkflowFacade regression proves an asterisk-bulleted exact marker for the CO-434 oversized key is reused without issueCreate; docs:freshness:maintain reports clean/no candidates."
+        },
+        "implementation_validation": {
+          "reviewer": "parent provider worker",
+          "date": "2026-05-05",
+          "status": "validation-green-before-review",
+          "summary": "Delegation guard, spec guard, build, lint, full test, docs:check, docs:freshness, docs:freshness:maintain, repo:stewardship, diff-budget, and pack:smoke passed. Lint reported only pre-existing DelegationMcpHealth.test.ts warnings."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-05",
+          "status": "clean-success",
+          "telemetry": ".runs/linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde/cli/2026-05-05T20-39-32-939Z-e273dbf9/review/telemetry.json",
+          "summary": "Manifest-backed standalone review found no discrete correctness, security, performance, or maintainability issues; marker matching remains exact while adding asterisk-bullet support."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-05-05",
+          "status": "no-simplification-needed",
+          "artifact": "out/linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde/manual/elegance-review.md",
+          "summary": "No simplification edits made; the diff stays at one local exact matcher expansion, one focused regression, and the required traceability packet."
+        },
+        "pr_review_handoff": {
+          "reviewer": "provider worker plus codex-orchestrator pr ready-review",
+          "date": "2026-05-05",
+          "status": "ready-review-clean",
+          "pr": "https://github.com/Kbediako/CO/pull/777",
+          "head": "9d34d6184e070f18ba7036226007e69725e6de1f",
+          "summary": "PR #777 is attached to CO-434, latest origin/main is merged, required checks are green, CodeRabbit requested-change feedback was fixed and re-reviewed cleanly, unresolved threads are zero, and ready-review drained cleanly at 2026-05-05T22:13:03Z."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde.md",
+        "task": "tasks/tasks-linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde.md",
+        "agent_task": ".agent/task/linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde.md",
+        "prd": "docs/PRD-linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde.md",
+        "docs": "docs/TECH_SPEC-linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde.md",
+        "action_plan": "docs/ACTION_PLAN-linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde.md"
+      }
     }
   ]
 }
