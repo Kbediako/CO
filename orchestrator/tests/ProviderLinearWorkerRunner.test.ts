@@ -2514,6 +2514,41 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
+  it('does not preserve earlier runtime effort when a later runtime record changes model', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        JSON.stringify({
+          type: 'turn_context',
+          payload: {
+            turn_id: 'turn-1',
+            model: 'gpt-5.5',
+            model_reasoning_effort: 'xhigh'
+          },
+          timestamp: '2026-05-05T04:40:01.000Z'
+        }),
+        JSON.stringify({
+          type: 'event_msg',
+          payload: {
+            type: 'task_complete',
+            turn_id: 'turn-1',
+            model: 'gpt-5.4'
+          },
+          timestamp: '2026-05-05T04:40:02.000Z'
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.resolvedModelProvenance).toMatchObject({
+      model: 'gpt-5.4',
+      model_reasoning_effort: null,
+      source: 'runtime_reported',
+      confidence: 'medium',
+      degraded_reason: 'runtime_metadata_partial',
+      runtime_model: 'gpt-5.4',
+      runtime_reasoning_effort: null
+    });
+  });
+
   it('parses turn-nested runtime resolved model metadata from appserver notifications', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       JSON.stringify({

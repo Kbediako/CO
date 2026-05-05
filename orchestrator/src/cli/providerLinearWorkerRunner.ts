@@ -2212,17 +2212,28 @@ function mergeProviderWorkerResolvedModelProvenance(
   const observedRank = rankProviderWorkerResolvedModelSource(normalizedObserved);
   const selected = observedRank >= currentRank ? normalizedObserved : normalizedCurrent;
   const secondary = selected === normalizedObserved ? normalizedCurrent : normalizedObserved;
-  const reviewModel = selected.review_model ?? secondary.review_model ?? null;
+  const canUseSecondaryModelMetadata =
+    selected.source !== 'runtime_reported' ||
+    secondary.source !== 'runtime_reported' ||
+    (selected.runtime_model !== null &&
+      secondary.runtime_model !== null &&
+      selected.runtime_model === secondary.runtime_model);
+  const secondaryModelMetadata = canUseSecondaryModelMetadata ? secondary : null;
+  const reviewModel = selected.review_model ?? secondaryModelMetadata?.review_model ?? null;
   const reasoningEffort =
-    selected.model_reasoning_effort ?? secondary.model_reasoning_effort ?? null;
+    selected.model_reasoning_effort ?? secondaryModelMetadata?.model_reasoning_effort ?? null;
   const runtimeReviewModel =
-    selected.runtime_review_model ?? secondary.runtime_review_model ?? null;
+    selected.runtime_review_model ?? secondaryModelMetadata?.runtime_review_model ?? null;
   const runtimeReasoningEffort =
-    selected.runtime_reasoning_effort ?? secondary.runtime_reasoning_effort ?? null;
-  const backfillsReviewModel = selected.review_model === null && secondary.review_model !== null;
+    selected.runtime_reasoning_effort ?? secondaryModelMetadata?.runtime_reasoning_effort ?? null;
+  const backfillsReviewModel =
+    selected.review_model === null &&
+    secondaryModelMetadata !== null &&
+    secondaryModelMetadata.review_model !== null;
   const backfillsReasoningEffort =
     selected.model_reasoning_effort === null &&
-    secondary.model_reasoning_effort !== null;
+    secondaryModelMetadata !== null &&
+    secondaryModelMetadata.model_reasoning_effort !== null;
   const secondaryReviewModelFromConfig =
     secondary.config_review_model !== null &&
     secondary.review_model === secondary.config_review_model;
