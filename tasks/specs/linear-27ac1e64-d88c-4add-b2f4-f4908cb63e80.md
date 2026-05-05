@@ -8,8 +8,9 @@ related_action_plan: docs/ACTION_PLAN-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e8
 risk: high
 owners:
   - Codex
-last_review: 2026-05-04
+last_review: 2026-05-05
 review_notes:
+  - 2026-05-05: CO-444 rollover review added fallback decision evidence for the completed-lane historical packet/spec freshness hold; metadata last_review now matches the table review date.
   - 2026-05-04: CO-444 parent-supplied live Linear evidence confirmed CO-75/27ac1e64 is `Done`/completed with PR #354; this completed-lane spec is reclassified to inactive terminal `done` under canonical owner key `spec-guard:active-specs:last_review=2026-04-03` so historical implementation evidence remains preserved without staying in active-spec freshness.
 ---
 
