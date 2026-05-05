@@ -848,7 +848,8 @@ function buildProjectionContextFromParts(
   const manifestRawStatus = readStringValue(manifestRecord, 'status') ?? 'unknown';
   const startedAt = readStringValue(manifestRecord, 'started_at', 'startedAt') ?? null;
   const providerProofRecord = (parts.providerLinearWorkerProof ?? null) as Record<string, unknown> | null;
-  const proofFreshnessStageStartedAt = providerClaim?.launch_started_at ?? startedAt;
+  const claimLaunchStartedAt = readValidTimestamp(providerClaim?.launch_started_at ?? null);
+  const proofFreshnessStageStartedAt = claimLaunchStartedAt ?? startedAt;
   const proofIsFreshForStage = isProviderLinearWorkerProofFreshForStage(
     providerProofRecord,
     proofFreshnessStageStartedAt
@@ -3302,6 +3303,14 @@ function readStringValue(record: Record<string, unknown>, ...keys: string[]): st
     }
   }
   return undefined;
+}
+
+function readValidTimestamp(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  return Number.isFinite(Date.parse(trimmed)) ? trimmed : null;
 }
 
 function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {

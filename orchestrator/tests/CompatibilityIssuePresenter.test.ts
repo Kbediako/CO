@@ -9,7 +9,10 @@ import type {
   ControlCompatibilityRuntimeSnapshot,
   ControlCompatibilitySourceContext
 } from '../src/cli/control/observabilityReadModel.js';
-import { resolveProviderWorkerHost } from '../src/cli/control/observabilityReadModel.js';
+import {
+  readProviderLinearWorkerWorkspacePath,
+  resolveProviderWorkerHost
+} from '../src/cli/control/observabilityReadModel.js';
 
 function buildCompatibilitySource(
   overrides: Partial<ControlCompatibilitySourceContext> = {}
@@ -274,6 +277,38 @@ describe('CompatibilityIssuePresenter', () => {
     });
 
     expect(projection.issues[0]?.payload.workspace.path).toBe('/repo/.workspaces/current-co-100');
+  });
+
+  it('falls back to stage started_at when claim launch_started_at is malformed', () => {
+    const proof = {
+      issue_id: 'issue-100',
+      issue_identifier: 'CO-100',
+      attempt_started_at: '2026-04-06T02:00:00.000Z',
+      workspace_path: '/repo/.workspaces/stale-co-100',
+      worker_host: 'worker-host-stale'
+    } as NonNullable<ControlCompatibilitySourceContext['providerLinearWorkerProof']> & {
+      worker_host: string;
+    };
+    const providerDebugSnapshot = {
+      claim: {
+        launch_started_at: 'not-a-date'
+      }
+    } as NonNullable<ControlCompatibilitySourceContext['providerDebugSnapshot']>;
+
+    expect(
+      readProviderLinearWorkerWorkspacePath(
+        proof,
+        '2026-04-06T02:30:00.000Z',
+        providerDebugSnapshot
+      )
+    ).toBeNull();
+    expect(
+      resolveProviderWorkerHost({
+        providerLinearWorkerProof: proof,
+        providerDebugSnapshot,
+        stageStartedAt: '2026-04-06T02:30:00.000Z'
+      })
+    ).toBeNull();
   });
 
   it('prefers claim launch_started_at over older started_at when filtering stale proof worker_host', () => {

@@ -757,7 +757,7 @@ export function readProviderLinearWorkerWorkspacePath(
   stageStartedAt: string | null | undefined,
   providerDebugSnapshot?: ControlProviderDebugSnapshot | null | undefined
 ): string | null {
-  const claimLaunchStartedAt = providerDebugSnapshot?.claim?.launch_started_at ?? null;
+  const claimLaunchStartedAt = readValidTimestamp(providerDebugSnapshot?.claim?.launch_started_at ?? null);
   const proofStageStartedAt =
     claimLaunchStartedAt
     ?? stageStartedAt
@@ -784,7 +784,7 @@ export function resolveProviderWorkerHost(input: {
   issueId?: string | null | undefined;
   stageStartedAt?: string | null | undefined;
 }): string | null {
-  const claimLaunchStartedAt = input.providerDebugSnapshot?.claim?.launch_started_at ?? null;
+  const claimLaunchStartedAt = readValidTimestamp(input.providerDebugSnapshot?.claim?.launch_started_at ?? null);
   const stageStartedAt =
     claimLaunchStartedAt
     ?? input.stageStartedAt
@@ -837,6 +837,14 @@ export function resolveProviderWorkerHost(input: {
     return null;
   }
   return normalizeProviderWorkerHostName(selectedClaim.worker_host);
+}
+
+function readValidTimestamp(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  return Number.isFinite(Date.parse(trimmed)) ? trimmed : null;
 }
 
 function readResolvedWorkerHost(
