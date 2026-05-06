@@ -175,6 +175,134 @@ describe('runCoStatusCliShell', () => {
     ]);
   });
 
+  it('falls back truthfully when a rotated endpoint times out but provider evidence advances', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    const taskId = 'linear-dd2af462-08ae-4ea2-aa53-92000f06952a';
+    const runId = '2026-05-01T01-12-41-376Z-co455';
+    const issueId = 'dd2af462-08ae-4ea2-aa53-92000f06952a';
+    const workspacePath = join(root, '.workspaces', taskId);
+    const manifestPath = await writeProviderRunArtifacts(root, {
+      taskId,
+      runId,
+      issueId,
+      issueIdentifier: 'CO-455',
+      workspacePath,
+      updatedAtMsAgo: 1_000
+    });
+    await writeProviderIntakeState(runDir, {
+      claims: [
+        {
+          issueIdentifier: 'CO-455',
+          issueId,
+          issueTitle: 'co-status attach timeout recurrence',
+          taskId,
+          runId,
+          runManifestPath: manifestPath,
+          reason: 'provider-intake-state.json and worker manifest heartbeats advanced during ui timeout',
+          updatedAtMsAgo: 500
+        }
+      ]
+    });
+
+    const refreshedServer = await startUiServer(buildUiPayload(), { responseDelayMs: 1_000 });
+    servers.add(refreshedServer.instance);
+    const staleServer = await startFailingUiServer(async () => {
+      await writeControlEndpointArtifacts(runDir, refreshedServer.baseUrl);
+    });
+    servers.add(staleServer.instance);
+    await writeControlEndpointArtifacts(runDir, staleServer.baseUrl);
+
+    const payload = (await readCoStatusJsonDataset({
+      flags: {
+        format: 'json',
+        'run-dir': runDir
+      },
+      requestTimeoutMs: 250
+    })) as {
+      degraded_read?: {
+        reason?: unknown;
+        source?: unknown;
+        finding_codes?: unknown[];
+      };
+      selected_issue_identifier?: unknown;
+      selected?: {
+        issue_identifier?: unknown;
+        task_id?: unknown;
+        run_id?: unknown;
+        raw_status?: unknown;
+        status_reason?: unknown;
+      };
+      provider_intake?: {
+        active_claim_count?: unknown;
+        selected_claim?: {
+          issue_identifier?: unknown;
+          freshness?: unknown;
+        };
+      };
+      running?: Array<{
+        issue_identifier?: unknown;
+      }>;
+      issues?: Array<{
+        issue_identifier?: unknown;
+        provider_linear_worker_proof?: {
+          issue_identifier?: unknown;
+          task_id?: unknown;
+          run_id?: unknown;
+          workspace_path?: unknown;
+        } | null;
+      }>;
+    };
+
+    expect(staleServer.requests).toEqual([
+      {
+        authorization: 'Bearer snapshot-token',
+        csrfToken: 'snapshot-token'
+      }
+    ]);
+    expect(refreshedServer.requests).toEqual([
+      {
+        authorization: 'Bearer snapshot-token',
+        csrfToken: 'snapshot-token'
+      }
+    ]);
+    expect(payload.degraded_read).toMatchObject({
+      reason: 'ui_request_timeout',
+      source: 'local_seeded_runtime'
+    });
+    expect(payload.selected_issue_identifier).toBe('CO-455');
+    expect(payload.selected).toMatchObject({
+      issue_identifier: 'CO-455',
+      task_id: taskId,
+      run_id: runId,
+      raw_status: 'in_progress',
+      status_reason: 'provider-intake-state.json and worker manifest heartbeats advanced during ui timeout'
+    });
+    expect(payload.provider_intake).toMatchObject({
+      active_claim_count: 1,
+      selected_claim: {
+        issue_identifier: 'CO-455',
+        freshness: 'fresh'
+      }
+    });
+    expect(payload.degraded_read?.finding_codes ?? []).not.toContain('active_worker_proof_missing');
+    expect(payload.running?.map((entry) => entry.issue_identifier)).toEqual(['CO-455']);
+    expect(payload.issues?.map((entry) => entry.issue_identifier)).toEqual(['CO-455']);
+    expect(payload.issues?.[0]?.provider_linear_worker_proof).toMatchObject({
+      issue_identifier: 'CO-455',
+      task_id: taskId,
+      run_id: runId,
+      workspace_path: workspacePath
+    });
+    const renderedPayload = JSON.stringify(payload);
+    expect(renderedPayload).not.toMatch(/control_endpoint\.json has not rotated/u);
+    expect(renderedPayload).not.toMatch(/stale endpoint after control-host restart/u);
+    expect(renderedPayload).not.toMatch(/stale control-host owner reclamation/u);
+  });
+
   it('does not use degraded local fallback when endpoint re-resolution fails', async () => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
     tempDirs.push(root);
@@ -2081,14 +2209,22 @@ async function writeProviderRunArtifacts(
     issueId: string;
     issueIdentifier: string;
     workspacePath: string;
+    updatedAtMsAgo?: number;
   }
-): Promise<void> {
+): Promise<string> {
   const runDir = join(root, '.runs', input.taskId, 'cli', input.runId);
-  const startedAt = '2026-05-02T04:10:00.000Z';
-  const updatedAt = '2026-05-02T04:12:00.000Z';
+  const startedAt =
+    input.updatedAtMsAgo === undefined
+      ? '2026-05-02T04:10:00.000Z'
+      : new Date(Date.now() - input.updatedAtMsAgo - 120_000).toISOString();
+  const updatedAt =
+    input.updatedAtMsAgo === undefined
+      ? '2026-05-02T04:12:00.000Z'
+      : new Date(Date.now() - input.updatedAtMsAgo).toISOString();
   await mkdir(runDir, { recursive: true });
+  const manifestPath = join(runDir, 'manifest.json');
   await writeFile(
-    join(runDir, 'manifest.json'),
+    manifestPath,
     JSON.stringify({
       run_id: input.runId,
       task_id: input.taskId,
@@ -2113,9 +2249,11 @@ async function writeProviderRunArtifacts(
     workspace_path: input.workspacePath,
     owner_phase: 'turn_running',
     owner_status: 'running',
+    first_heartbeat_at: updatedAt,
     last_event_at: updatedAt,
     updated_at: updatedAt
   });
+  return manifestPath;
 }
 
 async function closeServer(server: http.Server): Promise<void> {
@@ -2300,6 +2438,7 @@ function buildProviderIntakeState(options: {
     issueTitle: string;
     taskId?: string;
     runId: string;
+    runManifestPath?: string;
     claimState?: 'running' | 'stale' | 'completed';
     issueState?: string;
     issueStateType?: string;
@@ -2377,7 +2516,7 @@ function buildProviderIntakeState(options: {
         last_action: 'poll',
         last_webhook_timestamp: null,
         run_id: claim.runId,
-        run_manifest_path: null,
+        run_manifest_path: claim.runManifestPath ?? null,
         launch_source: 'control-host',
         launch_token: null
       };

@@ -49,6 +49,47 @@
       }
     },
     {
+      "id": "20260505-linear-dd2af462-08ae-4ea2-aa53-92000f06952a",
+      "title": "CO-455 attach timeout with healthy lower-authority evidence",
+      "relates_to": "tasks/tasks-linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-05",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md",
+        "docs/TECH_SPEC-linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md",
+        "docs/ACTION_PLAN-linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md",
+        "tasks/specs/linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md",
+        "tasks/tasks-linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md",
+        ".agent/task/linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md",
+        "docs/TASKS.md",
+        "tasks/index.json",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-dd2af462-08ae-4ea2-aa53-92000f06952a-docs-packet/cli/2026-05-05T22-29-01-603Z-53a89036/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet",
+          "date": "2026-05-05",
+          "status": "produced",
+          "manifest": ".runs/linear-dd2af462-08ae-4ea2-aa53-92000f06952a-docs-packet/cli/2026-05-05T22-29-01-603Z-53a89036/manifest.json",
+          "source_anchor": "ctx:sha256:4c0a0f86311a384399aff1273a95e9e72eed60adf0127cd70616e736d4088164#chunk:c000001",
+          "summary": "Created the CO-455 docs-first packet and registry mirrors only. The packet preserves co-status --format json, control-host ui request timeout after 15000ms, provider-intake-state.json, worker manifest heartbeats, stale endpoint rotation, stale control-host owner reclamation, /ui/data.json, truthful degraded-read status, and no fabricated coherent status. It rejects CO-459 stale provider_intake projection, CO-468 accepted no-run recovery, CO-407 direct JSON timeout budget, broad provider admission policy, and manual provider-intake artifact edits."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md",
+        "task": "tasks/tasks-linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md",
+        "agent_task": ".agent/task/linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md",
+        "prd": "docs/PRD-linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md",
+        "docs": "docs/TECH_SPEC-linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md",
+        "action_plan": "docs/ACTION_PLAN-linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md"
+      }
+    },
+    {
       "id": "20260505-linear-62d5261d-b0ee-4988-9f02-43b3e1c85bde",
       "title": "CO-434 oversized docs-freshness canonical owner reuse",
       "status": "in_progress",
