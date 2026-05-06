@@ -304,9 +304,7 @@ export function coerceReviewSemanticVerdict(value: unknown): ReviewSemanticVerdi
 }
 
 export function coerceReviewFindingPriority(value: unknown): ReviewFindingPriority | null {
-  return value === 'P0' || value === 'P1' || value === 'P2' || value === 'P3'
-    ? value
-    : null;
+  return value === 'P0' || value === 'P1' || value === 'P2' || value === 'P3' ? value : null;
 }
 
 async function readReviewOutputLog(outputLogPath: string): Promise<string | null> {
@@ -356,10 +354,7 @@ function isLikelyInspectedCommandOutputMarker(lines: string[], markerIndex: numb
 }
 
 function isTopLevelReviewRuntimeLine(trimmedLine: string): boolean {
-  return (
-    trimmedLine.startsWith('[run-review]') ||
-    /^\d{4}-\d{2}-\d{2}T[^\s]+\s+(?:TRACE|DEBUG|INFO|WARN|ERROR)\s/u.test(trimmedLine)
-  );
+  return trimmedLine.startsWith('[run-review]') || /^\d{4}-\d{2}-\d{2}T[^\s]+\s+(?:TRACE|DEBUG|INFO|WARN|ERROR)\s/u.test(trimmedLine);
 }
 
 function isCommandResultHeaderLine(line: string): boolean {
@@ -516,7 +511,7 @@ function parseStructuredReviewFinding(value: unknown): ParsedReviewFinding | nul
     return null;
   }
   const title = normalizeOptionalString(value.title);
-  const titleFinding = title ? parseReviewFindingTitle(title) : null;
+  const titleFinding = title ? parseReviewFindingLine(title) : null;
   const priority = titleFinding?.priority ?? parseStructuredReviewFindingPriority(value.priority);
   if (!priority) {
     return null;
@@ -529,19 +524,6 @@ function parseStructuredReviewFinding(value: unknown): ParsedReviewFinding | nul
       normalizeOptionalString(value.body) ??
       `structured ${priority} finding`
   };
-}
-
-function parseReviewFindingTitle(title: string): ParsedReviewFinding | null {
-  const match = title.match(/^\s*\[(P[0-3])\]\s+(.+?)\s*$/u);
-  if (!match) {
-    return null;
-  }
-  const priority = coerceReviewFindingPriority(match[1]);
-  const text = match[2]?.trim();
-  if (!priority || !text) {
-    return null;
-  }
-  return { priority, text };
 }
 
 function parseStructuredReviewFindingPriority(value: unknown): ReviewFindingPriority | null {
@@ -594,21 +576,10 @@ function compareReviewFindingPriority(
   left: ReviewFindingPriority,
   right: ReviewFindingPriority
 ): number {
-  return reviewFindingPriorityRank(left) - reviewFindingPriorityRank(right);
+  return reviewFindingPriorityRanks[left] - reviewFindingPriorityRanks[right];
 }
 
-function reviewFindingPriorityRank(priority: ReviewFindingPriority): number {
-  switch (priority) {
-    case 'P0':
-      return 0;
-    case 'P1':
-      return 1;
-    case 'P2':
-      return 2;
-    case 'P3':
-      return 3;
-  }
-}
+const reviewFindingPriorityRanks: Record<ReviewFindingPriority, number> = { P0: 0, P1: 1, P2: 2, P3: 3 };
 
 function hasCleanReviewVerdict(outputText: string): boolean {
   return outputText
