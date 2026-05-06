@@ -44,6 +44,7 @@
           "date": "2026-05-06",
           "status": "implemented",
           "validation": "npm run test:core -- orchestrator/tests/ProviderLinearWorkerRunner.test.ts passed 325 tests.",
+          "manifest": ".runs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5/cli/2026-05-06T19-35-23-588Z-d76dc5a5/manifest.json",
           "delegation_note": "The tests-metadata same-issue subagent output had no repo-local .runs child manifest; parent evidence is the accepted prompt-regression diff plus focused suite pass.",
           "summary": "Updated provider-worker prompt guidance, bundled Linear skill guidance, and standalone-review guide wording so retained legacy succeeded payload handling requires owner, trigger, introduced date, review date, maximum lifetime or expiry, removal condition, reason, and validation evidence. Accepted tests-metadata prompt regressions from the parent-applied diff; focused suite passed 325 tests."
         }
