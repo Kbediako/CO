@@ -1,10 +1,10 @@
 ---
-id: 20260506-linear-dd2af462-08ae-4ea2-aa53-92000f06952a
+id: 20260505-linear-dd2af462-08ae-4ea2-aa53-92000f06952a
 title: "CO-455 attach timeout with healthy lower-authority evidence"
 status: in_progress
 owner: Codex
-created: 2026-05-06
-last_review: 2026-05-06
+created: 2026-05-05
+last_review: 2026-05-05
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md
@@ -13,7 +13,7 @@ related_action_plan: docs/ACTION_PLAN-linear-dd2af462-08ae-4ea2-aa53-92000f06952
 related_tasks:
   - tasks/tasks-linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md
 review_notes:
-  - 2026-05-06: Bounded child lane created the docs-first packet and registry mirrors.
+  - 2026-05-05: Bounded child lane created the docs-first packet and registry mirrors.
 ---
 
 # TECH_SPEC - CO-455 attach timeout with healthy lower-authority evidence
@@ -96,7 +96,7 @@ review_notes:
   - parent fixes the issue through manual provider-intake artifact edits
   - parent widens into CO-459, CO-468, CO-407, or broad provider admission policy
 - Pre-implementation issue-quality review evidence:
-  - 2026-05-06: issue is specific enough for parent implementation. The packet preserves exact protected terms, defines current/reference/target truth for each status surface, and rejects adjacent issue families, so it is not plausibly narrower than the user's request.
+  - 2026-05-05: issue is specific enough for parent implementation. The packet preserves exact protected terms, defines current/reference/target truth for each status surface, and rejects adjacent issue families, so it is not plausibly narrower than the user's request.
 - Safeguard ownership split:
   - child lane owns docs and declared registry mirrors
   - parent owns implementation, docs-review, lifecycle state, and PR handoff
@@ -116,9 +116,9 @@ review_notes:
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Attach `/ui/data.json` read | `control-host ui request timeout after 15000ms` can be treated as stale endpoint or stale owner truth even when lower authority is healthy. | remove fallback | CO-455 | Attach UI read times out while `provider-intake-state.json` and worker manifest heartbeats remain healthy. | observed 2026-05-05 | 2026-05-06 | 0 days | Parent emits truthful degraded-read status and blocks timeout-only stale endpoint rotation or stale control-host owner reclamation. | Focused attach-timeout regression with healthy lower-authority evidence. |
-| Lower-authority health evidence | `provider-intake-state.json` and worker manifest heartbeats support degraded-read diagnosis. | justify retaining fallback | CO-455 | `/ui/data.json` is unavailable but lower-authority evidence is fresh. | existing control-host observability contract | 2026-05-06 | Non-expiring diagnostic support | Replace only if a stronger unified health-read authority preserves degraded-read truth and source provenance. | Tests prove lower authority informs diagnosis without fabricated coherent status. |
-| Stale endpoint rotation / stale control-host owner reclamation | Rotation or reclamation remains available for real stale/dead authority evidence. | justify retaining fallback | Control-host status owner | Endpoint or owner evidence is stale/dead, not merely slow. | existing control-host recovery contract | 2026-05-06 | Non-expiring recovery contract | Replace only with a better stale/dead endpoint and owner recovery mechanism. | Tests prove timeout-only healthy-lower-authority cases do not trigger these paths. |
+| Attach `/ui/data.json` read | `control-host ui request timeout after 15000ms` can be treated as stale endpoint or stale owner truth even when lower authority is healthy. | remove fallback | CO-455 | Attach UI read times out while `provider-intake-state.json` and worker manifest heartbeats remain healthy. | observed 2026-05-05 | 2026-05-05 | 0 days | Parent emits truthful degraded-read status and blocks timeout-only stale endpoint rotation or stale control-host owner reclamation. | Focused attach-timeout regression with healthy lower-authority evidence. |
+| Lower-authority health evidence | `provider-intake-state.json` and worker manifest heartbeats support degraded-read diagnosis. | justify retaining fallback | CO-455 | `/ui/data.json` is unavailable but lower-authority evidence is fresh. | existing control-host observability contract | 2026-05-05 | Non-expiring diagnostic support | Replace only if a stronger unified health-read authority preserves degraded-read truth and source provenance. | Tests prove lower authority informs diagnosis without fabricated coherent status. |
+| Stale endpoint rotation / stale control-host owner reclamation | Rotation or reclamation remains available for real stale/dead authority evidence. | justify retaining fallback | Control-host status owner | Endpoint or owner evidence is stale/dead, not merely slow. | existing control-host recovery contract | 2026-05-05 | Non-expiring recovery contract | Replace only with a better stale/dead endpoint and owner recovery mechanism. | Tests prove timeout-only healthy-lower-authority cases do not trigger these paths. |
 
 - Durable retention evidence: `provider-intake-state.json` and worker manifest heartbeats remain retained lower-authority evidence, and stale endpoint/owner recovery remains retained for actual stale/dead evidence.
 - Large-refactor check: keep the implementation narrow if attach-read timeout classification can share existing status/read-model helpers. Escalate only if timeout classification, lower-authority evidence, and stale endpoint/owner recovery are split across incompatible authority paths.
@@ -153,4 +153,4 @@ review_notes:
 
 ## Approvals
 - Reviewer: CO-455 provider worker
-- Date: 2026-05-06
+- Date: 2026-05-05

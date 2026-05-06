@@ -1,14 +1,14 @@
 {
   "items": [
     {
-      "id": "20260506-linear-dd2af462-08ae-4ea2-aa53-92000f06952a",
+      "id": "20260505-linear-dd2af462-08ae-4ea2-aa53-92000f06952a",
       "title": "CO-455 attach timeout with healthy lower-authority evidence",
       "relates_to": "tasks/tasks-linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md",
       "risk": "high",
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-06",
+      "last_review": "2026-05-05",
       "status": "in_progress",
       "evidence": [
         "docs/PRD-linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md",
@@ -25,7 +25,7 @@
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue child lane docs-packet",
-          "date": "2026-05-06",
+          "date": "2026-05-05",
           "status": "produced",
           "manifest": ".runs/linear-dd2af462-08ae-4ea2-aa53-92000f06952a-docs-packet/cli/2026-05-05T22-29-01-603Z-53a89036/manifest.json",
           "source_anchor": "ctx:sha256:4c0a0f86311a384399aff1273a95e9e72eed60adf0127cd70616e736d4088164#chunk:c000001",

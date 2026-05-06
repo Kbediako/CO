@@ -25,7 +25,7 @@
   - parent fixes this by editing `provider-intake-state.json` or other provider-intake artifacts manually
   - parent widens into CO-459, CO-468, CO-407, broad provider admission policy, or manual provider-intake artifact edits
 - Pre-implementation issue-quality review:
-  - 2026-05-06: the lane is correctly shaped as attach-read timeout classification with healthy lower-authority evidence. It is not narrower than the user request because it carries the protected terms, explicit non-goals, and current/reference/target parity across status, `/ui/data.json`, lower-authority evidence, stale endpoint rotation, and stale control-host owner reclamation surfaces.
+  - 2026-05-05: the lane is correctly shaped as attach-read timeout classification with healthy lower-authority evidence. It is not narrower than the user request because it carries the protected terms, explicit non-goals, and current/reference/target parity across status, `/ui/data.json`, lower-authority evidence, stale endpoint rotation, and stale control-host owner reclamation surfaces.
 - Fallback / refactor decision: this task touches timeout and stale recovery behavior. Decision is `remove fallback` for treating `control-host ui request timeout after 15000ms` as stale endpoint or stale owner truth when lower authority is healthy; `justify retaining fallback` for `provider-intake-state.json` and worker manifest heartbeats as lower-authority diagnostic support; and `justify retaining fallback` for stale endpoint rotation and stale control-host owner reclamation only when stale/dead evidence exists.
 
 ## Milestones & Sequencing
