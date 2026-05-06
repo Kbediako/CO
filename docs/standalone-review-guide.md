@@ -94,11 +94,14 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
 - In the default bounded `diff` path, repeated post-startup-anchor relevant rereads now terminate as a successful bounded completion instead of drifting toward a late failure; the success-side `termination_boundary` is preserved in `review/telemetry.json`.
 - Operator interpretation for `review/telemetry.json`:
   - `review_outcome: clean-success` means review completed successfully without any preserved termination boundary.
-  - `review_outcome: bounded-success` means review completed successfully with a preserved bounded stop. Treat it as successful review completion, not as a blocker or generic quiet-tail failure.
+  - `review_outcome: bounded-success` means review completed successfully with a preserved bounded stop. Treat it as successful wrapper completion, not as a blocker or generic quiet-tail failure.
   - `review_outcome: failed-boundary` means the review wrapper failed on an explicit machine-checkable boundary family (for example `command-intent`, `startup-loop`, `timeout`, or `stall`).
   - `review_outcome: failed-other` means the review command failed without a classified termination boundary. Treat it as a failed review outcome that still needs inspection, but not as proof that the wrapper itself hit a first-class boundary failure.
   - Older telemetry may not have `review_outcome`; when absent, interpret succeeded + null `termination_boundary` as clean success, succeeded + non-null `termination_boundary` as bounded success, failed + non-null `termination_boundary` as failed boundary, and failed + null `termination_boundary` as failed-other.
-- Provider-worker workpads should copy the review outcome and command-intent counts from `review/telemetry.json` (`summary.commandIntentViolationCount`, `summary.commandIntentViolationKinds`, and `termination_boundary.provenance`) so reviewer-command fallbacks stay separate from product findings or unrelated validation failures.
+  - `review_verdict: findings` means parsed actionable findings are present. Do not treat `review_outcome: clean-success` or `review_outcome: bounded-success` as handoff-clean until those findings are resolved or explicitly pushed back.
+  - `review_verdict: clean` means the semantic review verdict is clean.
+  - `review_verdict: unknown` or missing `review_verdict` is a review-handoff blocker unless an explicit break-glass waiver records owner, expiry, reason, and evidence.
+- Provider-worker workpads should copy the review outcome, semantic verdict fields (`review_verdict`, `highest_finding_priority`, `finding_count`), and command-intent counts from `review/telemetry.json` (`summary.commandIntentViolationCount`, `summary.commandIntentViolationKinds`, and `termination_boundary.provenance`) so reviewer-command fallbacks stay separate from product findings or unrelated validation failures.
 - Pipeline-owned review gates can require terminal review-evidence consistency by setting `CODEX_REVIEW_ENFORCE_EVIDENCE_CONSISTENCY=1`; an explicit waiver can be recorded with `CODEX_REVIEW_EVIDENCE_WAIVER_REASON="<reason>"`.
 - Optional timeout/stall/startup-loop guards:
   - `CODEX_REVIEW_TIMEOUT_SECONDS=<seconds>` (`0` disables when set); when this guard fires, runtime telemetry records a first-class `timeout` termination boundary
@@ -117,7 +120,7 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
 - `codex-orchestrator review` writes artifacts under `<runDir>/review/`, where `<runDir>` tracks the resolved manifest lineage: it uses `CODEX_ORCHESTRATOR_RUN_DIR` only when that directory contains the resolved manifest, otherwise it falls back to `dirname(manifestPath)`.
 - Prompt artifact: `<runDir>/review/prompt.txt` (always).
 - Review transcript: `<runDir>/review/output.log` (when `codex review` runs, for example with `FORCE_CODEX_REVIEW=1`).
-- Runtime telemetry artifact: `<runDir>/review/telemetry.json` (best-effort summary of observed command activity, startup events, output tail, an explicit `review_outcome` disposition, plus a first-class `termination_boundary` record when the current timeout, stall, bounded command-intent, shell-probe, active-closeout-bundle-reread, startup-anchor, startup-loop, meta-surface expansion, verdict-stability, or relevant-reinspection dwell guard fires).
+- Runtime telemetry artifact: `<runDir>/review/telemetry.json` (best-effort summary of observed command activity, startup events, output tail, explicit `review_outcome` and semantic `review_verdict` fields, plus a first-class `termination_boundary` record when the current timeout, stall, bounded command-intent, shell-probe, active-closeout-bundle-reread, startup-anchor, startup-loop, meta-surface expansion, verdict-stability, or relevant-reinspection dwell guard fires).
 
 ## Expected outputs
 - `codex review`: prioritized findings; no working tree edits.

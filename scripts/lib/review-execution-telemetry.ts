@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import type {
@@ -12,6 +12,9 @@ export interface ReviewTelemetryPayload {
   generated_at: string;
   status: 'succeeded' | 'failed';
   review_outcome: ReviewOutcomeDisposition;
+  review_verdict: ReviewSemanticVerdict;
+  highest_finding_priority: ReviewFindingPriority | null;
+  finding_count: number;
   error: string | null;
   output_log_path: string;
   launch_context: ReviewLaunchContext | null;
@@ -24,6 +27,15 @@ export type ReviewOutcomeDisposition =
   | 'bounded-success'
   | 'failed-boundary'
   | 'failed-other';
+
+export type ReviewSemanticVerdict = 'findings' | 'clean' | 'unknown';
+export type ReviewFindingPriority = 'P0' | 'P1' | 'P2' | 'P3';
+
+export interface ReviewSemanticVerdictSummary {
+  review_verdict: ReviewSemanticVerdict;
+  highest_finding_priority: ReviewFindingPriority | null;
+  finding_count: number;
+}
 
 export interface ReviewLaunchContext {
   scope_flag_mode: 'commit' | 'base' | 'uncommitted' | null;
@@ -48,6 +60,7 @@ export interface BuildReviewTelemetryPayloadOptions {
   includeRawTelemetry: boolean;
   telemetryDebugEnvKey: string;
   launchContext?: ReviewLaunchContext | null;
+  reviewOutputText?: string | null;
   summary: ReviewOutputSummary;
 }
 
@@ -66,6 +79,7 @@ export interface ReviewTelemetryPayloadBuilder {
     includeRawTelemetry: boolean;
     telemetryDebugEnvKey: string;
     launchContext?: ReviewLaunchContext | null;
+    reviewOutputText?: string | null;
   }): ReviewTelemetryPayload;
 }
 
@@ -129,10 +143,14 @@ export function formatReviewOutcomeSummary(payload: {
   status: 'succeeded' | 'failed';
   review_outcome?: ReviewOutcomeDisposition | null;
   termination_boundary: ReviewTerminationBoundaryRecord | null;
+  review_verdict?: ReviewSemanticVerdict | null;
+  highest_finding_priority?: ReviewFindingPriority | null;
+  finding_count?: number | null;
 }): string {
   const disposition = resolveReviewOutcomeDisposition(payload);
   const boundaryKind = payload.termination_boundary?.kind ?? null;
-  switch (disposition) {
+  const wrapperSummary = (() => {
+    switch (disposition) {
     case 'clean-success':
       return 'clean success';
     case 'bounded-success':
@@ -145,7 +163,10 @@ export function formatReviewOutcomeSummary(payload: {
         : 'review-wrapper failure via explicit termination boundary';
     case 'failed-other':
       return 'review command failed without termination-boundary classification; not an explicit wrapper-boundary failure';
-  }
+    }
+  })();
+  const semanticSummary = formatReviewSemanticVerdictSummary(payload);
+  return semanticSummary ? `${wrapperSummary}; ${semanticSummary}` : wrapperSummary;
 }
 
 export function buildReviewTelemetryPayload(
@@ -156,6 +177,7 @@ export function buildReviewTelemetryPayload(
     options.includeRawTelemetry,
     options.telemetryDebugEnvKey
   );
+  const semanticVerdict = analyzeReviewSemanticVerdict(options.reviewOutputText ?? '');
   return {
     version: 1,
     generated_at: new Date().toISOString(),
@@ -164,6 +186,9 @@ export function buildReviewTelemetryPayload(
       status: options.status,
       terminationBoundary
     }),
+    review_verdict: semanticVerdict.review_verdict,
+    highest_finding_priority: semanticVerdict.highest_finding_priority,
+    finding_count: semanticVerdict.finding_count,
     error: sanitizeTelemetryErrorForPersistence(
       options.error ?? null,
       options.includeRawTelemetry,
@@ -198,7 +223,8 @@ export async function writeReviewExecutionTelemetry(
       repoRoot: options.repoRoot,
       includeRawTelemetry: options.includeRawTelemetry,
       telemetryDebugEnvKey: options.telemetryDebugEnvKey,
-      launchContext: options.launchContext ?? null
+      launchContext: options.launchContext ?? null,
+      reviewOutputText: await readReviewOutputLog(options.outputLogPath)
     };
     if (Object.prototype.hasOwnProperty.call(options, 'terminationBoundary')) {
       payloadOptions.terminationBoundary = options.terminationBoundary;
@@ -219,6 +245,458 @@ export async function writeReviewExecutionTelemetry(
     logPersistFailure(telemetryMessage);
     return null;
   }
+}
+
+export function analyzeReviewSemanticVerdict(outputText: string): ReviewSemanticVerdictSummary {
+  const verdictText = extractFinalReviewVerdictText(outputText);
+  const structuredVerdict = analyzeStructuredReviewVerdict(verdictText);
+  if (structuredVerdict) {
+    return structuredVerdict;
+  }
+
+  const findings: ParsedReviewFinding[] = [];
+  for (const line of verdictText.split(/\r?\n/u)) {
+    const finding = parseReviewFindingLine(line);
+    if (finding) {
+      findings.push(finding);
+    }
+  }
+
+  const findingsSummary = summarizeReviewFindings(findings);
+  if (findingsSummary) {
+    return findingsSummary;
+  }
+
+  return {
+    review_verdict: hasCleanReviewVerdict(verdictText) ? 'clean' : 'unknown',
+    highest_finding_priority: null,
+    finding_count: 0
+  };
+}
+
+export function formatReviewSemanticVerdictSummary(payload: {
+  review_verdict?: ReviewSemanticVerdict | null;
+  highest_finding_priority?: ReviewFindingPriority | null;
+  finding_count?: number | null;
+}): string | null {
+  if (payload.review_verdict === 'findings') {
+    const findingCount =
+      typeof payload.finding_count === 'number' && Number.isFinite(payload.finding_count)
+        ? Math.max(0, Math.trunc(payload.finding_count))
+        : 0;
+    const findingLabel = findingCount === 1 ? 'finding' : 'findings';
+    const priority = payload.highest_finding_priority
+      ? `, highest ${payload.highest_finding_priority}`
+      : '';
+    return `semantic review verdict: findings (${findingCount} ${findingLabel}${priority})`;
+  }
+  if (payload.review_verdict === 'clean') {
+    return 'semantic review verdict: clean';
+  }
+  if (payload.review_verdict === 'unknown') {
+    return 'semantic review verdict: unknown';
+  }
+  return null;
+}
+
+export function coerceReviewSemanticVerdict(value: unknown): ReviewSemanticVerdict | null {
+  return value === 'findings' || value === 'clean' || value === 'unknown' ? value : null;
+}
+
+export function coerceReviewFindingPriority(value: unknown): ReviewFindingPriority | null {
+  return value === 'P0' || value === 'P1' || value === 'P2' || value === 'P3' ? value : null;
+}
+
+async function readReviewOutputLog(outputLogPath: string): Promise<string | null> {
+  try {
+    return await readFile(outputLogPath, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+interface ParsedReviewFinding {
+  priority: ReviewFindingPriority | null;
+  text: string;
+}
+
+function extractFinalReviewVerdictText(outputText: string): string {
+  const lines = outputText.split(/\r?\n/u);
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (lines[index]?.trim() === 'codex') {
+      if (isLikelyInspectedCommandOutputMarker(lines, index)) {
+        continue;
+      }
+      return lines.slice(index + 1).join('\n').trim();
+    }
+  }
+  return looksLikeCodexTranscript(lines) ? '' : outputText;
+}
+
+function isLikelyInspectedCommandOutputMarker(lines: string[], markerIndex: number): boolean {
+  let sawNonRuntimeCommandOutput = false;
+  let sawEarlierCodexMarker = false;
+  let sawNestedTranscriptMarker = false;
+  for (let index = markerIndex - 1; index >= 0; index -= 1) {
+    const trimmed = lines[index]?.trim() ?? '';
+    if (!trimmed) {
+      continue;
+    }
+    if (trimmed === 'codex') {
+      sawNonRuntimeCommandOutput = true;
+      sawEarlierCodexMarker = true;
+      continue;
+    }
+    if (isCodexTranscriptMarkerLine(trimmed)) {
+      sawNonRuntimeCommandOutput = true;
+      sawNestedTranscriptMarker = true;
+      continue;
+    }
+    if (isTopLevelReviewRuntimeLine(trimmed)) {
+      continue;
+    }
+    if (isCommandResultHeaderLine(lines[index] ?? '')) {
+      const commandLine =
+        extractInlineCommandLineFromResultHeader(lines[index] ?? '') ??
+        findCommandLineBeforeResultHeader(lines, index);
+      if (isReviewTranscriptInspectionCommandLine(commandLine)) {
+        return !sawNonRuntimeCommandOutput || sawEarlierCodexMarker || sawNestedTranscriptMarker;
+      }
+    }
+    sawNonRuntimeCommandOutput = true;
+  }
+  return false;
+}
+
+function isTopLevelReviewRuntimeLine(trimmedLine: string): boolean {
+  return (
+    trimmedLine.startsWith('[run-review]') ||
+    /^\d{4}-\d{2}-\d{2}T[^\s]+\s+(?:TRACE|DEBUG|INFO|WARN|ERROR)\s/u.test(trimmedLine) ||
+    isCodexRolloutItemCleanupNoiseLine(trimmedLine)
+  );
+}
+
+function isCodexRolloutItemCleanupNoiseLine(trimmedLine: string): boolean {
+  return /^(?:(?:trace|debug|info|warn|error)\s+|\d{4}-\d{2}-\d{2}T[^\s]+\s+(?:trace|debug|info|warn|error)\s+)?codex_core::session:\s+failed to record rollout items:\s+thread\b.*\bnot found\b/iu.test(
+    trimmedLine
+  );
+}
+
+function isCodexTranscriptMarkerLine(trimmedLine: string): boolean {
+  return (
+    trimmedLine === 'user' ||
+    trimmedLine === 'thinking' ||
+    trimmedLine === 'exec' ||
+    trimmedLine === '--------' ||
+    /^OpenAI Codex v/u.test(trimmedLine) ||
+    /^(workdir|model|provider|approval|sandbox|reasoning effort|session id):\s/u.test(trimmedLine)
+  );
+}
+
+function isCommandResultHeaderLine(line: string): boolean {
+  return STANDALONE_COMMAND_RESULT_HEADER_PATTERN.test(line) || extractInlineCommandLineFromResultHeader(line) !== null;
+}
+
+const STANDALONE_COMMAND_RESULT_HEADER_PATTERN =
+  /^\s+(?:succeeded|exited \d+|failed) in \d+(?:\.\d+)?(?:ms|s):\s*$/u;
+
+const COMMAND_RESULT_TRAILER_PATTERN =
+  /\s(?:succeeded|exited \d+|failed) in \d+(?:\.\d+)?(?:ms|s):\s*$/u;
+
+function extractInlineCommandLineFromResultHeader(line: string): string | null {
+  const trailerMatch = line.match(COMMAND_RESULT_TRAILER_PATTERN);
+  if (!trailerMatch || typeof trailerMatch.index !== 'number') {
+    return null;
+  }
+  const beforeStatus = line.slice(0, trailerMatch.index).trimEnd();
+  const cwdDelimiterIndex = beforeStatus.lastIndexOf(' in ');
+  if (cwdDelimiterIndex <= 0) {
+    return null;
+  }
+  const commandLine = beforeStatus.slice(0, cwdDelimiterIndex).trim();
+  return commandLine && commandLine.length > 0 ? commandLine : null;
+}
+
+function findCommandLineBeforeResultHeader(lines: string[], headerIndex: number): string | null {
+  for (let index = headerIndex - 1; index >= 0; index -= 1) {
+    const trimmed = lines[index]?.trim() ?? '';
+    if (!trimmed) {
+      continue;
+    }
+    return trimmed === 'exec' ? null : trimmed;
+  }
+  return null;
+}
+
+function isReviewTranscriptInspectionCommandLine(commandLine: string | null): boolean {
+  if (!commandLine) {
+    return false;
+  }
+  const normalized = commandLine.toLowerCase();
+  return (
+    /(?:^|[/\s"'=])review\/output(?:-[^/\s"']*)?\.log(?:$|[\s"'])/u.test(normalized) ||
+    /\b(?:cat|sed|tail|head|less|rg|grep|awk|nl)\b[\s\S]*(?:^|[/\s"'=])(?:nested-review|codex[^/\s"']*|[^/\s"']*transcript[^/\s"']*)\.log(?:$|[\s"'])/u.test(
+      normalized
+    )
+  );
+}
+
+function looksLikeCodexTranscript(lines: string[]): boolean {
+  return lines.some((line) => {
+    const trimmed = line.trim();
+    return trimmed === 'codex' || isCodexTranscriptMarkerLine(trimmed);
+  });
+}
+
+function analyzeStructuredReviewVerdict(verdictText: string): ReviewSemanticVerdictSummary | null {
+  const objectText = extractLeadingJsonObjectText(verdictText);
+  if (!objectText) {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(objectText);
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed)) return null;
+  const structuredFindings = Array.isArray(parsed.findings) ? parsed.findings : null;
+  if (structuredFindings && structuredFindings.length > 0) {
+    const findings = structuredFindings.map(parseStructuredReviewFinding);
+    return (
+      summarizeReviewFindings(
+        findings.map((finding, index) =>
+          finding ?? {
+            priority: null,
+            text: `structured finding ${index + 1}`
+          }
+        )
+      ) ?? {
+        review_verdict: 'findings',
+        highest_finding_priority: null,
+        finding_count: structuredFindings.length
+      }
+    );
+  }
+
+  const summarizedVerdict = coerceReviewSemanticVerdict(parsed.review_verdict);
+  if (summarizedVerdict) {
+    const findingCount =
+      typeof parsed.finding_count === 'number' && Number.isFinite(parsed.finding_count)
+        ? Math.max(0, Math.trunc(parsed.finding_count))
+        : 0;
+    return {
+      review_verdict: summarizedVerdict,
+      highest_finding_priority:
+        summarizedVerdict === 'findings' ? coerceReviewFindingPriority(parsed.highest_finding_priority) : null,
+      finding_count: summarizedVerdict === 'findings' ? findingCount : 0
+    };
+  }
+  if (structuredFindings && structuredFindings.length === 0 && hasStructuredCleanReviewVerdict(parsed)) {
+    return {
+      review_verdict: 'clean',
+      highest_finding_priority: null,
+      finding_count: 0
+    };
+  }
+  return null;
+}
+
+function extractLeadingJsonObjectText(verdictText: string): string | null {
+  let trimmed = stripLeadingReviewRuntimeNoise(verdictText).trimStart();
+  if (trimmed.startsWith('```')) {
+    const firstNewline = trimmed.indexOf('\n');
+    if (firstNewline === -1) {
+      return null;
+    }
+    const fenceHeader = trimmed.slice(0, firstNewline).trim().toLowerCase();
+    if (fenceHeader !== '```' && fenceHeader !== '```json') {
+      return null;
+    }
+    trimmed = trimmed.slice(firstNewline + 1).trimStart();
+  }
+
+  if (!trimmed.startsWith('{')) {
+    return null;
+  }
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = 0; index < trimmed.length; index += 1) {
+    const char = trimmed[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+    if (char === '{') {
+      depth += 1;
+      continue;
+    }
+    if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return trimmed.slice(0, index + 1);
+      }
+    }
+  }
+  return null;
+}
+
+function stripLeadingReviewRuntimeNoise(value: string): string {
+  const lines = value.split(/\r?\n/u);
+  let index = 0;
+  for (; index < lines.length; index += 1) {
+    const trimmed = lines[index]?.trim() ?? '';
+    if (!trimmed || isTopLevelReviewRuntimeLine(trimmed)) {
+      continue;
+    }
+    break;
+  }
+  return lines.slice(index).join('\n');
+}
+
+function parseReviewFindingLine(
+  line: string
+): ParsedReviewFinding | null {
+  const match = line.match(/^\s*(?:[-*]\s*)?(?:\d+[.)]\s*)?(?:>\s*)?\[(P[0-3])\]\s+(.+?)\s*$/u);
+  if (!match) {
+    return null;
+  }
+  const priority = coerceReviewFindingPriority(match[1]);
+  const text = match[2]?.trim();
+  if (!priority || !text) {
+    return null;
+  }
+  return { priority, text };
+}
+
+function parseStructuredReviewFinding(value: unknown): ParsedReviewFinding | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const title = normalizeOptionalString(value.title);
+  const titleFinding = title ? parseReviewFindingLine(title) : null;
+  const priority = titleFinding?.priority ?? parseStructuredReviewFindingPriority(value.priority);
+  if (!priority) {
+    return null;
+  }
+  return {
+    priority,
+    text:
+      titleFinding?.text ??
+      title ??
+      normalizeOptionalString(value.body) ??
+      `structured ${priority} finding`
+  };
+}
+
+function hasStructuredCleanReviewVerdict(value: Record<string, unknown>): boolean {
+  return normalizeOptionalString(value.overall_correctness)?.toLowerCase() === 'patch is correct';
+}
+
+function parseStructuredReviewFindingPriority(value: unknown): ReviewFindingPriority | null {
+  if (typeof value === 'number' && Number.isInteger(value)) {
+    return coerceReviewFindingPriority(`P${value}`);
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim().toUpperCase();
+    return coerceReviewFindingPriority(trimmed.startsWith('P') ? trimmed : `P${trimmed}`);
+  }
+  return null;
+}
+
+function summarizeReviewFindings(
+  findings: ParsedReviewFinding[]
+): ReviewSemanticVerdictSummary | null {
+  const findingKeys = new Map<string, ReviewFindingPriority | null>();
+  for (const finding of findings) {
+    const priorityKey = finding.priority ?? 'unknown';
+    const key = `${priorityKey}:${normalizeReviewFindingText(finding.text)}`;
+    if (!findingKeys.has(key)) {
+      findingKeys.set(key, finding.priority);
+    }
+  }
+
+  if (findingKeys.size === 0) {
+    return null;
+  }
+
+  const priorities = [...findingKeys.values()].filter(
+    (priority): priority is ReviewFindingPriority => priority !== null
+  );
+  return {
+    review_verdict: 'findings',
+    highest_finding_priority: priorities.sort(compareReviewFindingPriority)[0] ?? null,
+    finding_count: findingKeys.size
+  };
+}
+
+function normalizeReviewFindingText(value: string): string {
+  return value
+    .replace(/`([^`]+)`/gu, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/gu, '$1')
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function compareReviewFindingPriority(
+  left: ReviewFindingPriority,
+  right: ReviewFindingPriority
+): number {
+  return reviewFindingPriorityRanks[left] - reviewFindingPriorityRanks[right];
+}
+
+const reviewFindingPriorityRanks: Record<ReviewFindingPriority, number> = { P0: 0, P1: 1, P2: 2, P3: 3 };
+
+const CLEAN_REVIEW_VERDICT_PATTERNS = [
+  /^\s*(?:[-*]\s*)?(?:(?:(?:I|[A-Z][^.\n]*?)\s+)?(?:found|find)\s+no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions)(?:\s+(?:in|for|from|against|with)\b.*)?[.!]?|no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions)(?:\s+(?:found|identified|were found))?(?:\s+(?:in|for|from|against|with)\b.*)?[.!]?|no\s+findings\.?)\s*$/iu,
+  /^\s*(?:[-*]\s*)?(?:I\s+)?did\s+not\s+(?:find|identify|detect|see)\s+(?:any\s+|a\s+)?(?:(?:concrete|discrete|actionable|correctness)\s+)*(?:issues?|findings?|regressions?)(?:\s+(?:in|for|from|against|with)\b.*)?[.!]?\s*$/iu
+] as const;
+
+const CLEAN_REVIEW_VERDICT_SENTENCE_BOUNDARY =
+  /[.!?]\s+(?=(?:[-*]\s*)?(?:I\b|No\b|Read-only\b))/u;
+
+function getCleanReviewVerdictCandidates(line: string): string[] {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return [];
+  }
+  return [trimmed, ...trimmed.split(CLEAN_REVIEW_VERDICT_SENTENCE_BOUNDARY).map((candidate) => candidate.trim())];
+}
+
+function hasCleanReviewVerdict(outputText: string): boolean {
+  return outputText
+    .split(/\r?\n/u)
+    .some((line) =>
+      getCleanReviewVerdictCandidates(line).some((candidate) =>
+        CLEAN_REVIEW_VERDICT_PATTERNS.some((pattern) => pattern.test(candidate))
+      )
+    );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 export function logReviewTelemetrySummary(
