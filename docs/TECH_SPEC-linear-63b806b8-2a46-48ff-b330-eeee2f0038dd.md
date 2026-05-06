@@ -125,7 +125,7 @@ task_checklists:
 | `docs/TASKS.md` external provenance | A path can be real evidence but outside the repo root. | justify retaining fallback | CO-505 | Inventory proves the target is external rather than in-repo. | historical | 2026-05-07 | N/A, external provenance | External reference is explicitly annotated and remains historically meaningful. | inventory plus review-visible exception note |
 
 - For `justify retaining fallback`: the retained contract is `external-provenance-reference`, owned by CO-505 for this cleanup surface. Steady-state proof is the parent inventory showing the reference cannot be represented as repo-relative without lying about location. Tests/docs are the final `docs/TASKS.md` exception annotation plus docs validation.
-- Large-refactor check: not applicable. The path cleanup is a bounded docs metadata repair with no code behavior seam.
+- Large-refactor check: not applicable. The path cleanup is bounded docs metadata repair work with no code behavior seam.
 
 ## Architecture & Data
 - Architecture / design adjustments: none.
