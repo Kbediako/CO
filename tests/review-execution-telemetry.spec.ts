@@ -18,9 +18,7 @@ const CO474_REVIEW_OUTPUT_FIXTURE = new URL('./fixtures/review-execution/co474-r
 
 type WriteTelemetryOptions = Parameters<typeof writeReviewExecutionTelemetry>[0];
 type TelemetryFixtureOptions = Partial<Pick<WriteTelemetryOptions, 'status' | 'terminationBoundary' | 'error' | 'includeRawTelemetry' | 'logPersistFailure'>> & {
-  outputName?: string;
-  state?: ReviewExecutionState;
-  telemetryName?: string;
+  outputName?: string; state?: ReviewExecutionState; telemetryName?: string;
 };
 
 async function makeSandbox(): Promise<string> {
