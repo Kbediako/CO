@@ -505,14 +505,27 @@ export async function runCommandStage(
         proofTerminalStatus === 'succeeded' &&
         proofTerminalReason === 'issue_review_handoff' &&
         result.status === 'succeeded';
+      if (
+        requiresProviderReviewSemanticVerdict &&
+        providerReviewTelemetry !== null &&
+        verifyReviewTelemetryFreshness({
+          env,
+          paths,
+          startedAt: proofAttemptStartedAt,
+          telemetry: providerReviewTelemetry,
+          telemetryPath: reviewTelemetryPath
+        }) !== null
+      ) {
+        providerReviewTelemetry = null;
+        reviewOutputLogNoiseSummary = null;
+      }
       if (requiresProviderReviewSemanticVerdict && providerReviewTelemetry === null) {
-        const awaitedReviewTelemetry = await loadReviewTelemetryEvidence(reviewTelemetryPath, {
-          waitForEvidence: true,
-          accept: (telemetry) =>
+        const awaitedReviewTelemetry = await waitForFreshReviewTelemetryEvidence(reviewTelemetryPath, {
+          isFresh: (telemetry) =>
             verifyReviewTelemetryFreshness({
               env,
               paths,
-              startedAt: entry.started_at,
+              startedAt: proofAttemptStartedAt,
               telemetry,
               telemetryPath: reviewTelemetryPath
             }) === null
@@ -1038,25 +1051,32 @@ function verifyReviewTelemetryFreshness(options: {
 
 async function loadReviewTelemetryEvidence(
   telemetryPath: string,
-  options: {
-    waitForEvidence: boolean;
-    accept?: (telemetry: ReviewTelemetryEvidencePayload) => boolean;
-  }
+  options: { waitForEvidence: boolean }
 ): Promise<ReviewTelemetryEvidencePayload | null> {
   if (options.waitForEvidence) {
-    return await waitForReviewTelemetryEvidence(telemetryPath, { accept: options.accept });
+    return await waitForReviewTelemetryEvidence(telemetryPath);
   }
   return await readReviewTelemetryEvidence(telemetryPath);
 }
 
 async function waitForReviewTelemetryEvidence(
+  telemetryPath: string
+): Promise<ReviewTelemetryEvidencePayload | null> {
+  return await waitForFreshReviewTelemetryEvidence(telemetryPath, {
+    isFresh: () => true
+  });
+}
+
+async function waitForFreshReviewTelemetryEvidence(
   telemetryPath: string,
-  options: { accept?: (telemetry: ReviewTelemetryEvidencePayload) => boolean } = {}
+  options: {
+    isFresh: (telemetry: ReviewTelemetryEvidencePayload) => boolean;
+  }
 ): Promise<ReviewTelemetryEvidencePayload | null> {
   const deadline = Date.now() + REVIEW_TELEMETRY_WAIT_TIMEOUT_MS;
   for (;;) {
     const telemetry = await readReviewTelemetryEvidence(telemetryPath);
-    if (telemetry && (!options.accept || options.accept(telemetry))) {
+    if (telemetry && options.isFresh(telemetry)) {
       return telemetry;
     }
     if (Date.now() >= deadline) {

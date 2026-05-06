@@ -846,7 +846,59 @@ describe('runCommandStage review evidence consistency', () => {
     expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_findings');
   });
 
-  it('polls past stale provider-worker review telemetry before evaluating handoff verdicts', async () => {
+  it('waits past stale handoff review telemetry until fresh findings arrive', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(input, {
+        generated_at: '2000-01-01T00:00:00.000Z',
+        status: 'succeeded',
+        review_outcome: 'clean-success',
+        review_verdict: 'clean',
+        finding_count: 0,
+        outputLogContent: 'No actionable issues.',
+        termination_boundary: null
+      });
+      setTimeout(() => {
+        void writeReviewArtifacts(input, {
+          status: 'succeeded',
+          review_outcome: 'clean-success',
+          review_verdict: 'findings',
+          highest_finding_priority: 'P1',
+          finding_count: 1,
+          outputLogContent: '- [P1] Fresh handoff review finding',
+          termination_boundary: null
+        });
+      }, 50);
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with stale review telemetry',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed while review telemetry was being refreshed'
+      },
+      { FORCE_CODEX_REVIEW: '1', CODEX_REVIEW_NON_INTERACTIVE: '1' }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed because standalone review reported findings.');
+    expect(result.summary).toContain('semantic review verdict: findings (1 finding, highest P1)');
+
+    const errorPayload = JSON.parse(
+      await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')
+    ) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_findings');
+  });
+
+  it('polls past stale provider-worker review telemetry before accepting clean handoff verdicts', async () => {
     mockState.runImpl = async (input) => {
       await writeProviderLinearWorkerProofArtifacts(input, {
         owner_phase: 'ended',
@@ -892,6 +944,64 @@ describe('runCommandStage review evidence consistency', () => {
     expect(result.summary).not.toContain('semantic review verdict: unknown');
     expect(manifest.commands[0]?.status).toBe('succeeded');
     expect(manifest.commands[0]?.error_file).toBeNull();
+  });
+
+  it('requires review telemetry to be fresh for the provider proof attempt', async () => {
+    mockState.runImpl = async (input) => {
+      const now = Date.now();
+      const staleGeneratedAt = new Date(now).toISOString();
+      const proofAttemptStartedAt = new Date(now + 100).toISOString();
+      const freshGeneratedAt = new Date(now + 200).toISOString();
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        attempt_started_at: proofAttemptStartedAt,
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(input, {
+        generated_at: staleGeneratedAt,
+        status: 'succeeded',
+        review_outcome: 'clean-success',
+        review_verdict: 'clean',
+        finding_count: 0,
+        outputLogContent: 'No actionable issues.',
+        termination_boundary: null
+      });
+      setTimeout(() => {
+        void writeReviewArtifacts(input, {
+          generated_at: freshGeneratedAt,
+          status: 'succeeded',
+          review_outcome: 'clean-success',
+          review_verdict: 'findings',
+          highest_finding_priority: 'P1',
+          finding_count: 1,
+          outputLogContent: '- [P1] Fresh proof-attempt review finding',
+          termination_boundary: null
+        });
+      }, 50);
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with retry-attempt review telemetry',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed after retry attempt review telemetry refreshed'
+      },
+      { FORCE_CODEX_REVIEW: '1', CODEX_REVIEW_NON_INTERACTIVE: '1' }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed because standalone review reported findings.');
+    expect(result.summary).toContain('semantic review verdict: findings (1 finding, highest P1)');
+
+    const errorPayload = JSON.parse(
+      await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')
+    ) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_findings');
   });
 
   it('fails succeeded provider-linear-worker stages when review telemetry verdict is unknown or omitted', async () => {
