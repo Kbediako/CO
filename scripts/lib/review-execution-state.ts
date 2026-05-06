@@ -296,6 +296,7 @@ interface ReviewExecutionTelemetryPayloadOptions {
   includeRawTelemetry: boolean;
   telemetryDebugEnvKey: string;
   launchContext?: ReviewLaunchContext | null;
+  reviewOutputText?: string | null;
 }
 
 export interface ReviewTerminationBoundaryRecord {
@@ -778,6 +779,7 @@ export class ReviewExecutionState {
       includeRawTelemetry: options.includeRawTelemetry,
       telemetryDebugEnvKey: options.telemetryDebugEnvKey,
       launchContext: options.launchContext ?? null,
+      reviewOutputText: options.reviewOutputText ?? this.getPreview(),
       summary: this.buildOutputSummary()
     });
   }

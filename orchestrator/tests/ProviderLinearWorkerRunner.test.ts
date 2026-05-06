@@ -1357,6 +1357,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(firstPrompt).toContain('manual correctness/regressions/missing-tests review');
     expect(firstPrompt).toContain('manual elegance checklist');
     expect(firstPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
+    expect(firstPrompt).toContain('`review_verdict: findings`');
+    expect(firstPrompt).toContain('do not call the review clean until the findings are resolved or explicitly pushed back');
     expect(firstPrompt).toContain('`review_outcome: bounded-success`');
     expect(firstPrompt).toContain('successful bounded review completion, not as a blocker or generic quiet-tail failure');
     expect(firstPrompt).toContain('Treat `review_outcome: failed-boundary`');
@@ -1429,6 +1431,8 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(continuationPrompt).toContain('manual correctness/regressions/missing-tests review');
     expect(continuationPrompt).toContain('manual elegance checklist');
     expect(continuationPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
+    expect(continuationPrompt).toContain('`review_verdict: findings`');
+    expect(continuationPrompt).toContain('do not call the review clean until the findings are resolved or explicitly pushed back');
     expect(continuationPrompt).toContain('`review_outcome: bounded-success`');
     expect(continuationPrompt).toContain('successful bounded review completion, not as a blocker or generic quiet-tail failure');
     expect(continuationPrompt).toContain('Treat `review_outcome: failed-boundary`');
