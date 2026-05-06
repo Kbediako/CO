@@ -803,22 +803,24 @@ describe('runCommandStage review evidence consistency', () => {
     expect(errorPayload.details?.review_outcome_summary).toContain('semantic review verdict: findings (2 findings, highest P1)');
   });
 
-  it('fails review handoff findings even when forced standalone review is disabled', async () => {
+  it('waits for review handoff findings even when forced standalone review is disabled', async () => {
     mockState.runImpl = async (input) => {
       await writeProviderLinearWorkerProofArtifacts(input, {
         owner_phase: 'ended',
         owner_status: 'succeeded',
         end_reason: 'issue_review_handoff'
       });
-      await writeReviewArtifacts(input, {
-        status: 'succeeded',
-        review_outcome: 'clean-success',
-        review_verdict: 'findings',
-        highest_finding_priority: 'P2',
-        finding_count: 1,
-        outputLogContent: '- [P2] Handoff review found an actionable issue',
-        termination_boundary: null
-      });
+      setTimeout(() => {
+        void writeReviewArtifacts(input, {
+          status: 'succeeded',
+          review_outcome: 'clean-success',
+          review_verdict: 'findings',
+          highest_finding_priority: 'P2',
+          finding_count: 1,
+          outputLogContent: '- [P2] Handoff review found an actionable issue',
+          termination_boundary: null
+        });
+      }, 50);
       return buildSuccessfulExecResult();
     };
 
@@ -829,7 +831,7 @@ describe('runCommandStage review evidence consistency', () => {
         command: 'node providerLinearWorkerRunner.js',
         summaryHint: 'Provider linear worker completed without forced standalone review'
       },
-      { FORCE_CODEX_REVIEW: '0' }
+      { FORCE_CODEX_REVIEW: '0', CODEX_REVIEW_NON_INTERACTIVE: '1' }
     );
     const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
 
