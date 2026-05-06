@@ -7,8 +7,8 @@
   "reviewed_at": "2026-05-07",
   "removal_condition": "Remove this baseline and keep npm run build:all on a clean root strict typecheck once total_errors reaches 0.",
   "total_errors": 1323,
-  "diagnostic_identity_algorithm": "sha256(sorted file:line:column:code:full-message-block)",
-  "diagnostic_identity_hash": "b14c90fbc0265bbd30be7b725e0d9b4c4d194ca20dfd237b21d13aeb02b9f37a",
+  "diagnostic_identity_algorithm": "sha256(sorted file:line:column:code:repo-root-normalized-full-message-block)",
+  "diagnostic_identity_hash": "1f35dd616ef016b71ab2f71ee2a02186e773eccacb00297ad303d65b11a143f9",
   "files": {
     "evaluation/tests/provider-linear-adoption.test.ts": 4,
     "orchestrator/tests/CloudPrompt.test.ts": 2,

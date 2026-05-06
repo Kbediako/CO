@@ -14,7 +14,7 @@ const REPO_ROOT = resolve(SCRIPT_DIR, '..');
 const DEFAULT_BASELINE_PATH = 'tasks/baselines/build-all-strict-typecheck-debt.json';
 const STRICT_TYPECHECK_COMMAND = ['-p', 'tsconfig.json', '--pretty', 'false', '--noEmit'];
 const CANONICAL_OWNER_KEY = 'build-all-strict-test-typecheck-debt';
-const DIAGNOSTIC_IDENTITY_ALGORITHM = 'sha256(sorted file:line:column:code:full-message-block)';
+const DIAGNOSTIC_IDENTITY_ALGORITHM = 'sha256(sorted file:line:column:code:repo-root-normalized-full-message-block)';
 
 function showUsage() {
   console.log(`Usage: node scripts/build-all-strict-typecheck.mjs [--baseline <path>] [--update]
@@ -96,6 +96,15 @@ function sortedObjectFromMap(map) {
   return Object.fromEntries([...map.entries()].sort(([left], [right]) => left.localeCompare(right)));
 }
 
+function normalizePathSeparators(value) {
+  return value.split('\\').join('/');
+}
+
+function normalizeDiagnosticMessage(message) {
+  const normalizedRoot = normalizePathSeparators(REPO_ROOT);
+  return normalizePathSeparators(message).split(normalizedRoot).join('<repo-root>');
+}
+
 function parseTypeScriptDiagnostics(output) {
   const byFile = new Map();
   const byCode = new Map();
@@ -116,7 +125,7 @@ function parseTypeScriptDiagnostics(output) {
       line: Number(line),
       column: Number(column),
       code: `TS${code}`,
-      message: messageLines.join('\n').trimEnd()
+      message: normalizeDiagnosticMessage(messageLines.join('\n').trimEnd())
     });
   }
 
