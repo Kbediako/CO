@@ -503,9 +503,7 @@ export async function runCommandStage(
         resolveProviderLinearWorkerAttemptStartedAt(providerLinearWorkerProofRecord) ?? entry.started_at ?? null;
       const reviewTelemetryStatus = coerceTelemetryStatusValue(providerReviewTelemetry?.status);
       const reviewOutcomeSummary = formatReviewTelemetryOutcomeSummary(providerReviewTelemetry);
-      const reviewSemanticVerdict = coerceReviewSemanticVerdict(
-        providerReviewTelemetry?.review_verdict
-      );
+      const reviewSemanticVerdict = resolveReviewSemanticVerdict(providerReviewTelemetry);
       providerLinearWorkerReviewOutcomeSummary = reviewOutcomeSummary;
       const mutationSuppressions = deriveDeterministicProviderMutationSuppressions(
         providerLinearWorkerProof?.linear_audit ?? null,
@@ -1188,11 +1186,20 @@ function formatReviewTelemetryOutcomeSummary(
     }
   })();
   const semanticSummary = formatReviewSemanticVerdictSummary({
-    review_verdict: coerceReviewSemanticVerdict(telemetry?.review_verdict),
+    review_verdict: resolveReviewSemanticVerdict(telemetry),
     highest_finding_priority: coerceReviewFindingPriority(telemetry?.highest_finding_priority),
     finding_count: coerceTelemetryFindingCount(telemetry?.finding_count)
   });
   return semanticSummary ? `${outcomeSummary}; ${semanticSummary}` : outcomeSummary;
+}
+
+function resolveReviewSemanticVerdict(
+  telemetry: ReviewTelemetryEvidencePayload | null
+): ReturnType<typeof coerceReviewSemanticVerdict> {
+  if (!telemetry) {
+    return null;
+  }
+  return coerceReviewSemanticVerdict(telemetry.review_verdict) ?? 'unknown';
 }
 
 function coerceTelemetryFindingCount(value: unknown): number | null {
