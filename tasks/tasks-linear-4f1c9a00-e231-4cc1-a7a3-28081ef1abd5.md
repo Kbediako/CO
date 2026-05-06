@@ -39,7 +39,7 @@
 
 - [x] Packet validation captured. Evidence: JSON parse for `tasks/index.json` and `docs/docs-freshness-registry.json`, `git diff --check`, new-file `git diff --no-index --check`, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, and `npm run docs:freshness` passed on 2026-05-06.
 - [x] Docs-review captured. Evidence: `.runs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5/cli/2026-05-06T19-30-14-566Z-97a6084f/manifest.json` and `review/telemetry.json` report `gpt-5.5`, `xhigh`, `review_outcome=clean-success`, `review_verdict=clean`, and `finding_count=0`.
-- [x] Provider-worker guidance/tests shipped. Evidence: `orchestrator/src/cli/providerLinearWorkerRunner.ts`, `skills/linear/SKILL.md`, `docs/standalone-review-guide.md`, `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`, child lane `.runs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5-tests-metadata/cli/2026-05-06T19-38-15-847Z-223befb3/manifest.json`, and `npm run test:core -- orchestrator/tests/ProviderLinearWorkerRunner.test.ts` passed 325 tests.
+- [x] Provider-worker guidance/tests shipped. Evidence: `orchestrator/src/cli/providerLinearWorkerRunner.ts`, `skills/linear/SKILL.md`, `docs/standalone-review-guide.md`, `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`, and `npm run test:core -- orchestrator/tests/ProviderLinearWorkerRunner.test.ts` passed 325 tests. The tests-metadata same-issue subagent output had no repo-local `.runs` child manifest, so parent evidence is the accepted prompt-regression diff plus focused suite pass.
 - [ ] PR review handoff evidence captured. Evidence: pending implementation lane.
 
 ### Protected Terms
@@ -57,7 +57,7 @@
 - 2026-05-06: Packet records `stay_serial` / `packet_only_helper_scope` because the work is a single traceability packet with tightly coupled mirror updates and no separable implementation stream.
 - 2026-05-06: Packet validation passed: JSON parse for `tasks/index.json` and `docs/docs-freshness-registry.json`, `git diff --check`, new-file `git diff --no-index --check`, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, and `npm run docs:freshness`.
 - 2026-05-06: Docs-review passed clean with `gpt-5.5` / `xhigh`: `.runs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5/cli/2026-05-06T19-30-14-566Z-97a6084f/manifest.json`.
-- 2026-05-07: Implementation updated provider-worker prompt guidance, bundled Linear skill guidance, and standalone-review guide wording so retained legacy succeeded payload handling requires owner, trigger, introduced date, review date, maximum lifetime or expiry, removal condition, reason, and validation evidence. Same-issue child lane `tests-metadata` added focused prompt regressions and was accepted; focused ProviderLinearWorkerRunner tests passed 325 tests.
+- 2026-05-06: Implementation updated provider-worker prompt guidance, bundled Linear skill guidance, and standalone-review guide wording so retained legacy succeeded payload handling requires owner, trigger, introduced date, review date, maximum lifetime or expiry, removal condition, reason, and validation evidence. Same-issue tests-metadata output had no repo-local `.runs` child manifest; parent accepted the prompt-regression diff, and focused ProviderLinearWorkerRunner tests passed 325 tests.
 
 ## Parent Tasks
 1. Register traceability packet.
