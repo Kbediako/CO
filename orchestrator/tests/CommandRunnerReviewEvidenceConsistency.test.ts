@@ -1127,6 +1127,7 @@ describe('runCommandStage review evidence consistency', () => {
           }
         }
       });
+      await writeReviewArtifacts(input, { status: 'succeeded', review_outcome: 'clean-success', review_verdict: 'clean', finding_count: 0, outputLogContent: 'No actionable issues.' });
       return buildSuccessfulExecResult();
     };
 
@@ -1208,6 +1209,7 @@ describe('runCommandStage review evidence consistency', () => {
           }
         }
       });
+      await writeReviewArtifacts(input, { status: 'succeeded', review_outcome: 'clean-success', review_verdict: 'clean', finding_count: 0, outputLogContent: 'No actionable issues.' });
       return buildSuccessfulExecResult();
     };
 
