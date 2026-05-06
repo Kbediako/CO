@@ -32,6 +32,13 @@
           "status": "six_terminal_reclassified_one_active_refreshed",
           "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-05",
           "summary": "Live Linear issue-context confirmed CO-80, CO-82, CO-83, CO-84, CO-85, and CO-98 are Done/completed with merged PR evidence, so those source specs are inactive done; 0105 remains active and was refreshed with a May 6 review note."
+        },
+        "review_handoff": {
+          "reviewer": "codex-orchestrator pr ready-review",
+          "date": "2026-05-06",
+          "status": "ready-review-clean",
+          "pr": "#781",
+          "summary": "PR #781 is attached to CO-503, current origin/main was ff-only checked, required checks are green, CodeRabbit in-diff feedback was fixed and re-reviewed cleanly, outside-diff historical docs/TASKS.md cleanup was split to CO-505, unresolved threads are zero, unacknowledged bot feedback is zero, and ready-review drained cleanly at 2026-05-06T01:17:50Z."
         }
       },
       "paths": {
