@@ -35,7 +35,7 @@
   - later implementation is docs-only
   - CO-478 semantic `review_verdict` handling is weakened
 - Pre-implementation issue-quality review:
-  - 2026-05-07: CO-506 is a valid packet-first follow-up from CO-478 / PR #782 and must stay limited to the legacy bounded-success metadata seam.
+  - 2026-05-06: CO-506 is a valid packet-first follow-up from CO-478 / PR #782 and must stay limited to the legacy bounded-success metadata seam.
 - Fallback / refactor decision:
   - The task touches legacy/fallback/seam behavior.
   - Decision: expire the fallback where a `legacy succeeded payload` with preserved `termination_boundary` can be accepted without full retained-fallback metadata.
@@ -84,5 +84,5 @@
 
 ## Approvals
 - Reviewer: codex-orchestrator docs-review
-- Date: 2026-05-07
+- Date: 2026-05-06
 - Evidence: `.runs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5/cli/2026-05-06T19-30-14-566Z-97a6084f/manifest.json` (`gpt-5.5`, `xhigh`, `review_outcome=clean-success`, `review_verdict=clean`, `finding_count=0`)

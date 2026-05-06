@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-07
+last_review: 2026-05-06
 related_action_plan: docs/ACTION_PLAN-linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5.md
 task_checklists:
   - tasks/tasks-linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5.md
@@ -76,8 +76,8 @@ Canonical spec: `tasks/specs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5.md`.
   - `termination_boundary` guard semantics are weakened
   - the issue leaves `Backlog` without packet/mirror evidence
 - Pre-implementation issue-quality review evidence:
-  - 2026-05-07: CO-506 is not narrower than the user request because it preserves all protected terms, the CO-478/PR #782 source, the `Backlog` hold reason, and the later guidance/test requirement.
-  - 2026-05-07: micro-task path is unavailable because the task touches legacy/fallback/seam behavior and exact review outcome terms.
+  - 2026-05-06: CO-506 is not narrower than the user request because it preserves all protected terms, the CO-478/PR #782 source, the `Backlog` hold reason, and the later guidance/test requirement.
+  - 2026-05-06: micro-task path is unavailable because the task touches legacy/fallback/seam behavior and exact review outcome terms.
 - Safeguard ownership split:
   - This packet lane owns only docs-first traceability setup.
   - A later implementation lane owns provider-worker guidance/tests and current review guide/help tests for the shipped legacy wording.
@@ -96,7 +96,7 @@ Canonical spec: `tasks/specs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5.md`.
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Provider-worker review outcome guidance | `legacy succeeded payload` with preserved `termination_boundary` can be treated as successful bounded review completion without full retained-fallback metadata. | expire fallback | CO-506 / `review-wrapper:bounded-success-legacy-fallback-metadata` | A legacy review telemetry payload has `status: succeeded` and preserved `termination_boundary` but lacks modern `review_outcome` / `review_verdict` fields. | 2026-05-06 | 2026-05-07 | 2026-06-05 | Remove legacy succeeded payload support, or require owner, trigger, introduced date, review date, maximum lifetime or expiry, removal condition, reason, and validation evidence before accepting the legacy path. | `ProviderLinearWorkerRunner` prompt regressions, `docs/standalone-review-guide.md` guide/help tests for the current legacy wording, telemetry fixture tests if runtime interpretation changes, docs checks, standalone review. |
+| Provider-worker review outcome guidance | `legacy succeeded payload` with preserved `termination_boundary` can be treated as successful bounded review completion without full retained-fallback metadata. | expire fallback | CO-506 / `review-wrapper:bounded-success-legacy-fallback-metadata` | A legacy review telemetry payload has `status: succeeded` and preserved `termination_boundary` but lacks modern `review_outcome` / `review_verdict` fields. | 2026-05-06 | 2026-05-06 | 2026-06-05 | Remove legacy succeeded payload support, or require owner, trigger, introduced date, review date, maximum lifetime or expiry, removal condition, reason, and validation evidence before accepting the legacy path. | `ProviderLinearWorkerRunner` prompt regressions, `docs/standalone-review-guide.md` guide/help tests for the current legacy wording, telemetry fixture tests if runtime interpretation changes, docs checks, standalone review. |
 
 - Large-refactor check: another minor seam is acceptable only if the implementation is limited to guidance/tests and fail-closed legacy metadata checks. If the work must change review telemetry schema, wrapper outcome disposition, or semantic verdict parsing, prefer a larger review-wrapper consolidation or split a separate follow-up.
 
@@ -130,5 +130,5 @@ Canonical spec: `tasks/specs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5.md`.
 
 ## Approvals
 - Reviewer: codex-orchestrator docs-review
-- Date: 2026-05-07
+- Date: 2026-05-06
 - Evidence: `.runs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5/cli/2026-05-06T19-30-14-566Z-97a6084f/manifest.json` (`gpt-5.5`, `xhigh`, `review_outcome=clean-success`, `review_verdict=clean`, `finding_count=0`)

@@ -8,32 +8,32 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-07",
+      "last_review": "2026-05-06",
       "status": "backlog_packet",
       "canonical_owner_key": "review-wrapper:bounded-success-legacy-fallback-metadata",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=review-wrapper:bounded-success-legacy-fallback-metadata",
       "approvals": {
         "traceability_packet": {
           "reviewer": "CO-506 traceability packet branch",
-          "date": "2026-05-07",
+          "date": "2026-05-06",
           "status": "produced",
           "summary": "Created the CO-506 docs-first packet and registry mirrors before the helper-created follow-up leaves Backlog. The packet clears backlog_head_follow_up_traceability_pending only after packet/registry setup exists, preserves CO-478 review_verdict semantics, and requires retained-fallback metadata before legacy succeeded payload guidance with preserved termination_boundary can be accepted."
         },
         "issue_quality_review": {
           "reviewer": "packet worker",
-          "date": "2026-05-07",
+          "date": "2026-05-06",
           "status": "approved-for-packet-first-admission",
           "summary": "Issue scope is explicit and packet-only: later implementation must ship provider-worker guidance/tests and update the current standalone-review guide/help legacy wording so owner, trigger, introduced date, review date, maximum lifetime or expiry, removal condition, reason, and validation evidence are required for the legacy bounded-success path without changing Codex review CLI exit-code behavior, command-intent, bounded-review, termination_boundary, or review_verdict handling."
         },
         "packet_validation": {
           "reviewer": "packet worker",
-          "date": "2026-05-07",
+          "date": "2026-05-06",
           "status": "passed",
           "summary": "JSON parse for tasks/index.json and docs/docs-freshness-registry.json, git diff --check, new-file git diff --no-index --check, node scripts/spec-guard.mjs --dry-run, npm run docs:check, and npm run docs:freshness passed for the packet-only diff."
         },
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
-          "date": "2026-05-07",
+          "date": "2026-05-06",
           "status": "clean-success",
           "manifest": ".runs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5/cli/2026-05-06T19-30-14-566Z-97a6084f/manifest.json",
           "telemetry": ".runs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5/cli/2026-05-06T19-30-14-566Z-97a6084f/review/telemetry.json",
