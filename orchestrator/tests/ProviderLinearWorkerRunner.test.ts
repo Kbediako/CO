@@ -1353,7 +1353,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(firstPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
     expect(firstPrompt).toContain('about 2+ changed files or about 40+ changed lines');
     expect(firstPrompt).toContain('use the wrapper-led review path by default');
-    expect(firstPrompt).toContain('do not hand off to review state unless a break-glass waiver is recorded with owner, expiry, reason, and evidence');
+    expect(firstPrompt).toContain('do not hand off to review state unless a break-glass waiver is recorded with owner, trigger, introduced date, review date, maximum lifetime or expiry, removal condition, reason, and validation evidence');
     expect(firstPrompt).toContain('manual correctness/regressions/missing-tests review');
     expect(firstPrompt).toContain('manual elegance checklist');
     expect(firstPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
@@ -1429,7 +1429,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(continuationPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
     expect(continuationPrompt).toContain('about 2+ changed files or about 40+ changed lines');
     expect(continuationPrompt).toContain('use the wrapper-led review path by default');
-    expect(continuationPrompt).toContain('do not hand off to review state unless a break-glass waiver is recorded with owner, expiry, reason, and evidence');
+    expect(continuationPrompt).toContain('do not hand off to review state unless a break-glass waiver is recorded with owner, trigger, introduced date, review date, maximum lifetime or expiry, removal condition, reason, and validation evidence');
     expect(continuationPrompt).toContain('manual correctness/regressions/missing-tests review');
     expect(continuationPrompt).toContain('manual elegance checklist');
     expect(continuationPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
@@ -6241,7 +6241,7 @@ for await (const line of rl) {
     const expectedSharedRepoCheckoutPath = await realpath(tempRoot ?? '');
     expect(firstTurnPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
     expect(firstTurnPrompt).toContain('about 2+ changed files or about 40+ changed lines');
-    expect(firstTurnPrompt).toContain('do not hand off to review state unless a break-glass waiver is recorded with owner, expiry, reason, and evidence');
+    expect(firstTurnPrompt).toContain('do not hand off to review state unless a break-glass waiver is recorded with owner, trigger, introduced date, review date, maximum lifetime or expiry, removal condition, reason, and validation evidence');
     expect(firstTurnPrompt).toContain('manual elegance checklist');
     expect(firstTurnPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
     expect(firstTurnPrompt).toContain('Ordinary eligible same-issue child-lane parallelisation is a runtime contract');
@@ -6270,7 +6270,7 @@ for await (const line of rl) {
     expect(firstTurnPrompt).toContain(`\`git -C "${expectedSharedRepoCheckoutPath}" merge --ff-only origin/main\``);
     expect(continuationPrompt).toContain('Treat standalone review plus elegance review as a required pre-review-handoff gate for any non-trivial diff');
     expect(continuationPrompt).toContain('about 2+ changed files or about 40+ changed lines');
-    expect(continuationPrompt).toContain('do not hand off to review state unless a break-glass waiver is recorded with owner, expiry, reason, and evidence');
+    expect(continuationPrompt).toContain('do not hand off to review state unless a break-glass waiver is recorded with owner, trigger, introduced date, review date, maximum lifetime or expiry, removal condition, reason, and validation evidence');
     expect(continuationPrompt).toContain('manual elegance checklist');
     expect(continuationPrompt).toContain('Refresh the workpad with the review goal, findings or fallback, and final clean or justified status before handoff.');
     expect(continuationPrompt).toContain('Ordinary eligible same-issue child-lane parallelisation is a runtime contract');

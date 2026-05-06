@@ -85,6 +85,16 @@ describe('review-execution-telemetry', () => {
     }
   });
 
+  it('does not treat empty structured findings as an explicit clean verdict', async () => {
+    const sandbox = await makeSandbox();
+    const payload = await writeTelemetryForOutput(sandbox, `${JSON.stringify({ findings: [] })}\n`);
+
+    expect(payload?.review_outcome).toBe('clean-success');
+    expect(payload?.review_verdict).toBe('unknown');
+    expect(payload?.highest_finding_priority).toBeNull();
+    expect(payload?.finding_count).toBe(0);
+  });
+
   it('derives semantic verdicts from final reviewer output, not inspected transcripts', async () => {
     const cases = [
       {

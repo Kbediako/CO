@@ -487,12 +487,7 @@ function analyzeStructuredReviewVerdict(verdictText: string): ReviewSemanticVerd
       finding_count: summarizedVerdict === 'findings' ? findingCount : 0
     };
   }
-  if (!structuredFindings) return null;
-  return {
-    review_verdict: 'clean',
-    highest_finding_priority: null,
-    finding_count: 0
-  };
+  return null;
 }
 
 function extractLeadingJsonObjectText(verdictText: string): string | null {
