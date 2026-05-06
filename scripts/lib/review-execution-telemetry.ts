@@ -347,7 +347,6 @@ function isLikelyInspectedCommandOutputMarker(lines: string[], markerIndex: numb
       if (isReviewTranscriptInspectionCommandLine(commandLine)) {
         return true;
       }
-      return false;
     }
   }
   return false;

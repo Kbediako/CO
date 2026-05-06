@@ -127,6 +127,23 @@ describe('review-execution-telemetry', () => {
         expectedVerdict: 'unknown'
       },
       {
+        name: 'does not promote transcript markers after nested command headers',
+        output: [
+          'exec',
+          '/bin/zsh -lc "tail -n 80 review/output.log"',
+          ' succeeded in 0ms:',
+          'user',
+          'nested review turn',
+          'exec',
+          '/bin/zsh -lc "rg P2 scripts/lib/review-execution-telemetry.ts"',
+          ' succeeded in 0ms:',
+          '- [P2] Nested inspected transcript finding',
+          'codex',
+          '- [P2] Nested inspected transcript finding should remain non-authoritative'
+        ].join('\n'),
+        expectedVerdict: 'unknown'
+      },
+      {
         name: 'keeps source-inspection markers as final verdict boundaries',
         output: [
           'OpenAI Codex v0.128.0 (research preview)',
