@@ -369,7 +369,11 @@ function isLikelyInspectedCommandOutputMarker(lines: string[], markerIndex: numb
 }
 
 function isTopLevelReviewRuntimeLine(trimmedLine: string): boolean {
-  return trimmedLine.startsWith('[run-review]') || /^\d{4}-\d{2}-\d{2}T[^\s]+\s+(?:TRACE|DEBUG|INFO|WARN|ERROR)\s/u.test(trimmedLine);
+  return (
+    trimmedLine.startsWith('[run-review]') ||
+    /^\d{4}-\d{2}-\d{2}T[^\s]+\s+(?:TRACE|DEBUG|INFO|WARN|ERROR)\s/u.test(trimmedLine) ||
+    /^codex_core::session: failed to record rollout items: thread .+ not found$/u.test(trimmedLine)
+  );
 }
 
 function isCodexTranscriptMarkerLine(trimmedLine: string): boolean {

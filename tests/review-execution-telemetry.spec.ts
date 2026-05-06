@@ -230,6 +230,25 @@ describe('review-execution-telemetry', () => {
         expectedPriority: 'P1',
         expectedCount: 2
       },
+      {
+        name: 'structured JSON verdict after codex cleanup noise',
+        output: [
+          'codex',
+          THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE,
+          JSON.stringify({
+            findings: [
+              {
+                title: '[P1] Cleanup noise must not hide structured findings',
+                priority: 1
+              }
+            ],
+            overall_correctness: 'patch is incorrect'
+          })
+        ].join('\n'),
+        expectedOutcome: 'clean-success',
+        expectedPriority: 'P1',
+        expectedCount: 1
+      },
       { name: 'summary-shaped structured JSON verdict', output: JSON.stringify({ review_verdict: 'findings', highest_finding_priority: 'P2', finding_count: 2 }), expectedOutcome: 'clean-success', expectedPriority: 'P2', expectedCount: 2 },
       {
         name: 'structured findings dominate clean summary verdict',
