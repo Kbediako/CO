@@ -372,7 +372,13 @@ function isTopLevelReviewRuntimeLine(trimmedLine: string): boolean {
   return (
     trimmedLine.startsWith('[run-review]') ||
     /^\d{4}-\d{2}-\d{2}T[^\s]+\s+(?:TRACE|DEBUG|INFO|WARN|ERROR)\s/u.test(trimmedLine) ||
-    /^codex_core::session: failed to record rollout items: thread .+ not found$/u.test(trimmedLine)
+    isCodexRolloutItemCleanupNoiseLine(trimmedLine)
+  );
+}
+
+function isCodexRolloutItemCleanupNoiseLine(trimmedLine: string): boolean {
+  return /^(?:(?:trace|debug|info|warn|error)\s+|\d{4}-\d{2}-\d{2}T[^\s]+\s+(?:trace|debug|info|warn|error)\s+)?codex_core::session:\s+failed to record rollout items:\s+thread\b.*\bnot found\b/iu.test(
+    trimmedLine
   );
 }
 

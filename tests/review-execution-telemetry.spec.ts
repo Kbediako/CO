@@ -14,6 +14,7 @@ import {
 const createdSandboxes: string[] = [];
 const THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE =
   'codex_core::session: failed to record rollout items: thread 019de1d2-3b27-7193-8330-0ed726e28044 not found';
+const WARN_THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE = `warn ${THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}`;
 const CO474_REVIEW_OUTPUT_FIXTURE = new URL('./fixtures/review-execution/co474-review-output-with-findings.log', import.meta.url);
 
 type WriteTelemetryOptions = Parameters<typeof writeReviewExecutionTelemetry>[0];
@@ -257,6 +258,25 @@ describe('review-execution-telemetry', () => {
         ].join('\n'),
         expectedOutcome: 'clean-success',
         expectedPriority: 'P1',
+        expectedCount: 1
+      },
+      {
+        name: 'structured JSON verdict after log-level codex cleanup noise',
+        output: [
+          'codex',
+          WARN_THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE,
+          JSON.stringify({
+            findings: [
+              {
+                title: '[P2] Log-level cleanup noise must not hide structured findings',
+                priority: 2
+              }
+            ],
+            overall_correctness: 'patch is incorrect'
+          })
+        ].join('\n'),
+        expectedOutcome: 'clean-success',
+        expectedPriority: 'P2',
         expectedCount: 1
       },
       { name: 'summary-shaped structured JSON verdict', output: JSON.stringify({ review_verdict: 'findings', highest_finding_priority: 'P2', finding_count: 2 }), expectedOutcome: 'clean-success', expectedPriority: 'P2', expectedCount: 2 },
