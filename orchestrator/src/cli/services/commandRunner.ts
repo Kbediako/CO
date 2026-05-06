@@ -506,19 +506,17 @@ export async function runCommandStage(
         proofTerminalReason === 'issue_review_handoff' &&
         result.status === 'succeeded';
       if (requiresProviderReviewSemanticVerdict && providerReviewTelemetry === null) {
-        const awaitedReviewTelemetry = await loadReviewTelemetryEvidence(reviewTelemetryPath, {
-          waitForEvidence: true
+        const awaitedReviewTelemetry = await waitForFreshReviewTelemetryEvidence(reviewTelemetryPath, {
+          isFresh: (telemetry) =>
+            verifyReviewTelemetryFreshness({
+              env,
+              paths,
+              startedAt: entry.started_at,
+              telemetry,
+              telemetryPath: reviewTelemetryPath
+            }) === null
         });
-        if (
-          awaitedReviewTelemetry &&
-          verifyReviewTelemetryFreshness({
-            env,
-            paths,
-            startedAt: entry.started_at,
-            telemetry: awaitedReviewTelemetry,
-            telemetryPath: reviewTelemetryPath
-          }) === null
-        ) {
+        if (awaitedReviewTelemetry) {
           providerReviewTelemetry = awaitedReviewTelemetry;
           reviewOutputLogNoiseSummary = await formatReviewOutputLogNoiseSummary({
             paths,
@@ -1050,10 +1048,21 @@ async function loadReviewTelemetryEvidence(
 async function waitForReviewTelemetryEvidence(
   telemetryPath: string
 ): Promise<ReviewTelemetryEvidencePayload | null> {
+  return await waitForFreshReviewTelemetryEvidence(telemetryPath, {
+    isFresh: () => true
+  });
+}
+
+async function waitForFreshReviewTelemetryEvidence(
+  telemetryPath: string,
+  options: {
+    isFresh: (telemetry: ReviewTelemetryEvidencePayload) => boolean;
+  }
+): Promise<ReviewTelemetryEvidencePayload | null> {
   const deadline = Date.now() + REVIEW_TELEMETRY_WAIT_TIMEOUT_MS;
   for (;;) {
     const telemetry = await readReviewTelemetryEvidence(telemetryPath);
-    if (telemetry) {
+    if (telemetry && options.isFresh(telemetry)) {
       return telemetry;
     }
     if (Date.now() >= deadline) {
