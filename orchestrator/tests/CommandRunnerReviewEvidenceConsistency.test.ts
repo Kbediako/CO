@@ -846,6 +846,54 @@ describe('runCommandStage review evidence consistency', () => {
     expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_findings');
   });
 
+  it('polls past stale provider-worker review telemetry before evaluating handoff verdicts', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(input, {
+        status: 'succeeded',
+        generated_at: '1970-01-01T00:00:00.000Z',
+        review_outcome: 'clean-success',
+        review_verdict: 'unknown',
+        finding_count: 0,
+        outputLogContent: 'stale review output',
+        termination_boundary: null
+      });
+      setTimeout(() => {
+        void writeReviewArtifacts(input, {
+          status: 'succeeded',
+          review_outcome: 'clean-success',
+          review_verdict: 'clean',
+          finding_count: 0,
+          outputLogContent: 'No actionable issues.',
+          termination_boundary: null
+        });
+      }, 50);
+      return buildSuccessfulExecResult();
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      { FORCE_CODEX_REVIEW: '1', CODEX_REVIEW_NON_INTERACTIVE: '1' }
+    );
+    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toContain('Provider linear worker reached review handoff.');
+    expect(result.summary).toContain('semantic review verdict: clean');
+    expect(result.summary).not.toContain('semantic review verdict: unknown');
+    expect(manifest.commands[0]?.status).toBe('succeeded');
+    expect(manifest.commands[0]?.error_file).toBeNull();
+  });
+
   it('fails succeeded provider-linear-worker stages when review telemetry verdict is unknown or omitted', async () => {
     const cases = [{ name: 'unknown', review_verdict: 'unknown' as const, output: '' }, { name: 'omitted', output: 'No actionable findings.' }, { name: 'missing', missingTelemetry: true }] as const;
 

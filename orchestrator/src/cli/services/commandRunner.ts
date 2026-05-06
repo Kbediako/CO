@@ -507,18 +507,17 @@ export async function runCommandStage(
         result.status === 'succeeded';
       if (requiresProviderReviewSemanticVerdict && providerReviewTelemetry === null) {
         const awaitedReviewTelemetry = await loadReviewTelemetryEvidence(reviewTelemetryPath, {
-          waitForEvidence: true
+          waitForEvidence: true,
+          accept: (telemetry) =>
+            verifyReviewTelemetryFreshness({
+              env,
+              paths,
+              startedAt: entry.started_at,
+              telemetry,
+              telemetryPath: reviewTelemetryPath
+            }) === null
         });
-        if (
-          awaitedReviewTelemetry &&
-          verifyReviewTelemetryFreshness({
-            env,
-            paths,
-            startedAt: entry.started_at,
-            telemetry: awaitedReviewTelemetry,
-            telemetryPath: reviewTelemetryPath
-          }) === null
-        ) {
+        if (awaitedReviewTelemetry) {
           providerReviewTelemetry = awaitedReviewTelemetry;
           reviewOutputLogNoiseSummary = await formatReviewOutputLogNoiseSummary({
             paths,
@@ -1039,21 +1038,25 @@ function verifyReviewTelemetryFreshness(options: {
 
 async function loadReviewTelemetryEvidence(
   telemetryPath: string,
-  options: { waitForEvidence: boolean }
+  options: {
+    waitForEvidence: boolean;
+    accept?: (telemetry: ReviewTelemetryEvidencePayload) => boolean;
+  }
 ): Promise<ReviewTelemetryEvidencePayload | null> {
   if (options.waitForEvidence) {
-    return await waitForReviewTelemetryEvidence(telemetryPath);
+    return await waitForReviewTelemetryEvidence(telemetryPath, { accept: options.accept });
   }
   return await readReviewTelemetryEvidence(telemetryPath);
 }
 
 async function waitForReviewTelemetryEvidence(
-  telemetryPath: string
+  telemetryPath: string,
+  options: { accept?: (telemetry: ReviewTelemetryEvidencePayload) => boolean } = {}
 ): Promise<ReviewTelemetryEvidencePayload | null> {
   const deadline = Date.now() + REVIEW_TELEMETRY_WAIT_TIMEOUT_MS;
   for (;;) {
     const telemetry = await readReviewTelemetryEvidence(telemetryPath);
-    if (telemetry) {
+    if (telemetry && (!options.accept || options.accept(telemetry))) {
       return telemetry;
     }
     if (Date.now() >= deadline) {
