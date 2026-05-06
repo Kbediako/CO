@@ -352,7 +352,7 @@ function isLikelyInspectedCommandOutputMarker(lines: string[], markerIndex: numb
           candidateVerdict.split(/\r?\n/u).some((line) => parseReviewFindingLine(line) !== null);
         return !((lines[markerIndex - 1]?.trim() ?? '') === '' && hasVerdict);
       }
-      return looksLikeCodexTranscript(lines.slice(index + 1, markerIndex));
+      return false;
     }
   }
   return false;

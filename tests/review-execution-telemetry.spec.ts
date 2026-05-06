@@ -14,18 +14,10 @@ import {
 const createdSandboxes: string[] = [];
 const THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE =
   'codex_core::session: failed to record rollout items: thread 019de1d2-3b27-7193-8330-0ed726e28044 not found';
-const CO474_REVIEW_OUTPUT_FIXTURE = new URL(
-  './fixtures/review-execution/co474-review-output-with-findings.log',
-  import.meta.url
-);
+const CO474_REVIEW_OUTPUT_FIXTURE = new URL('./fixtures/review-execution/co474-review-output-with-findings.log', import.meta.url);
 
 type WriteTelemetryOptions = Parameters<typeof writeReviewExecutionTelemetry>[0];
-type TelemetryFixtureOptions = Partial<
-  Pick<
-    WriteTelemetryOptions,
-    'status' | 'terminationBoundary' | 'error' | 'includeRawTelemetry' | 'logPersistFailure'
-  >
-> & {
+type TelemetryFixtureOptions = Partial<Pick<WriteTelemetryOptions, 'status' | 'terminationBoundary' | 'error' | 'includeRawTelemetry' | 'logPersistFailure'>> & {
   outputName?: string;
   state?: ReviewExecutionState;
   telemetryName?: string;
@@ -37,11 +29,7 @@ async function makeSandbox(): Promise<string> {
   return sandbox;
 }
 
-async function writeTelemetryForOutput(
-  sandbox: string,
-  outputText: string,
-  options: TelemetryFixtureOptions = {}
-) {
+async function writeTelemetryForOutput(sandbox: string, outputText: string, options: TelemetryFixtureOptions = {}) {
   const reviewDir = join(sandbox, 'review');
   await mkdir(reviewDir, { recursive: true });
   const outputLogPath = join(reviewDir, options.outputName ?? 'output.log');
@@ -82,9 +70,7 @@ describe('review-execution-telemetry', () => {
     expect(payload?.highest_finding_priority).toBeNull();
     expect(payload?.finding_count).toBe(0);
     expect(payload?.termination_boundary).toBeNull();
-    await expect(readFile(join(sandbox, 'review', 'telemetry.json'), 'utf8')).resolves.toContain(
-      '"status": "succeeded"'
-    );
+    await expect(readFile(join(sandbox, 'review', 'telemetry.json'), 'utf8')).resolves.toContain('"status": "succeeded"');
   });
 
   it('persists clean semantic review verdicts separately from wrapper execution state', async () => {
@@ -147,6 +133,9 @@ describe('review-execution-telemetry', () => {
           'exec',
           '/bin/zsh -lc "sed -n 1,20p scripts/lib/review-execution-telemetry.ts"',
           ' succeeded in 0ms:',
+          'const promptRole = "user";',
+          'const runtimeName = "OpenAI Codex v0.128.0";',
+          'codex',
           'export function analyzeReviewOutput() {',
           '  return null;',
           '}',
@@ -169,18 +158,8 @@ describe('review-execution-telemetry', () => {
   });
 
   it('persists semantic findings without migrating wrapper outcome semantics', async () => {
-    const boundedTermination = {
-      kind: 'relevant-reinspection-dwell',
-      provenance: 'post-startup-anchor',
-      reason: 'bounded review relevant-reinspection dwell boundary violated after 1s.',
-      sample: null
-    } as const;
-    const failedBoundary = {
-      kind: 'stall',
-      provenance: 'output-stall',
-      reason: 'review stalled',
-      sample: null
-    } as const;
+    const boundedTermination = { kind: 'relevant-reinspection-dwell', provenance: 'post-startup-anchor', reason: 'bounded review relevant-reinspection dwell boundary violated after 1s.', sample: null } as const;
+    const failedBoundary = { kind: 'stall', provenance: 'output-stall', reason: 'review stalled', sample: null } as const;
     const cases = [
       {
         name: 'CO-474 successful raw output',
@@ -295,9 +274,7 @@ describe('review-execution-telemetry', () => {
       sample:
         '[redacted relevant-reinspection-dwell sample; set CODEX_REVIEW_DEBUG_TELEMETRY=1 to persist raw sample]'
     });
-    await expect(readFile(join(sandbox, 'review', 'telemetry.json'), 'utf8')).resolves.toContain(
-      '"kind": "relevant-reinspection-dwell"'
-    );
+    await expect(readFile(join(sandbox, 'review', 'telemetry.json'), 'utf8')).resolves.toContain('"kind": "relevant-reinspection-dwell"');
   });
 
   it('persists failure telemetry with an explicit termination boundary', async () => {
@@ -317,9 +294,7 @@ describe('review-execution-telemetry', () => {
     expect(payload?.review_outcome).toBe('failed-boundary');
     expect(payload?.review_verdict).toBe('unknown');
     expect(payload?.termination_boundary).toEqual(terminationBoundary);
-    await expect(readFile(join(sandbox, 'review', 'telemetry.json'), 'utf8')).resolves.toContain(
-      '"kind": "stall"'
-    );
+    await expect(readFile(join(sandbox, 'review', 'telemetry.json'), 'utf8')).resolves.toContain('"kind": "stall"');
   });
 
   it('preserves omitted termination-boundary inference for failed telemetry', async () => {
@@ -331,9 +306,7 @@ describe('review-execution-telemetry', () => {
 
     expect(payload?.review_outcome).toBe('failed-boundary');
     expect(payload?.termination_boundary?.kind).toBe('timeout');
-    await expect(readFile(join(sandbox, 'review', 'telemetry.json'), 'utf8')).resolves.toContain(
-      '"kind": "timeout"'
-    );
+    await expect(readFile(join(sandbox, 'review', 'telemetry.json'), 'utf8')).resolves.toContain('"kind": "timeout"');
   });
 
   it('logs and suppresses persistence failures', async () => {
