@@ -60,6 +60,7 @@ Canonical spec: `tasks/specs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5.md`.
   - no GitHub PR lifecycle work
 
 ## Parity / Alignment Matrix
+
 | Surface | Current truth | Reference truth | Target truth | Explicitly out-of-scope differences |
 | --- | --- | --- | --- | --- |
 | Modern `review/telemetry.json` | Modern payloads include `status`, `review_outcome`, `termination_boundary`, and `review_verdict`. | CO-478 requires semantic verdict checks before clean wording. | Preserve modern telemetry semantics. | Changing wrapper exit code interpretation. |
