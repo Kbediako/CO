@@ -1,0 +1,7 @@
+Reviewing CO-474 provider-worker handoff readiness.
+
+Findings:
+- [P1] Treating review_outcome=clean-success as clean loses actionable review findings
+  Raw standalone review output already reported actionable findings, but the paired telemetry surface let downstream handoff summarize the review as clean.
+- [P2] Provider-worker handoff omits parsed finding evidence
+  Workpad and operator summaries need machine-readable finding count and severity evidence before calling a review clean.

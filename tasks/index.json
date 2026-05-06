@@ -49,6 +49,47 @@
       }
     },
     {
+      "id": "20260506-linear-f3aec8da-23c6-459e-acba-a5045b404c7f",
+      "title": "CO-478 review wrapper telemetry findings",
+      "relates_to": "tasks/tasks-linear-f3aec8da-23c6-459e-acba-a5045b404c7f.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-06",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-f3aec8da-23c6-459e-acba-a5045b404c7f.md",
+        "docs/TECH_SPEC-linear-f3aec8da-23c6-459e-acba-a5045b404c7f.md",
+        "docs/ACTION_PLAN-linear-f3aec8da-23c6-459e-acba-a5045b404c7f.md",
+        "tasks/specs/linear-f3aec8da-23c6-459e-acba-a5045b404c7f.md",
+        "tasks/tasks-linear-f3aec8da-23c6-459e-acba-a5045b404c7f.md",
+        ".agent/task/linear-f3aec8da-23c6-459e-acba-a5045b404c7f.md",
+        "docs/TASKS.md",
+        "tasks/index.json",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-f3aec8da-23c6-459e-acba-a5045b404c7f-docs-packet-r3/cli/2026-05-06T02-34-49-449Z-92e67c3a/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet-r3",
+          "date": "2026-05-06",
+          "status": "produced",
+          "manifest": ".runs/linear-f3aec8da-23c6-459e-acba-a5045b404c7f-docs-packet-r3/cli/2026-05-06T02-34-49-449Z-92e67c3a/manifest.json",
+          "source_anchor": "ctx:sha256:f983b67c8a06c11f75aebca28b58cc1e77ec942dc46d6cd97c291d57164b3714#chunk:c000001",
+          "summary": "Created the CO-478 docs-first packet and registry mirrors only. The packet preserves raw review output, review/telemetry.json, [P0]/[P1]/[P2]/[P3] findings, review_outcome=clean-success, termination_boundary=null, provider-worker handoff, ready-review summaries, semantic review verdict, duplicated finding blocks, and the CO-474 evidence boundary. Parent owns source/tests, validation, Linear state, workpad, PR lifecycle, and review handoff."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-f3aec8da-23c6-459e-acba-a5045b404c7f.md",
+        "task": "tasks/tasks-linear-f3aec8da-23c6-459e-acba-a5045b404c7f.md",
+        "agent_task": ".agent/task/linear-f3aec8da-23c6-459e-acba-a5045b404c7f.md",
+        "prd": "docs/PRD-linear-f3aec8da-23c6-459e-acba-a5045b404c7f.md",
+        "docs": "docs/TECH_SPEC-linear-f3aec8da-23c6-459e-acba-a5045b404c7f.md",
+        "action_plan": "docs/ACTION_PLAN-linear-f3aec8da-23c6-459e-acba-a5045b404c7f.md"
+      }
+    },
+    {
       "id": "20260505-linear-dd2af462-08ae-4ea2-aa53-92000f06952a",
       "title": "CO-455 attach timeout with healthy lower-authority evidence",
       "relates_to": "tasks/tasks-linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md",

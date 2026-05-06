@@ -5043,13 +5043,14 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain(
-      '[run-review] review outcome: bounded success via relevant-reinspection-dwell; not a wrapper failure.'
+      '[run-review] review outcome: bounded success via relevant-reinspection-dwell; not a wrapper failure; semantic review verdict: unknown.'
     );
 
     const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
       review_outcome: ReviewOutcomeDisposition;
+      review_verdict: string;
       termination_boundary: {
         kind: string;
         provenance: string;
@@ -5066,6 +5067,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     };
     expect(telemetry.status).toBe('succeeded');
     expect(telemetry.review_outcome).toBe('bounded-success');
+    expect(telemetry.review_verdict).toBe('unknown');
     expect(telemetry.termination_boundary).toEqual(
       expect.objectContaining({
         kind: 'relevant-reinspection-dwell',
@@ -5089,7 +5091,9 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     });
 
     expect(cleanResult.exitCode).toBe(0);
-    expect(cleanResult.stdout).toContain('[run-review] review outcome: clean success.');
+    expect(cleanResult.stdout).toContain(
+      '[run-review] review outcome: clean success; semantic review verdict: unknown.'
+    );
     const cleanOutputLogPath = join(dirname(cleanManifestPath), 'review', 'output.log');
     const cleanOutputLog = await readFile(cleanOutputLogPath, 'utf8');
     expect(cleanOutputLog).toContain(THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE);
@@ -5097,10 +5101,12 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const cleanTelemetry = JSON.parse(await readFile(cleanTelemetryPath, 'utf8')) as {
       status: string;
       review_outcome: ReviewOutcomeDisposition;
+      review_verdict: string;
       error: string | null;
     };
     expect(cleanTelemetry.status).toBe('succeeded');
     expect(cleanTelemetry.review_outcome).toBe('clean-success');
+    expect(cleanTelemetry.review_verdict).toBe('unknown');
     expect(cleanTelemetry.error).toBeNull();
 
     const boundedSandbox = await makeSandbox();
@@ -5117,7 +5123,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(boundedResult.exitCode).toBe(0);
     expect(boundedResult.stdout).toContain(
-      '[run-review] review outcome: bounded success via relevant-reinspection-dwell; not a wrapper failure.'
+      '[run-review] review outcome: bounded success via relevant-reinspection-dwell; not a wrapper failure; semantic review verdict: unknown.'
     );
     const boundedOutputLogPath = join(dirname(boundedManifestPath), 'review', 'output.log');
     const boundedOutputLog = await readFile(boundedOutputLogPath, 'utf8');
@@ -5126,6 +5132,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const boundedTelemetry = JSON.parse(await readFile(boundedTelemetryPath, 'utf8')) as {
       status: string;
       review_outcome: ReviewOutcomeDisposition;
+      review_verdict: string;
       error: string | null;
       termination_boundary: {
         kind: string;
@@ -5134,6 +5141,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     };
     expect(boundedTelemetry.status).toBe('succeeded');
     expect(boundedTelemetry.review_outcome).toBe('bounded-success');
+    expect(boundedTelemetry.review_verdict).toBe('unknown');
     expect(boundedTelemetry.error).toBeNull();
     expect(boundedTelemetry.termination_boundary).toEqual(
       expect.objectContaining({
@@ -5154,7 +5162,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
 
     expect(result.exitCode).toBeGreaterThan(0);
     expect(result.stderr).toContain(
-      '[run-review] review outcome: review command failed without termination-boundary classification; not an explicit wrapper-boundary failure.'
+      '[run-review] review outcome: review command failed without termination-boundary classification; not an explicit wrapper-boundary failure; semantic review verdict: unknown.'
     );
     const outputLogPath = join(dirname(manifestPath), 'review', 'output.log');
     const outputLog = await readFile(outputLogPath, 'utf8');
@@ -5163,6 +5171,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
       status: string;
       review_outcome: ReviewOutcomeDisposition;
+      review_verdict: string;
       error: string | null;
       termination_boundary: {
         kind: string;
@@ -5170,6 +5179,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     };
     expect(telemetry.status).toBe('failed');
     expect(telemetry.review_outcome).toBe('failed-other');
+    expect(telemetry.review_verdict).toBe('unknown');
     expect(telemetry.error).toBeTruthy();
     expect(telemetry.termination_boundary).toBeNull();
   }, LONG_WAIT_TEST_TIMEOUT_MS);
