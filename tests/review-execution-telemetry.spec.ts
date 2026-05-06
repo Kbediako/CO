@@ -123,16 +123,7 @@ describe('review-execution-telemetry', () => {
       },
       {
         name: 'does not promote inspected transcript verdicts after blank separators',
-        output: [
-          'exec',
-          '/bin/zsh -lc "tail -n 80 review/output.log"',
-          ' succeeded in 0ms:',
-          'codex',
-          'Nested clean verdict.',
-          '',
-          'codex',
-          '- [P2] Inspected transcript finding should not become the current verdict'
-        ].join('\n'),
+        output: 'exec\n/bin/zsh -lc "tail -n 80 review/output.log"\n succeeded in 0ms:\ncodex\nNested clean verdict.\n\ncodex\n- [P2] Inspected transcript finding should not become the current verdict',
         expectedVerdict: 'unknown'
       },
       {
