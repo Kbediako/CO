@@ -505,13 +505,27 @@ export async function runCommandStage(
         proofTerminalStatus === 'succeeded' &&
         proofTerminalReason === 'issue_review_handoff' &&
         result.status === 'succeeded';
+      if (
+        requiresProviderReviewSemanticVerdict &&
+        providerReviewTelemetry !== null &&
+        verifyReviewTelemetryFreshness({
+          env,
+          paths,
+          startedAt: proofAttemptStartedAt,
+          telemetry: providerReviewTelemetry,
+          telemetryPath: reviewTelemetryPath
+        }) !== null
+      ) {
+        providerReviewTelemetry = null;
+        reviewOutputLogNoiseSummary = null;
+      }
       if (requiresProviderReviewSemanticVerdict && providerReviewTelemetry === null) {
         const awaitedReviewTelemetry = await waitForFreshReviewTelemetryEvidence(reviewTelemetryPath, {
           isFresh: (telemetry) =>
             verifyReviewTelemetryFreshness({
               env,
               paths,
-              startedAt: entry.started_at,
+              startedAt: proofAttemptStartedAt,
               telemetry,
               telemetryPath: reviewTelemetryPath
             }) === null
