@@ -334,21 +334,31 @@ function extractFinalReviewVerdictText(outputText: string): string {
 }
 
 function isLikelyInspectedCommandOutputMarker(lines: string[], markerIndex: number): boolean {
+  let sawNonRuntimeCommandOutput = false;
+  let sawEarlierCodexMarker = false;
   for (let index = markerIndex - 1; index >= 0; index -= 1) {
     const trimmed = lines[index]?.trim() ?? '';
     if (!trimmed) {
+      continue;
+    }
+    if (trimmed === 'codex') {
+      sawNonRuntimeCommandOutput = true;
+      sawEarlierCodexMarker = true;
       continue;
     }
     if (isTopLevelReviewRuntimeLine(trimmed)) {
       continue;
     }
     if (isCommandResultHeaderLine(lines[index] ?? '')) {
-      const commandLine = findCommandLineBeforeResultHeader(lines, index);
+      const commandLine =
+        extractInlineCommandLineFromResultHeader(lines[index] ?? '') ??
+        findCommandLineBeforeResultHeader(lines, index);
       if (isReviewTranscriptInspectionCommandLine(commandLine)) {
-        return true;
+        return !sawNonRuntimeCommandOutput || sawEarlierCodexMarker;
       }
       return false;
     }
+    sawNonRuntimeCommandOutput = true;
   }
   return false;
 }
@@ -358,7 +368,27 @@ function isTopLevelReviewRuntimeLine(trimmedLine: string): boolean {
 }
 
 function isCommandResultHeaderLine(line: string): boolean {
-  return /^\s+(?:succeeded|exited \d+|failed) in \d+(?:ms|s):\s*$/u.test(line);
+  return STANDALONE_COMMAND_RESULT_HEADER_PATTERN.test(line) || extractInlineCommandLineFromResultHeader(line) !== null;
+}
+
+const STANDALONE_COMMAND_RESULT_HEADER_PATTERN =
+  /^\s+(?:succeeded|exited \d+|failed) in \d+(?:\.\d+)?(?:ms|s):\s*$/u;
+
+const COMMAND_RESULT_TRAILER_PATTERN =
+  /\s(?:succeeded|exited \d+|failed) in \d+(?:\.\d+)?(?:ms|s):\s*$/u;
+
+function extractInlineCommandLineFromResultHeader(line: string): string | null {
+  const trailerMatch = line.match(COMMAND_RESULT_TRAILER_PATTERN);
+  if (!trailerMatch || typeof trailerMatch.index !== 'number') {
+    return null;
+  }
+  const beforeStatus = line.slice(0, trailerMatch.index).trimEnd();
+  const cwdDelimiterIndex = beforeStatus.lastIndexOf(' in ');
+  if (cwdDelimiterIndex <= 0) {
+    return null;
+  }
+  const commandLine = beforeStatus.slice(0, cwdDelimiterIndex).trim();
+  return commandLine && commandLine.length > 0 ? commandLine : null;
 }
 
 function findCommandLineBeforeResultHeader(lines: string[], headerIndex: number): string | null {
