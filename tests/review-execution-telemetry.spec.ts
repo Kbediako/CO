@@ -224,7 +224,7 @@ describe('review-execution-telemetry', () => {
       },
       {
         name: 'bounded success with findings',
-        output: '- [P2] Bounded review still found a handoff blocker\n',
+        output: 'exec\n/bin/zsh -lc "tail -n 80 review/output.log"\n succeeded in 0ms:\ncodex\nNested clean verdict.\n\ncodex\n- [P2] Bounded review still found a handoff blocker',
         terminationBoundary: boundedTermination,
         expectedOutcome: 'bounded-success',
         expectedPriority: 'P2',

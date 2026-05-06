@@ -345,7 +345,12 @@ function isLikelyInspectedCommandOutputMarker(lines: string[], markerIndex: numb
     if (isCommandResultHeaderLine(lines[index] ?? '')) {
       const commandLine = findCommandLineBeforeResultHeader(lines, index);
       if (isReviewTranscriptInspectionCommandLine(commandLine)) {
-        return true;
+        const candidateVerdict = lines.slice(markerIndex + 1).join('\n');
+        const hasVerdict =
+          analyzeStructuredReviewVerdict(candidateVerdict) ||
+          hasCleanReviewVerdict(candidateVerdict) ||
+          candidateVerdict.split(/\r?\n/u).some((line) => parseReviewFindingLine(line) !== null);
+        return !((lines[markerIndex - 1]?.trim() ?? '') === '' && hasVerdict);
       }
       return looksLikeCodexTranscript(lines.slice(index + 1, markerIndex));
     }
