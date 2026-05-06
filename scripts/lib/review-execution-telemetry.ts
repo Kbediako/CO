@@ -334,20 +334,36 @@ function extractFinalReviewVerdictText(outputText: string): string {
 }
 
 function isLikelyInspectedCommandOutputMarker(lines: string[], markerIndex: number): boolean {
+  let sawNonRuntimeCommandOutput = false;
+  let sawEarlierCodexMarker = false;
+  let sawNestedTranscriptMarker = false;
   for (let index = markerIndex - 1; index >= 0; index -= 1) {
     const trimmed = lines[index]?.trim() ?? '';
     if (!trimmed) {
+      continue;
+    }
+    if (trimmed === 'codex') {
+      sawNonRuntimeCommandOutput = true;
+      sawEarlierCodexMarker = true;
+      continue;
+    }
+    if (isCodexTranscriptMarkerLine(trimmed)) {
+      sawNonRuntimeCommandOutput = true;
+      sawNestedTranscriptMarker = true;
       continue;
     }
     if (isTopLevelReviewRuntimeLine(trimmed)) {
       continue;
     }
     if (isCommandResultHeaderLine(lines[index] ?? '')) {
-      const commandLine = findCommandLineBeforeResultHeader(lines, index);
+      const commandLine =
+        extractInlineCommandLineFromResultHeader(lines[index] ?? '') ??
+        findCommandLineBeforeResultHeader(lines, index);
       if (isReviewTranscriptInspectionCommandLine(commandLine)) {
-        return true;
+        return !sawNonRuntimeCommandOutput || sawEarlierCodexMarker || sawNestedTranscriptMarker;
       }
     }
+    sawNonRuntimeCommandOutput = true;
   }
   return false;
 }
@@ -356,8 +372,39 @@ function isTopLevelReviewRuntimeLine(trimmedLine: string): boolean {
   return trimmedLine.startsWith('[run-review]') || /^\d{4}-\d{2}-\d{2}T[^\s]+\s+(?:TRACE|DEBUG|INFO|WARN|ERROR)\s/u.test(trimmedLine);
 }
 
+function isCodexTranscriptMarkerLine(trimmedLine: string): boolean {
+  return (
+    trimmedLine === 'user' ||
+    trimmedLine === 'thinking' ||
+    trimmedLine === 'exec' ||
+    trimmedLine === '--------' ||
+    /^OpenAI Codex v/u.test(trimmedLine) ||
+    /^(workdir|model|provider|approval|sandbox|reasoning effort|session id):\s/u.test(trimmedLine)
+  );
+}
+
 function isCommandResultHeaderLine(line: string): boolean {
-  return /^\s+(?:succeeded|exited \d+|failed) in \d+(?:ms|s):\s*$/u.test(line);
+  return STANDALONE_COMMAND_RESULT_HEADER_PATTERN.test(line) || extractInlineCommandLineFromResultHeader(line) !== null;
+}
+
+const STANDALONE_COMMAND_RESULT_HEADER_PATTERN =
+  /^\s+(?:succeeded|exited \d+|failed) in \d+(?:\.\d+)?(?:ms|s):\s*$/u;
+
+const COMMAND_RESULT_TRAILER_PATTERN =
+  /\s(?:succeeded|exited \d+|failed) in \d+(?:\.\d+)?(?:ms|s):\s*$/u;
+
+function extractInlineCommandLineFromResultHeader(line: string): string | null {
+  const trailerMatch = line.match(COMMAND_RESULT_TRAILER_PATTERN);
+  if (!trailerMatch || typeof trailerMatch.index !== 'number') {
+    return null;
+  }
+  const beforeStatus = line.slice(0, trailerMatch.index).trimEnd();
+  const cwdDelimiterIndex = beforeStatus.lastIndexOf(' in ');
+  if (cwdDelimiterIndex <= 0) {
+    return null;
+  }
+  const commandLine = beforeStatus.slice(0, cwdDelimiterIndex).trim();
+  return commandLine && commandLine.length > 0 ? commandLine : null;
 }
 
 function findCommandLineBeforeResultHeader(lines: string[], headerIndex: number): string | null {
@@ -387,15 +434,7 @@ function isReviewTranscriptInspectionCommandLine(commandLine: string | null): bo
 function looksLikeCodexTranscript(lines: string[]): boolean {
   return lines.some((line) => {
     const trimmed = line.trim();
-    return (
-      trimmed === 'user' ||
-      trimmed === 'thinking' ||
-      trimmed === 'exec' ||
-      trimmed === 'codex' ||
-      trimmed === '--------' ||
-      /^OpenAI Codex v/u.test(trimmed) ||
-      /^(workdir|model|provider|approval|sandbox|reasoning effort|session id):\s/u.test(trimmed)
-    );
+    return trimmed === 'codex' || isCodexTranscriptMarkerLine(trimmed);
   });
 }
 

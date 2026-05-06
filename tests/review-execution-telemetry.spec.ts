@@ -144,6 +144,27 @@ describe('review-execution-telemetry', () => {
         expectedVerdict: 'unknown'
       },
       {
+        name: 'does not promote inline cwd command-result transcript verdicts',
+        output: [
+          'exec',
+          '/bin/zsh -lc "tail -n 20 review/output.log" in /repo succeeded in 0ms:',
+          'codex',
+          'I found no actionable issues.'
+        ].join('\n'),
+        expectedVerdict: 'unknown'
+      },
+      {
+        name: 'does not promote decimal-duration transcript verdicts',
+        output: [
+          'exec',
+          '/bin/zsh -lc "tail -n 20 review/output.log"',
+          ' succeeded in 1.55s:',
+          'codex',
+          'I found no actionable issues.'
+        ].join('\n'),
+        expectedVerdict: 'unknown'
+      },
+      {
         name: 'keeps source-inspection markers as final verdict boundaries',
         output: [
           'OpenAI Codex v0.128.0 (research preview)',
@@ -252,6 +273,22 @@ describe('review-execution-telemetry', () => {
         output: 'Findings:\n- [P2] Review telemetry summary drops actionable findings\nFindings:\n- [P2] Review telemetry summary drops actionable findings',
         expectedOutcome: 'clean-success',
         expectedPriority: 'P2',
+        expectedCount: 1
+      },
+      {
+        name: 'current finding after cat-v rendered inspected review log',
+        output: [
+          'exec',
+          '/bin/zsh -lc "tail -n 40 review/output.log | cat -vet"',
+          ' succeeded in 0ms:',
+          'codex$',
+          'Nested clean verdict.$',
+          '',
+          'codex',
+          '- [P1] Current final verdict remains actionable'
+        ].join('\n'),
+        expectedOutcome: 'clean-success',
+        expectedPriority: 'P1',
         expectedCount: 1
       },
       {
