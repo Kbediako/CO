@@ -503,12 +503,10 @@ export async function runCommandStage(
         resolveProviderLinearWorkerAttemptStartedAt(providerLinearWorkerProofRecord) ?? entry.started_at ?? null;
       const reviewTelemetryStatus = coerceTelemetryStatusValue(providerReviewTelemetry?.status);
       const reviewOutcomeSummary = formatReviewTelemetryOutcomeSummary(providerReviewTelemetry);
-      const forcedStandaloneReview = parseBooleanEnvFlag(execEnv.FORCE_CODEX_REVIEW);
       const requiresProviderReviewSemanticVerdict =
         proofTerminalStatus === 'succeeded' &&
         proofTerminalReason === 'issue_review_handoff' &&
-        result.status === 'succeeded' &&
-        forcedStandaloneReview;
+        result.status === 'succeeded';
       const reviewSemanticVerdict = providerReviewTelemetry
         ? resolveReviewSemanticVerdict(providerReviewTelemetry)
         : requiresProviderReviewSemanticVerdict
