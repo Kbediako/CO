@@ -837,6 +837,48 @@ describe('review-execution-telemetry', () => {
     expect(payload?.finding_count).toBe(2);
   });
 
+  it('persists markerless structured JSON findings after leading runtime noise', async () => {
+    const sandbox = await makeSandbox();
+    const outputLogPath = await writeReviewOutput(
+      sandbox,
+      [
+        '2026-05-06T07:49:22.913222Z  WARN codex_core::session::turn: after_agent hook failed; continuing',
+        JSON.stringify(
+          {
+            findings: [
+              {
+                title: '[P1] Markerless JSON finding remains actionable',
+                body: 'The parser should skip runtime noise before the final JSON verdict.',
+                priority: 1
+              }
+            ],
+            overall_correctness: 'patch is incorrect'
+          },
+          null,
+          2
+        ),
+        ''
+      ].join('\n')
+    );
+    const telemetryPath = join(sandbox, 'review', 'telemetry.json');
+    const state = new ReviewExecutionState({ repoRoot: sandbox });
+
+    const payload = await writeReviewExecutionTelemetry({
+      state,
+      status: 'succeeded',
+      outputLogPath,
+      repoRoot: sandbox,
+      telemetryPath,
+      includeRawTelemetry: false,
+      telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY'
+    });
+
+    expect(payload?.review_outcome).toBe('clean-success');
+    expect(payload?.review_verdict).toBe('findings');
+    expect(payload?.highest_finding_priority).toBe('P1');
+    expect(payload?.finding_count).toBe(1);
+  });
+
   it('deduplicates repeated finding blocks when deriving the semantic verdict', async () => {
     const sandbox = await makeSandbox();
     const outputLogPath = await writeReviewOutput(

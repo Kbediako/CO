@@ -545,7 +545,7 @@ function analyzeStructuredReviewVerdict(verdictText: string): ReviewSemanticVerd
 }
 
 function extractLeadingJsonObjectText(verdictText: string): string | null {
-  let trimmed = verdictText.trimStart();
+  let trimmed = stripLeadingReviewRuntimeNoise(verdictText).trimStart();
   if (trimmed.startsWith('```')) {
     const firstNewline = trimmed.indexOf('\n');
     if (firstNewline === -1) {
@@ -593,6 +593,19 @@ function extractLeadingJsonObjectText(verdictText: string): string | null {
     }
   }
   return null;
+}
+
+function stripLeadingReviewRuntimeNoise(value: string): string {
+  const lines = value.split(/\r?\n/u);
+  let index = 0;
+  for (; index < lines.length; index += 1) {
+    const trimmed = lines[index]?.trim() ?? '';
+    if (!trimmed || isTopLevelReviewRuntimeLine(trimmed)) {
+      continue;
+    }
+    break;
+  }
+  return lines.slice(index).join('\n');
 }
 
 function parseReviewFindingLine(
