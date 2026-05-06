@@ -803,6 +803,49 @@ describe('runCommandStage review evidence consistency', () => {
     expect(errorPayload.details?.review_outcome_summary).toContain('semantic review verdict: findings (2 findings, highest P1)');
   });
 
+  it('waits for review handoff findings even when forced standalone review is disabled', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      setTimeout(() => {
+        void writeReviewArtifacts(input, {
+          status: 'succeeded',
+          review_outcome: 'clean-success',
+          review_verdict: 'findings',
+          highest_finding_priority: 'P2',
+          finding_count: 1,
+          outputLogContent: '- [P2] Handoff review found an actionable issue',
+          termination_boundary: null
+        });
+      }, 50);
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed without forced standalone review'
+      },
+      { FORCE_CODEX_REVIEW: '0', CODEX_REVIEW_NON_INTERACTIVE: '1' }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed because standalone review reported findings.');
+    expect(result.summary).toContain('semantic review verdict: findings (1 finding, highest P2)');
+
+    const errorPayload = JSON.parse(
+      await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')
+    ) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_findings');
+  });
+
   it('fails succeeded provider-linear-worker stages when review telemetry verdict is unknown or omitted', async () => {
     const cases = [{ name: 'unknown', review_verdict: 'unknown' as const, output: '' }, { name: 'omitted', output: 'No actionable findings.' }, { name: 'missing', missingTelemetry: true }] as const;
 

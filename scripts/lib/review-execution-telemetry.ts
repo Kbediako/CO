@@ -442,9 +442,13 @@ function analyzeStructuredReviewVerdict(verdictText: string): ReviewSemanticVerd
   } catch {
     return null;
   }
-  if (!isRecord(parsed) || !Array.isArray(parsed.findings)) {
-    return null;
+  if (!isRecord(parsed)) return null;
+  const summarizedVerdict = coerceReviewSemanticVerdict(parsed.review_verdict);
+  if (summarizedVerdict) {
+    const findingCount = typeof parsed.finding_count === 'number' && Number.isFinite(parsed.finding_count) ? Math.max(0, Math.trunc(parsed.finding_count)) : 0;
+    return { review_verdict: summarizedVerdict, highest_finding_priority: summarizedVerdict === 'findings' ? coerceReviewFindingPriority(parsed.highest_finding_priority) : null, finding_count: summarizedVerdict === 'findings' ? findingCount : 0 };
   }
+  if (!Array.isArray(parsed.findings)) return null;
   if (parsed.findings.length === 0) {
     return {
       review_verdict: 'clean',

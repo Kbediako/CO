@@ -418,7 +418,7 @@ export async function runCommandStage(
           telemetryPath: reviewTelemetryPath
         })
       : null;
-    const providerReviewTelemetry =
+    let providerReviewTelemetry =
       providerReviewTelemetryMismatch === null
         ? reviewTelemetry
         : null;
@@ -501,14 +501,33 @@ export async function runCommandStage(
       providerLinearWorkerTerminalReason = proofTerminalReason;
       const proofAttemptStartedAt =
         resolveProviderLinearWorkerAttemptStartedAt(providerLinearWorkerProofRecord) ?? entry.started_at ?? null;
-      const reviewTelemetryStatus = coerceTelemetryStatusValue(providerReviewTelemetry?.status);
-      const reviewOutcomeSummary = formatReviewTelemetryOutcomeSummary(providerReviewTelemetry);
-      const forcedStandaloneReview = parseBooleanEnvFlag(execEnv.FORCE_CODEX_REVIEW);
       const requiresProviderReviewSemanticVerdict =
         proofTerminalStatus === 'succeeded' &&
         proofTerminalReason === 'issue_review_handoff' &&
-        result.status === 'succeeded' &&
-        forcedStandaloneReview;
+        result.status === 'succeeded';
+      if (requiresProviderReviewSemanticVerdict && providerReviewTelemetry === null) {
+        const awaitedReviewTelemetry = await loadReviewTelemetryEvidence(reviewTelemetryPath, {
+          waitForEvidence: true
+        });
+        if (
+          awaitedReviewTelemetry &&
+          verifyReviewTelemetryFreshness({
+            env,
+            paths,
+            startedAt: entry.started_at,
+            telemetry: awaitedReviewTelemetry,
+            telemetryPath: reviewTelemetryPath
+          }) === null
+        ) {
+          providerReviewTelemetry = awaitedReviewTelemetry;
+          reviewOutputLogNoiseSummary = await formatReviewOutputLogNoiseSummary({
+            paths,
+            telemetry: providerReviewTelemetry
+          });
+        }
+      }
+      const reviewTelemetryStatus = coerceTelemetryStatusValue(providerReviewTelemetry?.status);
+      const reviewOutcomeSummary = formatReviewTelemetryOutcomeSummary(providerReviewTelemetry);
       const reviewSemanticVerdict = providerReviewTelemetry
         ? resolveReviewSemanticVerdict(providerReviewTelemetry)
         : requiresProviderReviewSemanticVerdict
