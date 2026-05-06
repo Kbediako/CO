@@ -21,9 +21,9 @@
 - [x] Pre-implementation issue-quality review recorded in the canonical spec. Evidence: `tasks/specs/linear-dd2af462-08ae-4ea2-aa53-92000f06952a.md`.
 
 ## Child-Lane Scope
-- [x] Child lane stayed inside the declared docs/checklist/registry file scope. Evidence: final diff.
-- [x] Child lane did not edit implementation or test files. Evidence: final diff.
-- [x] Child lane did not mutate Linear, GitHub, workpad, or PR lifecycle state. Evidence: this checklist and final diff.
+- [x] Child lane stayed inside the declared docs/checklist/registry file scope. Evidence: docs-packet child-lane manifest `.runs/linear-dd2af462-08ae-4ea2-aa53-92000f06952a-docs-packet/cli/2026-05-05T22-29-01-603Z-53a89036/manifest.json` plus this scoped checklist.
+- [x] Child lane did not edit implementation or test files. Evidence: docs-packet child-lane manifest `.runs/linear-dd2af462-08ae-4ea2-aa53-92000f06952a-docs-packet/cli/2026-05-05T22-29-01-603Z-53a89036/manifest.json` and parent-owned implementation/test validation below.
+- [x] Child lane did not mutate Linear, GitHub, workpad, or PR lifecycle state. Evidence: docs-packet child-lane manifest `.runs/linear-dd2af462-08ae-4ea2-aa53-92000f06952a-docs-packet/cli/2026-05-05T22-29-01-603Z-53a89036/manifest.json`; parent workpad/PR lifecycle is recorded separately in Linear and PR #779.
 - [x] Child lane did not run full repo validation suites. Evidence: validation section below.
 - [x] Child lane leaves changes uncommitted for parent patch export. Evidence: `git status --short`.
 
