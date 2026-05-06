@@ -503,7 +503,9 @@ export async function runCommandStage(
         resolveProviderLinearWorkerAttemptStartedAt(providerLinearWorkerProofRecord) ?? entry.started_at ?? null;
       const reviewTelemetryStatus = coerceTelemetryStatusValue(providerReviewTelemetry?.status);
       const reviewOutcomeSummary = formatReviewTelemetryOutcomeSummary(providerReviewTelemetry);
-      const reviewSemanticVerdict = resolveReviewSemanticVerdict(providerReviewTelemetry);
+      const reviewSemanticVerdict = providerReviewTelemetry
+        ? resolveReviewSemanticVerdict(providerReviewTelemetry)
+        : result.status === 'succeeded' && reviewTelemetry === null && providerReviewTelemetryMismatch === null && parseBooleanEnvFlag(stage.env?.FORCE_CODEX_REVIEW) ? 'unknown' : null;
       providerLinearWorkerReviewOutcomeSummary = reviewOutcomeSummary;
       const mutationSuppressions = deriveDeterministicProviderMutationSuppressions(
         providerLinearWorkerProof?.linear_audit ?? null,

@@ -825,10 +825,7 @@ describe('runCommandStage review evidence consistency', () => {
   });
 
   it('fails succeeded provider-linear-worker stages when review telemetry verdict is unknown or omitted', async () => {
-    const cases = [
-      { name: 'unknown', review_verdict: 'unknown' as const, output: '' },
-      { name: 'omitted', output: 'No actionable findings.' }
-    ] as const;
+    const cases = [{ name: 'unknown', review_verdict: 'unknown' as const, output: '' }, { name: 'omitted', output: 'No actionable findings.' }, { name: 'missing', missingTelemetry: true }] as const;
 
     for (const testCase of cases) {
       mockState.runImpl = async (input) => {
@@ -837,14 +834,10 @@ describe('runCommandStage review evidence consistency', () => {
           owner_status: 'succeeded',
           end_reason: 'issue_review_handoff'
         });
-        await writeReviewArtifacts(input, {
-          status: 'succeeded',
-          review_outcome: 'clean-success',
-          ...('review_verdict' in testCase ? { review_verdict: testCase.review_verdict } : {}),
-          finding_count: 0,
-          outputLogContent: ['codex', testCase.output].join('\n'),
-          termination_boundary: null
-        });
+        if ('missingTelemetry' in testCase) await rm(join(String(((input.env ?? {}) as NodeJS.ProcessEnv).CODEX_ORCHESTRATOR_RUN_DIR), 'review'), { recursive: true, force: true });
+        if (!('missingTelemetry' in testCase)) {
+          await writeReviewArtifacts(input, { status: 'succeeded', review_outcome: 'clean-success', ...('review_verdict' in testCase ? { review_verdict: testCase.review_verdict } : {}), finding_count: 0, outputLogContent: ['codex', testCase.output].join('\n'), termination_boundary: null });
+        }
         return buildSuccessfulExecResult();
       };
 
@@ -863,7 +856,6 @@ describe('runCommandStage review evidence consistency', () => {
       expect(result.summary).toContain(
         'Provider linear worker failed because standalone review did not produce a concrete verdict.'
       );
-      expect(result.summary).toContain('review outcome: clean success');
       expect(result.summary).toContain('semantic review verdict: unknown');
       expect(result.summary).not.toContain('semantic review verdict: unknown; semantic review verdict: unknown');
 

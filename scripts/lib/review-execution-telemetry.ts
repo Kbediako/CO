@@ -304,9 +304,7 @@ export function coerceReviewSemanticVerdict(value: unknown): ReviewSemanticVerdi
 }
 
 export function coerceReviewFindingPriority(value: unknown): ReviewFindingPriority | null {
-  return value === 'P0' || value === 'P1' || value === 'P2' || value === 'P3'
-    ? value
-    : null;
+  return value === 'P0' || value === 'P1' || value === 'P2' || value === 'P3' ? value : null;
 }
 
 async function readReviewOutputLog(outputLogPath: string): Promise<string | null> {
@@ -344,114 +342,28 @@ function isLikelyInspectedCommandOutputMarker(lines: string[], markerIndex: numb
     if (isTopLevelReviewRuntimeLine(trimmed)) {
       continue;
     }
-    const inlineCommandLine = extractInlineCommandResultCommandLine(lines[index] ?? '');
-    if (inlineCommandLine) {
-      if (isReviewTranscriptInspectionCommandLine(inlineCommandLine)) {
-        return isCodexMarkerInsideInspectedTranscriptCommandOutput(
-          lines,
-          index,
-          markerIndex
-        );
-      }
-      return false;
-    }
     if (isCommandResultHeaderLine(lines[index] ?? '')) {
       const commandLine = findCommandLineBeforeResultHeader(lines, index);
       if (isReviewTranscriptInspectionCommandLine(commandLine)) {
-        return isCodexMarkerInsideInspectedTranscriptCommandOutput(
-          lines,
-          index,
-          markerIndex
-        );
+        const candidateVerdict = lines.slice(markerIndex + 1).join('\n');
+        const hasVerdict =
+          analyzeStructuredReviewVerdict(candidateVerdict) ||
+          hasCleanReviewVerdict(candidateVerdict) ||
+          candidateVerdict.split(/\r?\n/u).some((line) => parseReviewFindingLine(line) !== null);
+        return !((lines[markerIndex - 1]?.trim() ?? '') === '' && hasVerdict);
       }
-      return false;
+      return looksLikeCodexTranscript(lines.slice(index + 1, markerIndex));
     }
   }
   return false;
-}
-
-function isCodexMarkerInsideInspectedTranscriptCommandOutput(
-  lines: string[],
-  headerIndex: number,
-  markerIndex: number
-): boolean {
-  if (!hasNonEmptyLineBetween(lines, headerIndex + 1, markerIndex)) {
-    return true;
-  }
-  for (let index = headerIndex + 1; index < markerIndex; index += 1) {
-    if (lines[index]?.trim() === 'codex') {
-      return hasTranscriptContinuationBetween(lines, index + 1, markerIndex);
-    }
-  }
-  return hasTranscriptContinuationBetween(lines, headerIndex + 1, markerIndex);
-}
-
-function hasNonEmptyLineBetween(lines: string[], startIndex: number, endIndex: number): boolean {
-  for (let index = startIndex; index < endIndex; index += 1) {
-    if (lines[index]?.trim()) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function hasTranscriptContinuationBetween(
-  lines: string[],
-  startIndex: number,
-  endIndex: number
-): boolean {
-  for (let index = startIndex; index < endIndex; index += 1) {
-    const trimmed = lines[index]?.trim() ?? '';
-    if (!trimmed) {
-      continue;
-    }
-    if (
-      trimmed === 'user' ||
-      trimmed === 'thinking' ||
-      trimmed === 'exec' ||
-      trimmed === '--------' ||
-      /^OpenAI Codex v/u.test(trimmed) ||
-      ((isRunReviewRuntimeLine(trimmed) || isReviewRuntimeTimestampLine(trimmed)) &&
-        !hasBlankLineBetween(lines, index + 1, endIndex)) ||
-      /^(workdir|model|provider|approval|sandbox|reasoning effort|session id):\s/u.test(trimmed)
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function hasBlankLineBetween(lines: string[], startIndex: number, endIndex: number): boolean {
-  for (let index = startIndex; index < endIndex; index += 1) {
-    if (!(lines[index]?.trim() ?? '')) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function isReviewRuntimeTimestampLine(trimmedLine: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}T[^\s]+\s+(?:TRACE|DEBUG|INFO|WARN|ERROR)\s/u.test(trimmedLine);
-}
-
-function isRunReviewRuntimeLine(trimmedLine: string): boolean {
-  return trimmedLine.startsWith('[run-review]');
 }
 
 function isTopLevelReviewRuntimeLine(trimmedLine: string): boolean {
-  return (
-    isRunReviewRuntimeLine(trimmedLine) ||
-    isReviewRuntimeTimestampLine(trimmedLine)
-  );
+  return trimmedLine.startsWith('[run-review]') || /^\d{4}-\d{2}-\d{2}T[^\s]+\s+(?:TRACE|DEBUG|INFO|WARN|ERROR)\s/u.test(trimmedLine);
 }
 
 function isCommandResultHeaderLine(line: string): boolean {
   return /^\s+(?:succeeded|exited \d+|failed) in \d+(?:ms|s):\s*$/u.test(line);
-}
-
-function extractInlineCommandResultCommandLine(line: string): string | null {
-  const match = line.match(/^\s*((?:\/[^\s]+|(?:cat|sed|tail|head|less|rg|grep|awk|nl)\b)[\s\S]*?)\s+(?:succeeded|exited\s+\d+|failed)\s+in\s+\d+(?:ms|s):\s*$/u);
-  return match?.[1]?.trim() || null;
 }
 
 function findCommandLineBeforeResultHeader(lines: string[], headerIndex: number): string | null {
@@ -470,19 +382,8 @@ function isReviewTranscriptInspectionCommandLine(commandLine: string | null): bo
     return false;
   }
   const normalized = commandLine.toLowerCase();
-  const transcriptReadToolPattern = /\b(?:cat|sed|tail|head|less|rg|grep|awk|nl)\b/u;
-  const outputLogPathPattern = /(?:^|[/\s"'=])output(?:-[^/\s"']*)?\.log(?:$|[\s"'])/u;
-  const recordedReviewCwdPattern = /\s+in\s+[^\n]*\/review(?:$|[\s"'`])/u;
   return (
     /(?:^|[/\s"'=])review\/output(?:-[^/\s"']*)?\.log(?:$|[\s"'])/u.test(normalized) ||
-    /\bcd\s+(?:[^\s;&|]+\/)?review\b[\s\S]*\b(?:cat|sed|tail|head|less|rg|grep|awk|nl)\b[\s\S]*(?:^|[/\s"'=])output(?:-[^/\s"']*)?\.log(?:$|[\s"'])/u.test(
-      normalized
-    ) ||
-    (transcriptReadToolPattern.test(normalized) &&
-      outputLogPathPattern.test(normalized) &&
-      recordedReviewCwdPattern.test(normalized)) ||
-    (transcriptReadToolPattern.test(normalized) &&
-      /\$(?:\{)?[a-z0-9_]*(?:review|transcript)[a-z0-9_]*(?:\})?/u.test(normalized)) ||
     /\b(?:cat|sed|tail|head|less|rg|grep|awk|nl)\b[\s\S]*(?:^|[/\s"'=])(?:nested-review|codex[^/\s"']*|[^/\s"']*transcript[^/\s"']*)\.log(?:$|[\s"'])/u.test(
       normalized
     )
@@ -628,7 +529,7 @@ function parseStructuredReviewFinding(value: unknown): ParsedReviewFinding | nul
     return null;
   }
   const title = normalizeOptionalString(value.title);
-  const titleFinding = title ? parseReviewFindingTitle(title) : null;
+  const titleFinding = title ? parseReviewFindingLine(title) : null;
   const priority = titleFinding?.priority ?? parseStructuredReviewFindingPriority(value.priority);
   if (!priority) {
     return null;
@@ -641,19 +542,6 @@ function parseStructuredReviewFinding(value: unknown): ParsedReviewFinding | nul
       normalizeOptionalString(value.body) ??
       `structured ${priority} finding`
   };
-}
-
-function parseReviewFindingTitle(title: string): ParsedReviewFinding | null {
-  const match = title.match(/^\s*\[(P[0-3])\]\s+(.+?)\s*$/u);
-  if (!match) {
-    return null;
-  }
-  const priority = coerceReviewFindingPriority(match[1]);
-  const text = match[2]?.trim();
-  if (!priority || !text) {
-    return null;
-  }
-  return { priority, text };
 }
 
 function parseStructuredReviewFindingPriority(value: unknown): ReviewFindingPriority | null {
@@ -706,21 +594,10 @@ function compareReviewFindingPriority(
   left: ReviewFindingPriority,
   right: ReviewFindingPriority
 ): number {
-  return reviewFindingPriorityRank(left) - reviewFindingPriorityRank(right);
+  return reviewFindingPriorityRanks[left] - reviewFindingPriorityRanks[right];
 }
 
-function reviewFindingPriorityRank(priority: ReviewFindingPriority): number {
-  switch (priority) {
-    case 'P0':
-      return 0;
-    case 'P1':
-      return 1;
-    case 'P2':
-      return 2;
-    case 'P3':
-      return 3;
-  }
-}
+const reviewFindingPriorityRanks: Record<ReviewFindingPriority, number> = { P0: 0, P1: 1, P2: 2, P3: 3 };
 
 function hasCleanReviewVerdict(outputText: string): boolean {
   return outputText
