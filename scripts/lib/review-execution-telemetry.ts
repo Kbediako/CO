@@ -443,35 +443,44 @@ function analyzeStructuredReviewVerdict(verdictText: string): ReviewSemanticVerd
     return null;
   }
   if (!isRecord(parsed)) return null;
-  const summarizedVerdict = coerceReviewSemanticVerdict(parsed.review_verdict);
-  if (summarizedVerdict) {
-    const findingCount = typeof parsed.finding_count === 'number' && Number.isFinite(parsed.finding_count) ? Math.max(0, Math.trunc(parsed.finding_count)) : 0;
-    return { review_verdict: summarizedVerdict, highest_finding_priority: summarizedVerdict === 'findings' ? coerceReviewFindingPriority(parsed.highest_finding_priority) : null, finding_count: summarizedVerdict === 'findings' ? findingCount : 0 };
-  }
-  if (!Array.isArray(parsed.findings)) return null;
-  if (parsed.findings.length === 0) {
-    return {
-      review_verdict: 'clean',
-      highest_finding_priority: null,
-      finding_count: 0
-    };
+  const structuredFindings = Array.isArray(parsed.findings) ? parsed.findings : null;
+  if (structuredFindings && structuredFindings.length > 0) {
+    const findings = structuredFindings.map(parseStructuredReviewFinding);
+    return (
+      summarizeReviewFindings(
+        findings.map((finding, index) =>
+          finding ?? {
+            priority: null,
+            text: `structured finding ${index + 1}`
+          }
+        )
+      ) ?? {
+        review_verdict: 'findings',
+        highest_finding_priority: null,
+        finding_count: structuredFindings.length
+      }
+    );
   }
 
-  const findings = parsed.findings.map(parseStructuredReviewFinding);
-  return (
-    summarizeReviewFindings(
-      findings.map((finding, index) =>
-        finding ?? {
-          priority: null,
-          text: `structured finding ${index + 1}`
-        }
-      )
-    ) ?? {
-      review_verdict: 'findings',
-      highest_finding_priority: null,
-      finding_count: parsed.findings.length
-    }
-  );
+  const summarizedVerdict = coerceReviewSemanticVerdict(parsed.review_verdict);
+  if (summarizedVerdict) {
+    const findingCount =
+      typeof parsed.finding_count === 'number' && Number.isFinite(parsed.finding_count)
+        ? Math.max(0, Math.trunc(parsed.finding_count))
+        : 0;
+    return {
+      review_verdict: summarizedVerdict,
+      highest_finding_priority:
+        summarizedVerdict === 'findings' ? coerceReviewFindingPriority(parsed.highest_finding_priority) : null,
+      finding_count: summarizedVerdict === 'findings' ? findingCount : 0
+    };
+  }
+  if (!structuredFindings) return null;
+  return {
+    review_verdict: 'clean',
+    highest_finding_priority: null,
+    finding_count: 0
+  };
 }
 
 function extractLeadingJsonObjectText(verdictText: string): string | null {
