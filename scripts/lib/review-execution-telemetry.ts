@@ -603,10 +603,25 @@ const CLEAN_REVIEW_VERDICT_PATTERNS = [
   /^\s*(?:[-*]\s*)?(?:I\s+)?did\s+not\s+(?:find|identify|detect|see)\s+(?:any\s+|a\s+)?(?:(?:concrete|discrete|actionable|correctness)\s+)*(?:issues?|findings?|regressions?)(?:\s+(?:in|for|from|against|with)\b.*)?[.!]?\s*$/iu
 ] as const;
 
+const CLEAN_REVIEW_VERDICT_SENTENCE_BOUNDARY =
+  /[.!?]\s+(?=(?:[-*]\s*)?(?:I\b|No\b|Read-only\b))/u;
+
+function getCleanReviewVerdictCandidates(line: string): string[] {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return [];
+  }
+  return [trimmed, ...trimmed.split(CLEAN_REVIEW_VERDICT_SENTENCE_BOUNDARY).map((candidate) => candidate.trim())];
+}
+
 function hasCleanReviewVerdict(outputText: string): boolean {
   return outputText
     .split(/\r?\n/u)
-    .some((line) => CLEAN_REVIEW_VERDICT_PATTERNS.some((pattern) => pattern.test(line)));
+    .some((line) =>
+      getCleanReviewVerdictCandidates(line).some((candidate) =>
+        CLEAN_REVIEW_VERDICT_PATTERNS.some((pattern) => pattern.test(candidate))
+      )
+    );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

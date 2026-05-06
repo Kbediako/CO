@@ -1008,6 +1008,40 @@ describe('runCommandStage review evidence consistency', () => {
     );
   });
 
+  it('does not require review telemetry for inherited FORCE_CODEX_REVIEW when the provider worker stops before review handoff', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive'
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { manifest, stage, ...context } = await bootstrapCommandStage({
+      id: 'provider-linear-worker',
+      title: 'Run provider linear worker',
+      command: 'node providerLinearWorkerRunner.js',
+      summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    });
+    const result = await runCommandStage({
+      ...context,
+      manifest,
+      stage,
+      index: 1,
+      envOverrides: {
+        FORCE_CODEX_REVIEW: '1'
+      }
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toContain(
+      'Provider linear worker stopped because the issue was no longer active.'
+    );
+    expect(result.summary).not.toContain('semantic review verdict: unknown');
+    expect(manifest.commands[0]?.status).toBe('succeeded');
+  });
+
   it('preserves proof-missing failure reason when review telemetry also fails', async () => {
     mockState.runImpl = async (input) => {
       await writeReviewArtifacts(input, {
@@ -1136,6 +1170,8 @@ describe('runCommandStage review evidence consistency', () => {
       title: 'Run provider linear worker',
       command: 'node providerLinearWorkerRunner.js',
       summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    }, {
+      FORCE_CODEX_REVIEW: '0'
     });
     const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
 
@@ -1218,6 +1254,8 @@ describe('runCommandStage review evidence consistency', () => {
       title: 'Run provider linear worker',
       command: 'node providerLinearWorkerRunner.js',
       summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    }, {
+      FORCE_CODEX_REVIEW: '0'
     });
     const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
 
