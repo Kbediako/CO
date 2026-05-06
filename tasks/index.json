@@ -8,7 +8,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-06",
+      "last_review": "2026-05-07",
       "status": "in_progress",
       "canonical_owner_marker": "build-all-strict-test-typecheck-debt",
       "evidence": [
@@ -20,7 +20,11 @@
         ".agent/task/linear-93f80950-06e5-41f2-9186-f4877e69f563.md",
         "docs/TASKS.md",
         "tasks/index.json",
-        "docs/docs-freshness-registry.json"
+        "docs/docs-freshness-registry.json",
+        "scripts/build-all-strict-typecheck.mjs",
+        "tasks/baselines/build-all-strict-typecheck-debt.json",
+        "package.json",
+        ".agent/SOPs/release.md"
       ],
       "approvals": {
         "traceability_packet": {
@@ -28,6 +32,12 @@
           "date": "2026-05-06",
           "status": "produced",
           "summary": "Created the CO-471 docs-first packet and registry mirrors to clear backlog_head_follow_up_traceability_pending only, while preserving npm run build:all as the release/full-matrix signal, root tsconfig.json strict test type debt authority, tsconfig.build.json production-build boundaries, named test debt, CO-458 non-goal scope, and the rule that npm run build passing is not completion."
+        },
+        "implementation_strategy": {
+          "reviewer": "CO-471 provider worker",
+          "date": "2026-05-07",
+          "status": "produced",
+          "summary": "Implemented staged root strict typecheck baseline guard: npm run build:all now runs npm run build, npm run build:patterns, and npm run typecheck:root-baseline; npm run typecheck:root remains raw debt reproduction; exact diagnostics live in tasks/baselines/build-all-strict-typecheck-debt.json."
         }
       },
       "paths": {
