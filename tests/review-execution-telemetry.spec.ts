@@ -194,6 +194,24 @@ describe('review-execution-telemetry', () => {
       },
       { name: 'summary-shaped structured JSON verdict', output: JSON.stringify({ review_verdict: 'findings', highest_finding_priority: 'P2', finding_count: 2 }), expectedOutcome: 'clean-success', expectedPriority: 'P2', expectedCount: 2 },
       {
+        name: 'structured findings dominate clean summary verdict',
+        output: JSON.stringify({
+          review_verdict: 'clean',
+          highest_finding_priority: null,
+          finding_count: 0,
+          findings: [
+            {
+              title: '[P1] Summary verdict must not hide an actionable finding',
+              body: 'The structured findings array is the authoritative actionable signal.',
+              priority: 1
+            }
+          ]
+        }),
+        expectedOutcome: 'clean-success',
+        expectedPriority: 'P1',
+        expectedCount: 1
+      },
+      {
         name: 'markerless structured JSON verdict after runtime noise',
         output: [
           '2026-05-06T07:49:22.913222Z  WARN codex_core::session::turn: after_agent hook failed; continuing',
