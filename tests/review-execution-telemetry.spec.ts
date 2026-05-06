@@ -72,7 +72,7 @@ describe('review-execution-telemetry', () => {
   });
 
   it('persists clean semantic review verdicts separately from wrapper execution state', async () => {
-    const cleanOutputs = ['I found no actionable issues in the uncommitted diff.', 'Read-only inspection of the uncommitted diff found no actionable correctness issues.', 'Read-only diff inspection found no actionable correctness regressions in the changed telemetry parser.', 'No actionable issues.', 'No actionable correctness regressions.', 'I did not identify a discrete regression.', 'I did not find a concrete regression in the changed telemetry parser.'];
+    const cleanOutputs = ['I found no actionable issues in the uncommitted diff.', 'Read-only inspection of the uncommitted diff found no actionable correctness issues.', 'Read-only diff inspection found no actionable correctness regressions in the changed telemetry parser.', 'No actionable issues.', 'No actionable correctness regressions.', 'I did not identify a discrete regression.', 'I did not find a concrete regression in the changed telemetry parser.', JSON.stringify({ review_verdict: 'clean', highest_finding_priority: null, finding_count: 0 })];
 
     for (const cleanOutput of cleanOutputs) {
       const sandbox = await makeSandbox();
@@ -192,6 +192,7 @@ describe('review-execution-telemetry', () => {
         expectedPriority: 'P1',
         expectedCount: 2
       },
+      { name: 'summary-shaped structured JSON verdict', output: JSON.stringify({ review_verdict: 'findings', highest_finding_priority: 'P2', finding_count: 2 }), expectedOutcome: 'clean-success', expectedPriority: 'P2', expectedCount: 2 },
       {
         name: 'markerless structured JSON verdict after runtime noise',
         output: [
@@ -213,12 +214,7 @@ describe('review-execution-telemetry', () => {
       },
       {
         name: 'duplicated finding blocks',
-        output: [
-          'Findings:',
-          '- [P2] Review telemetry summary drops actionable findings',
-          'Findings:',
-          '- [P2] Review telemetry summary drops actionable findings'
-        ].join('\n'),
+        output: 'Findings:\n- [P2] Review telemetry summary drops actionable findings\nFindings:\n- [P2] Review telemetry summary drops actionable findings',
         expectedOutcome: 'clean-success',
         expectedPriority: 'P2',
         expectedCount: 1
