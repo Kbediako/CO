@@ -27,7 +27,10 @@ import { isoTimestamp } from '../utils/time.js';
 import { buildCommandPreview } from '../utils/commandPreview.js';
 import { EnvUtils } from '../../../../packages/shared/config/index.js';
 import {
+  coerceReviewFindingPriority,
+  coerceReviewSemanticVerdict,
   deriveReviewOutcomeDisposition,
+  formatReviewSemanticVerdictSummary,
   type ReviewOutcomeDisposition
 } from '../../../../scripts/lib/review-execution-telemetry.js';
 import { findPackageRoot } from '../utils/packageInfo.js';
@@ -106,6 +109,9 @@ interface ReviewTelemetryEvidencePayload {
   output_log_path?: unknown;
   status?: unknown;
   review_outcome?: unknown;
+  review_verdict?: unknown;
+  highest_finding_priority?: unknown;
+  finding_count?: unknown;
   error?: unknown;
   termination_boundary?: unknown;
 }
@@ -497,6 +503,9 @@ export async function runCommandStage(
         resolveProviderLinearWorkerAttemptStartedAt(providerLinearWorkerProofRecord) ?? entry.started_at ?? null;
       const reviewTelemetryStatus = coerceTelemetryStatusValue(providerReviewTelemetry?.status);
       const reviewOutcomeSummary = formatReviewTelemetryOutcomeSummary(providerReviewTelemetry);
+      const reviewSemanticVerdict = coerceReviewSemanticVerdict(
+        providerReviewTelemetry?.review_verdict
+      );
       providerLinearWorkerReviewOutcomeSummary = reviewOutcomeSummary;
       const mutationSuppressions = deriveDeterministicProviderMutationSuppressions(
         providerLinearWorkerProof?.linear_audit ?? null,
@@ -523,6 +532,34 @@ export async function runCommandStage(
           status: 'failed',
           endReason: null,
           reviewOutcomeSummary: reviewOutcomeSummary ?? 'review telemetry reported terminal failure',
+          reviewOutputLogNoiseSummary,
+          degradationSummary
+        });
+        forceProviderLinearWorkerFailure = true;
+      } else if (
+        providerLinearWorkerFailureReason === null &&
+        reviewSemanticVerdict === 'findings'
+      ) {
+        providerLinearWorkerFailureReason = 'provider_linear_worker_review_findings';
+        effectiveSummary = buildProviderLinearWorkerTerminalSummary({
+          status: 'failed',
+          endReason: 'review_findings_detected',
+          reviewOutcomeSummary: reviewOutcomeSummary ?? 'semantic review verdict: findings',
+          reviewOutputLogNoiseSummary,
+          degradationSummary
+        });
+        forceProviderLinearWorkerFailure = true;
+      } else if (
+        providerLinearWorkerFailureReason === null &&
+        reviewSemanticVerdict === 'unknown'
+      ) {
+        const unknownReviewOutcomeSummary = reviewOutcomeSummary ?? 'semantic review verdict: unknown';
+        providerLinearWorkerReviewOutcomeSummary = unknownReviewOutcomeSummary;
+        providerLinearWorkerFailureReason = 'provider_linear_worker_review_unknown';
+        effectiveSummary = buildProviderLinearWorkerTerminalSummary({
+          status: 'failed',
+          endReason: 'review_verdict_unknown',
+          reviewOutcomeSummary: unknownReviewOutcomeSummary,
           reviewOutputLogNoiseSummary,
           degradationSummary
         });
@@ -1134,20 +1171,32 @@ function formatReviewTelemetryOutcomeSummary(
     return null;
   }
   const boundaryKind = coerceTelemetryTerminationBoundaryKind(telemetry);
-  switch (disposition) {
-    case 'clean-success':
-      return 'review outcome: clean success';
-    case 'bounded-success':
-      return boundaryKind
-        ? `review outcome: bounded success via ${boundaryKind}; not a wrapper failure`
-        : 'review outcome: bounded success with preserved termination boundary; not a wrapper failure';
-    case 'failed-boundary':
-      return boundaryKind
-        ? `review outcome: review-wrapper failure via ${boundaryKind}`
-        : 'review outcome: review-wrapper failure via explicit termination boundary';
-    case 'failed-other':
-      return 'review outcome: review command failed without termination-boundary classification; not an explicit wrapper-boundary failure';
-  }
+  const outcomeSummary = (() => {
+    switch (disposition) {
+      case 'clean-success':
+        return 'review outcome: clean success';
+      case 'bounded-success':
+        return boundaryKind
+          ? `review outcome: bounded success via ${boundaryKind}; not a wrapper failure`
+          : 'review outcome: bounded success with preserved termination boundary; not a wrapper failure';
+      case 'failed-boundary':
+        return boundaryKind
+          ? `review outcome: review-wrapper failure via ${boundaryKind}`
+          : 'review outcome: review-wrapper failure via explicit termination boundary';
+      case 'failed-other':
+        return 'review outcome: review command failed without termination-boundary classification; not an explicit wrapper-boundary failure';
+    }
+  })();
+  const semanticSummary = formatReviewSemanticVerdictSummary({
+    review_verdict: coerceReviewSemanticVerdict(telemetry?.review_verdict),
+    highest_finding_priority: coerceReviewFindingPriority(telemetry?.highest_finding_priority),
+    finding_count: coerceTelemetryFindingCount(telemetry?.finding_count)
+  });
+  return semanticSummary ? `${outcomeSummary}; ${semanticSummary}` : outcomeSummary;
+}
+
+function coerceTelemetryFindingCount(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : null;
 }
 
 async function formatReviewOutputLogNoiseSummary(options: {

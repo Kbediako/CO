@@ -3593,6 +3593,7 @@ function buildPreReviewHandoffGateSection(): string[] {
 
 function buildReviewOutcomeGuidanceSection(): string[] {
   return [
+    '- When `review/telemetry.json` reports `review_verdict: findings`, treat the parsed findings as actionable review feedback even if wrapper execution reports `status: succeeded`, `review_outcome: clean-success`, or `review_outcome: bounded-success`; record the finding count/severity in the workpad and do not call the review clean until the findings are resolved or explicitly pushed back.',
     '- When `review/telemetry.json` reports `status: succeeded` with `review_outcome: bounded-success` (or a legacy succeeded payload with a preserved `termination_boundary`), record that in the workpad and validation notes as successful bounded review completion, not as a blocker or generic quiet-tail failure.',
     '- Treat `review_outcome: failed-boundary` (or legacy failed telemetry with a non-null `termination_boundary`) as an explicit review-wrapper boundary failure. Treat `failed-other` as a failed review command without a classified boundary, not as proof of wrapper breakage; keep unrelated validation, CI, or merge blockers labeled separately instead of blaming review closeout.'
   ];

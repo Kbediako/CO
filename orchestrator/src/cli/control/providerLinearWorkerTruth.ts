@@ -445,6 +445,10 @@ function formatProviderLinearWorkerTerminalBaseSummary(
           return 'Provider linear worker failed because Codex did not emit a thread identifier.';
         case 'provider_linear_worker_proof_missing_or_unreadable':
           return 'Provider linear worker failed because authoritative proof was missing or unreadable.';
+        case 'review_findings_detected':
+          return 'Provider linear worker failed because standalone review reported findings.';
+        case 'review_verdict_unknown':
+          return 'Provider linear worker failed because standalone review did not produce a concrete verdict.';
         default:
           return `Provider linear worker failed (${endReason}).`;
       }
