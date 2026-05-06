@@ -1,6 +1,48 @@
 {
   "items": [
     {
+      "id": "20260507-linear-63b806b8-2a46-48ff-b330-eeee2f0038dd",
+      "title": "CO-505 normalize docs/TASKS historical evidence paths",
+      "relates_to": "tasks/tasks-linear-63b806b8-2a46-48ff-b330-eeee2f0038dd.md",
+      "risk": "low",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-07",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "Codex provider worker for CO-505",
+          "date": "2026-05-07",
+          "status": "ready_to_in_progress",
+          "summary": "linear issue-context found CO-505 Ready/unstarted with In Progress as the live started state, no attached PR, and no prior workpad."
+        },
+        "parallelization": {
+          "reviewer": "linear parallelization helper",
+          "date": "2026-05-07",
+          "decision": "parallelize_now",
+          "reason": "independent_scope_available",
+          "child_lane": ".runs/linear-63b806b8-2a46-48ff-b330-eeee2f0038dd-docs-packet/cli/2026-05-06T21-26-39-696Z-11dba66f/manifest.json",
+          "summary": "Packet-only docs child owns six docs-first files while parent owns docs/TASKS.md path normalization and registry mirrors.",
+          "outcome": "Child lane docs-packet completed successfully, produced provider-linear-child-lane.patch, and was accepted by the parent after git apply --check passed."
+        },
+        "path_inventory": {
+          "reviewer": "Codex provider worker for CO-505",
+          "date": "2026-05-07",
+          "status": "completed",
+          "summary": "rg inventory found repo-owned CO checkout absolute evidence paths and no current upward-traversal run-path references in docs/TASKS.md; parent normalized in-repo references and retained external home, LaunchAgent, user-report, and sibling Symphony paths with the file-level external exception note."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-63b806b8-2a46-48ff-b330-eeee2f0038dd.md",
+        "task": "tasks/tasks-linear-63b806b8-2a46-48ff-b330-eeee2f0038dd.md",
+        "agent_task": ".agent/task/linear-63b806b8-2a46-48ff-b330-eeee2f0038dd.md",
+        "prd": "docs/PRD-linear-63b806b8-2a46-48ff-b330-eeee2f0038dd.md",
+        "docs": "docs/TECH_SPEC-linear-63b806b8-2a46-48ff-b330-eeee2f0038dd.md",
+        "action_plan": "docs/ACTION_PLAN-linear-63b806b8-2a46-48ff-b330-eeee2f0038dd.md"
+      }
+    },
+    {
       "id": "20260507-linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5",
       "title": "CO-506 require full fallback metadata for legacy bounded-success review guidance",
       "relates_to": "tasks/tasks-linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5.md",
