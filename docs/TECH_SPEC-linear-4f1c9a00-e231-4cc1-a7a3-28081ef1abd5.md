@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-07
+last_review: 2026-05-06
 related_action_plan: docs/ACTION_PLAN-linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5.md
 task_checklists:
   - tasks/tasks-linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5.md
@@ -129,6 +129,6 @@ Canonical spec: `tasks/specs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5.md`.
   - broader build/lint/test/review gates scaled to source changes
 
 ## Approvals
-- Reviewer: codex-orchestrator docs-review
+- Reviewer: codex-orchestrator current-head standalone review
 - Date: 2026-05-06
-- Evidence: `.runs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5/cli/2026-05-06T19-30-14-566Z-97a6084f/manifest.json` (`gpt-5.5`, `xhigh`, `review_outcome=clean-success`, `review_verdict=clean`, `finding_count=0`)
+- Evidence: `.runs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5/cli/2026-05-06T19-35-23-588Z-d76dc5a5/manifest.json` (`gpt-5.5`, `xhigh`, `review_outcome=bounded-success`, `review_verdict=clean`, `finding_count=0`, `termination_boundary=command-intent`)
