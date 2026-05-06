@@ -985,7 +985,7 @@ describe('runCommandStage review evidence consistency', () => {
     expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_proof_missing_or_unreadable');
   });
 
-  it('ignores stale provider-worker review telemetry from an earlier attempt in the same run', async () => {
+  it('fails closed on stale provider-worker review telemetry from an earlier attempt in the same run', async () => {
     mockState.runImpl = async (input) => {
       await writeProviderLinearWorkerProofArtifacts(input, {
         owner_phase: 'ended',
@@ -1020,10 +1020,22 @@ describe('runCommandStage review evidence consistency', () => {
     );
     const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
 
-    expect(result.exitCode).toBe(0);
-    expect(result.summary).toContain('Provider linear worker reached review handoff.');
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain(
+      'Provider linear worker failed because standalone review did not produce a concrete verdict.'
+    );
+    expect(result.summary).toContain('semantic review verdict: unknown');
     expect(result.summary).not.toContain('review-wrapper failure');
-    expect(manifest.commands[0]?.status).toBe('succeeded');
+    expect(manifest.commands[0]?.status).toBe('failed');
+
+    const errorPayload = JSON.parse(
+      await readFile(join(context.env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')
+    ) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_unknown');
+    expect(errorPayload.details?.review_outcome_summary).toContain(
+      'semantic review verdict: unknown'
+    );
   });
 
   it('preserves proof-missing failure reason when review telemetry also fails', async () => {
