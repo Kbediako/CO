@@ -27,6 +27,16 @@
 - [x] Issue-quality review captured (pre-implementation). Evidence: `tasks/specs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5.md` carries protected terms, wrong interpretations, explicit non-goals, parity matrix, and Not Done If clauses.
 - [x] Fallback / refactor decision captured (pre-implementation). Evidence: `tasks/specs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5.md` expires the legacy succeeded payload acceptance path unless full retained-fallback metadata is present.
 - [x] Durable retention evidence captured. Evidence: PRD and TECH_SPEC state that modern `review_outcome: bounded-success` remains successful bounded wrapper completion while clean handoff still requires `review_verdict: clean`.
+
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Provider-worker review outcome guidance | `legacy succeeded payload` with preserved `termination_boundary` can be treated as successful bounded review completion without full retained-fallback metadata. | expire fallback | CO-506 / `review-wrapper:bounded-success-legacy-fallback-metadata` | A legacy review telemetry payload has `status: succeeded` and preserved `termination_boundary` but lacks modern `review_outcome` / `review_verdict` fields. | 2026-05-06 | 2026-05-06 | 2026-06-05 | Remove legacy succeeded payload support, or require owner, trigger, introduced date, review date, maximum lifetime or expiry, removal condition, reason, and validation evidence before accepting the legacy path. | `ProviderLinearWorkerRunner` prompt regressions, `docs/standalone-review-guide.md` wording, telemetry fixture tests only if runtime interpretation changes, docs checks, standalone review. |
+
+- Large-refactor check: a narrow guidance/test implementation is acceptable because the unsafe seam is a single legacy compatibility interpretation, not a split authority across review execution, semantic verdict parsing, and provider-worker handoff.
+- Minor-seam decision: the retained compatibility handling is acceptable only as this bounded guidance/test seam, and it expires unless the full retained-fallback metadata set is present.
+
 - [x] Packet validation captured. Evidence: JSON parse for `tasks/index.json` and `docs/docs-freshness-registry.json`, `git diff --check`, new-file `git diff --no-index --check`, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, and `npm run docs:freshness` passed on 2026-05-06.
 - [x] Docs-review captured. Evidence: `.runs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5/cli/2026-05-06T19-30-14-566Z-97a6084f/manifest.json` and `review/telemetry.json` report `gpt-5.5`, `xhigh`, `review_outcome=clean-success`, `review_verdict=clean`, and `finding_count=0`.
 - [x] Provider-worker guidance/tests shipped. Evidence: `orchestrator/src/cli/providerLinearWorkerRunner.ts`, `skills/linear/SKILL.md`, `docs/standalone-review-guide.md`, `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`, child lane `.runs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5-tests-metadata/cli/2026-05-06T19-38-15-847Z-223befb3/manifest.json`, and `npm run test:core -- orchestrator/tests/ProviderLinearWorkerRunner.test.ts` passed 325 tests.

@@ -39,10 +39,15 @@
 - Fallback / refactor decision:
   - The task touches legacy/fallback/seam behavior.
   - Decision: expire the fallback where a `legacy succeeded payload` with preserved `termination_boundary` can be accepted without full retained-fallback metadata.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Provider-worker review outcome guidance | `legacy succeeded payload` with preserved `termination_boundary` can be treated as successful bounded review completion without full retained-fallback metadata. | expire fallback | CO-506 / `review-wrapper:bounded-success-legacy-fallback-metadata` | A legacy review telemetry payload has `status: succeeded` and preserved `termination_boundary` but lacks modern `review_outcome` / `review_verdict` fields. | 2026-05-06 | 2026-05-06 | 2026-06-05 | Remove legacy succeeded payload support, or require owner, trigger, introduced date, review date, maximum lifetime or expiry, removal condition, reason, and validation evidence before accepting the legacy path. | `ProviderLinearWorkerRunner` prompt regressions, `docs/standalone-review-guide.md` wording, telemetry fixture tests only if runtime interpretation changes, docs checks, standalone review. |
+
 - Durable retention evidence:
   - Modern `review_outcome: bounded-success` plus preserved `termination_boundary` remains successful bounded wrapper completion, but clean handoff still requires `review_verdict: clean`.
-- Large-refactor check:
-  - A narrow guidance/test implementation is acceptable if it fails closed on missing retained metadata. If implementation needs schema or semantic verdict changes, split or promote the larger review-wrapper refactor.
+- Large-refactor check: a narrow guidance/test implementation is acceptable if it fails closed on missing retained metadata. If implementation needs schema or semantic verdict changes, split or promote the larger review-wrapper refactor.
+- Minor-seam decision: the retained compatibility handling is acceptable only as this bounded guidance/test seam, and it expires unless the full retained-fallback metadata set is present.
 
 ## Milestones & Sequencing
 1. Register traceability packet.
