@@ -14,7 +14,7 @@
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5.md`
 - Agent mirror: `.agent/task/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5.md`
 - Canonical owner key: `review-wrapper:bounded-success-legacy-fallback-metadata`
-- Summary of scope: packet-only setup for a later implementation that requires full retained-fallback metadata before accepting `legacy succeeded payload` bounded-success review guidance.
+- Summary of scope: docs-first packet plus implementation requiring full retained-fallback metadata before accepting `legacy succeeded payload` bounded-success review guidance.
 
 ### Checklist Convention
 - Start every task/subtask with `[ ]` and flip it to `[x]` when the acceptance criteria are met, citing evidence.
@@ -29,7 +29,7 @@
 - [x] Durable retention evidence captured. Evidence: PRD and TECH_SPEC state that modern `review_outcome: bounded-success` remains successful bounded wrapper completion while clean handoff still requires `review_verdict: clean`.
 - [x] Packet validation captured. Evidence: JSON parse for `tasks/index.json` and `docs/docs-freshness-registry.json`, `git diff --check`, new-file `git diff --no-index --check`, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, and `npm run docs:freshness` passed on 2026-05-06.
 - [x] Docs-review captured. Evidence: `.runs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5/cli/2026-05-06T19-30-14-566Z-97a6084f/manifest.json` and `review/telemetry.json` report `gpt-5.5`, `xhigh`, `review_outcome=clean-success`, `review_verdict=clean`, and `finding_count=0`.
-- [ ] Later provider-worker guidance/tests shipped. Evidence: pending implementation lane.
+- [x] Provider-worker guidance/tests shipped. Evidence: `orchestrator/src/cli/providerLinearWorkerRunner.ts`, `skills/linear/SKILL.md`, `docs/standalone-review-guide.md`, `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`, child lane `.runs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5-tests-metadata/cli/2026-05-06T19-38-15-847Z-223befb3/manifest.json`, and `npm run test:core -- orchestrator/tests/ProviderLinearWorkerRunner.test.ts` passed 325 tests.
 - [ ] PR review handoff evidence captured. Evidence: pending implementation lane.
 
 ### Protected Terms
@@ -47,6 +47,7 @@
 - 2026-05-06: Packet records `stay_serial` / `packet_only_helper_scope` because the work is a single traceability packet with tightly coupled mirror updates and no separable implementation stream.
 - 2026-05-06: Packet validation passed: JSON parse for `tasks/index.json` and `docs/docs-freshness-registry.json`, `git diff --check`, new-file `git diff --no-index --check`, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, and `npm run docs:freshness`.
 - 2026-05-06: Docs-review passed clean with `gpt-5.5` / `xhigh`: `.runs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5/cli/2026-05-06T19-30-14-566Z-97a6084f/manifest.json`.
+- 2026-05-07: Implementation updated provider-worker prompt guidance, bundled Linear skill guidance, and standalone-review guide wording so retained legacy succeeded payload handling requires owner, trigger, introduced date, review date, maximum lifetime or expiry, removal condition, reason, and validation evidence. Same-issue child lane `tests-metadata` added focused prompt regressions and was accepted; focused ProviderLinearWorkerRunner tests passed 325 tests.
 
 ## Parent Tasks
 1. Register traceability packet.
@@ -57,12 +58,12 @@
    - Acceptance: lightweight docs/JSON validation passes or exact blockers are recorded.
    - [x] Status: Complete. Evidence: JSON parse, `git diff --check`, new-file whitespace check, spec guard, docs check, docs freshness, and docs-review passed on 2026-05-06.
 3. Implement retained-fallback metadata guidance.
-   - Files: expected `orchestrator/src/cli/providerLinearWorkerRunner.ts`, `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`, `docs/standalone-review-guide.md`, and corresponding guide/help tests for the current shipped legacy wording.
+   - Files: `orchestrator/src/cli/providerLinearWorkerRunner.ts`, `skills/linear/SKILL.md`, `docs/standalone-review-guide.md`, and `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`.
    - Acceptance: `legacy succeeded payload` acceptance requires owner, trigger, introduced date, review date, maximum lifetime or expiry, removal condition, reason, and validation evidence.
-   - [ ] Status: Pending later implementation.
+   - [x] Status: Complete. Evidence: files listed above and focused test pass.
 4. Preserve CO-478 review semantics.
    - Acceptance: `review_verdict` remains clean-handoff authority; command-intent, bounded-review, and `termination_boundary` guards are unchanged.
-   - [ ] Status: Pending later implementation.
+   - [x] Status: Complete. Evidence: ProviderLinearWorkerRunner prompt regression asserts findings/unknown blockers and `review_verdict: clean` remains required for clean handoff.
 5. Parent-owned review and handoff.
    - Files: parent lane manifests, workpad, PR, and review artifacts.
    - Acceptance: validation, review feedback, ready-review drain, and Linear handoff complete in the implementation lane.
@@ -78,12 +79,12 @@
 - `tasks/index.json`
 - `docs/TASKS.md`
 - `docs/docs-freshness-registry.json`
-- `orchestrator/src/cli/providerLinearWorkerRunner.ts` (later implementation)
-- `orchestrator/tests/ProviderLinearWorkerRunner.test.ts` (later implementation)
-- `docs/standalone-review-guide.md` (later implementation)
-- `tests/run-review.spec.ts` or corresponding guide/help tests (later implementation)
+- `orchestrator/src/cli/providerLinearWorkerRunner.ts`
+- `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`
+- `skills/linear/SKILL.md`
+- `docs/standalone-review-guide.md`
 
 ## Notes
 - CO-506 is a packet-first follow-up from CO-478 / PR #782.
-- This packet does not transition Linear, open/modify GitHub PRs, or implement provider-worker source changes.
-- The later implementation must not be docs-only.
+- This implementation does not change Codex review CLI exit-code behavior or weaken semantic `review_verdict` gating.
+- Remaining work is validation/review/PR handoff, not source implementation.

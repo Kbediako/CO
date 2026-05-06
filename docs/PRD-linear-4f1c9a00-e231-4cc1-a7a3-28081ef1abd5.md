@@ -19,17 +19,16 @@
 CO-506 must require owner, trigger, introduced date, review date, maximum lifetime or expiry, removal condition, reason, and validation evidence before any legacy succeeded review payload can be treated as acceptable bounded-success guidance. Modern `review/telemetry.json` payloads with `status: succeeded`, `review_outcome: bounded-success`, preserved `termination_boundary`, and `review_verdict` semantics must remain unchanged.
 
 ## User Request Translation
-- User intent / needs: create the traceability/docs-first packet before this helper-created follow-up leaves `Backlog`, preserving the exact legacy review-wrapper fallback issue and setting up a later implementation that ships guidance and tests.
+- User intent / needs: create the traceability/docs-first packet before this helper-created follow-up leaves `Backlog`, preserve the exact legacy review-wrapper fallback issue, and ship guidance plus tests.
 - Success criteria / acceptance:
   - the six packet files exist
   - `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` register the packet
   - the packet states the `Backlog` hold reason and that packet/registry setup clears `backlog_head_follow_up_traceability_pending`
   - the packet requires retained-fallback metadata for the `legacy succeeded payload` path
-  - later implementation is not docs-only and must include shipped guidance/tests
+  - implementation is not docs-only and includes shipped guidance/tests
 - Constraints / non-goals:
-  - do not implement provider-worker code changes in this packet lane
-  - do not transition Linear
-  - do not open or modify GitHub PRs
+  - historical packet setup did not implement provider-worker source, transition Linear, or change GitHub PR lifecycle before packet evidence existed
+  - do not transition Linear or update PR handoff state before required validation/review gates are clean
   - do not change Codex review CLI exit-code behavior
   - do not weaken command-intent, bounded-review, `termination_boundary`, or semantic `review_verdict` handling
   - do not broaden into `CO-474` product recovery
@@ -56,7 +55,7 @@ CO-506 must require owner, trigger, introduced date, review date, maximum lifeti
   - treating this as a `CO-474` product recovery lane
   - treating `bounded-success` as handoff-clean without checking `review_verdict`
   - accepting a legacy succeeded payload solely because `termination_boundary` is preserved
-  - shipping only docs without provider-worker guidance and regression tests in the later implementation
+  - shipping only docs without provider-worker guidance and regression tests
 
 ## Parity / Alignment Matrix
 | Surface | Current truth | Reference truth | Target truth | Explicitly out of scope |
@@ -70,19 +69,19 @@ CO-506 must require owner, trigger, introduced date, review date, maximum lifeti
 ## Not Done If
 - A `legacy succeeded payload` with preserved `termination_boundary` can be accepted without owner, trigger, introduced date, review date, maximum lifetime or expiry, removal condition, reason, and validation evidence.
 - `review_outcome: bounded-success` is documented as clean-handoff proof without `review_verdict: clean`.
-- The later implementation changes Codex review CLI exit-code behavior.
-- The later implementation weakens command-intent, bounded-review, `termination_boundary`, or semantic `review_verdict` handling.
-- The later implementation is docs-only and lacks shipped provider-worker guidance/tests.
+- The implementation changes Codex review CLI exit-code behavior.
+- The implementation weakens command-intent, bounded-review, `termination_boundary`, or semantic `review_verdict` handling.
+- The implementation is docs-only and lacks shipped provider-worker guidance/tests.
 - The packet omits the `Backlog` hold reason or the `backlog_head_follow_up_traceability_pending` clearance condition.
 
 ## Goals
-- Create and register the CO-506 docs-first packet while the issue remains in `Backlog`.
+- Create and register the CO-506 docs-first packet before implementation handoff.
 - Define the retained-fallback metadata contract for legacy bounded-success review guidance.
 - Keep CO-506 scoped to review-wrapper/provider-worker guidance and tests.
 - Preserve CO-478's `review_verdict` authority and existing bounded-review guard behavior.
 
 ## Non-Goals
-- No provider-worker source edits in this packet lane.
+- No Codex review CLI behavior changes.
 - No Codex review CLI exit-code changes.
 - No command-intent, bounded-review, `termination_boundary`, or `review_verdict` weakening.
 - No `CO-474` product recovery.
@@ -97,7 +96,7 @@ CO-506 is a helper-created follow-up that must remain in `Backlog` until the pac
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Provider-worker review outcome guidance | `legacy succeeded payload` with preserved `termination_boundary` can be described as successful bounded review completion without full retained-fallback metadata. | expire fallback | CO-506 / `review-wrapper:bounded-success-legacy-fallback-metadata` | Provider-worker guidance or docs encounter legacy succeeded telemetry lacking modern `review_outcome` / `review_verdict` fields but carrying a preserved `termination_boundary`. | 2026-05-06 | 2026-05-06 | 2026-06-05 | Legacy succeeded payload support is removed, or any retained legacy path requires owner, trigger, introduced date, review date, maximum lifetime or expiry, removal condition, reason, and validation evidence before acceptance. | Provider-worker prompt tests, standalone-review guide/help tests, telemetry fixture tests, docs checks, standalone review. |
+| Provider-worker review outcome guidance | `legacy succeeded payload` with preserved `termination_boundary` can be described as successful bounded review completion without full retained-fallback metadata. | expire fallback | CO-506 / `review-wrapper:bounded-success-legacy-fallback-metadata` | Provider-worker guidance or docs encounter legacy succeeded telemetry lacking modern `review_outcome` / `review_verdict` fields but carrying a preserved `termination_boundary`. | 2026-05-06 | 2026-05-06 | 2026-06-05 | Legacy succeeded payload support is removed, or any retained legacy path requires owner, trigger, introduced date, review date, maximum lifetime or expiry, removal condition, reason, and validation evidence before acceptance. | Provider-worker prompt tests, standalone-review guide wording inspection, telemetry fixture tests only if runtime interpretation changes, docs checks, standalone review. |
 
 - Large-refactor check: a narrow guidance/test patch is acceptable because the unsafe seam is a single legacy compatibility interpretation, not a split authority across review execution, semantic verdict parsing, and provider-worker handoff. If implementation must inspect legacy telemetry runtime paths beyond guidance, split or promote the broader review-wrapper refactor instead of adding another minor seam.
 

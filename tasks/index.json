@@ -8,8 +8,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-06",
-      "status": "backlog_packet",
+      "last_review": "2026-05-07",
+      "status": "in_progress",
       "canonical_owner_key": "review-wrapper:bounded-success-legacy-fallback-metadata",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=review-wrapper:bounded-success-legacy-fallback-metadata",
       "approvals": {
@@ -38,6 +38,13 @@
           "manifest": ".runs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5/cli/2026-05-06T19-30-14-566Z-97a6084f/manifest.json",
           "telemetry": ".runs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5/cli/2026-05-06T19-30-14-566Z-97a6084f/review/telemetry.json",
           "summary": "Docs-review completed with model gpt-5.5, reasoning effort xhigh, runtime appserver, no runtime fallback, review_outcome=clean-success, review_verdict=clean, and finding_count=0."
+        },
+        "implementation_guidance": {
+          "reviewer": "CO-506 provider worker",
+          "date": "2026-05-07",
+          "status": "implemented",
+          "child_lane": ".runs/linear-4f1c9a00-e231-4cc1-a7a3-28081ef1abd5-tests-metadata/cli/2026-05-06T19-38-15-847Z-223befb3/manifest.json",
+          "summary": "Updated provider-worker prompt guidance, bundled Linear skill guidance, and standalone-review guide wording so retained legacy succeeded payload handling requires owner, trigger, introduced date, review date, maximum lifetime or expiry, removal condition, reason, and validation evidence. Accepted tests-metadata child lane added focused ProviderLinearWorkerRunner prompt regressions; focused suite passed 325 tests."
         }
       },
       "paths": {
