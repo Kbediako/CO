@@ -493,6 +493,13 @@ function analyzeStructuredReviewVerdict(verdictText: string): ReviewSemanticVerd
       finding_count: summarizedVerdict === 'findings' ? findingCount : 0
     };
   }
+  if (structuredFindings && structuredFindings.length === 0 && hasStructuredCleanReviewVerdict(parsed)) {
+    return {
+      review_verdict: 'clean',
+      highest_finding_priority: null,
+      finding_count: 0
+    };
+  }
   return null;
 }
 
@@ -593,6 +600,10 @@ function parseStructuredReviewFinding(value: unknown): ParsedReviewFinding | nul
       normalizeOptionalString(value.body) ??
       `structured ${priority} finding`
   };
+}
+
+function hasStructuredCleanReviewVerdict(value: Record<string, unknown>): boolean {
+  return normalizeOptionalString(value.overall_correctness)?.toLowerCase() === 'patch is correct';
 }
 
 function parseStructuredReviewFindingPriority(value: unknown): ReviewFindingPriority | null {

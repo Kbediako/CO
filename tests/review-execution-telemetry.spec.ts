@@ -86,7 +86,7 @@ describe('review-execution-telemetry', () => {
     }
   });
 
-  it('does not treat empty structured findings as an explicit clean verdict', async () => {
+  it('requires explicit structured clean evidence when findings are empty', async () => {
     const sandbox = await makeSandbox();
     const payload = await writeTelemetryForOutput(sandbox, `${JSON.stringify({ findings: [] })}\n`);
 
@@ -94,6 +94,28 @@ describe('review-execution-telemetry', () => {
     expect(payload?.review_verdict).toBe('unknown');
     expect(payload?.highest_finding_priority).toBeNull();
     expect(payload?.finding_count).toBe(0);
+
+    const cleanSandbox = await makeSandbox();
+    const cleanPayload = await writeTelemetryForOutput(cleanSandbox, `${JSON.stringify({
+      findings: [],
+      overall_correctness: 'patch is correct'
+    })}\n`);
+
+    expect(cleanPayload?.review_outcome).toBe('clean-success');
+    expect(cleanPayload?.review_verdict).toBe('clean');
+    expect(cleanPayload?.highest_finding_priority).toBeNull();
+    expect(cleanPayload?.finding_count).toBe(0);
+
+    const incorrectSandbox = await makeSandbox();
+    const incorrectPayload = await writeTelemetryForOutput(incorrectSandbox, `${JSON.stringify({
+      findings: [],
+      overall_correctness: 'patch is incorrect'
+    })}\n`);
+
+    expect(incorrectPayload?.review_outcome).toBe('clean-success');
+    expect(incorrectPayload?.review_verdict).toBe('unknown');
+    expect(incorrectPayload?.highest_finding_priority).toBeNull();
+    expect(incorrectPayload?.finding_count).toBe(0);
   });
 
   it('derives semantic verdicts from final reviewer output, not inspected transcripts', async () => {
