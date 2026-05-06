@@ -2682,6 +2682,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           latest_turn_id: 'turn-1',
           latest_session_id: 'thread-1-turn-1',
           latest_session_id_source: 'derived_from_thread_and_turn',
+          attempt_started_at: '2026-05-05T04:40:00.000Z',
           resolved_model_provenance: buildProviderLinearWorkerResolvedModelProvenance({
             runtimeModel: 'gpt-5.5',
             runtimeReasoningEffort: 'xhigh',
@@ -2755,6 +2756,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
           latest_turn_id: 'turn-1',
           latest_session_id: 'thread-1-turn-1',
           latest_session_id_source: 'derived_from_thread_and_turn',
+          attempt_started_at: '2026-05-05T04:40:00.000Z',
           resolved_model_provenance: storedProvenance,
           workspace_path: tempRoot
         })
