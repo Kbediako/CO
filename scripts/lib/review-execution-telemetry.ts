@@ -599,14 +599,15 @@ function compareReviewFindingPriority(
 
 const reviewFindingPriorityRanks: Record<ReviewFindingPriority, number> = { P0: 0, P1: 1, P2: 2, P3: 3 };
 
+const CLEAN_REVIEW_VERDICT_PATTERNS = [
+  /^\s*(?:[-*]\s*)?(?:(?:(?:I|[A-Z][^.\n]*?)\s+)?(?:found|find)\s+no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions)(?:\s+(?:in|for|from|against|with)\b.*)?[.!]?|no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions)(?:\s+(?:found|identified|were found))?(?:\s+(?:in|for|from|against|with)\b.*)?[.!]?|no\s+findings\.?)\s*$/iu,
+  /^\s*(?:[-*]\s*)?(?:I\s+)?did\s+not\s+(?:find|identify|detect|see)\s+(?:any\s+|a\s+)?(?:(?:concrete|discrete|actionable|correctness)\s+)*(?:issues?|findings?|regressions?)(?:\s+(?:in|for|from|against|with)\b.*)?[.!]?\s*$/iu
+] as const;
+
 function hasCleanReviewVerdict(outputText: string): boolean {
   return outputText
     .split(/\r?\n/u)
-    .some((line) =>
-      /^\s*(?:[-*]\s*)?(?:(?:(?:I|[A-Z][^.\n]*?)\s+)?(?:found|find)\s+no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions)(?:\s+(?:in|for|from|against|with)\b.*)?[.!]?|no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions)(?:\s+(?:found|identified|were found))?(?:\s+(?:in|for|from|against|with)\b.*)?[.!]?|no\s+findings\.?)\s*$/iu.test(
-        line
-      )
-    );
+    .some((line) => CLEAN_REVIEW_VERDICT_PATTERNS.some((pattern) => pattern.test(line)));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

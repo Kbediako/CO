@@ -88,7 +88,7 @@ describe('review-execution-telemetry', () => {
   });
 
   it('persists clean semantic review verdicts separately from wrapper execution state', async () => {
-    const cleanOutputs = ['I found no actionable issues in the uncommitted diff.', 'Read-only inspection of the uncommitted diff found no actionable correctness issues.', 'Read-only diff inspection found no actionable correctness regressions in the changed telemetry parser.', 'No actionable issues.', 'No actionable correctness regressions.'];
+    const cleanOutputs = ['I found no actionable issues in the uncommitted diff.', 'Read-only inspection of the uncommitted diff found no actionable correctness issues.', 'Read-only diff inspection found no actionable correctness regressions in the changed telemetry parser.', 'No actionable issues.', 'No actionable correctness regressions.', 'I did not identify a discrete regression.', 'I did not find a concrete regression in the changed telemetry parser.'];
 
     for (const cleanOutput of cleanOutputs) {
       const sandbox = await makeSandbox();
