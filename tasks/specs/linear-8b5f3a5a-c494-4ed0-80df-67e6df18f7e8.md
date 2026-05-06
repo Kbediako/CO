@@ -1,10 +1,10 @@
 ---
 id: 20260405-linear-8b5f3a5a-c494-4ed0-80df-67e6df18f7e8
 title: CO: Fix ready-review false block on current-head CodeRabbit issue-comment completion
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-05
-last_review: 2026-04-05
+last_review: 2026-05-06
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-8b5f3a5a-c494-4ed0-80df-67e6df18f7e8.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-8b5f3a5a-c494-4ed0-80df-67e6df18f7e
 related_tasks:
   - tasks/tasks-linear-8b5f3a5a-c494-4ed0-80df-67e6df18f7e8.md
 review_notes:
+  - 2026-05-06: CO-503 live Linear audit confirmed CO-85 is `Done` (state_type=completed, updated_at=2026-04-30T13:27:53.706Z) with merged PR #363 attached; this completed-lane spec is reclassified to inactive `done` under canonical owner key `spec-guard:active-specs:last_review=2026-04-05` so historical implementation evidence remains preserved without staying in active-spec freshness.
   - 2026-04-05: Opened from Linear issue `CO-85` in the provider-worker workspace using issue id `8b5f3a5a-c494-4ed0-80df-67e6df18f7e8`.
   - 2026-04-05: Packaged `linear issue-context` confirmed the CO workflow states (`Ready`, `In Progress`, `In Review`, `Merging`, `Rework`, `Done`), showed no attached PR, no issue comments, and no existing workpad comment on this issue.
   - 2026-04-05: The issue was moved from `Ready` to `In Progress` before active coding via packaged `linear transition`.

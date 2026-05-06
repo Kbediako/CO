@@ -1,10 +1,10 @@
 ---
 id: 20260405-linear-bbc5ad99-0806-4b13-a8fc-0b49b0e8a9bc
 title: CO STATUS: restore live root control-host Codex session, token, throughput, and 5-hour/weekly rate-limit telemetry after CO-83
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-05
-last_review: 2026-04-05
+last_review: 2026-05-06
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-bbc5ad99-0806-4b13-a8fc-0b49b0e8a9bc.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-bbc5ad99-0806-4b13-a8fc-0b49b0e8a9b
 related_tasks:
   - tasks/tasks-linear-bbc5ad99-0806-4b13-a8fc-0b49b0e8a9bc.md
 review_notes:
+  - 2026-05-06: CO-503 live Linear audit confirmed CO-98 is `Done` (state_type=completed, updated_at=2026-04-15T22:50:29.293Z) with merged PR #367 attached; this completed-lane spec is reclassified to inactive `done` under canonical owner key `spec-guard:active-specs:last_review=2026-04-05` so historical implementation evidence remains preserved without staying in active-spec freshness.
   - 2026-04-05: Opened from Linear issue `CO-98` in the provider-worker workspace using issue id `bbc5ad99-0806-4b13-a8fc-0b49b0e8a9bc`.
   - 2026-04-05: Live `linear issue-context` confirmed the CO workflow states (`Ready`, `In Progress`, `In Review`, `Merging`, `Rework`), showed no attached PR and no existing workpad, and the issue was transitioned from `Ready` to `In Progress` before active coding.
   - 2026-04-05: The workspace started detached at `8c6a76339` (equal to `origin/main`) and moved onto branch `linear/co-98-root-status-telemetry` before tracked repo edits.
