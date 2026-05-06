@@ -131,6 +131,11 @@ describe('review-execution-telemetry', () => {
         expectedVerdict: 'unknown'
       },
       {
+        name: 'does not promote inspected transcript verdicts after blank separators',
+        output: 'exec\n/bin/zsh -lc "tail -n 80 review/output.log"\n succeeded in 0ms:\ncodex\nNested clean verdict.\n\ncodex\n- [P2] Inspected transcript finding should not become the current verdict',
+        expectedVerdict: 'unknown'
+      },
+      {
         name: 'keeps source-inspection markers as final verdict boundaries',
         output: [
           'OpenAI Codex v0.128.0 (research preview)',
@@ -228,12 +233,13 @@ describe('review-execution-telemetry', () => {
         expectedCount: 1
       },
       {
-        name: 'bounded success with findings',
+        name: 'bounded success with unknown verdict after inspected transcript findings',
         output: 'exec\n/bin/zsh -lc "tail -n 80 review/output.log"\n succeeded in 0ms:\ncodex\nNested clean verdict.\n\ncodex\n- [P2] Bounded review still found a handoff blocker',
         terminationBoundary: boundedTermination,
         expectedOutcome: 'bounded-success',
-        expectedPriority: 'P2',
-        expectedCount: 1
+        expectedVerdict: 'unknown',
+        expectedPriority: null,
+        expectedCount: 0
       },
       {
         name: 'failed-boundary with findings',
@@ -256,7 +262,7 @@ describe('review-execution-telemetry', () => {
       });
 
       expect(payload?.review_outcome, testCase.name).toBe(testCase.expectedOutcome);
-      expect(payload?.review_verdict, testCase.name).toBe('findings');
+      expect(payload?.review_verdict, testCase.name).toBe(testCase.expectedVerdict ?? 'findings');
       expect(payload?.highest_finding_priority, testCase.name).toBe(testCase.expectedPriority);
       expect(payload?.finding_count, testCase.name).toBe(testCase.expectedCount);
     }
