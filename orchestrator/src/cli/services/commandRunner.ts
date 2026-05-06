@@ -504,9 +504,14 @@ export async function runCommandStage(
       const reviewTelemetryStatus = coerceTelemetryStatusValue(providerReviewTelemetry?.status);
       const reviewOutcomeSummary = formatReviewTelemetryOutcomeSummary(providerReviewTelemetry);
       const forcedStandaloneReview = parseBooleanEnvFlag(execEnv.FORCE_CODEX_REVIEW);
+      const requiresProviderReviewSemanticVerdict =
+        proofTerminalStatus === 'succeeded' &&
+        proofTerminalReason === 'issue_review_handoff' &&
+        result.status === 'succeeded' &&
+        forcedStandaloneReview;
       const reviewSemanticVerdict = providerReviewTelemetry
         ? resolveReviewSemanticVerdict(providerReviewTelemetry)
-        : proofTerminalStatus === 'succeeded' && result.status === 'succeeded' && forcedStandaloneReview
+        : requiresProviderReviewSemanticVerdict
           ? 'unknown'
           : null;
       providerLinearWorkerReviewOutcomeSummary = reviewOutcomeSummary;
@@ -541,6 +546,7 @@ export async function runCommandStage(
         forceProviderLinearWorkerFailure = true;
       } else if (
         providerLinearWorkerFailureReason === null &&
+        requiresProviderReviewSemanticVerdict &&
         reviewSemanticVerdict === 'findings'
       ) {
         providerLinearWorkerFailureReason = 'provider_linear_worker_review_findings';
@@ -554,6 +560,7 @@ export async function runCommandStage(
         forceProviderLinearWorkerFailure = true;
       } else if (
         providerLinearWorkerFailureReason === null &&
+        requiresProviderReviewSemanticVerdict &&
         reviewSemanticVerdict === 'unknown'
       ) {
         const unknownReviewOutcomeSummary = reviewOutcomeSummary ?? 'semantic review verdict: unknown';
