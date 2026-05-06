@@ -133,6 +133,27 @@ function buildSingleEntryAuditSummary(
   } as ProviderLinearAuditSummary;
 }
 
+function findPromptLine(prompt: string, ...needles: string[]): string {
+  const line = prompt.split('\n').find((candidate) => needles.every((needle) => candidate.includes(needle)));
+  expect(line, `Expected prompt line containing: ${needles.join(' | ')}`).toBeDefined();
+  return line ?? '';
+}
+
+function expectRetainedFallbackMetadata(line: string): void {
+  for (const needle of [
+    'owner',
+    'trigger',
+    'introduced date',
+    'review date',
+    'maximum lifetime or expiry',
+    'removal condition',
+    'reason',
+    'validation evidence'
+  ]) {
+    expect(line).toContain(needle);
+  }
+}
+
 beforeEach(() => {
   originalAuthProvenanceFingerprintKey = process.env.CODEX_AUTH_PROVENANCE_FINGERPRINT_KEY;
   process.env.CODEX_AUTH_PROVENANCE_FINGERPRINT_KEY = TEST_AUTH_PROVENANCE_FINGERPRINT_KEY;
@@ -1538,6 +1559,36 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     expect(continuationPrompt).toContain('- Retrieval profile: executor');
     expect(continuationPrompt).toContain('- Pack id: pp-implementation');
     expect(continuationPrompt).toContain('[exp impl-1] Keep provider-worker changes narrowly scoped.');
+  });
+
+  it('keeps review verdict blockers while requiring retained-fallback metadata on legacy bounded-success guidance', () => {
+    const issue = createTrackedIssue();
+    const helperCommand = SOURCE_HELPER_COMMAND;
+    const prompts = [
+      buildProviderWorkerPrompt(issue, 1, 5, helperCommand, '/tmp/co'),
+      buildProviderWorkerPrompt(issue, 2, 5, helperCommand, '/tmp/co')
+    ];
+
+    for (const prompt of prompts) {
+      const findingsGuidance = findPromptLine(prompt, '`review_verdict: findings`');
+      expect(findingsGuidance).toContain('treat the parsed findings as actionable review feedback');
+      expect(findingsGuidance).toContain('do not call the review clean until the findings are resolved or explicitly pushed back');
+
+      const unknownGuidance = findPromptLine(prompt, '`review_verdict: unknown`');
+      expect(unknownGuidance).toContain('treat the semantic verdict as a review-handoff blocker');
+      expectRetainedFallbackMetadata(unknownGuidance);
+
+      const boundedSuccessGuidance = findPromptLine(
+        prompt,
+        '`review_outcome: bounded-success`',
+        'legacy succeeded payload',
+        'preserved `termination_boundary`'
+      );
+      expect(boundedSuccessGuidance).toContain('successful bounded review outcome');
+      expect(boundedSuccessGuidance).toContain('this does not override `review_verdict`');
+      expect(boundedSuccessGuidance).toContain('clean handoff still requires `review_verdict: clean`');
+      expectRetainedFallbackMetadata(boundedSuccessGuidance);
+    }
   });
 
   it('builds continuation guidance for first-turn guarded resident restarts', () => {
