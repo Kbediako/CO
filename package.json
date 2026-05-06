@@ -49,8 +49,10 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "build:all": "tsc -p tsconfig.json && npm run build:patterns",
+    "build:all": "npm run build && npm run build:patterns && npm run typecheck:root-baseline",
     "build:patterns": "tsc -p patterns/tsconfig.json",
+    "typecheck:root": "tsc -p tsconfig.json --pretty false --noEmit",
+    "typecheck:root-baseline": "node scripts/build-all-strict-typecheck.mjs",
     "clean:dist": "node scripts/clean-dist.mjs",
     "docs:check": "node --loader ts-node/esm scripts/docs-hygiene.ts --check",
     "docs:archive-implementation": "node scripts/implementation-docs-archive.mjs",

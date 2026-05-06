@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { PassThrough } from 'node:stream';
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import {
   appendProviderLinearWorkerChildLaneRecord,
@@ -34,12 +34,16 @@ import {
   PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
   type ProviderLinearWorkerDependencies,
+  type ProviderLinearWorkerChildLaneRecord,
+  type ProviderLinearWorkerExecRequest,
+  type ProviderLinearWorkerExecResult,
   type ProviderLinearWorkerProof
 } from '../src/cli/providerLinearWorkerRunner.js';
 import type { LiveLinearTrackedIssue } from '../src/cli/control/linearDispatchSource.js';
 import {
   PROVIDER_LINEAR_AUDIT_ENV_VAR,
   appendProviderLinearAuditEntry,
+  type ProviderLinearAuditEntry,
   type ProviderLinearDecisionLineage,
   type ProviderLinearParallelizationDecision,
   type ProviderLinearParallelizationReason,
@@ -87,7 +91,9 @@ function testFingerprint(value: string): string {
     .slice(0, 16)}`;
 }
 
-function buildChildLaneParentDirtyAuditEntry(overrides: Record<string, unknown> = {}) {
+function buildChildLaneParentDirtyAuditEntry(
+  overrides: Partial<ProviderLinearAuditEntry> = {}
+): ProviderLinearAuditEntry {
   return {
     recorded_at: '2026-03-21T09:00:00.000Z',
     operation: 'child-lane',
@@ -110,7 +116,7 @@ function buildChildLaneParentDirtyAuditEntry(overrides: Record<string, unknown> 
 }
 
 function buildSingleEntryAuditSummary(
-  entry: Record<string, unknown>,
+  entry: ProviderLinearAuditEntry,
   overrides: Partial<ProviderLinearAuditSummary> = {}
 ): ProviderLinearAuditSummary {
   return {
@@ -348,6 +354,77 @@ async function writeCodexConfig(maxTurns: number): Promise<string> {
 }
 
 type ReadTrackedIssueInput = Parameters<ProviderLinearWorkerDependencies['readTrackedIssue']>[0];
+type ReadTrackedIssueMock = Mock<[ReadTrackedIssueInput], Promise<LiveLinearTrackedIssue>>;
+type ExecRunnerMock = Mock<[ProviderLinearWorkerExecRequest], Promise<ProviderLinearWorkerExecResult>>;
+type WriteProofMock = Mock<
+  Parameters<ProviderLinearWorkerDependencies['writeProof']>,
+  ReturnType<ProviderLinearWorkerDependencies['writeProof']>
+>;
+type FetchMock = Mock<Parameters<typeof fetch>, ReturnType<typeof fetch>>;
+type MutableFakeChildProcess = Omit<ChildProcess, 'exitCode' | 'signalCode'> & {
+  exitCode: number | null;
+  signalCode: NodeJS.Signals | null;
+};
+
+function createReadTrackedIssueMock(): ReadTrackedIssueMock {
+  return vi.fn<[ReadTrackedIssueInput], Promise<LiveLinearTrackedIssue>>();
+}
+
+function createExecRunnerMock(): ExecRunnerMock {
+  return vi.fn<[ProviderLinearWorkerExecRequest], Promise<ProviderLinearWorkerExecResult>>();
+}
+
+function createWriteProofMock(
+  implementation: ProviderLinearWorkerDependencies['writeProof'] = async () => undefined
+): WriteProofMock {
+  return vi.fn<
+    Parameters<ProviderLinearWorkerDependencies['writeProof']>,
+    ReturnType<ProviderLinearWorkerDependencies['writeProof']>
+  >(implementation);
+}
+
+function createFetchMock(): FetchMock {
+  return vi.fn<Parameters<typeof fetch>, ReturnType<typeof fetch>>();
+}
+
+function buildRuntimeFallback(
+  overrides: Partial<RuntimeCodexCommandContext['runtime']['fallback']> = {}
+): RuntimeCodexCommandContext['runtime']['fallback'] {
+  return {
+    occurred: false,
+    policy: 'auto',
+    policy_source: 'default',
+    code: null,
+    reason: null,
+    from_mode: null,
+    to_mode: null,
+    original_target: null,
+    fallback_target: null,
+    blocking_reason: null,
+    checked_at: '2026-03-21T09:00:00.000Z',
+    ...overrides
+  };
+}
+
+function invokeDeferred(callback: (() => void) | null): void {
+  callback?.();
+}
+
+function resolveDeferred<T>(
+  callback: ((value: T | PromiseLike<T>) => void) | null,
+  value: T
+): void {
+  callback?.(value);
+}
+
+function readPrimaryRateLimitUsedPercent(rateLimits: Record<string, unknown> | null): unknown {
+  const primary = rateLimits?.primary;
+  if (typeof primary !== 'object' || primary === null || !('used_percent' in primary)) {
+    return undefined;
+  }
+  return primary.used_percent;
+}
+
 type PersistedSessionLogHydrationState = {
   path: string;
   offset_bytes: number;
@@ -421,6 +498,7 @@ function buildInProgressProof(
     issue_id: 'lin-issue-1',
     issue_identifier: 'CO-2',
     attempt_started_at: '2026-03-21T09:00:00.000Z',
+    pid: null,
     thread_id: 'thread-1',
     latest_turn_id: null,
     latest_session_id: null,
@@ -473,7 +551,7 @@ function expectRefreshAuthHeaders(
       if (value == null) {
         return [];
       }
-      return [[key, Array.isArray(value) ? value.join(', ') : String(value)]];
+      return [[key, Array.isArray(value) ? value.join(', ') : String(value)] as [string, string]];
     })
   );
   expect(normalized.get('authorization')).toBe(`Bearer ${token}`);
@@ -1667,6 +1745,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     };
     const continuationPrompt = buildProviderWorkerPrompt(issue, 2, 5, SOURCE_HELPER_COMMAND, '/tmp/co', {
       linearAudit: {
+        path: '/tmp/provider-linear-worker-linear-audit.jsonl',
         attempted_count: 2,
         success_count: 1,
         failure_count: 1,
@@ -4770,11 +4849,11 @@ for await (const line of rl) {
       stdout,
       stderr,
       kill
-    }) as unknown as ChildProcess;
+    }) as unknown as MutableFakeChildProcess;
     const actualChildProcess = await vi.importActual<typeof import('node:child_process')>('node:child_process');
     vi.doMock('node:child_process', () => ({
       ...actualChildProcess,
-      spawn: vi.fn(() => fakeChild)
+      spawn: vi.fn(() => fakeChild as unknown as ChildProcess)
     }));
 
     try {
@@ -4843,11 +4922,11 @@ for await (const line of rl) {
       killed: false,
       exitCode: null,
       signalCode: null
-    }) as unknown as ChildProcess;
+    }) as unknown as MutableFakeChildProcess;
     const actualChildProcess = await vi.importActual<typeof import('node:child_process')>('node:child_process');
     vi.doMock('node:child_process', () => ({
       ...actualChildProcess,
-      spawn: vi.fn(() => fakeChild)
+      spawn: vi.fn(() => fakeChild as unknown as ChildProcess)
     }));
 
     try {
@@ -4895,11 +4974,11 @@ for await (const line of rl) {
       killed: false,
       exitCode: null,
       signalCode: null
-    }) as unknown as ChildProcess;
+    }) as unknown as MutableFakeChildProcess;
     const actualChildProcess = await vi.importActual<typeof import('node:child_process')>('node:child_process');
     vi.doMock('node:child_process', () => ({
       ...actualChildProcess,
-      spawn: vi.fn(() => fakeChild)
+      spawn: vi.fn(() => fakeChild as unknown as ChildProcess)
     }));
 
     try {
@@ -4948,8 +5027,7 @@ for await (const line of rl) {
         ''
       ].join('\n')
     );
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(
         createTrackedIssue({
@@ -5048,8 +5126,7 @@ for await (const line of rl) {
         ''
       ].join('\n')
     );
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(
         createTrackedIssue({
@@ -5143,8 +5220,7 @@ for await (const line of rl) {
         ''
       ].join('\n')
     );
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(
         createTrackedIssue({
@@ -5231,8 +5307,7 @@ for await (const line of rl) {
         ''
       ].join('\n')
     );
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(
         createTrackedIssue({
@@ -5315,8 +5390,7 @@ for await (const line of rl) {
         ''
       ].join('\n')
     );
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(
         createTrackedIssue({
@@ -5420,8 +5494,7 @@ for await (const line of rl) {
         ''
       ].join('\n')
     );
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(
         createTrackedIssue({
@@ -5515,8 +5588,7 @@ for await (const line of rl) {
         ''
       ].join('\n')
     );
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(
         createTrackedIssue({
@@ -5604,8 +5676,7 @@ for await (const line of rl) {
         ''
       ].join('\n')
     );
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(
         createTrackedIssue({
@@ -5687,8 +5758,7 @@ for await (const line of rl) {
         ''
       ].join('\n')
     );
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(
         createTrackedIssue({
@@ -5768,8 +5838,7 @@ for await (const line of rl) {
   it('records degraded unknown resolved model provenance when runtime and config metadata are missing', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
     const codexHome = await writeCodexConfigContent('[agent]\nmax_turns = 1\n');
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(
         createTrackedIssue({
@@ -5854,8 +5923,7 @@ for await (const line of rl) {
         ''
       ].join('\n')
     );
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(
@@ -5870,16 +5938,7 @@ for await (const line of rl) {
       writtenProofs.push(proof);
       await writeFile(path, JSON.stringify(proof, null, 2), 'utf8');
     });
-    const execRunner = vi
-      .fn<
-        (request: {
-          command: string;
-          args: string[];
-          cwd: string;
-          env: NodeJS.ProcessEnv;
-          mirrorOutput: boolean;
-        }) => Promise<{ exitCode: number; stdout: string; stderr: string }>
-      >()
+    const execRunner = createExecRunnerMock()
       .mockImplementationOnce(async (request) => {
         await appendStaySerialParallelizationDecisionAuditForRequest(request, {
           turnIndex: 1
@@ -5980,8 +6039,7 @@ for await (const line of rl) {
       provider_control_host_task_id: 'local-mcp',
       provider_control_host_run_id: 'control-host'
     });
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(
@@ -6011,7 +6069,7 @@ for await (const line of rl) {
       files: ['orchestrator/src/cli/providerLinearChildLaneShell.ts'],
       phases: []
     });
-    const childLaneRecord = {
+    const childLaneRecord: ProviderLinearWorkerChildLaneRecord = {
       stream: 'impl-a',
       pipeline_id: 'provider-linear-child-lane',
       task_id: 'linear-lin-issue-1-impl-a',
@@ -6044,16 +6102,7 @@ for await (const line of rl) {
       decision_reason: null
     };
     let currentNow = '2026-03-21T09:00:00.000Z';
-    const execRunner = vi
-      .fn<
-        (request: {
-          command: string;
-          args: string[];
-          cwd: string;
-          env: NodeJS.ProcessEnv;
-          mirrorOutput: boolean;
-        }) => Promise<{ exitCode: number; stdout: string; stderr: string }>
-      >()
+    const execRunner = createExecRunnerMock()
       .mockImplementationOnce(async (request) => {
         const auditPath = request.env[PROVIDER_LINEAR_AUDIT_ENV_VAR];
         expect(auditPath).toBe(join(runDir, PROVIDER_LINEAR_WORKER_AUDIT_FILENAME));
@@ -6480,8 +6529,7 @@ for await (const line of rl) {
 
   it('records appserver supervision proof with sticky environment and retained JSONL truth', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(
         createTrackedIssue({
           state: 'Merging',
@@ -6606,8 +6654,7 @@ for await (const line of rl) {
     const { manifestPath } = await createManifestRoot();
     const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
     const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-app.jsonl');
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(
         createTrackedIssue({
           state: 'Merging',
@@ -6723,8 +6770,7 @@ for await (const line of rl) {
     );
     const sessionDir = join(codexHome, 'sessions', '2026', '03', '21');
     const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-app.jsonl');
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(
         createTrackedIssue({
           state: 'Merging',
@@ -6870,8 +6916,7 @@ for await (const line of rl) {
     const { manifestPath } = await createManifestRoot();
     const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
     const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-app.jsonl');
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(
         createTrackedIssue({
           state: 'Merging',
@@ -7079,8 +7124,7 @@ for await (const line of rl) {
     const { manifestPath, runDir } = await createManifestRoot();
     const sessionDir = join(tempRoot!, 'sessions', '2026', '03', '21');
     const sessionLogPath = join(sessionDir, 'rollout-2026-03-21T09-00-00-thread-1.jsonl');
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(
         createTrackedIssue({
           state: 'Merging',
@@ -7221,14 +7265,7 @@ for await (const line of rl) {
       selected_mode: 'appserver',
       provider: 'AppServerRuntimeProvider',
       runtime_session_id: 'appserver-run-child',
-      fallback: {
-        occurred: false,
-        code: null,
-        reason: null,
-        from_mode: null,
-        to_mode: null,
-        checked_at: '2026-03-21T09:00:00.000Z'
-      }
+      fallback: buildRuntimeFallback()
     } as const;
     await mkdir(sessionDir, { recursive: true });
     await writeFile(
@@ -7327,14 +7364,7 @@ for await (const line of rl) {
       selected_mode: 'appserver',
       provider: 'AppServerRuntimeProvider',
       runtime_session_id: 'appserver-run-child',
-      fallback: {
-        occurred: false,
-        code: null,
-        reason: null,
-        from_mode: null,
-        to_mode: null,
-        checked_at: '2026-03-21T09:00:00.000Z'
-      }
+      fallback: buildRuntimeFallback()
     } as const;
     await mkdir(sessionDir, { recursive: true });
     await writeFile(
@@ -7488,14 +7518,7 @@ for await (const line of rl) {
             selected_mode: 'appserver',
             provider: 'AppServerRuntimeProvider',
             runtime_session_id: 'appserver-run-child',
-            fallback: {
-              occurred: false,
-              code: null,
-              reason: null,
-              from_mode: null,
-              to_mode: null,
-              checked_at: '2026-03-21T09:00:00.000Z'
-            }
+            fallback: buildRuntimeFallback()
           },
           auth_provenance: {
             provider_kind: 'codex',
@@ -7613,14 +7636,7 @@ for await (const line of rl) {
             selected_mode: 'appserver',
             provider: 'AppServerRuntimeProvider',
             runtime_session_id: 'appserver-run-child',
-            fallback: {
-              occurred: false,
-              code: null,
-              reason: null,
-              from_mode: null,
-              to_mode: null,
-              checked_at: '2026-03-21T09:00:00.000Z'
-            }
+            fallback: buildRuntimeFallback()
           },
           auth_provenance: {
             provider_kind: 'codex',
@@ -7709,14 +7725,7 @@ for await (const line of rl) {
         selected_mode: 'appserver',
         provider: 'AppServerRuntimeProvider',
         runtime_session_id: 'appserver-run-child',
-        fallback: {
-          occurred: false,
-          code: null,
-          reason: null,
-          from_mode: null,
-          to_mode: null,
-          checked_at: '2026-03-21T09:00:00.000Z'
-        }
+        fallback: buildRuntimeFallback()
       },
       auth_provenance: {
         provider_kind: 'codex',
@@ -7780,14 +7789,13 @@ for await (const line of rl) {
 
   it('preserves machine-readable appserver fallback reasons when provider supervision falls back to exec', async () => {
     const { manifestPath } = await createManifestRoot();
-    const fallback = {
+    const fallback = buildRuntimeFallback({
       occurred: true,
       code: 'appserver-command-unavailable',
       reason: 'Appserver preflight failed (appserver-command-unavailable). Failed probing `codex app-server --help`.',
       from_mode: 'appserver',
-      to_mode: 'cli',
-      checked_at: '2026-03-21T09:00:00.000Z'
-    } as const;
+      to_mode: 'cli'
+    });
 
     const proof = await runProviderLinearWorker(
       {
@@ -7798,8 +7806,7 @@ for await (const line of rl) {
         CODEX_CLOUD_ENV_ID: 'env-appserver-fallback'
       },
       {
-        readTrackedIssue: vi
-          .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+        readTrackedIssue: createReadTrackedIssueMock()
           .mockResolvedValueOnce(
             createTrackedIssue({
               state: 'Merging',
@@ -8045,8 +8052,7 @@ for await (const line of rl) {
 
   it('passes env-backed Linear scope bindings into tracked issue refreshes', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(
         createTrackedIssue({
@@ -8185,7 +8191,7 @@ for await (const line of rl) {
     await new Promise((resolve) => setTimeout(resolve, 25));
     expect(secondSettled).toBe(false);
 
-    releaseFirstWrite?.();
+    invokeDeferred(releaseFirstWrite);
     const [firstResult, secondResult] = await Promise.all([
       firstPromise,
       secondPromise
@@ -8264,7 +8270,7 @@ for await (const line of rl) {
     await new Promise((resolve) => setTimeout(resolve, 25));
     expect(secondSettled).toBe(false);
 
-    releaseFirstWrite?.();
+    invokeDeferred(releaseFirstWrite);
     const recorded = await Promise.all([firstPromise, secondPromise]).then(async () =>
       await readProviderLinearWorkerChildStreams(runDir)
     );
@@ -8310,7 +8316,7 @@ for await (const line of rl) {
       'utf8'
     );
     await writeFile(proofLockPath, 'locked', 'utf8');
-    const writeProof = vi.fn(async () => undefined);
+    const writeProof = createWriteProofMock();
 
     const refreshPromise = refreshProviderLinearWorkerProofSnapshot(
       runDir,
@@ -8596,14 +8602,7 @@ for await (const line of rl) {
             selected_mode: 'appserver',
             provider: 'AppServerRuntimeProvider',
             runtime_session_id: 'appserver-run-child',
-            fallback: {
-              occurred: false,
-              code: null,
-              reason: null,
-              from_mode: null,
-              to_mode: null,
-              checked_at: '2026-03-21T09:00:00.000Z'
-            }
+            fallback: buildRuntimeFallback()
           } as never,
           workspace_path: tempRoot
         })
@@ -11096,6 +11095,7 @@ for await (const line of rl) {
       kind: 'worker',
       status: 'progressing',
       summary: 'Investigating provider-worker EVENT provenance.',
+      last_semantic_progress_at: null,
       stall_classification: 'progressing',
       stall_reason: null,
       recovery_recommendation: 'continue_waiting'
@@ -11505,14 +11505,7 @@ for await (const line of rl) {
             selected_mode: 'appserver',
             provider: 'AppServerRuntimeProvider',
             runtime_session_id: 'appserver-run-child',
-            fallback: {
-              occurred: false,
-              code: null,
-              reason: null,
-              from_mode: null,
-              to_mode: null,
-              checked_at: '2026-03-21T09:00:00.000Z'
-            }
+            fallback: buildRuntimeFallback()
           },
           workspace_path: tempRoot
         })
@@ -11907,7 +11900,7 @@ for await (const line of rl) {
     );
     const secondHydration = await readPersistedSessionLogHydrationState(hydrationPath);
 
-    expect(secondRefresh.tokens).toEqual({
+    expect(secondRefresh?.tokens).toEqual({
       input_tokens: 18,
       output_tokens: 12,
       total_tokens: 30
@@ -12498,8 +12491,7 @@ for await (const line of rl) {
 
   it('forces standalone review execution env and seeds authoritative notes inside non-interactive provider worker turns', async () => {
     const { manifestPath } = await createManifestRoot();
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(
         createTrackedIssue({
@@ -12607,8 +12599,7 @@ for await (const line of rl) {
         }
       })
     ];
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(
         createTrackedIssue({
@@ -13344,8 +13335,7 @@ for await (const line of rl) {
 
   it('keeps codex exec as labeled break-glass control when appserver falls back to cli', async () => {
     const { manifestPath } = await createManifestRoot();
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(
         createTrackedIssue({
@@ -13382,14 +13372,13 @@ for await (const line of rl) {
             requested_mode: 'appserver',
             selected_mode: 'cli',
             provider: 'CliRuntimeProvider',
-            fallback: {
+            fallback: buildRuntimeFallback({
               occurred: true,
               code: 'appserver_unavailable',
               reason: 'codex app-server unavailable',
               from_mode: 'appserver',
-              to_mode: 'cli',
-              checked_at: '2026-03-21T09:00:00.000Z'
-            }
+              to_mode: 'cli'
+            })
           })
         ),
         execRunner,
@@ -13466,8 +13455,7 @@ for await (const line of rl) {
       state: 'Done',
       state_type: 'completed'
     });
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(issue)
       .mockResolvedValueOnce(issue)
       .mockResolvedValueOnce(completedIssue);
@@ -14020,7 +14008,7 @@ for await (const line of rl) {
         readTrackedIssue: vi.fn(async () => createTrackedIssue()),
         resolveRuntimeContext: vi.fn(async () =>
           createRuntimeContext({}, {
-            CODEX_ORCHESTRATOR_ROOT: tempRoot,
+            CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
             CODEX_ORCHESTRATOR_REPO_CONFIG_PATH: relativeRepoConfigPath
           })
         ),
@@ -14519,7 +14507,10 @@ for await (const line of rl) {
   it('persists the first proof snapshot and runtime diagnosis when the manifest cannot be reread later', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
     const readManifest = vi
-      .fn<ProviderLinearWorkerDependencies['readManifest']>()
+      .fn<
+        Parameters<ProviderLinearWorkerDependencies['readManifest']>,
+        ReturnType<ProviderLinearWorkerDependencies['readManifest']>
+      >()
       .mockResolvedValueOnce({
         run_id: 'run-child',
         task_id: 'linear-lin-issue-1',
@@ -14727,7 +14718,7 @@ for await (const line of rl) {
     );
     const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
     await mkdir(controlHostRunDir, { recursive: true });
-    const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ queued: true, coalesced: false }), {
+    const fetchSpy = vi.fn<Parameters<typeof fetch>, ReturnType<typeof fetch>>(async () => new Response(JSON.stringify({ queued: true, coalesced: false }), {
       status: 202,
       headers: { 'Content-Type': 'application/json' }
     }));
@@ -14821,7 +14812,7 @@ for await (const line of rl) {
     );
     const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
     await mkdir(controlHostRunDir, { recursive: true });
-    const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ queued: true, coalesced: false }), {
+    const fetchSpy = vi.fn<Parameters<typeof fetch>, ReturnType<typeof fetch>>(async () => new Response(JSON.stringify({ queued: true, coalesced: false }), {
       status: 202,
       headers: { 'Content-Type': 'application/json' }
     }));
@@ -14898,7 +14889,7 @@ for await (const line of rl) {
     const { manifestPath } = await createManifestRoot();
     const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
     await mkdir(controlHostRunDir, { recursive: true });
-    const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ queued: true, coalesced: false }), {
+    const fetchSpy = vi.fn<Parameters<typeof fetch>, ReturnType<typeof fetch>>(async () => new Response(JSON.stringify({ queued: true, coalesced: false }), {
       status: 202,
       headers: { 'Content-Type': 'application/json' }
     }));
@@ -15279,8 +15270,7 @@ for await (const line of rl) {
       JSON.stringify({ stale: true }),
       'utf8'
     );
-    const fetchMock = vi
-      .fn<typeof fetch>()
+    const fetchMock = createFetchMock()
       .mockRejectedValueOnce(new Error('fetch failed'))
       .mockResolvedValue(new Response(JSON.stringify({ queued: true }), { status: 202 }));
     vi.stubGlobal('fetch', fetchMock);
@@ -15407,8 +15397,7 @@ for await (const line of rl) {
     );
     const timeoutError = new Error('request aborted');
     timeoutError.name = 'AbortError';
-    const fetchMock = vi
-      .fn<typeof fetch>()
+    const fetchMock = createFetchMock()
       .mockRejectedValueOnce(timeoutError)
       .mockResolvedValue(new Response(JSON.stringify({ queued: true }), { status: 202 }));
     vi.stubGlobal('fetch', fetchMock);
@@ -15535,7 +15524,7 @@ for await (const line of rl) {
     );
     vi.stubGlobal(
       'fetch',
-      vi.fn<typeof fetch>().mockRejectedValue(new Error('fetch failed'))
+      createFetchMock().mockRejectedValue(new Error('fetch failed'))
     );
 
     await expect(
@@ -16439,7 +16428,7 @@ for await (const line of rl) {
       '[ui]\nallowed_bind_hosts = ["control.example"]\n',
       'utf8'
     );
-    const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ queued: true, coalesced: false }), {
+    const fetchSpy = vi.fn<Parameters<typeof fetch>, ReturnType<typeof fetch>>(async () => new Response(JSON.stringify({ queued: true, coalesced: false }), {
       status: 202,
       headers: { 'Content-Type': 'application/json' }
     }));
@@ -16534,7 +16523,7 @@ for await (const line of rl) {
       '[ui]\nallowed_bind_hosts = ["127.0.0.1", "localhost"]\n',
       'utf8'
     );
-    const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ queued: true, coalesced: false }), {
+    const fetchSpy = vi.fn<Parameters<typeof fetch>, ReturnType<typeof fetch>>(async () => new Response(JSON.stringify({ queued: true, coalesced: false }), {
       status: 202,
       headers: { 'Content-Type': 'application/json' }
     }));
@@ -16614,7 +16603,7 @@ for await (const line of rl) {
     const controlHostRunDir = join(tempRoot, 'outside-runs', 'local-mcp', 'cli', 'control-host');
     await mkdir(malformedRunDir, { recursive: true });
     await mkdir(controlHostRunDir, { recursive: true });
-    const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ queued: true, coalesced: false }), {
+    const fetchSpy = vi.fn<Parameters<typeof fetch>, ReturnType<typeof fetch>>(async () => new Response(JSON.stringify({ queued: true, coalesced: false }), {
       status: 202,
       headers: { 'Content-Type': 'application/json' }
     }));
@@ -16691,7 +16680,7 @@ for await (const line of rl) {
     const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
     const controlHostRunDir = join(tempRoot ?? '', '.runs', 'local-mcp', 'cli', 'control-host');
     await mkdir(controlHostRunDir, { recursive: true });
-    const fetchSpy = vi.fn(async () => new Response('already queued elsewhere', {
+    const fetchSpy = vi.fn<Parameters<typeof fetch>, ReturnType<typeof fetch>>(async () => new Response('already queued elsewhere', {
       status: 200,
       headers: { 'Content-Type': 'text/plain' }
     }));
@@ -17158,7 +17147,7 @@ for await (const line of rl) {
         })
       );
     });
-    releaseLiveProofWrite?.();
+    invokeDeferred(releaseLiveProofWrite);
 
     await expect(workerPromise).rejects.toThrow('spawn failed');
 
@@ -17309,8 +17298,7 @@ for await (const line of rl) {
       recordedAt: '2026-03-21T08:59:00.000Z'
     });
 
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(createTrackedIssue({
         state: 'Done',
@@ -17801,8 +17789,7 @@ for await (const line of rl) {
         decision_reason: 'Applied bounded implementation patch.'
       }));
 
-      const readTrackedIssue = vi
-        .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      const readTrackedIssue = createReadTrackedIssueMock()
         .mockResolvedValueOnce(createTrackedIssue(initialIssue))
         .mockResolvedValueOnce(createTrackedIssue(finalIssue));
       const execRunner = vi.fn(async (request) => {
@@ -17920,8 +17907,7 @@ for await (const line of rl) {
   }) => {
     const { manifestPath, runDir } = await createManifestRoot();
     const sourceProofEnv = await writeCleanControlHostSourceProof();
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue({
         state: 'In Progress',
         state_type: 'started'
@@ -18158,8 +18144,7 @@ for await (const line of rl) {
           CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
         },
         {
-          readTrackedIssue: vi
-            .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+          readTrackedIssue: createReadTrackedIssueMock()
             .mockResolvedValueOnce(createTrackedIssue({
               state: 'Merging',
               state_type: 'started'
@@ -18368,8 +18353,7 @@ for await (const line of rl) {
             CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1'
           },
           {
-            readTrackedIssue: vi
-              .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+            readTrackedIssue: createReadTrackedIssueMock()
               .mockResolvedValueOnce(createTrackedIssue({
                 state: 'Merging',
                 state_type: 'started'
@@ -19599,8 +19583,7 @@ for await (const line of rl) {
 
   it('fails closed when the tracked issue refresh fails after a completed turn', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockRejectedValueOnce(new Error('tracked issue lookup failed'));
     const execRunner = vi.fn(async (request) => {
@@ -19668,8 +19651,7 @@ for await (const line of rl) {
         request_id: 'req-worker-short'
       }
     });
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockRejectedValueOnce(shortWaitRateLimit)
       .mockResolvedValueOnce(
@@ -19691,7 +19673,7 @@ for await (const line of rl) {
         stderr: ''
       };
     });
-    const waitForRateLimitReset = vi.fn(async () => undefined);
+    const waitForRateLimitReset = vi.fn<[number], Promise<void>>(async () => undefined);
 
     const proof = await runProviderLinearWorker(
       {
@@ -19745,8 +19727,7 @@ for await (const line of rl) {
           request_id: 'req-worker-endpoint-short'
         }
       });
-      const readTrackedIssue = vi
-        .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      const readTrackedIssue = createReadTrackedIssueMock()
         .mockResolvedValueOnce(createTrackedIssue())
         .mockRejectedValueOnce(shortEndpointWaitRateLimit)
         .mockResolvedValueOnce(
@@ -19767,7 +19748,7 @@ for await (const line of rl) {
           stderr: ''
         };
       });
-      const waitForRateLimitReset = vi.fn(async () => undefined);
+      const waitForRateLimitReset = vi.fn<[number], Promise<void>>(async () => undefined);
 
       const proof = await runProviderLinearWorker(
         {
@@ -19826,9 +19807,8 @@ for await (const line of rl) {
         state: 'Done',
         state_type: 'completed'
       });
-      const waitForRateLimitReset = vi.fn(async () => undefined);
-      const readTrackedIssue = vi
-        .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      const waitForRateLimitReset = vi.fn<[number], Promise<void>>(async () => undefined);
+      const readTrackedIssue = createReadTrackedIssueMock()
         .mockResolvedValueOnce(createTrackedIssue())
         .mockRejectedValueOnce(mixedBucketRateLimit)
         .mockImplementation(async () => {
@@ -19899,8 +19879,7 @@ for await (const line of rl) {
         request_id: 'req-worker-long'
       }
     });
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockRejectedValueOnce(longWaitRateLimit);
     const execRunner = vi.fn(async (request) => {
@@ -19915,7 +19894,7 @@ for await (const line of rl) {
         stderr: ''
       };
     });
-    const waitForRateLimitReset = vi.fn(async () => undefined);
+    const waitForRateLimitReset = vi.fn<[number], Promise<void>>(async () => undefined);
 
     await expect(
       runProviderLinearWorker(
@@ -20072,8 +20051,7 @@ for await (const line of rl) {
     'stops after a completed turn when the tracked issue moves to %s',
     async (reviewState) => {
       const { manifestPath, runDir } = await createManifestRoot();
-      const readTrackedIssue = vi
-        .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+      const readTrackedIssue = createReadTrackedIssueMock()
         .mockResolvedValueOnce(createTrackedIssue())
         .mockResolvedValueOnce(
           createTrackedIssue({
@@ -20137,8 +20115,7 @@ for await (const line of rl) {
 
   it('stops after a completed turn when the tracked issue moves to Todo with a non-terminal blocker', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValueOnce(createTrackedIssue())
       .mockResolvedValueOnce(
         createTrackedIssue({
@@ -20209,8 +20186,7 @@ for await (const line of rl) {
 
   it('records max_turns_reached_issue_still_active when the worker exhausts its budget', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValue(createTrackedIssue());
 
     const proof = await runProviderLinearWorker(
@@ -20264,7 +20240,7 @@ for await (const line of rl) {
 
   it('persists the current turn count in live proof updates before the turn completes', async () => {
     const { manifestPath } = await createManifestRoot();
-    const writeProof = vi.fn(async () => undefined);
+    const writeProof = createWriteProofMock();
     const execRunner = vi.fn(async (request: Parameters<ProviderLinearWorkerDependencies['execRunner']>[0]) => {
       await appendStaySerialParallelizationDecisionAuditForRequest(request);
       request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-1"}\n');
@@ -20357,7 +20333,7 @@ for await (const line of rl) {
     await utimes(sessionLogPath, hintedMtime, hintedMtime);
     await utimes(staleSessionLogPath, staleMtime, staleMtime);
 
-    const writeProof = vi.fn(async () => undefined);
+    const writeProof = createWriteProofMock();
     const execRunner = vi.fn(async (request) => {
       await appendStaySerialParallelizationDecisionAuditForRequest(request);
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -20957,7 +20933,7 @@ for await (const line of rl) {
     });
 
     let execCallCount = 0;
-    const writeProof = vi.fn(async () => undefined);
+    const writeProof = createWriteProofMock();
     const execRunner = vi.fn(async (request) => {
       execCallCount += 1;
       await appendStaySerialParallelizationDecisionAuditForRequest(request, {
@@ -21070,7 +21046,7 @@ for await (const line of rl) {
     });
 
     let execCallCount = 0;
-    const writeProof = vi.fn(async () => undefined);
+    const writeProof = createWriteProofMock();
     const execRunner = vi.fn(async (request) => {
       execCallCount += 1;
       await appendStaySerialParallelizationDecisionAuditForRequest(request, {
@@ -21152,7 +21128,7 @@ for await (const line of rl) {
       secondTurnBootstrapProofs.some(
         (writtenProof) =>
           writtenProof.tokens.total_tokens === 20 ||
-          writtenProof.rate_limits?.primary?.used_percent === 12.5 ||
+          readPrimaryRateLimitUsedPercent(writtenProof.rate_limits) === 12.5 ||
           writtenProof.latest_session_id === 'thread-1-turn-1'
       )
     ).toBe(false);
@@ -21168,7 +21144,7 @@ for await (const line of rl) {
 
   it('hydrates shared sidecar metadata into live proof updates before the turn completes', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
-    const writeProof = vi.fn(async () => undefined);
+    const writeProof = createWriteProofMock();
     const childStreamRecord = {
       stream: 'docs-review',
       pipeline_id: 'docs-review',
@@ -21189,7 +21165,7 @@ for await (const line of rl) {
       files: ['orchestrator/src/cli/providerLinearChildLaneShell.ts'],
       phases: []
     });
-    const childLaneRecord = {
+    const childLaneRecord: ProviderLinearWorkerChildLaneRecord = {
       stream: 'impl-a',
       pipeline_id: 'provider-linear-child-lane',
       task_id: 'linear-lin-issue-1-impl-a',
@@ -21299,7 +21275,7 @@ for await (const line of rl) {
 
   it('flushes a trailing JSONL fragment into live proof updates before the turn completes', async () => {
     const { manifestPath } = await createManifestRoot();
-    const writeProof = vi.fn(async () => undefined);
+    const writeProof = createWriteProofMock();
     const execRunner = vi.fn(async (request: Parameters<ProviderLinearWorkerDependencies['execRunner']>[0]) => {
       await appendStaySerialParallelizationDecisionAuditForRequest(request);
       request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-1"}\n');
@@ -21354,15 +21330,8 @@ for await (const line of rl) {
 
   it('does not reuse the previous turn session before a later turn emits turn_context', async () => {
     const { manifestPath } = await createManifestRoot();
-    const writeProof = vi.fn(async () => undefined);
-    const execRunner = vi
-      .fn<
-        (request: Parameters<ProviderLinearWorkerDependencies['execRunner']>[0]) => Promise<{
-          exitCode: number;
-          stdout: string;
-          stderr: string;
-        }>
-      >()
+    const writeProof = createWriteProofMock();
+    const execRunner = createExecRunnerMock()
       .mockImplementationOnce(async (request) => {
         await appendStaySerialParallelizationDecisionAuditForRequest(request, {
           turnIndex: 1
@@ -21929,7 +21898,7 @@ for await (const line of rl) {
         refreshCallCount += 1;
         refreshBodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
         if (refreshCallCount === 1) {
-          liveRefreshStartedResolve?.();
+          invokeDeferred(liveRefreshStartedResolve);
           return await new Promise<Response>((_resolve, reject) => {
             const abortError = Object.assign(new Error('This operation was aborted'), {
               name: 'AbortError'
@@ -22084,7 +22053,7 @@ for await (const line of rl) {
           const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
           refreshBodies.push(body);
           if (refreshCallCount === 1) {
-            firstLiveRefreshStartedResolve?.();
+            invokeDeferred(firstLiveRefreshStartedResolve);
             return await new Promise<Response>((resolve) => {
               resolveFirstLiveRefresh = resolve;
             });
@@ -22145,7 +22114,8 @@ for await (const line of rl) {
       );
 
       await firstLiveRefreshStarted;
-      resolveFirstLiveRefresh?.(
+      resolveDeferred(
+        resolveFirstLiveRefresh,
         new Response(JSON.stringify({ queued: true, coalesced: false }), {
           status: 202,
           headers: {
@@ -22170,7 +22140,7 @@ for await (const line of rl) {
         });
       });
 
-      allowRunnerToFinishResolve?.();
+      invokeDeferred(allowRunnerToFinishResolve);
       await workerPromise;
     } finally {
       vi.useRealTimers();
@@ -22238,7 +22208,7 @@ for await (const line of rl) {
           if (body.owner_status === 'in_progress') {
             liveRefreshCount += 1;
             if (liveRefreshCount === 1) {
-              firstLiveRefreshStartedResolve?.();
+              invokeDeferred(firstLiveRefreshStartedResolve);
               return await new Promise<Response>((resolve) => {
                 resolveFirstLiveRefresh = resolve;
               });
@@ -22279,7 +22249,7 @@ for await (const line of rl) {
               request.onStdoutChunk?.('{"type":"thread.started","thread_id":"thread-1"}\n');
             }
             if (runnerCallCount === 2) {
-              secondTurnStartedResolve?.();
+              invokeDeferred(secondTurnStartedResolve);
             }
             request.onStdoutChunk?.(`{"type":"turn_context","payload":{"turn_id":"${currentTurnId}"}}\n`);
             request.onStdoutChunk?.(
@@ -22310,7 +22280,8 @@ for await (const line of rl) {
       await firstLiveRefreshStarted;
       await secondTurnStarted;
 
-      resolveFirstLiveRefresh?.(
+      resolveDeferred(
+        resolveFirstLiveRefresh,
         new Response(JSON.stringify({ queued: true, coalesced: false }), {
           status: 202,
           headers: {
@@ -22334,7 +22305,7 @@ for await (const line of rl) {
         });
       });
 
-      allowSecondTurnToFinishResolve?.();
+      invokeDeferred(allowSecondTurnToFinishResolve);
       const proof = await workerPromise;
       expect(proof).toMatchObject({
         owner_status: 'succeeded',
@@ -22428,7 +22399,7 @@ for await (const line of rl) {
         )
       ).toBe(true);
 
-      allowRunnerToFinishResolve?.();
+      invokeDeferred(allowRunnerToFinishResolve);
       await workerPromise;
     } finally {
       vi.useRealTimers();
@@ -22540,7 +22511,7 @@ for await (const line of rl) {
         ).toBe(true);
       });
 
-      allowRunnerToFinishResolve?.();
+      invokeDeferred(allowRunnerToFinishResolve);
       await workerPromise;
     } finally {
       vi.useRealTimers();
@@ -22660,8 +22631,7 @@ for await (const line of rl) {
 
   it('treats Ready as the live Todo-equivalent queue state even though Linear marks it unstarted', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValue(
         createTrackedIssue({
           state: 'Ready',
@@ -22720,8 +22690,7 @@ for await (const line of rl) {
 
   it('treats custom started states outside the explicit active-state set as inactive', async () => {
     const { manifestPath, runDir } = await createManifestRoot();
-    const readTrackedIssue = vi
-      .fn<(input: ReadTrackedIssueInput) => Promise<LiveLinearTrackedIssue>>()
+    const readTrackedIssue = createReadTrackedIssueMock()
       .mockResolvedValue(
         createTrackedIssue({
           state: 'QA Ready',

@@ -23,6 +23,7 @@
    - `npm run pack:audit`
    - `npm run pack:smoke`
    - Note: release/RC should run the full matrix (`npm run build:all`, `npm run test:adapters`, `npm run test:evaluation`, `npm run eval:test` when fixtures/optional deps exist) per docs policy.
+   - `npm run build:all` runs the production build, pattern build, and the CO-471 root strict typecheck baseline guard. Use `npm run typecheck:root` to reproduce the current raw root `tsconfig.json` strict test type debt; update `tasks/baselines/build-all-strict-typecheck-debt.json` only from the `build-all-strict-test-typecheck-debt` owner lane after reviewing diagnostic drift.
 4. Validate the package artifact:
    - `npm run clean:dist && npm run build`
    - `npm run pack:audit` (release workflow reruns this before publish)
