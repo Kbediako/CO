@@ -1,6 +1,6 @@
 # Mini-Spec - Recursive Language Model Orchestrator (Task 0105)
 
-last_review: 2026-04-05
+last_review: 2026-05-06
 ## Summary & Scope
 - Add an RLM runner that can be invoked via `npx` on any repo.
 - Loop includes self-refine/critique, tool recursion, and validator gating.
@@ -24,3 +24,4 @@ last_review: 2026-04-05
 ## Review Decisions
 - Require a docs-review gate before implementation.
 - Keep MVP minimal (loop + validator + pipeline + CLI wrapper) before adding role splits.
+- 2026-05-06: CO-503 stale active-spec review re-read this spec and `tasks/index.json`. The task index still records `0105` as `in-progress` with no terminal Linear issue evidence, so this spec remains active and is refreshed with current review evidence rather than reclassified or blindly date-bumped. No `spec-guard` behavior changed.

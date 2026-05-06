@@ -1,13 +1,16 @@
 ---
 id: 20260405-linear-7bb1895e-cda2-4173-86ec-c6794ccb1ce7
 title: CO: Make Merging-stage merge closeout deterministic and watchdog-backed
+status: done
 relates_to: docs/PRD-linear-7bb1895e-cda2-4173-86ec-c6794ccb1ce7.md
 related_prd: docs/PRD-linear-7bb1895e-cda2-4173-86ec-c6794ccb1ce7.md
 related_action_plan: docs/ACTION_PLAN-linear-7bb1895e-cda2-4173-86ec-c6794ccb1ce7.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-05
+last_review: 2026-05-06
+review_notes:
+  - 2026-05-06: CO-503 live Linear audit confirmed CO-80 is `Done` (state_type=completed, updated_at=2026-04-11T00:21:29.848Z) with merged PR #364 attached; this completed-lane spec is reclassified to inactive `done` under canonical owner key `spec-guard:active-specs:last_review=2026-04-05` so historical implementation evidence remains preserved without staying in active-spec freshness.
 ---
 
 ## Added by Bootstrap (refresh as needed)
