@@ -590,7 +590,7 @@ function hasCleanReviewVerdict(outputText: string): boolean {
   return outputText
     .split(/\r?\n/u)
     .some((line) =>
-      /^\s*(?:[-*]\s*)?(?:(?:(?:I|[A-Z][^.\n]*?)\s+)?(?:found|find)\s+no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions)(?:\s+(?:in|for|from|against|with)\b.*)?[.!]?|no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions)(?:\s+(?:found|identified|were found))?(?:\s+(?:in|for|from|against|with)\b.*)?[.!]?|no\s+findings\.?)\s*$/iu.test(
+      /^\s*(?:[-*]\s*)?(?:(?:(?:I|[A-Z][^.\n]*?)\s+)?(?:found|find)\s+no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions)(?:\s+(?:in|for|from|against|with)\b.*)?[.!]?|(?:(?:I|[A-Z][^.\n]*?)\s+)?did\s+not\s+identify\s+an?\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issue|finding|regression)(?:\s+(?:in|for|from|against|with)\b.*)?[.!]?|no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions)(?:\s+(?:found|identified|were found|were identified))?(?:\s+(?:in|for|from|against|with)\b.*)?[.!]?|no\s+findings\.?)\s*$/iu.test(
         line
       )
     );

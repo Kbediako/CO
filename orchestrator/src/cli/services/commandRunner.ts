@@ -503,7 +503,12 @@ export async function runCommandStage(
         resolveProviderLinearWorkerAttemptStartedAt(providerLinearWorkerProofRecord) ?? entry.started_at ?? null;
       const reviewTelemetryStatus = coerceTelemetryStatusValue(providerReviewTelemetry?.status);
       const reviewOutcomeSummary = formatReviewTelemetryOutcomeSummary(providerReviewTelemetry);
-      const reviewSemanticVerdict = resolveReviewSemanticVerdict(providerReviewTelemetry);
+      const reviewSemanticVerdict =
+        providerReviewTelemetry === null
+          ? reviewTelemetry === null && shouldAwaitReviewTelemetry
+            ? 'unknown'
+            : null
+          : resolveReviewSemanticVerdict(providerReviewTelemetry);
       providerLinearWorkerReviewOutcomeSummary = reviewOutcomeSummary;
       const mutationSuppressions = deriveDeterministicProviderMutationSuppressions(
         providerLinearWorkerProof?.linear_audit ?? null,

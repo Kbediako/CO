@@ -878,6 +878,43 @@ describe('runCommandStage review evidence consistency', () => {
     }
   });
 
+  it('fails succeeded provider-linear-worker stages when review telemetry is missing', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker without telemetry',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      { FORCE_CODEX_REVIEW: '1', CODEX_REVIEW_NON_INTERACTIVE: '1' }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain(
+      'Provider linear worker failed because standalone review did not produce a concrete verdict.'
+    );
+    expect(result.summary).toContain('semantic review verdict: unknown');
+
+    const errorPayload = JSON.parse(
+      await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')
+    ) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_unknown');
+    expect(errorPayload.details?.review_outcome_summary).toContain(
+      'semantic review verdict: unknown'
+    );
+  });
+
   it('preserves rollout-item thread-not-found review log noise notes in provider-worker terminal summaries', async () => {
     mockState.runImpl = async (input) => {
       await writeProviderLinearWorkerProofArtifacts(input, {
