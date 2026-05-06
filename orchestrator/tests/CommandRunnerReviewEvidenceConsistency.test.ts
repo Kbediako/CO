@@ -946,7 +946,7 @@ describe('runCommandStage review evidence consistency', () => {
     expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_proof_missing_or_unreadable');
   });
 
-  it('fails closed on stale provider-worker review telemetry from an earlier attempt in the same run', async () => {
+  it('fails closed on stale provider-worker review telemetry when FORCE_CODEX_REVIEW is inherited', async () => {
     mockState.runImpl = async (input) => {
       await writeProviderLinearWorkerProofArtifacts(input, {
         owner_phase: 'ended',
@@ -979,7 +979,16 @@ describe('runCommandStage review evidence consistency', () => {
         CODEX_REVIEW_NON_INTERACTIVE: '1'
       }
     );
-    const result = await runCommandStage({ ...context, manifest, stage, index: 1 });
+    delete stage.env?.FORCE_CODEX_REVIEW;
+    const result = await runCommandStage({
+      ...context,
+      manifest,
+      stage,
+      index: 1,
+      envOverrides: {
+        FORCE_CODEX_REVIEW: '1'
+      }
+    });
 
     expect(result.exitCode).toBe(1);
     expect(result.summary).toContain(
