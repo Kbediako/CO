@@ -1416,7 +1416,7 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
         updated_at: '2026-03-21T09:00:00.000Z',
         authority: 'advisory_only',
         linear_authority_preserved: true,
-        not_authorized_for: ['linear_transition', 'hook_resume_control_integration'],
+        not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
         reason: null
       }
     };
@@ -13058,6 +13058,7 @@ for await (const line of rl) {
     expect(proof.goal_evidence?.not_authorized_for).toEqual(
       expect.arrayContaining([
         'linear_transition',
+        'workpad_replacement',
         'pr_attachment',
         'review_handoff',
         'ready_review_success',
@@ -13131,7 +13132,7 @@ for await (const line of rl) {
     );
 
     expect(proof.goal_evidence).toMatchObject({
-      feature_available: false,
+      feature_available: true,
       feature_enabled: false,
       capture_mode: 'disabled',
       reason: 'goals_feature_disabled',
@@ -13200,7 +13201,83 @@ for await (const line of rl) {
     );
 
     expect(proof.goal_evidence).toMatchObject({
-      feature_available: false,
+      feature_available: true,
+      feature_enabled: false,
+      capture_mode: 'disabled',
+      reason: 'goals_feature_disabled',
+      objective: null,
+      status: null
+    });
+  });
+
+  it('honors profile-scoped config overrides for goals', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent(
+      [
+        '[features]',
+        'goals = true',
+        '',
+        '[profile.worker.features]',
+        'goals = false',
+        ''
+      ].join('\n')
+    );
+    const appServerTurnRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-profile-disabled"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-profile-disabled-1"}}',
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:00.250Z',
+            type: 'notification',
+            method: 'thread/goal/updated',
+            params: {
+              threadId: 'thread-profile-disabled',
+              goal: {
+                threadId: 'thread-profile-disabled',
+                objective: 'must not persist when profile disables goals',
+                status: 'active',
+                updatedAt: '2026-03-21T09:00:00.000Z'
+              }
+            }
+          }),
+          '{"type":"notification","method":"turn/completed","params":{"threadId":"thread-profile-disabled","turn":{"id":"turn-profile-disabled-1","status":"completed"}}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_HOME: codexHome
+      },
+      {
+        readTrackedIssue: createReadTrackedIssueMock()
+          .mockResolvedValueOnce(createTrackedIssue())
+          .mockResolvedValueOnce(createTrackedIssue({ state: 'Done', state_type: 'completed' })),
+        resolveRuntimeContext: vi.fn(async () =>
+          createAppServerRuntimeContext({}, {
+            CODEX_CONFIG_OVERRIDES: 'profile="worker"'
+          })
+        ),
+        execRunner: vi.fn(),
+        appServerTurnRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof.goal_evidence).toMatchObject({
+      feature_available: true,
       feature_enabled: false,
       capture_mode: 'disabled',
       reason: 'goals_feature_disabled',
@@ -13431,7 +13508,7 @@ for await (const line of rl) {
             updated_at: '2026-03-21T09:00:00.000Z',
             authority: 'advisory_only',
             linear_authority_preserved: true,
-            not_authorized_for: ['linear_transition'],
+            not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
             reason: null
           }
         })
@@ -13500,9 +13577,9 @@ for await (const line of rl) {
             elapsed_seconds: '1.5',
             created_at: 'bad-date',
             updated_at: 'bad-date',
-            authority: 'something-else',
-            linear_authority_preserved: false,
-            not_authorized_for: ['linear_transition'],
+            authority: 'advisory_only',
+            linear_authority_preserved: true,
+            not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
             payload: { unexpected: true },
             reason: 12
           } as unknown as ProviderLinearWorkerProof['goal_evidence']
@@ -13536,6 +13613,128 @@ for await (const line of rl) {
       linear_authority_preserved: true,
       not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
       reason: 'goal_timestamp_unavailable'
+    });
+  });
+
+  it('rejects carried goal evidence without advisory authority before proof refresh re-emits it', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          current_turn_started_at: '2026-03-21T09:10:00.000Z',
+          runtime: {
+            requested_mode: 'appserver',
+            selected_mode: 'appserver',
+            provider: 'AppServerRuntimeProvider',
+            fallback: null
+          },
+          goal_evidence: {
+            source: 'codex-goals',
+            feature_available: true,
+            feature_enabled: true,
+            capture_mode: 'captured',
+            capture_timestamp: '2026-03-21T09:10:01.000Z',
+            thread_id: 'thread-1',
+            turn_id: 'turn-2',
+            objective: 'must not leak without authority',
+            status: 'active',
+            token_budget: null,
+            tokens_used: null,
+            elapsed_seconds: null,
+            created_at: '2026-03-21T09:00:00.000Z',
+            updated_at: '2026-03-21T09:10:01.000Z',
+            authority: 'lifecycle_control',
+            linear_authority_preserved: false,
+            not_authorized_for: ['linear_transition'],
+            reason: null
+          } as unknown as ProviderLinearWorkerProof['goal_evidence']
+        })
+      ),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:10:05.000Z'
+    );
+
+    expect(refreshed?.goal_evidence).toMatchObject({
+      feature_available: true,
+      feature_enabled: null,
+      capture_mode: 'unavailable',
+      capture_timestamp: '2026-03-21T09:10:05.000Z',
+      thread_id: 'thread-1',
+      turn_id: 'turn-2',
+      objective: null,
+      status: null,
+      reason: 'goal_state_not_observed',
+      authority: 'advisory_only',
+      linear_authority_preserved: true,
+      not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR]
+    });
+  });
+
+  it('marks carried cleared goal evidence stale when it predates the current provider turn', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          current_turn_started_at: '2026-03-21T09:10:00.000Z',
+          runtime: {
+            requested_mode: 'appserver',
+            selected_mode: 'appserver',
+            provider: 'AppServerRuntimeProvider',
+            fallback: null
+          },
+          goal_evidence: {
+            source: 'codex-goals',
+            feature_available: true,
+            feature_enabled: true,
+            capture_mode: 'cleared',
+            capture_timestamp: '2026-03-21T09:00:00.000Z',
+            thread_id: 'thread-1',
+            turn_id: 'turn-1',
+            objective: null,
+            status: 'cleared',
+            token_budget: null,
+            tokens_used: null,
+            elapsed_seconds: null,
+            created_at: null,
+            updated_at: null,
+            authority: 'advisory_only',
+            linear_authority_preserved: true,
+            not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+            reason: 'goal_cleared'
+          }
+        })
+      ),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:10:05.000Z'
+    );
+
+    expect(refreshed?.goal_evidence).toMatchObject({
+      capture_mode: 'stale',
+      capture_timestamp: '2026-03-21T09:00:00.000Z',
+      thread_id: 'thread-1',
+      objective: null,
+      status: null,
+      reason: 'goal_evidence_predates_current_turn',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
     });
   });
 

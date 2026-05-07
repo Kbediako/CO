@@ -149,7 +149,7 @@ Valid `capture_mode` values are `captured`, `cleared`, `disabled`, `unavailable`
 - [ ] `elapsed_seconds` accepts fractional seconds.
 - [ ] Thread-mismatch regression pins goals on.
 - [ ] Stale candidate timestamps classify as stale.
-- [ ] Goal state cannot authorize Linear transitions, PR attachment, review handoff, ready-review success, merge closeout, hook recovery success, long-poll terminal status, hook/resume control integration, or TUI automation.
+- [ ] Goal state cannot authorize Linear transitions, workpad replacement, PR attachment, review handoff, ready-review success, merge closeout, hook recovery success, long-poll terminal status, hook/resume control integration, or TUI automation.
 
 ## Architecture & Data
 - Candidate sources:

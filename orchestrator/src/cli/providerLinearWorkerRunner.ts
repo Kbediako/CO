@@ -1798,6 +1798,7 @@ interface ProviderWorkerConfigModelProfileDefaults {
   model: string | null;
   review_model: string | null;
   reasoning_effort: string | null;
+  goals_feature_enabled?: boolean | null;
 }
 
 interface ProviderWorkerRuntimeReportedModel {
@@ -1878,6 +1879,16 @@ function readProviderWorkerConfigModelDefaultsFromToml(
         profiles[profileName] ?? createEmptyProviderWorkerConfigModelProfileDefaults();
       if (isProviderWorkerConfigProfileRootTable(currentTableKind, currentTablePath)) {
         mergeProviderWorkerConfigModelAssignment(profileDefaults, trimmed);
+        profileDefaults.goals_feature_enabled =
+          readTomlBooleanAssignment(trimmed, 'features.goals') ??
+          profileDefaults.goals_feature_enabled;
+      } else if (
+        currentTableKind === 'table' &&
+        currentTablePath.length === 3 &&
+        currentTablePath[2] === 'features'
+      ) {
+        profileDefaults.goals_feature_enabled =
+          readTomlBooleanAssignment(trimmed, 'goals') ?? profileDefaults.goals_feature_enabled;
       }
       profiles[profileName] = profileDefaults;
       defaults.profiles = profiles;
@@ -1911,7 +1922,8 @@ function createEmptyProviderWorkerConfigModelProfileDefaults(): ProviderWorkerCo
   return {
     model: null,
     review_model: null,
-    reasoning_effort: null
+    reasoning_effort: null,
+    goals_feature_enabled: null
   };
 }
 
@@ -2002,7 +2014,7 @@ function selectProviderWorkerConfigModelDefaultsForProfile(
     review_model: profileDefaults.review_model ?? rootDefaults.review_model,
     reasoning_effort: profileDefaults.reasoning_effort ?? rootDefaults.reasoning_effort,
     config_path: defaults.config_path,
-    goals_feature_enabled: defaults.goals_feature_enabled ?? null,
+    goals_feature_enabled: profileDefaults.goals_feature_enabled ?? defaults.goals_feature_enabled ?? null,
     root_model: rootDefaults.model,
     root_review_model: rootDefaults.review_model,
     root_reasoning_effort: rootDefaults.reasoning_effort,
@@ -2163,9 +2175,14 @@ function resolveProviderWorkerCommandGoalsFeatureEnabled(
   args: string[],
   configDefaults: ProviderWorkerConfigModelDefaults
 ): boolean | null {
+  const commandOverrides = resolveProviderWorkerCommandModelOverrides(args);
+  const selectedConfigDefaults = selectProviderWorkerConfigModelDefaultsForProfile(
+    configDefaults,
+    commandOverrides.profile
+  );
   return (
-    resolveProviderWorkerCommandModelOverrides(args).goals_feature_enabled ??
-    configDefaults.goals_feature_enabled ??
+    commandOverrides.goals_feature_enabled ??
+    selectedConfigDefaults.goals_feature_enabled ??
     null
   );
 }
@@ -2530,6 +2547,8 @@ export function buildProviderLinearWorkerResolvedModelProvenance(input: {
       reasoning_effort?: string | null;
       model_reasoning_effort?: string | null;
       modelReasoningEffort?: string | null;
+      goals_feature_enabled?: boolean | null;
+      goalsFeatureEnabled?: boolean | null;
     }
   >;
   configActiveProfile?: string | null;
@@ -2581,6 +2600,8 @@ function normalizeProviderWorkerConfigModelProfiles(
           reasoning_effort?: string | null;
           model_reasoning_effort?: string | null;
           modelReasoningEffort?: string | null;
+          goals_feature_enabled?: boolean | null;
+          goalsFeatureEnabled?: boolean | null;
         }
       >
     | undefined
@@ -2603,7 +2624,10 @@ function normalizeProviderWorkerConfigModelProfiles(
         rawProfile.reasoning_effort ??
           rawProfile.model_reasoning_effort ??
           rawProfile.modelReasoningEffort
-      )
+      ),
+      goals_feature_enabled:
+        normalizeProviderLinearGoalEvidenceBoolean(rawProfile.goals_feature_enabled) ??
+        normalizeProviderLinearGoalEvidenceBoolean(rawProfile.goalsFeatureEnabled)
     };
   }
   return normalized;
@@ -4766,8 +4790,30 @@ function normalizeProviderLinearGoalEvidenceBoolean(value: unknown): boolean | n
   return typeof value === 'boolean' ? value : null;
 }
 
+function hasProviderLinearGoalEvidenceAuthorityBoundary(value: Record<string, unknown>): boolean {
+  if (value.authority !== 'advisory_only' || value.linear_authority_preserved !== true) {
+    return false;
+  }
+  const notAuthorizedFor = Array.isArray(value.not_authorized_for)
+    ? value.not_authorized_for
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter((item): item is string => item.length > 0)
+    : [];
+  const notAuthorizedForSet = new Set(notAuthorizedFor);
+  return (
+    notAuthorizedFor.length === PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR.length &&
+    notAuthorizedForSet.size === PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR.length &&
+    PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR.every((item) =>
+      notAuthorizedForSet.has(item)
+    )
+  );
+}
+
 export function normalizeProviderLinearGoalEvidenceValue(value: unknown): ProviderLinearGoalEvidence | null {
   if (!isRecord(value) || value.source !== 'codex-goals') {
+    return null;
+  }
+  if (!hasProviderLinearGoalEvidenceAuthorityBoundary(value)) {
     return null;
   }
   const captureMode = normalizeProviderLinearGoalEvidenceCaptureMode(value.capture_mode);
@@ -4827,7 +4873,10 @@ function normalizeProviderLinearGoalEvidenceForProof(input: {
   const runtimeMode = normalizeOptionalString(input.runtimeMode);
   if (featureEnabled === false) {
     return buildProviderLinearGoalEvidence({
-      featureAvailable: false,
+      featureAvailable:
+        candidate?.feature_available ??
+        previous?.feature_available ??
+        (runtimeMode === 'appserver' ? true : false),
       featureEnabled: false,
       captureMode: 'disabled',
       captureTimestamp: input.observedAt,
@@ -4867,7 +4916,7 @@ function normalizeProviderLinearGoalEvidenceForProof(input: {
   const goalThreadId = normalizeOptionalString(base.thread_id);
   const proofThreadId = normalizeOptionalString(input.proofThreadId);
   const freshnessTimestamp =
-    captureMode === 'captured'
+    captureMode === 'captured' || captureMode === 'cleared'
       ? normalizeOptionalString(base.updated_at) ??
         normalizeOptionalString(base.created_at) ??
         normalizeOptionalString(base.capture_timestamp)
@@ -4878,11 +4927,11 @@ function normalizeProviderLinearGoalEvidenceForProof(input: {
   } else if (!goalThreadId && proofThreadId && captureMode === 'captured') {
     captureMode = 'thread_mismatch';
     reason = `goal_thread_missing:${proofThreadId}`;
-  } else if (captureMode === 'captured' && freshnessTimestamp === null) {
+  } else if ((captureMode === 'captured' || captureMode === 'cleared') && freshnessTimestamp === null) {
     captureMode = 'unavailable';
     reason = 'goal_timestamp_unavailable';
   } else if (
-    captureMode === 'captured' &&
+    (captureMode === 'captured' || captureMode === 'cleared') &&
     freshnessTimestamp !== null &&
     compareIsoTimestamp(freshnessTimestamp, input.currentTurnStartedAt) < 0
   ) {
@@ -8785,7 +8834,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
             proofTurnId: liveTurnId,
             observedAt: proof.updated_at ?? new Date().toISOString(),
             currentTurnStartedAt: proof.current_turn_started_at ?? proof.attempt_started_at ?? null,
-            featureEnabled: proof.goal_evidence?.feature_enabled ?? null,
+            featureEnabled: null,
             runtimeMode: proof.runtime?.selected_mode ?? null
           }),
     failure_diagnosis: parseState.failureDiagnosis ?? (liveTurnChanged ? null : proof.failure_diagnosis ?? null)
@@ -11997,7 +12046,7 @@ async function writeProofSnapshot(
               proofTurnId: proof.latest_turn_id,
               observedAt: deps.now(),
               currentTurnStartedAt: proof.current_turn_started_at ?? proof.attempt_started_at ?? null,
-              featureEnabled: proof.goal_evidence?.feature_enabled ?? null,
+              featureEnabled: null,
               runtimeMode: proof.runtime?.selected_mode ?? null
             }),
       linear_budget: linearBudget
@@ -12081,7 +12130,7 @@ export async function refreshProviderLinearWorkerProofSnapshot(
               proofTurnId: parsed.latest_turn_id,
               observedAt: now(),
               currentTurnStartedAt: parsed.current_turn_started_at ?? parsed.attempt_started_at ?? null,
-              featureEnabled: parsed.goal_evidence?.feature_enabled ?? null,
+              featureEnabled: null,
               runtimeMode: parsed.runtime?.selected_mode ?? null
             }),
       linear_budget: linearBudget,
@@ -12628,7 +12677,7 @@ export async function runProviderLinearWorker(
             proofTurnId: liveTurnId,
             observedAt: deps.now(),
             currentTurnStartedAt: finalProof.current_turn_started_at ?? turnStartedAt,
-            featureEnabled: currentTurnGoalsFeatureEnabled ?? finalProof.goal_evidence?.feature_enabled ?? null,
+            featureEnabled: currentTurnGoalsFeatureEnabled ?? null,
             runtimeMode: runtimeContext.runtime.selected_mode
           }),
           auth_provenance: mergeProviderWorkerAuthProvenance(
@@ -12806,7 +12855,7 @@ export async function runProviderLinearWorker(
             proofTurnId: null,
             observedAt: turnStartedAt,
             currentTurnStartedAt: turnStartedAt,
-            featureEnabled: currentTurnGoalsFeatureEnabled ?? finalProof.goal_evidence?.feature_enabled ?? null,
+            featureEnabled: currentTurnGoalsFeatureEnabled ?? null,
             runtimeMode: runtimeContext.runtime.selected_mode
           }),
           // Runtime-reported model provenance is turn-scoped; start each turn from
@@ -13159,7 +13208,7 @@ export async function runProviderLinearWorker(
           proofTurnId: turnId,
           observedAt: deps.now(),
           currentTurnStartedAt: turnStartedAt,
-          featureEnabled: currentTurnGoalsFeatureEnabled ?? finalProof.goal_evidence?.feature_enabled ?? null,
+          featureEnabled: currentTurnGoalsFeatureEnabled ?? null,
           runtimeMode: runtimeContext.runtime.selected_mode
         }),
         auth_provenance: mergeProviderWorkerAuthProvenance(
