@@ -4760,11 +4760,7 @@ function isProviderWorkerGoalSnapshotRecord(value: Record<string, unknown>): boo
     'timeUsedSeconds',
     'time_used_seconds',
     'elapsedSeconds',
-    'elapsed_seconds',
-    'createdAt',
-    'created_at',
-    'updatedAt',
-    'updated_at'
+    'elapsed_seconds'
   ].some((key) => value[key] !== undefined);
 }
 
@@ -5185,9 +5181,13 @@ export function normalizeProviderLinearGoalEvidenceForProof(input: {
   let reason = base.reason ?? null;
   const goalThreadId = normalizeOptionalString(base.thread_id);
   const proofThreadId = normalizeOptionalString(input.proofThreadId);
+  const captureTimestamp = base.capture_timestamp ?? input.observedAt;
+  const freshnessCaptureTimestamp = base.capture_timestamp ?? (candidate ? input.observedAt : null);
   const freshnessTimestamp =
     captureMode === 'captured' || captureMode === 'cleared'
-      ? selectProviderLinearGoalEvidenceFreshnessTimestamp(base)
+      ? freshnessCaptureTimestamp ??
+        normalizeOptionalString(base.updated_at) ??
+        normalizeOptionalString(base.created_at)
       : null;
   if (goalThreadId && proofThreadId && goalThreadId !== proofThreadId) {
     captureMode = 'thread_mismatch';
@@ -5211,7 +5211,7 @@ export function normalizeProviderLinearGoalEvidenceForProof(input: {
       featureAvailable: base.feature_available ?? (runtimeMode === 'appserver' ? true : false),
       featureEnabled,
       captureMode,
-      captureTimestamp: base.capture_timestamp ?? input.observedAt,
+      captureTimestamp,
       threadId: goalThreadId ?? proofThreadId ?? null,
       turnId: base.turn_id ?? input.proofTurnId ?? null,
       objective: null,
@@ -5229,7 +5229,7 @@ export function normalizeProviderLinearGoalEvidenceForProof(input: {
     feature_available: base.feature_available ?? (runtimeMode === 'appserver' ? true : false),
     feature_enabled: featureEnabled,
     capture_mode: captureMode,
-    capture_timestamp: base.capture_timestamp ?? input.observedAt,
+    capture_timestamp: captureTimestamp,
     turn_id: base.turn_id ?? input.proofTurnId ?? null,
     authority: 'advisory_only',
     linear_authority_preserved: true,
@@ -8953,7 +8953,8 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
       rateLimits: proof.rate_limits,
       authProvenance: proof.auth_provenance ?? null,
       resolvedModelProvenance: proofBaselineResolvedModelProvenance,
-      failureDiagnosis: proof.failure_diagnosis ?? null
+      failureDiagnosis: proof.failure_diagnosis ?? null,
+      goalEvidence: proof.goal_evidence ?? null
     },
     selectProviderLinearWorkerProofFinalMessageSource(proof),
     selectProviderLinearWorkerProofFinalMessageDeltaKey(proof)
