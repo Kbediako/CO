@@ -256,6 +256,8 @@ const LOCAL_IMAGE_CONTENT_TYPE_BY_EXTENSION = new Map<string, string>([
 const PROVIDER_LINEAR_CANONICAL_OWNER_MARKER_PREFIX = 'codex-orchestrator:canonical-owner-key=';
 const PROVIDER_LINEAR_SUPERSEDED_CANONICAL_OWNER_MARKER_PREFIX =
   'codex-orchestrator:superseded-canonical-owner-key=';
+const FOLLOW_UP_REQUIRED_LIFECYCLE_LABEL = 'Lifecycle: Implementation';
+const FOLLOW_UP_TYPE_LABEL_NAMES = new Set(['Bug', 'Improvement', 'Feature']);
 const PROVIDER_LINEAR_CANONICAL_OWNER_SEARCH_LIMIT = 50;
 
 type ProviderLinearOperation =
@@ -497,6 +499,7 @@ export interface ProviderLinearCreatedIssue {
     id: string | null;
     name: string | null;
   } | null;
+  labels?: ProviderLinearIssueLabel[];
 }
 
 export type ProviderLinearCreateFollowUpResult =
@@ -675,7 +678,7 @@ interface LinearCanonicalOwnerIssuesQueryResponse {
         id?: string | null;
         name?: string | null;
       } | null;
-    }> | null;
+    } & LinearIssueLabelConnectionField> | null;
     pageInfo?: LinearConnectionPageInfo | null;
   } | null;
 }
@@ -683,6 +686,17 @@ interface LinearCanonicalOwnerIssuesQueryResponse {
 interface LinearConnectionPageInfo {
   hasNextPage?: boolean | null;
   endCursor?: string | null;
+}
+
+interface LinearIssueLabelConnectionField {
+  labels?: {
+    nodes?: Array<{
+      id?: string | null;
+      name?: string | null;
+      color?: string | null;
+    }> | null;
+    pageInfo?: LinearConnectionPageInfo | null;
+  } | null;
 }
 
 interface CommentMutationResponse {
@@ -785,7 +799,7 @@ interface IssueCreateMutationResponse {
         id?: string | null;
         name?: string | null;
       } | null;
-    } | null;
+    } & LinearIssueLabelConnectionField | null;
   } | null;
 }
 
@@ -812,7 +826,7 @@ interface IssueDescriptionUpdateMutationResponse {
         id?: string | null;
         name?: string | null;
       } | null;
-    } | null;
+    } & LinearIssueLabelConnectionField | null;
   } | null;
 }
 
@@ -2771,6 +2785,9 @@ export async function createProviderLinearFollowUpIssue(input: {
     );
   }
   const canonicalOwnerMarker = canonicalOwnerKey ? buildCanonicalOwnerMarker(canonicalOwnerKey) : null;
+  const canonicalOwnerStamp = canonicalOwnerKey && canonicalOwnerMarker
+    ? { key: canonicalOwnerKey, marker: canonicalOwnerMarker }
+    : null;
   const blockedBySource = input.blockedBySource === true;
 
   const session = resolveLinearWorkflowSession(input.env, input.fetchImpl, input.sourceSetup);
@@ -2781,9 +2798,9 @@ export async function createProviderLinearFollowUpIssue(input: {
   const budgetError = await preflightProviderLinearBudget({
     session: session.session,
     operation: 'create-follow-up',
-    minimumRequestsRemaining: blockedBySource
-      ? (canonicalOwnerKey ? 4 : 5)
-      : (canonicalOwnerKey ? 3 : 4)
+    minimumRequestsRemaining: canonicalOwnerKey
+      ? (blockedBySource ? 4 : 3)
+      : (blockedBySource ? 6 : 5)
   });
   if (budgetError) {
     return failureFromWorkflowError('create-follow-up', budgetError);
@@ -2814,6 +2831,18 @@ export async function createProviderLinearFollowUpIssue(input: {
     );
   }
 
+  const followUpLabels = resolveFollowUpLabelsFromSourceIssue(issueSummary.issue);
+  if (!followUpLabels.ok) {
+    return failure(
+      'create-follow-up',
+      followUpLabels.error.code,
+      followUpLabels.error.message,
+      followUpLabels.error.status,
+      followUpLabels.error.details,
+      followUpLabels.error.retryable
+    );
+  }
+
   const canonicalOwner = canonicalOwnerKey && canonicalOwnerMarker
     ? await findCanonicalFollowUpOwnerIssue({
         session: session.session,
@@ -2826,10 +2855,90 @@ export async function createProviderLinearFollowUpIssue(input: {
     return failureFromWorkflowError('create-follow-up', canonicalOwner.error);
   }
   if (canonicalOwner?.ok && canonicalOwner.issue && canonicalOwnerKey && canonicalOwnerMarker) {
-    const relationResult = await createFollowUpRelations({
+    const ownerReuseRequestsRemaining = countCanonicalOwnerReuseRequests({
+      sourceIssue: issueSummary.issue,
+      followUpIssue: canonicalOwner.issue,
+      requestedLabels: followUpLabels.labels,
+      description,
+      intentChecksum,
+      nonGoals,
+      notDoneIf,
+      acceptanceCriteria,
+      parityMatrix,
+      canonicalOwner: {
+        key: canonicalOwnerKey,
+        marker: canonicalOwnerMarker
+      },
+      blockedBySource
+    });
+    if (ownerReuseRequestsRemaining > 0) {
+      const ownerReuseBudgetError = await preflightProviderLinearBudget({
+        session: session.session,
+        operation: 'create-follow-up',
+        minimumRequestsRemaining: ownerReuseRequestsRemaining
+      });
+      if (ownerReuseBudgetError) {
+        return failureFromWorkflowError('create-follow-up', ownerReuseBudgetError);
+      }
+    }
+
+    const tracedOwner = await ensureFollowUpIssueTraceability({
       session: session.session,
       sourceIssue: issueSummary.issue,
       followUpIssue: canonicalOwner.issue,
+      requestedLabels: followUpLabels.labels,
+      description,
+      intentChecksum,
+      nonGoals,
+      notDoneIf,
+      acceptanceCriteria,
+      parityMatrix,
+      canonicalOwner: {
+        key: canonicalOwnerKey,
+        marker: canonicalOwnerMarker
+      },
+      failedStep: 'canonical_owner_traceability_update'
+    });
+    if (!tracedOwner.ok) {
+      return tracedOwner.result;
+    }
+    const ownerLabelRepairNeeded =
+      findMissingFollowUpLabelIds(tracedOwner.issue.labels, followUpLabels.labels).length > 0;
+    const labeledOwner = await ensureFollowUpIssueLabels({
+      session: session.session,
+      followUpIssue: tracedOwner.issue,
+      requestedLabels: followUpLabels.labels,
+      failedStep: 'canonical_owner_label_update',
+      retryableUpdateFailures: true
+    });
+    if (!labeledOwner.ok) {
+      return labeledOwner.result;
+    }
+    if (ownerLabelRepairNeeded) {
+      const traceableLabeledOwner = verifyFollowUpIssueTraceability({
+        sourceIssue: issueSummary.issue,
+        followUpIssue: labeledOwner.issue,
+        acceptedDescription: tracedOwner.issue.description,
+        description,
+        intentChecksum,
+        nonGoals,
+        notDoneIf,
+        acceptanceCriteria,
+        parityMatrix,
+        canonicalOwner: {
+          key: canonicalOwnerKey,
+          marker: canonicalOwnerMarker
+        },
+        failedStep: 'canonical_owner_label_update'
+      });
+      if (!traceableLabeledOwner.ok) {
+        return traceableLabeledOwner.result;
+      }
+    }
+    const relationResult = await createFollowUpRelations({
+      session: session.session,
+      sourceIssue: issueSummary.issue,
+      followUpIssue: labeledOwner.issue,
       blockedBySource
     });
     if (!relationResult.ok) {
@@ -2843,7 +2952,7 @@ export async function createProviderLinearFollowUpIssue(input: {
         id: issueSummary.issue.id,
         identifier: issueSummary.issue.identifier
       },
-      follow_up_issue: canonicalOwner.issue,
+      follow_up_issue: labeledOwner.issue,
       canonical_owner: {
         key: canonicalOwnerKey,
         marker: canonicalOwnerMarker
@@ -2870,7 +2979,7 @@ export async function createProviderLinearFollowUpIssue(input: {
     const createPathBudgetError = await preflightProviderLinearBudget({
       session: session.session,
       operation: 'create-follow-up',
-      minimumRequestsRemaining: blockedBySource ? 6 : 5
+      minimumRequestsRemaining: blockedBySource ? 8 : 7
     });
     if (createPathBudgetError) {
       return failureFromWorkflowError('create-follow-up', createPathBudgetError);
@@ -2888,13 +2997,15 @@ export async function createProviderLinearFollowUpIssue(input: {
         projectId,
         stateId: backlogState.id,
         title,
+        labelIds: followUpLabels.labelIds,
         description: buildFollowUpIssueDescription({
           description,
           intentChecksum,
           nonGoals,
           notDoneIf,
           acceptanceCriteria,
-          parityMatrix
+          parityMatrix,
+          canonicalOwner: canonicalOwnerStamp
         })
       }
     }
@@ -2912,7 +3023,6 @@ export async function createProviderLinearFollowUpIssue(input: {
       503
     );
   }
-
   const finalizedDescription = buildFollowUpIssueDescription({
     description,
     intentChecksum,
@@ -2920,9 +3030,7 @@ export async function createProviderLinearFollowUpIssue(input: {
     notDoneIf,
     acceptanceCriteria,
     parityMatrix,
-    canonicalOwner: canonicalOwnerKey && canonicalOwnerMarker
-      ? { key: canonicalOwnerKey, marker: canonicalOwnerMarker }
-      : null,
+    canonicalOwner: canonicalOwnerStamp,
     traceability: buildFollowUpTraceabilitySection({
       sourceIssue: issueSummary.issue,
       followUpIssue: createdIssue
@@ -2967,6 +3075,22 @@ export async function createProviderLinearFollowUpIssue(input: {
         false
       );
     }
+    if (updatedIssue.description !== finalizedDescription) {
+      return failure(
+        'create-follow-up',
+        'linear_follow_up_description_update_incomplete',
+        'Linear follow-up issue description update returned a different description than requested.',
+        409,
+        {
+          created_issue: createdIssue,
+          follow_up_issue: updatedIssue,
+          expected_description: finalizedDescription,
+          observed_description: updatedIssue.description,
+          failed_step: 'description_update'
+        },
+        false
+      );
+    }
     createdIssue = updatedIssue;
   }
 
@@ -2988,8 +3112,82 @@ export async function createProviderLinearFollowUpIssue(input: {
     }
     followUpIssue = reconciliation.issue;
     action = reconciliation.issue.id === createdIssue.id ? 'created' : 'reused';
+    const tracedFollowUpIssue = await ensureFollowUpIssueTraceability({
+      session: session.session,
+      sourceIssue: issueSummary.issue,
+      followUpIssue,
+      createdIssue: createdIssue.id === followUpIssue.id ? null : createdIssue,
+      requestedLabels: followUpLabels.labels,
+      description,
+      intentChecksum,
+      nonGoals,
+      notDoneIf,
+      acceptanceCriteria,
+      parityMatrix,
+      canonicalOwner: {
+        key: canonicalOwnerKey,
+        marker: canonicalOwnerMarker
+      },
+      failedStep: 'label_update_traceability_update'
+    });
+    if (!tracedFollowUpIssue.ok) {
+      return tracedFollowUpIssue.result;
+    }
+    followUpIssue = tracedFollowUpIssue.issue;
   }
-
+  const followUpIssueBeforeLabelRepair = followUpIssue;
+  const followUpLabelRepairNeeded =
+    findMissingFollowUpLabelIds(followUpIssue.labels, followUpLabels.labels).length > 0;
+  const labeledFollowUpIssue = await ensureFollowUpIssueLabels({
+    session: session.session,
+    followUpIssue,
+    createdIssue: createdIssue.id === followUpIssue.id ? null : createdIssue,
+    requestedLabels: followUpLabels.labels,
+    failedStep: 'label_update',
+    retryableUpdateFailures: Boolean(canonicalOwnerKey && canonicalOwnerMarker)
+  });
+  if (!labeledFollowUpIssue.ok) {
+    return labeledFollowUpIssue.result;
+  }
+  followUpIssue = labeledFollowUpIssue.issue;
+  if (canonicalOwnerKey && canonicalOwnerMarker && followUpLabelRepairNeeded) {
+    const traceableFollowUpIssue = verifyFollowUpIssueTraceability({
+      sourceIssue: issueSummary.issue,
+      followUpIssue,
+      createdIssue: createdIssue.id === followUpIssue.id ? null : createdIssue,
+      acceptedDescription: followUpIssueBeforeLabelRepair.description,
+      description,
+      intentChecksum,
+      nonGoals,
+      notDoneIf,
+      acceptanceCriteria,
+      parityMatrix,
+      canonicalOwner: {
+        key: canonicalOwnerKey,
+        marker: canonicalOwnerMarker
+      },
+      failedStep: 'label_update'
+    });
+    if (!traceableFollowUpIssue.ok) {
+      return traceableFollowUpIssue.result;
+    }
+  }
+  if (!canonicalOwnerKey && followUpIssue.description !== finalizedDescription) {
+    return failure(
+      'create-follow-up',
+      'linear_follow_up_description_update_incomplete',
+      'Linear follow-up issue description update returned a different description than requested.',
+      409,
+      {
+        created_issue: createdIssue,
+        follow_up_issue: followUpIssue,
+        expected_description: finalizedDescription,
+        observed_description: followUpIssue.description,
+        failed_step: 'label_update'
+      },
+      false
+    );
+  }
   const relationResult = await createFollowUpRelations({
     session: session.session,
     sourceIssue: issueSummary.issue,
@@ -3022,6 +3220,589 @@ export async function createProviderLinearFollowUpIssue(input: {
     },
     source_setup: session.session.sourceSetup
   };
+}
+
+function resolveFollowUpLabelsFromSourceIssue(issue: ProviderLinearIssueSummary):
+  | {
+      ok: true;
+      labels: ProviderLinearIssueLabel[];
+      labelIds: string[];
+    }
+  | {
+      ok: false;
+      error: ProviderLinearWorkflowError;
+    } {
+  const sourceLabels = issue.labels;
+  const lifecycleLabels = sourceLabels.filter((label) => label.name === FOLLOW_UP_REQUIRED_LIFECYCLE_LABEL);
+  const priorityLabels = sourceLabels.filter((label) => label.name.startsWith('Priority:'));
+  const areaLabels = sourceLabels.filter((label) => label.name.startsWith('Area:'));
+  const typeLabels = sourceLabels.filter((label) => FOLLOW_UP_TYPE_LABEL_NAMES.has(label.name));
+  const missingRequirements: string[] = [];
+  if (lifecycleLabels.length === 0) {
+    missingRequirements.push(FOLLOW_UP_REQUIRED_LIFECYCLE_LABEL);
+  }
+  if (priorityLabels.length === 0) {
+    missingRequirements.push('Priority:*');
+  }
+  if (areaLabels.length === 0) {
+    missingRequirements.push('Area:*');
+  }
+  if (typeLabels.length === 0) {
+    missingRequirements.push([...FOLLOW_UP_TYPE_LABEL_NAMES].join('|'));
+  }
+  if (missingRequirements.length > 0) {
+    return {
+      ok: false,
+      error: {
+        code: 'linear_follow_up_label_resolution_failed',
+        message: `Linear issue ${issue.identifier} is missing live labels required for follow-up creation: ${missingRequirements.join(', ')}.`,
+        status: 422,
+        retryable: false,
+        details: {
+          source_issue: {
+            id: issue.id,
+            identifier: issue.identifier
+          },
+          missing_label_requirements: missingRequirements,
+          available_labels: sourceLabels
+        }
+      }
+    };
+  }
+  const labels = dedupeLinearLabels([
+    ...lifecycleLabels,
+    ...priorityLabels,
+    ...areaLabels,
+    ...typeLabels
+  ]);
+  return {
+    ok: true,
+    labels,
+    labelIds: labels.map((label) => label.id)
+  };
+}
+
+async function ensureFollowUpIssueLabels(input: {
+  session: ResolvedLinearWorkflowSession;
+  followUpIssue: ProviderLinearCreatedIssue;
+  createdIssue?: ProviderLinearCreatedIssue | null;
+  requestedLabels: ProviderLinearIssueLabel[];
+  failedStep: string;
+  retryableUpdateFailures?: boolean;
+}): Promise<
+  | {
+      ok: true;
+      issue: ProviderLinearCreatedIssue;
+    }
+  | {
+      ok: false;
+      result: Extract<ProviderLinearCreateFollowUpResult, { ok: false }>;
+    }
+> {
+  const missingLabelIds = findMissingFollowUpLabelIds(input.followUpIssue.labels, input.requestedLabels);
+  if (missingLabelIds.length === 0) {
+    return {
+      ok: true,
+      issue: input.followUpIssue
+    };
+  }
+
+  const updateResult = await executeProviderLinearGraphql<IssueDescriptionUpdateMutationResponse>({
+    session: input.session,
+    operation: 'create-follow-up',
+    step: input.failedStep,
+    query: buildIssueLabelsUpdateMutation(),
+    variables: {
+      id: input.followUpIssue.id,
+      labelIds: missingLabelIds
+    }
+  });
+  if (!updateResult.ok) {
+    return {
+      ok: false,
+      result: failure(
+        'create-follow-up',
+        updateResult.error.code,
+        updateResult.error.message,
+        input.retryableUpdateFailures === true ? updateResult.error.status : 409,
+        {
+          ...(updateResult.error.details ?? {}),
+          ...buildFollowUpLabelFailureDetails(input.followUpIssue, input.createdIssue ?? null, input.requestedLabels),
+          failed_step: input.failedStep
+        },
+        input.retryableUpdateFailures === true ? updateResult.error.retryable : false
+      )
+    };
+  }
+
+  const updatedIssue = parseCreatedIssue(updateResult.payload.data?.issueUpdate?.issue ?? null);
+  if (updateResult.payload.data?.issueUpdate?.success !== true || !updatedIssue) {
+    return {
+      ok: false,
+      result: failure(
+        'create-follow-up',
+        'linear_follow_up_label_update_failed',
+        'Linear follow-up issue label update did not succeed.',
+        409,
+        {
+          ...buildFollowUpLabelFailureDetails(input.followUpIssue, input.createdIssue ?? null, input.requestedLabels),
+          failed_step: input.failedStep
+        },
+        false
+      )
+    };
+  }
+
+  const verification = verifyFollowUpIssueLabels({
+    followUpIssue: updatedIssue,
+    createdIssue: input.createdIssue ?? null,
+    requestedLabels: input.requestedLabels,
+    failedStep: input.failedStep
+  });
+  if (!verification.ok) {
+    return verification;
+  }
+
+  return {
+    ok: true,
+    issue: updatedIssue
+  };
+}
+
+function countCanonicalOwnerReuseRequests(input: {
+  sourceIssue: ProviderLinearIssueSummary;
+  followUpIssue: ProviderLinearCreatedIssue;
+  requestedLabels: ProviderLinearIssueLabel[];
+  description: string;
+  intentChecksum: string;
+  nonGoals: string;
+  notDoneIf: string;
+  acceptanceCriteria: string;
+  parityMatrix?: string | null;
+  canonicalOwner: {
+    key: string;
+    marker: string;
+  };
+  blockedBySource: boolean;
+}): number {
+  const traceabilityUpdate = resolveFollowUpTraceabilityUpdate(input);
+  if (traceabilityUpdate.invalid) {
+    return 0;
+  }
+  const traceabilityUpdateRequests = traceabilityUpdate.shouldUpdate ? 1 : 0;
+  const labelUpdateRequests =
+    traceabilityUpdateRequests === 0 && findMissingFollowUpLabelIds(input.followUpIssue.labels, input.requestedLabels).length > 0
+      ? 1
+      : 0;
+  const postTraceabilityLabelRepairRequests = traceabilityUpdateRequests > 0 ? 1 : 0;
+  const relationRequests =
+    input.sourceIssue.id === input.followUpIssue.id
+      ? 0
+      : input.blockedBySource
+        ? 2
+        : 1;
+  return labelUpdateRequests + traceabilityUpdateRequests + postTraceabilityLabelRepairRequests + relationRequests;
+}
+
+function resolveFollowUpTraceabilityUpdate(input: {
+  sourceIssue: ProviderLinearIssueSummary;
+  followUpIssue: ProviderLinearCreatedIssue;
+  description: string;
+  intentChecksum: string;
+  nonGoals: string;
+  notDoneIf: string;
+  acceptanceCriteria: string;
+  parityMatrix?: string | null;
+  canonicalOwner: {
+    key: string;
+    marker: string;
+  };
+}): {
+  finalizedDescription: string;
+  shouldUpdate: boolean;
+  invalid: boolean;
+  observedDescription: string;
+} {
+  const observedDescription = input.followUpIssue.description ?? '';
+  const finalizedDescription = buildFollowUpIssueDescription({
+    description: input.description,
+    intentChecksum: input.intentChecksum,
+    nonGoals: input.nonGoals,
+    notDoneIf: input.notDoneIf,
+    acceptanceCriteria: input.acceptanceCriteria,
+    parityMatrix: input.parityMatrix,
+    canonicalOwner: input.canonicalOwner,
+    traceability: buildFollowUpTraceabilitySection({
+      sourceIssue: input.sourceIssue,
+      followUpIssue: input.followUpIssue
+    })
+  });
+  if (observedDescription === finalizedDescription) {
+    return {
+      finalizedDescription,
+      shouldUpdate: false,
+      invalid: false,
+      observedDescription
+    };
+  }
+  if (sameFollowUpDescriptionExceptSourceIssueTraceability(observedDescription, finalizedDescription)) {
+    return {
+      finalizedDescription,
+      shouldUpdate: false,
+      invalid: false,
+      observedDescription
+    };
+  }
+
+  const unfinishedDescription = buildFollowUpIssueDescription({
+    description: input.description,
+    intentChecksum: input.intentChecksum,
+    nonGoals: input.nonGoals,
+    notDoneIf: input.notDoneIf,
+    acceptanceCriteria: input.acceptanceCriteria,
+    parityMatrix: input.parityMatrix,
+    canonicalOwner: input.canonicalOwner
+  });
+  return {
+    finalizedDescription,
+    shouldUpdate: observedDescription === unfinishedDescription,
+    invalid: isManagedFollowUpDescriptionDrift(observedDescription, finalizedDescription, unfinishedDescription),
+    observedDescription
+  };
+}
+
+function isManagedFollowUpDescriptionDrift(observedDescription: string, ...expectedDescriptions: string[]): boolean {
+  const normalizedObservedDescription = normalizeFollowUpSourceIssueTraceabilityLine(observedDescription);
+  return expectedDescriptions.some((expectedDescription) => {
+    if (hasTrailingManagedFollowUpDescriptionDrift(observedDescription, expectedDescription)) {
+      return true;
+    }
+    const normalizedExpectedDescription = normalizeFollowUpSourceIssueTraceabilityLine(expectedDescription);
+    return hasTrailingManagedFollowUpDescriptionDrift(
+      normalizedObservedDescription,
+      normalizedExpectedDescription
+    );
+  });
+}
+
+function hasTrailingManagedFollowUpDescriptionDrift(observedDescription: string, expectedDescription: string): boolean {
+  return (
+    observedDescription.startsWith(`${expectedDescription}\n`) ||
+    observedDescription.startsWith(`${expectedDescription}\r\n`)
+  );
+}
+
+function sameFollowUpDescriptionExceptSourceIssueTraceability(left: string, right: string): boolean {
+  const normalizedLeft = normalizeFollowUpSourceIssueTraceabilityLine(left);
+  const normalizedRight = normalizeFollowUpSourceIssueTraceabilityLine(right);
+  return normalizedLeft !== left && normalizedRight !== right && normalizedLeft === normalizedRight;
+}
+
+function normalizeFollowUpSourceIssueTraceabilityLine(description: string): string {
+  const lines = description.split(/\r?\n/u);
+  let normalized = false;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (lines[index] !== '## Immediate Traceability') {
+      continue;
+    }
+    const nextHeadingIndex = lines.findIndex((line, candidateIndex) =>
+      candidateIndex > index && /^## [^\s#]/u.test(line)
+    );
+    const sectionEnd = nextHeadingIndex === -1 ? lines.length : nextHeadingIndex;
+    const sectionLines = lines.slice(index + 1, sectionEnd);
+    if (!sectionLines.some((line) => line.startsWith('- Follow-up packet prefix:'))) {
+      continue;
+    }
+    const sourceLineOffset = sectionLines.findIndex((line) => /^- Source issue: .+$/u.test(line));
+    if (sourceLineOffset === -1) {
+      continue;
+    }
+    lines[index + 1 + sourceLineOffset] = '- Source issue: __SOURCE_ISSUE__';
+    normalized = true;
+  }
+  return normalized ? lines.join('\n') : description;
+}
+
+async function ensureFollowUpIssueTraceability(input: {
+  session: ResolvedLinearWorkflowSession;
+  sourceIssue: ProviderLinearIssueSummary;
+  followUpIssue: ProviderLinearCreatedIssue;
+  createdIssue?: ProviderLinearCreatedIssue | null;
+  requestedLabels: ProviderLinearIssueLabel[];
+  description: string;
+  intentChecksum: string;
+  nonGoals: string;
+  notDoneIf: string;
+  acceptanceCriteria: string;
+  parityMatrix?: string | null;
+  canonicalOwner: {
+    key: string;
+    marker: string;
+  };
+  failedStep: string;
+}): Promise<
+  | {
+      ok: true;
+      issue: ProviderLinearCreatedIssue;
+    }
+  | {
+      ok: false;
+      result: Extract<ProviderLinearCreateFollowUpResult, { ok: false }>;
+    }
+> {
+  const traceabilityUpdate = resolveFollowUpTraceabilityUpdate(input);
+  if (traceabilityUpdate.invalid) {
+    return {
+      ok: false,
+      result: failure(
+        'create-follow-up',
+        'linear_follow_up_traceability_invalid',
+        'Linear follow-up canonical owner traceability does not match the expected managed description.',
+        409,
+        {
+          follow_up_issue: input.followUpIssue,
+          ...(input.createdIssue ? { created_issue: input.createdIssue } : {}),
+          expected_description: traceabilityUpdate.finalizedDescription,
+          observed_description: traceabilityUpdate.observedDescription,
+          failed_step: input.failedStep
+        },
+        false
+      )
+    };
+  }
+  if (!traceabilityUpdate.shouldUpdate) {
+    return {
+      ok: true,
+      issue: input.followUpIssue
+    };
+  }
+
+  const updateResult = await executeProviderLinearGraphql<IssueDescriptionUpdateMutationResponse>({
+    session: input.session,
+    operation: 'create-follow-up',
+    step: input.failedStep,
+    query: buildIssueDescriptionUpdateMutation(),
+    variables: {
+      id: input.followUpIssue.id,
+      description: traceabilityUpdate.finalizedDescription
+    }
+  });
+  if (!updateResult.ok) {
+    return {
+      ok: false,
+      result: failure(
+        'create-follow-up',
+        updateResult.error.code,
+        updateResult.error.message,
+        updateResult.error.status,
+        {
+          ...(updateResult.error.details ?? {}),
+          follow_up_issue: input.followUpIssue,
+          ...(input.createdIssue ? { created_issue: input.createdIssue } : {}),
+          failed_step: input.failedStep
+        },
+        updateResult.error.retryable
+      )
+    };
+  }
+
+  const updatedIssue = parseCreatedIssue(updateResult.payload.data?.issueUpdate?.issue ?? null);
+  if (updateResult.payload.data?.issueUpdate?.success !== true || !updatedIssue) {
+    return {
+      ok: false,
+      result: failure(
+        'create-follow-up',
+        'linear_follow_up_traceability_update_failed',
+        'Linear follow-up issue traceability update did not succeed.',
+        409,
+        {
+          follow_up_issue: input.followUpIssue,
+          ...(input.createdIssue ? { created_issue: input.createdIssue } : {}),
+          failed_step: input.failedStep
+        },
+        false
+      )
+    };
+  }
+  if (updatedIssue.description !== traceabilityUpdate.finalizedDescription) {
+    return {
+      ok: false,
+      result: failure(
+        'create-follow-up',
+        'linear_follow_up_traceability_update_incomplete',
+        'Linear follow-up canonical owner traceability update returned a different description than requested.',
+        409,
+        {
+          follow_up_issue: updatedIssue,
+          ...(input.createdIssue ? { created_issue: input.createdIssue } : {}),
+          expected_description: traceabilityUpdate.finalizedDescription,
+          observed_description: updatedIssue.description,
+          failed_step: input.failedStep
+        },
+        false
+      )
+    };
+  }
+  const labeledIssue = await ensureFollowUpIssueLabels({
+    session: input.session,
+    followUpIssue: updatedIssue,
+    createdIssue: input.createdIssue ?? null,
+    requestedLabels: input.requestedLabels,
+    failedStep: input.failedStep,
+    retryableUpdateFailures: true
+  });
+  if (!labeledIssue.ok) {
+    return labeledIssue;
+  }
+  if (labeledIssue.issue.description !== traceabilityUpdate.finalizedDescription) {
+    return {
+      ok: false,
+      result: failure(
+        'create-follow-up',
+        'linear_follow_up_traceability_update_incomplete',
+        'Linear follow-up canonical owner traceability update returned a different description than requested.',
+        409,
+        {
+          follow_up_issue: labeledIssue.issue,
+          ...(input.createdIssue ? { created_issue: input.createdIssue } : {}),
+          expected_description: traceabilityUpdate.finalizedDescription,
+          observed_description: labeledIssue.issue.description,
+          failed_step: input.failedStep
+        },
+        false
+      )
+    };
+  }
+
+  return {
+    ok: true,
+    issue: labeledIssue.issue
+  };
+}
+
+function verifyFollowUpIssueTraceability(input: {
+  sourceIssue: ProviderLinearIssueSummary;
+  followUpIssue: ProviderLinearCreatedIssue;
+  createdIssue?: ProviderLinearCreatedIssue | null;
+  acceptedDescription?: string | null;
+  description: string;
+  intentChecksum: string;
+  nonGoals: string;
+  notDoneIf: string;
+  acceptanceCriteria: string;
+  parityMatrix?: string | null;
+  canonicalOwner: {
+    key: string;
+    marker: string;
+  };
+  failedStep: string;
+}):
+  | {
+      ok: true;
+    }
+  | {
+      ok: false;
+      result: Extract<ProviderLinearCreateFollowUpResult, { ok: false }>;
+    } {
+  const traceabilityUpdate = resolveFollowUpTraceabilityUpdate(input);
+  const acceptedDescription = input.acceptedDescription ?? null;
+  const traceabilityPreserved =
+    traceabilityUpdate.observedDescription === traceabilityUpdate.finalizedDescription ||
+    (acceptedDescription !== null && traceabilityUpdate.observedDescription === acceptedDescription);
+  if (!traceabilityPreserved) {
+    return {
+      ok: false,
+      result: failure(
+        'create-follow-up',
+        'linear_follow_up_traceability_update_incomplete',
+        'Linear follow-up canonical owner traceability was not preserved after label assignment.',
+        409,
+        {
+          follow_up_issue: input.followUpIssue,
+          ...(input.createdIssue ? { created_issue: input.createdIssue } : {}),
+          expected_description: traceabilityUpdate.finalizedDescription,
+          observed_description: traceabilityUpdate.observedDescription,
+          failed_step: input.failedStep
+        },
+        false
+      )
+    };
+  }
+  return { ok: true };
+}
+
+function verifyFollowUpIssueLabels(input: {
+  followUpIssue: ProviderLinearCreatedIssue;
+  createdIssue?: ProviderLinearCreatedIssue | null;
+  requestedLabels: ProviderLinearIssueLabel[];
+  failedStep: string;
+}):
+  | {
+      ok: true;
+    }
+  | {
+      ok: false;
+      result: Extract<ProviderLinearCreateFollowUpResult, { ok: false }>;
+    } {
+  const missingLabelIds = findMissingFollowUpLabelIds(input.followUpIssue.labels, input.requestedLabels);
+  if (missingLabelIds.length === 0) {
+    return { ok: true };
+  }
+  return {
+    ok: false,
+    result: failure(
+      'create-follow-up',
+      'linear_follow_up_label_assignment_incomplete',
+      'Linear follow-up issue label assignment did not return all requested live labels.',
+      409,
+      {
+        ...buildFollowUpLabelFailureDetails(
+          input.followUpIssue,
+          input.createdIssue ?? input.followUpIssue,
+          input.requestedLabels
+        ),
+        failed_step: input.failedStep
+      },
+      false
+    )
+  };
+}
+
+function findMissingFollowUpLabelIds(
+  currentLabels: readonly ProviderLinearIssueLabel[] | undefined,
+  requestedLabels: readonly ProviderLinearIssueLabel[]
+): string[] {
+  const currentLabelIds = new Set((currentLabels ?? []).map((label) => label.id));
+  return requestedLabels
+    .map((label) => label.id)
+    .filter((labelId) => !currentLabelIds.has(labelId));
+}
+
+function buildFollowUpLabelFailureDetails(
+  followUpIssue: ProviderLinearCreatedIssue,
+  createdIssue: ProviderLinearCreatedIssue | null,
+  requestedLabels: readonly ProviderLinearIssueLabel[]
+): Record<string, unknown> {
+  return {
+    follow_up_issue: followUpIssue,
+    ...(createdIssue ? { created_issue: createdIssue } : {}),
+    requested_labels: requestedLabels,
+    observed_labels: followUpIssue.labels ?? null,
+    missing_label_ids: findMissingFollowUpLabelIds(followUpIssue.labels, requestedLabels)
+  };
+}
+
+function dedupeLinearLabels(labels: readonly ProviderLinearIssueLabel[]): ProviderLinearIssueLabel[] {
+  const seen = new Set<string>();
+  const deduped: ProviderLinearIssueLabel[] = [];
+  for (const label of labels) {
+    if (seen.has(label.id)) {
+      continue;
+    }
+    seen.add(label.id);
+    deduped.push(label);
+  }
+  return deduped;
 }
 
 async function reconcileCreatedCanonicalOwner(input: {
@@ -3259,6 +4040,24 @@ async function findCanonicalFollowUpOwnerIssues(input: {
     }
     if (!descriptionHasExactCanonicalOwnerMarker(node.description, input.marker)) {
       continue;
+    }
+    if (parseIssueLabelConnection(node.labels) === null) {
+      return {
+        ok: false,
+        error: {
+          code: 'linear_canonical_owner_labels_invalid',
+          message: 'Linear canonical owner search returned a matching issue with missing, malformed, or paginated labels.',
+          status: 503,
+          retryable: true,
+          details: {
+            canonical_owner_issue: {
+              id: normalizeOptionalString(node.id),
+              identifier: normalizeOptionalString(node.identifier)
+            },
+            label_limit: LINEAR_WORKFLOW_LABEL_LIMIT
+          }
+        }
+      };
     }
     const issue = parseCreatedIssue(node);
     if (issue) {
@@ -5954,6 +6753,57 @@ function buildIssueDescriptionUpdateMutation(): string {
           id
           name
         }
+        labels(first: ${LINEAR_WORKFLOW_LABEL_LIMIT}) {
+          nodes {
+            id
+            name
+            color
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+    }
+  }`;
+}
+
+function buildIssueLabelsUpdateMutation(): string {
+  return `mutation ProviderLinearUpdateIssueLabels($id: String!, $labelIds: [String!]!) {
+    issueUpdate(id: $id, input: { addedLabelIds: $labelIds }) {
+      success
+      issue {
+        id
+        identifier
+        title
+        description
+        url
+        state {
+          id
+          name
+          type
+        }
+        team {
+          id
+          key
+          name
+        }
+        project {
+          id
+          name
+        }
+        labels(first: ${LINEAR_WORKFLOW_LABEL_LIMIT}) {
+          nodes {
+            id
+            name
+            color
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
       }
     }
   }`;
@@ -6011,6 +6861,17 @@ function buildCreateFollowUpIssueMutation(): string {
           id
           name
         }
+        labels(first: ${LINEAR_WORKFLOW_LABEL_LIMIT}) {
+          nodes {
+            id
+            name
+            color
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
       }
     }
   }`;
@@ -6050,6 +6911,17 @@ function buildCanonicalOwnerIssuesQuery(): string {
         project {
           id
           name
+        }
+        labels(first: ${LINEAR_WORKFLOW_LABEL_LIMIT}) {
+          nodes {
+            id
+            name
+            color
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
         }
       }
       pageInfo {
@@ -6322,7 +7194,7 @@ function parseCreatedIssue(
           id?: string | null;
           name?: string | null;
         } | null;
-      }
+      } & LinearIssueLabelConnectionField
     | null
 ): ProviderLinearCreatedIssue | null {
   const id = normalizeRequiredString(value?.id);
@@ -6331,6 +7203,7 @@ function parseCreatedIssue(
   if (!id || !identifier || !title) {
     return null;
   }
+  const labels = value?.labels === undefined ? undefined : (parseIssueLabelConnection(value.labels) ?? undefined);
 
   return {
     id,
@@ -6351,7 +7224,8 @@ function parseCreatedIssue(
           id: normalizeOptionalString(value.project.id),
           name: normalizeOptionalString(value.project.name)
         }
-      : null
+      : null,
+    ...(labels !== undefined ? { labels } : {})
   };
 }
 

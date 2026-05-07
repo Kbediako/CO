@@ -1,0 +1,167 @@
+---
+id: 20260507-linear-203c5fad-698f-4094-970c-06de5743d94c
+title: CO-482 create-follow-up label assignment by live Linear label ids
+relates_to: docs/PRD-linear-203c5fad-698f-4094-970c-06de5743d94c.md
+risk: medium
+owners:
+  - Codex
+last_review: 2026-05-07
+related_action_plan: docs/ACTION_PLAN-linear-203c5fad-698f-4094-970c-06de5743d94c.md
+task_checklists:
+  - tasks/tasks-linear-203c5fad-698f-4094-970c-06de5743d94c.md
+---
+
+# TECH_SPEC - CO-482 create-follow-up label assignment by live Linear label ids
+
+## Canonical Reference
+- PRD: `docs/PRD-linear-203c5fad-698f-4094-970c-06de5743d94c.md`
+- TECH_SPEC mirror: `docs/TECH_SPEC-linear-203c5fad-698f-4094-970c-06de5743d94c.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-203c5fad-698f-4094-970c-06de5743d94c.md`
+- Task checklist: `tasks/tasks-linear-203c5fad-698f-4094-970c-06de5743d94c.md`
+- Linear issue: `CO-482` / `203c5fad-698f-4094-970c-06de5743d94c`
+- Source anchor: `ctx:sha256:35dc0ba6bd24707bc8b61eb4e856c128cd9c9b2df7c212299073774262aacd50#chunk:c000001`
+- Child lane manifest: `.runs/linear-203c5fad-698f-4094-970c-06de5743d94c-docs-packet-fileonly/cli/2026-05-07T06-16-45-038Z-578da43b/manifest.json`
+
+## Summary
+- Objective: extend `codex-orchestrator linear create-follow-up` so required follow-up issue labels are derived from live source issue labels, assigned using Linear label ids, and verified in CLI JSON/failure evidence.
+- Scope:
+  - provider Linear workflow facade create/reuse path
+  - live source issue label policy derivation
+  - Linear `labelIds` create and `addedLabelIds` update mutation paths
+  - created and reused follow-up issue behavior
+  - focused tests for success, failure, and traceability
+- Constraints:
+  - no CO-400 issue-context/cache label projection
+  - no free-form label-name, hard-coded id, or fuzzy matching path
+  - no Linear label definition, project, team, or workflow-state mutations
+  - no weakening of existing follow-up issue-shaping requirements
+  - no full repo validation from the docs-only child lane
+
+## Issue-Shaping Contract
+- User-request translation carried forward: CO-482 is the narrow `create-follow-up` label-assignment lane; it must assign follow-up issue labels by live Linear label ids and must not become another CO-400 label projection lane.
+- Protected terms / exact artifact and surface names:
+  - `codex-orchestrator linear create-follow-up`
+  - `follow-up issue labels`
+  - `live Linear label ids`
+  - `label policy`
+  - `immediate traceability`
+  - `ProviderLinearWorkflowFacade`
+  - `LinearCliShell`
+  - CLI JSON output
+  - `CO-400 label projection`
+- Nearby wrong interpretations to reject:
+  - resolving labels from names, hard-coded ids, or stale local text
+  - adding label projection to `linear issue-context`
+  - treating omitted labels as clean success
+  - changing canonical-owner matching beyond label outcome handling
+  - mutating label definitions or workflow labels
+- Explicit non-goals carried forward:
+  - no CO-400 label projection/cache/summary work
+  - no generic label catalog
+  - no unrelated Linear/GitHub/workpad lifecycle work
+
+## Parity / Alignment Matrix
+
+| Surface | Current truth | Reference truth | Target truth | Explicitly out-of-scope differences |
+| --- | --- | --- | --- | --- |
+| Source-label contract | `create-follow-up` accepts governed issue-shaping fields, but required label assignment is not enforced. | Live source issue labels provide lifecycle, priority, area, and type signal. | Facade derives required labels from live source issue labels and fails closed when any category is missing. | Label names, hard-coded ids, fuzzy matching, or explicit label-id CLI expansion. |
+| Workflow facade | Create/reuse output proves issue action but not complete label outcome. | Mutating helper results should carry resulting labels or failure metadata. | Result includes label data and failures include requested/observed/missing label details. | Generic audit redesign. |
+| Linear mutation | Follow-up issue creation/reuse can finish without required labels. | Label ids must come from live Linear issue labels before successful assignment is claimed. | Created/reused issue path attaches source-derived labels or fails closed. | Label definition management. |
+| CO-400 projection | CO-400 owns current-state label projection through issue-context/cache/summary surfaces. | CO-482 only mutates labels on follow-up issues. | No projection/cache code changes in CO-482. | Any issue-context label projection changes. |
+
+## Readiness Gate
+- Not done if:
+  - source-derived required labels can be dropped silently
+  - label assignment uses names, stale projection, or local text as authority
+  - JSON output or failure evidence lacks resulting/requested/observed label ids
+  - label mutation failure after issue creation is reported as clean success
+  - implementation touches CO-400 projection/cache surfaces
+- Pre-implementation issue-quality review evidence:
+  - 2026-05-07 docs child lane translated the parent prompt into a bounded mutation-only contract and rejected CO-400 projection scope.
+- Safeguard ownership split:
+  - CO-482 owns follow-up issue label assignment on `create-follow-up`.
+  - CO-400 owns label projection through issue-context, cache, summaries, and provider current-state authority.
+
+## Architecture & Data
+- Current behavior:
+  - `LinearCliShell` routes `create-follow-up` into the provider Linear workflow facade.
+  - Existing `create-follow-up` contracts govern title, description, intent checksum, non-goals, `Not Done If`, acceptance criteria, related links, parity matrices, canonical-owner reuse, and optional blocker linkage.
+  - Label assignment is not documented as a first-class live-id result surface for the follow-up helper.
+- Target behavior:
+  1. Read source issue labels from the existing live source issue summary used by `create-follow-up`.
+  2. Normalize and deduplicate live source labels by id.
+  3. Require `Lifecycle: Implementation`, at least one `Priority:*`, at least one `Area:*`, and one type label from `Bug`, `Improvement`, or `Feature`.
+  4. Create or reuse the follow-up issue using existing structured validations.
+  5. Apply missing required labels to the target issue using Linear's `labelIds` create input or `addedLabelIds` update path.
+  6. Verify the created or reused target issue carries every requested label id before clean success.
+  7. Return labels on `follow_up_issue.labels`; failures include requested, observed, and missing label evidence.
+- Reuse policy:
+  - Reused canonical-owner issues must not hide label drift.
+  - Reused issues attach missing source-derived labels with `addedLabelIds` and verify the response.
+  - Silent success with missing source-derived labels is forbidden.
+- Data model changes:
+  - No storage migration is expected.
+  - Result issues can carry label nodes.
+  - Recovery metadata should distinguish issue creation/reuse success from label assignment failure.
+- External dependencies / integrations:
+  - Linear GraphQL/API issue-label assignment mutation.
+
+## Technical Requirements
+- Functional requirements:
+  1. Derive required follow-up labels from live source issue labels.
+  2. Extend facade result types to carry returned label nodes.
+  3. Fail closed before issue creation when live source labels cannot satisfy lifecycle, priority, area, and type policy.
+  4. Apply labels to newly created follow-up issues with `labelIds` when derivation succeeds.
+  5. Handle reused follow-up issues by applying missing source-derived labels with `addedLabelIds`.
+  6. Preserve existing issue-shaping guards for intent checksum, non-goals, `Not Done If`, acceptance criteria, parity matrix, related link, blocker linkage, and canonical-owner reuse.
+  7. Emit CLI JSON with resulting labels and fail closed with requested/observed/missing label details when assignment verification fails.
+  8. Include recovery metadata if issue creation/reuse succeeds but label assignment verification fails.
+- Non-functional requirements:
+  - Bounded changes in existing Linear CLI/facade surfaces.
+  - No new broad abstraction or label cache.
+  - Fail-closed behavior for missing source label categories and incomplete create/update responses.
+  - Deterministic tests with mocked Linear responses.
+- Interfaces / contracts:
+  - `orchestrator/src/cli/control/providerLinearWorkflowFacade.ts`
+  - `orchestrator/tests/ProviderLinearWorkflowFacade.test.ts`
+
+## Fallback Expiry / Refactor Decision
+- Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `Yes`.
+- Large-refactor decision: not required; the change adds a bounded live-id mutation branch to the existing helper and deliberately avoids label current-state projection.
+- Minor-seam decision: acceptable because live Linear remains the only label authority and no cache/projection fallback is added.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Follow-up label assignment | Required follow-up labels can be omitted or inferred from non-authoritative sources. | `remove fallback` | CO-482 | Worker creates or reuses a follow-up issue. | Existing pre-CO-482 behavior | 2026-05-07 | This issue | `create-follow-up` applies or fails labels using live source issue Linear label ids. | Focused facade label tests plus output/failure assertions. |
+
+- Contract name: `create-follow-up` live label-id assignment.
+- Owning surface: provider Linear workflow facade and CLI shell.
+- Steady-state proof: focused tests prove source-derived label ids are applied and traceable in create/reuse/failure paths.
+- Tests/docs: `ProviderLinearWorkflowFacade.test.ts`, CO-482 docs packet.
+- Non-expiring rationale: live label-id assignment is the intended durable mutation contract.
+- Adjacent owner note: CO-400 label projection is out of scope and is not modeled as a retained CO-482 fallback.
+
+## Validation Plan
+- Focused tests:
+  - Facade create path derives live source issue label ids and applies them to a new follow-up issue.
+  - Facade reuse path applies missing source-derived labels with `addedLabelIds`.
+  - Missing lifecycle/priority/area/type source labels return a clear failure and do not create an unlabeled follow-up.
+  - Incomplete created/reused issue label responses fail closed with requested/observed/missing label details.
+  - Output includes resulting labels for created and reused follow-up issues.
+  - Regression asserts CO-400 projection/cache paths are untouched by the focused scope where practical.
+- Parent validation gates:
+  - focused test commands around `ProviderLinearWorkflowFacade.test.ts`
+  - `node scripts/delegation-guard.mjs`
+  - `node scripts/spec-guard.mjs --dry-run`
+  - build/lint/test/docs gates as required by the parent lane
+  - manifest-backed review and explicit elegance/minimality pass before handoff
+- Child-lane validation:
+  - docs-only file-scope inspection and `git diff --check`
+
+## Open Questions
+- Parent implementation chose source-derived live labels rather than adding explicit label-id CLI input in this lane.
+- Reused issues auto-attach missing source-derived labels with `addedLabelIds`; silent success is not allowed.
+
+## Approvals
+- Reviewer: provider-worker parent lane.
+- Date: 2026-05-07.
