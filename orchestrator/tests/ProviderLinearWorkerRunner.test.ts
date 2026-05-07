@@ -456,6 +456,7 @@ type PersistedSessionLogHydrationState = {
   proof_signature: string;
   id_rewind_signature?: string | null;
   resolved_model_provenance?: unknown;
+  goal_tool_call_names?: Record<string, string>;
 };
 
 function createTrackedIssue(overrides: Partial<LiveLinearTrackedIssue> = {}): LiveLinearTrackedIssue {
@@ -13404,6 +13405,596 @@ for await (const line of rl) {
       authority: 'advisory_only',
       linear_authority_preserved: true
     });
+  });
+
+  it('captures wrapped app-server goal notification payloads', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-wrapped"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-wrapped-1"}}',
+        JSON.stringify({
+          type: 'event_msg',
+          payload: {
+            type: 'notification',
+            method: 'thread/goal/updated',
+            timestamp: '2026-03-21T09:00:01.000Z',
+            params: {
+              threadId: 'thread-wrapped',
+              goal: {
+                threadId: 'thread-wrapped',
+                objective: 'wrapped goal evidence',
+                status: 'active',
+                updatedAt: '2026-03-21T09:00:00.000Z'
+              }
+            }
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:01.000Z',
+      thread_id: 'thread-wrapped',
+      objective: 'wrapped goal evidence',
+      status: 'active',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('keeps scanning model-tool output arrays until a goal payload is found', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-array-goal"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-array-goal-1"}}',
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.900Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call',
+            name: 'get_goal',
+            call_id: 'call-array-goal'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:01.250Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call_output',
+            call_id: 'call-array-goal',
+            output: [
+              { type: 'metadata', text: 'not json' },
+              {
+                type: 'output_text',
+                text: JSON.stringify({
+                  goal: {
+                    threadId: 'thread-array-goal',
+                    objective: 'array goal evidence',
+                    status: 'active',
+                    updatedAt: '2026-03-21T09:00:01.000Z'
+                  }
+                })
+              }
+            ]
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:01.250Z',
+      thread_id: 'thread-array-goal',
+      objective: 'array goal evidence',
+      status: 'active',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('keeps scanning model-tool output records until a goal payload is found', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-record-goal"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-record-goal-1"}}',
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.900Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call',
+            name: 'get_goal',
+            call_id: 'call-record-goal'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:01.250Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call_output',
+            call_id: 'call-record-goal',
+            output: {
+              text: JSON.stringify({ metadata: true }),
+              content: [
+                {
+                  type: 'output_text',
+                  text: JSON.stringify({
+                    goal: {
+                      threadId: 'thread-record-goal',
+                      objective: 'record goal evidence',
+                      status: 'active',
+                      updatedAt: '2026-03-21T09:00:01.000Z'
+                    }
+                  })
+                }
+              ]
+            }
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:01.250Z',
+      thread_id: 'thread-record-goal',
+      objective: 'record goal evidence',
+      status: 'active',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('ignores status-only model-tool output envelopes before a goal payload', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-envelope-goal"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-envelope-goal-1"}}',
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.900Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call',
+            name: 'get_goal',
+            call_id: 'call-envelope-goal'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:01.250Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call_output',
+            call_id: 'call-envelope-goal',
+            output: {
+              status: 'completed',
+              content: [
+                {
+                  type: 'output_text',
+                  text: JSON.stringify({
+                    goal: {
+                      threadId: 'thread-envelope-goal',
+                      objective: 'envelope goal evidence',
+                      status: 'active',
+                      updatedAt: '2026-03-21T09:00:01.000Z'
+                    }
+                  })
+                }
+              ]
+            }
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:01.250Z',
+      thread_id: 'thread-envelope-goal',
+      objective: 'envelope goal evidence',
+      status: 'active',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('reads raw response item goal tool payloads from app-server notifications', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-raw-goal"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-raw-goal-1"}}',
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.900Z',
+          type: 'notification',
+          method: 'rawResponseItem/completed',
+          params: {
+            item: {
+              type: 'function_call',
+              name: 'get_goal',
+              call_id: 'call-raw-goal'
+            }
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:01.250Z',
+          type: 'notification',
+          method: 'rawResponseItem/completed',
+          params: {
+            item: {
+              type: 'function_call_output',
+              call_id: 'call-raw-goal',
+              output: JSON.stringify({
+                goal: {
+                  threadId: 'thread-raw-goal',
+                  objective: 'raw response item goal evidence',
+                  status: 'active',
+                  updatedAt: '2026-03-21T09:00:01.000Z'
+                }
+              })
+            }
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:01.250Z',
+      thread_id: 'thread-raw-goal',
+      objective: 'raw response item goal evidence',
+      status: 'active',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('persists pending model-tool call names across session-log hydration refreshes', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '05', '05');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-05-05T04-40-00-thread-split-goal.jsonl');
+    const initialSessionLog = [
+      JSON.stringify({
+        type: 'session_meta',
+        payload: {
+          id: 'thread-split-goal',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        },
+        timestamp: '2026-05-05T04:40:00.000Z'
+      }),
+      JSON.stringify({
+        type: 'turn_context',
+        payload: {
+          turn_id: 'turn-split-goal-1'
+        },
+        timestamp: '2026-05-05T04:40:01.000Z'
+      }),
+      JSON.stringify({
+        timestamp: '2026-05-05T04:40:02.000Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'get_goal',
+          call_id: 'call-split-goal'
+        }
+      })
+    ].join('\n');
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(sessionLogPath, `${initialSessionLog}\n`, 'utf8');
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          thread_id: 'thread-split-goal',
+          latest_turn_id: 'turn-split-goal-1',
+          latest_session_id: 'thread-split-goal-turn-split-goal-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          attempt_started_at: '2026-05-05T04:40:00.000Z',
+          current_turn_started_at: '2026-05-05T04:40:00.000Z',
+          workspace_path: tempRoot,
+          goal_evidence: {
+            source: 'codex-goals',
+            feature_available: true,
+            feature_enabled: true,
+            capture_mode: 'unavailable',
+            capture_timestamp: '2026-05-05T04:40:00.000Z',
+            thread_id: 'thread-split-goal',
+            turn_id: 'turn-split-goal-1',
+            objective: null,
+            status: null,
+            token_budget: null,
+            tokens_used: null,
+            elapsed_seconds: null,
+            created_at: null,
+            updated_at: null,
+            authority: 'advisory_only',
+            linear_authority_preserved: true,
+            not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+            reason: 'goal_state_not_observed'
+          }
+        })
+      ),
+      'utf8'
+    );
+
+    await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-05-05T04:40:03.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+    const firstHydration = await readPersistedSessionLogHydrationState(hydrationPath);
+    expect(firstHydration.goal_tool_call_names).toMatchObject({
+      'call-split-goal': 'get_goal'
+    });
+
+    const outputLine = JSON.stringify({
+      timestamp: '2026-05-05T04:40:04.000Z',
+      type: 'response_item',
+      payload: {
+        type: 'function_call_output',
+        call_id: 'call-split-goal',
+        output: JSON.stringify({
+          goal: {
+            threadId: 'thread-split-goal',
+            objective: 'hydrated split goal evidence',
+            status: 'active',
+            updatedAt: '2026-05-05T04:40:03.500Z'
+          }
+        })
+      }
+    });
+    await writeFile(sessionLogPath, `${initialSessionLog}\n${outputLine}\n`, 'utf8');
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-05-05T04:40:05.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+
+    expect(refreshed?.goal_evidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-05-05T04:40:04.000Z',
+      thread_id: 'thread-split-goal',
+      objective: 'hydrated split goal evidence',
+      status: 'active',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('clears pending model-tool call names when the proof turn changes', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '05', '05');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-05-05T04-42-00-thread-scoped-goal.jsonl');
+    const sessionLog = [
+      JSON.stringify({
+        type: 'session_meta',
+        payload: {
+          id: 'thread-scoped-goal',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        },
+        timestamp: '2026-05-05T04:42:00.000Z'
+      }),
+      JSON.stringify({
+        type: 'turn_context',
+        payload: {
+          turn_id: 'turn-scoped-goal-1'
+        },
+        timestamp: '2026-05-05T04:42:01.000Z'
+      }),
+      JSON.stringify({
+        timestamp: '2026-05-05T04:42:02.000Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'get_goal',
+          call_id: 'call-scoped-goal'
+        }
+      })
+    ].join('\n');
+
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(sessionLogPath, `${sessionLog}\n`, 'utf8');
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          thread_id: 'thread-scoped-goal',
+          latest_turn_id: 'turn-scoped-goal-1',
+          latest_session_id: 'thread-scoped-goal-turn-scoped-goal-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          attempt_started_at: '2026-05-05T04:42:00.000Z',
+          current_turn_started_at: '2026-05-05T04:42:00.000Z',
+          workspace_path: tempRoot,
+          goal_evidence: {
+            source: 'codex-goals',
+            feature_available: true,
+            feature_enabled: true,
+            capture_mode: 'unavailable',
+            capture_timestamp: '2026-05-05T04:42:00.000Z',
+            thread_id: 'thread-scoped-goal',
+            turn_id: 'turn-scoped-goal-1',
+            objective: null,
+            status: null,
+            token_budget: null,
+            tokens_used: null,
+            elapsed_seconds: null,
+            created_at: null,
+            updated_at: null,
+            authority: 'advisory_only',
+            linear_authority_preserved: true,
+            not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+            reason: 'goal_state_not_observed'
+          }
+        })
+      ),
+      'utf8'
+    );
+
+    await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-05-05T04:42:03.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+    const firstHydration = await readPersistedSessionLogHydrationState(hydrationPath);
+    expect(firstHydration.goal_tool_call_names).toMatchObject({
+      'call-scoped-goal': 'get_goal'
+    });
+
+    const firstProof = JSON.parse(await readFile(proofPath, 'utf8')) as ProviderLinearWorkerProof;
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        {
+          ...firstProof,
+          latest_turn_id: 'turn-scoped-goal-2',
+          latest_session_id: 'thread-scoped-goal-turn-scoped-goal-2',
+          current_turn_started_at: '2026-05-05T04:42:04.000Z'
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-05-05T04:42:05.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+    const secondHydration = await readPersistedSessionLogHydrationState(hydrationPath);
+    expect(secondHydration.goal_tool_call_names).toBeUndefined();
+  });
+
+  it('clears pending model-tool call names after session-log truncation', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const hydrationPath = buildSessionLogHydrationPath(runDir);
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '05', '05');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-05-05T04-45-00-thread-truncated-goal.jsonl');
+    const firstSessionLog = [
+      JSON.stringify({
+        type: 'session_meta',
+        payload: {
+          id: 'thread-truncated-goal',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        },
+        timestamp: '2026-05-05T04:45:00.000Z'
+      }),
+      JSON.stringify({
+        type: 'turn_context',
+        payload: {
+          turn_id: 'turn-truncated-goal-1'
+        },
+        timestamp: '2026-05-05T04:45:01.000Z'
+      }),
+      JSON.stringify({
+        timestamp: '2026-05-05T04:45:02.000Z',
+        type: 'response_item',
+        payload: {
+          type: 'function_call',
+          name: 'get_goal',
+          call_id: 'call-truncated-goal'
+        }
+      })
+    ].join('\n');
+    const truncatedSessionLog = [
+      JSON.stringify({
+        type: 'session_meta',
+        payload: {
+          id: 'thread-truncated-goal',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        },
+        timestamp: '2026-05-05T04:45:00.000Z'
+      }),
+      JSON.stringify({
+        type: 'turn_context',
+        payload: {
+          turn_id: 'turn-truncated-goal-1'
+        },
+        timestamp: '2026-05-05T04:45:01.000Z'
+      })
+    ].join('\n');
+    expect(Buffer.byteLength(truncatedSessionLog, 'utf8')).toBeLessThan(
+      Buffer.byteLength(`${firstSessionLog}\n`, 'utf8')
+    );
+
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(sessionLogPath, `${firstSessionLog}\n`, 'utf8');
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          thread_id: 'thread-truncated-goal',
+          latest_turn_id: 'turn-truncated-goal-1',
+          latest_session_id: 'thread-truncated-goal-turn-truncated-goal-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          attempt_started_at: '2026-05-05T04:45:00.000Z',
+          current_turn_started_at: '2026-05-05T04:45:00.000Z',
+          workspace_path: tempRoot,
+          goal_evidence: {
+            source: 'codex-goals',
+            feature_available: true,
+            feature_enabled: true,
+            capture_mode: 'unavailable',
+            capture_timestamp: '2026-05-05T04:45:00.000Z',
+            thread_id: 'thread-truncated-goal',
+            turn_id: 'turn-truncated-goal-1',
+            objective: null,
+            status: null,
+            token_budget: null,
+            tokens_used: null,
+            elapsed_seconds: null,
+            created_at: null,
+            updated_at: null,
+            authority: 'advisory_only',
+            linear_authority_preserved: true,
+            not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+            reason: 'goal_state_not_observed'
+          }
+        })
+      ),
+      'utf8'
+    );
+
+    await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-05-05T04:45:03.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+    const firstHydration = await readPersistedSessionLogHydrationState(hydrationPath);
+    expect(firstHydration).not.toBeNull();
+    expect(firstHydration.goal_tool_call_names).toMatchObject({
+      'call-truncated-goal': 'get_goal'
+    });
+
+    await writeFile(sessionLogPath, `${truncatedSessionLog}\n`, 'utf8');
+    await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-05-05T04:45:04.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+    const secondHydration = await readPersistedSessionLogHydrationState(hydrationPath);
+    expect(secondHydration).not.toBeNull();
+    expect(secondHydration.goal_tool_call_names).toBeUndefined();
   });
 
   it('fails closed when no thread identity can be proven for model-tool goal snapshots', async () => {

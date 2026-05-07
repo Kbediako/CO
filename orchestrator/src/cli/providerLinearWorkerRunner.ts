@@ -729,6 +729,7 @@ interface ProviderWorkerSessionLogTailState {
   bootstrapPending: boolean;
   currentTurnStartedAt: string | null;
   idRewindSignature: string | null;
+  goalToolCallNames: Record<string, string>;
 }
 
 interface ProviderWorkerSessionLogHydrationState {
@@ -739,6 +740,7 @@ interface ProviderWorkerSessionLogHydrationState {
   proof_signature: string;
   id_rewind_signature?: string | null;
   resolved_model_provenance?: ProviderLinearWorkerResolvedModelProvenance | null;
+  goal_tool_call_names?: Record<string, string>;
 }
 
 interface ProviderControlHostManifestTarget {
@@ -4322,8 +4324,10 @@ function readProviderWorkerParams(input: Record<string, unknown>): Record<string
 
 function isProviderWorkerGoalNotificationRecord(input: Record<string, unknown>): boolean {
   const payload = isRecord(input.payload) ? input.payload : null;
-  const type = normalizeOptionalString(input.type) ?? normalizeOptionalString(payload?.type);
-  return type === 'notification';
+  return (
+    normalizeOptionalString(input.type) === 'notification' ||
+    normalizeOptionalString(payload?.type) === 'notification'
+  );
 }
 
 function readFirstProviderWorkerRawStringAtPaths(
@@ -4645,13 +4649,24 @@ function normalizeProviderWorkerGoalToolName(value: unknown): string | null {
 }
 
 function readProviderWorkerResponseItemPayload(input: Record<string, unknown>): Record<string, unknown> | null {
-  return isRecord(input.payload)
-    ? input.payload
-    : isRecord(input.item)
-      ? input.item
-      : isRecord(input.response_item)
-        ? input.response_item
-        : null;
+  const payload = isRecord(input.payload) ? input.payload : null;
+  const params = isRecord(input.params) ? input.params : null;
+  const payloadParams = isRecord(payload?.params) ? payload.params : null;
+  return isRecord(input.item)
+    ? input.item
+    : isRecord(input.response_item)
+      ? input.response_item
+      : isRecord(params?.item)
+        ? params.item
+        : isRecord(params?.response_item)
+          ? params.response_item
+          : isRecord(payloadParams?.item)
+            ? payloadParams.item
+            : isRecord(payloadParams?.response_item)
+              ? payloadParams.response_item
+              : input.type === 'response_item' && payload
+                ? payload
+                : null;
 }
 
 function readProviderWorkerResponseItemCallId(input: Record<string, unknown>): string | null {
@@ -4699,6 +4714,15 @@ function readProviderWorkerGoalToolOutputValue(input: Record<string, unknown>): 
 
 function parseProviderWorkerGoalToolOutputValue(value: unknown): unknown {
   if (isRecord(value)) {
+    if (isProviderWorkerGoalToolPayloadRecord(value)) {
+      return value;
+    }
+    for (const nested of [value.text, value.output_text, value.output, value.result, value.content]) {
+      const parsed = parseProviderWorkerGoalToolOutputValue(nested);
+      if (isRecord(parsed) && isProviderWorkerGoalToolPayloadRecord(parsed)) {
+        return parsed;
+      }
+    }
     return value;
   }
   if (typeof value === 'string') {
@@ -4707,27 +4731,17 @@ function parseProviderWorkerGoalToolOutputValue(value: unknown): unknown {
       return null;
     }
     try {
-      return JSON.parse(trimmed) as unknown;
+      const parsed = JSON.parse(trimmed) as unknown;
+      return parseProviderWorkerGoalToolOutputValue(parsed) ?? parsed;
     } catch {
       return null;
     }
   }
   if (Array.isArray(value)) {
     for (const item of value) {
-      if (isRecord(item)) {
-        const parsed =
-          parseProviderWorkerGoalToolOutputValue(item.text) ??
-          parseProviderWorkerGoalToolOutputValue(item.output_text) ??
-          parseProviderWorkerGoalToolOutputValue(item.output) ??
-          item;
-        if (parsed !== null) {
-          return parsed;
-        }
-      } else {
-        const parsed = parseProviderWorkerGoalToolOutputValue(item);
-        if (parsed !== null) {
-          return parsed;
-        }
+      const parsed = parseProviderWorkerGoalToolOutputValue(item);
+      if (isRecord(parsed) && isProviderWorkerGoalToolPayloadRecord(parsed)) {
+        return parsed;
       }
     }
   }
@@ -4739,7 +4753,6 @@ function isProviderWorkerGoalSnapshotRecord(value: Record<string, unknown>): boo
     'threadId',
     'thread_id',
     'objective',
-    'status',
     'tokenBudget',
     'token_budget',
     'tokensUsed',
@@ -4753,6 +4766,15 @@ function isProviderWorkerGoalSnapshotRecord(value: Record<string, unknown>): boo
     'updatedAt',
     'updated_at'
   ].some((key) => value[key] !== undefined);
+}
+
+function isProviderWorkerGoalToolPayloadRecord(value: Record<string, unknown>): boolean {
+  return (
+    isRecord(value.goal) ||
+    isRecord(value.threadGoal) ||
+    isRecord(value.thread_goal) ||
+    isProviderWorkerGoalSnapshotRecord(value)
+  );
 }
 
 function selectProviderWorkerGoalToolSnapshotRecord(value: unknown): Record<string, unknown> | null {
@@ -7456,6 +7478,22 @@ function resetProviderWorkerSessionLogTailState(state: ProviderWorkerSessionLogT
   state.trailingText = '';
   state.bootstrapPending = true;
   state.idRewindSignature = null;
+  state.goalToolCallNames = {};
+}
+
+function normalizeProviderWorkerGoalToolCallNames(value: unknown): Record<string, string> {
+  if (!isRecord(value)) {
+    return {};
+  }
+  const normalized: Record<string, string> = {};
+  for (const [callId, toolName] of Object.entries(value)) {
+    const normalizedCallId = normalizeOptionalString(callId);
+    const normalizedToolName = normalizeProviderWorkerGoalToolName(toolName);
+    if (normalizedCallId && normalizedToolName) {
+      normalized[normalizedCallId] = normalizedToolName;
+    }
+  }
+  return normalized;
 }
 
 function normalizeProviderWorkerSessionLogHydrationState(
@@ -7486,6 +7524,10 @@ function normalizeProviderWorkerSessionLogHydrationState(
   if (resolvedModelProvenance) {
     normalized.resolved_model_provenance = resolvedModelProvenance;
   }
+  const goalToolCallNames = normalizeProviderWorkerGoalToolCallNames(value.goal_tool_call_names);
+  if (Object.keys(goalToolCallNames).length > 0) {
+    normalized.goal_tool_call_names = goalToolCallNames;
+  }
   return normalized;
 }
 
@@ -7502,7 +7544,8 @@ function buildProviderWorkerSessionLogTailState(
       trailingText: '',
       bootstrapPending: true,
       currentTurnStartedAt: normalizedCurrentTurnStartedAt,
-      idRewindSignature: null
+      idRewindSignature: null,
+      goalToolCallNames: {}
     };
   }
   return {
@@ -7511,7 +7554,8 @@ function buildProviderWorkerSessionLogTailState(
     trailingText: hydrationState.trailing_text,
     bootstrapPending: hydrationState.bootstrap_pending,
     currentTurnStartedAt: normalizedCurrentTurnStartedAt,
-    idRewindSignature: hydrationState.id_rewind_signature ?? null
+    idRewindSignature: hydrationState.id_rewind_signature ?? null,
+    goalToolCallNames: normalizeProviderWorkerGoalToolCallNames(hydrationState.goal_tool_call_names)
   };
 }
 
@@ -7530,6 +7574,9 @@ function snapshotProviderWorkerSessionLogTailState(
   };
   if (state.idRewindSignature) {
     snapshot.id_rewind_signature = state.idRewindSignature;
+  }
+  if (Object.keys(state.goalToolCallNames).length > 0) {
+    snapshot.goal_tool_call_names = { ...state.goalToolCallNames };
   }
   return snapshot;
 }
@@ -7647,6 +7694,7 @@ async function readProviderWorkerSessionLogDelta(
     state.trailingText = '';
     state.bootstrapPending = true;
     state.idRewindSignature = null;
+    state.goalToolCallNames = {};
   }
   const bytesToRead = fileStat.size - state.offsetBytes;
   if (bytesToRead <= 0) {
@@ -7893,6 +7941,26 @@ function shouldAllowCompletedProviderWorkerSessionBootstrapTurn(
   return continuityState !== 'guarded_resume_pending' && continuityState !== 'guarded_resume_active';
 }
 
+function seedProviderWorkerGoalToolCallNamesFromTail(
+  parseState: ProviderLinearWorkerJsonlParseResult,
+  tailState: ProviderWorkerSessionLogTailState
+): void {
+  if (Object.keys(tailState.goalToolCallNames).length === 0) {
+    return;
+  }
+  parseState.goalToolCallNames = {
+    ...tailState.goalToolCallNames,
+    ...(parseState.goalToolCallNames ?? {})
+  };
+}
+
+function snapshotProviderWorkerGoalToolCallNamesToTail(
+  parseState: ProviderLinearWorkerJsonlParseResult,
+  tailState: ProviderWorkerSessionLogTailState
+): void {
+  tailState.goalToolCallNames = { ...(parseState.goalToolCallNames ?? {}) };
+}
+
 function applyProviderWorkerSessionLogDelta(
   parseState: ProviderLinearWorkerJsonlParseResult,
   tailState: ProviderWorkerSessionLogTailState,
@@ -7902,6 +7970,7 @@ function applyProviderWorkerSessionLogDelta(
     allowCompletedBootstrapTurn?: boolean;
   } = {}
 ): ProviderWorkerSessionLogApplyResult {
+  seedProviderWorkerGoalToolCallNamesFromTail(parseState, tailState);
   const combined = `${tailState.trailingText}${chunk}`;
   const lines = combined.split(/\r?\n/u);
   tailState.trailingText = lines.pop() ?? '';
@@ -7932,6 +8001,7 @@ function applyProviderWorkerSessionLogDelta(
     }
     changed = applyProviderLinearWorkerSessionJsonlRecord(parseState, parsed, env) || changed;
   }
+  snapshotProviderWorkerGoalToolCallNamesToTail(parseState, tailState);
   if (tailState.bootstrapPending && lines.length > 0) {
     tailState.bootstrapPending = requireTurnContext && parseState.turnId === null;
   }
@@ -7946,12 +8016,15 @@ function flushProviderWorkerSessionLogTail(
     allowCompletedBootstrapTurn?: boolean;
   } = {}
 ): ProviderWorkerSessionLogApplyResult {
+  seedProviderWorkerGoalToolCallNamesFromTail(parseState, tailState);
   const trailingLine = tailState.trailingText.trim();
   if (!trailingLine) {
     tailState.trailingText = '';
+    snapshotProviderWorkerGoalToolCallNamesToTail(parseState, tailState);
     return { changed: false, observed: false, observedThreadId: null, observedTurnId: null };
   }
   if (!parseProviderWorkerSessionJsonlLine(trailingLine)) {
+    snapshotProviderWorkerGoalToolCallNamesToTail(parseState, tailState);
     return { changed: false, observed: false, observedThreadId: null, observedTurnId: null };
   }
   tailState.trailingText = '';
@@ -7978,6 +8051,7 @@ function flushProviderWorkerSessionLogTail(
     }
     changed = applyProviderLinearWorkerSessionJsonlRecord(parseState, parsed, env) || changed;
   }
+  snapshotProviderWorkerGoalToolCallNamesToTail(parseState, tailState);
   if (shouldBootstrap) {
     tailState.bootstrapPending = requireTurnContext && parseState.turnId === null;
   }
@@ -8918,7 +8992,8 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
           trailingText: tailState.trailingText,
           bootstrapPending: true,
           currentTurnStartedAt: tailState.currentTurnStartedAt,
-          idRewindSignature: tailState.idRewindSignature
+          idRewindSignature: tailState.idRewindSignature,
+          goalToolCallNames: {}
         };
       } else if (fileStat.size < tailState.offsetBytes) {
         tailState = {
@@ -8927,13 +9002,15 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
           trailingText: '',
           bootstrapPending: true,
           currentTurnStartedAt: tailState.currentTurnStartedAt,
-          idRewindSignature: null
+          idRewindSignature: null,
+          goalToolCallNames: {}
         };
       } else {
         preserveProofTelemetryFloor = true;
         tailState = {
           ...tailState,
-          bootstrapPending: true
+          bootstrapPending: true,
+          goalToolCallNames: {}
         };
       }
     }
@@ -8955,7 +9032,8 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
       trailingText: '',
       bootstrapPending: true,
       currentTurnStartedAt: tailState.currentTurnStartedAt,
-      idRewindSignature: idHydrationRewindSignature
+      idRewindSignature: idHydrationRewindSignature,
+      goalToolCallNames: {}
     };
   }
   seedProviderWorkerAgentMessageDeltaHydration(parseState, proof, tailState);
@@ -13128,7 +13206,8 @@ export async function runProviderLinearWorker(
               trailingText: '',
               bootstrapPending: true,
               currentTurnStartedAt: turnStartedAt,
-              idRewindSignature: null
+              idRewindSignature: null,
+              goalToolCallNames: {}
             }
           : null;
       const allowCompletedSessionBootstrapTurn =
