@@ -19,6 +19,7 @@ import {
 } from '../run/manifest.js';
 import { persistManifest, type ManifestPersister } from '../run/manifestPersister.js';
 import {
+  normalizeProviderLinearGoalEvidenceValue,
   PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
   type ProviderLinearWorkerProof
@@ -1167,8 +1168,12 @@ function buildProviderLinearWorkerManifestGoalEvidence(
   ) {
     return null;
   }
+  const normalizedGoalEvidence = normalizeProviderLinearGoalEvidenceValue(goalEvidence);
+  if (normalizedGoalEvidence === null) {
+    return null;
+  }
   return {
-    ...goalEvidence,
+    ...normalizedGoalEvidence,
     authority: 'advisory_only',
     linear_authority_preserved: true,
     not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR]

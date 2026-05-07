@@ -2221,6 +2221,30 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     );
   });
 
+  it('ignores method-shaped goal records that are not app-server notifications', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-goal"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-goal-1"}}',
+        JSON.stringify({
+          type: 'event_msg',
+          method: 'thread/goal/updated',
+          params: {
+            threadId: 'thread-goal',
+            goal: {
+              threadId: 'thread-goal',
+              objective: 'not a notification',
+              status: 'active',
+              updatedAt: '2026-03-21T09:00:00.000Z'
+            }
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toBeNull();
+  });
+
   it('clears parsed goal evidence when the app-server turn changes', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [
@@ -13118,6 +13142,73 @@ for await (const line of rl) {
     });
   });
 
+  it('honors command config overrides that disable goals', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent('[features]\ngoals = true\n');
+    const appServerTurnRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-1"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-1"}}',
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:00.250Z',
+            type: 'notification',
+            method: 'thread/goal/updated',
+            params: {
+              threadId: 'thread-1',
+              goal: {
+                threadId: 'thread-1',
+                objective: 'must not persist when override disables goals',
+                status: 'active',
+                updatedAt: '2026-03-21T09:00:00.000Z'
+              }
+            }
+          }),
+          '{"type":"notification","method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","status":"completed"}}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_HOME: codexHome
+      },
+      {
+        readTrackedIssue: createReadTrackedIssueMock()
+          .mockResolvedValueOnce(createTrackedIssue())
+          .mockResolvedValueOnce(createTrackedIssue({ state: 'Done', state_type: 'completed' })),
+        resolveRuntimeContext: vi.fn(async () =>
+          createAppServerRuntimeContext({}, {
+            CODEX_CONFIG_OVERRIDES: 'features.goals=false'
+          })
+        ),
+        execRunner: vi.fn(),
+        appServerTurnRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof.goal_evidence).toMatchObject({
+      feature_available: false,
+      feature_enabled: false,
+      capture_mode: 'disabled',
+      reason: 'goals_feature_disabled',
+      objective: null,
+      status: null
+    });
+  });
+
   it('fails closed on thread-mismatched goal evidence', async () => {
     const { manifestPath } = await createManifestRoot();
     const codexHome = await writeCodexConfigContent('[features]\ngoals = true\n');
@@ -13179,6 +13270,129 @@ for await (const line of rl) {
       status: null,
       updated_at: null,
       reason: 'goal_thread_mismatch:thread-other->thread-current',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('fails closed when goal evidence omits thread identity', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent('[features]\ngoals = true\n');
+    const appServerTurnRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-current"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-current-1"}}',
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:00.250Z',
+            type: 'notification',
+            method: 'thread/goal/updated',
+            params: {
+              goal: {
+                objective: 'missing thread provenance',
+                status: 'active',
+                updatedAt: '2026-03-21T09:00:00.000Z'
+              }
+            }
+          }),
+          '{"type":"notification","method":"turn/completed","params":{"threadId":"thread-current","turn":{"id":"turn-current-1","status":"completed"}}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_HOME: codexHome
+      },
+      {
+        readTrackedIssue: createReadTrackedIssueMock()
+          .mockResolvedValueOnce(createTrackedIssue())
+          .mockResolvedValueOnce(createTrackedIssue({ state: 'Done', state_type: 'completed' })),
+        resolveRuntimeContext: vi.fn(async () => createAppServerRuntimeContext()),
+        execRunner: vi.fn(),
+        appServerTurnRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof.goal_evidence).toMatchObject({
+      capture_mode: 'thread_mismatch',
+      thread_id: 'thread-current',
+      objective: null,
+      status: null,
+      reason: 'goal_thread_missing:thread-current',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('fails closed when goal evidence has no freshness timestamp', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent('[features]\ngoals = true\n');
+    const appServerTurnRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-current"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-current-1"}}',
+          JSON.stringify({
+            type: 'notification',
+            method: 'thread/goal/updated',
+            params: {
+              threadId: 'thread-current',
+              goal: {
+                threadId: 'thread-current',
+                objective: 'missing freshness',
+                status: 'active'
+              }
+            }
+          }),
+          '{"type":"notification","method":"turn/completed","params":{"threadId":"thread-current","turn":{"id":"turn-current-1","status":"completed"}}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_HOME: codexHome
+      },
+      {
+        readTrackedIssue: createReadTrackedIssueMock()
+          .mockResolvedValueOnce(createTrackedIssue())
+          .mockResolvedValueOnce(createTrackedIssue({ state: 'Done', state_type: 'completed' })),
+        resolveRuntimeContext: vi.fn(async () => createAppServerRuntimeContext()),
+        execRunner: vi.fn(),
+        appServerTurnRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof.goal_evidence).toMatchObject({
+      capture_mode: 'unavailable',
+      objective: null,
+      status: null,
+      reason: 'goal_timestamp_unavailable',
       authority: 'advisory_only',
       linear_authority_preserved: true
     });
@@ -13307,12 +13521,12 @@ for await (const line of rl) {
       source: 'codex-goals',
       feature_available: true,
       feature_enabled: true,
-      capture_mode: 'captured',
+      capture_mode: 'unavailable',
       capture_timestamp: '2026-03-21T09:10:05.000Z',
       thread_id: 'thread-1',
       turn_id: 'turn-raw',
       objective: null,
-      status: 'active',
+      status: null,
       token_budget: null,
       tokens_used: null,
       elapsed_seconds: null,
@@ -13321,7 +13535,7 @@ for await (const line of rl) {
       authority: 'advisory_only',
       linear_authority_preserved: true,
       not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
-      reason: null
+      reason: 'goal_timestamp_unavailable'
     });
   });
 

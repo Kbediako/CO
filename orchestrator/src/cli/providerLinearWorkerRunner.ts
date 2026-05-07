@@ -1812,6 +1812,7 @@ interface ProviderWorkerCommandModelOverrides {
   review_model: string | null;
   reasoning_effort: string | null;
   profile: string | null;
+  goals_feature_enabled: boolean | null;
 }
 
 async function readProviderWorkerConfigModelDefaults(
@@ -2077,7 +2078,8 @@ function buildEmptyProviderWorkerCommandModelOverrides(): ProviderWorkerCommandM
     model: null,
     review_model: null,
     reasoning_effort: null,
-    profile: null
+    profile: null,
+    goals_feature_enabled: null
   };
 }
 
@@ -2103,7 +2105,9 @@ function mergeProviderWorkerCommandConfigOverride(
       ) ?? current.reasoning_effort,
     profile:
       normalizeProviderWorkerConfigProfileName(readTomlStringAssignment(trimmed, 'profile')) ??
-      current.profile
+      current.profile,
+    goals_feature_enabled:
+      readTomlBooleanAssignment(trimmed, 'features.goals') ?? current.goals_feature_enabled
   };
 }
 
@@ -2153,6 +2157,17 @@ function resolveProviderWorkerCommandModelOverrides(args: string[]): ProviderWor
     }
   }
   return overrides;
+}
+
+function resolveProviderWorkerCommandGoalsFeatureEnabled(
+  args: string[],
+  configDefaults: ProviderWorkerConfigModelDefaults
+): boolean | null {
+  return (
+    resolveProviderWorkerCommandModelOverrides(args).goals_feature_enabled ??
+    configDefaults.goals_feature_enabled ??
+    null
+  );
 }
 
 function extractProviderWorkerRuntimeReportedModel(
@@ -4270,6 +4285,12 @@ function readProviderWorkerParams(input: Record<string, unknown>): Record<string
   return isRecord(input.params) ? input.params : isRecord(payload?.params) ? payload.params : null;
 }
 
+function isProviderWorkerGoalNotificationRecord(input: Record<string, unknown>): boolean {
+  const payload = isRecord(input.payload) ? input.payload : null;
+  const type = normalizeOptionalString(input.type) ?? normalizeOptionalString(payload?.type);
+  return type === 'notification';
+}
+
 function readFirstProviderWorkerRawStringAtPaths(
   input: Record<string, unknown>,
   paths: string[][]
@@ -4585,6 +4606,9 @@ function extractProviderWorkerGoalEvidence(
   if (method !== 'thread/goal/updated' && method !== 'thread/goal/cleared') {
     return null;
   }
+  if (!isProviderWorkerGoalNotificationRecord(parsed)) {
+    return null;
+  }
   const params = readProviderWorkerParams(parsed);
   const goal = isRecord(params?.goal)
     ? params.goal
@@ -4598,8 +4622,7 @@ function extractProviderWorkerGoalEvidence(
     normalizeOptionalString(goal?.threadId) ??
     normalizeOptionalString(goal?.thread_id) ??
     normalizeOptionalString(params?.threadId) ??
-    normalizeOptionalString(params?.thread_id) ??
-    state.threadId;
+    normalizeOptionalString(params?.thread_id);
   const turnId = extractProviderWorkerActivityTurnId(parsed) ?? state.turnId;
   if (method === 'thread/goal/cleared') {
     return buildProviderLinearGoalEvidence({
@@ -4743,7 +4766,7 @@ function normalizeProviderLinearGoalEvidenceBoolean(value: unknown): boolean | n
   return typeof value === 'boolean' ? value : null;
 }
 
-function normalizeProviderLinearGoalEvidenceValue(value: unknown): ProviderLinearGoalEvidence | null {
+export function normalizeProviderLinearGoalEvidenceValue(value: unknown): ProviderLinearGoalEvidence | null {
   if (!isRecord(value) || value.source !== 'codex-goals') {
     return null;
   }
@@ -4751,7 +4774,7 @@ function normalizeProviderLinearGoalEvidenceValue(value: unknown): ProviderLinea
   if (captureMode === null) {
     return null;
   }
-  return buildProviderLinearGoalEvidence({
+  const capturedEvidence = buildProviderLinearGoalEvidence({
     featureAvailable: normalizeProviderLinearGoalEvidenceBoolean(value.feature_available),
     featureEnabled: normalizeProviderLinearGoalEvidenceBoolean(value.feature_enabled),
     captureMode,
@@ -4766,6 +4789,25 @@ function normalizeProviderLinearGoalEvidenceValue(value: unknown): ProviderLinea
     createdAt: normalizeProviderLinearGoalIsoTimestamp(value.created_at),
     updatedAt: normalizeProviderLinearGoalIsoTimestamp(value.updated_at),
     reason: normalizeOptionalString(value.reason)
+  });
+  if (captureMode === 'captured') {
+    return capturedEvidence;
+  }
+  return buildProviderLinearGoalEvidence({
+    featureAvailable: capturedEvidence.feature_available,
+    featureEnabled: capturedEvidence.feature_enabled,
+    captureMode,
+    captureTimestamp: capturedEvidence.capture_timestamp,
+    threadId: capturedEvidence.thread_id,
+    turnId: capturedEvidence.turn_id,
+    objective: null,
+    status: captureMode === 'cleared' ? 'cleared' : null,
+    tokenBudget: null,
+    tokensUsed: null,
+    elapsedSeconds: null,
+    createdAt: null,
+    updatedAt: null,
+    reason: capturedEvidence.reason
   });
 }
 
@@ -4833,6 +4875,12 @@ function normalizeProviderLinearGoalEvidenceForProof(input: {
   if (goalThreadId && proofThreadId && goalThreadId !== proofThreadId) {
     captureMode = 'thread_mismatch';
     reason = `goal_thread_mismatch:${goalThreadId}->${proofThreadId}`;
+  } else if (!goalThreadId && proofThreadId && captureMode === 'captured') {
+    captureMode = 'thread_mismatch';
+    reason = `goal_thread_missing:${proofThreadId}`;
+  } else if (captureMode === 'captured' && freshnessTimestamp === null) {
+    captureMode = 'unavailable';
+    reason = 'goal_timestamp_unavailable';
   } else if (
     captureMode === 'captured' &&
     freshnessTimestamp !== null &&
@@ -4841,7 +4889,7 @@ function normalizeProviderLinearGoalEvidenceForProof(input: {
     captureMode = 'stale';
     reason = 'goal_evidence_predates_current_turn';
   }
-  if (captureMode === 'thread_mismatch' || captureMode === 'stale') {
+  if (captureMode !== 'captured') {
     return buildProviderLinearGoalEvidence({
       featureAvailable: base.feature_available ?? (runtimeMode === 'appserver' ? true : false),
       featureEnabled,
@@ -4850,7 +4898,7 @@ function normalizeProviderLinearGoalEvidenceForProof(input: {
       threadId: goalThreadId ?? proofThreadId ?? null,
       turnId: base.turn_id ?? input.proofTurnId ?? null,
       objective: null,
-      status: null,
+      status: captureMode === 'cleared' ? 'cleared' : null,
       tokenBudget: null,
       tokensUsed: null,
       elapsedSeconds: null,
@@ -12411,6 +12459,7 @@ export async function runProviderLinearWorker(
     for (let turnNumber = 1; turnNumber <= context.maxTurns; turnNumber += 1) {
       let liveStdoutBuffer = '';
       let liveProofSignature: string | null = null;
+      let currentTurnGoalsFeatureEnabled = configModelDefaults.goals_feature_enabled ?? null;
       const liveParseState = buildEmptyProviderLinearWorkerJsonlParseResult();
       let liveSessionLogThreadId: string | null = null;
       let liveSessionLogTurnId: string | null = null;
@@ -12579,7 +12628,7 @@ export async function runProviderLinearWorker(
             proofTurnId: liveTurnId,
             observedAt: deps.now(),
             currentTurnStartedAt: finalProof.current_turn_started_at ?? turnStartedAt,
-            featureEnabled: configModelDefaults.goals_feature_enabled ?? finalProof.goal_evidence?.feature_enabled ?? null,
+            featureEnabled: currentTurnGoalsFeatureEnabled ?? finalProof.goal_evidence?.feature_enabled ?? null,
             runtimeMode: runtimeContext.runtime.selected_mode
           }),
           auth_provenance: mergeProviderWorkerAuthProvenance(
@@ -12715,6 +12764,10 @@ export async function runProviderLinearWorker(
         useAppServerControl ? ['app-server'] : args,
         runtimeContext
       );
+      currentTurnGoalsFeatureEnabled = resolveProviderWorkerCommandGoalsFeatureEnabled(
+        resolved.args,
+        configModelDefaults
+      );
       let stopLiveSessionTailResolve: (() => void) | null = null;
       let liveSessionTailStopped = false;
       const stopLiveSessionTailPromise = new Promise<void>((resolve) => {
@@ -12753,7 +12806,7 @@ export async function runProviderLinearWorker(
             proofTurnId: null,
             observedAt: turnStartedAt,
             currentTurnStartedAt: turnStartedAt,
-            featureEnabled: configModelDefaults.goals_feature_enabled ?? finalProof.goal_evidence?.feature_enabled ?? null,
+            featureEnabled: currentTurnGoalsFeatureEnabled ?? finalProof.goal_evidence?.feature_enabled ?? null,
             runtimeMode: runtimeContext.runtime.selected_mode
           }),
           // Runtime-reported model provenance is turn-scoped; start each turn from
@@ -13106,7 +13159,7 @@ export async function runProviderLinearWorker(
           proofTurnId: turnId,
           observedAt: deps.now(),
           currentTurnStartedAt: turnStartedAt,
-          featureEnabled: configModelDefaults.goals_feature_enabled ?? finalProof.goal_evidence?.feature_enabled ?? null,
+          featureEnabled: currentTurnGoalsFeatureEnabled ?? finalProof.goal_evidence?.feature_enabled ?? null,
           runtimeMode: runtimeContext.runtime.selected_mode
         }),
         auth_provenance: mergeProviderWorkerAuthProvenance(

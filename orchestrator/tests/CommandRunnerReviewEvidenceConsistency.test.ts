@@ -1512,6 +1512,61 @@ describe('runCommandStage review evidence consistency', () => {
     expect(persisted.goal_evidence).toBeNull();
   });
 
+  it('clears non-captured provider-worker goal evidence payload fields before manifest persist', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive',
+        goal_evidence: {
+          source: 'codex-goals',
+          feature_available: true,
+          feature_enabled: true,
+          capture_mode: 'stale',
+          capture_timestamp: '2026-03-21T09:00:00.250Z',
+          thread_id: 'thread-goal',
+          turn_id: 'turn-goal-1',
+          objective: 'must not leak',
+          status: 'active',
+          token_budget: 5000,
+          tokens_used: 321,
+          elapsed_seconds: 66.5,
+          created_at: '2026-03-21T08:59:00.000Z',
+          updated_at: '2026-03-21T09:00:00.000Z',
+          authority: 'advisory_only',
+          linear_authority_preserved: true,
+          not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+          reason: 'goal_evidence_predates_current_turn'
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage({
+      id: 'provider-linear-worker',
+      title: 'Run provider linear worker',
+      command: 'node providerLinearWorkerRunner.js',
+      summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    });
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+    const persisted = JSON.parse(await readFile(paths.manifestPath, 'utf8')) as {
+      goal_evidence?: Record<string, unknown> | null;
+    };
+
+    expect(result.exitCode).toBe(0);
+    expect(persisted.goal_evidence).toMatchObject({
+      capture_mode: 'stale',
+      objective: null,
+      status: null,
+      token_budget: null,
+      tokens_used: null,
+      elapsed_seconds: null,
+      created_at: null,
+      updated_at: null,
+      reason: 'goal_evidence_predates_current_turn'
+    });
+  });
+
   it('rejects provider-worker goal evidence that lacks advisory authority markers', async () => {
     mockState.runImpl = async (input) => {
       await writeProviderLinearWorkerProofArtifacts(input, {
