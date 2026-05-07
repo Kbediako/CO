@@ -2221,6 +2221,64 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     );
   });
 
+  it('parses advisory goal evidence from model-tool goal snapshots', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-tool-goal"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-tool-goal-1"}}',
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.900Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call',
+            name: 'create_goal',
+            call_id: 'call-tool-goal',
+            arguments: '{"objective":"finish CO-492"}'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:01.250Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call_output',
+            call_id: 'call-tool-goal',
+            output: JSON.stringify({
+              goal: {
+                threadId: 'thread-tool-goal',
+                objective: 'finish CO-492',
+                status: 'active',
+                tokenBudget: 8000,
+                tokensUsed: 240,
+                timeUsedSeconds: 55,
+                createdAt: 1774083540,
+                updatedAt: 1774083601
+              },
+              remainingTokens: 7760
+            })
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      source: 'codex-goals',
+      feature_available: true,
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:01.250Z',
+      thread_id: 'thread-tool-goal',
+      turn_id: 'turn-tool-goal-1',
+      objective: 'finish CO-492',
+      status: 'active',
+      token_budget: 8000,
+      tokens_used: 240,
+      elapsed_seconds: 55,
+      created_at: '2026-03-21T08:59:00.000Z',
+      updated_at: '2026-03-21T09:00:01.000Z',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
   it('ignores method-shaped goal records that are not app-server notifications', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [
@@ -13078,6 +13136,174 @@ for await (const line of rl) {
     expect(manifest.status_detail).toBe('fresh-parent-manifest-state');
   });
 
+  it('persists advisory goal evidence from model-tool snapshots in provider-worker proof and run manifest', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent('[features]\ngoals = true\n');
+    const appServerTurnRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-tool-goal"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-tool-goal-1"}}',
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:00.900Z',
+            type: 'response_item',
+            payload: {
+              type: 'function_call',
+              name: 'get_goal',
+              call_id: 'call-tool-goal'
+            }
+          }),
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:01.250Z',
+            type: 'response_item',
+            payload: {
+              type: 'function_call_output',
+              call_id: 'call-tool-goal',
+              output: JSON.stringify({
+                goal: {
+                  threadId: 'thread-tool-goal',
+                  objective: 'capture advisory model-tool goal evidence',
+                  status: 'active',
+                  tokenBudget: 7000,
+                  tokensUsed: 111,
+                  timeUsedSeconds: 30,
+                  createdAt: 1774083540,
+                  updatedAt: 1774083601
+                }
+              })
+            }
+          }),
+          '{"type":"notification","method":"turn/completed","params":{"threadId":"thread-tool-goal","turn":{"id":"turn-tool-goal-1","status":"completed"}}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_HOME: codexHome
+      },
+      {
+        readTrackedIssue: createReadTrackedIssueMock()
+          .mockResolvedValueOnce(createTrackedIssue())
+          .mockResolvedValueOnce(createTrackedIssue({ state: 'Done', state_type: 'completed' })),
+        resolveRuntimeContext: vi.fn(async () => createAppServerRuntimeContext()),
+        execRunner: vi.fn(),
+        appServerTurnRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof.goal_evidence).toMatchObject({
+      feature_available: true,
+      feature_enabled: true,
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:01.250Z',
+      thread_id: 'thread-tool-goal',
+      objective: 'capture advisory model-tool goal evidence',
+      status: 'active',
+      token_budget: 7000,
+      tokens_used: 111,
+      elapsed_seconds: 30,
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>;
+    expect(manifest.goal_evidence).toMatchObject({
+      capture_mode: 'captured',
+      thread_id: 'thread-tool-goal',
+      objective: 'capture advisory model-tool goal evidence',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('fails closed when model-tool goal snapshots omit thread identity', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent('[features]\ngoals = true\n');
+    const appServerTurnRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-current"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-current-1"}}',
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:00.900Z',
+            type: 'response_item',
+            payload: {
+              type: 'function_call',
+              name: 'get_goal',
+              call_id: 'call-tool-goal-missing-thread'
+            }
+          }),
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:01.250Z',
+            type: 'response_item',
+            payload: {
+              type: 'function_call_output',
+              call_id: 'call-tool-goal-missing-thread',
+              output: JSON.stringify({
+                goal: {
+                  objective: 'threadless model-tool goal evidence',
+                  status: 'active',
+                  tokensUsed: 111,
+                  timeUsedSeconds: 30,
+                  updatedAt: 1774083601
+                }
+              })
+            }
+          }),
+          '{"type":"notification","method":"turn/completed","params":{"threadId":"thread-current","turn":{"id":"turn-current-1","status":"completed"}}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_HOME: codexHome
+      },
+      {
+        readTrackedIssue: createReadTrackedIssueMock()
+          .mockResolvedValueOnce(createTrackedIssue())
+          .mockResolvedValueOnce(createTrackedIssue({ state: 'Done', state_type: 'completed' })),
+        resolveRuntimeContext: vi.fn(async () => createAppServerRuntimeContext()),
+        execRunner: vi.fn(),
+        appServerTurnRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof.goal_evidence).toMatchObject({
+      capture_mode: 'thread_mismatch',
+      thread_id: 'thread-current',
+      objective: null,
+      status: null,
+      reason: 'goal_thread_missing:thread-current',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
   it('marks unavailable goal evidence as disabled when the goals feature is off', async () => {
     const { manifestPath } = await createManifestRoot();
     const codexHome = await writeCodexConfigContent('[features]\ngoals = false\n');
@@ -13373,6 +13599,62 @@ for await (const line of rl) {
                 updatedAt: '2026-03-21T09:00:00.000Z'
               }
             }
+          }),
+          '{"type":"notification","method":"turn/completed","params":{"threadId":"thread-current","turn":{"id":"turn-current-1","status":"completed"}}}'
+        ].join('\n'),
+        stderr: ''
+      };
+    });
+
+    const proof = await runProviderLinearWorker(
+      {
+        CODEX_ORCHESTRATOR_MANIFEST_PATH: manifestPath,
+        CODEX_ORCHESTRATOR_ROOT: tempRoot ?? undefined,
+        CODEX_ORCHESTRATOR_RUN_ID: 'run-child',
+        CODEX_ORCHESTRATOR_PROVIDER_WORKER_MAX_TURNS: '1',
+        CODEX_HOME: codexHome
+      },
+      {
+        readTrackedIssue: createReadTrackedIssueMock()
+          .mockResolvedValueOnce(createTrackedIssue())
+          .mockResolvedValueOnce(createTrackedIssue({ state: 'Done', state_type: 'completed' })),
+        resolveRuntimeContext: vi.fn(async () => createAppServerRuntimeContext()),
+        execRunner: vi.fn(),
+        appServerTurnRunner,
+        now: vi
+          .fn()
+          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
+          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+      }
+    );
+
+    expect(proof.goal_evidence).toMatchObject({
+      capture_mode: 'thread_mismatch',
+      thread_id: 'thread-current',
+      objective: null,
+      status: null,
+      reason: 'goal_thread_missing:thread-current',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('fails closed when cleared goal evidence omits thread identity', async () => {
+    const { manifestPath } = await createManifestRoot();
+    const codexHome = await writeCodexConfigContent('[features]\ngoals = true\n');
+    const appServerTurnRunner = vi.fn(async (request) => {
+      await appendStaySerialParallelizationDecisionAuditForRequest(request);
+      return {
+        exitCode: 0,
+        stdout: [
+          '{"type":"thread.started","thread_id":"thread-current"}',
+          '{"type":"turn_context","payload":{"turn_id":"turn-current-1"}}',
+          JSON.stringify({
+            timestamp: '2026-03-21T09:00:00.250Z',
+            type: 'notification',
+            method: 'thread/goal/cleared',
+            params: {}
           }),
           '{"type":"notification","method":"turn/completed","params":{"threadId":"thread-current","turn":{"id":"turn-current-1","status":"completed"}}}'
         ].join('\n'),

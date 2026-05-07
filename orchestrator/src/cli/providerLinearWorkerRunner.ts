@@ -666,6 +666,7 @@ export interface ProviderLinearWorkerJsonlParseResult {
   resolvedModelProvenance: ProviderLinearWorkerResolvedModelProvenance | null;
   failureDiagnosis: ProviderLinearWorkerFailureDiagnosis | null;
   goalEvidence?: ProviderLinearGoalEvidence | null;
+  goalToolCallNames?: Record<string, string>;
 }
 
 interface ProviderWorkerAgentMessageDeltaHydrationSeed {
@@ -3992,6 +3993,12 @@ function initializeProviderLinearWorkerJsonlInternalState(
     enumerable: goalEvidence !== null,
     configurable: true
   });
+  Object.defineProperty(state, 'goalToolCallNames', {
+    value: {},
+    writable: true,
+    enumerable: false,
+    configurable: true
+  });
   Object.defineProperty(state, 'finalMessageSource', {
     value: finalMessageSource,
     writable: true,
@@ -4282,6 +4289,7 @@ function resetProviderLinearWorkerTurnScopedTelemetry(
   state.resolvedModelProvenance = null;
   state.failureDiagnosis = null;
   state.goalEvidence = preservedGoalEvidence;
+  state.goalToolCallNames = {};
 }
 
 function shouldPreserveProviderLinearGoalEvidenceAcrossTurnReset(
@@ -4622,10 +4630,219 @@ function extractProviderWorkerActivityTurnId(parsed: Record<string, unknown>): s
   );
 }
 
+function normalizeProviderWorkerGoalToolName(value: unknown): string | null {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return null;
+  }
+  const leafName = normalized.split('.').pop()?.trim() ?? '';
+  return leafName === 'get_goal' || leafName === 'create_goal' || leafName === 'update_goal'
+    ? leafName
+    : null;
+}
+
+function readProviderWorkerResponseItemPayload(input: Record<string, unknown>): Record<string, unknown> | null {
+  return isRecord(input.payload)
+    ? input.payload
+    : isRecord(input.item)
+      ? input.item
+      : isRecord(input.response_item)
+        ? input.response_item
+        : null;
+}
+
+function readProviderWorkerResponseItemCallId(input: Record<string, unknown>): string | null {
+  const payload = readProviderWorkerResponseItemPayload(input);
+  return (
+    normalizeOptionalString(input.call_id) ??
+    normalizeOptionalString(payload?.call_id) ??
+    normalizeOptionalString(payload?.callId)
+  );
+}
+
+function readProviderWorkerResponseItemGoalToolName(
+  input: Record<string, unknown>
+): string | null {
+  const payload = readProviderWorkerResponseItemPayload(input);
+  const nestedFunction = isRecord(payload?.function) ? payload.function : null;
+  return (
+    normalizeProviderWorkerGoalToolName(input.name) ??
+    normalizeProviderWorkerGoalToolName(input.tool_name) ??
+    normalizeProviderWorkerGoalToolName(input.toolName) ??
+    normalizeProviderWorkerGoalToolName(payload?.name) ??
+    normalizeProviderWorkerGoalToolName(payload?.tool_name) ??
+    normalizeProviderWorkerGoalToolName(payload?.toolName) ??
+    normalizeProviderWorkerGoalToolName(nestedFunction?.name)
+  );
+}
+
+function readProviderWorkerGoalToolOutputValue(input: Record<string, unknown>): unknown {
+  const payload = readProviderWorkerResponseItemPayload(input);
+  const outputCandidates = [
+    input.output,
+    input.result,
+    input.content,
+    payload?.output,
+    payload?.result,
+    payload?.content
+  ];
+  for (const candidate of outputCandidates) {
+    if (candidate !== undefined) {
+      return candidate;
+    }
+  }
+  return undefined;
+}
+
+function parseProviderWorkerGoalToolOutputValue(value: unknown): unknown {
+  if (isRecord(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+      return null;
+    }
+    try {
+      return JSON.parse(trimmed) as unknown;
+    } catch {
+      return null;
+    }
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (isRecord(item)) {
+        const parsed =
+          parseProviderWorkerGoalToolOutputValue(item.text) ??
+          parseProviderWorkerGoalToolOutputValue(item.output_text) ??
+          parseProviderWorkerGoalToolOutputValue(item.output) ??
+          item;
+        if (parsed !== null) {
+          return parsed;
+        }
+      } else {
+        const parsed = parseProviderWorkerGoalToolOutputValue(item);
+        if (parsed !== null) {
+          return parsed;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function isProviderWorkerGoalSnapshotRecord(value: Record<string, unknown>): boolean {
+  return [
+    'threadId',
+    'thread_id',
+    'objective',
+    'status',
+    'tokenBudget',
+    'token_budget',
+    'tokensUsed',
+    'tokens_used',
+    'timeUsedSeconds',
+    'time_used_seconds',
+    'elapsedSeconds',
+    'elapsed_seconds',
+    'createdAt',
+    'created_at',
+    'updatedAt',
+    'updated_at'
+  ].some((key) => value[key] !== undefined);
+}
+
+function selectProviderWorkerGoalToolSnapshotRecord(value: unknown): Record<string, unknown> | null {
+  const parsed = parseProviderWorkerGoalToolOutputValue(value);
+  if (!isRecord(parsed)) {
+    return null;
+  }
+  if (isRecord(parsed.goal)) {
+    return parsed.goal;
+  }
+  if (isRecord(parsed.threadGoal)) {
+    return parsed.threadGoal;
+  }
+  if (isRecord(parsed.thread_goal)) {
+    return parsed.thread_goal;
+  }
+  return isProviderWorkerGoalSnapshotRecord(parsed) ? parsed : null;
+}
+
+function extractProviderWorkerGoalToolEvidence(
+  parsed: Record<string, unknown>,
+  state: ProviderLinearWorkerJsonlParseResult
+): ProviderLinearGoalEvidence | null {
+  const callId = readProviderWorkerResponseItemCallId(parsed);
+  const directToolName = readProviderWorkerResponseItemGoalToolName(parsed);
+  if (directToolName && callId) {
+    state.goalToolCallNames ??= {};
+    state.goalToolCallNames[callId] = directToolName;
+  }
+  const payload = readProviderWorkerResponseItemPayload(parsed);
+  const payloadType = normalizeOptionalString(payload?.type);
+  const outputValue = readProviderWorkerGoalToolOutputValue(parsed);
+  if (outputValue === undefined) {
+    return null;
+  }
+  const toolName =
+    directToolName ?? (callId ? normalizeProviderWorkerGoalToolName(state.goalToolCallNames?.[callId]) : null);
+  if (!toolName || (payloadType && payloadType !== 'function_call_output' && payloadType !== 'tool_result')) {
+    return null;
+  }
+  const capturedAt = extractProviderWorkerEventTimestamp(parsed);
+  const turnId = extractProviderWorkerActivityTurnId(parsed) ?? state.turnId;
+  const goal = selectProviderWorkerGoalToolSnapshotRecord(outputValue);
+  if (!goal) {
+    return buildProviderLinearGoalEvidence({
+      featureAvailable: true,
+      featureEnabled: null,
+      captureMode: 'unavailable',
+      captureTimestamp: capturedAt,
+      threadId: state.threadId,
+      turnId,
+      objective: null,
+      status: null,
+      tokenBudget: null,
+      tokensUsed: null,
+      elapsedSeconds: null,
+      createdAt: null,
+      updatedAt: null,
+      reason: `${toolName}_goal_payload_missing`
+    });
+  }
+  const createdAt = normalizeProviderLinearGoalTimestamp(goal.createdAt ?? goal.created_at);
+  const updatedAt = normalizeProviderLinearGoalTimestamp(goal.updatedAt ?? goal.updated_at);
+  return buildProviderLinearGoalEvidence({
+    featureAvailable: true,
+    featureEnabled: null,
+    captureMode: 'captured',
+    captureTimestamp: capturedAt,
+    threadId:
+      normalizeOptionalString(goal.threadId) ??
+      normalizeOptionalString(goal.thread_id),
+    turnId,
+    objective: normalizeOptionalString(goal.objective),
+    status: normalizeOptionalString(goal.status),
+    tokenBudget: normalizeNonNegativeInteger(goal.tokenBudget ?? goal.token_budget),
+    tokensUsed: normalizeNonNegativeInteger(goal.tokensUsed ?? goal.tokens_used),
+    elapsedSeconds: normalizeNonNegativeNumber(
+      goal.timeUsedSeconds ?? goal.time_used_seconds ?? goal.elapsedSeconds ?? goal.elapsed_seconds
+    ),
+    createdAt,
+    updatedAt,
+    reason: null
+  });
+}
+
 function extractProviderWorkerGoalEvidence(
   parsed: Record<string, unknown>,
   state: ProviderLinearWorkerJsonlParseResult
 ): ProviderLinearGoalEvidence | null {
+  const goalToolEvidence = extractProviderWorkerGoalToolEvidence(parsed, state);
+  if (goalToolEvidence) {
+    return goalToolEvidence;
+  }
   const method = readProviderWorkerMethod(parsed)?.toLowerCase();
   if (method !== 'thread/goal/updated' && method !== 'thread/goal/cleared') {
     return null;
@@ -4924,7 +5141,7 @@ function normalizeProviderLinearGoalEvidenceForProof(input: {
   if (goalThreadId && proofThreadId && goalThreadId !== proofThreadId) {
     captureMode = 'thread_mismatch';
     reason = `goal_thread_mismatch:${goalThreadId}->${proofThreadId}`;
-  } else if (!goalThreadId && proofThreadId && captureMode === 'captured') {
+  } else if (!goalThreadId && proofThreadId && (captureMode === 'captured' || captureMode === 'cleared')) {
     captureMode = 'thread_mismatch';
     reason = `goal_thread_missing:${proofThreadId}`;
   } else if ((captureMode === 'captured' || captureMode === 'cleared') && freshnessTimestamp === null) {
