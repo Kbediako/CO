@@ -486,6 +486,8 @@ export async function runCommandStage(
       }
       manifest.provider_linear_worker_tokens =
         buildProviderLinearWorkerManifestTokenUsage(providerLinearWorkerProof?.tokens) ?? null;
+      manifest.goal_evidence =
+        buildProviderLinearWorkerManifestGoalEvidence(providerLinearWorkerProof?.goal_evidence) ?? null;
       if (result.status === 'succeeded' && providerLinearWorkerProofRecord === null) {
         providerLinearWorkerFailureReason = 'provider_linear_worker_proof_missing_or_unreadable';
         effectiveSummary = buildProviderLinearWorkerTerminalSummary({
@@ -1137,6 +1139,24 @@ function buildProviderLinearWorkerManifestTokenUsage(
     usage.reasoning_output_tokens = reasoningOutputTokens;
   }
   return usage;
+}
+
+function buildProviderLinearWorkerManifestGoalEvidence(
+  goalEvidence: ProviderLinearWorkerProof['goal_evidence'] | null | undefined
+): NonNullable<CliManifest['goal_evidence']> | null {
+  if (!goalEvidence || typeof goalEvidence !== 'object') {
+    return null;
+  }
+  const notAuthorizedFor = Array.isArray(goalEvidence.not_authorized_for)
+    ? goalEvidence.not_authorized_for.filter((item): item is string => typeof item === 'string' && item.length > 0)
+    : [];
+  if (notAuthorizedFor.length === 0) {
+    return null;
+  }
+  return {
+    ...goalEvidence,
+    not_authorized_for: notAuthorizedFor as [string, ...string[]]
+  };
 }
 
 function normalizeManifestTokenCount(value: unknown): number | null {

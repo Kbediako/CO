@@ -101,6 +101,48 @@
       }
     },
     {
+      "id": "20260507-linear-779bc931-f6b4-4a1c-b16f-145d500aca73",
+      "title": "CO-492 advisory persisted goal evidence capture",
+      "relates_to": "tasks/tasks-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-07",
+      "status": "in_progress",
+      "evidence": [
+        "docs/PRD-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "docs/TECH_SPEC-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "docs/ACTION_PLAN-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "tasks/specs/linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "tasks/tasks-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        ".agent/task/linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-779bc931-f6b4-4a1c-b16f-145d500aca73-docs-packet/cli/2026-05-06T23-13-09-726Z-85d46883/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet",
+          "date": "2026-05-07",
+          "status": "produced",
+          "manifest": ".runs/linear-779bc931-f6b4-4a1c-b16f-145d500aca73-docs-packet/cli/2026-05-06T23-13-09-726Z-85d46883/manifest.json",
+          "source_anchor": "ctx:sha256:aeaf7bb89eb5a370f39d4f1098e89c80b5da6a6a29b77b1972ececf1cdb811f6#chunk:c000001",
+          "source_payload_status": "prompt_path_not_present_in_child_checkout",
+          "summary": "Created the CO-492 docs-first packet and registry mirrors only. The packet preserves persisted /goal, goals feature, app-server APIs, model tools, provider-worker run evidence, manifest goal_evidence, workpad summary, advisory_only, and Linear remains source of truth. It explicitly rejects goal state as authority for Linear transitions, PR attachment, review handoff, ready-review success, merge closeout, hook recovery success, long-poll terminal status, hook/resume control integration, or TUI automation. Parent owns implementation, tests, Linear state, workpad, PR lifecycle, validation, and patch import."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "task": "tasks/tasks-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "agent_task": ".agent/task/linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "prd": "docs/PRD-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "docs": "docs/TECH_SPEC-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "action_plan": "docs/ACTION_PLAN-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md"
+      }
+    },
+    {
       "id": "20260506-linear-93f80950-06e5-41f2-9186-f4877e69f563",
       "title": "CO-471 build:all strict test typecheck debt",
       "relates_to": "tasks/tasks-linear-93f80950-06e5-41f2-9186-f4877e69f563.md",

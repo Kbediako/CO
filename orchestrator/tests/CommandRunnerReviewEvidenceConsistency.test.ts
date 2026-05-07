@@ -1408,6 +1408,65 @@ describe('runCommandStage review evidence consistency', () => {
     expect(errorPayload.details?.command_exit_code).toBe(0);
   });
 
+  it('copies provider-worker advisory goal evidence from proof into the final manifest persist', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive',
+        goal_evidence: {
+          source: 'codex-goals',
+          feature_available: true,
+          feature_enabled: true,
+          capture_mode: 'captured',
+          capture_timestamp: '2026-03-21T09:00:00.250Z',
+          thread_id: 'thread-goal',
+          turn_id: 'turn-goal-1',
+          objective: 'capture advisory goal evidence',
+          status: 'active',
+          token_budget: 5000,
+          tokens_used: 321,
+          elapsed_seconds: 66,
+          created_at: '2026-03-21T08:59:00.000Z',
+          updated_at: '2026-03-21T09:00:00.000Z',
+          authority: 'advisory_only',
+          linear_authority_preserved: true,
+          not_authorized_for: ['linear_transition', 'review_handoff', 'merge_closeout'],
+          reason: null
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage({
+      id: 'provider-linear-worker',
+      title: 'Run provider linear worker',
+      command: 'node providerLinearWorkerRunner.js',
+      summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    });
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+    const persisted = JSON.parse(await readFile(paths.manifestPath, 'utf8')) as {
+      goal_evidence?: Record<string, unknown> | null;
+    };
+
+    expect(result.exitCode).toBe(0);
+    expect(manifest.goal_evidence).toMatchObject({
+      capture_mode: 'captured',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+    expect(persisted.goal_evidence).toMatchObject({
+      capture_mode: 'captured',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+    expect(persisted.goal_evidence?.not_authorized_for).toEqual([
+      'linear_transition',
+      'review_handoff',
+      'merge_closeout'
+    ]);
+  });
+
   it('appends current archived issue mutation suppressions to the provider-worker summary', async () => {
     mockState.runImpl = async (input) => {
       const attemptStartedAt = new Date().toISOString();
