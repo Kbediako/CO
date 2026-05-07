@@ -20,6 +20,7 @@ import {
   defaultAppServerTurnRunner,
   loadProviderLinearWorkerContext,
   mergeProviderWorkerResolvedModelProvenance,
+  normalizeProviderLinearGoalEvidenceForProof,
   parseProviderLinearWorkerJsonl,
   PROVIDER_LINEAR_RESIDENT_SESSION_SEED_ENV,
   ProviderLinearTrackedIssueReadError,
@@ -2274,6 +2275,107 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       elapsed_seconds: 55,
       created_at: '2026-03-21T08:59:00.000Z',
       updated_at: '2026-03-21T09:00:01.000Z',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('keeps the newest advisory goal evidence when older session-log records replay later', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-goal-replay"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-goal-replay-1"}}',
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:02.000Z',
+          type: 'notification',
+          method: 'thread/goal/updated',
+          params: {
+            threadId: 'thread-goal-replay',
+            goal: {
+              threadId: 'thread-goal-replay',
+              objective: 'newer advisory goal evidence',
+              status: 'active',
+              updatedAt: '2026-03-21T09:00:02.000Z'
+            }
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:01.000Z',
+          type: 'notification',
+          method: 'thread/goal/updated',
+          params: {
+            threadId: 'thread-goal-replay',
+            goal: {
+              threadId: 'thread-goal-replay',
+              objective: 'older replayed advisory goal evidence',
+              status: 'active',
+              updatedAt: '2026-03-21T09:00:01.000Z'
+            }
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:02.000Z',
+      objective: 'newer advisory goal evidence',
+      updated_at: '2026-03-21T09:00:02.000Z'
+    });
+  });
+
+  it('replaces captured goal evidence with later timestampless cleared evidence', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-goal-clear"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-goal-clear-1"}}',
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:02.000Z',
+          type: 'notification',
+          method: 'thread/goal/updated',
+          params: {
+            threadId: 'thread-goal-clear',
+            goal: {
+              threadId: 'thread-goal-clear',
+              objective: 'goal before clear',
+              status: 'active',
+              updatedAt: '2026-03-21T09:00:02.000Z'
+            }
+          }
+        }),
+        JSON.stringify({
+          type: 'notification',
+          method: 'thread/goal/cleared',
+          params: {
+            threadId: 'thread-goal-clear'
+          }
+        })
+      ].join('\n')
+    );
+    const proofGoalEvidence = normalizeProviderLinearGoalEvidenceForProof({
+      candidate: parsed.goalEvidence,
+      previous: null,
+      proofThreadId: 'thread-goal-clear',
+      proofTurnId: 'turn-goal-clear-1',
+      observedAt: '2026-03-21T09:00:03.000Z',
+      currentTurnStartedAt: '2026-03-21T09:00:00.000Z',
+      featureEnabled: true,
+      runtimeMode: 'appserver'
+    });
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'cleared',
+      capture_timestamp: null,
+      thread_id: 'thread-goal-clear',
+      status: 'cleared'
+    });
+    expect(proofGoalEvidence).toMatchObject({
+      capture_mode: 'unavailable',
+      capture_timestamp: '2026-03-21T09:00:03.000Z',
+      thread_id: 'thread-goal-clear',
+      objective: null,
+      status: null,
+      reason: 'goal_timestamp_unavailable',
       authority: 'advisory_only',
       linear_authority_preserved: true
     });
@@ -13304,6 +13406,59 @@ for await (const line of rl) {
     });
   });
 
+  it('fails closed when no thread identity can be proven for model-tool goal snapshots', async () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.900Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call',
+            name: 'get_goal',
+            call_id: 'call-tool-goal-no-thread'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:01.250Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call_output',
+            call_id: 'call-tool-goal-no-thread',
+            output: JSON.stringify({
+              goal: {
+                objective: 'threadless model-tool goal evidence',
+                status: 'active',
+                updatedAt: 1774083601
+              }
+            })
+          }
+        })
+      ].join('\n')
+    );
+    const proofGoalEvidence = normalizeProviderLinearGoalEvidenceForProof(
+      {
+        candidate: parsed.goalEvidence,
+        previous: null,
+        proofThreadId: null,
+        proofTurnId: null,
+        observedAt: '2026-03-21T09:00:02.000Z',
+        currentTurnStartedAt: '2026-03-21T09:00:00.000Z',
+        featureEnabled: true,
+        runtimeMode: 'appserver'
+      }
+    );
+
+    expect(proofGoalEvidence).toMatchObject({
+      capture_mode: 'thread_mismatch',
+      thread_id: null,
+      objective: null,
+      status: null,
+      reason: 'goal_thread_missing',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
   it('marks unavailable goal evidence as disabled when the goals feature is off', async () => {
     const { manifestPath } = await createManifestRoot();
     const codexHome = await writeCodexConfigContent('[features]\ngoals = false\n');
@@ -14020,7 +14175,7 @@ for await (const line of rl) {
     });
   });
 
-  it('marks live goal candidates stale when their goal timestamp predates the current provider turn', async () => {
+  it('keeps live goal candidates captured when their current capture timestamp is in the provider turn', async () => {
     const { manifestPath } = await createManifestRoot();
     const codexHome = await writeCodexConfigContent('[features]\ngoals = true\n');
     const appServerTurnRunner = vi.fn(async (request) => {
@@ -14065,22 +14220,19 @@ for await (const line of rl) {
         resolveRuntimeContext: vi.fn(async () => createAppServerRuntimeContext()),
         execRunner: vi.fn(),
         appServerTurnRunner,
-        now: vi
-          .fn()
-          .mockReturnValueOnce('2026-03-21T09:00:00.000Z')
-          .mockReturnValue('2026-03-21T09:00:01.000Z'),
+        now: vi.fn().mockReturnValue('2026-03-21T09:00:00.000Z'),
         log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
       }
     );
 
     expect(proof.goal_evidence).toMatchObject({
-      capture_mode: 'stale',
+      capture_mode: 'captured',
       capture_timestamp: '2026-03-21T09:00:00.750Z',
       thread_id: 'thread-stale-candidate',
-      objective: null,
-      status: null,
-      updated_at: null,
-      reason: 'goal_evidence_predates_current_turn',
+      objective: 'old persisted objective',
+      status: 'active',
+      updated_at: '2026-03-21T08:59:59.000Z',
+      reason: null,
       authority: 'advisory_only',
       linear_authority_preserved: true
     });

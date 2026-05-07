@@ -4216,12 +4216,15 @@ function applyProviderLinearWorkerJsonlRecord(
     changed = true;
   }
   const observedGoalEvidence = extractProviderWorkerGoalEvidence(parsed, state);
-  if (
-    observedGoalEvidence &&
-    JSON.stringify(observedGoalEvidence) !== JSON.stringify(state.goalEvidence ?? null)
-  ) {
-    state.goalEvidence = observedGoalEvidence;
-    changed = true;
+  if (observedGoalEvidence) {
+    const nextGoalEvidence = selectPreferredProviderLinearGoalEvidence(
+      state.goalEvidence ?? null,
+      observedGoalEvidence
+    );
+    if (JSON.stringify(nextGoalEvidence) !== JSON.stringify(state.goalEvidence ?? null)) {
+      state.goalEvidence = nextGoalEvidence;
+      changed = true;
+    }
   }
   const observedRateLimits = extractProviderWorkerRateLimits(parsed);
   if (observedRateLimits) {
@@ -4923,6 +4926,34 @@ function extractProviderWorkerGoalEvidence(
   });
 }
 
+function selectProviderLinearGoalEvidenceFreshnessTimestamp(
+  evidence: ProviderLinearGoalEvidence | null | undefined
+): string | null {
+  if (!evidence) {
+    return null;
+  }
+  return (
+    normalizeOptionalString(evidence.capture_timestamp) ??
+    normalizeOptionalString(evidence.updated_at) ??
+    normalizeOptionalString(evidence.created_at)
+  );
+}
+
+function selectPreferredProviderLinearGoalEvidence(
+  current: ProviderLinearGoalEvidence | null,
+  observed: ProviderLinearGoalEvidence
+): ProviderLinearGoalEvidence {
+  if (!current) {
+    return observed;
+  }
+  const currentTimestamp = selectProviderLinearGoalEvidenceFreshnessTimestamp(current);
+  const observedTimestamp = selectProviderLinearGoalEvidenceFreshnessTimestamp(observed);
+  if (currentTimestamp && observedTimestamp && compareIsoTimestamp(observedTimestamp, currentTimestamp) < 0) {
+    return current;
+  }
+  return observed;
+}
+
 function normalizeProviderLinearGoalTimestamp(value: unknown): string | null {
   const normalized = normalizeOptionalString(value);
   if (normalized) {
@@ -5074,7 +5105,7 @@ export function normalizeProviderLinearGoalEvidenceValue(value: unknown): Provid
   });
 }
 
-function normalizeProviderLinearGoalEvidenceForProof(input: {
+export function normalizeProviderLinearGoalEvidenceForProof(input: {
   candidate?: ProviderLinearGoalEvidence | null;
   previous?: ProviderLinearGoalEvidence | null;
   proofThreadId?: string | null;
@@ -5134,16 +5165,14 @@ function normalizeProviderLinearGoalEvidenceForProof(input: {
   const proofThreadId = normalizeOptionalString(input.proofThreadId);
   const freshnessTimestamp =
     captureMode === 'captured' || captureMode === 'cleared'
-      ? normalizeOptionalString(base.updated_at) ??
-        normalizeOptionalString(base.created_at) ??
-        normalizeOptionalString(base.capture_timestamp)
+      ? selectProviderLinearGoalEvidenceFreshnessTimestamp(base)
       : null;
   if (goalThreadId && proofThreadId && goalThreadId !== proofThreadId) {
     captureMode = 'thread_mismatch';
     reason = `goal_thread_mismatch:${goalThreadId}->${proofThreadId}`;
-  } else if (!goalThreadId && proofThreadId && (captureMode === 'captured' || captureMode === 'cleared')) {
+  } else if (!goalThreadId && (captureMode === 'captured' || captureMode === 'cleared')) {
     captureMode = 'thread_mismatch';
-    reason = `goal_thread_missing:${proofThreadId}`;
+    reason = proofThreadId ? `goal_thread_missing:${proofThreadId}` : 'goal_thread_missing';
   } else if ((captureMode === 'captured' || captureMode === 'cleared') && freshnessTimestamp === null) {
     captureMode = 'unavailable';
     reason = 'goal_timestamp_unavailable';

@@ -19,6 +19,7 @@ import {
 } from '../run/manifest.js';
 import { persistManifest, type ManifestPersister } from '../run/manifestPersister.js';
 import {
+  normalizeProviderLinearGoalEvidenceForProof,
   normalizeProviderLinearGoalEvidenceValue,
   PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
@@ -489,7 +490,7 @@ export async function runCommandStage(
       manifest.provider_linear_worker_tokens =
         buildProviderLinearWorkerManifestTokenUsage(providerLinearWorkerProof?.tokens) ?? null;
       manifest.goal_evidence =
-        buildProviderLinearWorkerManifestGoalEvidence(providerLinearWorkerProof?.goal_evidence) ?? null;
+        buildProviderLinearWorkerManifestGoalEvidence(providerLinearWorkerProof) ?? null;
       if (result.status === 'succeeded' && providerLinearWorkerProofRecord === null) {
         providerLinearWorkerFailureReason = 'provider_linear_worker_proof_missing_or_unreadable';
         effectiveSummary = buildProviderLinearWorkerTerminalSummary({
@@ -1144,8 +1145,9 @@ function buildProviderLinearWorkerManifestTokenUsage(
 }
 
 function buildProviderLinearWorkerManifestGoalEvidence(
-  goalEvidence: ProviderLinearWorkerProof['goal_evidence'] | null | undefined
+  proof: ProviderLinearWorkerProof | null | undefined
 ): NonNullable<CliManifest['goal_evidence']> | null {
+  const goalEvidence = proof?.goal_evidence;
   if (!goalEvidence || typeof goalEvidence !== 'object') {
     return null;
   }
@@ -1168,7 +1170,20 @@ function buildProviderLinearWorkerManifestGoalEvidence(
   ) {
     return null;
   }
-  const normalizedGoalEvidence = normalizeProviderLinearGoalEvidenceValue(goalEvidence);
+  const goalEvidenceValue = normalizeProviderLinearGoalEvidenceValue(goalEvidence);
+  if (goalEvidenceValue === null) {
+    return null;
+  }
+  const normalizedGoalEvidence = normalizeProviderLinearGoalEvidenceForProof({
+    candidate: goalEvidenceValue,
+    previous: null,
+    proofThreadId: proof?.thread_id ?? null,
+    proofTurnId: proof?.latest_turn_id ?? null,
+    observedAt: isoTimestamp(),
+    currentTurnStartedAt: proof?.current_turn_started_at ?? proof?.attempt_started_at ?? null,
+    featureEnabled: null,
+    runtimeMode: proof?.runtime?.selected_mode ?? null
+  });
   if (normalizedGoalEvidence === null) {
     return null;
   }
