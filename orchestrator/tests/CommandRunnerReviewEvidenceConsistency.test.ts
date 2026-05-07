@@ -1580,6 +1580,119 @@ describe('runCommandStage review evidence consistency', () => {
     });
   });
 
+  it('fails closed before manifest persist when proof goal evidence lacks freshness timestamps', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive',
+        thread_id: 'thread-goal',
+        latest_turn_id: 'turn-goal-1',
+        current_turn_started_at: '2026-03-21T08:58:00.000Z',
+        goal_evidence: {
+          source: 'codex-goals',
+          feature_available: true,
+          feature_enabled: true,
+          capture_mode: 'captured',
+          capture_timestamp: null,
+          thread_id: 'thread-goal',
+          turn_id: 'turn-goal-1',
+          objective: 'must not be restamped as fresh',
+          status: 'active',
+          token_budget: 5000,
+          tokens_used: 321,
+          elapsed_seconds: 66.5,
+          created_at: null,
+          updated_at: null,
+          authority: 'advisory_only',
+          linear_authority_preserved: true,
+          not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+          reason: null
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage({
+      id: 'provider-linear-worker',
+      title: 'Run provider linear worker',
+      command: 'node providerLinearWorkerRunner.js',
+      summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    });
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+    const persisted = JSON.parse(await readFile(paths.manifestPath, 'utf8')) as {
+      goal_evidence?: Record<string, unknown> | null;
+    };
+
+    expect(result.exitCode).toBe(0);
+    expect(persisted.goal_evidence).toMatchObject({
+      capture_mode: 'unavailable',
+      thread_id: 'thread-goal',
+      objective: null,
+      status: null,
+      reason: 'goal_timestamp_unavailable',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('fails closed before manifest persist when proof goal evidence lacks a turn freshness floor', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive',
+        attempt_started_at: null,
+        current_turn_started_at: null,
+        thread_id: 'thread-goal',
+        latest_turn_id: 'turn-goal-1',
+        goal_evidence: {
+          source: 'codex-goals',
+          feature_available: true,
+          feature_enabled: true,
+          capture_mode: 'captured',
+          capture_timestamp: '2026-03-21T09:00:00.250Z',
+          thread_id: 'thread-goal',
+          turn_id: 'turn-goal-1',
+          objective: 'must not leak without a turn floor',
+          status: 'active',
+          token_budget: 5000,
+          tokens_used: 321,
+          elapsed_seconds: 66.5,
+          created_at: '2026-03-21T08:59:00.000Z',
+          updated_at: '2026-03-21T09:00:00.000Z',
+          authority: 'advisory_only',
+          linear_authority_preserved: true,
+          not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+          reason: null
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage({
+      id: 'provider-linear-worker',
+      title: 'Run provider linear worker',
+      command: 'node providerLinearWorkerRunner.js',
+      summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    });
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+    const persisted = JSON.parse(await readFile(paths.manifestPath, 'utf8')) as {
+      goal_evidence?: Record<string, unknown> | null;
+    };
+
+    expect(result.exitCode).toBe(0);
+    expect(persisted.goal_evidence).toMatchObject({
+      capture_mode: 'unavailable',
+      thread_id: 'thread-goal',
+      objective: null,
+      status: null,
+      reason: 'goal_current_turn_started_at_unavailable',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
   it('rejects provider-worker goal evidence with incomplete lifecycle denial markers', async () => {
     mockState.runImpl = async (input) => {
       await writeProviderLinearWorkerProofArtifacts(input, {

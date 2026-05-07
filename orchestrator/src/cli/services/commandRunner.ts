@@ -1175,8 +1175,8 @@ function buildProviderLinearWorkerManifestGoalEvidence(
     return null;
   }
   const normalizedGoalEvidence = normalizeProviderLinearGoalEvidenceForProof({
-    candidate: goalEvidenceValue,
-    previous: null,
+    candidate: null,
+    previous: goalEvidenceValue,
     proofThreadId: proof?.thread_id ?? null,
     proofTurnId: proof?.latest_turn_id ?? null,
     observedAt: isoTimestamp(),

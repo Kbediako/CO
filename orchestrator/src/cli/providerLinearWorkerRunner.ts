@@ -4683,6 +4683,7 @@ function readProviderWorkerResponseItemCallId(input: Record<string, unknown>): s
   const payload = readProviderWorkerResponseItemPayload(input);
   return (
     normalizeOptionalString(input.call_id) ??
+    normalizeOptionalString(input.callId) ??
     normalizeOptionalString(payload?.call_id) ??
     normalizeOptionalString(payload?.callId)
   );
@@ -4714,12 +4715,18 @@ function readProviderWorkerGoalToolOutputValue(input: Record<string, unknown>): 
     payload?.result,
     payload?.content
   ];
+  let firstDefined: unknown = undefined;
   for (const candidate of outputCandidates) {
-    if (candidate !== undefined) {
-      return candidate;
+    if (candidate === undefined) {
+      continue;
+    }
+    firstDefined ??= candidate;
+    const parsed = parseProviderWorkerGoalToolOutputValue(candidate);
+    if (isRecord(parsed) && isProviderWorkerGoalToolPayloadRecord(parsed)) {
+      return parsed;
     }
   }
-  return undefined;
+  return firstDefined;
 }
 
 function parseProviderWorkerGoalToolOutputValue(value: unknown): unknown {
@@ -4800,10 +4807,38 @@ function selectProviderWorkerGoalToolSnapshotRecord(value: unknown): Record<stri
   return isProviderWorkerGoalSnapshotRecord(parsed) ? parsed : null;
 }
 
+function isProviderWorkerGoalToolResponseItemSource(input: Record<string, unknown>): boolean {
+  const payload = isRecord(input.payload) ? input.payload : null;
+  const params = isRecord(input.params) ? input.params : null;
+  const payloadParams = isRecord(payload?.params) ? payload.params : null;
+  const inputType = normalizeOptionalString(input.type)?.toLowerCase();
+  const payloadType = normalizeOptionalString(payload?.type)?.toLowerCase();
+  if (inputType === 'response_item' || payloadType === 'response_item') {
+    return true;
+  }
+  if (
+    isRecord(input.response_item) ||
+    isRecord(params?.response_item) ||
+    isRecord(payloadParams?.response_item)
+  ) {
+    return true;
+  }
+  const method = readProviderWorkerMethod(input)?.toLowerCase();
+  return (
+    isProviderWorkerGoalNotificationRecord(input) &&
+    (method === 'rawresponseitem/started' ||
+      method === 'rawresponseitem/updated' ||
+      method === 'rawresponseitem/completed')
+  );
+}
+
 function extractProviderWorkerGoalToolEvidence(
   parsed: Record<string, unknown>,
   state: ProviderLinearWorkerJsonlParseResult
 ): ProviderLinearGoalEvidence | null {
+  if (!isProviderWorkerGoalToolResponseItemSource(parsed)) {
+    return null;
+  }
   const callId = readProviderWorkerResponseItemCallId(parsed);
   const directToolName = readProviderWorkerResponseItemGoalToolName(parsed);
   if (directToolName && callId) {
@@ -4979,13 +5014,23 @@ function selectPreferredProviderLinearGoalEvidence(
   }
   const currentTimestamp = selectProviderLinearGoalEvidenceFreshnessTimestamp(current);
   const observedTimestamp = selectProviderLinearGoalEvidenceFreshnessTimestamp(observed);
+  const observedCaptureTimestamp = normalizeOptionalString(observed.capture_timestamp);
   if (
     options.preserveTimestampedCurrentFromTimestamplessObserved === true &&
     currentTimestamp &&
-    !observedTimestamp &&
-    observed.capture_mode !== 'cleared'
+    !observedCaptureTimestamp &&
+    !observedTimestamp
   ) {
     return current;
+  }
+  if (
+    options.preserveTimestampedCurrentFromTimestamplessObserved !== true &&
+    current.capture_mode !== 'captured' &&
+    current.capture_mode !== 'cleared' &&
+    observed.capture_mode === 'captured' &&
+    !observedCaptureTimestamp
+  ) {
+    return observed;
   }
   if (currentTimestamp && observedTimestamp && compareIsoTimestamp(observedTimestamp, currentTimestamp) < 0) {
     return current;
@@ -5202,6 +5247,8 @@ export function normalizeProviderLinearGoalEvidenceForProof(input: {
   let reason = base.reason ?? null;
   const goalThreadId = normalizeOptionalString(base.thread_id);
   const proofThreadId = normalizeOptionalString(input.proofThreadId);
+  const currentTurnStartedAt = normalizeProviderLinearGoalIsoTimestamp(input.currentTurnStartedAt);
+  const featureAvailable = base.feature_available ?? (runtimeMode === 'appserver' ? true : false);
   const captureTimestamp = base.capture_timestamp ?? input.observedAt;
   const freshnessCaptureTimestamp = base.capture_timestamp ?? (candidate ? input.observedAt : null);
   const freshnessTimestamp =
@@ -5216,20 +5263,26 @@ export function normalizeProviderLinearGoalEvidenceForProof(input: {
   } else if (!goalThreadId && (captureMode === 'captured' || captureMode === 'cleared')) {
     captureMode = 'thread_mismatch';
     reason = proofThreadId ? `goal_thread_missing:${proofThreadId}` : 'goal_thread_missing';
+  } else if ((captureMode === 'captured' || captureMode === 'cleared') && featureAvailable === false) {
+    captureMode = 'unavailable';
+    reason = 'goal_surface_unavailable';
   } else if ((captureMode === 'captured' || captureMode === 'cleared') && freshnessTimestamp === null) {
     captureMode = 'unavailable';
     reason = 'goal_timestamp_unavailable';
+  } else if ((captureMode === 'captured' || captureMode === 'cleared') && currentTurnStartedAt === null) {
+    captureMode = 'unavailable';
+    reason = 'goal_current_turn_started_at_unavailable';
   } else if (
     (captureMode === 'captured' || captureMode === 'cleared') &&
     freshnessTimestamp !== null &&
-    compareIsoTimestamp(freshnessTimestamp, input.currentTurnStartedAt) < 0
+    compareIsoTimestamp(freshnessTimestamp, currentTurnStartedAt) < 0
   ) {
     captureMode = 'stale';
     reason = 'goal_evidence_predates_current_turn';
   }
   if (captureMode !== 'captured') {
     return buildProviderLinearGoalEvidence({
-      featureAvailable: base.feature_available ?? (runtimeMode === 'appserver' ? true : false),
+      featureAvailable,
       featureEnabled,
       captureMode,
       captureTimestamp,
@@ -5247,7 +5300,7 @@ export function normalizeProviderLinearGoalEvidenceForProof(input: {
   }
   return {
     ...base,
-    feature_available: base.feature_available ?? (runtimeMode === 'appserver' ? true : false),
+    feature_available: featureAvailable,
     feature_enabled: featureEnabled,
     capture_mode: captureMode,
     capture_timestamp: captureTimestamp,
