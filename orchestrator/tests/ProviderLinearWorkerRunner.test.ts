@@ -30,6 +30,7 @@ import {
   shouldEmitProviderLinearWorkerProgressSignatureTransition,
   transactProviderLinearWorkerChildLanes,
   PROVIDER_LINEAR_CHILD_LANE_DIAGNOSTICS_FILENAME,
+  PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR,
   PROVIDER_LINEAR_WORKER_AUDIT_FILENAME,
   PROVIDER_LINEAR_WORKER_CHILD_LANES_FILENAME,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
@@ -13251,6 +13252,76 @@ for await (const line of rl) {
       capture_mode: 'stale',
       capture_timestamp: '2026-03-21T09:00:00.000Z',
       reason: 'goal_evidence_predates_current_turn'
+    });
+  });
+
+  it('normalizes carried goal evidence before proof refresh re-emits it', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          thread_id: 'thread-1',
+          latest_turn_id: 'turn-2',
+          current_turn_started_at: '2026-03-21T09:10:00.000Z',
+          runtime: {
+            requested_mode: 'appserver',
+            selected_mode: 'appserver',
+            provider: 'AppServerRuntimeProvider',
+            fallback: null
+          },
+          goal_evidence: {
+            source: 'codex-goals',
+            feature_available: 'yes',
+            feature_enabled: true,
+            capture_mode: 'captured',
+            capture_timestamp: 'not-a-date',
+            thread_id: 'thread-1',
+            turn_id: 'turn-raw',
+            objective: ['raw objective'],
+            status: 'active',
+            token_budget: 'many',
+            tokens_used: -1,
+            elapsed_seconds: '1.5',
+            created_at: 'bad-date',
+            updated_at: 'bad-date',
+            authority: 'something-else',
+            linear_authority_preserved: false,
+            not_authorized_for: ['linear_transition'],
+            payload: { unexpected: true },
+            reason: 12
+          } as unknown as ProviderLinearWorkerProof['goal_evidence']
+        })
+      ),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:10:05.000Z'
+    );
+
+    expect(refreshed?.goal_evidence).toEqual({
+      source: 'codex-goals',
+      feature_available: true,
+      feature_enabled: true,
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:10:05.000Z',
+      thread_id: 'thread-1',
+      turn_id: 'turn-raw',
+      objective: null,
+      status: 'active',
+      token_budget: null,
+      tokens_used: null,
+      elapsed_seconds: null,
+      created_at: null,
+      updated_at: null,
+      authority: 'advisory_only',
+      linear_authority_preserved: true,
+      not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+      reason: null
     });
   });
 

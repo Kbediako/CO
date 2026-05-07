@@ -508,6 +508,14 @@ export type ProviderLinearGoalEvidenceCaptureMode =
   | 'unavailable'
   | 'stale'
   | 'thread_mismatch';
+const PROVIDER_LINEAR_GOAL_EVIDENCE_CAPTURE_MODES: readonly ProviderLinearGoalEvidenceCaptureMode[] = [
+  'captured',
+  'cleared',
+  'disabled',
+  'unavailable',
+  'stale',
+  'thread_mismatch'
+];
 
 export interface ProviderLinearGoalEvidence {
   source: 'codex-goals';
@@ -4664,6 +4672,14 @@ function normalizeProviderLinearGoalTimestamp(value: unknown): string | null {
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
 
+function normalizeProviderLinearGoalIsoTimestamp(value: unknown): string | null {
+  const normalized = normalizeProviderLinearGoalTimestamp(value);
+  if (!normalized) {
+    return null;
+  }
+  return Number.isFinite(Date.parse(normalized)) ? normalized : null;
+}
+
 function extractProviderWorkerEventTimestamp(input: Record<string, unknown>): string | null {
   const payload = isRecord(input.payload) ? input.payload : null;
   return (
@@ -4714,6 +4730,45 @@ function buildProviderLinearGoalEvidence(input: {
   };
 }
 
+function normalizeProviderLinearGoalEvidenceCaptureMode(
+  value: unknown
+): ProviderLinearGoalEvidenceCaptureMode | null {
+  return typeof value === 'string' &&
+    PROVIDER_LINEAR_GOAL_EVIDENCE_CAPTURE_MODES.includes(value as ProviderLinearGoalEvidenceCaptureMode)
+    ? (value as ProviderLinearGoalEvidenceCaptureMode)
+    : null;
+}
+
+function normalizeProviderLinearGoalEvidenceBoolean(value: unknown): boolean | null {
+  return typeof value === 'boolean' ? value : null;
+}
+
+function normalizeProviderLinearGoalEvidenceValue(value: unknown): ProviderLinearGoalEvidence | null {
+  if (!isRecord(value) || value.source !== 'codex-goals') {
+    return null;
+  }
+  const captureMode = normalizeProviderLinearGoalEvidenceCaptureMode(value.capture_mode);
+  if (captureMode === null) {
+    return null;
+  }
+  return buildProviderLinearGoalEvidence({
+    featureAvailable: normalizeProviderLinearGoalEvidenceBoolean(value.feature_available),
+    featureEnabled: normalizeProviderLinearGoalEvidenceBoolean(value.feature_enabled),
+    captureMode,
+    captureTimestamp: normalizeProviderLinearGoalIsoTimestamp(value.capture_timestamp),
+    threadId: normalizeOptionalString(value.thread_id),
+    turnId: normalizeOptionalString(value.turn_id),
+    objective: normalizeOptionalString(value.objective),
+    status: normalizeOptionalString(value.status),
+    tokenBudget: normalizeNonNegativeInteger(value.token_budget),
+    tokensUsed: normalizeNonNegativeInteger(value.tokens_used),
+    elapsedSeconds: normalizeNonNegativeNumber(value.elapsed_seconds),
+    createdAt: normalizeProviderLinearGoalIsoTimestamp(value.created_at),
+    updatedAt: normalizeProviderLinearGoalIsoTimestamp(value.updated_at),
+    reason: normalizeOptionalString(value.reason)
+  });
+}
+
 function normalizeProviderLinearGoalEvidenceForProof(input: {
   candidate?: ProviderLinearGoalEvidence | null;
   previous?: ProviderLinearGoalEvidence | null;
@@ -4724,7 +4779,9 @@ function normalizeProviderLinearGoalEvidenceForProof(input: {
   featureEnabled?: boolean | null;
   runtimeMode?: string | null;
 }): ProviderLinearGoalEvidence {
-  const featureEnabled = input.featureEnabled ?? input.candidate?.feature_enabled ?? input.previous?.feature_enabled ?? null;
+  const candidate = normalizeProviderLinearGoalEvidenceValue(input.candidate);
+  const previous = normalizeProviderLinearGoalEvidenceValue(input.previous);
+  const featureEnabled = input.featureEnabled ?? candidate?.feature_enabled ?? previous?.feature_enabled ?? null;
   const runtimeMode = normalizeOptionalString(input.runtimeMode);
   if (featureEnabled === false) {
     return buildProviderLinearGoalEvidence({
@@ -4745,8 +4802,8 @@ function normalizeProviderLinearGoalEvidenceForProof(input: {
     });
   }
   const base =
-    input.candidate ??
-    input.previous ??
+    candidate ??
+    previous ??
     buildProviderLinearGoalEvidence({
       featureAvailable: runtimeMode === 'appserver' ? featureEnabled ?? null : false,
       featureEnabled,
@@ -4820,10 +4877,7 @@ function selectProviderWorkerManifestGoalEvidence(
   manifest: Record<string, unknown> | null | undefined
 ): ProviderLinearGoalEvidence | null {
   const goalEvidence = isRecord(manifest?.goal_evidence) ? manifest.goal_evidence : null;
-  if (!goalEvidence) {
-    return null;
-  }
-  return goalEvidence as unknown as ProviderLinearGoalEvidence;
+  return normalizeProviderLinearGoalEvidenceValue(goalEvidence);
 }
 
 function buildProviderWorkerGoalEvidenceWorkpadGuidance(input: {
@@ -9152,8 +9206,11 @@ async function patchProviderWorkerGoalEvidenceManifestFile(input: {
   let manifest: Record<string, unknown>;
   try {
     manifest = await readProviderWorkerManifestPatchBase(input.manifestPath);
-  } catch {
-    return;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      return;
+    }
+    throw error;
   }
   const changed = applyProviderWorkerGoalEvidenceToManifest({
     manifest,
@@ -9163,8 +9220,11 @@ async function patchProviderWorkerGoalEvidenceManifestFile(input: {
     let latestManifest = manifest;
     try {
       latestManifest = await readProviderWorkerManifestPatchBase(input.manifestPath);
-    } catch {
-      return;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+        return;
+      }
+      throw error;
     }
     const latestChanged = applyProviderWorkerGoalEvidenceToManifest({
       manifest: latestManifest,

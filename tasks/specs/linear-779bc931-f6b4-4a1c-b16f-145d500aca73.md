@@ -99,7 +99,7 @@ task_checklists:
   "source": "codex-goals",
   "feature_available": true,
   "feature_enabled": true,
-  "capture_mode": "captured|cleared|disabled|unavailable|stale|thread_mismatch",
+  "capture_mode": "captured",
   "capture_timestamp": "ISO-8601|null",
   "thread_id": "string|null",
   "turn_id": "string|null",
@@ -127,6 +127,8 @@ task_checklists:
   "reason": "string|null"
 }
 ```
+
+Valid `capture_mode` values are `captured`, `cleared`, `disabled`, `unavailable`, `stale`, and `thread_mismatch`.
 
 ## PR #788 Review Findings Required For Replacement Branch
 - Disabled goals fail closed before candidate reuse.
