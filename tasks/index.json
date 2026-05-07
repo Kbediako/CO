@@ -1,6 +1,49 @@
 {
   "items": [
     {
+      "id": "20260507-linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5",
+      "title": "CO-511 restore docs freshness owner for CO-102 stale packet rows",
+      "relates_to": "tasks/tasks-linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-07",
+      "canonical_owner_key": "docs:freshness:maintain",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "co511-packet-docs child lane",
+          "date": "2026-05-07",
+          "status": "accepted",
+          "manifest": ".runs/linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5-co511-packet-docs/cli/2026-05-07T03-34-10-435Z-a35ba55b/manifest.json",
+          "patch": ".runs/linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5-co511-packet-docs/cli/2026-05-07T03-34-10-435Z-a35ba55b/provider-linear-child-lane.patch",
+          "summary": "Bounded same-issue child lane created the six CO-511 docs-first packet files and parent accepted the patch after git apply --check succeeded."
+        },
+        "owner_rehome_validation": {
+          "reviewer": "CO-511 provider worker",
+          "date": "2026-05-07",
+          "status": "owner_restored",
+          "canonical_owner_key": "docs:freshness:maintain",
+          "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+          "owner_issue": "CO-511",
+          "validation": "npm run docs:freshness:maintain -- --format json",
+          "report": "out/linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5/docs-freshness-maintenance.json",
+          "summary": "Rehomed rolling_freshness_cohorts.owner_issue from terminal CO-444 to live same-project CO-511, archived the April 6 completed-lane packet/spec residue from live Linear terminal evidence, and verified docs:freshness:maintain returned clean with candidate_cohorts=[] and blocking_changed_paths=[].",
+          "manifest": ".runs/linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5/cli/2026-05-07T03-31-08-667Z-8c860a58/manifest.json"
+        }
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5.md",
+        "prd": "docs/PRD-linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5.md",
+        "docs": "docs/TECH_SPEC-linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5.md",
+        "action_plan": "docs/ACTION_PLAN-linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5.md",
+        "spec": "tasks/specs/linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5.md",
+        "task": "tasks/tasks-linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5.md"
+      }
+    },
+    {
       "id": "20260507-linear-63b806b8-2a46-48ff-b330-eeee2f0038dd",
       "title": "CO-505 normalize docs/TASKS historical evidence paths",
       "relates_to": "tasks/tasks-linear-63b806b8-2a46-48ff-b330-eeee2f0038dd.md",
@@ -9207,12 +9250,26 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-06",
+      "last_review": "2026-05-07",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-04-06",
           "manifest": ".runs/linear-bd8f3cc3-0871-470b-8c86-2f3815b326f2-co-97-docs-review/cli/2026-04-06T09-58-42-515Z-642faafe/manifest.json"
+        },
+        "co511_completed_lane_review": {
+          "reviewer": "CO-511 provider worker",
+          "date": "2026-05-07",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "docs:freshness:maintain",
+          "issue_id": "bd8f3cc3-0871-470b-8c86-2f3815b326f2",
+          "linear_identifier": "CO-97",
+          "linear_state": "Done",
+          "state_type": "completed",
+          "updated_at": "2026-04-07T10:13:14.255Z",
+          "related_pr": "#371",
+          "summary": "Live Linear issue-context confirmed CO-97 is Done (state_type=completed, updated_at=2026-04-07T10:13:14.255Z); existing packet lineage records #371. Reclassified the April 6 stale active spec mirror as completed-lane historical metadata under live CO-511 docs:freshness:maintain ownership without weakening docs:freshness, deleting historical evidence, or widening product-scope implementation lanes.",
+          "manifest": ".runs/linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5/cli/2026-05-07T03-31-08-667Z-8c860a58/manifest.json"
         }
       },
       "paths": {
@@ -9220,7 +9277,9 @@
         "task": "tasks/tasks-linear-bd8f3cc3-0871-470b-8c86-2f3815b326f2.md",
         "agent_task": ".agent/task/linear-bd8f3cc3-0871-470b-8c86-2f3815b326f2.md",
         "docs": "docs/TECH_SPEC-linear-bd8f3cc3-0871-470b-8c86-2f3815b326f2.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-04-06"
     },
     {
       "id": "20260406-linear-f0d312eb-055f-4926-80df-8fcaaf56839c",
@@ -9230,12 +9289,26 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-09",
+      "last_review": "2026-05-07",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-04-09",
           "manifest": ".runs/linear-f0d312eb-055f-4926-80df-8fcaaf56839c-co-102-docs-review-r2/cli/2026-04-08T22-48-54-430Z-492ca414/manifest.json"
+        },
+        "co511_completed_lane_review": {
+          "reviewer": "CO-511 provider worker",
+          "date": "2026-05-07",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "docs:freshness:maintain",
+          "issue_id": "f0d312eb-055f-4926-80df-8fcaaf56839c",
+          "linear_identifier": "CO-102",
+          "linear_state": "Done",
+          "state_type": "completed",
+          "updated_at": "2026-04-17T08:54:26.933Z",
+          "related_pr": "#387",
+          "summary": "Live Linear issue-context confirmed CO-102 is Done (state_type=completed, updated_at=2026-04-17T08:54:26.933Z); existing packet lineage records #387. Reclassified the April 6 docs-baseline packet mirrors as completed-lane historical metadata under live CO-511 docs:freshness:maintain ownership without weakening docs:freshness, deleting historical evidence, or widening product-scope implementation lanes.",
+          "manifest": ".runs/linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5/cli/2026-05-07T03-31-08-667Z-8c860a58/manifest.json"
         }
       },
       "paths": {
@@ -9243,7 +9316,9 @@
         "task": "tasks/tasks-linear-f0d312eb-055f-4926-80df-8fcaaf56839c.md",
         "agent_task": ".agent/task/linear-f0d312eb-055f-4926-80df-8fcaaf56839c.md",
         "docs": "docs/TECH_SPEC-linear-f0d312eb-055f-4926-80df-8fcaaf56839c.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-04-09"
     },
     {
       "id": "20260406-linear-179fd570-c493-49a7-9eaf-9222beca114a",
@@ -9253,14 +9328,31 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-06",
-      "approvals": {},
+      "last_review": "2026-05-07",
+      "approvals": {
+        "co511_completed_lane_review": {
+          "reviewer": "CO-511 provider worker",
+          "date": "2026-05-07",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "docs:freshness:maintain",
+          "issue_id": "179fd570-c493-49a7-9eaf-9222beca114a",
+          "linear_identifier": "CO-100",
+          "linear_state": "Done",
+          "state_type": "completed",
+          "updated_at": "2026-04-19T06:41:07.632Z",
+          "related_pr": "#369",
+          "summary": "Live Linear issue-context confirmed CO-100 is Done (state_type=completed, updated_at=2026-04-19T06:41:07.632Z); existing packet lineage records #369. Reclassified the April 6 shared-root reconciliation packet/spec mirrors as completed-lane historical metadata under live CO-511 docs:freshness:maintain ownership without weakening docs:freshness, deleting historical evidence, or widening product-scope implementation lanes.",
+          "manifest": ".runs/linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5/cli/2026-05-07T03-31-08-667Z-8c860a58/manifest.json"
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-179fd570-c493-49a7-9eaf-9222beca114a.md",
         "task": "tasks/tasks-linear-179fd570-c493-49a7-9eaf-9222beca114a.md",
         "agent_task": ".agent/task/linear-179fd570-c493-49a7-9eaf-9222beca114a.md",
         "docs": "docs/TECH_SPEC-linear-179fd570-c493-49a7-9eaf-9222beca114a.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-04-06"
     },
     {
       "id": "20260406-linear-7f1931f8-cfd0-4698-951e-df1c3984a337",
@@ -9270,12 +9362,26 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-06",
+      "last_review": "2026-05-07",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-04-06",
           "manifest": ".runs/linear-7f1931f8-cfd0-4698-951e-df1c3984a337-co-99-docs-review-r2/cli/2026-04-05T23-12-59-925Z-cae6b004/manifest.json"
+        },
+        "co511_completed_lane_review": {
+          "reviewer": "CO-511 provider worker",
+          "date": "2026-05-07",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "docs:freshness:maintain",
+          "issue_id": "7f1931f8-cfd0-4698-951e-df1c3984a337",
+          "linear_identifier": "CO-99",
+          "linear_state": "Done",
+          "state_type": "completed",
+          "updated_at": "2026-04-08T15:10:15.498Z",
+          "related_pr": "#368",
+          "summary": "Live Linear issue-context confirmed CO-99 is Done (state_type=completed, updated_at=2026-04-08T15:10:15.498Z); existing packet lineage records #368. Reclassified the April 6 proof-refresh packet/spec mirrors as completed-lane historical metadata under live CO-511 docs:freshness:maintain ownership without weakening docs:freshness, deleting historical evidence, or widening product-scope implementation lanes.",
+          "manifest": ".runs/linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5/cli/2026-05-07T03-31-08-667Z-8c860a58/manifest.json"
         }
       },
       "paths": {
@@ -9283,7 +9389,9 @@
         "task": "tasks/tasks-linear-7f1931f8-cfd0-4698-951e-df1c3984a337.md",
         "agent_task": ".agent/task/linear-7f1931f8-cfd0-4698-951e-df1c3984a337.md",
         "docs": "docs/TECH_SPEC-linear-7f1931f8-cfd0-4698-951e-df1c3984a337.md"
-      }
+      },
+      "status": "completed",
+      "completed_at": "2026-04-06"
     },
     {
       "id": "20260405-linear-bbc5ad99-0806-4b13-a8fc-0b49b0e8a9bc",

@@ -10,11 +10,11 @@ The machine-readable policy lives in `docs/docs-catalog.json` under `policies.ro
 
 Current CO policy:
 
-- Owner issue: `CO-444`
+- Owner issue: `CO-511`
 - Canonical recurring owner key: `docs:freshness:maintain`
 - Live-owner verification: `docs:freshness:maintain` must verify the configured owner issue as a non-terminal issue in the configured Linear project before owned rolling debt can pass. Terminal, canceled, duplicate, out-of-project, or unverifiable owners are evidence only and must route to canonical owner reuse/re-home action instead of remaining live owner metadata.
 - Exact canonical owner overrides: `canonical_owner_issues[]` may map one `canonical_owner_key` to one live owner issue, such as `CO-320` for `docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30`
-- Historical owner lineage: `CO-175` established the Apr 14 baseline, `CO-267` owned the Apr 20/21 maintenance refreshes, `CO-300` owned the Apr 22 reset, `CO-324` owned the Apr 23 reset, `CO-343` owned the Apr 24/25 reset, `CO-401` owned the Apr 27 reset, `CO-420` temporarily re-homed the Mar 28 rolling cohort before reaching terminal `Done`, `CO-409` restored live same-project owner metadata after `CO-420` before also reaching terminal `Done`, `CO-423` restored live same-project owner metadata after `CO-409` before reaching terminal `Done`, `CO-425` restored live same-project owner metadata after `CO-423` before reaching terminal `Done`, `CO-430` briefly carried the integrated owner metadata from the CO-428 blocker-clear branch before also reaching terminal `Done`, `CO-427` restored live same-project owner metadata after `CO-425`/`CO-430` before reaching terminal `Done`, and `CO-441` restored live same-project owner metadata after `CO-427` before reaching terminal `Done`; these prior owners are now terminal or invalid evidence only and must not remain the live maintenance owner after they reach terminal or unverifiable states. `CO-444` is the current live same-project owner for the retained March 28 rolling cohort.
+- Historical owner lineage: `CO-175` established the Apr 14 baseline, `CO-267` owned the Apr 20/21 maintenance refreshes, `CO-300` owned the Apr 22 reset, `CO-324` owned the Apr 23 reset, `CO-343` owned the Apr 24/25 reset, `CO-401` owned the Apr 27 reset, `CO-420` temporarily re-homed the Mar 28 rolling cohort before reaching terminal `Done`, `CO-409` restored live same-project owner metadata after `CO-420` before also reaching terminal `Done`, `CO-423` restored live same-project owner metadata after `CO-409` before reaching terminal `Done`, `CO-425` restored live same-project owner metadata after `CO-423` before reaching terminal `Done`, `CO-430` briefly carried the integrated owner metadata from the CO-428 blocker-clear branch before also reaching terminal `Done`, `CO-427` restored live same-project owner metadata after `CO-425`/`CO-430` before reaching terminal `Done`, `CO-441` restored live same-project owner metadata after `CO-427` before reaching terminal `Done`, and `CO-444` restored live same-project owner metadata after `CO-441` before reaching terminal `Done`; these prior owners are now terminal or invalid evidence only and must not remain the live maintenance owner after they reach terminal or unverifiable states. `CO-511` is the current live same-project owner for the retained March 28 rolling cohort plus the April 6 completed-lane residue cleanup.
 - Window: `7` days after the normal freshness cadence expires
 - Maximum active rolling cohorts: `2`
 - Maximum rolling rows: `300`
@@ -437,3 +437,17 @@ Live Linear issue-context reads on 2026-05-05 confirmed the source issues behind
 CO-444 keeps `docs:freshness:maintain` and the live owner marker unchanged. The April 4 residue is not a new product implementation lane: the affected task-packet rows are archived as completed-lane historical metadata, stale active specs are reclassified to terminal `done`, and `tasks/index.json` records the live Linear terminal evidence. This follows the same owner-renewal rule as the April 3 cleanup: preserve historical evidence, avoid blind active `last_review` bumps, and keep product-scope implementation lanes out of recurring docs-freshness maintenance.
 
 After the April 4 packet residue was cleared, the only remaining hard-stale row was active seeded template guidance in `templates/README.md`. CO-444 reviewed it as current initializer guidance and refreshed only the registry `last_review` metadata; no template behavior or public docs policy changed.
+
+## May 7 April 6 Completed-Lane Residue Cleanup
+
+### Reproduction / Baseline Findings
+
+CO-511 reproduced the owner blocker after CO-444 reached terminal `Done`:
+
+- `docs:freshness:maintain -- --format json` reported configured owner `CO-444` with `owner_issue_action.reason=configured_owner_terminal`, `issue_state=Done`, `issue_state_type=completed`, and `blocking_changed_paths=[]`.
+- The same report surfaced the April 6 cleanup cluster: six task-packet / task-mirror path-family cohorts with `last_review=2026-04-06`, plus one stale active-spec cohort for April 6 task specs.
+- Live Linear issue-context reads on 2026-05-07 confirmed the source issues behind the April 6 residue are terminal: `CO-100` (`179fd570-c493-49a7-9eaf-9222beca114a`), `CO-99` (`7f1931f8-cfd0-4698-951e-df1c3984a337`), `CO-102` (`f0d312eb-055f-4926-80df-8fcaaf56839c`), and `CO-97` (`bd8f3cc3-0871-470b-8c86-2f3815b326f2`) are all `Done` / `completed`.
+
+### Rolling Disposition
+
+CO-511 re-homes the live `docs:freshness:maintain` owner metadata from terminal `CO-444` to live same-project issue `CO-511`. The April 6 residue is not a new product implementation lane: the affected task-packet rows are archived as completed-lane historical metadata, the stale active specs are reclassified to terminal `done`, and `tasks/index.json` records the live Linear terminal evidence. This preserves historical packet evidence, avoids blind `last_review` churn, and keeps `docs:freshness` / `spec-guard` enforcement unchanged.
