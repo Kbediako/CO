@@ -4080,7 +4080,10 @@ function applyProviderLinearWorkerJsonlRecord(
   state: ProviderLinearWorkerJsonlParseResult,
   parsed: Record<string, unknown>,
   activitySource: ProviderLinearWorkerCurrentTurnActivitySource,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  options: {
+    preserveTimestampedGoalEvidenceFromTimestamplessReplay?: boolean;
+  } = {}
 ): boolean {
   let changed = false;
   let threadChanged = false;
@@ -4221,7 +4224,11 @@ function applyProviderLinearWorkerJsonlRecord(
   if (observedGoalEvidence) {
     const nextGoalEvidence = selectPreferredProviderLinearGoalEvidence(
       state.goalEvidence ?? null,
-      observedGoalEvidence
+      observedGoalEvidence,
+      {
+        preserveTimestampedCurrentFromTimestamplessObserved:
+          options.preserveTimestampedGoalEvidenceFromTimestamplessReplay === true
+      }
     );
     if (JSON.stringify(nextGoalEvidence) !== JSON.stringify(state.goalEvidence ?? null)) {
       state.goalEvidence = nextGoalEvidence;
@@ -4263,9 +4270,12 @@ function applyProviderLinearWorkerJsonlRecord(
 function applyProviderLinearWorkerSessionJsonlRecord(
   state: ProviderLinearWorkerJsonlParseResult,
   parsed: Record<string, unknown>,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  options: {
+    preserveTimestampedGoalEvidenceFromTimestamplessReplay?: boolean;
+  } = {}
 ): boolean {
-  return applyProviderLinearWorkerJsonlRecord(state, parsed, 'session_log_hydration', env);
+  return applyProviderLinearWorkerJsonlRecord(state, parsed, 'session_log_hydration', env, options);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -4959,13 +4969,24 @@ function selectProviderLinearGoalEvidenceFreshnessTimestamp(
 
 function selectPreferredProviderLinearGoalEvidence(
   current: ProviderLinearGoalEvidence | null,
-  observed: ProviderLinearGoalEvidence
+  observed: ProviderLinearGoalEvidence,
+  options: {
+    preserveTimestampedCurrentFromTimestamplessObserved?: boolean;
+  } = {}
 ): ProviderLinearGoalEvidence {
   if (!current) {
     return observed;
   }
   const currentTimestamp = selectProviderLinearGoalEvidenceFreshnessTimestamp(current);
   const observedTimestamp = selectProviderLinearGoalEvidenceFreshnessTimestamp(observed);
+  if (
+    options.preserveTimestampedCurrentFromTimestamplessObserved === true &&
+    currentTimestamp &&
+    !observedTimestamp &&
+    observed.capture_mode !== 'cleared'
+  ) {
+    return current;
+  }
   if (currentTimestamp && observedTimestamp && compareIsoTimestamp(observedTimestamp, currentTimestamp) < 0) {
     return current;
   }
@@ -7994,12 +8015,16 @@ function applyProviderWorkerSessionLogDelta(
     bootstrapPending: tailState.bootstrapPending
   });
   let changed = false;
+  const preserveTimestampedGoalEvidenceFromTimestamplessReplay = tailState.bootstrapPending;
   for (const line of linesToApply) {
     const parsed = parseProviderWorkerSessionJsonlLine(line);
     if (!parsed) {
       continue;
     }
-    changed = applyProviderLinearWorkerSessionJsonlRecord(parseState, parsed, env) || changed;
+    changed =
+      applyProviderLinearWorkerSessionJsonlRecord(parseState, parsed, env, {
+        preserveTimestampedGoalEvidenceFromTimestamplessReplay
+      }) || changed;
   }
   snapshotProviderWorkerGoalToolCallNamesToTail(parseState, tailState);
   if (tailState.bootstrapPending && lines.length > 0) {
@@ -8049,7 +8074,10 @@ function flushProviderWorkerSessionLogTail(
     if (!parsed) {
       continue;
     }
-    changed = applyProviderLinearWorkerSessionJsonlRecord(parseState, parsed, env) || changed;
+    changed =
+      applyProviderLinearWorkerSessionJsonlRecord(parseState, parsed, env, {
+        preserveTimestampedGoalEvidenceFromTimestamplessReplay: shouldBootstrap
+      }) || changed;
   }
   snapshotProviderWorkerGoalToolCallNamesToTail(parseState, tailState);
   if (shouldBootstrap) {

@@ -2325,6 +2325,49 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
+  it('keeps later live timestampless captured goal evidence in JSONL order', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-goal-live"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-goal-live-1"}}',
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:02.000Z',
+          type: 'notification',
+          method: 'thread/goal/updated',
+          params: {
+            threadId: 'thread-goal-live',
+            goal: {
+              threadId: 'thread-goal-live',
+              objective: 'older timestamped goal evidence',
+              status: 'active',
+              updatedAt: '2026-03-21T09:00:02.000Z'
+            }
+          }
+        }),
+        JSON.stringify({
+          type: 'notification',
+          method: 'thread/goal/updated',
+          params: {
+            threadId: 'thread-goal-live',
+            goal: {
+              threadId: 'thread-goal-live',
+              objective: 'later timestampless goal evidence',
+              status: 'active'
+            }
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: null,
+      thread_id: 'thread-goal-live',
+      objective: 'later timestampless goal evidence',
+      status: 'active'
+    });
+  });
+
   it('replaces captured goal evidence with later timestampless cleared evidence', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [
@@ -13861,6 +13904,99 @@ for await (const line of rl) {
       thread_id: 'thread-proof-goal',
       objective: 'newer proof goal evidence',
       updated_at: '2026-05-05T04:41:05.000Z',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('keeps newer proof goal evidence when session-log hydration replays timestampless records', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '05', '05');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-05-05T04-42-00-thread-proof-goal.jsonl');
+    const sessionLog = [
+      JSON.stringify({
+        type: 'session_meta',
+        payload: {
+          id: 'thread-proof-goal',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        },
+        timestamp: '2026-05-05T04:42:00.000Z'
+      }),
+      JSON.stringify({
+        type: 'turn_context',
+        payload: {
+          turn_id: 'turn-proof-goal-1'
+        },
+        timestamp: '2026-05-05T04:42:01.000Z'
+      }),
+      JSON.stringify({
+        type: 'notification',
+        method: 'thread/goal/updated',
+        params: {
+          threadId: 'thread-proof-goal',
+          goal: {
+            threadId: 'thread-proof-goal',
+            objective: 'timestampless replayed goal evidence',
+            status: 'active'
+          }
+        }
+      })
+    ].join('\n');
+
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(sessionLogPath, `${sessionLog}\n`, 'utf8');
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          thread_id: 'thread-proof-goal',
+          latest_turn_id: 'turn-proof-goal-1',
+          latest_session_id: 'thread-proof-goal-turn-proof-goal-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          attempt_started_at: '2026-05-05T04:42:00.000Z',
+          current_turn_started_at: '2026-05-05T04:42:00.000Z',
+          workspace_path: tempRoot,
+          goal_evidence: {
+            source: 'codex-goals',
+            feature_available: true,
+            feature_enabled: true,
+            capture_mode: 'captured',
+            capture_timestamp: '2026-05-05T04:42:05.000Z',
+            thread_id: 'thread-proof-goal',
+            turn_id: 'turn-proof-goal-1',
+            objective: 'newer proof goal evidence',
+            status: 'active',
+            token_budget: null,
+            tokens_used: null,
+            elapsed_seconds: null,
+            created_at: null,
+            updated_at: '2026-05-05T04:42:05.000Z',
+            authority: 'advisory_only',
+            linear_authority_preserved: true,
+            not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+            reason: null
+          }
+        })
+      ),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-05-05T04:42:06.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+
+    expect(refreshed?.goal_evidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-05-05T04:42:05.000Z',
+      thread_id: 'thread-proof-goal',
+      objective: 'newer proof goal evidence',
+      updated_at: '2026-05-05T04:42:05.000Z',
       authority: 'advisory_only',
       linear_authority_preserved: true
     });
