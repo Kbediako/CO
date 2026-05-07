@@ -136,6 +136,18 @@ const PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS = 15_000;
 const PROVIDER_CONTROL_HOST_REFRESH_RETRY_DELAY_MS = 250;
 const PROVIDER_CONTROL_HOST_REFRESH_FAILURE_FILENAME =
   'provider-control-host-refresh-failure.json';
+export const PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR = [
+  'linear_transition',
+  'workpad_replacement',
+  'pr_attachment',
+  'review_handoff',
+  'ready_review_success',
+  'merge_closeout',
+  'hook_recovery_success',
+  'long_poll_terminal_status',
+  'hook_resume_control_integration',
+  'tui_automation'
+];
 const PROVIDER_LINEAR_TRACKED_ISSUE_RATE_LIMIT_MAX_WAIT_MS = 15_000;
 const PROVIDER_LINEAR_TRACKED_ISSUE_RATE_LIMIT_BUCKETS = [
   {
@@ -489,6 +501,35 @@ export interface ProviderLinearWorkerAppServerSupervisionProof {
   updated_at: string | null;
 }
 
+export type ProviderLinearGoalEvidenceCaptureMode =
+  | 'captured'
+  | 'cleared'
+  | 'disabled'
+  | 'unavailable'
+  | 'stale'
+  | 'thread_mismatch';
+
+export interface ProviderLinearGoalEvidence {
+  source: 'codex-goals';
+  feature_available: boolean | null;
+  feature_enabled: boolean | null;
+  capture_mode: ProviderLinearGoalEvidenceCaptureMode;
+  capture_timestamp: string | null;
+  thread_id: string | null;
+  turn_id: string | null;
+  objective: string | null;
+  status: string | null;
+  token_budget: number | null;
+  tokens_used: number | null;
+  elapsed_seconds: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  authority: 'advisory_only';
+  linear_authority_preserved: true;
+  not_authorized_for: string[];
+  reason: string | null;
+}
+
 export interface ProviderLinearWorkerProof {
   issue_id: string;
   issue_identifier: string;
@@ -514,6 +555,7 @@ export interface ProviderLinearWorkerProof {
   rate_limits: Record<string, unknown> | null;
   runtime?: ProviderLinearWorkerRuntimeProof | null;
   appserver_supervision?: ProviderLinearWorkerAppServerSupervisionProof | null;
+  goal_evidence?: ProviderLinearGoalEvidence | null;
   auth_provenance?: ProviderLinearWorkerAuthProvenance | null;
   resolved_model_provenance?: ProviderLinearWorkerResolvedModelProvenance | null;
   worker_control?: ProviderLinearWorkerControlPlane | null;
@@ -615,6 +657,7 @@ export interface ProviderLinearWorkerJsonlParseResult {
   authProvenance: ProviderLinearWorkerAuthProvenance | null;
   resolvedModelProvenance: ProviderLinearWorkerResolvedModelProvenance | null;
   failureDiagnosis: ProviderLinearWorkerFailureDiagnosis | null;
+  goalEvidence?: ProviderLinearGoalEvidence | null;
 }
 
 interface ProviderWorkerAgentMessageDeltaHydrationSeed {
@@ -1616,6 +1659,13 @@ function normalizeNonNegativeInteger(value: unknown): number | null {
   return normalized !== null && normalized >= 0 ? normalized : null;
 }
 
+function normalizeNonNegativeNumber(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    return null;
+  }
+  return value;
+}
+
 function normalizePositiveInteger(value: unknown): number | null {
   const normalized = normalizeOptionalInteger(value);
   return normalized !== null && normalized > 0 ? normalized : null;
@@ -1728,6 +1778,7 @@ interface ProviderWorkerConfigModelDefaults {
   review_model: string | null;
   reasoning_effort: string | null;
   config_path: string | null;
+  goals_feature_enabled?: boolean | null;
   root_model?: string | null;
   root_review_model?: string | null;
   root_reasoning_effort?: string | null;
@@ -1772,7 +1823,8 @@ async function readProviderWorkerConfigModelDefaults(
       model: null,
       review_model: null,
       reasoning_effort: null,
-      config_path: configPath
+      config_path: configPath,
+      goals_feature_enabled: null
     };
   }
 }
@@ -1789,6 +1841,7 @@ function readProviderWorkerConfigModelDefaultsFromToml(
     review_model: null,
     reasoning_effort: null,
     config_path: configPath,
+    goals_feature_enabled: null,
     root_model: null,
     root_review_model: null,
     root_reasoning_effort: null,
@@ -1822,11 +1875,21 @@ function readProviderWorkerConfigModelDefaultsFromToml(
       continue;
     }
     if (currentTableKind !== null || currentTablePath.length !== 0) {
+      if (
+        currentTableKind === 'table' &&
+        currentTablePath.length === 1 &&
+        currentTablePath[0] === 'features'
+      ) {
+        defaults.goals_feature_enabled =
+          readTomlBooleanAssignment(trimmed, 'goals') ?? defaults.goals_feature_enabled;
+      }
       continue;
     }
     defaults.active_profile =
       normalizeProviderWorkerConfigProfileName(readTomlStringAssignment(trimmed, 'profile')) ??
       defaults.active_profile;
+    defaults.goals_feature_enabled =
+      readTomlBooleanAssignment(trimmed, 'features.goals') ?? defaults.goals_feature_enabled;
     mergeProviderWorkerConfigModelAssignment(defaults, trimmed);
   }
   defaults.root_model = defaults.model;
@@ -1917,6 +1980,7 @@ function selectProviderWorkerConfigModelDefaultsForProfile(
       review_model: null,
       reasoning_effort: null,
       config_path: defaults.config_path,
+      goals_feature_enabled: defaults.goals_feature_enabled ?? null,
       root_model: rootDefaults.model,
       root_review_model: rootDefaults.review_model,
       root_reasoning_effort: rootDefaults.reasoning_effort,
@@ -1929,6 +1993,7 @@ function selectProviderWorkerConfigModelDefaultsForProfile(
     review_model: profileDefaults.review_model ?? rootDefaults.review_model,
     reasoning_effort: profileDefaults.reasoning_effort ?? rootDefaults.reasoning_effort,
     config_path: defaults.config_path,
+    goals_feature_enabled: defaults.goals_feature_enabled ?? null,
     root_model: rootDefaults.model,
     root_review_model: rootDefaults.review_model,
     root_reasoning_effort: rootDefaults.reasoning_effort,
@@ -1947,6 +2012,25 @@ function readTomlStringAssignment(trimmedLine: string, key: string): string | nu
     return null;
   }
   return parseTomlStringValue(trimmedLine.slice(separatorIndex + 1).trim());
+}
+
+function readTomlBooleanAssignment(trimmedLine: string, key: string): boolean | null {
+  const separatorIndex = findTomlAssignmentSeparator(trimmedLine);
+  if (separatorIndex === -1) {
+    return null;
+  }
+  const rawKey = normalizeTomlKey(trimmedLine.slice(0, separatorIndex));
+  if (rawKey !== key) {
+    return null;
+  }
+  const normalizedValue = trimmedLine.slice(separatorIndex + 1).trim().toLowerCase();
+  if (normalizedValue === 'true') {
+    return true;
+  }
+  if (normalizedValue === 'false') {
+    return false;
+  }
+  return null;
 }
 
 function parseTomlStringValue(raw: string): string | null {
@@ -3681,6 +3765,7 @@ export function buildProviderWorkerPrompt(
     linearAudit?: ProviderLinearAuditSummary | null;
     attemptStartedAt?: string | null;
     manifest?: Record<string, unknown> | null;
+    manifestPath?: string | null;
     residentSession?: ProviderLinearResidentSessionState | null;
     continueResidentSessionOnBoot?: boolean;
   } = {}
@@ -3697,6 +3782,10 @@ export function buildProviderWorkerPrompt(
       hints: [issue.identifier, issue.title, issue.description ?? '']
     })
   );
+  const goalEvidenceWorkpadGuidance = buildProviderWorkerGoalEvidenceWorkpadGuidance({
+    manifest: attemptContext.manifest ?? null,
+    manifestPath: attemptContext.manifestPath ?? null
+  });
   const continueResidentSessionOnBoot = attemptContext.continueResidentSessionOnBoot === true;
   const logicalTurnCount = attemptContext.residentSession?.logical_turn_count ?? 0;
   if (turnNumber > 1 || continueResidentSessionOnBoot) {
@@ -3716,6 +3805,7 @@ export function buildProviderWorkerPrompt(
       '- The workpad body must keep this exact top-level structure, in order, with every section non-empty: `## Codex Workpad`, `### Environment / Workspace Stamp`, `### Plan`, `### Acceptance Criteria`, `### Validation`, `### Notes`.',
       '- `Acceptance Criteria` and `Validation` must contain non-empty checkbox list items (`- [ ] task` / `- [x] task`). `Environment / Workspace Stamp`, `Plan`, and `Notes` can stay free-form.',
       '- If the ticket includes `Validation`, `Test Plan`, or `Testing` requirements, mirror them in the workpad `Acceptance Criteria` and `Validation` sections.',
+      ...goalEvidenceWorkpadGuidance,
       '- If the issue is `Todo` or the live team\'s equivalent queued state (for example `Ready`) and not blocked by a non-terminal dependency, move it into the team\'s actual started state before active coding instead of assuming a fixed state name.',
       `- When you discover a meaningful out-of-scope improvement, use \`${helperCommand} create-follow-up --issue-id ${issue.id} ...\` to file or reuse a same-project follow-up issue in \`Backlog\` with a clear title, description, intent checksum, non-goals, \`Not Done If\`, acceptance criteria, a \`related\` link, the required parity matrix for parity/alignment follow-ups, and optional blocker linkage instead of expanding scope. For recurring baseline debt, pass the exact \`--canonical-owner-key\` from machine output such as \`docs:freshness:maintain\` so the helper reuses an open stamped owner before creating a new one.`,
       ...deterministicMutationSuppressions,
@@ -3761,6 +3851,7 @@ export function buildProviderWorkerPrompt(
     '- `Acceptance Criteria` and `Validation` must contain non-empty checkbox list items (`- [ ] task` / `- [x] task`). `Environment / Workspace Stamp`, `Plan`, and `Notes` can stay free-form.',
     '- If the ticket includes `Validation`, `Test Plan`, or `Testing` requirements, mirror them in the workpad `Acceptance Criteria` and `Validation` sections.',
     '- Refresh the same workpad after each meaningful milestone and immediately before any review or merge handoff. Keep final closeout in that same workpad comment.',
+    ...goalEvidenceWorkpadGuidance,
     '- If a PR is already attached, run a full PR feedback sweep before any new implementation work: review top-level comments, inline review comments, and review summaries; resolve each actionable item or post explicit, justified pushback.',
     ...deterministicMutationSuppressions,
     buildRuntimeProofGuidance(helperCommand, issue.id),
@@ -3813,7 +3904,8 @@ function snapshotProviderLinearWorkerPublicJsonlParseResult(
     rateLimits: state.rateLimits,
     authProvenance: state.authProvenance,
     resolvedModelProvenance: state.resolvedModelProvenance,
-    failureDiagnosis: state.failureDiagnosis
+    failureDiagnosis: state.failureDiagnosis,
+    goalEvidence: state.goalEvidence ?? null
   }, state.finalMessageSource, state.finalMessageDeltaKey);
 }
 
@@ -3829,7 +3921,8 @@ function buildEmptyProviderLinearWorkerJsonlParseResult(): ProviderLinearWorkerJ
     rateLimits: null,
     authProvenance: null,
     resolvedModelProvenance: null,
-    failureDiagnosis: null
+    failureDiagnosis: null,
+    goalEvidence: null
   });
 }
 
@@ -3839,10 +3932,17 @@ function initializeProviderLinearWorkerJsonlInternalState(
   finalMessageDeltaKey: string | null = null
 ): ProviderLinearWorkerJsonlParseResult {
   const resolvedModelProvenance = state.resolvedModelProvenance ?? null;
+  const goalEvidence = state.goalEvidence ?? null;
   Object.defineProperty(state, 'resolvedModelProvenance', {
     value: resolvedModelProvenance,
     writable: true,
     enumerable: resolvedModelProvenance !== null,
+    configurable: true
+  });
+  Object.defineProperty(state, 'goalEvidence', {
+    value: goalEvidence,
+    writable: true,
+    enumerable: goalEvidence !== null,
     configurable: true
   });
   Object.defineProperty(state, 'finalMessageSource', {
@@ -3952,7 +4052,7 @@ function applyProviderLinearWorkerJsonlRecord(
   if (parsed.type === 'turn_context' && payload) {
     const nextTurnId = normalizeOptionalString(payload.turn_id);
     if (nextTurnId && nextTurnId !== state.turnId) {
-      resetProviderLinearWorkerTurnScopedTelemetry(state);
+      resetProviderLinearWorkerTurnScopedTelemetry(state, nextTurnId);
       state.turnId = nextTurnId;
       changed = true;
     }
@@ -3960,7 +4060,7 @@ function applyProviderLinearWorkerJsonlRecord(
   if (parsed.type === 'event_msg' && payload && payload.type === 'task_complete') {
     const nextTurnId = normalizeOptionalString(payload.turn_id);
     if (nextTurnId && nextTurnId !== state.turnId) {
-      resetProviderLinearWorkerTurnScopedTelemetry(state);
+      resetProviderLinearWorkerTurnScopedTelemetry(state, nextTurnId);
       state.turnId = nextTurnId;
       changed = true;
     }
@@ -4061,6 +4161,14 @@ function applyProviderLinearWorkerJsonlRecord(
     state.tokens = mergeProviderWorkerObservedTokenUsage(state.tokens, observedTokens);
     changed = true;
   }
+  const observedGoalEvidence = extractProviderWorkerGoalEvidence(parsed, state);
+  if (
+    observedGoalEvidence &&
+    JSON.stringify(observedGoalEvidence) !== JSON.stringify(state.goalEvidence ?? null)
+  ) {
+    state.goalEvidence = observedGoalEvidence;
+    changed = true;
+  }
   const observedRateLimits = extractProviderWorkerRateLimits(parsed);
   if (observedRateLimits) {
     state.rateLimits = observedRateLimits;
@@ -4106,8 +4214,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function resetProviderLinearWorkerTurnScopedTelemetry(
-  state: ProviderLinearWorkerJsonlParseResult
+  state: ProviderLinearWorkerJsonlParseResult,
+  preserveGoalEvidenceForTurnId: string | null = null
 ): void {
+  const preservedGoalEvidence = shouldPreserveProviderLinearGoalEvidenceAcrossTurnReset(
+    state.goalEvidence ?? null,
+    preserveGoalEvidenceForTurnId
+  )
+    ? state.goalEvidence ?? null
+    : null;
   state.lastEvent = null;
   state.finalMessage = null;
   state.finalMessageSource = null;
@@ -4119,6 +4234,18 @@ function resetProviderLinearWorkerTurnScopedTelemetry(
   state.currentTurnActivity = null;
   state.resolvedModelProvenance = null;
   state.failureDiagnosis = null;
+  state.goalEvidence = preservedGoalEvidence;
+}
+
+function shouldPreserveProviderLinearGoalEvidenceAcrossTurnReset(
+  goalEvidence: ProviderLinearGoalEvidence | null,
+  nextTurnId: string | null
+): boolean {
+  if (!goalEvidence || !nextTurnId) {
+    return false;
+  }
+  const evidenceTurnId = normalizeOptionalString(goalEvidence.turn_id);
+  return evidenceTurnId === null || evidenceTurnId === nextTurnId;
 }
 
 function isProviderLinearWorkerBookkeepingRecord(parsed: Record<string, unknown>): boolean {
@@ -4440,6 +4567,260 @@ function extractProviderWorkerActivityTurnId(parsed: Record<string, unknown>): s
     normalizeOptionalString(payloadParams?.turnId) ??
     normalizeOptionalString(payloadParams?.turn_id)
   );
+}
+
+function extractProviderWorkerGoalEvidence(
+  parsed: Record<string, unknown>,
+  state: ProviderLinearWorkerJsonlParseResult
+): ProviderLinearGoalEvidence | null {
+  const method = readProviderWorkerMethod(parsed)?.toLowerCase();
+  if (method !== 'thread/goal/updated' && method !== 'thread/goal/cleared') {
+    return null;
+  }
+  const params = readProviderWorkerParams(parsed);
+  const goal = isRecord(params?.goal)
+    ? params.goal
+    : isRecord(params?.threadGoal)
+      ? params.threadGoal
+      : isRecord(params?.thread_goal)
+        ? params.thread_goal
+        : null;
+  const capturedAt = extractProviderWorkerEventTimestamp(parsed);
+  const threadId =
+    normalizeOptionalString(goal?.threadId) ??
+    normalizeOptionalString(goal?.thread_id) ??
+    normalizeOptionalString(params?.threadId) ??
+    normalizeOptionalString(params?.thread_id) ??
+    state.threadId;
+  const turnId = extractProviderWorkerActivityTurnId(parsed) ?? state.turnId;
+  if (method === 'thread/goal/cleared') {
+    return buildProviderLinearGoalEvidence({
+      featureAvailable: true,
+      featureEnabled: null,
+      captureMode: 'cleared',
+      captureTimestamp: capturedAt,
+      threadId,
+      turnId,
+      objective: null,
+      status: 'cleared',
+      tokenBudget: null,
+      tokensUsed: null,
+      elapsedSeconds: null,
+      createdAt: null,
+      updatedAt: null,
+      reason: 'goal_cleared'
+    });
+  }
+  if (!goal) {
+    return buildProviderLinearGoalEvidence({
+      featureAvailable: true,
+      featureEnabled: null,
+      captureMode: 'unavailable',
+      captureTimestamp: capturedAt,
+      threadId,
+      turnId,
+      objective: null,
+      status: null,
+      tokenBudget: null,
+      tokensUsed: null,
+      elapsedSeconds: null,
+      createdAt: null,
+      updatedAt: null,
+      reason: 'goal_updated_payload_missing'
+    });
+  }
+  const createdAt = normalizeProviderLinearGoalTimestamp(goal.createdAt ?? goal.created_at);
+  const updatedAt = normalizeProviderLinearGoalTimestamp(goal.updatedAt ?? goal.updated_at);
+  return buildProviderLinearGoalEvidence({
+    featureAvailable: true,
+    featureEnabled: null,
+    captureMode: 'captured',
+    captureTimestamp: capturedAt,
+    threadId,
+    turnId,
+    objective: normalizeOptionalString(goal.objective),
+    status: normalizeOptionalString(goal.status),
+    tokenBudget: normalizeNonNegativeInteger(goal.tokenBudget ?? goal.token_budget),
+    tokensUsed: normalizeNonNegativeInteger(goal.tokensUsed ?? goal.tokens_used),
+    elapsedSeconds: normalizeNonNegativeNumber(
+      goal.timeUsedSeconds ?? goal.time_used_seconds ?? goal.elapsedSeconds ?? goal.elapsed_seconds
+    ),
+    createdAt,
+    updatedAt,
+    reason: null
+  });
+}
+
+function normalizeProviderLinearGoalTimestamp(value: unknown): string | null {
+  const normalized = normalizeOptionalString(value);
+  if (normalized) {
+    return normalized;
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+  const epochMillis = Math.abs(value) < 10_000_000_000 ? value * 1000 : value;
+  const date = new Date(epochMillis);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
+function extractProviderWorkerEventTimestamp(input: Record<string, unknown>): string | null {
+  const payload = isRecord(input.payload) ? input.payload : null;
+  return (
+    normalizeOptionalString(input.timestamp) ??
+    normalizeOptionalString(input.created_at) ??
+    normalizeOptionalString(input.at) ??
+    normalizeOptionalString(payload?.timestamp) ??
+    normalizeOptionalString(payload?.created_at) ??
+    normalizeOptionalString(payload?.at)
+  );
+}
+
+function buildProviderLinearGoalEvidence(input: {
+  featureAvailable: boolean | null;
+  featureEnabled: boolean | null;
+  captureMode: ProviderLinearGoalEvidenceCaptureMode;
+  captureTimestamp: string | null;
+  threadId: string | null;
+  turnId: string | null;
+  objective: string | null;
+  status: string | null;
+  tokenBudget: number | null;
+  tokensUsed: number | null;
+  elapsedSeconds: number | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  reason: string | null;
+}): ProviderLinearGoalEvidence {
+  return {
+    source: 'codex-goals',
+    feature_available: input.featureAvailable,
+    feature_enabled: input.featureEnabled,
+    capture_mode: input.captureMode,
+    capture_timestamp: input.captureTimestamp,
+    thread_id: input.threadId,
+    turn_id: input.turnId,
+    objective: input.objective,
+    status: input.status,
+    token_budget: input.tokenBudget,
+    tokens_used: input.tokensUsed,
+    elapsed_seconds: input.elapsedSeconds,
+    created_at: input.createdAt,
+    updated_at: input.updatedAt,
+    authority: 'advisory_only',
+    linear_authority_preserved: true,
+    not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+    reason: input.reason
+  };
+}
+
+function normalizeProviderLinearGoalEvidenceForProof(input: {
+  candidate?: ProviderLinearGoalEvidence | null;
+  previous?: ProviderLinearGoalEvidence | null;
+  proofThreadId?: string | null;
+  proofTurnId?: string | null;
+  observedAt: string;
+  currentTurnStartedAt?: string | null;
+  featureEnabled?: boolean | null;
+  runtimeMode?: string | null;
+}): ProviderLinearGoalEvidence {
+  const featureEnabled = input.featureEnabled ?? input.candidate?.feature_enabled ?? input.previous?.feature_enabled ?? null;
+  const runtimeMode = normalizeOptionalString(input.runtimeMode);
+  if (featureEnabled === false) {
+    return buildProviderLinearGoalEvidence({
+      featureAvailable: false,
+      featureEnabled: false,
+      captureMode: 'disabled',
+      captureTimestamp: input.observedAt,
+      threadId: input.proofThreadId ?? null,
+      turnId: input.proofTurnId ?? null,
+      objective: null,
+      status: null,
+      tokenBudget: null,
+      tokensUsed: null,
+      elapsedSeconds: null,
+      createdAt: null,
+      updatedAt: null,
+      reason: 'goals_feature_disabled'
+    });
+  }
+  const base =
+    input.candidate ??
+    input.previous ??
+    buildProviderLinearGoalEvidence({
+      featureAvailable: runtimeMode === 'appserver' ? featureEnabled ?? null : false,
+      featureEnabled,
+      captureMode: 'unavailable',
+      captureTimestamp: input.observedAt,
+      threadId: input.proofThreadId ?? null,
+      turnId: input.proofTurnId ?? null,
+      objective: null,
+      status: null,
+      tokenBudget: null,
+      tokensUsed: null,
+      elapsedSeconds: null,
+      createdAt: null,
+      updatedAt: null,
+      reason: runtimeMode === 'appserver' ? 'goal_state_not_observed' : 'appserver_goal_surface_unavailable'
+    });
+  let captureMode = base.capture_mode;
+  let reason = base.reason ?? null;
+  const goalThreadId = normalizeOptionalString(base.thread_id);
+  const proofThreadId = normalizeOptionalString(input.proofThreadId);
+  const freshnessTimestamp =
+    captureMode === 'captured'
+      ? normalizeOptionalString(base.updated_at) ??
+        normalizeOptionalString(base.created_at) ??
+        normalizeOptionalString(base.capture_timestamp)
+      : null;
+  if (goalThreadId && proofThreadId && goalThreadId !== proofThreadId) {
+    captureMode = 'thread_mismatch';
+    reason = `goal_thread_mismatch:${goalThreadId}->${proofThreadId}`;
+  } else if (
+    captureMode === 'captured' &&
+    freshnessTimestamp !== null &&
+    compareIsoTimestamp(freshnessTimestamp, input.currentTurnStartedAt) < 0
+  ) {
+    captureMode = 'stale';
+    reason = 'goal_evidence_predates_current_turn';
+  }
+  return {
+    ...base,
+    feature_available: base.feature_available ?? (runtimeMode === 'appserver' ? true : false),
+    feature_enabled: featureEnabled,
+    capture_mode: captureMode,
+    capture_timestamp: base.capture_timestamp ?? input.observedAt,
+    turn_id: base.turn_id ?? input.proofTurnId ?? null,
+    authority: 'advisory_only',
+    linear_authority_preserved: true,
+    not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+    reason
+  };
+}
+
+function selectProviderWorkerManifestGoalEvidence(
+  manifest: Record<string, unknown> | null | undefined
+): ProviderLinearGoalEvidence | null {
+  const goalEvidence = isRecord(manifest?.goal_evidence) ? manifest.goal_evidence : null;
+  if (!goalEvidence) {
+    return null;
+  }
+  return goalEvidence as unknown as ProviderLinearGoalEvidence;
+}
+
+function buildProviderWorkerGoalEvidenceWorkpadGuidance(input: {
+  manifest: Record<string, unknown> | null | undefined;
+  manifestPath: string | null | undefined;
+}): string[] {
+  const goalEvidence = selectProviderWorkerManifestGoalEvidence(input.manifest);
+  const manifestPath = normalizeOptionalString(input.manifestPath);
+  if (!manifestPath && !goalEvidence) {
+    return [];
+  }
+  const manifestReference = manifestPath ?? '<current run manifest>';
+  return [
+    `- Advisory persisted \`/goal\` evidence is advisory-only. Immediately before the final workpad closeout, re-read the current run manifest at \`${manifestReference}\` and, if \`goal_evidence\` is present, render a concise \`Advisory goal evidence: ...\` line from that current manifest snapshot; do not copy any prompt-time goal snapshot, and never use goal evidence for lifecycle authority.`
+  ];
 }
 
 function synchronizeProviderLinearWorkerCurrentTurnActivity(
@@ -7206,6 +7587,7 @@ function normalizeProviderLinearWorkerProofForUpdatedAtComparison(
           updated_at: null
         }
       : proof.appserver_supervision ?? null,
+    goal_evidence: proof.goal_evidence ?? null,
     auth_provenance: proof.auth_provenance ?? null,
     resolved_model_provenance: proof.resolved_model_provenance ?? null,
     failure_diagnosis: proof.failure_diagnosis ?? null,
@@ -7275,6 +7657,7 @@ function selectProviderLinearWorkerProofTelemetryFields(
     current_turn_activity: selectProviderLinearWorkerCurrentTurnActivity(proof) ?? null,
     tokens: proof.tokens,
     rate_limits: proof.rate_limits ?? null,
+    goal_evidence: proof.goal_evidence ?? null,
     auth_provenance: proof.auth_provenance ?? null,
     resolved_model_provenance: proof.resolved_model_provenance ?? null,
     worker_control: proof.worker_control ?? null,
@@ -8100,6 +8483,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     parseState.currentTurnActivity = proofCurrentTurnActivity;
     parseState.resolvedModelProvenance = proofBaselineResolvedModelProvenance;
     parseState.failureDiagnosis = proof.failure_diagnosis ?? null;
+    parseState.goalEvidence = proof.goal_evidence ?? null;
   };
   let tailState = buildProviderWorkerSessionLogTailState(
     sessionLogPath,
@@ -8271,6 +8655,19 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
       proofResolvedModelProvenanceForHydration,
       parseState.resolvedModelProvenance
     ),
+    goal_evidence:
+      proof.goal_evidence === undefined
+        ? undefined
+        : normalizeProviderLinearGoalEvidenceForProof({
+            candidate: parseState.goalEvidence ?? null,
+            previous: liveThreadChanged ? null : proof.goal_evidence ?? null,
+            proofThreadId: liveThreadId,
+            proofTurnId: liveTurnId,
+            observedAt: proof.updated_at ?? new Date().toISOString(),
+            currentTurnStartedAt: proof.current_turn_started_at ?? proof.attempt_started_at ?? null,
+            featureEnabled: proof.goal_evidence?.feature_enabled ?? null,
+            runtimeMode: proof.runtime?.selected_mode ?? null
+          }),
     failure_diagnosis: parseState.failureDiagnosis ?? (liveTurnChanged ? null : proof.failure_diagnosis ?? null)
   };
   return {
@@ -8702,6 +9099,54 @@ function applyProviderWorkerRuntimeSelectionToManifest(input: {
   return before !== after;
 }
 
+function applyProviderWorkerGoalEvidenceToManifest(input: {
+  manifest: Record<string, unknown>;
+  goalEvidence: ProviderLinearGoalEvidence | null | undefined;
+}): boolean {
+  const before = JSON.stringify(input.manifest.goal_evidence ?? null);
+  input.manifest.goal_evidence = input.goalEvidence ?? null;
+  return before !== JSON.stringify(input.manifest.goal_evidence ?? null);
+}
+
+async function readProviderWorkerManifestPatchBase(manifestPath: string): Promise<Record<string, unknown>> {
+  const parsed = JSON.parse(await readFile(manifestPath, 'utf8')) as unknown;
+  if (!isRecord(parsed)) {
+    throw new Error(`Provider-worker manifest patch base at ${manifestPath} is not a JSON object.`);
+  }
+  return parsed;
+}
+
+function replaceProviderWorkerManifestSnapshot(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>
+): void {
+  for (const key of Object.keys(target)) {
+    delete target[key];
+  }
+  Object.assign(target, source);
+}
+
+async function patchProviderWorkerGoalEvidenceManifestFile(input: {
+  manifestPath: string;
+  fallbackManifest: Record<string, unknown>;
+  goalEvidence: ProviderLinearGoalEvidence | null | undefined;
+}): Promise<void> {
+  let manifest: Record<string, unknown>;
+  try {
+    manifest = await readProviderWorkerManifestPatchBase(input.manifestPath);
+  } catch {
+    return;
+  }
+  const changed = applyProviderWorkerGoalEvidenceToManifest({
+    manifest,
+    goalEvidence: input.goalEvidence
+  });
+  if (changed) {
+    await writeJsonAtomic(input.manifestPath, manifest);
+  }
+  replaceProviderWorkerManifestSnapshot(input.fallbackManifest, manifest);
+}
+
 async function readProviderWorkerControlHostSourceRootFreshness(
   context: Pick<
     ProviderLinearWorkerContext,
@@ -8841,6 +9286,26 @@ async function persistProviderWorkerRuntimeSelectionToManifests(input: {
   if (selectedChanged) {
     await writeJsonAtomic(input.context.manifestPath, input.context.manifest);
   }
+}
+
+async function persistProviderWorkerGoalEvidenceToManifests(input: {
+  context: ProviderLinearWorkerContext;
+  goalEvidence: ProviderLinearGoalEvidence | null | undefined;
+}): Promise<void> {
+  await patchProviderWorkerGoalEvidenceManifestFile({
+    manifestPath: input.context.controlHostManifestPath,
+    fallbackManifest: input.context.controlHostManifest,
+    goalEvidence: input.goalEvidence
+  });
+  if (input.context.manifestPath === input.context.controlHostManifestPath) {
+    return;
+  }
+
+  await patchProviderWorkerGoalEvidenceManifestFile({
+    manifestPath: input.context.manifestPath,
+    fallbackManifest: input.context.manifest,
+    goalEvidence: input.goalEvidence
+  });
 }
 
 async function readTrackedIssueOrThrow(input: {
@@ -11382,6 +11847,19 @@ async function writeProofSnapshot(
         currentTurnStartedAt: proof.current_turn_started_at,
         childLanes
       }),
+      goal_evidence:
+        proof.goal_evidence === undefined
+          ? undefined
+          : normalizeProviderLinearGoalEvidenceForProof({
+              candidate: proof.goal_evidence ?? null,
+              previous: proof.goal_evidence ?? null,
+              proofThreadId: proof.thread_id,
+              proofTurnId: proof.latest_turn_id,
+              observedAt: deps.now(),
+              currentTurnStartedAt: proof.current_turn_started_at ?? proof.attempt_started_at ?? null,
+              featureEnabled: proof.goal_evidence?.feature_enabled ?? null,
+              runtimeMode: proof.runtime?.selected_mode ?? null
+            }),
       linear_budget: linearBudget
     };
     const hydratedProof = {
@@ -11453,6 +11931,19 @@ export async function refreshProviderLinearWorkerProofSnapshot(
         currentTurnStartedAt: parsed.current_turn_started_at,
         childLanes
       }),
+      goal_evidence:
+        parsed.goal_evidence === undefined
+          ? undefined
+          : normalizeProviderLinearGoalEvidenceForProof({
+              candidate: null,
+              previous: parsed.goal_evidence ?? null,
+              proofThreadId: parsed.thread_id,
+              proofTurnId: parsed.latest_turn_id,
+              observedAt: now(),
+              currentTurnStartedAt: parsed.current_turn_started_at ?? parsed.attempt_started_at ?? null,
+              featureEnabled: parsed.goal_evidence?.feature_enabled ?? null,
+              runtimeMode: parsed.runtime?.selected_mode ?? null
+            }),
       linear_budget: linearBudget,
       updated_at: parsed.updated_at ?? null
     };
@@ -11654,6 +12145,11 @@ export async function runProviderLinearWorker(
     rate_limits: null,
     runtime: buildProviderLinearWorkerRuntimeProof(runtimeContext.runtime),
     appserver_supervision: null,
+    goal_evidence: normalizeProviderLinearGoalEvidenceForProof({
+      observedAt: attemptStartedAt,
+      featureEnabled: configModelDefaults.goals_feature_enabled ?? null,
+      runtimeMode: runtimeContext.runtime.selected_mode
+    }),
     auth_provenance: buildProviderWorkerRuntimeAuthProvenance({
       env: childEnv,
       runtime: runtimeContext.runtime,
@@ -11707,6 +12203,10 @@ export async function runProviderLinearWorker(
   const persistProof = async (nextProof: ProviderLinearWorkerProof): Promise<ProviderLinearWorkerProof> => {
     const hydratedProof = await writeFreshProofSnapshot(nextProof);
     emitSemanticProgressIfChanged(hydratedProof);
+    await persistProviderWorkerGoalEvidenceToManifests({
+      context,
+      goalEvidence: hydratedProof.goal_evidence ?? null
+    });
     await requestProviderControlHostRefresh({
       currentManifestPath: context.controlHostManifestPath,
       env,
@@ -11980,6 +12480,16 @@ export async function runProviderLinearWorker(
               ? buildEmptyProviderLinearWorkerTokenUsage()
               : finalProof.tokens,
           rate_limits: liveParseState.rateLimits ?? (liveTurnChanged ? null : finalProof.rate_limits),
+          goal_evidence: normalizeProviderLinearGoalEvidenceForProof({
+            candidate: liveParseState.goalEvidence ?? null,
+            previous: liveThreadChanged ? null : finalProof.goal_evidence ?? null,
+            proofThreadId: liveThreadId,
+            proofTurnId: liveTurnId,
+            observedAt: deps.now(),
+            currentTurnStartedAt: finalProof.current_turn_started_at ?? turnStartedAt,
+            featureEnabled: configModelDefaults.goals_feature_enabled ?? finalProof.goal_evidence?.feature_enabled ?? null,
+            runtimeMode: runtimeContext.runtime.selected_mode
+          }),
           auth_provenance: mergeProviderWorkerAuthProvenance(
             finalProof.auth_provenance ?? null,
             liveParseState.authProvenance
@@ -12015,6 +12525,7 @@ export async function runProviderLinearWorker(
           current_turn_activity: nextProof.current_turn_activity ?? null,
           tokens: nextProof.tokens,
           rate_limits: nextProof.rate_limits,
+          goal_evidence: nextProof.goal_evidence ?? null,
           auth_provenance: nextProof.auth_provenance ?? null,
           resolved_model_provenance: nextProof.resolved_model_provenance ?? null,
           failure_diagnosis: nextProof.failure_diagnosis ?? null,
@@ -12030,6 +12541,10 @@ export async function runProviderLinearWorker(
           .then(async () => {
             const hydratedProof = await writeFreshProofSnapshot(nextProof);
             finalProof = hydratedProof;
+            await persistProviderWorkerGoalEvidenceToManifests({
+              context,
+              goalEvidence: hydratedProof.goal_evidence ?? null
+            });
             emitSemanticProgressIfChanged(hydratedProof);
             scheduleLiveSemanticStallRefresh(hydratedProof);
             if (liveRefreshClosed) {
@@ -12091,6 +12606,7 @@ export async function runProviderLinearWorker(
           linearAudit: finalProof.linear_audit,
           attemptStartedAt: finalProof.attempt_started_at ?? null,
           manifest: context.manifest,
+          manifestPath: context.manifestPath,
           residentSession: finalProof.resident_session ?? null,
           continueResidentSessionOnBoot
         }
@@ -12139,11 +12655,24 @@ export async function runProviderLinearWorker(
             turnStartedAt,
             resumeSourceThreadIdForTurn
           ),
+          goal_evidence: normalizeProviderLinearGoalEvidenceForProof({
+            previous: finalProof.goal_evidence ?? null,
+            proofThreadId: finalProof.thread_id,
+            proofTurnId: null,
+            observedAt: turnStartedAt,
+            currentTurnStartedAt: turnStartedAt,
+            featureEnabled: configModelDefaults.goals_feature_enabled ?? finalProof.goal_evidence?.feature_enabled ?? null,
+            runtimeMode: runtimeContext.runtime.selected_mode
+          }),
           // Runtime-reported model provenance is turn-scoped; start each turn from
           // current command/config evidence until this turn reports runtime metadata.
           resolved_model_provenance: turnResolvedModelProvenance
         }
       );
+      await persistProviderWorkerGoalEvidenceToManifests({
+        context,
+        goalEvidence: finalProof.goal_evidence ?? null
+      });
       const parallelizationDecisionCountBeforeTurn = readProviderLinearParallelizationSnapshots(
         finalProof.linear_audit,
         {
@@ -12478,6 +13007,16 @@ export async function runProviderLinearWorker(
         rate_limits: parsed.rateLimits ?? finalProof.rate_limits,
         runtime: finalProof.runtime ?? buildProviderLinearWorkerRuntimeProof(runtimeContext.runtime),
         appserver_supervision: finalProof.appserver_supervision ?? null,
+        goal_evidence: normalizeProviderLinearGoalEvidenceForProof({
+          candidate: parsed.goalEvidence ?? null,
+          previous: parsedThreadChanged ? null : finalProof.goal_evidence ?? null,
+          proofThreadId: threadId,
+          proofTurnId: turnId,
+          observedAt: deps.now(),
+          currentTurnStartedAt: turnStartedAt,
+          featureEnabled: configModelDefaults.goals_feature_enabled ?? finalProof.goal_evidence?.feature_enabled ?? null,
+          runtimeMode: runtimeContext.runtime.selected_mode
+        }),
         auth_provenance: mergeProviderWorkerAuthProvenance(
           finalProof.auth_provenance ?? null,
           parsed.authProvenance
