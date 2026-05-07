@@ -1698,8 +1698,24 @@
         "linear_authority_preserved": { "type": "boolean", "const": true },
         "not_authorized_for": {
           "type": "array",
-          "items": { "type": "string" },
-          "minItems": 1
+          "items": {
+            "type": "string",
+            "enum": [
+              "linear_transition",
+              "workpad_replacement",
+              "pr_attachment",
+              "review_handoff",
+              "ready_review_success",
+              "merge_closeout",
+              "hook_recovery_success",
+              "long_poll_terminal_status",
+              "hook_resume_control_integration",
+              "tui_automation"
+            ]
+          },
+          "minItems": 10,
+          "maxItems": 10,
+          "uniqueItems": true
         },
         "reason": { "type": ["string", "null"] }
       }

@@ -59,6 +59,20 @@
 - Render workpad summary from persisted advisory manifest evidence only.
 - Add focused tests for every stale PR `#788` review finding before replacement PR handoff.
 
+## Fallback Expiry / Refactor Decision
+- Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? Yes.
+- Contract name: Linear-first lifecycle authority with optional advisory `manifest goal_evidence`.
+- Owning surface: provider-worker manifest persistence and workpad summary rendering.
+- Steady-state proof: focused provider-worker tests prove invalid candidate rejection, canonical advisory marker persistence, and no lifecycle authorization from goal state.
+- Tests/docs: CO-492 focused provider-worker tests, manifest schema coverage, and this ACTION_PLAN.
+- Non-expiring rationale: Linear/workpad/PR/review/check authority is the durable governing contract; advisory goal evidence is not temporary lifecycle authority and can only be replaced by a separate approved authority redesign.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Provider-worker lifecycle authority | Goal evidence may exist beside Linear/workpad/PR/review/check truth. | justify retaining fallback | CO provider-worker workflow | goals feature enabled, unavailable, stale, or thread mismatched | Existing authority predates CO-492 | 2026-05-07 | non-expiring authority contract | only replaced by a separate approved authority redesign | Advisory marker tests plus provider-worker lifecycle gates. |
+| Stale fallback snapshots | Manifest patching could reuse stale candidate data to populate `goal_evidence`. | remove fallback | CO-492 | candidate reuse or manifest patching | stale PR #788 attempt | 2026-05-07 | this issue | stale snapshots are never written; stale candidates classify as stale | Manifest patching and stale timestamp regressions. |
+| Legacy hydration backfill | Legacy manifests could infer goal evidence without real goal notification. | remove fallback | CO-492 | legacy hydration reads old manifests | stale PR #788 attempt | 2026-05-07 | this issue | no backfill without real notification/current snapshot | Legacy hydration real notification regression. |
+
 ## Parent-Owned Validation
 - Focused tests:
   - disabled goals fail closed before candidate reuse

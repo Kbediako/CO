@@ -13172,7 +13172,11 @@ for await (const line of rl) {
 
     expect(proof.goal_evidence).toMatchObject({
       capture_mode: 'thread_mismatch',
+      capture_timestamp: '2026-03-21T09:00:00.250Z',
       thread_id: 'thread-other',
+      objective: null,
+      status: null,
+      updated_at: null,
       reason: 'goal_thread_mismatch:thread-other->thread-current',
       authority: 'advisory_only',
       linear_authority_preserved: true
@@ -13228,9 +13232,25 @@ for await (const line of rl) {
 
     expect(refreshed?.goal_evidence).toMatchObject({
       capture_mode: 'stale',
+      capture_timestamp: '2026-03-21T09:00:00.000Z',
+      objective: null,
+      status: null,
+      updated_at: null,
       reason: 'goal_evidence_predates_current_turn',
       authority: 'advisory_only',
       linear_authority_preserved: true
+    });
+
+    const refreshedAgain = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-03-21T09:10:30.000Z'
+    );
+
+    expect(refreshedAgain?.goal_evidence).toMatchObject({
+      capture_mode: 'stale',
+      capture_timestamp: '2026-03-21T09:00:00.000Z',
+      reason: 'goal_evidence_predates_current_turn'
     });
   });
 
@@ -13289,7 +13309,11 @@ for await (const line of rl) {
 
     expect(proof.goal_evidence).toMatchObject({
       capture_mode: 'stale',
+      capture_timestamp: '2026-03-21T09:00:00.750Z',
       thread_id: 'thread-stale-candidate',
+      objective: null,
+      status: null,
+      updated_at: null,
       reason: 'goal_evidence_predates_current_turn',
       authority: 'advisory_only',
       linear_authority_preserved: true
@@ -13350,6 +13374,9 @@ for await (const line of rl) {
       const manifestBeforeOutput = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>;
       expect(manifestBeforeOutput.goal_evidence).toMatchObject({
         capture_mode: 'stale',
+        objective: null,
+        status: null,
+        updated_at: null,
         reason: 'goal_evidence_predates_current_turn',
         authority: 'advisory_only',
         linear_authority_preserved: true
@@ -13387,10 +13414,16 @@ for await (const line of rl) {
     expect(appServerTurnRunner).toHaveBeenCalledTimes(2);
     expect(proof.goal_evidence).toMatchObject({
       capture_mode: 'stale',
+      objective: null,
+      status: null,
+      updated_at: null,
       reason: 'goal_evidence_predates_current_turn'
     });
     expect(manifest.goal_evidence).toMatchObject({
       capture_mode: 'stale',
+      objective: null,
+      status: null,
+      updated_at: null,
       reason: 'goal_evidence_predates_current_turn',
       authority: 'advisory_only',
       linear_authority_preserved: true

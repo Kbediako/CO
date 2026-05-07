@@ -147,7 +147,7 @@ export const PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR = [
   'long_poll_terminal_status',
   'hook_resume_control_integration',
   'tui_automation'
-];
+] as const;
 const PROVIDER_LINEAR_TRACKED_ISSUE_RATE_LIMIT_MAX_WAIT_MS = 15_000;
 const PROVIDER_LINEAR_TRACKED_ISSUE_RATE_LIMIT_BUCKETS = [
   {
@@ -4784,6 +4784,24 @@ function normalizeProviderLinearGoalEvidenceForProof(input: {
     captureMode = 'stale';
     reason = 'goal_evidence_predates_current_turn';
   }
+  if (captureMode === 'thread_mismatch' || captureMode === 'stale') {
+    return buildProviderLinearGoalEvidence({
+      featureAvailable: base.feature_available ?? (runtimeMode === 'appserver' ? true : false),
+      featureEnabled,
+      captureMode,
+      captureTimestamp: base.capture_timestamp ?? input.observedAt,
+      threadId: goalThreadId ?? proofThreadId ?? null,
+      turnId: base.turn_id ?? input.proofTurnId ?? null,
+      objective: null,
+      status: null,
+      tokenBudget: null,
+      tokensUsed: null,
+      elapsedSeconds: null,
+      createdAt: null,
+      updatedAt: null,
+      reason
+    });
+  }
   return {
     ...base,
     feature_available: base.feature_available ?? (runtimeMode === 'appserver' ? true : false),
@@ -9142,7 +9160,21 @@ async function patchProviderWorkerGoalEvidenceManifestFile(input: {
     goalEvidence: input.goalEvidence
   });
   if (changed) {
-    await writeJsonAtomic(input.manifestPath, manifest);
+    let latestManifest = manifest;
+    try {
+      latestManifest = await readProviderWorkerManifestPatchBase(input.manifestPath);
+    } catch {
+      return;
+    }
+    const latestChanged = applyProviderWorkerGoalEvidenceToManifest({
+      manifest: latestManifest,
+      goalEvidence: input.goalEvidence
+    });
+    if (latestChanged) {
+      await writeJsonAtomic(input.manifestPath, latestManifest);
+    }
+    replaceProviderWorkerManifestSnapshot(input.fallbackManifest, latestManifest);
+    return;
   }
   replaceProviderWorkerManifestSnapshot(input.fallbackManifest, manifest);
 }

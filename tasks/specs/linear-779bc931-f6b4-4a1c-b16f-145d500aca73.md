@@ -97,18 +97,24 @@ task_checklists:
 ```json
 {
   "source": "codex-goals",
+  "feature_available": true,
   "feature_enabled": true,
-  "capture_mode": "model_tool|app_server_notification|unavailable|stale|thread_mismatch",
-  "captured_at": "ISO-8601",
+  "capture_mode": "captured|cleared|disabled|unavailable|stale|thread_mismatch",
+  "capture_timestamp": "ISO-8601|null",
   "thread_id": "string|null",
+  "turn_id": "string|null",
   "objective": "string|null",
-  "status": "active|paused|budgetLimited|complete|unknown",
+  "status": "string|null",
+  "token_budget": 5000,
+  "tokens_used": 120,
   "elapsed_seconds": 0.25,
-  "candidate_updated_at": "ISO-8601|null",
+  "created_at": "ISO-8601|null",
+  "updated_at": "ISO-8601|null",
   "authority": "advisory_only",
   "linear_authority_preserved": true,
   "not_authorized_for": [
     "linear_transition",
+    "workpad_replacement",
     "pr_attachment",
     "review_handoff",
     "ready_review_success",
@@ -117,7 +123,8 @@ task_checklists:
     "long_poll_terminal_status",
     "hook_resume_control_integration",
     "tui_automation"
-  ]
+  ],
+  "reason": "string|null"
 }
 ```
 
@@ -175,6 +182,7 @@ task_checklists:
 - Owning surface: provider-worker manifest persistence and workpad summary rendering.
 - Steady-state proof: focused tests prove invalid candidate rejection and advisory marker persistence.
 - Tests/docs: CO-492 focused provider-worker manifest/workpad tests and this packet.
+- Non-expiring rationale: Linear/workpad/PR/review/check authority is the durable governing contract; advisory goal evidence is not temporary lifecycle authority and can only be replaced by a separate approved authority redesign.
 
 ## Validation Plan
 - Focused tests:

@@ -19,6 +19,7 @@ import {
 } from '../run/manifest.js';
 import { persistManifest, type ManifestPersister } from '../run/manifestPersister.js';
 import {
+  PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
   type ProviderLinearWorkerProof
 } from '../providerLinearWorkerRunner.js';
@@ -1155,14 +1156,22 @@ function buildProviderLinearWorkerManifestGoalEvidence(
         .map((item) => (typeof item === 'string' ? item.trim() : ''))
         .filter((item): item is string => item.length > 0)
     : [];
-  if (notAuthorizedFor.length === 0) {
+  const notAuthorizedForSet = new Set(notAuthorizedFor);
+  const hasCanonicalDenialSet = PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR.every((item) =>
+    notAuthorizedForSet.has(item)
+  );
+  if (
+    !hasCanonicalDenialSet ||
+    notAuthorizedFor.length !== PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR.length ||
+    notAuthorizedForSet.size !== PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR.length
+  ) {
     return null;
   }
   return {
     ...goalEvidence,
     authority: 'advisory_only',
     linear_authority_preserved: true,
-    not_authorized_for: notAuthorizedFor as [string, ...string[]]
+    not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR]
   };
 }
 

@@ -548,9 +548,131 @@ export interface ProviderLinearGoalEvidence {
   authority: "advisory_only";
   linear_authority_preserved: true;
   /**
-   * @minItems 1
+   * @minItems 10
+   * @maxItems 10
    */
-  not_authorized_for: [string, ...string[]];
+  not_authorized_for: [
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    ),
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    ),
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    ),
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    ),
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    ),
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    ),
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    ),
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    ),
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    ),
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    )
+  ];
   reason: string | null;
 }
 export interface CollabToolCall {

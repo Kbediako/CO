@@ -65,6 +65,12 @@
 | Stale fallback snapshots | Manifest patching could reuse stale candidate data to populate `goal_evidence`. | remove fallback | CO-492 | candidate reuse or manifest patching | stale PR #788 attempt | 2026-05-07 | this issue | stale snapshots are never written; stale candidates classify as stale | Manifest patching and stale timestamp regressions. |
 | Legacy hydration backfill | Legacy manifests could infer goal evidence without real goal notification. | remove fallback | CO-492 | legacy hydration reads old manifests | stale PR #788 attempt | 2026-05-07 | this issue | no backfill without real notification/current snapshot | Legacy hydration real notification regression. |
 
+- Contract name: Linear-first lifecycle authority with optional advisory `manifest goal_evidence`.
+- Owning surface: provider-worker manifest persistence and workpad summary rendering.
+- Steady-state proof: focused tests prove invalid candidate rejection and advisory marker persistence.
+- Tests/docs: CO-492 focused provider-worker manifest/workpad tests and this packet.
+- Non-expiring rationale: Linear/workpad/PR/review/check authority is the durable governing contract; advisory goal evidence is not temporary lifecycle authority and can only be replaced by a separate approved authority redesign.
+
 ## Parent-Owned Implementation
 - [ ] Add normalized advisory `goal_evidence` capture to provider-worker manifest evidence assembly.
 - [ ] Gate candidate reuse on goals feature availability, source provenance, thread identity, and timestamp freshness.

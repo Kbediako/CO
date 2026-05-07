@@ -79,12 +79,21 @@
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? Yes.
 - Decision: retain Linear/workpad/PR/review/check authority as the governing workflow contract and add only advisory goal evidence.
 - Contract name: Linear-first provider-worker lifecycle authority with optional advisory `manifest goal_evidence`.
-- Owner / owning surface: CO provider-worker workflow.
+- Owning surface: CO provider-worker workflow.
 - Introduced date: authority contract predates CO-492; advisory capture introduced by this lane.
 - Review date: 2026-05-07.
 - Maximum lifetime: non-expiring authority contract; stale candidate reuse fallback must be removed in the implementation.
 - Removal condition: only a separate approved authority redesign can replace Linear/workpad/PR/review/check truth; stale fallback snapshots are not supported.
+- Non-expiring rationale: Linear/workpad/PR/review/check authority is the durable governing contract; advisory goal evidence is not temporary lifecycle authority and can only be replaced by a separate approved authority redesign.
+- Steady-state proof: focused provider-worker tests prove invalid candidate rejection, canonical advisory marker persistence, and no lifecycle authorization from goal state.
+- Tests/docs: CO-492 focused provider-worker tests, manifest schema coverage, and this docs packet.
 - Validation evidence: focused tests listed in the CO-492 TECH_SPEC plus parent validation and review gates.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Provider-worker lifecycle authority | Goal evidence may exist beside Linear/workpad/PR/review/check truth. | justify retaining fallback | CO provider-worker workflow | goals feature enabled, unavailable, stale, or thread mismatched | Existing authority predates CO-492 | 2026-05-07 | non-expiring authority contract | only replaced by a separate approved authority redesign | Advisory marker tests plus provider-worker lifecycle gates. |
+| Stale fallback snapshots | Manifest patching could reuse stale candidate data to populate `goal_evidence`. | remove fallback | CO-492 | candidate reuse or manifest patching | stale PR #788 attempt | 2026-05-07 | this issue | stale snapshots are never written; stale candidates classify as stale | Manifest patching and stale timestamp regressions. |
+| Legacy hydration backfill | Legacy manifests could infer goal evidence without real goal notification. | remove fallback | CO-492 | legacy hydration reads old manifests | stale PR #788 attempt | 2026-05-07 | this issue | no backfill without real notification/current snapshot | Legacy hydration real notification regression. |
 
 ## Open Questions
 - Should unavailable goal capture record a full `goal_evidence` object with `capture_mode=unavailable`, or only a minimal advisory marker and reason?

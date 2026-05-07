@@ -56,6 +56,7 @@ import { deriveReviewOutcomeDisposition } from '../../scripts/lib/review-executi
 import { normalizeEnvironmentPaths } from '../src/cli/run/environment.js';
 import { bootstrapManifest } from '../src/cli/run/manifest.js';
 import { runCommandStage } from '../src/cli/services/commandRunner.js';
+import { PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR } from '../src/cli/providerLinearWorkerRunner.js';
 import type { CommandStage, PipelineDefinition } from '../src/cli/types.js';
 
 const ORIGINAL_ENV = {
@@ -1431,7 +1432,7 @@ describe('runCommandStage review evidence consistency', () => {
           updated_at: '2026-03-21T09:00:00.000Z',
           authority: 'advisory_only',
           linear_authority_preserved: true,
-          not_authorized_for: ['linear_transition', 'review_handoff', 'merge_closeout'],
+          not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
           reason: null
         }
       });
@@ -1460,11 +1461,55 @@ describe('runCommandStage review evidence consistency', () => {
       authority: 'advisory_only',
       linear_authority_preserved: true
     });
-    expect(persisted.goal_evidence?.not_authorized_for).toEqual([
-      'linear_transition',
-      'review_handoff',
-      'merge_closeout'
-    ]);
+    expect(persisted.goal_evidence?.not_authorized_for).toEqual(
+      PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR
+    );
+  });
+
+  it('rejects provider-worker goal evidence with incomplete lifecycle denial markers', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_inactive',
+        goal_evidence: {
+          source: 'codex-goals',
+          feature_available: true,
+          feature_enabled: true,
+          capture_mode: 'captured',
+          capture_timestamp: '2026-03-21T09:00:00.250Z',
+          thread_id: 'thread-goal',
+          turn_id: 'turn-goal-1',
+          objective: 'partial denial evidence',
+          status: 'active',
+          token_budget: 5000,
+          tokens_used: 321,
+          elapsed_seconds: 66.5,
+          created_at: '2026-03-21T08:59:00.000Z',
+          updated_at: '2026-03-21T09:00:00.000Z',
+          authority: 'advisory_only',
+          linear_authority_preserved: true,
+          not_authorized_for: ['linear_transition', 'review_handoff', 'merge_closeout'],
+          reason: null
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage({
+      id: 'provider-linear-worker',
+      title: 'Run provider linear worker',
+      command: 'node providerLinearWorkerRunner.js',
+      summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+    });
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+    const persisted = JSON.parse(await readFile(paths.manifestPath, 'utf8')) as {
+      goal_evidence?: Record<string, unknown> | null;
+    };
+
+    expect(result.exitCode).toBe(0);
+    expect(manifest.goal_evidence).toBeNull();
+    expect(persisted.goal_evidence).toBeNull();
   });
 
   it('rejects provider-worker goal evidence that lacks advisory authority markers', async () => {
