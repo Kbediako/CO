@@ -1,6 +1,40 @@
 {
   "items": [
     {
+      "id": "20260507-linear-203c5fad-698f-4094-970c-06de5743d94c",
+      "title": "CO-482 create-follow-up label assignment by live Linear label ids",
+      "relates_to": "tasks/tasks-linear-203c5fad-698f-4094-970c-06de5743d94c.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-07",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "docs-packet-fileonly same-issue child lane",
+          "date": "2026-05-07",
+          "status": "accepted",
+          "manifest": ".runs/linear-203c5fad-698f-4094-970c-06de5743d94c-docs-packet-fileonly/cli/2026-05-07T06-16-45-038Z-578da43b/manifest.json",
+          "summary": "Bounded same-issue child lane created the CO-482 docs-first packet and parent accepted the patch after the first docs child drifted into parent-owned Linear/tool discovery."
+        },
+        "implementation_strategy": {
+          "reviewer": "CO-482 provider worker",
+          "date": "2026-05-07",
+          "status": "implemented-focused-validation-green",
+          "summary": "Implemented source-derived live label assignment in ProviderLinearWorkflowFacade: create-follow-up now requires live source labels for Lifecycle: Implementation, Priority, Area, and type, uses labelIds on create, uses addedLabelIds on canonical-owner reuse, returns result labels, and fails closed with requested/observed/missing label evidence."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-203c5fad-698f-4094-970c-06de5743d94c.md",
+        "task": "tasks/tasks-linear-203c5fad-698f-4094-970c-06de5743d94c.md",
+        "agent_task": ".agent/task/linear-203c5fad-698f-4094-970c-06de5743d94c.md",
+        "prd": "docs/PRD-linear-203c5fad-698f-4094-970c-06de5743d94c.md",
+        "docs": "docs/TECH_SPEC-linear-203c5fad-698f-4094-970c-06de5743d94c.md",
+        "action_plan": "docs/ACTION_PLAN-linear-203c5fad-698f-4094-970c-06de5743d94c.md"
+      }
+    },
+    {
       "id": "20260507-linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5",
       "title": "CO-511 restore docs freshness owner for CO-102 stale packet rows",
       "relates_to": "tasks/tasks-linear-df57f3cf-2e2e-4d29-a484-a8f3cd92e7c5.md",
