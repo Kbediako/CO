@@ -16131,7 +16131,7 @@ describe('providerLinearWorkflowFacade', () => {
       `- Canonical owner marker: \`${canonicalOwnerMarker}\``,
       '',
       '## Immediate Traceability',
-      '- Follow-up packet prefix: `linear-lin-issue-254`'
+      '* Follow-up packet prefix: `linear-lin-issue-254`'
     ].join('\n');
     const longerCanonicalOwnerMarker = `${canonicalOwnerMarker}-other`;
     const calls: string[] = [];
@@ -16750,6 +16750,105 @@ describe('providerLinearWorkflowFacade', () => {
       }
     });
     expect(calls).toEqual(['issue-summary', 'owner-search', 'related-relation', 'blocks-relation']);
+  });
+
+  it('keeps packet readiness blocked when the packet prefix only appears inside a fenced example', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'provider-linear-follow-up-packet-'));
+    tempDirs.push(repoRoot);
+    await seedFollowUpPacketReadiness(repoRoot, 'linear-lin-issue-254');
+    const canonicalOwnerKey = 'baseline_cohort_id:apr-19-docs-freshness';
+    const canonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
+    const canonicalOwnerDescription = [
+      'Apr 19 baseline owner.',
+      '## Canonical Owner',
+      `- Canonical owner key: \`${canonicalOwnerKey}\``,
+      `- Canonical owner marker: \`${canonicalOwnerMarker}\``,
+      '',
+      '## Immediate Traceability',
+      '```md',
+      '- Follow-up packet prefix: `linear-lin-issue-254`',
+      '```'
+    ].join('\n');
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, unknown>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCanonicalFollowUpOwners')) {
+        return jsonResponse(
+          buildCanonicalOwnerIssuesBody([
+            buildCanonicalOwnerIssue({
+              id: 'lin-issue-254',
+              identifier: 'CO-254',
+              title: 'Apr 19 spec/docs freshness baseline owner',
+              description: canonicalOwnerDescription,
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            })
+          ])
+        );
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        throw new Error('canonical owner reuse with existing owner must not create another issue');
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        return jsonResponse({
+          errors: [
+            {
+              message: 'Issue relation already exists.',
+              extensions: {
+                code: 'RELATION_ALREADY_EXISTS'
+              }
+            }
+          ]
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Apr 19 spec/docs freshness baseline owner',
+      description: 'Keep the Apr 19 duplicate cluster on one owner.',
+      intentChecksum: '- Preserve Apr 19 spec/docs freshness baseline owner routing.',
+      nonGoals: '- [ ] Do not create duplicate Apr 19 owner issues.',
+      notDoneIf: '- [ ] A repeated lane creates a new owner.',
+      acceptanceCriteria: '- [ ] Repeated lanes reuse the stamped owner.',
+      canonicalOwnerKey,
+      repoRoot,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'create-follow-up',
+      action: 'reused',
+      traceability: {
+        packet: {
+          readiness: {
+            checked: true,
+            description_has_packet_prefix: false,
+            ready: false,
+            missing_paths: [],
+            missing_registry_mirrors: []
+          },
+          queue_admission_blocker: {
+            reason: 'backlog_head_follow_up_traceability_pending',
+            state: 'Backlog',
+            enforced_by: 'create-follow-up'
+          }
+        }
+      }
+    });
   });
 
   it('keeps packet readiness blocked when registry mirror evidence is incomplete or invalid', async () => {
