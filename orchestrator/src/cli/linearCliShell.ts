@@ -16,6 +16,7 @@ import {
   descriptionHasExactCanonicalOwnerMarker,
   findMissingFollowUpLabelIds,
   getProviderLinearIssueContext,
+  reconcileProviderLinearFollowUpRelations,
   resolveFollowUpLabelsFromSourceIssue,
   type ProviderLinearAttachPrResult,
   type ProviderLinearCreateFollowUpResult,
@@ -88,6 +89,7 @@ interface LinearCliShellDependencies {
   runProviderLinearChildStreamShell: typeof runProviderLinearChildStreamShell;
   runProviderLinearChildLaneShell: typeof runProviderLinearChildLaneShell;
   createProviderLinearFollowUpIssue: typeof createProviderLinearFollowUpIssue;
+  reconcileProviderLinearFollowUpRelations: typeof reconcileProviderLinearFollowUpRelations;
   resolveProviderLinearRuntimeProof: typeof resolveProviderLinearRuntimeProof;
   resolveProviderLinearScreenshotProof: typeof resolveProviderLinearScreenshotProof;
   loadProviderLinearWorkerContext: typeof loadProviderLinearWorkerContext;
@@ -204,6 +206,7 @@ const DEFAULT_DEPENDENCIES: LinearCliShellDependencies = {
   runProviderLinearChildStreamShell,
   runProviderLinearChildLaneShell,
   createProviderLinearFollowUpIssue,
+  reconcileProviderLinearFollowUpRelations,
   resolveProviderLinearRuntimeProof,
   resolveProviderLinearScreenshotProof,
   loadProviderLinearWorkerContext,
@@ -480,7 +483,8 @@ export async function runLinearCliShell(
           'canonical-owner-key-file'
         );
         const blockedBySource = readBooleanFlag(params.flags, 'blocked-by-source');
-        const repoRoot = resolveRuntimeProofRepoRoot(dependencies.getCwd(), env);
+        const sourceSetup = readSourceSetup(params.flags);
+        const repoRoot = resolveFollowUpPacketRepoRoot(dependencies.getCwd(), env);
         const retrySuppressed = await resolveCreateFollowUpRetrySuppression({
           issueId,
           title,
@@ -490,6 +494,7 @@ export async function runLinearCliShell(
           parityLane,
           parityMatrix,
           repoRoot,
+          sourceSetup,
           env,
           dependencies
         });
@@ -515,7 +520,7 @@ export async function runLinearCliShell(
             canonicalOwnerKey,
             blockedBySource,
             repoRoot,
-            sourceSetup: readSourceSetup(params.flags),
+            sourceSetup,
             env
           })
         );
@@ -778,10 +783,15 @@ async function resolveCreateFollowUpRetrySuppression(input: {
   parityLane: boolean;
   parityMatrix: string | null;
   repoRoot: string;
+  sourceSetup: DispatchPilotSourceSetup | null;
   env: NodeJS.ProcessEnv;
   dependencies: Pick<
     LinearCliShellDependencies,
-    'getProviderLinearIssueContext' | 'loadProviderLinearWorkerContext' | 'readTextFile' | 'warn'
+    | 'getProviderLinearIssueContext'
+    | 'reconcileProviderLinearFollowUpRelations'
+    | 'loadProviderLinearWorkerContext'
+    | 'readTextFile'
+    | 'warn'
   >;
 }): Promise<ProviderLinearCreateFollowUpResult | null> {
   const auditPath = resolveProviderLinearAuditPath(input.env);
@@ -848,6 +858,7 @@ async function resolveCreateFollowUpRetrySuppression(input: {
           canonicalOwnerKey: input.canonicalOwnerKey,
           blockedBySource: input.blockedBySource,
           repoRoot: input.repoRoot,
+          sourceSetup: input.sourceSetup,
           env: input.env,
           dependencies: input.dependencies
         })
@@ -935,8 +946,12 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
   canonicalOwnerKey: string | null;
   blockedBySource: boolean;
   repoRoot: string;
+  sourceSetup: DispatchPilotSourceSetup | null;
   env: NodeJS.ProcessEnv;
-  dependencies: Pick<LinearCliShellDependencies, 'getProviderLinearIssueContext'>;
+  dependencies: Pick<
+    LinearCliShellDependencies,
+    'getProviderLinearIssueContext' | 'reconcileProviderLinearFollowUpRelations'
+  >;
 }): Promise<ProviderLinearCreateFollowUpResult | null> {
   const entry = input.entry;
   const followUpIssueId = normalizeOptionalString(entry.follow_up_issue_id);
@@ -947,19 +962,6 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
   const sourceIssueIdentifier = normalizeOptionalString(entry.issue_identifier) ?? sourceIssueId;
   const followUpIssueIdentifier = normalizeOptionalString(entry.follow_up_issue_identifier);
   if (!sourceIssueId || !sourceIssueIdentifier || !followUpIssueIdentifier) {
-    return null;
-  }
-  const selfRelationSkipped = sourceIssueId === followUpIssueId && entry.via === 'none';
-  const relatedSatisfied = entry.via === 'related' || entry.via === 'related+blocks';
-  const blockedSatisfied = entry.via === 'related+blocks';
-  const relatedAction = selfRelationSkipped ? 'skipped_self' : 'already_satisfied';
-  const blockedAction = input.blockedBySource
-    ? relatedAction
-    : 'not_requested';
-  if (
-    (!relatedSatisfied && !selfRelationSkipped)
-    || (input.blockedBySource && !blockedSatisfied && !selfRelationSkipped)
-  ) {
     return null;
   }
   const localPacketTraceability = await buildFollowUpPacketTraceabilityEvidence({
@@ -977,12 +979,20 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
   ) {
     return null;
   }
+  const sourceScopedInput = input.sourceSetup
+    ? { sourceSetup: input.sourceSetup }
+    : {};
   const followUpContext = await input.dependencies.getProviderLinearIssueContext({
     issueId: followUpIssueId,
+    ...sourceScopedInput,
     env: input.env
   });
   if (!followUpContext.ok) {
     return null;
+  }
+  const followUpMutabilityFailure = buildCreateFollowUpIssueNotMutableResult(followUpContext.issue);
+  if (followUpMutabilityFailure) {
+    return followUpMutabilityFailure;
   }
   const packetTraceability = await buildFollowUpPacketTraceabilityEvidence(
     followUpContext.issue,
@@ -1023,6 +1033,7 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
   }
   const sourceContext = await input.dependencies.getProviderLinearIssueContext({
     issueId: sourceIssueId,
+    ...sourceScopedInput,
     env: input.env
   });
   if (!sourceContext.ok) {
@@ -1065,6 +1076,16 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
       }
     };
   }
+  const relationResult = await input.dependencies.reconcileProviderLinearFollowUpRelations({
+    sourceIssue: sourceContext.issue,
+    followUpIssue: followUpContext.issue,
+    blockedBySource: input.blockedBySource,
+    sourceSetup: input.sourceSetup,
+    env: input.env
+  });
+  if (!relationResult.ok) {
+    return relationResult.result;
+  }
   const followUpTeam = followUpContext.issue.team
     ? {
         id: followUpContext.issue.team.id,
@@ -1097,8 +1118,8 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
         }
       : null,
     relations: {
-      related: relatedSatisfied,
-      blocked_by_source: blockedSatisfied
+      related: relationResult.relations.related.satisfied,
+      blocked_by_source: relationResult.relations.blocked_by_source.satisfied
     },
     traceability: {
       labels: {
@@ -1110,27 +1131,40 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
         observed_labels: followUpContext.issue.labels,
         missing_label_ids: []
       },
-      relations: {
-        related: {
-          type: 'related',
-          requested: true,
-          satisfied: relatedSatisfied,
-          action: relatedAction,
-          issue_id: sourceIssueId,
-          related_issue_id: followUpIssueId
-        },
-        blocked_by_source: {
-          type: 'blocks',
-          requested: input.blockedBySource,
-          satisfied: blockedSatisfied,
-          action: blockedAction,
-          issue_id: sourceIssueId,
-          related_issue_id: followUpIssueId
-        }
-      },
+      relations: relationResult.relations,
       packet: packetTraceability
     },
-    source_setup: null
+    source_setup: relationResult.source_setup
+  };
+}
+
+function buildCreateFollowUpIssueNotMutableResult(issue: {
+  id: string;
+  identifier: string;
+  archived_at?: string | null;
+  trashed?: boolean | null;
+}): Extract<ProviderLinearCreateFollowUpResult, { ok: false }> | null {
+  const states = [
+    issue.archived_at ? 'archived' : null,
+    issue.trashed === true ? 'trashed' : null
+  ].filter((value): value is string => Boolean(value));
+  if (states.length === 0) {
+    return null;
+  }
+  return {
+    ok: false,
+    operation: 'create-follow-up',
+    error: {
+      code: 'linear_issue_not_mutable',
+      message: `Linear issue ${issue.identifier} is ${states.join(' and ')} and cannot accept provider mutations.`,
+      status: 409,
+      details: {
+        issue_id: issue.id,
+        issue_identifier: issue.identifier,
+        archived_at: issue.archived_at ?? null,
+        trashed: issue.trashed ?? null
+      }
+    }
   };
 }
 
@@ -2195,7 +2229,7 @@ function resolveAuditSourceSetup(flags: ArgMap, env: NodeJS.ProcessEnv): Dispatc
   return resolved.workspace_id || resolved.team_id || resolved.project_id ? resolved : null;
 }
 
-function resolveRuntimeProofRepoRoot(cwd: string, env: NodeJS.ProcessEnv): string {
+function resolveFollowUpPacketRepoRoot(cwd: string, env: NodeJS.ProcessEnv): string {
   const configuredRoot = normalizeEnvPath(env.CODEX_ORCHESTRATOR_ROOT);
   if (!configuredRoot) {
     return resolveRepoRootFromHint(cwd);
@@ -2204,14 +2238,42 @@ function resolveRuntimeProofRepoRoot(cwd: string, env: NodeJS.ProcessEnv): strin
   return resolveRepoRootFromHint(configuredHint);
 }
 
+function resolveRuntimeProofRepoRoot(cwd: string, env: NodeJS.ProcessEnv): string {
+  const configuredRoot = normalizeEnvPath(env.CODEX_ORCHESTRATOR_ROOT);
+  if (!configuredRoot) {
+    return resolveNearestProjectRootFromHint(cwd);
+  }
+  const configuredHint = isAbsolute(configuredRoot) ? configuredRoot : resolve(cwd, configuredRoot);
+  return resolveNearestProjectRootFromHint(configuredHint);
+}
+
 function resolveRepoRootFromHint(rootHint: string): string {
   const normalizedHint = resolve(rootHint);
   const gitBoundary = findNearestGitBoundary(normalizedHint);
-  const taskRegistryRoots: string[] = [];
-  let current: string | null = normalizedHint;
+  const taskRegistryRoots = findTaskRegistryRoots(normalizedHint);
+  return (
+    taskRegistryRoots.find(isCodexOrchestratorRepoRoot)
+    ?? taskRegistryRoots[0]
+    ?? gitBoundary
+    ?? normalizedHint
+  );
+}
+
+function resolveNearestProjectRootFromHint(rootHint: string): string {
+  const normalizedHint = resolve(rootHint);
+  const gitBoundary = findNearestGitBoundary(normalizedHint);
+  if (gitBoundary) {
+    return gitBoundary;
+  }
+  return findTaskRegistryRoots(normalizedHint)[0] ?? normalizedHint;
+}
+
+function findTaskRegistryRoots(start: string): string[] {
+  const roots: string[] = [];
+  let current: string | null = resolve(start);
   while (current) {
     if (existsSync(join(current, 'tasks', 'index.json'))) {
-      taskRegistryRoots.push(current);
+      roots.push(current);
     }
     const parent = dirname(current);
     if (parent === current) {
@@ -2219,12 +2281,7 @@ function resolveRepoRootFromHint(rootHint: string): string {
     }
     current = parent;
   }
-  return (
-    taskRegistryRoots.find(isCodexOrchestratorRepoRoot)
-    ?? taskRegistryRoots[0]
-    ?? gitBoundary
-    ?? normalizedHint
-  );
+  return roots;
 }
 
 function findNearestGitBoundary(start: string): string | null {

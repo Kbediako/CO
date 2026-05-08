@@ -3287,6 +3287,65 @@ export async function createProviderLinearFollowUpIssue(input: {
   };
 }
 
+export async function reconcileProviderLinearFollowUpRelations(input: {
+  sourceIssue: Pick<ProviderLinearIssueContext, 'id' | 'identifier' | 'archived_at' | 'trashed'>;
+  followUpIssue: ProviderLinearIssueContext;
+  blockedBySource?: boolean;
+  sourceSetup?: DispatchPilotSourceSetup | null;
+  env?: NodeJS.ProcessEnv;
+  fetchImpl?: typeof fetch;
+}): Promise<
+  | {
+      ok: true;
+      relations: ProviderLinearFollowUpRelationEvidence;
+      source_setup: DispatchPilotSourceSetup | null;
+    }
+  | {
+      ok: false;
+      result: Extract<ProviderLinearCreateFollowUpResult, { ok: false }>;
+    }
+> {
+  const followUpMutabilityFailure = failureIfIssueNotMutable('create-follow-up', input.followUpIssue);
+  if (followUpMutabilityFailure) {
+    return {
+      ok: false,
+      result: followUpMutabilityFailure
+    };
+  }
+  const session = resolveLinearWorkflowSession(input.env, input.fetchImpl, input.sourceSetup);
+  if (!session.ok) {
+    return {
+      ok: false,
+      result: failureFromWorkflowError('create-follow-up', session.error)
+    };
+  }
+  const budgetError = await preflightProviderLinearBudget({
+    session: session.session,
+    operation: 'create-follow-up',
+    minimumRequestsRemaining: input.blockedBySource === true ? 2 : 1
+  });
+  if (budgetError) {
+    return {
+      ok: false,
+      result: failureFromWorkflowError('create-follow-up', budgetError)
+    };
+  }
+  const relationResult = await createFollowUpRelations({
+    session: session.session,
+    sourceIssue: input.sourceIssue,
+    followUpIssue: input.followUpIssue,
+    blockedBySource: input.blockedBySource === true
+  });
+  if (!relationResult.ok) {
+    return relationResult;
+  }
+  return {
+    ok: true,
+    relations: relationResult.relations,
+    source_setup: session.session.sourceSetup
+  };
+}
+
 export function resolveFollowUpLabelsFromSourceIssue(issue: ProviderLinearIssueSummary):
   | {
       ok: true;
@@ -4258,7 +4317,7 @@ function isIssueRelationAlreadySatisfiedError(
 
 async function createFollowUpRelations(input: {
   session: ResolvedLinearWorkflowSession;
-  sourceIssue: ProviderLinearIssueSummary;
+  sourceIssue: Pick<ProviderLinearIssueSummary, 'id' | 'identifier'>;
   followUpIssue: ProviderLinearCreatedIssue;
   createdIssue?: ProviderLinearCreatedIssue | null;
   blockedBySource: boolean;
@@ -4465,7 +4524,7 @@ async function buildFollowUpCreationTraceability(input: {
 }
 
 function buildFollowUpRelationEvidence(input: {
-  sourceIssue: ProviderLinearIssueSummary;
+  sourceIssue: Pick<ProviderLinearIssueSummary, 'id' | 'identifier'>;
   followUpIssue: ProviderLinearCreatedIssue;
   blockedBySource: boolean;
   relatedAction: ProviderLinearFollowUpRelationEvidenceEntry['action'];
