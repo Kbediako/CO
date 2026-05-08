@@ -648,6 +648,7 @@ interface ProviderControlHostRefreshFailureDiagnostic {
 export interface ProviderLinearWorkerJsonlParseResult {
   threadId: string | null;
   turnId: string | null;
+  turnStartedAt?: string | null;
   finalMessage: string | null;
   finalMessageSource?: 'agent_message_delta' | 'other' | null;
   finalMessageDeltaKey?: string | null;
@@ -3983,6 +3984,13 @@ function initializeProviderLinearWorkerJsonlInternalState(
 ): ProviderLinearWorkerJsonlParseResult {
   const resolvedModelProvenance = state.resolvedModelProvenance ?? null;
   const goalEvidence = state.goalEvidence ?? null;
+  const turnStartedAt = state.turnStartedAt ?? null;
+  Object.defineProperty(state, 'turnStartedAt', {
+    value: turnStartedAt,
+    writable: true,
+    enumerable: false,
+    configurable: true
+  });
   Object.defineProperty(state, 'resolvedModelProvenance', {
     value: resolvedModelProvenance,
     writable: true,
@@ -4111,9 +4119,14 @@ function applyProviderLinearWorkerJsonlRecord(
   }
   if (parsed.type === 'turn_context' && payload) {
     const nextTurnId = normalizeOptionalString(payload.turn_id);
+    const nextTurnStartedAt = extractProviderWorkerEventTimestamp(parsed);
     if (nextTurnId && nextTurnId !== state.turnId) {
       resetProviderLinearWorkerTurnScopedTelemetry(state, nextTurnId);
       state.turnId = nextTurnId;
+      state.turnStartedAt = nextTurnStartedAt;
+      changed = true;
+    } else if (nextTurnId && !state.turnStartedAt && nextTurnStartedAt) {
+      state.turnStartedAt = nextTurnStartedAt;
       changed = true;
     }
   }
@@ -4308,6 +4321,7 @@ function resetProviderLinearWorkerTurnScopedTelemetry(
   state.failureDiagnosis = null;
   state.goalEvidence = preservedGoalEvidence;
   state.goalToolCallNames = {};
+  state.turnStartedAt = null;
 }
 
 function shouldPreserveProviderLinearGoalEvidenceAcrossTurnReset(
@@ -4691,8 +4705,12 @@ function readProviderWorkerResponseItemCallId(input: Record<string, unknown>): s
   return (
     normalizeOptionalString(input.call_id) ??
     normalizeOptionalString(input.callId) ??
+    normalizeOptionalString(input.tool_call_id) ??
+    normalizeOptionalString(input.toolCallId) ??
     normalizeOptionalString(payload?.call_id) ??
-    normalizeOptionalString(payload?.callId)
+    normalizeOptionalString(payload?.callId) ??
+    normalizeOptionalString(payload?.tool_call_id) ??
+    normalizeOptionalString(payload?.toolCallId)
   );
 }
 
@@ -5058,6 +5076,14 @@ function selectPreferredProviderLinearGoalEvidence(
   ) {
     return observed;
   }
+  if (
+    options.preserveTimestampedCurrentFromTimestamplessObserved !== true &&
+    current.capture_mode === 'captured' &&
+    observed.capture_mode === 'captured' &&
+    !observedCaptureTimestamp
+  ) {
+    return observed;
+  }
   if (currentTimestamp && observedTimestamp && compareIsoTimestamp(observedTimestamp, currentTimestamp) < 0) {
     return current;
   }
@@ -5214,6 +5240,28 @@ export function normalizeProviderLinearGoalEvidenceValue(value: unknown): Provid
       createdAt: null,
       updatedAt: null,
       reason: 'goal_feature_available_malformed'
+    });
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(value, 'feature_enabled') &&
+    value.feature_enabled != null &&
+    normalizeProviderLinearGoalEvidenceBoolean(value.feature_enabled) === null
+  ) {
+    return buildProviderLinearGoalEvidence({
+      featureAvailable: capturedEvidence.feature_available,
+      featureEnabled: null,
+      captureMode: 'unavailable',
+      captureTimestamp: capturedEvidence.capture_timestamp,
+      threadId: capturedEvidence.thread_id,
+      turnId: capturedEvidence.turn_id,
+      objective: null,
+      status: null,
+      tokenBudget: null,
+      tokensUsed: null,
+      elapsedSeconds: null,
+      createdAt: null,
+      updatedAt: null,
+      reason: 'goal_feature_enabled_malformed'
     });
   }
   if (captureMode === 'captured') {
@@ -9119,6 +9167,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     parseState.resolvedModelProvenance = proofBaselineResolvedModelProvenance;
     parseState.failureDiagnosis = proof.failure_diagnosis ?? null;
     parseState.goalEvidence = proof.goal_evidence ?? null;
+    parseState.turnStartedAt = proof.current_turn_started_at ?? proof.attempt_started_at ?? null;
     sessionLogGoalEvidence = null;
   };
   let tailState = buildProviderWorkerSessionLogTailState(
@@ -9331,7 +9380,11 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
             proofThreadId: liveThreadId,
             proofTurnId: liveTurnId,
             observedAt: proof.updated_at ?? new Date().toISOString(),
-            currentTurnStartedAt: proof.current_turn_started_at ?? proof.attempt_started_at ?? null,
+            currentTurnStartedAt:
+              parseState.turnStartedAt ??
+              proof.current_turn_started_at ??
+              proof.attempt_started_at ??
+              null,
             featureEnabled: null,
             runtimeMode: proof.runtime?.selected_mode ?? null
           }),
@@ -13177,7 +13230,7 @@ export async function runProviderLinearWorker(
             proofThreadId: liveThreadId,
             proofTurnId: liveTurnId,
             observedAt: deps.now(),
-            currentTurnStartedAt: finalProof.current_turn_started_at ?? turnStartedAt,
+            currentTurnStartedAt: turnStartedAt ?? finalProof.current_turn_started_at ?? null,
             featureEnabled: currentTurnGoalsFeatureEnabled ?? null,
             runtimeMode: runtimeContext.runtime.selected_mode
           }),
@@ -13676,7 +13729,7 @@ export async function runProviderLinearWorker(
         issue_id: context.issueId,
         issue_identifier: context.issueIdentifier,
         attempt_started_at: finalProof.attempt_started_at,
-        current_turn_started_at: finalProof.current_turn_started_at ?? turnStartedAt,
+        current_turn_started_at: turnStartedAt,
         pid: workerPid,
         thread_id: threadId,
         latest_turn_id: turnId,
