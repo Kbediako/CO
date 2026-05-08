@@ -9,12 +9,13 @@
 ## Checklist
 - [x] Docs-first packet created and mirrored for CO-509. Evidence: this packet and registry updates on branch `kb/co-509-packet-traceability`.
 - [x] User reminder translated into issue scope: automatic labels, related links, and packet/mirror traceability.
-- [ ] Run `node scripts/spec-guard.mjs --dry-run`.
-- [ ] Run `npm run docs:check`.
-- [ ] Run `npm run docs:freshness`.
-- [ ] Run docs/review gate before implementation work.
-- [ ] Implement helper changes for labels, relations, canonical-owner reuse, and packet/mirror readiness or fail-closed evidence.
-- [ ] Validate focused tests and full required gates before review handoff.
+- [x] Run `node scripts/spec-guard.mjs --dry-run`. Evidence: passed locally on 2026-05-08.
+- [x] Run `npm run docs:check`. Evidence: passed locally on 2026-05-08.
+- [x] Run `npm run docs:freshness`. Evidence: passed locally on 2026-05-08 with 5309 docs and 5312 registry entries.
+- [x] Run manifest-backed standalone/elegance review gate before review handoff. Evidence: final `codex-orchestrator review --uncommitted` returned `review_verdict=clean`, `finding_count=0`.
+- [x] Implement helper changes for labels, relations, canonical-owner reuse, and packet/mirror readiness or fail-closed evidence. Evidence: `ProviderLinearCreateFollowUpResult.traceability` now returns label, relation, and packet admission evidence while preserving existing `relations` booleans.
+- [x] Validate focused tests for the helper changes. Evidence: `npm run test:core -- orchestrator/tests/ProviderLinearWorkflowFacade.test.ts orchestrator/tests/LinearCliShell.test.ts` passed 339 tests after the repo-root packet-readiness fix.
+- [x] Validate full required gates before review handoff. Evidence: delegation guard, spec guard, build, lint, test, docs checks, stewardship, diff-budget, and pack-smoke passed; `npm run test` passed 359 files / 5523 tests.
 
 ## Notes
 - Fresh evidence comment: CO-509 comment `f440fafc-6bfe-4e87-aacb-5843a487467b` records the post-CO-508 queue audit and CO-517 relation repair path.

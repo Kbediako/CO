@@ -493,6 +493,7 @@ export async function runLinearCliShell(
             'canonical-owner-key-file'
           ),
           blockedBySource: readBooleanFlag(params.flags, 'blocked-by-source'),
+          repoRoot: resolveRuntimeProofRepoRoot(dependencies.getCwd(), env),
           sourceSetup: readSourceSetup(params.flags),
           env
         });

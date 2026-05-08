@@ -675,6 +675,7 @@ describe('runLinearCliShell', () => {
       {
         createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
         getEnv: () => ({ CO_LINEAR_API_TOKEN: 'lin-api-token' }),
+        getCwd: () => '/repo',
         log: vi.fn()
       }
     );
@@ -691,11 +692,62 @@ describe('runLinearCliShell', () => {
       parityMatrix: null,
       canonicalOwnerKey: null,
       blockedBySource: true,
+      repoRoot: '/repo',
       sourceSetup: null,
       env: {
         CO_LINEAR_API_TOKEN: 'lin-api-token'
       }
     });
+  });
+
+  it('resolves create-follow-up packet readiness repo root from the cwd hint', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'linear-cli-follow-up-root-'));
+    tempDirs.push(repoRoot);
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await mkdir(join(repoRoot, 'packages', 'app'), { recursive: true });
+    await writeFile(join(repoRoot, 'tasks/index.json'), '{}');
+    const createProviderLinearFollowUpIssueMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>()
+        .mockResolvedValue({
+          ok: false,
+          operation: 'create-follow-up',
+          error: {
+            code: 'linear_follow_up_label_resolution_failed',
+            message: 'missing label',
+            status: 422
+          }
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          title: 'Follow-up',
+          description: 'Investigate',
+          'intent-checksum': '- Preserve exact `CO STATUS` wording.',
+          'non-goals': '- [ ] Do not reopen the browser surface.',
+          'not-done-if': '- [ ] The issue still allows browser-first parity.',
+          'acceptance-criteria': '- [ ] Captured'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        getEnv: () => ({ CO_LINEAR_API_TOKEN: 'lin-api-token' }),
+        getCwd: () => join(repoRoot, 'packages', 'app'),
+        log: vi.fn(),
+        setExitCode: vi.fn()
+      }
+    );
+
+    expect(createProviderLinearFollowUpIssueMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        issueId: 'lin-issue-1',
+        repoRoot
+      })
+    );
   });
 
   it('routes runtime-proof into the policy resolver and records audit metadata', async () => {
@@ -1247,6 +1299,7 @@ describe('runLinearCliShell', () => {
           CO_LINEAR_API_TOKEN: 'lin-api-token',
           CODEX_PROVIDER_LINEAR_AUDIT_PATH: '/tmp/provider-linear-audit.jsonl'
         }),
+        getCwd: () => '/repo',
         now: () => '2026-03-22T12:00:00.000Z',
         appendAuditEntry,
         log
@@ -1266,6 +1319,7 @@ describe('runLinearCliShell', () => {
         '- Current: browser-first\n- Reference: Symphony terminal parity\n- Target: exact terminal parity\n- Out of scope: unrelated UI additions',
       canonicalOwnerKey: 'baseline_cohort_id:co-175-apr-14-march-14-tasks-1164-1195',
       blockedBySource: true,
+      repoRoot: '/repo',
       sourceSetup: {
         provider: 'linear',
         workspace_id: 'lin-workspace-1',

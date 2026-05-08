@@ -502,6 +502,51 @@ export interface ProviderLinearCreatedIssue {
   labels?: ProviderLinearIssueLabel[];
 }
 
+export interface ProviderLinearFollowUpCreationTraceability {
+  labels: {
+    source_issue: Pick<ProviderLinearIssueContext, 'id' | 'identifier'>;
+    requested_labels: ProviderLinearIssueLabel[];
+    observed_labels: ProviderLinearIssueLabel[] | null;
+    missing_label_ids: string[];
+  };
+  relations: ProviderLinearFollowUpRelationEvidence;
+  packet: ProviderLinearFollowUpPacketTraceabilityEvidence;
+}
+
+export interface ProviderLinearFollowUpRelationEvidence {
+  related: ProviderLinearFollowUpRelationEvidenceEntry;
+  blocked_by_source: ProviderLinearFollowUpRelationEvidenceEntry;
+}
+
+export interface ProviderLinearFollowUpRelationEvidenceEntry {
+  type: 'related' | 'blocks';
+  requested: boolean;
+  satisfied: boolean;
+  action: 'created' | 'already_satisfied' | 'not_requested' | 'skipped_self';
+  issue_id: string;
+  related_issue_id: string;
+}
+
+export interface ProviderLinearFollowUpPacketTraceabilityEvidence {
+  task_id: string;
+  required_paths: string[];
+  registry_mirrors: string[];
+  observed_state: ProviderLinearWorkflowState | null;
+  readiness: {
+    checked: boolean;
+    repo_root: string | null;
+    ready: boolean;
+    missing_paths: string[];
+    missing_registry_mirrors: string[];
+  };
+  queue_admission_blocker: {
+    reason: 'backlog_head_follow_up_traceability_pending';
+    state: 'Backlog';
+    enforced_by: 'provider-operator-autopilot';
+    summary: string;
+  } | null;
+}
+
 export type ProviderLinearCreateFollowUpResult =
   | {
       ok: true;
@@ -517,6 +562,7 @@ export type ProviderLinearCreateFollowUpResult =
         related: true;
         blocked_by_source: boolean;
       };
+      traceability: ProviderLinearFollowUpCreationTraceability;
       source_setup: DispatchPilotSourceSetup | null;
     }
   | {
@@ -2700,6 +2746,7 @@ export async function createProviderLinearFollowUpIssue(input: {
   parityMatrix?: string | null;
   canonicalOwnerKey?: string | null;
   blockedBySource?: boolean;
+  repoRoot?: string | null;
   sourceSetup?: DispatchPilotSourceSetup | null;
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
@@ -2961,6 +3008,13 @@ export async function createProviderLinearFollowUpIssue(input: {
         related: true,
         blocked_by_source: blockedBySource
       },
+      traceability: await buildFollowUpCreationTraceability({
+        sourceIssue: issueSummary.issue,
+        followUpIssue: labeledOwner.issue,
+        requestedLabels: followUpLabels.labels,
+        relationEvidence: relationResult.relations,
+        repoRoot: input.repoRoot
+      }),
       source_setup: session.session.sourceSetup
     };
   }
@@ -3218,6 +3272,13 @@ export async function createProviderLinearFollowUpIssue(input: {
       related: true,
       blocked_by_source: blockedBySource
     },
+    traceability: await buildFollowUpCreationTraceability({
+      sourceIssue: issueSummary.issue,
+      followUpIssue,
+      requestedLabels: followUpLabels.labels,
+      relationEvidence: relationResult.relations,
+      repoRoot: input.repoRoot
+    }),
     source_setup: session.session.sourceSetup
   };
 }
@@ -4197,6 +4258,7 @@ async function createFollowUpRelations(input: {
 }): Promise<
   | {
       ok: true;
+      relations: ProviderLinearFollowUpRelationEvidence;
     }
   | {
       ok: false;
@@ -4204,9 +4266,19 @@ async function createFollowUpRelations(input: {
     }
 > {
   if (input.sourceIssue.id === input.followUpIssue.id) {
-    return { ok: true };
+    return {
+      ok: true,
+      relations: buildFollowUpRelationEvidence({
+        sourceIssue: input.sourceIssue,
+        followUpIssue: input.followUpIssue,
+        blockedBySource: input.blockedBySource,
+        relatedAction: 'skipped_self',
+        blockedAction: input.blockedBySource ? 'skipped_self' : 'not_requested'
+      })
+    };
   }
 
+  let relatedAction: ProviderLinearFollowUpRelationEvidenceEntry['action'] = 'created';
   const relatedRelationResult = await executeProviderLinearGraphql<IssueRelationMutationResponse>({
     session: input.session,
     operation: 'create-follow-up',
@@ -4222,8 +4294,18 @@ async function createFollowUpRelations(input: {
   });
   if (!relatedRelationResult.ok) {
     if (isIssueRelationAlreadySatisfiedError(relatedRelationResult.error, 'related')) {
+      relatedAction = 'already_satisfied';
       if (!input.blockedBySource) {
-        return { ok: true };
+        return {
+          ok: true,
+          relations: buildFollowUpRelationEvidence({
+            sourceIssue: input.sourceIssue,
+            followUpIssue: input.followUpIssue,
+            blockedBySource: false,
+            relatedAction,
+            blockedAction: 'not_requested'
+          })
+        };
       }
     } else {
       return {
@@ -4264,9 +4346,19 @@ async function createFollowUpRelations(input: {
   }
 
   if (!input.blockedBySource) {
-    return { ok: true };
+    return {
+      ok: true,
+      relations: buildFollowUpRelationEvidence({
+        sourceIssue: input.sourceIssue,
+        followUpIssue: input.followUpIssue,
+        blockedBySource: false,
+        relatedAction,
+        blockedAction: 'not_requested'
+      })
+    };
   }
 
+  let blockedAction: ProviderLinearFollowUpRelationEvidenceEntry['action'] = 'created';
   const blockingRelationResult = await executeProviderLinearGraphql<IssueRelationMutationResponse>({
     session: input.session,
     operation: 'create-follow-up',
@@ -4282,7 +4374,17 @@ async function createFollowUpRelations(input: {
   });
   if (!blockingRelationResult.ok) {
     if (isIssueRelationAlreadySatisfiedError(blockingRelationResult.error, 'blocks')) {
-      return { ok: true };
+      blockedAction = 'already_satisfied';
+      return {
+        ok: true,
+        relations: buildFollowUpRelationEvidence({
+          sourceIssue: input.sourceIssue,
+          followUpIssue: input.followUpIssue,
+          blockedBySource: true,
+          relatedAction,
+          blockedAction
+        })
+      };
     }
     return {
       ok: false,
@@ -4321,7 +4423,65 @@ async function createFollowUpRelations(input: {
     };
   }
 
-  return { ok: true };
+  return {
+    ok: true,
+    relations: buildFollowUpRelationEvidence({
+      sourceIssue: input.sourceIssue,
+      followUpIssue: input.followUpIssue,
+      blockedBySource: true,
+      relatedAction,
+      blockedAction
+    })
+  };
+}
+
+async function buildFollowUpCreationTraceability(input: {
+  sourceIssue: ProviderLinearIssueSummary;
+  followUpIssue: ProviderLinearCreatedIssue;
+  requestedLabels: ProviderLinearIssueLabel[];
+  relationEvidence: ProviderLinearFollowUpRelationEvidence;
+  repoRoot?: string | null;
+}): Promise<ProviderLinearFollowUpCreationTraceability> {
+  return {
+    labels: {
+      source_issue: {
+        id: input.sourceIssue.id,
+        identifier: input.sourceIssue.identifier
+      },
+      requested_labels: input.requestedLabels,
+      observed_labels: input.followUpIssue.labels ?? null,
+      missing_label_ids: findMissingFollowUpLabelIds(input.followUpIssue.labels, input.requestedLabels)
+    },
+    relations: input.relationEvidence,
+    packet: await buildFollowUpPacketTraceabilityEvidence(input.followUpIssue, input.repoRoot)
+  };
+}
+
+function buildFollowUpRelationEvidence(input: {
+  sourceIssue: ProviderLinearIssueSummary;
+  followUpIssue: ProviderLinearCreatedIssue;
+  blockedBySource: boolean;
+  relatedAction: ProviderLinearFollowUpRelationEvidenceEntry['action'];
+  blockedAction: ProviderLinearFollowUpRelationEvidenceEntry['action'];
+}): ProviderLinearFollowUpRelationEvidence {
+  return {
+    related: {
+      type: 'related',
+      requested: true,
+      satisfied: true,
+      action: input.relatedAction,
+      issue_id: input.sourceIssue.id,
+      related_issue_id: input.followUpIssue.id
+    },
+    blocked_by_source: {
+      type: 'blocks',
+      requested: input.blockedBySource,
+      satisfied: input.blockedBySource,
+      action: input.blockedAction,
+      issue_id: input.sourceIssue.id,
+      related_issue_id: input.followUpIssue.id
+    }
+  };
 }
 
 function buildFollowUpRelationFailureDetails(input: {
@@ -8860,15 +9020,8 @@ function buildFollowUpTraceabilitySection(input: {
   sourceIssue: ProviderLinearIssueSummary;
   followUpIssue: ProviderLinearCreatedIssue;
 }): string {
-  const followUpTaskId = `linear-${input.followUpIssue.id}`;
-  const repoPacketPaths = [
-    `docs/PRD-${followUpTaskId}.md`,
-    `docs/TECH_SPEC-${followUpTaskId}.md`,
-    `docs/ACTION_PLAN-${followUpTaskId}.md`,
-    `tasks/specs/${followUpTaskId}.md`,
-    `tasks/tasks-${followUpTaskId}.md`,
-    `.agent/task/${followUpTaskId}.md`
-  ];
+  const followUpTaskId = buildFollowUpTaskId(input.followUpIssue);
+  const repoPacketPaths = buildFollowUpPacketPaths(followUpTaskId);
   const formatIssueReference = (identifier: string, id: string, url: string | null | undefined): string =>
     url ? `\`${identifier}\` / \`${id}\` (${url})` : `\`${identifier}\` / \`${id}\``;
   return [
@@ -8877,8 +9030,113 @@ function buildFollowUpTraceabilitySection(input: {
     `- Follow-up packet prefix: \`${followUpTaskId}\``,
     '- Canonical registry task id: see `tasks/index.json` (format `YYYYMMDD-linear-<linear-issue-id>`)',
     `- Create before active work: ${repoPacketPaths.map((path) => `\`${path}\``).join(', ')}`,
-    '- Update registry mirrors before the issue leaves `Backlog`: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`'
+    `- Update registry mirrors before the issue leaves \`Backlog\`: ${FOLLOW_UP_REGISTRY_MIRRORS.map((path) => `\`${path}\``).join(', ')}`
   ].join('\n');
+}
+
+const FOLLOW_UP_REGISTRY_MIRRORS = [
+  'tasks/index.json',
+  'docs/TASKS.md',
+  'docs/docs-freshness-registry.json'
+] as const;
+
+function buildFollowUpTaskId(issue: Pick<ProviderLinearCreatedIssue, 'id'>): string {
+  return `linear-${issue.id}`;
+}
+
+function buildFollowUpPacketPaths(followUpTaskId: string): string[] {
+  return [
+    `docs/PRD-${followUpTaskId}.md`,
+    `docs/TECH_SPEC-${followUpTaskId}.md`,
+    `docs/ACTION_PLAN-${followUpTaskId}.md`,
+    `tasks/specs/${followUpTaskId}.md`,
+    `tasks/tasks-${followUpTaskId}.md`,
+    `.agent/task/${followUpTaskId}.md`
+  ];
+}
+
+async function buildFollowUpPacketTraceabilityEvidence(
+  issue: Pick<ProviderLinearCreatedIssue, 'id'>
+    & {
+      state?: ProviderLinearWorkflowState | null;
+    },
+  repoRoot: string | null | undefined
+): Promise<ProviderLinearFollowUpPacketTraceabilityEvidence> {
+  const taskId = buildFollowUpTaskId(issue);
+  const requiredPaths = buildFollowUpPacketPaths(taskId);
+  const registryMirrors = [...FOLLOW_UP_REGISTRY_MIRRORS];
+  const readiness = await resolveFollowUpPacketReadiness({
+    followUpTaskId: taskId,
+    requiredPaths,
+    registryMirrors,
+    repoRoot
+  });
+  return {
+    task_id: taskId,
+    required_paths: requiredPaths,
+    registry_mirrors: registryMirrors,
+    observed_state: issue.state ?? null,
+    readiness,
+    queue_admission_blocker: isBacklogWorkflowState(issue.state) && !readiness.ready
+      ? {
+          reason: 'backlog_head_follow_up_traceability_pending',
+          state: 'Backlog',
+          enforced_by: 'provider-operator-autopilot',
+          summary: 'Backlog promotion remains blocked until follow-up packet files and registry mirrors exist.'
+        }
+      : null
+  };
+}
+
+async function resolveFollowUpPacketReadiness(input: {
+  followUpTaskId: string;
+  requiredPaths: readonly string[];
+  registryMirrors: readonly string[];
+  repoRoot: string | null | undefined;
+}): Promise<ProviderLinearFollowUpPacketTraceabilityEvidence['readiness']> {
+  const normalizedRepoRoot = normalizeOptionalString(input.repoRoot ?? null) ?? process.cwd();
+  const repoRoot = resolvePath(normalizedRepoRoot);
+  const missingPaths: string[] = [];
+  for (const path of input.requiredPaths) {
+    if (!await fileExists(join(repoRoot, path))) {
+      missingPaths.push(path);
+    }
+  }
+  const missingRegistryMirrors: string[] = [];
+  for (const path of input.registryMirrors) {
+    const content = await readTextFileIfPresent(join(repoRoot, path));
+    if (!content?.includes(input.followUpTaskId)) {
+      missingRegistryMirrors.push(path);
+    }
+  }
+  return {
+    checked: true,
+    repo_root: repoRoot,
+    ready: missingPaths.length === 0 && missingRegistryMirrors.length === 0,
+    missing_paths: missingPaths,
+    missing_registry_mirrors: missingRegistryMirrors
+  };
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile();
+  } catch {
+    return false;
+  }
+}
+
+async function readTextFileIfPresent(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+function isBacklogWorkflowState(state: ProviderLinearWorkflowState | null | undefined): boolean {
+  const name = normalizeOptionalString(state?.name);
+  return name !== null && normalizeComparableValue(name) === normalizeComparableValue('Backlog');
 }
 
 function escapeRegExp(value: string): string {

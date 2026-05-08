@@ -11,3 +11,4 @@
 - Use live Linear issue-context before any state transition.
 - Preserve WIP caps and existing queue semantics.
 - Do not treat packet/mirror traceability as manual cleanup when the helper can prove or fail closed on the missing evidence.
+- Implementation note: `create-follow-up` success output now carries structured `traceability` evidence for labels, relations, packet/mirror readiness, and a Backlog queue-admission blocker only when required packet evidence is missing.
