@@ -2089,6 +2089,80 @@ describe('runLinearCliShell', () => {
     }));
   });
 
+  it('keeps parity matrix failure ahead of packet-blocked retry reuse', async () => {
+    const log = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const setExitCode = vi.fn();
+    const repoRoot = await mkdtemp(join(tmpdir(), 'linear-cli-follow-up-parity-packet-ready-retry-'));
+    tempDirs.push(repoRoot);
+    await seedCliFollowUpPacketReadiness(repoRoot, 'linear-lin-issue-2');
+    const createProviderLinearFollowUpIssueMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>()
+        .mockResolvedValue({
+          ok: false,
+          operation: 'create-follow-up',
+          error: {
+            code: 'linear_follow_up_parity_matrix_missing',
+            message: FOLLOW_UP_PARITY_MATRIX_MISSING_MESSAGE,
+            status: 422
+          }
+        } as never);
+    const { auditPath, loadProviderLinearWorkerContextMock } = await createSameAttemptFollowUpFixture(
+      'linear-cli-follow-up-parity-packet-retry-',
+      [
+        buildPacketTraceabilityPendingAuditEntry({
+          follow_up_intent_key: 'title=parity%20follow-up;canonical=;blocked=0;parity=1'
+        })
+      ]
+    );
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: buildParityFollowUpFlags(),
+        printHelp: vi.fn()
+      },
+      {
+        createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        loadProviderLinearWorkerContext: loadProviderLinearWorkerContextMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: auditPath
+        }),
+        getCwd: () => repoRoot,
+        now: () => '2026-04-22T08:06:00.000Z',
+        appendAuditEntry,
+        log,
+        setExitCode
+      }
+    );
+
+    expect(createProviderLinearFollowUpIssueMock).toHaveBeenCalledTimes(1);
+    expect(createProviderLinearFollowUpIssueMock).toHaveBeenCalledWith(expect.objectContaining({
+      parityLane: true,
+      parityMatrix: null
+    }));
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_parity_matrix_missing',
+        message: FOLLOW_UP_PARITY_MATRIX_MISSING_MESSAGE,
+        status: 422
+      }
+    });
+    expect(appendAuditEntry).toHaveBeenCalledWith(auditPath, expect.objectContaining({
+      recorded_at: '2026-04-22T08:06:00.000Z',
+      operation: 'create-follow-up',
+      ok: false,
+      issue_id: 'lin-issue-1',
+      follow_up_intent_key: 'title=parity%20follow-up;canonical=;blocked=0;parity=1',
+      error_code: 'linear_follow_up_parity_matrix_missing',
+      error_message: FOLLOW_UP_PARITY_MATRIX_MISSING_MESSAGE
+    }));
+  });
+
   it('reuses packet-blocked follow-ups after packet mirrors are reconciled locally', async () => {
     const log = vi.fn();
     const appendAuditEntry = vi.fn();

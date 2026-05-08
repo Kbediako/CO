@@ -812,6 +812,20 @@ async function resolveCreateFollowUpRetrySuppression(input: {
   if (!suppression) {
     return null;
   }
+  if (input.parityLane && (input.parityMatrix?.trim().length ?? 0) === 0) {
+    if (!isFollowUpParityMatrixSuppressionCode(suppression.error_code)) {
+      return null;
+    }
+    return {
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_parity_matrix_retry_suppressed',
+        message: `Same-attempt retry suppressed: ${suppression.instruction}`,
+        status: 409
+      }
+    };
+  }
   if (isFollowUpPacketTraceabilitySuppressionCode(suppression.error_code)) {
     const suppressionEntry = findLatestCreateFollowUpSuppressionAuditEntry({
       audit,
@@ -860,22 +874,7 @@ async function resolveCreateFollowUpRetrySuppression(input: {
       }
     };
   }
-  if (
-    !input.parityLane
-    || (input.parityMatrix?.trim().length ?? 0) > 0
-    || !isFollowUpParityMatrixSuppressionCode(suppression.error_code)
-  ) {
-    return null;
-  }
-  return {
-    ok: false,
-    operation: 'create-follow-up',
-    error: {
-      code: 'linear_follow_up_parity_matrix_retry_suppressed',
-      message: `Same-attempt retry suppressed: ${suppression.instruction}`,
-      status: 409
-    }
-  };
+  return null;
 }
 
 function buildFollowUpIntentKey(input: {
