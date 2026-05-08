@@ -37,6 +37,7 @@ import {
 import {
   findDeterministicProviderMutationSuppression,
   isFollowUpParityMatrixSuppressionCode,
+  isFollowUpPacketTraceabilitySuppressionCode,
   resolveProviderLinearWorkerAttemptStartedAt
 } from './control/providerLinearWorkerTruth.js';
 import {
@@ -476,27 +477,29 @@ export async function runLinearCliShell(
           emitJsonResult(retrySuppressed, dependencies);
           return;
         }
-        const result = await dependencies.createProviderLinearFollowUpIssue({
-          issueId: requireFlag(params.flags, 'issue-id'),
-          title: requireFlag(params.flags, 'title'),
-          description,
-          intentChecksum,
-          nonGoals,
-          notDoneIf,
-          acceptanceCriteria,
-          parityLane,
-          parityMatrix,
-          canonicalOwnerKey: await resolveOptionalText(
-            params.flags,
-            dependencies.readTextFile,
-            'canonical-owner-key',
-            'canonical-owner-key-file'
-          ),
-          blockedBySource: readBooleanFlag(params.flags, 'blocked-by-source'),
-          repoRoot: resolveRuntimeProofRepoRoot(dependencies.getCwd(), env),
-          sourceSetup: readSourceSetup(params.flags),
-          env
-        });
+        const result = normalizeCreateFollowUpResultForCli(
+          await dependencies.createProviderLinearFollowUpIssue({
+            issueId: requireFlag(params.flags, 'issue-id'),
+            title: requireFlag(params.flags, 'title'),
+            description,
+            intentChecksum,
+            nonGoals,
+            notDoneIf,
+            acceptanceCriteria,
+            parityLane,
+            parityMatrix,
+            canonicalOwnerKey: await resolveOptionalText(
+              params.flags,
+              dependencies.readTextFile,
+              'canonical-owner-key',
+              'canonical-owner-key-file'
+            ),
+            blockedBySource: readBooleanFlag(params.flags, 'blocked-by-source'),
+            repoRoot: resolveRuntimeProofRepoRoot(dependencies.getCwd(), env),
+            sourceSetup: readSourceSetup(params.flags),
+            env
+          })
+        );
         await recordAuditResult(result, params.flags, env, dependencies);
         emitJsonResult(result, dependencies);
         return;
@@ -754,9 +757,6 @@ async function resolveCreateFollowUpRetrySuppression(input: {
     'loadProviderLinearWorkerContext' | 'readTextFile' | 'warn'
   >;
 }): Promise<ProviderLinearCreateFollowUpResult | null> {
-  if (!input.parityLane || (input.parityMatrix?.trim().length ?? 0) > 0) {
-    return null;
-  }
   const auditPath = resolveProviderLinearAuditPath(input.env);
   if (!auditPath) {
     return null;
@@ -787,7 +787,25 @@ async function resolveCreateFollowUpRetrySuppression(input: {
       issueId: input.issueId
     }
   );
-  if (!suppression || !isFollowUpParityMatrixSuppressionCode(suppression.error_code)) {
+  if (!suppression) {
+    return null;
+  }
+  if (isFollowUpPacketTraceabilitySuppressionCode(suppression.error_code)) {
+    return {
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_packet_traceability_retry_suppressed',
+        message: `Same-attempt retry suppressed: ${suppression.instruction}`,
+        status: 409
+      }
+    };
+  }
+  if (
+    !input.parityLane
+    || (input.parityMatrix?.trim().length ?? 0) > 0
+    || !isFollowUpParityMatrixSuppressionCode(suppression.error_code)
+  ) {
     return null;
   }
   return {
@@ -835,25 +853,51 @@ function emitJsonResult(
   dependencies: Pick<LinearCliShellDependencies, 'log' | 'setExitCode'>
 ): void {
   dependencies.log(JSON.stringify(result, null, 2));
-  if (!result.ok || isCreateFollowUpPacketAdmissionBlocked(result)) {
+  if (!result.ok) {
     dependencies.setExitCode(1);
   }
 }
 
-function isCreateFollowUpPacketAdmissionBlocked(result: { ok: boolean }): boolean {
-  if (!result.ok || !('operation' in result) || result.operation !== 'create-follow-up') {
-    return false;
+function normalizeCreateFollowUpResultForCli(
+  result: ProviderLinearCreateFollowUpResult
+): ProviderLinearCreateFollowUpResult {
+  if (!result.ok) {
+    return result;
   }
-  const traceability = (result as { traceability?: unknown }).traceability;
-  if (!traceability || typeof traceability !== 'object') {
-    return false;
+  const traceability = (result as {
+    traceability?: {
+      packet?: {
+        queue_admission_blocker?: unknown;
+      };
+    };
+  }).traceability;
+  const blocker = traceability?.packet?.queue_admission_blocker;
+  if (!blocker || typeof blocker !== 'object') {
+    return result;
   }
-  const packet = (traceability as Record<string, unknown>).packet;
-  if (!packet || typeof packet !== 'object') {
-    return false;
-  }
-  return (packet as Record<string, unknown>).queue_admission_blocker !== null
-    && (packet as Record<string, unknown>).queue_admission_blocker !== undefined;
+  const blockerRecord = blocker as Record<string, unknown>;
+  const summary = typeof blockerRecord.summary === 'string'
+    ? blockerRecord.summary
+    : 'Backlog admission remains blocked until follow-up packet traceability evidence is ready.';
+  return {
+    ok: false,
+    operation: 'create-follow-up',
+    error: {
+      code: 'linear_follow_up_packet_traceability_pending',
+      message: summary,
+      status: 409,
+      retryable: false,
+      details: {
+        issue: result.issue,
+        follow_up_issue: result.follow_up_issue,
+        action: result.action,
+        canonical_owner: result.canonical_owner,
+        relations: result.relations,
+        traceability,
+        queue_admission_blocker: blocker
+      }
+    }
+  };
 }
 
 function assertAllowedFlags(flags: ArgMap, allowed: string[]): void {

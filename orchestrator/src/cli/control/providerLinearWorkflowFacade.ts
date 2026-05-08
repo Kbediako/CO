@@ -9042,6 +9042,12 @@ const FOLLOW_UP_REGISTRY_MIRRORS = [
   'docs/TASKS.md',
   'docs/docs-freshness-registry.json'
 ] as const;
+const DOCS_FRESHNESS_REGISTRY_STATUSES = new Set([
+  'active',
+  'archived',
+  'deprecated',
+  'preserved_historical_stub'
+]);
 
 function buildFollowUpTaskId(issue: Pick<ProviderLinearCreatedIssue, 'id'>): string {
   return `linear-${issue.id}`;
@@ -9191,7 +9197,7 @@ function registryMirrorContainsFollowUpTaskId(
     };
   }
   return {
-    matched: markdownContainsExactFollowUpTaskId(content, followUpTaskId),
+    matched: markdownContainsFollowUpPacketSnapshot(content, followUpTaskId, requiredPaths),
     canonicalTaskId: null
   };
 }
@@ -9224,16 +9230,51 @@ function docsFreshnessRegistryContainsRequiredPaths(content: string, requiredPat
     }
     const rawPath = (entry as Record<string, unknown>).path;
     const path = typeof rawPath === 'string' ? normalizeOptionalString(rawPath) : null;
-    if (path) {
+    if (path && docsFreshnessRegistryEntryHasValidMetadata(entry as Record<string, unknown>)) {
       paths.add(path);
     }
   }
   return requiredPaths.every((path) => paths.has(path));
 }
 
+function docsFreshnessRegistryEntryHasValidMetadata(entry: Record<string, unknown>): boolean {
+  const status = typeof entry.status === 'string' ? normalizeOptionalString(entry.status) : null;
+  const cadenceDays = typeof entry.cadence_days === 'number' && Number.isInteger(entry.cadence_days)
+    ? entry.cadence_days
+    : null;
+  const lastReview = typeof entry.last_review === 'string' ? normalizeOptionalString(entry.last_review) : null;
+  return Boolean(
+    status
+    && DOCS_FRESHNESS_REGISTRY_STATUSES.has(status)
+    && cadenceDays !== null
+    && cadenceDays > 0
+    && lastReview
+    && isIsoDateString(lastReview)
+  );
+}
+
+function markdownContainsFollowUpPacketSnapshot(
+  content: string,
+  followUpTaskId: string,
+  requiredPaths: readonly string[]
+): boolean {
+  if (!markdownContainsExactFollowUpTaskId(content, followUpTaskId)) {
+    return false;
+  }
+  return requiredPaths.every((path) => content.includes(path));
+}
+
 function markdownContainsExactFollowUpTaskId(content: string, followUpTaskId: string): boolean {
   const escapedTaskId = escapeRegExp(followUpTaskId);
   return new RegExp(`(^|[^A-Za-z0-9-])${escapedTaskId}([^A-Za-z0-9-]|$)`, 'u').test(content);
+}
+
+function isIsoDateString(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) {
+    return false;
+  }
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 function parseJsonRecord(content: string): Record<string, unknown> | null {
