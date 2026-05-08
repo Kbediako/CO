@@ -4083,6 +4083,7 @@ function applyProviderLinearWorkerJsonlRecord(
   env: NodeJS.ProcessEnv = process.env,
   options: {
     preserveTimestampedGoalEvidenceFromTimestamplessReplay?: boolean;
+    onGoalEvidenceObserved?: (goalEvidence: ProviderLinearGoalEvidence) => void;
   } = {}
 ): boolean {
   let changed = false;
@@ -4222,6 +4223,7 @@ function applyProviderLinearWorkerJsonlRecord(
   }
   const observedGoalEvidence = extractProviderWorkerGoalEvidence(parsed, state);
   if (observedGoalEvidence) {
+    options.onGoalEvidenceObserved?.(observedGoalEvidence);
     const nextGoalEvidence = selectPreferredProviderLinearGoalEvidence(
       state.goalEvidence ?? null,
       observedGoalEvidence,
@@ -4273,6 +4275,7 @@ function applyProviderLinearWorkerSessionJsonlRecord(
   env: NodeJS.ProcessEnv = process.env,
   options: {
     preserveTimestampedGoalEvidenceFromTimestamplessReplay?: boolean;
+    onGoalEvidenceObserved?: (goalEvidence: ProviderLinearGoalEvidence) => void;
   } = {}
 ): boolean {
   return applyProviderLinearWorkerJsonlRecord(state, parsed, 'session_log_hydration', env, options);
@@ -4662,21 +4665,25 @@ function readProviderWorkerResponseItemPayload(input: Record<string, unknown>): 
   const payload = isRecord(input.payload) ? input.payload : null;
   const params = isRecord(input.params) ? input.params : null;
   const payloadParams = isRecord(payload?.params) ? payload.params : null;
-  return isRecord(input.item)
-    ? input.item
-    : isRecord(input.response_item)
-      ? input.response_item
-      : isRecord(params?.item)
-        ? params.item
-        : isRecord(params?.response_item)
-          ? params.response_item
-          : isRecord(payloadParams?.item)
-            ? payloadParams.item
-            : isRecord(payloadParams?.response_item)
-              ? payloadParams.response_item
-              : input.type === 'response_item' && payload
-                ? payload
-                : null;
+  const payloadWrappedPayload = isRecord(payload?.payload) ? payload.payload : null;
+  for (const candidate of [
+    input.item,
+    input.response_item,
+    payload?.item,
+    payload?.response_item,
+    params?.item,
+    params?.response_item,
+    payloadParams?.item,
+    payloadParams?.response_item
+  ]) {
+    if (isRecord(candidate)) {
+      return candidate;
+    }
+  }
+  if (payload?.type === 'response_item' && payloadWrappedPayload) {
+    return payloadWrappedPayload;
+  }
+  return (input.type === 'response_item' || payload?.type === 'response_item') && payload ? payload : null;
 }
 
 function readProviderWorkerResponseItemCallId(input: Record<string, unknown>): string | null {
@@ -4850,13 +4857,15 @@ function extractProviderWorkerGoalToolEvidence(
   }
   const payload = readProviderWorkerResponseItemPayload(parsed);
   const payloadType = normalizeOptionalString(payload?.type);
+  const hasSupportedPayloadType =
+    !payloadType || payloadType === 'function_call_output' || payloadType === 'tool_result' || payloadType === 'response_item';
   const outputValue = readProviderWorkerGoalToolOutputValue(parsed);
   if (outputValue === undefined) {
     return null;
   }
   const toolName =
     directToolName ?? (callId ? normalizeProviderWorkerGoalToolName(state.goalToolCallNames?.[callId]) : null);
-  if (!toolName || (payloadType && payloadType !== 'function_call_output' && payloadType !== 'tool_result')) {
+  if (!toolName || !hasSupportedPayloadType) {
     return null;
   }
   const capturedAt = extractProviderWorkerEventTimestamp(parsed);
@@ -5183,6 +5192,28 @@ export function normalizeProviderLinearGoalEvidenceValue(value: unknown): Provid
     updatedAt: normalizeProviderLinearGoalIsoTimestamp(value.updated_at),
     reason: normalizeOptionalString(value.reason)
   });
+  if (
+    Object.prototype.hasOwnProperty.call(value, 'feature_available') &&
+    value.feature_available != null &&
+    normalizeProviderLinearGoalEvidenceBoolean(value.feature_available) === null
+  ) {
+    return buildProviderLinearGoalEvidence({
+      featureAvailable: false,
+      featureEnabled: capturedEvidence.feature_enabled,
+      captureMode: 'unavailable',
+      captureTimestamp: capturedEvidence.capture_timestamp,
+      threadId: capturedEvidence.thread_id,
+      turnId: capturedEvidence.turn_id,
+      objective: null,
+      status: null,
+      tokenBudget: null,
+      tokensUsed: null,
+      elapsedSeconds: null,
+      createdAt: null,
+      updatedAt: null,
+      reason: 'goal_feature_available_malformed'
+    });
+  }
   if (captureMode === 'captured') {
     return capturedEvidence;
   }
@@ -5216,7 +5247,9 @@ export function normalizeProviderLinearGoalEvidenceForProof(input: {
 }): ProviderLinearGoalEvidence {
   const candidate = normalizeProviderLinearGoalEvidenceValue(input.candidate);
   const previous = normalizeProviderLinearGoalEvidenceValue(input.previous);
-  const featureEnabled = input.featureEnabled ?? candidate?.feature_enabled ?? previous?.feature_enabled ?? null;
+  const previousForFeatureEnabled = previous?.capture_mode === 'disabled' ? null : previous;
+  const featureEnabled =
+    input.featureEnabled ?? candidate?.feature_enabled ?? previousForFeatureEnabled?.feature_enabled ?? null;
   const runtimeMode = normalizeOptionalString(input.runtimeMode);
   if (featureEnabled === false) {
     return buildProviderLinearGoalEvidence({
@@ -8066,6 +8099,7 @@ function applyProviderWorkerSessionLogDelta(
   env: NodeJS.ProcessEnv = process.env,
   options: {
     allowCompletedBootstrapTurn?: boolean;
+    onGoalEvidenceObserved?: (goalEvidence: ProviderLinearGoalEvidence) => void;
   } = {}
 ): ProviderWorkerSessionLogApplyResult {
   seedProviderWorkerGoalToolCallNamesFromTail(parseState, tailState);
@@ -8100,7 +8134,8 @@ function applyProviderWorkerSessionLogDelta(
     }
     changed =
       applyProviderLinearWorkerSessionJsonlRecord(parseState, parsed, env, {
-        preserveTimestampedGoalEvidenceFromTimestamplessReplay
+        preserveTimestampedGoalEvidenceFromTimestamplessReplay,
+        onGoalEvidenceObserved: options.onGoalEvidenceObserved
       }) || changed;
   }
   snapshotProviderWorkerGoalToolCallNamesToTail(parseState, tailState);
@@ -8116,6 +8151,7 @@ function flushProviderWorkerSessionLogTail(
   env: NodeJS.ProcessEnv = process.env,
   options: {
     allowCompletedBootstrapTurn?: boolean;
+    onGoalEvidenceObserved?: (goalEvidence: ProviderLinearGoalEvidence) => void;
   } = {}
 ): ProviderWorkerSessionLogApplyResult {
   seedProviderWorkerGoalToolCallNamesFromTail(parseState, tailState);
@@ -8153,7 +8189,8 @@ function flushProviderWorkerSessionLogTail(
     }
     changed =
       applyProviderLinearWorkerSessionJsonlRecord(parseState, parsed, env, {
-        preserveTimestampedGoalEvidenceFromTimestamplessReplay: shouldBootstrap
+        preserveTimestampedGoalEvidenceFromTimestamplessReplay: shouldBootstrap,
+        onGoalEvidenceObserved: options.onGoalEvidenceObserved
       }) || changed;
   }
   snapshotProviderWorkerGoalToolCallNamesToTail(parseState, tailState);
@@ -9064,6 +9101,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     selectProviderLinearWorkerProofFinalMessageSource(proof),
     selectProviderLinearWorkerProofFinalMessageDeltaKey(proof)
   );
+  let sessionLogGoalEvidence: ProviderLinearGoalEvidence | null = null;
   const restoreProofTelemetryFloor = () => {
     parseState.threadId = proof.thread_id;
     parseState.turnId = proof.latest_turn_id;
@@ -9079,6 +9117,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     parseState.resolvedModelProvenance = proofBaselineResolvedModelProvenance;
     parseState.failureDiagnosis = proof.failure_diagnosis ?? null;
     parseState.goalEvidence = proof.goal_evidence ?? null;
+    sessionLogGoalEvidence = null;
   };
   let tailState = buildProviderWorkerSessionLogTailState(
     sessionLogPath,
@@ -9146,20 +9185,29 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
   let sessionLogObserved = false;
   let observedSessionLogThreadId = proof.session_log_thread_id ?? null;
   let observedSessionLogTurnId = proof.session_log_turn_id ?? null;
+  const rememberSessionLogGoalEvidence = (goalEvidence: ProviderLinearGoalEvidence) => {
+    sessionLogGoalEvidence = selectPreferredProviderLinearGoalEvidence(
+      sessionLogGoalEvidence,
+      goalEvidence,
+      { preserveTimestampedCurrentFromTimestamplessObserved: true }
+    );
+  };
   const allowCompletedBootstrapTurn =
     shouldAllowCompletedProviderWorkerSessionBootstrapTurn(proof);
   try {
     const delta = await readProviderWorkerSessionLogDelta(tailState);
     if (delta) {
       const deltaApply = applyProviderWorkerSessionLogDelta(parseState, tailState, delta, env, {
-        allowCompletedBootstrapTurn
+        allowCompletedBootstrapTurn,
+        onGoalEvidenceObserved: rememberSessionLogGoalEvidence
       });
       sessionLogObserved = deltaApply.observed || sessionLogObserved;
       observedSessionLogThreadId = deltaApply.observedThreadId ?? observedSessionLogThreadId;
       observedSessionLogTurnId = deltaApply.observedTurnId ?? observedSessionLogTurnId;
     }
     const tailApply = flushProviderWorkerSessionLogTail(parseState, tailState, env, {
-      allowCompletedBootstrapTurn
+      allowCompletedBootstrapTurn,
+      onGoalEvidenceObserved: rememberSessionLogGoalEvidence
     });
     sessionLogObserved = tailApply.observed || sessionLogObserved;
     observedSessionLogThreadId = tailApply.observedThreadId ?? observedSessionLogThreadId;
@@ -9215,6 +9263,24 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
   });
   const proofResolvedModelProvenanceForHydration =
     liveScopeChanged && proof.latest_turn_id !== null ? null : proofBaselineResolvedModelProvenance;
+  const previousGoalEvidenceForHydration = liveThreadChanged ? null : proof.goal_evidence ?? null;
+  const scopedSessionLogGoalEvidence =
+    sessionLogGoalEvidence === null
+      ? null
+      : normalizeProviderLinearGoalEvidenceValue(parseState.goalEvidence);
+  const selectedSessionLogGoalEvidence =
+    scopedSessionLogGoalEvidence === null
+      ? null
+      : selectPreferredProviderLinearGoalEvidence(
+          previousGoalEvidenceForHydration,
+          scopedSessionLogGoalEvidence,
+          { preserveTimestampedCurrentFromTimestamplessObserved: true }
+        );
+  const hydratedGoalEvidenceCandidate =
+    selectedSessionLogGoalEvidence !== null &&
+    JSON.stringify(selectedSessionLogGoalEvidence) !== JSON.stringify(previousGoalEvidenceForHydration)
+      ? selectedSessionLogGoalEvidence
+      : null;
   const hydratedProof: ProviderLinearWorkerProof = {
     ...proof,
     thread_id: liveThreadId,
@@ -9258,8 +9324,8 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
       proof.goal_evidence === undefined
         ? undefined
         : normalizeProviderLinearGoalEvidenceForProof({
-            candidate: parseState.goalEvidence ?? null,
-            previous: liveThreadChanged ? null : proof.goal_evidence ?? null,
+            candidate: hydratedGoalEvidenceCandidate,
+            previous: previousGoalEvidenceForHydration,
             proofThreadId: liveThreadId,
             proofTurnId: liveTurnId,
             observedAt: proof.updated_at ?? new Date().toISOString(),
