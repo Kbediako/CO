@@ -19,6 +19,9 @@ import {
 } from '../run/manifest.js';
 import { persistManifest, type ManifestPersister } from '../run/manifestPersister.js';
 import {
+  normalizeProviderLinearGoalEvidenceForProof,
+  normalizeProviderLinearGoalEvidenceValue,
+  PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR,
   PROVIDER_LINEAR_WORKER_PROOF_FILENAME,
   type ProviderLinearWorkerProof
 } from '../providerLinearWorkerRunner.js';
@@ -486,6 +489,8 @@ export async function runCommandStage(
       }
       manifest.provider_linear_worker_tokens =
         buildProviderLinearWorkerManifestTokenUsage(providerLinearWorkerProof?.tokens) ?? null;
+      manifest.goal_evidence =
+        buildProviderLinearWorkerManifestGoalEvidence(providerLinearWorkerProof) ?? null;
       if (result.status === 'succeeded' && providerLinearWorkerProofRecord === null) {
         providerLinearWorkerFailureReason = 'provider_linear_worker_proof_missing_or_unreadable';
         effectiveSummary = buildProviderLinearWorkerTerminalSummary({
@@ -1137,6 +1142,57 @@ function buildProviderLinearWorkerManifestTokenUsage(
     usage.reasoning_output_tokens = reasoningOutputTokens;
   }
   return usage;
+}
+
+function buildProviderLinearWorkerManifestGoalEvidence(
+  proof: ProviderLinearWorkerProof | null | undefined
+): NonNullable<CliManifest['goal_evidence']> | null {
+  const goalEvidence = proof?.goal_evidence;
+  if (!goalEvidence || typeof goalEvidence !== 'object') {
+    return null;
+  }
+  if (goalEvidence.authority !== 'advisory_only' || goalEvidence.linear_authority_preserved !== true) {
+    return null;
+  }
+  const notAuthorizedFor = Array.isArray(goalEvidence.not_authorized_for)
+    ? goalEvidence.not_authorized_for
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter((item): item is string => item.length > 0)
+    : [];
+  const notAuthorizedForSet = new Set(notAuthorizedFor);
+  const hasCanonicalDenialSet = PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR.every((item) =>
+    notAuthorizedForSet.has(item)
+  );
+  if (
+    !hasCanonicalDenialSet ||
+    notAuthorizedFor.length !== PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR.length ||
+    notAuthorizedForSet.size !== PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR.length
+  ) {
+    return null;
+  }
+  const goalEvidenceValue = normalizeProviderLinearGoalEvidenceValue(goalEvidence);
+  if (goalEvidenceValue === null) {
+    return null;
+  }
+  const normalizedGoalEvidence = normalizeProviderLinearGoalEvidenceForProof({
+    candidate: null,
+    previous: goalEvidenceValue,
+    proofThreadId: proof?.thread_id ?? null,
+    proofTurnId: proof?.latest_turn_id ?? null,
+    observedAt: isoTimestamp(),
+    currentTurnStartedAt: proof?.current_turn_started_at ?? proof?.attempt_started_at ?? null,
+    featureEnabled: null,
+    runtimeMode: proof?.runtime?.selected_mode ?? null
+  });
+  if (normalizedGoalEvidence === null) {
+    return null;
+  }
+  return {
+    ...normalizedGoalEvidence,
+    authority: 'advisory_only',
+    linear_authority_preserved: true,
+    not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR]
+  };
 }
 
 function normalizeManifestTokenCount(value: unknown): number | null {

@@ -136,6 +136,18 @@ const PROVIDER_CONTROL_HOST_REFRESH_TIMEOUT_MS = 15_000;
 const PROVIDER_CONTROL_HOST_REFRESH_RETRY_DELAY_MS = 250;
 const PROVIDER_CONTROL_HOST_REFRESH_FAILURE_FILENAME =
   'provider-control-host-refresh-failure.json';
+export const PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR = [
+  'linear_transition',
+  'workpad_replacement',
+  'pr_attachment',
+  'review_handoff',
+  'ready_review_success',
+  'merge_closeout',
+  'hook_recovery_success',
+  'long_poll_terminal_status',
+  'hook_resume_control_integration',
+  'tui_automation'
+] as const;
 const PROVIDER_LINEAR_TRACKED_ISSUE_RATE_LIMIT_MAX_WAIT_MS = 15_000;
 const PROVIDER_LINEAR_TRACKED_ISSUE_RATE_LIMIT_BUCKETS = [
   {
@@ -489,6 +501,43 @@ export interface ProviderLinearWorkerAppServerSupervisionProof {
   updated_at: string | null;
 }
 
+export type ProviderLinearGoalEvidenceCaptureMode =
+  | 'captured'
+  | 'cleared'
+  | 'disabled'
+  | 'unavailable'
+  | 'stale'
+  | 'thread_mismatch';
+const PROVIDER_LINEAR_GOAL_EVIDENCE_CAPTURE_MODES: readonly ProviderLinearGoalEvidenceCaptureMode[] = [
+  'captured',
+  'cleared',
+  'disabled',
+  'unavailable',
+  'stale',
+  'thread_mismatch'
+];
+
+export interface ProviderLinearGoalEvidence {
+  source: 'codex-goals';
+  feature_available: boolean | null;
+  feature_enabled: boolean | null;
+  capture_mode: ProviderLinearGoalEvidenceCaptureMode;
+  capture_timestamp: string | null;
+  thread_id: string | null;
+  turn_id: string | null;
+  objective: string | null;
+  status: string | null;
+  token_budget: number | null;
+  tokens_used: number | null;
+  elapsed_seconds: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  authority: 'advisory_only';
+  linear_authority_preserved: true;
+  not_authorized_for: string[];
+  reason: string | null;
+}
+
 export interface ProviderLinearWorkerProof {
   issue_id: string;
   issue_identifier: string;
@@ -514,6 +563,7 @@ export interface ProviderLinearWorkerProof {
   rate_limits: Record<string, unknown> | null;
   runtime?: ProviderLinearWorkerRuntimeProof | null;
   appserver_supervision?: ProviderLinearWorkerAppServerSupervisionProof | null;
+  goal_evidence?: ProviderLinearGoalEvidence | null;
   auth_provenance?: ProviderLinearWorkerAuthProvenance | null;
   resolved_model_provenance?: ProviderLinearWorkerResolvedModelProvenance | null;
   worker_control?: ProviderLinearWorkerControlPlane | null;
@@ -598,6 +648,7 @@ interface ProviderControlHostRefreshFailureDiagnostic {
 export interface ProviderLinearWorkerJsonlParseResult {
   threadId: string | null;
   turnId: string | null;
+  turnStartedAt?: string | null;
   finalMessage: string | null;
   finalMessageSource?: 'agent_message_delta' | 'other' | null;
   finalMessageDeltaKey?: string | null;
@@ -615,6 +666,8 @@ export interface ProviderLinearWorkerJsonlParseResult {
   authProvenance: ProviderLinearWorkerAuthProvenance | null;
   resolvedModelProvenance: ProviderLinearWorkerResolvedModelProvenance | null;
   failureDiagnosis: ProviderLinearWorkerFailureDiagnosis | null;
+  goalEvidence?: ProviderLinearGoalEvidence | null;
+  goalToolCallNames?: Record<string, string>;
 }
 
 interface ProviderWorkerAgentMessageDeltaHydrationSeed {
@@ -677,6 +730,7 @@ interface ProviderWorkerSessionLogTailState {
   bootstrapPending: boolean;
   currentTurnStartedAt: string | null;
   idRewindSignature: string | null;
+  goalToolCallNames: Record<string, string>;
 }
 
 interface ProviderWorkerSessionLogHydrationState {
@@ -687,6 +741,7 @@ interface ProviderWorkerSessionLogHydrationState {
   proof_signature: string;
   id_rewind_signature?: string | null;
   resolved_model_provenance?: ProviderLinearWorkerResolvedModelProvenance | null;
+  goal_tool_call_names?: Record<string, string>;
 }
 
 interface ProviderControlHostManifestTarget {
@@ -1616,6 +1671,13 @@ function normalizeNonNegativeInteger(value: unknown): number | null {
   return normalized !== null && normalized >= 0 ? normalized : null;
 }
 
+function normalizeNonNegativeNumber(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    return null;
+  }
+  return value;
+}
+
 function normalizePositiveInteger(value: unknown): number | null {
   const normalized = normalizeOptionalInteger(value);
   return normalized !== null && normalized > 0 ? normalized : null;
@@ -1728,10 +1790,13 @@ interface ProviderWorkerConfigModelDefaults {
   review_model: string | null;
   reasoning_effort: string | null;
   config_path: string | null;
+  goals_feature_enabled?: boolean | null;
+  root_goals_feature_enabled?: boolean | null;
   root_model?: string | null;
   root_review_model?: string | null;
   root_reasoning_effort?: string | null;
   active_profile?: string | null;
+  selected_profile?: string | null;
   profiles?: Record<string, ProviderWorkerConfigModelProfileDefaults>;
 }
 
@@ -1739,6 +1804,7 @@ interface ProviderWorkerConfigModelProfileDefaults {
   model: string | null;
   review_model: string | null;
   reasoning_effort: string | null;
+  goals_feature_enabled?: boolean | null;
 }
 
 interface ProviderWorkerRuntimeReportedModel {
@@ -1753,6 +1819,7 @@ interface ProviderWorkerCommandModelOverrides {
   review_model: string | null;
   reasoning_effort: string | null;
   profile: string | null;
+  goals_feature_enabled: boolean | null;
 }
 
 async function readProviderWorkerConfigModelDefaults(
@@ -1772,7 +1839,8 @@ async function readProviderWorkerConfigModelDefaults(
       model: null,
       review_model: null,
       reasoning_effort: null,
-      config_path: configPath
+      config_path: configPath,
+      goals_feature_enabled: null
     };
   }
 }
@@ -1789,10 +1857,13 @@ function readProviderWorkerConfigModelDefaultsFromToml(
     review_model: null,
     reasoning_effort: null,
     config_path: configPath,
+    goals_feature_enabled: null,
+    root_goals_feature_enabled: null,
     root_model: null,
     root_review_model: null,
     root_reasoning_effort: null,
     active_profile: null,
+    selected_profile: null,
     profiles: {}
   };
   for (const line of rawConfig.split(/\r?\n/u)) {
@@ -1816,22 +1887,43 @@ function readProviderWorkerConfigModelDefaultsFromToml(
         profiles[profileName] ?? createEmptyProviderWorkerConfigModelProfileDefaults();
       if (isProviderWorkerConfigProfileRootTable(currentTableKind, currentTablePath)) {
         mergeProviderWorkerConfigModelAssignment(profileDefaults, trimmed);
+        profileDefaults.goals_feature_enabled =
+          readTomlBooleanAssignment(trimmed, 'features.goals') ??
+          profileDefaults.goals_feature_enabled;
+      } else if (
+        currentTableKind === 'table' &&
+        currentTablePath.length === 3 &&
+        currentTablePath[2] === 'features'
+      ) {
+        profileDefaults.goals_feature_enabled =
+          readTomlBooleanAssignment(trimmed, 'goals') ?? profileDefaults.goals_feature_enabled;
       }
       profiles[profileName] = profileDefaults;
       defaults.profiles = profiles;
       continue;
     }
     if (currentTableKind !== null || currentTablePath.length !== 0) {
+      if (
+        currentTableKind === 'table' &&
+        currentTablePath.length === 1 &&
+        currentTablePath[0] === 'features'
+      ) {
+        defaults.goals_feature_enabled =
+          readTomlBooleanAssignment(trimmed, 'goals') ?? defaults.goals_feature_enabled;
+      }
       continue;
     }
     defaults.active_profile =
       normalizeProviderWorkerConfigProfileName(readTomlStringAssignment(trimmed, 'profile')) ??
       defaults.active_profile;
+    defaults.goals_feature_enabled =
+      readTomlBooleanAssignment(trimmed, 'features.goals') ?? defaults.goals_feature_enabled;
     mergeProviderWorkerConfigModelAssignment(defaults, trimmed);
   }
   defaults.root_model = defaults.model;
   defaults.root_review_model = defaults.review_model;
   defaults.root_reasoning_effort = defaults.reasoning_effort;
+  defaults.root_goals_feature_enabled = defaults.goals_feature_enabled;
   return defaults;
 }
 
@@ -1839,7 +1931,8 @@ function createEmptyProviderWorkerConfigModelProfileDefaults(): ProviderWorkerCo
   return {
     model: null,
     review_model: null,
-    reasoning_effort: null
+    reasoning_effort: null,
+    goals_feature_enabled: null
   };
 }
 
@@ -1908,7 +2001,8 @@ function selectProviderWorkerConfigModelDefaultsForProfile(
   const rootDefaults = {
     model: defaults.root_model ?? defaults.model,
     review_model: defaults.root_review_model ?? defaults.review_model,
-    reasoning_effort: defaults.root_reasoning_effort ?? defaults.reasoning_effort
+    reasoning_effort: defaults.root_reasoning_effort ?? defaults.reasoning_effort,
+    goals_feature_enabled: defaults.root_goals_feature_enabled ?? defaults.goals_feature_enabled ?? null
   };
   const profileDefaults = defaults.profiles?.[activeProfile];
   if (!profileDefaults) {
@@ -1917,10 +2011,13 @@ function selectProviderWorkerConfigModelDefaultsForProfile(
       review_model: null,
       reasoning_effort: null,
       config_path: defaults.config_path,
+      goals_feature_enabled: rootDefaults.goals_feature_enabled,
+      root_goals_feature_enabled: rootDefaults.goals_feature_enabled,
       root_model: rootDefaults.model,
       root_review_model: rootDefaults.review_model,
       root_reasoning_effort: rootDefaults.reasoning_effort,
       active_profile: activeProfile,
+      selected_profile: activeProfile,
       profiles: defaults.profiles
     };
   }
@@ -1929,12 +2026,25 @@ function selectProviderWorkerConfigModelDefaultsForProfile(
     review_model: profileDefaults.review_model ?? rootDefaults.review_model,
     reasoning_effort: profileDefaults.reasoning_effort ?? rootDefaults.reasoning_effort,
     config_path: defaults.config_path,
+    goals_feature_enabled: profileDefaults.goals_feature_enabled ?? rootDefaults.goals_feature_enabled,
+    root_goals_feature_enabled: rootDefaults.goals_feature_enabled,
     root_model: rootDefaults.model,
     root_review_model: rootDefaults.review_model,
     root_reasoning_effort: rootDefaults.reasoning_effort,
     active_profile: activeProfile,
+    selected_profile: activeProfile,
     profiles: defaults.profiles
   };
+}
+
+function selectProviderWorkerConfigModelDefaultsForCommandProfile(
+  defaults: ProviderWorkerConfigModelDefaults,
+  rawProfile: string | null
+): ProviderWorkerConfigModelDefaults {
+  if (rawProfile) {
+    return selectProviderWorkerConfigModelDefaultsForProfile(defaults, rawProfile);
+  }
+  return defaults.selected_profile ? defaults : selectProviderWorkerConfigModelDefaultsForProfile(defaults, null);
 }
 
 function readTomlStringAssignment(trimmedLine: string, key: string): string | null {
@@ -1947,6 +2057,25 @@ function readTomlStringAssignment(trimmedLine: string, key: string): string | nu
     return null;
   }
   return parseTomlStringValue(trimmedLine.slice(separatorIndex + 1).trim());
+}
+
+function readTomlBooleanAssignment(trimmedLine: string, key: string): boolean | null {
+  const separatorIndex = findTomlAssignmentSeparator(trimmedLine);
+  if (separatorIndex === -1) {
+    return null;
+  }
+  const rawKey = normalizeTomlKey(trimmedLine.slice(0, separatorIndex));
+  if (rawKey !== key) {
+    return null;
+  }
+  const normalizedValue = trimmedLine.slice(separatorIndex + 1).trim().toLowerCase();
+  if (normalizedValue === 'true') {
+    return true;
+  }
+  if (normalizedValue === 'false') {
+    return false;
+  }
+  return null;
 }
 
 function parseTomlStringValue(raw: string): string | null {
@@ -1985,7 +2114,8 @@ function buildEmptyProviderWorkerCommandModelOverrides(): ProviderWorkerCommandM
     model: null,
     review_model: null,
     reasoning_effort: null,
-    profile: null
+    profile: null,
+    goals_feature_enabled: null
   };
 }
 
@@ -2011,7 +2141,9 @@ function mergeProviderWorkerCommandConfigOverride(
       ) ?? current.reasoning_effort,
     profile:
       normalizeProviderWorkerConfigProfileName(readTomlStringAssignment(trimmed, 'profile')) ??
-      current.profile
+      current.profile,
+    goals_feature_enabled:
+      readTomlBooleanAssignment(trimmed, 'features.goals') ?? current.goals_feature_enabled
   };
 }
 
@@ -2061,6 +2193,22 @@ function resolveProviderWorkerCommandModelOverrides(args: string[]): ProviderWor
     }
   }
   return overrides;
+}
+
+function resolveProviderWorkerCommandGoalsFeatureEnabled(
+  args: string[],
+  configDefaults: ProviderWorkerConfigModelDefaults
+): boolean | null {
+  const commandOverrides = resolveProviderWorkerCommandModelOverrides(args);
+  const selectedConfigDefaults = selectProviderWorkerConfigModelDefaultsForCommandProfile(
+    configDefaults,
+    commandOverrides.profile
+  );
+  return (
+    commandOverrides.goals_feature_enabled ??
+    selectedConfigDefaults.goals_feature_enabled ??
+    null
+  );
 }
 
 function extractProviderWorkerRuntimeReportedModel(
@@ -2317,7 +2465,7 @@ function buildProviderWorkerResolvedModelProvenance(input: {
   const commandOverrides = input.commandArgs
     ? resolveProviderWorkerCommandModelOverrides(input.commandArgs)
     : buildEmptyProviderWorkerCommandModelOverrides();
-  const configDefaults = selectProviderWorkerConfigModelDefaultsForProfile(
+  const configDefaults = selectProviderWorkerConfigModelDefaultsForCommandProfile(
     input.configDefaults,
     commandOverrides.profile
   );
@@ -2423,6 +2571,8 @@ export function buildProviderLinearWorkerResolvedModelProvenance(input: {
       reasoning_effort?: string | null;
       model_reasoning_effort?: string | null;
       modelReasoningEffort?: string | null;
+      goals_feature_enabled?: boolean | null;
+      goalsFeatureEnabled?: boolean | null;
     }
   >;
   configActiveProfile?: string | null;
@@ -2474,6 +2624,8 @@ function normalizeProviderWorkerConfigModelProfiles(
           reasoning_effort?: string | null;
           model_reasoning_effort?: string | null;
           modelReasoningEffort?: string | null;
+          goals_feature_enabled?: boolean | null;
+          goalsFeatureEnabled?: boolean | null;
         }
       >
     | undefined
@@ -2496,7 +2648,10 @@ function normalizeProviderWorkerConfigModelProfiles(
         rawProfile.reasoning_effort ??
           rawProfile.model_reasoning_effort ??
           rawProfile.modelReasoningEffort
-      )
+      ),
+      goals_feature_enabled:
+        normalizeProviderLinearGoalEvidenceBoolean(rawProfile.goals_feature_enabled) ??
+        normalizeProviderLinearGoalEvidenceBoolean(rawProfile.goalsFeatureEnabled)
     };
   }
   return normalized;
@@ -3681,6 +3836,7 @@ export function buildProviderWorkerPrompt(
     linearAudit?: ProviderLinearAuditSummary | null;
     attemptStartedAt?: string | null;
     manifest?: Record<string, unknown> | null;
+    manifestPath?: string | null;
     residentSession?: ProviderLinearResidentSessionState | null;
     continueResidentSessionOnBoot?: boolean;
   } = {}
@@ -3697,6 +3853,10 @@ export function buildProviderWorkerPrompt(
       hints: [issue.identifier, issue.title, issue.description ?? '']
     })
   );
+  const goalEvidenceWorkpadGuidance = buildProviderWorkerGoalEvidenceWorkpadGuidance({
+    manifest: attemptContext.manifest ?? null,
+    manifestPath: attemptContext.manifestPath ?? null
+  });
   const continueResidentSessionOnBoot = attemptContext.continueResidentSessionOnBoot === true;
   const logicalTurnCount = attemptContext.residentSession?.logical_turn_count ?? 0;
   if (turnNumber > 1 || continueResidentSessionOnBoot) {
@@ -3716,6 +3876,7 @@ export function buildProviderWorkerPrompt(
       '- The workpad body must keep this exact top-level structure, in order, with every section non-empty: `## Codex Workpad`, `### Environment / Workspace Stamp`, `### Plan`, `### Acceptance Criteria`, `### Validation`, `### Notes`.',
       '- `Acceptance Criteria` and `Validation` must contain non-empty checkbox list items (`- [ ] task` / `- [x] task`). `Environment / Workspace Stamp`, `Plan`, and `Notes` can stay free-form.',
       '- If the ticket includes `Validation`, `Test Plan`, or `Testing` requirements, mirror them in the workpad `Acceptance Criteria` and `Validation` sections.',
+      ...goalEvidenceWorkpadGuidance,
       '- If the issue is `Todo` or the live team\'s equivalent queued state (for example `Ready`) and not blocked by a non-terminal dependency, move it into the team\'s actual started state before active coding instead of assuming a fixed state name.',
       `- When you discover a meaningful out-of-scope improvement, use \`${helperCommand} create-follow-up --issue-id ${issue.id} ...\` to file or reuse a same-project follow-up issue in \`Backlog\` with a clear title, description, intent checksum, non-goals, \`Not Done If\`, acceptance criteria, a \`related\` link, the required parity matrix for parity/alignment follow-ups, and optional blocker linkage instead of expanding scope. For recurring baseline debt, pass the exact \`--canonical-owner-key\` from machine output such as \`docs:freshness:maintain\` so the helper reuses an open stamped owner before creating a new one.`,
       ...deterministicMutationSuppressions,
@@ -3761,6 +3922,7 @@ export function buildProviderWorkerPrompt(
     '- `Acceptance Criteria` and `Validation` must contain non-empty checkbox list items (`- [ ] task` / `- [x] task`). `Environment / Workspace Stamp`, `Plan`, and `Notes` can stay free-form.',
     '- If the ticket includes `Validation`, `Test Plan`, or `Testing` requirements, mirror them in the workpad `Acceptance Criteria` and `Validation` sections.',
     '- Refresh the same workpad after each meaningful milestone and immediately before any review or merge handoff. Keep final closeout in that same workpad comment.',
+    ...goalEvidenceWorkpadGuidance,
     '- If a PR is already attached, run a full PR feedback sweep before any new implementation work: review top-level comments, inline review comments, and review summaries; resolve each actionable item or post explicit, justified pushback.',
     ...deterministicMutationSuppressions,
     buildRuntimeProofGuidance(helperCommand, issue.id),
@@ -3813,7 +3975,8 @@ function snapshotProviderLinearWorkerPublicJsonlParseResult(
     rateLimits: state.rateLimits,
     authProvenance: state.authProvenance,
     resolvedModelProvenance: state.resolvedModelProvenance,
-    failureDiagnosis: state.failureDiagnosis
+    failureDiagnosis: state.failureDiagnosis,
+    goalEvidence: state.goalEvidence ?? null
   }, state.finalMessageSource, state.finalMessageDeltaKey);
 }
 
@@ -3829,7 +3992,8 @@ function buildEmptyProviderLinearWorkerJsonlParseResult(): ProviderLinearWorkerJ
     rateLimits: null,
     authProvenance: null,
     resolvedModelProvenance: null,
-    failureDiagnosis: null
+    failureDiagnosis: null,
+    goalEvidence: null
   });
 }
 
@@ -3839,10 +4003,30 @@ function initializeProviderLinearWorkerJsonlInternalState(
   finalMessageDeltaKey: string | null = null
 ): ProviderLinearWorkerJsonlParseResult {
   const resolvedModelProvenance = state.resolvedModelProvenance ?? null;
+  const goalEvidence = state.goalEvidence ?? null;
+  const turnStartedAt = state.turnStartedAt ?? null;
+  Object.defineProperty(state, 'turnStartedAt', {
+    value: turnStartedAt,
+    writable: true,
+    enumerable: false,
+    configurable: true
+  });
   Object.defineProperty(state, 'resolvedModelProvenance', {
     value: resolvedModelProvenance,
     writable: true,
     enumerable: resolvedModelProvenance !== null,
+    configurable: true
+  });
+  Object.defineProperty(state, 'goalEvidence', {
+    value: goalEvidence,
+    writable: true,
+    enumerable: goalEvidence !== null,
+    configurable: true
+  });
+  Object.defineProperty(state, 'goalToolCallNames', {
+    value: {},
+    writable: true,
+    enumerable: false,
     configurable: true
   });
   Object.defineProperty(state, 'finalMessageSource', {
@@ -3924,7 +4108,11 @@ function applyProviderLinearWorkerJsonlRecord(
   state: ProviderLinearWorkerJsonlParseResult,
   parsed: Record<string, unknown>,
   activitySource: ProviderLinearWorkerCurrentTurnActivitySource,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  options: {
+    preserveTimestampedGoalEvidenceFromTimestamplessReplay?: boolean;
+    onGoalEvidenceObserved?: (goalEvidence: ProviderLinearGoalEvidence) => void;
+  } = {}
 ): boolean {
   let changed = false;
   let threadChanged = false;
@@ -3951,16 +4139,21 @@ function applyProviderLinearWorkerJsonlRecord(
   }
   if (parsed.type === 'turn_context' && payload) {
     const nextTurnId = normalizeOptionalString(payload.turn_id);
+    const nextTurnStartedAt = extractProviderWorkerEventTimestamp(parsed);
     if (nextTurnId && nextTurnId !== state.turnId) {
-      resetProviderLinearWorkerTurnScopedTelemetry(state);
+      resetProviderLinearWorkerTurnScopedTelemetry(state, nextTurnId);
       state.turnId = nextTurnId;
+      state.turnStartedAt = nextTurnStartedAt;
+      changed = true;
+    } else if (nextTurnId && !state.turnStartedAt && nextTurnStartedAt) {
+      state.turnStartedAt = nextTurnStartedAt;
       changed = true;
     }
   }
   if (parsed.type === 'event_msg' && payload && payload.type === 'task_complete') {
     const nextTurnId = normalizeOptionalString(payload.turn_id);
     if (nextTurnId && nextTurnId !== state.turnId) {
-      resetProviderLinearWorkerTurnScopedTelemetry(state);
+      resetProviderLinearWorkerTurnScopedTelemetry(state, nextTurnId);
       state.turnId = nextTurnId;
       changed = true;
     }
@@ -4061,6 +4254,22 @@ function applyProviderLinearWorkerJsonlRecord(
     state.tokens = mergeProviderWorkerObservedTokenUsage(state.tokens, observedTokens);
     changed = true;
   }
+  const observedGoalEvidence = extractProviderWorkerGoalEvidence(parsed, state);
+  if (observedGoalEvidence) {
+    options.onGoalEvidenceObserved?.(observedGoalEvidence);
+    const nextGoalEvidence = selectPreferredProviderLinearGoalEvidence(
+      state.goalEvidence ?? null,
+      observedGoalEvidence,
+      {
+        preserveTimestampedCurrentFromTimestamplessObserved:
+          options.preserveTimestampedGoalEvidenceFromTimestamplessReplay === true
+      }
+    );
+    if (JSON.stringify(nextGoalEvidence) !== JSON.stringify(state.goalEvidence ?? null)) {
+      state.goalEvidence = nextGoalEvidence;
+      changed = true;
+    }
+  }
   const observedRateLimits = extractProviderWorkerRateLimits(parsed);
   if (observedRateLimits) {
     state.rateLimits = observedRateLimits;
@@ -4096,9 +4305,13 @@ function applyProviderLinearWorkerJsonlRecord(
 function applyProviderLinearWorkerSessionJsonlRecord(
   state: ProviderLinearWorkerJsonlParseResult,
   parsed: Record<string, unknown>,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  options: {
+    preserveTimestampedGoalEvidenceFromTimestamplessReplay?: boolean;
+    onGoalEvidenceObserved?: (goalEvidence: ProviderLinearGoalEvidence) => void;
+  } = {}
 ): boolean {
-  return applyProviderLinearWorkerJsonlRecord(state, parsed, 'session_log_hydration', env);
+  return applyProviderLinearWorkerJsonlRecord(state, parsed, 'session_log_hydration', env, options);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -4106,8 +4319,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function resetProviderLinearWorkerTurnScopedTelemetry(
-  state: ProviderLinearWorkerJsonlParseResult
+  state: ProviderLinearWorkerJsonlParseResult,
+  preserveGoalEvidenceForTurnId: string | null = null
 ): void {
+  const preservedGoalEvidence = shouldPreserveProviderLinearGoalEvidenceAcrossTurnReset(
+    state.goalEvidence ?? null,
+    preserveGoalEvidenceForTurnId,
+    state.turnId ?? null
+  )
+    ? state.goalEvidence ?? null
+    : null;
   state.lastEvent = null;
   state.finalMessage = null;
   state.finalMessageSource = null;
@@ -4119,6 +4340,21 @@ function resetProviderLinearWorkerTurnScopedTelemetry(
   state.currentTurnActivity = null;
   state.resolvedModelProvenance = null;
   state.failureDiagnosis = null;
+  state.goalEvidence = preservedGoalEvidence;
+  state.goalToolCallNames = {};
+  state.turnStartedAt = null;
+}
+
+function shouldPreserveProviderLinearGoalEvidenceAcrossTurnReset(
+  goalEvidence: ProviderLinearGoalEvidence | null,
+  nextTurnId: string | null,
+  currentTurnId: string | null
+): boolean {
+  if (!goalEvidence || !nextTurnId) {
+    return false;
+  }
+  const evidenceTurnId = normalizeOptionalString(goalEvidence.turn_id);
+  return evidenceTurnId === nextTurnId || (evidenceTurnId === null && currentTurnId === null);
 }
 
 function isProviderLinearWorkerBookkeepingRecord(parsed: Record<string, unknown>): boolean {
@@ -4133,6 +4369,14 @@ function readProviderWorkerMethod(input: Record<string, unknown>): string | null
 function readProviderWorkerParams(input: Record<string, unknown>): Record<string, unknown> | null {
   const payload = isRecord(input.payload) ? input.payload : null;
   return isRecord(input.params) ? input.params : isRecord(payload?.params) ? payload.params : null;
+}
+
+function isProviderWorkerGoalNotificationRecord(input: Record<string, unknown>): boolean {
+  const payload = isRecord(input.payload) ? input.payload : null;
+  return (
+    normalizeOptionalString(input.type) === 'notification' ||
+    normalizeOptionalString(payload?.type) === 'notification'
+  );
 }
 
 function readFirstProviderWorkerRawStringAtPaths(
@@ -4349,13 +4593,7 @@ function extractProviderWorkerEventSummary(input: Record<string, unknown>): {
   at: string | null;
 } {
   const payload = isRecord(input.payload) ? input.payload : null;
-  const timestamp =
-    normalizeOptionalString(input.timestamp) ??
-    (payload
-      ? normalizeOptionalString(payload.timestamp) ??
-        normalizeOptionalString(payload.created_at) ??
-        normalizeOptionalString(payload.at)
-      : null);
+  const timestamp = extractProviderWorkerEventTimestamp(input);
   if (input.type === 'event_msg' && payload) {
     return {
       event: normalizeOptionalString(payload.type),
@@ -4440,6 +4678,1032 @@ function extractProviderWorkerActivityTurnId(parsed: Record<string, unknown>): s
     normalizeOptionalString(payloadParams?.turnId) ??
     normalizeOptionalString(payloadParams?.turn_id)
   );
+}
+
+function normalizeProviderWorkerGoalToolName(value: unknown): string | null {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return null;
+  }
+  const leafName = normalized.split('.').pop()?.trim() ?? '';
+  return leafName === 'get_goal' || leafName === 'create_goal' || leafName === 'update_goal'
+    ? leafName
+    : null;
+}
+
+function mergeProviderWorkerResponseItemPayloadMetadata(
+  wrapper: Record<string, unknown>,
+  nested: Record<string, unknown>
+): Record<string, unknown> {
+  return {
+    ...wrapper,
+    ...nested,
+    call_id: nested.call_id ?? wrapper.call_id,
+    callId: nested.callId ?? wrapper.callId,
+    tool_call_id: nested.tool_call_id ?? wrapper.tool_call_id,
+    toolCallId: nested.toolCallId ?? wrapper.toolCallId,
+    name: nested.name ?? wrapper.name,
+    tool_name: nested.tool_name ?? wrapper.tool_name,
+    toolName: nested.toolName ?? wrapper.toolName
+  };
+}
+
+const PROVIDER_WORKER_RESPONSE_ITEM_UNWRAP_DEPTH_LIMIT = 4;
+
+function hasProviderWorkerResponseItemOutputPayload(
+  value: Record<string, unknown>,
+  depth = 0
+): boolean {
+  const type = normalizeOptionalString(value.type)?.toLowerCase();
+  if (
+    type === 'function_call_output' ||
+    type === 'tool_result' ||
+    value.output !== undefined ||
+    value.result !== undefined
+  ) {
+    return true;
+  }
+  if (depth >= PROVIDER_WORKER_RESPONSE_ITEM_UNWRAP_DEPTH_LIMIT) {
+    return false;
+  }
+  const payload = isRecord(value.payload) ? value.payload : null;
+  const params = isRecord(value.params) ? value.params : null;
+  const payloadParams = isRecord(payload?.params) ? payload.params : null;
+  return [
+    value.item,
+    value.response_item,
+    params?.item,
+    params?.response_item,
+    payload,
+    payload?.item,
+    payload?.response_item,
+    payload?.payload,
+    payloadParams?.item,
+    payloadParams?.response_item
+  ].some(
+    (candidate) =>
+      isRecord(candidate) && hasProviderWorkerResponseItemOutputPayload(candidate, depth + 1)
+  );
+}
+
+function unwrapProviderWorkerResponseItemPayloadCandidate(
+  candidate: Record<string, unknown>,
+  depth = 0
+): Record<string, unknown> {
+  if (depth >= PROVIDER_WORKER_RESPONSE_ITEM_UNWRAP_DEPTH_LIMIT) {
+    return candidate;
+  }
+  const params = isRecord(candidate.params) ? candidate.params : null;
+  const directNestedCandidates = [
+    isRecord(candidate.item) ? candidate.item : null,
+    isRecord(candidate.response_item) ? candidate.response_item : null,
+    isRecord(params?.item) ? params.item : null,
+    isRecord(params?.response_item) ? params.response_item : null
+  ];
+  const hasOutputBearingDirectNestedCandidate = directNestedCandidates.some((nested) =>
+    nested ? hasProviderWorkerResponseItemOutputPayload(nested, depth + 1) : false
+  );
+  if (hasOutputBearingDirectNestedCandidate) {
+    const selectedDirectNested = selectProviderWorkerNestedResponseItemPayload(
+      candidate,
+      directNestedCandidates,
+      depth + 1
+    );
+    if (selectedDirectNested) {
+      return mergeProviderWorkerResponseItemPayloadMetadata(candidate, selectedDirectNested);
+    }
+  }
+  const payload = isRecord(candidate.payload) ? candidate.payload : null;
+  if (!payload) {
+    return candidate;
+  }
+  const payloadParams = isRecord(payload.params) ? payload.params : null;
+  const selectedNested = selectProviderWorkerNestedResponseItemPayload(
+    payload,
+    [
+      isRecord(payload.item) ? payload.item : null,
+      isRecord(payload.response_item) ? payload.response_item : null,
+      isRecord(payload.payload) ? payload.payload : null,
+      isRecord(payloadParams?.item) ? payloadParams.item : null,
+      isRecord(payloadParams?.response_item) ? payloadParams.response_item : null
+    ],
+    depth + 1
+  );
+  if (selectedNested) {
+    return mergeProviderWorkerResponseItemPayloadMetadata(candidate, selectedNested);
+  }
+  if (
+    normalizeOptionalString(candidate.type)?.toLowerCase() === 'response_item' ||
+    normalizeOptionalString(payload.type)?.toLowerCase() === 'response_item' ||
+    hasProviderWorkerResponseItemOutputPayload(payload, depth + 1)
+  ) {
+    return mergeProviderWorkerResponseItemPayloadMetadata(candidate, payload);
+  }
+  return candidate;
+}
+
+function selectProviderWorkerNestedResponseItemPayload(
+  wrapper: Record<string, unknown>,
+  nestedCandidates: Array<Record<string, unknown> | null>,
+  depth = 0
+): Record<string, unknown> | null {
+  const candidates = nestedCandidates.filter(
+    (candidate): candidate is Record<string, unknown> => candidate !== null
+  );
+  const outputCandidate = candidates.find((candidate) =>
+    hasProviderWorkerResponseItemOutputPayload(candidate, depth)
+  );
+  if (!outputCandidate) {
+    const firstCandidate = candidates[0] ?? null;
+    return firstCandidate
+      ? mergeProviderWorkerResponseItemPayloadMetadata(
+          wrapper,
+          unwrapProviderWorkerResponseItemPayloadCandidate(firstCandidate, depth + 1)
+        )
+      : null;
+  }
+  const normalizedOutputCandidate = unwrapProviderWorkerResponseItemPayloadCandidate(
+    outputCandidate,
+    depth + 1
+  );
+  const selectedOutputCandidate = mergeProviderWorkerResponseItemPayloadMetadata(
+    wrapper,
+    normalizedOutputCandidate
+  );
+  return candidates.reduce(
+    (selected, candidate) =>
+      candidate === outputCandidate
+        ? selected
+        : mergeProviderWorkerResponseItemPayloadMetadata(
+            unwrapProviderWorkerResponseItemPayloadCandidate(candidate, depth + 1),
+            selected
+          ),
+    selectedOutputCandidate
+  );
+}
+
+function readProviderWorkerResponseItemPayload(input: Record<string, unknown>): Record<string, unknown> | null {
+  const payload = isRecord(input.payload) ? input.payload : null;
+  const params = isRecord(input.params) ? input.params : null;
+  const payloadParams = isRecord(payload?.params) ? payload.params : null;
+  const payloadWrappedPayload = isRecord(payload?.payload) ? payload.payload : null;
+  const payloadItem = isRecord(payload?.item) ? payload.item : null;
+  const payloadResponseItem = isRecord(payload?.response_item) ? payload.response_item : null;
+  if (payload) {
+    const selectedNested = selectProviderWorkerNestedResponseItemPayload(payload, [
+      payloadItem,
+      payloadResponseItem,
+      payloadWrappedPayload,
+      isRecord(payloadParams?.item) ? payloadParams.item : null,
+      isRecord(payloadParams?.response_item) ? payloadParams.response_item : null
+    ]);
+    if (selectedNested) {
+      return selectedNested;
+    }
+  }
+  const selectedOuterNested = selectProviderWorkerNestedResponseItemPayload(input, [
+    input.item,
+    input.response_item,
+    params?.item,
+    params?.response_item,
+    payloadParams?.item,
+    payloadParams?.response_item
+  ].map((candidate) => (isRecord(candidate) ? candidate : null)));
+  if (selectedOuterNested) {
+    return selectedOuterNested;
+  }
+  for (const candidate of [
+    input.item,
+    input.response_item,
+    params?.item,
+    params?.response_item,
+    payloadParams?.item,
+    payloadParams?.response_item
+  ]) {
+    if (isRecord(candidate)) {
+      return unwrapProviderWorkerResponseItemPayloadCandidate(candidate);
+    }
+  }
+  if (payload?.type === 'response_item' && payloadWrappedPayload) {
+    return mergeProviderWorkerResponseItemPayloadMetadata(payload, payloadWrappedPayload);
+  }
+  return (input.type === 'response_item' || payload?.type === 'response_item') && payload ? payload : null;
+}
+
+function readProviderWorkerResponseItemCallId(input: Record<string, unknown>): string | null {
+  const payload = readProviderWorkerResponseItemPayload(input);
+  return (
+    normalizeOptionalString(input.call_id) ??
+    normalizeOptionalString(input.callId) ??
+    normalizeOptionalString(input.tool_call_id) ??
+    normalizeOptionalString(input.toolCallId) ??
+    normalizeOptionalString(payload?.call_id) ??
+    normalizeOptionalString(payload?.callId) ??
+    normalizeOptionalString(payload?.tool_call_id) ??
+    normalizeOptionalString(payload?.toolCallId)
+  );
+}
+
+function readProviderWorkerResponseItemGoalToolName(
+  input: Record<string, unknown>
+): string | null {
+  const payload = readProviderWorkerResponseItemPayload(input);
+  const nestedFunction = isRecord(payload?.function) ? payload.function : null;
+  return (
+    normalizeProviderWorkerGoalToolName(input.name) ??
+    normalizeProviderWorkerGoalToolName(input.tool_name) ??
+    normalizeProviderWorkerGoalToolName(input.toolName) ??
+    normalizeProviderWorkerGoalToolName(payload?.name) ??
+    normalizeProviderWorkerGoalToolName(payload?.tool_name) ??
+    normalizeProviderWorkerGoalToolName(payload?.toolName) ??
+    normalizeProviderWorkerGoalToolName(nestedFunction?.name)
+  );
+}
+
+type ProviderWorkerGoalToolOutputParseOptions = {
+  includeStatus?: boolean;
+};
+
+function readProviderWorkerGoalToolOutputValue(
+  input: Record<string, unknown>,
+  options: ProviderWorkerGoalToolOutputParseOptions = {}
+): unknown {
+  const payload = readProviderWorkerResponseItemPayload(input);
+  const outputCandidates = [
+    input.output,
+    input.result,
+    input.content,
+    payload?.output,
+    payload?.result,
+    payload?.content
+  ];
+  let firstDefined: unknown = undefined;
+  let firstStatusPayload: Record<string, unknown> | undefined = undefined;
+  for (const candidate of outputCandidates) {
+    if (candidate === undefined) {
+      continue;
+    }
+    firstDefined ??= candidate;
+    const parsed = parseProviderWorkerGoalToolOutputValue(candidate, options);
+    if (isRecord(parsed) && isProviderWorkerGoalToolPayloadRecord(parsed)) {
+      return parsed;
+    }
+    if (
+      options.includeStatus === true &&
+      isRecord(parsed) &&
+      isProviderWorkerGoalToolPayloadRecord(parsed, options)
+    ) {
+      firstStatusPayload = parsed;
+    }
+  }
+  return firstStatusPayload ?? firstDefined;
+}
+
+function parseProviderWorkerGoalToolOutputValue(
+  value: unknown,
+  options: ProviderWorkerGoalToolOutputParseOptions = {}
+): unknown {
+  if (isRecord(value)) {
+    if (isRecord(value.goal) || isRecord(value.threadGoal) || isRecord(value.thread_goal)) {
+      return value;
+    }
+    let statusFallback: Record<string, unknown> | null = null;
+    for (const nested of [value.text, value.output_text, value.output, value.result, value.content]) {
+      const parsed = parseProviderWorkerGoalToolOutputValue(nested, options);
+      if (isRecord(parsed)) {
+        if (isProviderWorkerGoalToolPayloadRecord(parsed)) {
+          return parsed;
+        }
+        if (options.includeStatus === true && isProviderWorkerGoalToolPayloadRecord(parsed, options)) {
+          statusFallback = parsed;
+        }
+      }
+    }
+    if (statusFallback) {
+      return statusFallback;
+    }
+    if (hasProviderWorkerGoalSnapshotContent(value, options)) {
+      return value;
+    }
+    return value;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      return parseProviderWorkerGoalToolOutputValue(parsed, options) ?? parsed;
+    } catch {
+      return null;
+    }
+  }
+  if (Array.isArray(value)) {
+    let statusFallback: Record<string, unknown> | null = null;
+    for (const item of value) {
+      const parsed = parseProviderWorkerGoalToolOutputValue(item, options);
+      if (isRecord(parsed)) {
+        if (isProviderWorkerGoalToolPayloadRecord(parsed)) {
+          return parsed;
+        }
+        if (options.includeStatus === true && isProviderWorkerGoalToolPayloadRecord(parsed, options)) {
+          statusFallback = parsed;
+        }
+      }
+    }
+    return statusFallback;
+  }
+  return null;
+}
+
+function hasProviderWorkerGoalSnapshotContent(
+  value: Record<string, unknown>,
+  options: { includeStatus?: boolean } = {}
+): boolean {
+  return (
+    normalizeOptionalString(value.objective) !== null ||
+    (options.includeStatus === true && normalizeOptionalString(value.status) !== null) ||
+    normalizeNonNegativeInteger(value.tokenBudget ?? value.token_budget) !== null ||
+    normalizeNonNegativeInteger(value.tokensUsed ?? value.tokens_used) !== null ||
+    normalizeNonNegativeNumber(
+      value.timeUsedSeconds ?? value.time_used_seconds ?? value.elapsedSeconds ?? value.elapsed_seconds
+    ) !== null
+  );
+}
+
+function isProviderWorkerGoalToolPayloadRecord(
+  value: Record<string, unknown>,
+  options: ProviderWorkerGoalToolOutputParseOptions = {}
+): boolean {
+  return (
+    isRecord(value.goal) ||
+    isRecord(value.threadGoal) ||
+    isRecord(value.thread_goal) ||
+    hasProviderWorkerGoalSnapshotContent(value, options)
+  );
+}
+
+function selectProviderWorkerGoalToolSnapshotRecord(
+  value: unknown,
+  options: { includeStatus?: boolean } = {}
+): Record<string, unknown> | null {
+  const parsed = parseProviderWorkerGoalToolOutputValue(value, options);
+  if (!isRecord(parsed)) {
+    return null;
+  }
+  if (isRecord(parsed.goal)) {
+    return parsed.goal;
+  }
+  if (isRecord(parsed.threadGoal)) {
+    return parsed.threadGoal;
+  }
+  if (isRecord(parsed.thread_goal)) {
+    return parsed.thread_goal;
+  }
+  return hasProviderWorkerGoalSnapshotContent(parsed, options) ? parsed : null;
+}
+
+function isProviderWorkerGoalToolResponseItemSource(input: Record<string, unknown>): boolean {
+  const payload = isRecord(input.payload) ? input.payload : null;
+  const params = isRecord(input.params) ? input.params : null;
+  const payloadParams = isRecord(payload?.params) ? payload.params : null;
+  const inputType = normalizeOptionalString(input.type)?.toLowerCase();
+  const payloadType = normalizeOptionalString(payload?.type)?.toLowerCase();
+  if (inputType === 'response_item' || payloadType === 'response_item') {
+    return true;
+  }
+  if (
+    isRecord(input.response_item) ||
+    isRecord(params?.response_item) ||
+    isRecord(payloadParams?.response_item)
+  ) {
+    return true;
+  }
+  const method = readProviderWorkerMethod(input)?.toLowerCase();
+  return (
+    isProviderWorkerGoalNotificationRecord(input) &&
+    (method === 'rawresponseitem/started' ||
+      method === 'rawresponseitem/updated' ||
+      method === 'rawresponseitem/completed')
+  );
+}
+
+function extractProviderWorkerGoalToolEvidence(
+  parsed: Record<string, unknown>,
+  state: ProviderLinearWorkerJsonlParseResult
+): ProviderLinearGoalEvidence | null {
+  if (!isProviderWorkerGoalToolResponseItemSource(parsed)) {
+    return null;
+  }
+  const callId = readProviderWorkerResponseItemCallId(parsed);
+  const directToolName = readProviderWorkerResponseItemGoalToolName(parsed);
+  if (directToolName && callId) {
+    state.goalToolCallNames ??= {};
+    state.goalToolCallNames[callId] = directToolName;
+  }
+  const payload = readProviderWorkerResponseItemPayload(parsed);
+  const payloadType = normalizeOptionalString(payload?.type);
+  const hasSupportedPayloadType =
+    !payloadType || payloadType === 'function_call_output' || payloadType === 'tool_result' || payloadType === 'response_item';
+  const toolName =
+    directToolName ?? (callId ? normalizeProviderWorkerGoalToolName(state.goalToolCallNames?.[callId]) : null);
+  if (!toolName || !hasSupportedPayloadType) {
+    return null;
+  }
+  const outputValue = readProviderWorkerGoalToolOutputValue(parsed, {
+    includeStatus: toolName === 'get_goal'
+  });
+  if (outputValue === undefined) {
+    return null;
+  }
+  const capturedAt = extractProviderWorkerEventTimestamp(parsed);
+  const turnId = extractProviderWorkerActivityTurnId(parsed) ?? state.turnId;
+  const goal = selectProviderWorkerGoalToolSnapshotRecord(outputValue, {
+    includeStatus: toolName === 'get_goal'
+  });
+  if (!goal || !hasProviderWorkerGoalSnapshotContent(goal, { includeStatus: true })) {
+    if (toolName === 'create_goal' || toolName === 'update_goal') {
+      return null;
+    }
+    return buildProviderLinearGoalEvidence({
+      featureAvailable: true,
+      featureEnabled: null,
+      captureMode: 'unavailable',
+      captureTimestamp: capturedAt,
+      threadId: state.threadId,
+      turnId,
+      objective: null,
+      status: null,
+      tokenBudget: null,
+      tokensUsed: null,
+      elapsedSeconds: null,
+      createdAt: null,
+      updatedAt: null,
+      reason: `${toolName}_goal_payload_missing`
+    });
+  }
+  const createdAt = normalizeProviderLinearGoalTimestamp(goal.createdAt ?? goal.created_at);
+  const updatedAt = normalizeProviderLinearGoalTimestamp(goal.updatedAt ?? goal.updated_at);
+  return buildProviderLinearGoalEvidence({
+    featureAvailable: true,
+    featureEnabled: null,
+    captureMode: 'captured',
+    captureTimestamp: capturedAt,
+    threadId:
+      normalizeOptionalString(goal.threadId) ??
+      normalizeOptionalString(goal.thread_id) ??
+      state.threadId,
+    turnId,
+    objective: normalizeOptionalString(goal.objective),
+    status: normalizeOptionalString(goal.status),
+    tokenBudget: normalizeNonNegativeInteger(goal.tokenBudget ?? goal.token_budget),
+    tokensUsed: normalizeNonNegativeInteger(goal.tokensUsed ?? goal.tokens_used),
+    elapsedSeconds: normalizeNonNegativeNumber(
+      goal.timeUsedSeconds ?? goal.time_used_seconds ?? goal.elapsedSeconds ?? goal.elapsed_seconds
+    ),
+    createdAt,
+    updatedAt,
+    reason: null
+  });
+}
+
+function extractProviderWorkerGoalEvidence(
+  parsed: Record<string, unknown>,
+  state: ProviderLinearWorkerJsonlParseResult
+): ProviderLinearGoalEvidence | null {
+  const goalToolEvidence = extractProviderWorkerGoalToolEvidence(parsed, state);
+  if (goalToolEvidence) {
+    return goalToolEvidence;
+  }
+  const method = readProviderWorkerMethod(parsed)?.toLowerCase();
+  if (method !== 'thread/goal/updated' && method !== 'thread/goal/cleared') {
+    return null;
+  }
+  if (!isProviderWorkerGoalNotificationRecord(parsed)) {
+    return null;
+  }
+  const params = readProviderWorkerParams(parsed);
+  const goal = isRecord(params?.goal)
+    ? params.goal
+    : isRecord(params?.threadGoal)
+      ? params.threadGoal
+      : isRecord(params?.thread_goal)
+        ? params.thread_goal
+        : null;
+  const capturedAt = extractProviderWorkerEventTimestamp(parsed);
+  const threadId =
+    normalizeOptionalString(goal?.threadId) ??
+    normalizeOptionalString(goal?.thread_id) ??
+    normalizeOptionalString(params?.threadId) ??
+    normalizeOptionalString(params?.thread_id);
+  const turnId = extractProviderWorkerActivityTurnId(parsed) ?? state.turnId;
+  if (method === 'thread/goal/cleared') {
+    return buildProviderLinearGoalEvidence({
+      featureAvailable: true,
+      featureEnabled: null,
+      captureMode: 'cleared',
+      captureTimestamp: capturedAt,
+      threadId,
+      turnId,
+      objective: null,
+      status: 'cleared',
+      tokenBudget: null,
+      tokensUsed: null,
+      elapsedSeconds: null,
+      createdAt: null,
+      updatedAt: null,
+      reason: 'goal_cleared'
+    });
+  }
+  if (!goal || !hasProviderWorkerGoalSnapshotContent(goal, { includeStatus: true })) {
+    return buildProviderLinearGoalEvidence({
+      featureAvailable: true,
+      featureEnabled: null,
+      captureMode: 'unavailable',
+      captureTimestamp: capturedAt,
+      threadId,
+      turnId,
+      objective: null,
+      status: null,
+      tokenBudget: null,
+      tokensUsed: null,
+      elapsedSeconds: null,
+      createdAt: null,
+      updatedAt: null,
+      reason: 'goal_updated_payload_missing'
+    });
+  }
+  const createdAt = normalizeProviderLinearGoalTimestamp(goal.createdAt ?? goal.created_at);
+  const updatedAt = normalizeProviderLinearGoalTimestamp(goal.updatedAt ?? goal.updated_at);
+  return buildProviderLinearGoalEvidence({
+    featureAvailable: true,
+    featureEnabled: null,
+    captureMode: 'captured',
+    captureTimestamp: capturedAt,
+    threadId,
+    turnId,
+    objective: normalizeOptionalString(goal.objective),
+    status: normalizeOptionalString(goal.status),
+    tokenBudget: normalizeNonNegativeInteger(goal.tokenBudget ?? goal.token_budget),
+    tokensUsed: normalizeNonNegativeInteger(goal.tokensUsed ?? goal.tokens_used),
+    elapsedSeconds: normalizeNonNegativeNumber(
+      goal.timeUsedSeconds ?? goal.time_used_seconds ?? goal.elapsedSeconds ?? goal.elapsed_seconds
+    ),
+    createdAt,
+    updatedAt,
+    reason: null
+  });
+}
+
+function selectProviderLinearGoalEvidenceFreshnessTimestamp(
+  evidence: ProviderLinearGoalEvidence | null | undefined
+): string | null {
+  if (!evidence) {
+    return null;
+  }
+  return (
+    normalizeOptionalString(evidence.capture_timestamp) ??
+    normalizeOptionalString(evidence.updated_at) ??
+    normalizeOptionalString(evidence.created_at)
+  );
+}
+
+function selectPreferredProviderLinearGoalEvidence(
+  current: ProviderLinearGoalEvidence | null,
+  observed: ProviderLinearGoalEvidence,
+  options: {
+    preserveTimestampedCurrentFromTimestamplessObserved?: boolean;
+  } = {}
+): ProviderLinearGoalEvidence {
+  if (!current) {
+    return observed;
+  }
+  const currentTimestamp = selectProviderLinearGoalEvidenceFreshnessTimestamp(current);
+  const observedTimestamp = selectProviderLinearGoalEvidenceFreshnessTimestamp(observed);
+  const observedCaptureTimestamp = normalizeOptionalString(observed.capture_timestamp);
+  const observedIsCurrentTurnCapture =
+    (observed.capture_mode === 'captured' || observed.capture_mode === 'cleared') &&
+    !observedCaptureTimestamp;
+  if (
+    options.preserveTimestampedCurrentFromTimestamplessObserved === true &&
+    currentTimestamp &&
+    current.capture_mode !== 'captured' &&
+    current.capture_mode !== 'cleared' &&
+    observedIsCurrentTurnCapture
+  ) {
+    return observed;
+  }
+  if (
+    options.preserveTimestampedCurrentFromTimestamplessObserved === true &&
+    currentTimestamp &&
+    !observedCaptureTimestamp &&
+    !observedTimestamp
+  ) {
+    return current;
+  }
+  if (
+    options.preserveTimestampedCurrentFromTimestamplessObserved !== true &&
+    current.capture_mode !== 'captured' &&
+    current.capture_mode !== 'cleared' &&
+    observed.capture_mode === 'captured' &&
+    !observedCaptureTimestamp
+  ) {
+    return observed;
+  }
+  if (
+    options.preserveTimestampedCurrentFromTimestamplessObserved !== true &&
+    current.capture_mode === 'captured' &&
+    observed.capture_mode === 'captured' &&
+    !observedCaptureTimestamp
+  ) {
+    return observed;
+  }
+  if (currentTimestamp && observedTimestamp && compareIsoTimestamp(observedTimestamp, currentTimestamp) < 0) {
+    return current;
+  }
+  return observed;
+}
+
+function normalizeProviderLinearGoalTimestamp(value: unknown): string | null {
+  const normalized = normalizeOptionalString(value);
+  if (normalized) {
+    return normalized;
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+  const epochMillis = Math.abs(value) < 10_000_000_000 ? value * 1000 : value;
+  const date = new Date(epochMillis);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
+function normalizeProviderLinearGoalIsoTimestamp(value: unknown): string | null {
+  const normalized = normalizeProviderLinearGoalTimestamp(value);
+  if (!normalized) {
+    return null;
+  }
+  return Number.isFinite(Date.parse(normalized)) ? normalized : null;
+}
+
+function extractProviderWorkerEventTimestamp(input: Record<string, unknown>): string | null {
+  const payload = isRecord(input.payload) ? input.payload : null;
+  const responsePayload = readProviderWorkerResponseItemPayload(input);
+  return (
+    normalizeOptionalString(input.timestamp) ??
+    normalizeOptionalString(input.created_at) ??
+    normalizeOptionalString(input.createdAt) ??
+    normalizeOptionalString(input.at) ??
+    normalizeOptionalString(payload?.timestamp) ??
+    normalizeOptionalString(payload?.created_at) ??
+    normalizeOptionalString(payload?.createdAt) ??
+    normalizeOptionalString(payload?.at) ??
+    normalizeOptionalString(responsePayload?.timestamp) ??
+    normalizeOptionalString(responsePayload?.created_at) ??
+    normalizeOptionalString(responsePayload?.createdAt) ??
+    normalizeOptionalString(responsePayload?.at)
+  );
+}
+
+function buildProviderLinearGoalEvidence(input: {
+  featureAvailable: boolean | null;
+  featureEnabled: boolean | null;
+  captureMode: ProviderLinearGoalEvidenceCaptureMode;
+  captureTimestamp: string | null;
+  threadId: string | null;
+  turnId: string | null;
+  objective: string | null;
+  status: string | null;
+  tokenBudget: number | null;
+  tokensUsed: number | null;
+  elapsedSeconds: number | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  reason: string | null;
+}): ProviderLinearGoalEvidence {
+  return {
+    source: 'codex-goals',
+    feature_available: input.featureAvailable,
+    feature_enabled: input.featureEnabled,
+    capture_mode: input.captureMode,
+    capture_timestamp: input.captureTimestamp,
+    thread_id: input.threadId,
+    turn_id: input.turnId,
+    objective: input.objective,
+    status: input.status,
+    token_budget: input.tokenBudget,
+    tokens_used: input.tokensUsed,
+    elapsed_seconds: input.elapsedSeconds,
+    created_at: input.createdAt,
+    updated_at: input.updatedAt,
+    authority: 'advisory_only',
+    linear_authority_preserved: true,
+    not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+    reason: input.reason
+  };
+}
+
+function normalizeProviderLinearGoalEvidenceCaptureMode(
+  value: unknown
+): ProviderLinearGoalEvidenceCaptureMode | null {
+  return typeof value === 'string' &&
+    PROVIDER_LINEAR_GOAL_EVIDENCE_CAPTURE_MODES.includes(value as ProviderLinearGoalEvidenceCaptureMode)
+    ? (value as ProviderLinearGoalEvidenceCaptureMode)
+    : null;
+}
+
+function normalizeProviderLinearGoalEvidenceBoolean(value: unknown): boolean | null {
+  return typeof value === 'boolean' ? value : null;
+}
+
+function hasProviderLinearGoalEvidenceAuthorityBoundary(value: Record<string, unknown>): boolean {
+  if (value.authority !== 'advisory_only' || value.linear_authority_preserved !== true) {
+    return false;
+  }
+  const notAuthorizedFor = Array.isArray(value.not_authorized_for)
+    ? value.not_authorized_for
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter((item): item is string => item.length > 0)
+    : [];
+  const notAuthorizedForSet = new Set(notAuthorizedFor);
+  return (
+    notAuthorizedFor.length === PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR.length &&
+    notAuthorizedForSet.size === PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR.length &&
+    PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR.every((item) =>
+      notAuthorizedForSet.has(item)
+    )
+  );
+}
+
+export function normalizeProviderLinearGoalEvidenceValue(value: unknown): ProviderLinearGoalEvidence | null {
+  if (!isRecord(value) || value.source !== 'codex-goals') {
+    return null;
+  }
+  if (!hasProviderLinearGoalEvidenceAuthorityBoundary(value)) {
+    return null;
+  }
+  const captureMode = normalizeProviderLinearGoalEvidenceCaptureMode(value.capture_mode);
+  if (captureMode === null) {
+    return null;
+  }
+  const capturedEvidence = buildProviderLinearGoalEvidence({
+    featureAvailable: normalizeProviderLinearGoalEvidenceBoolean(value.feature_available),
+    featureEnabled: normalizeProviderLinearGoalEvidenceBoolean(value.feature_enabled),
+    captureMode,
+    captureTimestamp: normalizeProviderLinearGoalIsoTimestamp(value.capture_timestamp),
+    threadId: normalizeOptionalString(value.thread_id),
+    turnId: normalizeOptionalString(value.turn_id),
+    objective: normalizeOptionalString(value.objective),
+    status: normalizeOptionalString(value.status),
+    tokenBudget: normalizeNonNegativeInteger(value.token_budget),
+    tokensUsed: normalizeNonNegativeInteger(value.tokens_used),
+    elapsedSeconds: normalizeNonNegativeNumber(value.elapsed_seconds),
+    createdAt: normalizeProviderLinearGoalIsoTimestamp(value.created_at),
+    updatedAt: normalizeProviderLinearGoalIsoTimestamp(value.updated_at),
+    reason: normalizeOptionalString(value.reason)
+  });
+  if (
+    Object.prototype.hasOwnProperty.call(value, 'feature_available') &&
+    value.feature_available != null &&
+    normalizeProviderLinearGoalEvidenceBoolean(value.feature_available) === null
+  ) {
+    return buildProviderLinearGoalEvidence({
+      featureAvailable: false,
+      featureEnabled: capturedEvidence.feature_enabled,
+      captureMode: 'unavailable',
+      captureTimestamp: capturedEvidence.capture_timestamp,
+      threadId: capturedEvidence.thread_id,
+      turnId: capturedEvidence.turn_id,
+      objective: null,
+      status: null,
+      tokenBudget: null,
+      tokensUsed: null,
+      elapsedSeconds: null,
+      createdAt: null,
+      updatedAt: null,
+      reason: 'goal_feature_available_malformed'
+    });
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(value, 'feature_enabled') &&
+    value.feature_enabled != null &&
+    normalizeProviderLinearGoalEvidenceBoolean(value.feature_enabled) === null
+  ) {
+    return buildProviderLinearGoalEvidence({
+      featureAvailable: capturedEvidence.feature_available,
+      featureEnabled: null,
+      captureMode: 'unavailable',
+      captureTimestamp: capturedEvidence.capture_timestamp,
+      threadId: capturedEvidence.thread_id,
+      turnId: capturedEvidence.turn_id,
+      objective: null,
+      status: null,
+      tokenBudget: null,
+      tokensUsed: null,
+      elapsedSeconds: null,
+      createdAt: null,
+      updatedAt: null,
+      reason: 'goal_feature_enabled_malformed'
+    });
+  }
+  if (
+    captureMode === 'captured' &&
+    hasProviderWorkerGoalSnapshotContent(capturedEvidence as unknown as Record<string, unknown>, {
+      includeStatus: true
+    })
+  ) {
+    return capturedEvidence;
+  }
+  if (captureMode === 'captured') {
+    return buildProviderLinearGoalEvidence({
+      featureAvailable: capturedEvidence.feature_available,
+      featureEnabled: capturedEvidence.feature_enabled,
+      captureMode: 'unavailable',
+      captureTimestamp: capturedEvidence.capture_timestamp,
+      threadId: capturedEvidence.thread_id,
+      turnId: capturedEvidence.turn_id,
+      objective: null,
+      status: null,
+      tokenBudget: null,
+      tokensUsed: null,
+      elapsedSeconds: null,
+      createdAt: null,
+      updatedAt: null,
+      reason: 'goal_captured_payload_missing'
+    });
+  }
+  return buildProviderLinearGoalEvidence({
+    featureAvailable: capturedEvidence.feature_available,
+    featureEnabled: capturedEvidence.feature_enabled,
+    captureMode,
+    captureTimestamp: capturedEvidence.capture_timestamp,
+    threadId: capturedEvidence.thread_id,
+    turnId: capturedEvidence.turn_id,
+    objective: null,
+    status: captureMode === 'cleared' ? 'cleared' : null,
+    tokenBudget: null,
+    tokensUsed: null,
+    elapsedSeconds: null,
+    createdAt: null,
+    updatedAt: null,
+    reason: capturedEvidence.reason
+  });
+}
+
+export function normalizeProviderLinearGoalEvidenceForProof(input: {
+  candidate?: ProviderLinearGoalEvidence | null;
+  previous?: ProviderLinearGoalEvidence | null;
+  proofThreadId?: string | null;
+  proofTurnId?: string | null;
+  observedAt: string;
+  currentTurnStartedAt?: string | null;
+  featureEnabled?: boolean | null;
+  runtimeMode?: string | null;
+}): ProviderLinearGoalEvidence {
+  const candidate = normalizeProviderLinearGoalEvidenceValue(input.candidate);
+  const previous = normalizeProviderLinearGoalEvidenceValue(input.previous);
+  const previousForFeatureEnabled = previous?.capture_mode === 'disabled' ? null : previous;
+  const featureEnabled =
+    input.featureEnabled ?? candidate?.feature_enabled ?? previousForFeatureEnabled?.feature_enabled ?? null;
+  const runtimeMode = normalizeOptionalString(input.runtimeMode);
+  if (featureEnabled === false) {
+    return buildProviderLinearGoalEvidence({
+      featureAvailable:
+        candidate?.feature_available ??
+        previous?.feature_available ??
+        (runtimeMode === 'appserver' ? true : false),
+      featureEnabled: false,
+      captureMode: 'disabled',
+      captureTimestamp: input.observedAt,
+      threadId: input.proofThreadId ?? null,
+      turnId: input.proofTurnId ?? null,
+      objective: null,
+      status: null,
+      tokenBudget: null,
+      tokensUsed: null,
+      elapsedSeconds: null,
+      createdAt: null,
+      updatedAt: null,
+      reason: 'goals_feature_disabled'
+    });
+  }
+  const candidateBase = candidate?.capture_mode === 'disabled' ? null : candidate;
+  const previousBase = previous?.capture_mode === 'disabled' ? null : previous;
+  const base =
+    candidateBase ??
+    previousBase ??
+    buildProviderLinearGoalEvidence({
+      featureAvailable: runtimeMode === 'appserver' ? featureEnabled ?? null : false,
+      featureEnabled,
+      captureMode: 'unavailable',
+      captureTimestamp: input.observedAt,
+      threadId: input.proofThreadId ?? null,
+      turnId: input.proofTurnId ?? null,
+      objective: null,
+      status: null,
+      tokenBudget: null,
+      tokensUsed: null,
+      elapsedSeconds: null,
+      createdAt: null,
+      updatedAt: null,
+      reason: runtimeMode === 'appserver' ? 'goal_state_not_observed' : 'appserver_goal_surface_unavailable'
+    });
+  let captureMode = base.capture_mode;
+  let reason = base.reason ?? null;
+  const goalThreadId = normalizeOptionalString(base.thread_id);
+  const proofThreadId = normalizeOptionalString(input.proofThreadId);
+  const currentTurnStartedAt = normalizeProviderLinearGoalIsoTimestamp(input.currentTurnStartedAt);
+  const featureAvailable = base.feature_available ?? (runtimeMode === 'appserver' ? true : false);
+  const captureTimestamp = base.capture_timestamp ?? input.observedAt;
+  const freshnessCaptureTimestamp = base.capture_timestamp ?? (candidate ? input.observedAt : null);
+  const freshnessTimestamp =
+    captureMode === 'captured' || captureMode === 'cleared'
+      ? freshnessCaptureTimestamp ??
+        normalizeOptionalString(base.updated_at) ??
+        normalizeOptionalString(base.created_at)
+      : null;
+  if (
+    (captureMode === 'captured' || captureMode === 'cleared') &&
+    goalThreadId &&
+    !proofThreadId
+  ) {
+    captureMode = 'thread_mismatch';
+    reason = `goal_thread_unverified:${goalThreadId}`;
+  } else if (goalThreadId && proofThreadId && goalThreadId !== proofThreadId) {
+    captureMode = 'thread_mismatch';
+    reason = `goal_thread_mismatch:${goalThreadId}->${proofThreadId}`;
+  } else if (!goalThreadId && (captureMode === 'captured' || captureMode === 'cleared')) {
+    captureMode = 'thread_mismatch';
+    reason = proofThreadId ? `goal_thread_missing:${proofThreadId}` : 'goal_thread_missing';
+  } else if ((captureMode === 'captured' || captureMode === 'cleared') && featureAvailable === false) {
+    captureMode = 'unavailable';
+    reason = 'goal_surface_unavailable';
+  } else if ((captureMode === 'captured' || captureMode === 'cleared') && freshnessTimestamp === null) {
+    captureMode = 'unavailable';
+    reason = 'goal_timestamp_unavailable';
+  } else if ((captureMode === 'captured' || captureMode === 'cleared') && currentTurnStartedAt === null) {
+    captureMode = 'unavailable';
+    reason = 'goal_current_turn_started_at_unavailable';
+  } else if (
+    (captureMode === 'captured' || captureMode === 'cleared') &&
+    freshnessTimestamp !== null &&
+    compareIsoTimestamp(freshnessTimestamp, currentTurnStartedAt) < 0
+  ) {
+    captureMode = 'stale';
+    reason = 'goal_evidence_predates_current_turn';
+  }
+  if (captureMode !== 'captured') {
+    return buildProviderLinearGoalEvidence({
+      featureAvailable,
+      featureEnabled,
+      captureMode,
+      captureTimestamp,
+      threadId: goalThreadId ?? proofThreadId ?? null,
+      turnId: base.turn_id ?? input.proofTurnId ?? null,
+      objective: null,
+      status: captureMode === 'cleared' ? 'cleared' : null,
+      tokenBudget: null,
+      tokensUsed: null,
+      elapsedSeconds: null,
+      createdAt: null,
+      updatedAt: null,
+      reason
+    });
+  }
+  return {
+    ...base,
+    feature_available: featureAvailable,
+    feature_enabled: featureEnabled,
+    capture_mode: captureMode,
+    capture_timestamp: captureTimestamp,
+    turn_id: base.turn_id ?? input.proofTurnId ?? null,
+    authority: 'advisory_only',
+    linear_authority_preserved: true,
+    not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+    reason
+  };
+}
+
+function selectProviderWorkerManifestGoalEvidence(
+  manifest: Record<string, unknown> | null | undefined
+): ProviderLinearGoalEvidence | null {
+  const goalEvidence = isRecord(manifest?.goal_evidence) ? manifest.goal_evidence : null;
+  return normalizeProviderLinearGoalEvidenceValue(goalEvidence);
+}
+
+function buildProviderWorkerGoalEvidenceWorkpadGuidance(input: {
+  manifest: Record<string, unknown> | null | undefined;
+  manifestPath: string | null | undefined;
+}): string[] {
+  const goalEvidence = selectProviderWorkerManifestGoalEvidence(input.manifest);
+  const manifestPath = normalizeOptionalString(input.manifestPath);
+  if (!manifestPath && !goalEvidence) {
+    return [];
+  }
+  const manifestReference = manifestPath ?? '<current run manifest>';
+  return [
+    `- Advisory persisted \`/goal\` evidence is advisory-only. Immediately before the final workpad closeout, re-read the current run manifest at \`${manifestReference}\` and, if \`goal_evidence\` is present, render a concise \`Advisory goal evidence: ...\` line from that current manifest snapshot; do not copy any prompt-time goal snapshot, and never use goal evidence for lifecycle authority.`
+  ];
 }
 
 function synchronizeProviderLinearWorkerCurrentTurnActivity(
@@ -6660,6 +7924,22 @@ function resetProviderWorkerSessionLogTailState(state: ProviderWorkerSessionLogT
   state.trailingText = '';
   state.bootstrapPending = true;
   state.idRewindSignature = null;
+  state.goalToolCallNames = {};
+}
+
+function normalizeProviderWorkerGoalToolCallNames(value: unknown): Record<string, string> {
+  if (!isRecord(value)) {
+    return {};
+  }
+  const normalized: Record<string, string> = {};
+  for (const [callId, toolName] of Object.entries(value)) {
+    const normalizedCallId = normalizeOptionalString(callId);
+    const normalizedToolName = normalizeProviderWorkerGoalToolName(toolName);
+    if (normalizedCallId && normalizedToolName) {
+      normalized[normalizedCallId] = normalizedToolName;
+    }
+  }
+  return normalized;
 }
 
 function normalizeProviderWorkerSessionLogHydrationState(
@@ -6690,6 +7970,10 @@ function normalizeProviderWorkerSessionLogHydrationState(
   if (resolvedModelProvenance) {
     normalized.resolved_model_provenance = resolvedModelProvenance;
   }
+  const goalToolCallNames = normalizeProviderWorkerGoalToolCallNames(value.goal_tool_call_names);
+  if (Object.keys(goalToolCallNames).length > 0) {
+    normalized.goal_tool_call_names = goalToolCallNames;
+  }
   return normalized;
 }
 
@@ -6706,7 +7990,8 @@ function buildProviderWorkerSessionLogTailState(
       trailingText: '',
       bootstrapPending: true,
       currentTurnStartedAt: normalizedCurrentTurnStartedAt,
-      idRewindSignature: null
+      idRewindSignature: null,
+      goalToolCallNames: {}
     };
   }
   return {
@@ -6715,7 +8000,8 @@ function buildProviderWorkerSessionLogTailState(
     trailingText: hydrationState.trailing_text,
     bootstrapPending: hydrationState.bootstrap_pending,
     currentTurnStartedAt: normalizedCurrentTurnStartedAt,
-    idRewindSignature: hydrationState.id_rewind_signature ?? null
+    idRewindSignature: hydrationState.id_rewind_signature ?? null,
+    goalToolCallNames: normalizeProviderWorkerGoalToolCallNames(hydrationState.goal_tool_call_names)
   };
 }
 
@@ -6734,6 +8020,9 @@ function snapshotProviderWorkerSessionLogTailState(
   };
   if (state.idRewindSignature) {
     snapshot.id_rewind_signature = state.idRewindSignature;
+  }
+  if (Object.keys(state.goalToolCallNames).length > 0) {
+    snapshot.goal_tool_call_names = { ...state.goalToolCallNames };
   }
   return snapshot;
 }
@@ -6851,6 +8140,7 @@ async function readProviderWorkerSessionLogDelta(
     state.trailingText = '';
     state.bootstrapPending = true;
     state.idRewindSignature = null;
+    state.goalToolCallNames = {};
   }
   const bytesToRead = fileStat.size - state.offsetBytes;
   if (bytesToRead <= 0) {
@@ -7063,16 +8353,7 @@ function providerWorkerSessionJsonlLineTimestamp(line: string): string | null {
   if (!parsed) {
     return null;
   }
-  const lineTimestamp = normalizeOptionalString(parsed.timestamp);
-  if (lineTimestamp) {
-    return lineTimestamp;
-  }
-  const payload = isRecord(parsed.payload) ? parsed.payload : null;
-  return payload
-    ? normalizeOptionalString(payload.timestamp) ??
-      normalizeOptionalString(payload.created_at) ??
-      normalizeOptionalString(payload.at)
-    : null;
+  return extractProviderWorkerEventTimestamp(parsed);
 }
 
 function isProviderWorkerSessionBootstrapLineAtOrAfter(
@@ -7097,6 +8378,26 @@ function shouldAllowCompletedProviderWorkerSessionBootstrapTurn(
   return continuityState !== 'guarded_resume_pending' && continuityState !== 'guarded_resume_active';
 }
 
+function seedProviderWorkerGoalToolCallNamesFromTail(
+  parseState: ProviderLinearWorkerJsonlParseResult,
+  tailState: ProviderWorkerSessionLogTailState
+): void {
+  if (Object.keys(tailState.goalToolCallNames).length === 0) {
+    return;
+  }
+  parseState.goalToolCallNames = {
+    ...tailState.goalToolCallNames,
+    ...(parseState.goalToolCallNames ?? {})
+  };
+}
+
+function snapshotProviderWorkerGoalToolCallNamesToTail(
+  parseState: ProviderLinearWorkerJsonlParseResult,
+  tailState: ProviderWorkerSessionLogTailState
+): void {
+  tailState.goalToolCallNames = { ...(parseState.goalToolCallNames ?? {}) };
+}
+
 function applyProviderWorkerSessionLogDelta(
   parseState: ProviderLinearWorkerJsonlParseResult,
   tailState: ProviderWorkerSessionLogTailState,
@@ -7104,8 +8405,10 @@ function applyProviderWorkerSessionLogDelta(
   env: NodeJS.ProcessEnv = process.env,
   options: {
     allowCompletedBootstrapTurn?: boolean;
+    onGoalEvidenceObserved?: (goalEvidence: ProviderLinearGoalEvidence) => void;
   } = {}
 ): ProviderWorkerSessionLogApplyResult {
+  seedProviderWorkerGoalToolCallNamesFromTail(parseState, tailState);
   const combined = `${tailState.trailingText}${chunk}`;
   const lines = combined.split(/\r?\n/u);
   tailState.trailingText = lines.pop() ?? '';
@@ -7129,13 +8432,19 @@ function applyProviderWorkerSessionLogDelta(
     bootstrapPending: tailState.bootstrapPending
   });
   let changed = false;
+  const preserveTimestampedGoalEvidenceFromTimestamplessReplay = tailState.bootstrapPending;
   for (const line of linesToApply) {
     const parsed = parseProviderWorkerSessionJsonlLine(line);
     if (!parsed) {
       continue;
     }
-    changed = applyProviderLinearWorkerSessionJsonlRecord(parseState, parsed, env) || changed;
+    changed =
+      applyProviderLinearWorkerSessionJsonlRecord(parseState, parsed, env, {
+        preserveTimestampedGoalEvidenceFromTimestamplessReplay,
+        onGoalEvidenceObserved: options.onGoalEvidenceObserved
+      }) || changed;
   }
+  snapshotProviderWorkerGoalToolCallNamesToTail(parseState, tailState);
   if (tailState.bootstrapPending && lines.length > 0) {
     tailState.bootstrapPending = requireTurnContext && parseState.turnId === null;
   }
@@ -7148,14 +8457,18 @@ function flushProviderWorkerSessionLogTail(
   env: NodeJS.ProcessEnv = process.env,
   options: {
     allowCompletedBootstrapTurn?: boolean;
+    onGoalEvidenceObserved?: (goalEvidence: ProviderLinearGoalEvidence) => void;
   } = {}
 ): ProviderWorkerSessionLogApplyResult {
+  seedProviderWorkerGoalToolCallNamesFromTail(parseState, tailState);
   const trailingLine = tailState.trailingText.trim();
   if (!trailingLine) {
     tailState.trailingText = '';
+    snapshotProviderWorkerGoalToolCallNamesToTail(parseState, tailState);
     return { changed: false, observed: false, observedThreadId: null, observedTurnId: null };
   }
   if (!parseProviderWorkerSessionJsonlLine(trailingLine)) {
+    snapshotProviderWorkerGoalToolCallNamesToTail(parseState, tailState);
     return { changed: false, observed: false, observedThreadId: null, observedTurnId: null };
   }
   tailState.trailingText = '';
@@ -7180,8 +8493,13 @@ function flushProviderWorkerSessionLogTail(
     if (!parsed) {
       continue;
     }
-    changed = applyProviderLinearWorkerSessionJsonlRecord(parseState, parsed, env) || changed;
+    changed =
+      applyProviderLinearWorkerSessionJsonlRecord(parseState, parsed, env, {
+        preserveTimestampedGoalEvidenceFromTimestamplessReplay: shouldBootstrap,
+        onGoalEvidenceObserved: options.onGoalEvidenceObserved
+      }) || changed;
   }
+  snapshotProviderWorkerGoalToolCallNamesToTail(parseState, tailState);
   if (shouldBootstrap) {
     tailState.bootstrapPending = requireTurnContext && parseState.turnId === null;
   }
@@ -7206,6 +8524,7 @@ function normalizeProviderLinearWorkerProofForUpdatedAtComparison(
           updated_at: null
         }
       : proof.appserver_supervision ?? null,
+    goal_evidence: proof.goal_evidence ?? null,
     auth_provenance: proof.auth_provenance ?? null,
     resolved_model_provenance: proof.resolved_model_provenance ?? null,
     failure_diagnosis: proof.failure_diagnosis ?? null,
@@ -7275,6 +8594,7 @@ function selectProviderLinearWorkerProofTelemetryFields(
     current_turn_activity: selectProviderLinearWorkerCurrentTurnActivity(proof) ?? null,
     tokens: proof.tokens,
     rate_limits: proof.rate_limits ?? null,
+    goal_evidence: proof.goal_evidence ?? null,
     auth_provenance: proof.auth_provenance ?? null,
     resolved_model_provenance: proof.resolved_model_provenance ?? null,
     worker_control: proof.worker_control ?? null,
@@ -8081,11 +9401,13 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
       rateLimits: proof.rate_limits,
       authProvenance: proof.auth_provenance ?? null,
       resolvedModelProvenance: proofBaselineResolvedModelProvenance,
-      failureDiagnosis: proof.failure_diagnosis ?? null
+      failureDiagnosis: proof.failure_diagnosis ?? null,
+      goalEvidence: proof.goal_evidence ?? null
     },
     selectProviderLinearWorkerProofFinalMessageSource(proof),
     selectProviderLinearWorkerProofFinalMessageDeltaKey(proof)
   );
+  let sessionLogGoalEvidence: ProviderLinearGoalEvidence | null = null;
   const restoreProofTelemetryFloor = () => {
     parseState.threadId = proof.thread_id;
     parseState.turnId = proof.latest_turn_id;
@@ -8100,6 +9422,9 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
     parseState.currentTurnActivity = proofCurrentTurnActivity;
     parseState.resolvedModelProvenance = proofBaselineResolvedModelProvenance;
     parseState.failureDiagnosis = proof.failure_diagnosis ?? null;
+    parseState.goalEvidence = proof.goal_evidence ?? null;
+    parseState.turnStartedAt = proof.current_turn_started_at ?? proof.attempt_started_at ?? null;
+    sessionLogGoalEvidence = null;
   };
   let tailState = buildProviderWorkerSessionLogTailState(
     sessionLogPath,
@@ -8119,7 +9444,8 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
           trailingText: tailState.trailingText,
           bootstrapPending: true,
           currentTurnStartedAt: tailState.currentTurnStartedAt,
-          idRewindSignature: tailState.idRewindSignature
+          idRewindSignature: tailState.idRewindSignature,
+          goalToolCallNames: {}
         };
       } else if (fileStat.size < tailState.offsetBytes) {
         tailState = {
@@ -8128,13 +9454,15 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
           trailingText: '',
           bootstrapPending: true,
           currentTurnStartedAt: tailState.currentTurnStartedAt,
-          idRewindSignature: null
+          idRewindSignature: null,
+          goalToolCallNames: {}
         };
       } else {
         preserveProofTelemetryFloor = true;
         tailState = {
           ...tailState,
-          bootstrapPending: true
+          bootstrapPending: true,
+          goalToolCallNames: {}
         };
       }
     }
@@ -8156,27 +9484,37 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
       trailingText: '',
       bootstrapPending: true,
       currentTurnStartedAt: tailState.currentTurnStartedAt,
-      idRewindSignature: idHydrationRewindSignature
+      idRewindSignature: idHydrationRewindSignature,
+      goalToolCallNames: {}
     };
   }
   seedProviderWorkerAgentMessageDeltaHydration(parseState, proof, tailState);
   let sessionLogObserved = false;
   let observedSessionLogThreadId = proof.session_log_thread_id ?? null;
   let observedSessionLogTurnId = proof.session_log_turn_id ?? null;
+  const rememberSessionLogGoalEvidence = (goalEvidence: ProviderLinearGoalEvidence) => {
+    sessionLogGoalEvidence = selectPreferredProviderLinearGoalEvidence(
+      sessionLogGoalEvidence,
+      goalEvidence,
+      { preserveTimestampedCurrentFromTimestamplessObserved: true }
+    );
+  };
   const allowCompletedBootstrapTurn =
     shouldAllowCompletedProviderWorkerSessionBootstrapTurn(proof);
   try {
     const delta = await readProviderWorkerSessionLogDelta(tailState);
     if (delta) {
       const deltaApply = applyProviderWorkerSessionLogDelta(parseState, tailState, delta, env, {
-        allowCompletedBootstrapTurn
+        allowCompletedBootstrapTurn,
+        onGoalEvidenceObserved: rememberSessionLogGoalEvidence
       });
       sessionLogObserved = deltaApply.observed || sessionLogObserved;
       observedSessionLogThreadId = deltaApply.observedThreadId ?? observedSessionLogThreadId;
       observedSessionLogTurnId = deltaApply.observedTurnId ?? observedSessionLogTurnId;
     }
     const tailApply = flushProviderWorkerSessionLogTail(parseState, tailState, env, {
-      allowCompletedBootstrapTurn
+      allowCompletedBootstrapTurn,
+      onGoalEvidenceObserved: rememberSessionLogGoalEvidence
     });
     sessionLogObserved = tailApply.observed || sessionLogObserved;
     observedSessionLogThreadId = tailApply.observedThreadId ?? observedSessionLogThreadId;
@@ -8232,6 +9570,24 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
   });
   const proofResolvedModelProvenanceForHydration =
     liveScopeChanged && proof.latest_turn_id !== null ? null : proofBaselineResolvedModelProvenance;
+  const previousGoalEvidenceForHydration = liveThreadChanged ? null : proof.goal_evidence ?? null;
+  const scopedSessionLogGoalEvidence =
+    sessionLogGoalEvidence === null
+      ? null
+      : normalizeProviderLinearGoalEvidenceValue(parseState.goalEvidence);
+  const selectedSessionLogGoalEvidence =
+    scopedSessionLogGoalEvidence === null
+      ? null
+      : selectPreferredProviderLinearGoalEvidence(
+          previousGoalEvidenceForHydration,
+          scopedSessionLogGoalEvidence,
+          { preserveTimestampedCurrentFromTimestamplessObserved: true }
+        );
+  const hydratedGoalEvidenceCandidate =
+    selectedSessionLogGoalEvidence !== null &&
+    JSON.stringify(selectedSessionLogGoalEvidence) !== JSON.stringify(previousGoalEvidenceForHydration)
+      ? selectedSessionLogGoalEvidence
+      : null;
   const hydratedProof: ProviderLinearWorkerProof = {
     ...proof,
     thread_id: liveThreadId,
@@ -8271,6 +9627,23 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
       proofResolvedModelProvenanceForHydration,
       parseState.resolvedModelProvenance
     ),
+    goal_evidence:
+      proof.goal_evidence === undefined && hydratedGoalEvidenceCandidate === null
+        ? undefined
+        : normalizeProviderLinearGoalEvidenceForProof({
+            candidate: hydratedGoalEvidenceCandidate,
+            previous: previousGoalEvidenceForHydration,
+            proofThreadId: liveThreadId,
+            proofTurnId: liveTurnId,
+            observedAt: proof.updated_at ?? new Date().toISOString(),
+            currentTurnStartedAt:
+              parseState.turnStartedAt ??
+              proof.current_turn_started_at ??
+              proof.attempt_started_at ??
+              null,
+            featureEnabled: null,
+            runtimeMode: proof.runtime?.selected_mode ?? null
+          }),
     failure_diagnosis: parseState.failureDiagnosis ?? (liveTurnChanged ? null : proof.failure_diagnosis ?? null)
   };
   return {
@@ -8702,6 +10075,74 @@ function applyProviderWorkerRuntimeSelectionToManifest(input: {
   return before !== after;
 }
 
+function applyProviderWorkerGoalEvidenceToManifest(input: {
+  manifest: Record<string, unknown>;
+  goalEvidence: ProviderLinearGoalEvidence | null | undefined;
+}): boolean {
+  const before = JSON.stringify(input.manifest.goal_evidence ?? null);
+  input.manifest.goal_evidence = input.goalEvidence ?? null;
+  return before !== JSON.stringify(input.manifest.goal_evidence ?? null);
+}
+
+async function readProviderWorkerManifestPatchBase(manifestPath: string): Promise<Record<string, unknown>> {
+  const parsed = JSON.parse(await readFile(manifestPath, 'utf8')) as unknown;
+  if (!isRecord(parsed)) {
+    throw new Error(`Provider-worker manifest patch base at ${manifestPath} is not a JSON object.`);
+  }
+  return parsed;
+}
+
+function replaceProviderWorkerManifestSnapshot(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>
+): void {
+  for (const key of Object.keys(target)) {
+    delete target[key];
+  }
+  Object.assign(target, source);
+}
+
+async function patchProviderWorkerGoalEvidenceManifestFile(input: {
+  manifestPath: string;
+  fallbackManifest: Record<string, unknown>;
+  goalEvidence: ProviderLinearGoalEvidence | null | undefined;
+}): Promise<void> {
+  let manifest: Record<string, unknown>;
+  try {
+    manifest = await readProviderWorkerManifestPatchBase(input.manifestPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      return;
+    }
+    throw error;
+  }
+  const changed = applyProviderWorkerGoalEvidenceToManifest({
+    manifest,
+    goalEvidence: input.goalEvidence
+  });
+  if (changed) {
+    let latestManifest = manifest;
+    try {
+      latestManifest = await readProviderWorkerManifestPatchBase(input.manifestPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+        return;
+      }
+      throw error;
+    }
+    const latestChanged = applyProviderWorkerGoalEvidenceToManifest({
+      manifest: latestManifest,
+      goalEvidence: input.goalEvidence
+    });
+    if (latestChanged) {
+      await writeJsonAtomic(input.manifestPath, latestManifest);
+    }
+    replaceProviderWorkerManifestSnapshot(input.fallbackManifest, latestManifest);
+    return;
+  }
+  replaceProviderWorkerManifestSnapshot(input.fallbackManifest, manifest);
+}
+
 async function readProviderWorkerControlHostSourceRootFreshness(
   context: Pick<
     ProviderLinearWorkerContext,
@@ -8841,6 +10282,26 @@ async function persistProviderWorkerRuntimeSelectionToManifests(input: {
   if (selectedChanged) {
     await writeJsonAtomic(input.context.manifestPath, input.context.manifest);
   }
+}
+
+async function persistProviderWorkerGoalEvidenceToManifests(input: {
+  context: ProviderLinearWorkerContext;
+  goalEvidence: ProviderLinearGoalEvidence | null | undefined;
+}): Promise<void> {
+  await patchProviderWorkerGoalEvidenceManifestFile({
+    manifestPath: input.context.controlHostManifestPath,
+    fallbackManifest: input.context.controlHostManifest,
+    goalEvidence: input.goalEvidence
+  });
+  if (input.context.manifestPath === input.context.controlHostManifestPath) {
+    return;
+  }
+
+  await patchProviderWorkerGoalEvidenceManifestFile({
+    manifestPath: input.context.manifestPath,
+    fallbackManifest: input.context.manifest,
+    goalEvidence: input.goalEvidence
+  });
 }
 
 async function readTrackedIssueOrThrow(input: {
@@ -11369,6 +12830,9 @@ async function writeProofSnapshot(
       runDir,
       proof.child_lanes
     );
+    const normalizedProofGoalEvidence = normalizeProviderLinearGoalEvidenceValue(
+      proof.goal_evidence ?? null
+    );
     const proofWithHydratedSources = {
       ...proof,
       runtime: normalizeProviderLinearWorkerRuntimeProofIfRelevant(proof),
@@ -11382,6 +12846,19 @@ async function writeProofSnapshot(
         currentTurnStartedAt: proof.current_turn_started_at,
         childLanes
       }),
+      goal_evidence:
+        proof.goal_evidence === undefined
+          ? undefined
+          : normalizeProviderLinearGoalEvidenceForProof({
+              candidate: null,
+              previous: normalizedProofGoalEvidence,
+              proofThreadId: proof.thread_id,
+              proofTurnId: proof.latest_turn_id,
+              observedAt: deps.now(),
+              currentTurnStartedAt: proof.current_turn_started_at ?? proof.attempt_started_at ?? null,
+              featureEnabled: normalizedProofGoalEvidence?.capture_mode === 'disabled' ? false : null,
+              runtimeMode: proof.runtime?.selected_mode ?? null
+            }),
       linear_budget: linearBudget
     };
     const hydratedProof = {
@@ -11453,6 +12930,19 @@ export async function refreshProviderLinearWorkerProofSnapshot(
         currentTurnStartedAt: parsed.current_turn_started_at,
         childLanes
       }),
+      goal_evidence:
+        parsed.goal_evidence === undefined
+          ? undefined
+          : normalizeProviderLinearGoalEvidenceForProof({
+              candidate: null,
+              previous: parsed.goal_evidence ?? null,
+              proofThreadId: parsed.thread_id,
+              proofTurnId: parsed.latest_turn_id,
+              observedAt: now(),
+              currentTurnStartedAt: parsed.current_turn_started_at ?? parsed.attempt_started_at ?? null,
+              featureEnabled: null,
+              runtimeMode: parsed.runtime?.selected_mode ?? null
+            }),
       linear_budget: linearBudget,
       updated_at: parsed.updated_at ?? null
     };
@@ -11654,6 +13144,11 @@ export async function runProviderLinearWorker(
     rate_limits: null,
     runtime: buildProviderLinearWorkerRuntimeProof(runtimeContext.runtime),
     appserver_supervision: null,
+    goal_evidence: normalizeProviderLinearGoalEvidenceForProof({
+      observedAt: attemptStartedAt,
+      featureEnabled: configModelDefaults.goals_feature_enabled ?? null,
+      runtimeMode: runtimeContext.runtime.selected_mode
+    }),
     auth_provenance: buildProviderWorkerRuntimeAuthProvenance({
       env: childEnv,
       runtime: runtimeContext.runtime,
@@ -11707,6 +13202,10 @@ export async function runProviderLinearWorker(
   const persistProof = async (nextProof: ProviderLinearWorkerProof): Promise<ProviderLinearWorkerProof> => {
     const hydratedProof = await writeFreshProofSnapshot(nextProof);
     emitSemanticProgressIfChanged(hydratedProof);
+    await persistProviderWorkerGoalEvidenceToManifests({
+      context,
+      goalEvidence: hydratedProof.goal_evidence ?? null
+    });
     await requestProviderControlHostRefresh({
       currentManifestPath: context.controlHostManifestPath,
       env,
@@ -11819,6 +13318,7 @@ export async function runProviderLinearWorker(
     for (let turnNumber = 1; turnNumber <= context.maxTurns; turnNumber += 1) {
       let liveStdoutBuffer = '';
       let liveProofSignature: string | null = null;
+      let currentTurnGoalsFeatureEnabled = configModelDefaults.goals_feature_enabled ?? null;
       const liveParseState = buildEmptyProviderLinearWorkerJsonlParseResult();
       let liveSessionLogThreadId: string | null = null;
       let liveSessionLogTurnId: string | null = null;
@@ -11980,6 +13480,16 @@ export async function runProviderLinearWorker(
               ? buildEmptyProviderLinearWorkerTokenUsage()
               : finalProof.tokens,
           rate_limits: liveParseState.rateLimits ?? (liveTurnChanged ? null : finalProof.rate_limits),
+          goal_evidence: normalizeProviderLinearGoalEvidenceForProof({
+            candidate: liveParseState.goalEvidence ?? null,
+            previous: liveThreadChanged ? null : finalProof.goal_evidence ?? null,
+            proofThreadId: liveThreadId,
+            proofTurnId: liveTurnId,
+            observedAt: deps.now(),
+            currentTurnStartedAt: turnStartedAt ?? finalProof.current_turn_started_at ?? null,
+            featureEnabled: currentTurnGoalsFeatureEnabled ?? null,
+            runtimeMode: runtimeContext.runtime.selected_mode
+          }),
           auth_provenance: mergeProviderWorkerAuthProvenance(
             finalProof.auth_provenance ?? null,
             liveParseState.authProvenance
@@ -12015,6 +13525,7 @@ export async function runProviderLinearWorker(
           current_turn_activity: nextProof.current_turn_activity ?? null,
           tokens: nextProof.tokens,
           rate_limits: nextProof.rate_limits,
+          goal_evidence: nextProof.goal_evidence ?? null,
           auth_provenance: nextProof.auth_provenance ?? null,
           resolved_model_provenance: nextProof.resolved_model_provenance ?? null,
           failure_diagnosis: nextProof.failure_diagnosis ?? null,
@@ -12030,6 +13541,10 @@ export async function runProviderLinearWorker(
           .then(async () => {
             const hydratedProof = await writeFreshProofSnapshot(nextProof);
             finalProof = hydratedProof;
+            await persistProviderWorkerGoalEvidenceToManifests({
+              context,
+              goalEvidence: hydratedProof.goal_evidence ?? null
+            });
             emitSemanticProgressIfChanged(hydratedProof);
             scheduleLiveSemanticStallRefresh(hydratedProof);
             if (liveRefreshClosed) {
@@ -12091,6 +13606,7 @@ export async function runProviderLinearWorker(
           linearAudit: finalProof.linear_audit,
           attemptStartedAt: finalProof.attempt_started_at ?? null,
           manifest: context.manifest,
+          manifestPath: context.manifestPath,
           residentSession: finalProof.resident_session ?? null,
           continueResidentSessionOnBoot
         }
@@ -12106,6 +13622,10 @@ export async function runProviderLinearWorker(
       const resolved = resolveRuntimeCodexCommand(
         useAppServerControl ? ['app-server'] : args,
         runtimeContext
+      );
+      currentTurnGoalsFeatureEnabled = resolveProviderWorkerCommandGoalsFeatureEnabled(
+        resolved.args,
+        configModelDefaults
       );
       let stopLiveSessionTailResolve: (() => void) | null = null;
       let liveSessionTailStopped = false;
@@ -12139,11 +13659,24 @@ export async function runProviderLinearWorker(
             turnStartedAt,
             resumeSourceThreadIdForTurn
           ),
+          goal_evidence: normalizeProviderLinearGoalEvidenceForProof({
+            previous: finalProof.goal_evidence ?? null,
+            proofThreadId: finalProof.thread_id,
+            proofTurnId: null,
+            observedAt: turnStartedAt,
+            currentTurnStartedAt: turnStartedAt,
+            featureEnabled: currentTurnGoalsFeatureEnabled ?? null,
+            runtimeMode: runtimeContext.runtime.selected_mode
+          }),
           // Runtime-reported model provenance is turn-scoped; start each turn from
           // current command/config evidence until this turn reports runtime metadata.
           resolved_model_provenance: turnResolvedModelProvenance
         }
       );
+      await persistProviderWorkerGoalEvidenceToManifests({
+        context,
+        goalEvidence: finalProof.goal_evidence ?? null
+      });
       const parallelizationDecisionCountBeforeTurn = readProviderLinearParallelizationSnapshots(
         finalProof.linear_audit,
         {
@@ -12159,7 +13692,8 @@ export async function runProviderLinearWorker(
               trailingText: '',
               bootstrapPending: true,
               currentTurnStartedAt: turnStartedAt,
-              idRewindSignature: null
+              idRewindSignature: null,
+              goalToolCallNames: {}
             }
           : null;
       const allowCompletedSessionBootstrapTurn =
@@ -12451,7 +13985,7 @@ export async function runProviderLinearWorker(
         issue_id: context.issueId,
         issue_identifier: context.issueIdentifier,
         attempt_started_at: finalProof.attempt_started_at,
-        current_turn_started_at: finalProof.current_turn_started_at ?? turnStartedAt,
+        current_turn_started_at: turnStartedAt,
         pid: workerPid,
         thread_id: threadId,
         latest_turn_id: turnId,
@@ -12478,6 +14012,16 @@ export async function runProviderLinearWorker(
         rate_limits: parsed.rateLimits ?? finalProof.rate_limits,
         runtime: finalProof.runtime ?? buildProviderLinearWorkerRuntimeProof(runtimeContext.runtime),
         appserver_supervision: finalProof.appserver_supervision ?? null,
+        goal_evidence: normalizeProviderLinearGoalEvidenceForProof({
+          candidate: parsed.goalEvidence ?? null,
+          previous: parsedThreadChanged ? null : finalProof.goal_evidence ?? null,
+          proofThreadId: threadId,
+          proofTurnId: turnId,
+          observedAt: deps.now(),
+          currentTurnStartedAt: turnStartedAt,
+          featureEnabled: currentTurnGoalsFeatureEnabled ?? null,
+          runtimeMode: runtimeContext.runtime.selected_mode
+        }),
         auth_provenance: mergeProviderWorkerAuthProvenance(
           finalProof.auth_provenance ?? null,
           parsed.authProvenance
