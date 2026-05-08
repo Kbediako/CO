@@ -183,7 +183,7 @@ export function deriveDeterministicProviderMutationSuppressions(
   const latestCreateFollowUpEntriesByIntent = scopedEntries
     .filter((entry) => entry.operation === 'create-follow-up')
     .reduce<Map<string, ProviderLinearAuditEntry>>((latestByIntent, entry) => {
-      const key = buildProviderLinearMutationEntryKey(entry);
+      const key = buildProviderLinearCreateFollowUpIntentKey(entry);
       const current = latestByIntent.get(key);
       const entryMs = readTimestampMs(entry as unknown as Record<string, unknown>, 'recorded_at');
       const currentMs = current
@@ -200,7 +200,9 @@ export function deriveDeterministicProviderMutationSuppressions(
       if (entry.operation !== 'create-follow-up') {
         return true;
       }
-      const latestForIntent = latestCreateFollowUpEntriesByIntent.get(buildProviderLinearMutationEntryKey(entry));
+      const latestForIntent = latestCreateFollowUpEntriesByIntent.get(
+        buildProviderLinearCreateFollowUpIntentKey(entry)
+      );
       return latestForIntent?.ok !== true;
     })
     .reduce<Map<string, ProviderLinearAuditEntry>>((latestByOperationAndAction, entry) => {
@@ -559,6 +561,13 @@ function buildProviderLinearMutationEntryKey(entry: ProviderLinearAuditEntry): s
     entry.operation,
     normalizeAuditAction(entry.action) ?? '',
     entry.operation === 'create-follow-up' ? normalizeOptionalString(entry.follow_up_intent_key) ?? '' : ''
+  ].join(':');
+}
+
+function buildProviderLinearCreateFollowUpIntentKey(entry: ProviderLinearAuditEntry): string {
+  return [
+    entry.operation,
+    normalizeOptionalString(entry.follow_up_intent_key) ?? ''
   ].join(':');
 }
 

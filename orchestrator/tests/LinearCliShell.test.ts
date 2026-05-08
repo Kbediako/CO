@@ -2705,6 +2705,7 @@ describe('runLinearCliShell', () => {
         buildPacketTraceabilityPendingAuditEntry({
           recorded_at: '2026-04-22T08:06:00.000Z',
           ok: true,
+          action: 'reused',
           error_code: null,
           error_message: null
         })
