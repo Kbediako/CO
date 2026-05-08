@@ -2224,6 +2224,38 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     );
   });
 
+  it('fails closed on goal update notifications without goal content', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-empty-goal"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-empty-goal-1"}}',
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:01.000Z',
+          type: 'notification',
+          method: 'thread/goal/updated',
+          params: {
+            threadId: 'thread-empty-goal',
+            goal: {
+              threadId: 'thread-empty-goal'
+            }
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'unavailable',
+      capture_timestamp: '2026-03-21T09:00:01.000Z',
+      thread_id: 'thread-empty-goal',
+      turn_id: 'turn-empty-goal-1',
+      objective: null,
+      status: null,
+      reason: 'goal_updated_payload_missing',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
   it('parses advisory goal evidence from model-tool goal snapshots', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [
@@ -2277,6 +2309,199 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
       elapsed_seconds: 55,
       created_at: '2026-03-21T08:59:00.000Z',
       updated_at: '2026-03-21T09:00:01.000Z',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('preserves captured goal evidence when update tool outputs only acknowledge persistence', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-tool-ack-goal"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-tool-ack-goal-1"}}',
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.900Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call',
+            name: 'get_goal',
+            call_id: 'call-get-goal'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:01.250Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call_output',
+            call_id: 'call-get-goal',
+            output: JSON.stringify({
+              goal: {
+                threadId: 'thread-tool-ack-goal',
+                objective: 'captured goal before ack',
+                status: 'active',
+                updatedAt: '2026-03-21T09:00:01.000Z'
+              }
+            })
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:02.000Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call',
+            name: 'update_goal',
+            call_id: 'call-update-goal'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:02.250Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call_output',
+            call_id: 'call-update-goal',
+            output: JSON.stringify({ ok: true })
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:01.250Z',
+      thread_id: 'thread-tool-ack-goal',
+      objective: 'captured goal before ack',
+      status: 'active',
+      reason: null,
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('preserves captured goal evidence when update tool outputs a status-only acknowledgement', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-tool-status-ack-goal"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-tool-status-ack-goal-1"}}',
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.900Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call',
+            name: 'get_goal',
+            call_id: 'call-get-status-ack-goal'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:01.250Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call_output',
+            call_id: 'call-get-status-ack-goal',
+            output: JSON.stringify({
+              goal: {
+                threadId: 'thread-tool-status-ack-goal',
+                objective: 'captured goal before status ack',
+                status: 'active',
+                updatedAt: '2026-03-21T09:00:01.000Z'
+              }
+            })
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:02.000Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call',
+            name: 'update_goal',
+            call_id: 'call-update-status-ack-goal'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:02.250Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call_output',
+            call_id: 'call-update-status-ack-goal',
+            output: JSON.stringify({ status: 'completed' })
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:01.250Z',
+      thread_id: 'thread-tool-status-ack-goal',
+      objective: 'captured goal before status ack',
+      status: 'active',
+      reason: null,
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('preserves captured goal evidence when update tool outputs an empty wrapped goal', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-tool-empty-ack-goal"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-tool-empty-ack-goal-1"}}',
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.900Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call',
+            name: 'get_goal',
+            call_id: 'call-get-wrapped-empty-goal'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:01.250Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call_output',
+            call_id: 'call-get-wrapped-empty-goal',
+            output: JSON.stringify({
+              goal: {
+                threadId: 'thread-tool-empty-ack-goal',
+                objective: 'captured goal before wrapped ack',
+                status: 'active',
+                updatedAt: '2026-03-21T09:00:01.000Z'
+              }
+            })
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:02.000Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call',
+            name: 'update_goal',
+            call_id: 'call-update-wrapped-empty-goal'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:02.250Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call_output',
+            call_id: 'call-update-wrapped-empty-goal',
+            output: JSON.stringify({
+              goal: {
+                threadId: 'thread-tool-empty-ack-goal'
+              }
+            })
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:01.250Z',
+      thread_id: 'thread-tool-empty-ack-goal',
+      objective: 'captured goal before wrapped ack',
+      status: 'active',
+      reason: null,
       authority: 'advisory_only',
       linear_authority_preserved: true
     });
@@ -15255,6 +15480,55 @@ for await (const line of rl) {
       objective: null,
       status: null,
       reason: 'goal_state_not_observed',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('treats carried captured goal evidence without freshness as unavailable', () => {
+    const proofGoalEvidence = normalizeProviderLinearGoalEvidenceForProof({
+      candidate: null,
+      previous: {
+        source: 'codex-goals',
+        feature_available: true,
+        feature_enabled: true,
+        capture_mode: 'captured',
+        capture_timestamp: null,
+        thread_id: 'thread-carried-goal',
+        turn_id: 'turn-carried-goal-1',
+        objective: 'legacy carried goal without timestamp',
+        status: 'active',
+        token_budget: 5000,
+        tokens_used: 300,
+        elapsed_seconds: 12,
+        created_at: null,
+        updated_at: null,
+        authority: 'advisory_only',
+        linear_authority_preserved: true,
+        not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+        reason: null
+      },
+      proofThreadId: 'thread-carried-goal',
+      proofTurnId: 'turn-carried-goal-1',
+      observedAt: '2026-03-21T09:00:02.000Z',
+      currentTurnStartedAt: '2026-03-21T09:00:00.000Z',
+      featureEnabled: true,
+      runtimeMode: 'appserver'
+    });
+
+    expect(proofGoalEvidence).toMatchObject({
+      feature_available: true,
+      feature_enabled: true,
+      capture_mode: 'unavailable',
+      capture_timestamp: '2026-03-21T09:00:02.000Z',
+      thread_id: 'thread-carried-goal',
+      turn_id: 'turn-carried-goal-1',
+      objective: null,
+      status: null,
+      token_budget: null,
+      tokens_used: null,
+      elapsed_seconds: null,
+      reason: 'goal_timestamp_unavailable',
       authority: 'advisory_only',
       linear_authority_preserved: true
     });

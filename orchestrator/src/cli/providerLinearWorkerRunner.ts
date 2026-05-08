@@ -4775,20 +4775,19 @@ function parseProviderWorkerGoalToolOutputValue(value: unknown): unknown {
   return null;
 }
 
+function hasProviderWorkerGoalSnapshotContent(value: Record<string, unknown>): boolean {
+  return (
+    normalizeOptionalString(value.objective) !== null ||
+    normalizeNonNegativeInteger(value.tokenBudget ?? value.token_budget) !== null ||
+    normalizeNonNegativeInteger(value.tokensUsed ?? value.tokens_used) !== null ||
+    normalizeNonNegativeNumber(
+      value.timeUsedSeconds ?? value.time_used_seconds ?? value.elapsedSeconds ?? value.elapsed_seconds
+    ) !== null
+  );
+}
+
 function isProviderWorkerGoalSnapshotRecord(value: Record<string, unknown>): boolean {
-  return [
-    'threadId',
-    'thread_id',
-    'objective',
-    'tokenBudget',
-    'token_budget',
-    'tokensUsed',
-    'tokens_used',
-    'timeUsedSeconds',
-    'time_used_seconds',
-    'elapsedSeconds',
-    'elapsed_seconds'
-  ].some((key) => value[key] !== undefined);
+  return hasProviderWorkerGoalSnapshotContent(value);
 }
 
 function isProviderWorkerGoalToolPayloadRecord(value: Record<string, unknown>): boolean {
@@ -4871,7 +4870,10 @@ function extractProviderWorkerGoalToolEvidence(
   const capturedAt = extractProviderWorkerEventTimestamp(parsed);
   const turnId = extractProviderWorkerActivityTurnId(parsed) ?? state.turnId;
   const goal = selectProviderWorkerGoalToolSnapshotRecord(outputValue);
-  if (!goal) {
+  if (!goal || !isProviderWorkerGoalSnapshotRecord(goal)) {
+    if (toolName === 'create_goal' || toolName === 'update_goal') {
+      return null;
+    }
     return buildProviderLinearGoalEvidence({
       featureAvailable: true,
       featureEnabled: null,
@@ -4961,7 +4963,7 @@ function extractProviderWorkerGoalEvidence(
       reason: 'goal_cleared'
     });
   }
-  if (!goal) {
+  if (!goal || !isProviderWorkerGoalSnapshotRecord(goal)) {
     return buildProviderLinearGoalEvidence({
       featureAvailable: true,
       featureEnabled: null,
@@ -12519,6 +12521,9 @@ async function writeProofSnapshot(
       runDir,
       proof.child_lanes
     );
+    const normalizedProofGoalEvidence = normalizeProviderLinearGoalEvidenceValue(
+      proof.goal_evidence ?? null
+    );
     const proofWithHydratedSources = {
       ...proof,
       runtime: normalizeProviderLinearWorkerRuntimeProofIfRelevant(proof),
@@ -12536,13 +12541,13 @@ async function writeProofSnapshot(
         proof.goal_evidence === undefined
           ? undefined
           : normalizeProviderLinearGoalEvidenceForProof({
-              candidate: proof.goal_evidence ?? null,
-              previous: proof.goal_evidence ?? null,
+              candidate: null,
+              previous: normalizedProofGoalEvidence,
               proofThreadId: proof.thread_id,
               proofTurnId: proof.latest_turn_id,
               observedAt: deps.now(),
               currentTurnStartedAt: proof.current_turn_started_at ?? proof.attempt_started_at ?? null,
-              featureEnabled: null,
+              featureEnabled: normalizedProofGoalEvidence?.capture_mode === 'disabled' ? false : null,
               runtimeMode: proof.runtime?.selected_mode ?? null
             }),
       linear_budget: linearBudget
