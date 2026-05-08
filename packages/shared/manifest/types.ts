@@ -38,6 +38,7 @@ export interface CodexOrchestratorCLIManifest {
     config_source: "repo" | "package" | null;
   } | null;
   provider_linear_worker_tokens?: null | ProviderLinearWorkerTokenUsage;
+  goal_evidence?: null | ProviderLinearGoalEvidence;
   summary: string | null;
   metrics_recorded: boolean;
   resume_token: string;
@@ -528,6 +529,151 @@ export interface ProviderLinearWorkerTokenUsage {
   output_tokens: number | null;
   total_tokens: number | null;
   reasoning_output_tokens?: number | null;
+}
+export interface ProviderLinearGoalEvidence {
+  source: "codex-goals";
+  feature_available: boolean | null;
+  feature_enabled: boolean | null;
+  capture_mode: "captured" | "cleared" | "disabled" | "unavailable" | "stale" | "thread_mismatch";
+  capture_timestamp: string | null;
+  thread_id: string | null;
+  turn_id: string | null;
+  objective: string | null;
+  status: string | null;
+  token_budget: number | null;
+  tokens_used: number | null;
+  elapsed_seconds: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  authority: "advisory_only";
+  linear_authority_preserved: true;
+  /**
+   * @minItems 10
+   * @maxItems 10
+   */
+  not_authorized_for: [
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    ),
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    ),
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    ),
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    ),
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    ),
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    ),
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    ),
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    ),
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    ),
+    (
+      | "linear_transition"
+      | "workpad_replacement"
+      | "pr_attachment"
+      | "review_handoff"
+      | "ready_review_success"
+      | "merge_closeout"
+      | "hook_recovery_success"
+      | "long_poll_terminal_status"
+      | "hook_resume_control_integration"
+      | "tui_automation"
+    )
+  ];
+  reason: string | null;
 }
 export interface CollabToolCall {
   observed_at: string;

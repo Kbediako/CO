@@ -92,6 +92,12 @@
         { "$ref": "#/definitions/providerLinearWorkerTokenUsage" }
       ]
     },
+    "goal_evidence": {
+      "anyOf": [
+        { "type": "null" },
+        { "$ref": "#/definitions/providerLinearGoalEvidence" }
+      ]
+    },
     "summary": { "type": ["string", "null"] },
     "metrics_recorded": { "type": "boolean" },
     "resume_token": { "type": "string", "minLength": 1 },
@@ -1645,6 +1651,73 @@
         "output_tokens": { "type": ["integer", "null"], "minimum": 0 },
         "total_tokens": { "type": ["integer", "null"], "minimum": 0 },
         "reasoning_output_tokens": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "providerLinearGoalEvidence": {
+      "type": "object",
+      "required": [
+        "source",
+        "feature_available",
+        "feature_enabled",
+        "capture_mode",
+        "capture_timestamp",
+        "thread_id",
+        "turn_id",
+        "objective",
+        "status",
+        "token_budget",
+        "tokens_used",
+        "elapsed_seconds",
+        "created_at",
+        "updated_at",
+        "authority",
+        "linear_authority_preserved",
+        "not_authorized_for",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "source": { "type": "string", "const": "codex-goals" },
+        "feature_available": { "type": ["boolean", "null"] },
+        "feature_enabled": { "type": ["boolean", "null"] },
+        "capture_mode": {
+          "type": "string",
+          "enum": ["captured", "cleared", "disabled", "unavailable", "stale", "thread_mismatch"]
+        },
+        "capture_timestamp": { "type": ["string", "null"] },
+        "thread_id": { "type": ["string", "null"] },
+        "turn_id": { "type": ["string", "null"] },
+        "objective": { "type": ["string", "null"] },
+        "status": { "type": ["string", "null"] },
+        "token_budget": { "type": ["integer", "null"], "minimum": 0 },
+        "tokens_used": { "type": ["integer", "null"], "minimum": 0 },
+        "elapsed_seconds": { "type": ["number", "null"], "minimum": 0 },
+        "created_at": { "type": ["string", "null"] },
+        "updated_at": { "type": ["string", "null"] },
+        "authority": { "type": "string", "const": "advisory_only" },
+        "linear_authority_preserved": { "type": "boolean", "const": true },
+        "not_authorized_for": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "linear_transition",
+              "workpad_replacement",
+              "pr_attachment",
+              "review_handoff",
+              "ready_review_success",
+              "merge_closeout",
+              "hook_recovery_success",
+              "long_poll_terminal_status",
+              "hook_resume_control_integration",
+              "tui_automation"
+            ]
+          },
+          "minItems": 10,
+          "maxItems": 10,
+          "uniqueItems": true
+        },
+        "reason": { "type": ["string", "null"] }
       }
     },
     "designMetrics": {

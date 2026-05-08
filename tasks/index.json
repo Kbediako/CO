@@ -1,6 +1,52 @@
 {
   "items": [
     {
+      "id": "20260507-linear-779bc931-f6b4-4a1c-b16f-145d500aca73",
+      "title": "CO-492 capture advisory persisted goal evidence in provider-worker manifests",
+      "relates_to": "tasks/tasks-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-07",
+      "evidence": [
+        "docs/PRD-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "docs/TECH_SPEC-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "docs/ACTION_PLAN-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "tasks/specs/linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "tasks/tasks-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        ".agent/task/linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "docs_packet_rework_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet-rework-2026-05-07T15-57-09-661Z-55e51e78",
+          "date": "2026-05-07",
+          "status": "produced_for_parent_import",
+          "manifest": ".runs/linear-779bc931-f6b4-4a1c-b16f-145d500aca73-docs-packet-rework/cli/2026-05-07T15-57-09-661Z-55e51e78/manifest.json",
+          "source_anchor": "ctx:sha256:3d2d783bff06744771ae73806255246cfa5f544055209f45373d48804ad1e0ba#chunk:c000001",
+          "summary": "Docs-only rework child lane rebuilt the CO-492 packet and registry mirrors from current origin/main, preserving advisory_only goal_evidence scope and stale PR #788 review acceptance coverage for parent-owned implementation."
+        },
+        "stale_pr_review_coverage": {
+          "reviewer": "CO-492 docs packet",
+          "date": "2026-05-07",
+          "status": "required_for_replacement_branch",
+          "summary": "Replacement branch acceptance must cover disabled goals fail-closed before candidate reuse, no stale fallback snapshots during manifest patching, command-runner advisory marker persistence, legacy hydration no-backfill with a real goal notification, fractional elapsed_seconds, goals-on thread mismatch regression, and stale candidate timestamp classification."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "task": "tasks/tasks-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "agent_task": ".agent/task/linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "prd": "docs/PRD-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "docs": "docs/TECH_SPEC-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md",
+        "action_plan": "docs/ACTION_PLAN-linear-779bc931-f6b4-4a1c-b16f-145d500aca73.md"
+      }
+    },
+    {
       "id": "20260507-linear-203c5fad-698f-4094-970c-06de5743d94c",
       "title": "CO-482 create-follow-up label assignment by live Linear label ids",
       "relates_to": "tasks/tasks-linear-203c5fad-698f-4094-970c-06de5743d94c.md",
@@ -9214,7 +9260,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-07",
+      "last_review": "2026-05-08",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
@@ -9238,7 +9284,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-07",
+      "last_review": "2026-05-08",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
@@ -9262,7 +9308,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-07",
+      "last_review": "2026-05-08",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",

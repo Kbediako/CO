@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-95f1c334-e623-471e-a013-d7019feed423.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-07
+last_review: 2026-05-08
 ---
 
 ## Canonical Reference
@@ -81,6 +81,12 @@ last_review: 2026-04-07
   - Linear GraphQL headers and viewer identity
   - existing lock-file helper for multi-process coordination
   - control-host polling-health persistence and read surfaces
+
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Packet freshness metadata | Fallback-sensitive historical packet remains active during docs freshness rollover. | expire fallback | CO-492 provider-worker docs repair | Spec guard rechecked refreshed historical packets on 2026-05-08 during PR #793. | 2026-05-08 | 2026-05-22 | 2026-06-07 | Remove this rollover row when the original lane packet is archived or a lane owner refresh records a dedicated fallback table. | `node scripts/spec-guard.mjs --dry-run` plus `npm run docs:freshness` in PR #793. |
 
 ## Validation Plan
 - Tests / checks:
