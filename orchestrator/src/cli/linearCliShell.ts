@@ -818,7 +818,7 @@ async function resolveCreateFollowUpRetrySuppression(input: {
       issueId: input.issueId,
       recordedAtNotBefore: attemptStartedAt,
       followUpIntentKey,
-      matchesErrorCode: isFollowUpPacketTraceabilitySuppressionCode
+      matchesErrorCode: isFollowUpPacketTraceabilityPendingCode
     });
     const reconciledRetry = suppressionEntry
       ? await buildLocallyReconciledFollowUpPacketRetryResult({
@@ -932,7 +932,7 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
     return null;
   }
   const sourceIssueId = normalizeOptionalString(entry.issue_id);
-  const sourceIssueIdentifier = normalizeOptionalString(entry.issue_identifier);
+  const sourceIssueIdentifier = normalizeOptionalString(entry.issue_identifier) ?? sourceIssueId;
   const followUpIssueIdentifier = normalizeOptionalString(entry.follow_up_issue_identifier);
   if (!sourceIssueId || !sourceIssueIdentifier || !followUpIssueIdentifier) {
     return null;
@@ -1550,12 +1550,12 @@ function buildAuditEntry(
     }
     return {
       recorded_at: recordedAt,
-      operation: result.operation,
-      ok: false,
-      issue_id: requestedIssueId,
-      issue_identifier: null,
-      source_setup: sourceSetup,
-      action: followUpFailureAuditFields.action,
+        operation: result.operation,
+        ok: false,
+        issue_id: requestedIssueId,
+        issue_identifier: resolveFailureIssueIdentifier(result),
+        source_setup: sourceSetup,
+        action: followUpFailureAuditFields.action,
       via: followUpFailureAuditFields.via,
       state: followUpFailureAuditFields.state,
       ...followUpAuditFields,
@@ -1982,6 +1982,14 @@ function formatFollowUpRelationsAuditVia(relations: Record<string, unknown> | nu
   return related ? 'related' : 'none';
 }
 
+function resolveFailureIssueIdentifier(result: LinearCliResult): string | null {
+  if (result.ok || result.operation !== 'create-follow-up') {
+    return null;
+  }
+  const issue = readIssueLikeRecord(result.error.details?.issue);
+  return readRecordString(issue, 'identifier');
+}
+
 function resolveFollowUpIntentAuditField(
   result: LinearCliResult,
   flags: ArgMap,
@@ -2033,6 +2041,10 @@ function readUnknownString(value: unknown): string | null {
 
 function normalizeOptionalString(value: unknown): string | null {
   return readUnknownString(value);
+}
+
+function isFollowUpPacketTraceabilityPendingCode(errorCode: string | null | undefined): boolean {
+  return normalizeOptionalString(errorCode) === 'linear_follow_up_packet_traceability_pending';
 }
 
 function readUnknownInteger(value: unknown): number | null {
