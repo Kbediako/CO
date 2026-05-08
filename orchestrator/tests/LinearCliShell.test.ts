@@ -2089,44 +2089,14 @@ describe('runLinearCliShell', () => {
     }));
   });
 
-  it('allows packet-blocked follow-up retries after packet mirrors are reconciled locally', async () => {
+  it('reuses packet-blocked follow-ups after packet mirrors are reconciled locally', async () => {
     const log = vi.fn();
     const appendAuditEntry = vi.fn();
     const repoRoot = await mkdtemp(join(tmpdir(), 'linear-cli-follow-up-reconciled-retry-'));
     tempDirs.push(repoRoot);
     await seedCliFollowUpPacketReadiness(repoRoot, 'linear-lin-issue-2');
     const createProviderLinearFollowUpIssueMock =
-      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>()
-        .mockResolvedValue({
-          ok: true,
-          operation: 'create-follow-up',
-          action: 'reused',
-          issue: {
-            id: 'lin-issue-1',
-            identifier: 'CO-1'
-          },
-          follow_up_issue: {
-            id: 'lin-issue-2',
-            identifier: 'CO-2',
-            title: 'Follow-up',
-            description: 'Do the thing',
-            url: 'https://linear.app/example/issue/CO-2',
-            state: {
-              id: 'state-backlog',
-              name: 'Backlog',
-              type: 'unstarted'
-            },
-            team: null,
-            project: null
-          },
-          canonical_owner: null,
-          relations: {
-            related: true,
-            blocked_by_source: false
-          },
-          traceability: buildReadyFollowUpTraceability(),
-          source_setup: null
-        } as never);
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>();
     const { auditPath, loadProviderLinearWorkerContextMock } = await createSameAttemptFollowUpFixture(
       'linear-cli-follow-up-packet-ready-retry-',
       [buildPacketTraceabilityPendingAuditEntry()]
@@ -2161,7 +2131,7 @@ describe('runLinearCliShell', () => {
       }
     );
 
-    expect(createProviderLinearFollowUpIssueMock).toHaveBeenCalledTimes(1);
+    expect(createProviderLinearFollowUpIssueMock).not.toHaveBeenCalled();
     expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
       ok: true,
       operation: 'create-follow-up',
@@ -2169,8 +2139,30 @@ describe('runLinearCliShell', () => {
       follow_up_issue: {
         id: 'lin-issue-2',
         identifier: 'CO-2'
+      },
+      traceability: {
+        packet: {
+          packet_prefix: 'linear-lin-issue-2',
+          readiness: {
+            ready: true
+          }
+        },
+        relations: {
+          related: {
+            action: 'already_satisfied',
+            satisfied: true
+          }
+        }
       }
     });
+    expect(appendAuditEntry).toHaveBeenCalledWith(auditPath, expect.objectContaining({
+      recorded_at: '2026-04-22T08:06:00.000Z',
+      operation: 'create-follow-up',
+      ok: true,
+      action: 'reused',
+      follow_up_issue_id: 'lin-issue-2',
+      follow_up_issue_identifier: 'CO-2'
+    }));
   });
 
   it('allows a same-attempt parity follow-up retry once the parity matrix is supplied', async () => {

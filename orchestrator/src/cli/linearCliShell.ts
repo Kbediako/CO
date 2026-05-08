@@ -227,6 +227,7 @@ const LINEAR_MUTATING_SUBCOMMANDS = new Set([
   'child-stream',
   'child-lane'
 ]);
+const LINEAR_CANONICAL_OWNER_MARKER_PREFIX = 'codex-orchestrator:canonical-owner-key=';
 
 export async function runLinearCliShell(
   params: RunLinearCliShellParams,
@@ -819,11 +820,17 @@ async function resolveCreateFollowUpRetrySuppression(input: {
       followUpIntentKey,
       matchesErrorCode: isFollowUpPacketTraceabilitySuppressionCode
     });
-    if (
-      suppressionEntry
-      && await locallyReconciledFollowUpPacketIsReady(suppressionEntry, input.repoRoot)
-    ) {
-      return null;
+    const reconciledRetry = suppressionEntry
+      ? await buildLocallyReconciledFollowUpPacketRetryResult({
+          entry: suppressionEntry,
+          title: input.title,
+          canonicalOwnerKey: input.canonicalOwnerKey,
+          blockedBySource: input.blockedBySource,
+          repoRoot: input.repoRoot
+        })
+      : null;
+    if (reconciledRetry) {
+      return reconciledRetry;
     }
     return {
       ok: false,
@@ -912,16 +919,31 @@ function findLatestCreateFollowUpSuppressionAuditEntry(input: {
     .sort((left, right) => Date.parse(right.recorded_at) - Date.parse(left.recorded_at))[0] ?? null;
 }
 
-async function locallyReconciledFollowUpPacketIsReady(
-  entry: ProviderLinearAuditEntry,
-  repoRoot: string
-): Promise<boolean> {
+async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
+  entry: ProviderLinearAuditEntry;
+  title: string;
+  canonicalOwnerKey: string | null;
+  blockedBySource: boolean;
+  repoRoot: string;
+}): Promise<ProviderLinearCreateFollowUpResult | null> {
+  const entry = input.entry;
   const followUpIssueId = normalizeOptionalString(entry.follow_up_issue_id);
   if (!followUpIssueId) {
-    return false;
+    return null;
+  }
+  const sourceIssueId = normalizeOptionalString(entry.issue_id);
+  const sourceIssueIdentifier = normalizeOptionalString(entry.issue_identifier);
+  const followUpIssueIdentifier = normalizeOptionalString(entry.follow_up_issue_identifier);
+  if (!sourceIssueId || !sourceIssueIdentifier || !followUpIssueIdentifier) {
+    return null;
+  }
+  const relatedSatisfied = entry.via === 'related' || entry.via === 'related+blocks';
+  const blockedSatisfied = entry.via === 'related+blocks';
+  if (!relatedSatisfied || (input.blockedBySource && !blockedSatisfied)) {
+    return null;
   }
   const packetPrefix = `linear-${followUpIssueId}`;
-  const traceability = await buildFollowUpPacketTraceabilityEvidence({
+  const packetTraceability = await buildFollowUpPacketTraceabilityEvidence({
     id: followUpIssueId,
     description: [
       '## Immediate Traceability',
@@ -932,8 +954,74 @@ async function locallyReconciledFollowUpPacketIsReady(
       name: entry.state ?? 'Backlog',
       type: null
     }
-  }, repoRoot);
-  return traceability.readiness.ready;
+  }, input.repoRoot);
+  if (!packetTraceability.readiness.ready) {
+    return null;
+  }
+  return {
+    ok: true,
+    operation: 'create-follow-up',
+    action: 'reused',
+    issue: {
+      id: sourceIssueId,
+      identifier: sourceIssueIdentifier
+    },
+    follow_up_issue: {
+      id: followUpIssueId,
+      identifier: followUpIssueIdentifier,
+      title: input.title,
+      description: null,
+      url: null,
+      state: {
+        id: 'audit-backlog-state',
+        name: entry.state ?? 'Backlog',
+        type: null
+      },
+      team: null,
+      project: null
+    },
+    canonical_owner: input.canonicalOwnerKey
+      ? {
+          key: input.canonicalOwnerKey,
+          marker: `${LINEAR_CANONICAL_OWNER_MARKER_PREFIX}${input.canonicalOwnerKey}`
+        }
+      : null,
+    relations: {
+      related: relatedSatisfied,
+      blocked_by_source: blockedSatisfied
+    },
+    traceability: {
+      labels: {
+        source_issue: {
+          id: sourceIssueId,
+          identifier: sourceIssueIdentifier
+        },
+        requested_labels: [],
+        observed_labels: null,
+        missing_label_ids: []
+      },
+      relations: {
+        related: {
+          type: 'related',
+          requested: true,
+          satisfied: relatedSatisfied,
+          action: 'already_satisfied',
+          issue_id: sourceIssueId,
+          related_issue_id: followUpIssueId
+        },
+        blocked_by_source: {
+          type: 'blocks',
+          requested: input.blockedBySource,
+          satisfied: blockedSatisfied,
+          action: input.blockedBySource ? 'already_satisfied' : 'not_requested',
+          issue_id: sourceIssueId,
+          related_issue_id: followUpIssueId
+        }
+      },
+      packet: packetTraceability
+    },
+    source_setup: null
+  };
 }
 
 async function refreshParallelizationProofSnapshotBestEffort(
