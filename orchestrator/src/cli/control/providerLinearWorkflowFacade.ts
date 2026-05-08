@@ -258,6 +258,7 @@ const PROVIDER_LINEAR_SUPERSEDED_CANONICAL_OWNER_MARKER_PREFIX =
   'codex-orchestrator:superseded-canonical-owner-key=';
 const FOLLOW_UP_REQUIRED_LIFECYCLE_LABEL = 'Lifecycle: Implementation';
 const FOLLOW_UP_TYPE_LABEL_NAMES = new Set(['Bug', 'Improvement', 'Feature']);
+const FOLLOW_UP_DOCS_FRESHNESS_OWNER_PLACEHOLDERS = new Set(['tbd', 'unassigned', 'owner']);
 const PROVIDER_LINEAR_CANONICAL_OWNER_SEARCH_LIMIT = 50;
 
 type ProviderLinearOperation =
@@ -9284,12 +9285,15 @@ function docsFreshnessRegistryEntryHasValidMetadata(entry: Record<string, unknow
     ? entry.cadence_days
     : null;
   const lastReview = typeof entry.last_review === 'string' ? normalizeOptionalString(entry.last_review) : null;
+  const owner = typeof entry.owner === 'string' ? normalizeOptionalString(entry.owner) : null;
   return Boolean(
     status === FOLLOW_UP_REQUIRED_DOCS_FRESHNESS_STATUS
     && cadenceDays !== null
     && cadenceDays > 0
     && lastReview
     && isIsoDateString(lastReview)
+    && owner
+    && !FOLLOW_UP_DOCS_FRESHNESS_OWNER_PLACEHOLDERS.has(owner.toLowerCase())
   );
 }
 

@@ -16994,6 +16994,39 @@ describe('providerLinearWorkflowFacade', () => {
       }
     });
 
+    const placeholderOwnerRegistryRoot = await mkdtemp(
+      join(tmpdir(), 'provider-linear-follow-up-placeholder-owner-registry-')
+    );
+    tempDirs.push(placeholderOwnerRegistryRoot);
+    await seedFollowUpPacketReadiness(placeholderOwnerRegistryRoot, followUpTaskId);
+    await writeFile(
+      join(placeholderOwnerRegistryRoot, 'docs/docs-freshness-registry.json'),
+      JSON.stringify({
+        entries: requiredPaths.map((path) => ({
+          path,
+          owner: 'tbd',
+          status: 'active',
+          last_review: '2026-05-08',
+          cadence_days: 30
+        }))
+      })
+    );
+    await expect(runWithRepoRoot(placeholderOwnerRegistryRoot)).resolves.toMatchObject({
+      ok: true,
+      traceability: {
+        packet: {
+          readiness: {
+            ready: false,
+            missing_registry_mirrors: ['docs/docs-freshness-registry.json']
+          },
+          queue_admission_blocker: {
+            reason: 'backlog_head_follow_up_traceability_pending',
+            state: 'Backlog'
+          }
+        }
+      }
+    });
+
     const incompleteTasksRoot = await mkdtemp(join(tmpdir(), 'provider-linear-follow-up-incomplete-tasks-'));
     tempDirs.push(incompleteTasksRoot);
     await seedFollowUpPacketReadiness(incompleteTasksRoot, followUpTaskId);

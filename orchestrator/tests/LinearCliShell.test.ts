@@ -730,6 +730,9 @@ describe('runLinearCliShell', () => {
             related: true,
             blocked_by_source: true
           },
+          traceability: buildReadyFollowUpTraceability({
+            blockedBySource: true
+          }),
           source_setup: null
         } as never);
 
