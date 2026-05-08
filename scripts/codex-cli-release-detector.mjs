@@ -650,21 +650,6 @@ function assertLinearJsonSuccess(result, commandName) {
   throw new Error(`${commandName} failed: ${code}: ${message}`);
 }
 
-function isExpectedPacketBlockedCreateFollowUpResult(result) {
-  if (!result || result.ok !== false || result.operation !== 'create-follow-up') {
-    return false;
-  }
-  const code = result.error?.code;
-  if (
-    code !== 'linear_follow_up_packet_traceability_pending' &&
-    code !== 'linear_follow_up_packet_traceability_retry_suppressed'
-  ) {
-    return false;
-  }
-  const issue = parseLinearIssueFromResult(result);
-  return Boolean(issue.id || issue.identifier);
-}
-
 export function defaultLinearRunner({ nodePath = process.execPath, scriptPath = join(process.cwd(), 'dist/bin/codex-orchestrator.js') } = {}) {
   return async (args, options = {}) => {
     try {
@@ -749,9 +734,7 @@ export async function runLinearMutation({
     ];
     const createResultRaw = await linearRunner(createArgs, { cwd: repoRoot, env });
     const createResult = parseLinearJson(createResultRaw.stdout, createResultRaw.stderr, 'Linear create-follow-up');
-    if (!isExpectedPacketBlockedCreateFollowUpResult(createResult)) {
-      assertLinearJsonSuccess(createResult, 'Linear create-follow-up');
-    }
+    assertLinearJsonSuccess(createResult, 'Linear create-follow-up');
     const selectedIssue = parseLinearIssueFromResult(createResult);
     if (!selectedIssue.id && !selectedIssue.identifier) {
       throw new Error('Linear create-follow-up did not return a selected issue id or identifier.');

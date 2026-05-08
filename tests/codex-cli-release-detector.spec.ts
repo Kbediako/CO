@@ -493,7 +493,7 @@ describe('codex CLI release detector', () => {
     expect(workpads[0]).toContain('> ## Closure Gate');
   });
 
-  it('upserts the workpad for packet-blocked create-follow-up JSON', async () => {
+  it('fails closed and skips workpad update for packet-blocked create-follow-up JSON', async () => {
     const repo = await writeFixtureRepo();
     const calls: string[][] = [];
     const runner = async (args: string[]) => {
@@ -534,11 +534,11 @@ describe('codex CLI release detector', () => {
       linearRunner: runner
     });
 
-    expect(exitCode).toBe(0);
-    expect(artifact.mutation_result.action).toBe('created');
-    expect(artifact.mutation_result.create_follow_up.ok).toBe(false);
-    expect(artifact.mutation_result.selected_issue.id).toBe('packet-blocked-linear-id');
-    expect(calls.some((args) => args[0] === 'upsert-workpad' && args.includes('packet-blocked-linear-id'))).toBe(true);
+    expect(exitCode).toBe(2);
+    expect(artifact.decision_state).toBe('blocked_detector_error');
+    expect(artifact.blocker_reason).toContain('linear_follow_up_packet_traceability_pending');
+    expect(artifact.mutation_result.action).toBe('failed');
+    expect(calls.filter((args) => args[0] === 'upsert-workpad')).toHaveLength(0);
   });
 
   it('fails closed when create-follow-up returns non-packet failure JSON', async () => {
