@@ -1796,6 +1796,7 @@ interface ProviderWorkerConfigModelDefaults {
   root_review_model?: string | null;
   root_reasoning_effort?: string | null;
   active_profile?: string | null;
+  selected_profile?: string | null;
   profiles?: Record<string, ProviderWorkerConfigModelProfileDefaults>;
 }
 
@@ -1862,6 +1863,7 @@ function readProviderWorkerConfigModelDefaultsFromToml(
     root_review_model: null,
     root_reasoning_effort: null,
     active_profile: null,
+    selected_profile: null,
     profiles: {}
   };
   for (const line of rawConfig.split(/\r?\n/u)) {
@@ -2015,6 +2017,7 @@ function selectProviderWorkerConfigModelDefaultsForProfile(
       root_review_model: rootDefaults.review_model,
       root_reasoning_effort: rootDefaults.reasoning_effort,
       active_profile: activeProfile,
+      selected_profile: activeProfile,
       profiles: defaults.profiles
     };
   }
@@ -2029,8 +2032,19 @@ function selectProviderWorkerConfigModelDefaultsForProfile(
     root_review_model: rootDefaults.review_model,
     root_reasoning_effort: rootDefaults.reasoning_effort,
     active_profile: activeProfile,
+    selected_profile: activeProfile,
     profiles: defaults.profiles
   };
+}
+
+function selectProviderWorkerConfigModelDefaultsForCommandProfile(
+  defaults: ProviderWorkerConfigModelDefaults,
+  rawProfile: string | null
+): ProviderWorkerConfigModelDefaults {
+  if (rawProfile) {
+    return selectProviderWorkerConfigModelDefaultsForProfile(defaults, rawProfile);
+  }
+  return defaults.selected_profile ? defaults : selectProviderWorkerConfigModelDefaultsForProfile(defaults, null);
 }
 
 function readTomlStringAssignment(trimmedLine: string, key: string): string | null {
@@ -2186,7 +2200,7 @@ function resolveProviderWorkerCommandGoalsFeatureEnabled(
   configDefaults: ProviderWorkerConfigModelDefaults
 ): boolean | null {
   const commandOverrides = resolveProviderWorkerCommandModelOverrides(args);
-  const selectedConfigDefaults = selectProviderWorkerConfigModelDefaultsForProfile(
+  const selectedConfigDefaults = selectProviderWorkerConfigModelDefaultsForCommandProfile(
     configDefaults,
     commandOverrides.profile
   );
@@ -2451,7 +2465,7 @@ function buildProviderWorkerResolvedModelProvenance(input: {
   const commandOverrides = input.commandArgs
     ? resolveProviderWorkerCommandModelOverrides(input.commandArgs)
     : buildEmptyProviderWorkerCommandModelOverrides();
-  const configDefaults = selectProviderWorkerConfigModelDefaultsForProfile(
+  const configDefaults = selectProviderWorkerConfigModelDefaultsForCommandProfile(
     input.configDefaults,
     commandOverrides.profile
   );
@@ -4677,16 +4691,40 @@ function normalizeProviderWorkerGoalToolName(value: unknown): string | null {
     : null;
 }
 
+function mergeProviderWorkerResponseItemPayloadMetadata(
+  wrapper: Record<string, unknown>,
+  nested: Record<string, unknown>
+): Record<string, unknown> {
+  return {
+    ...wrapper,
+    ...nested,
+    call_id: nested.call_id ?? wrapper.call_id,
+    callId: nested.callId ?? wrapper.callId,
+    tool_call_id: nested.tool_call_id ?? wrapper.tool_call_id,
+    toolCallId: nested.toolCallId ?? wrapper.toolCallId,
+    name: nested.name ?? wrapper.name,
+    tool_name: nested.tool_name ?? wrapper.tool_name,
+    toolName: nested.toolName ?? wrapper.toolName
+  };
+}
+
 function readProviderWorkerResponseItemPayload(input: Record<string, unknown>): Record<string, unknown> | null {
   const payload = isRecord(input.payload) ? input.payload : null;
   const params = isRecord(input.params) ? input.params : null;
   const payloadParams = isRecord(payload?.params) ? payload.params : null;
   const payloadWrappedPayload = isRecord(payload?.payload) ? payload.payload : null;
+  const payloadItem = isRecord(payload?.item) ? payload.item : null;
+  const payloadResponseItem = isRecord(payload?.response_item) ? payload.response_item : null;
+  if (payload) {
+    for (const nested of [payloadItem, payloadResponseItem]) {
+      if (nested) {
+        return mergeProviderWorkerResponseItemPayloadMetadata(payload, nested);
+      }
+    }
+  }
   for (const candidate of [
     input.item,
     input.response_item,
-    payload?.item,
-    payload?.response_item,
     params?.item,
     params?.response_item,
     payloadParams?.item,
@@ -4697,17 +4735,7 @@ function readProviderWorkerResponseItemPayload(input: Record<string, unknown>): 
     }
   }
   if (payload?.type === 'response_item' && payloadWrappedPayload) {
-    return {
-      ...payload,
-      ...payloadWrappedPayload,
-      call_id: payloadWrappedPayload.call_id ?? payload.call_id,
-      callId: payloadWrappedPayload.callId ?? payload.callId,
-      tool_call_id: payloadWrappedPayload.tool_call_id ?? payload.tool_call_id,
-      toolCallId: payloadWrappedPayload.toolCallId ?? payload.toolCallId,
-      name: payloadWrappedPayload.name ?? payload.name,
-      tool_name: payloadWrappedPayload.tool_name ?? payload.tool_name,
-      toolName: payloadWrappedPayload.toolName ?? payload.toolName
-    };
+    return mergeProviderWorkerResponseItemPayloadMetadata(payload, payloadWrappedPayload);
   }
   return (input.type === 'response_item' || payload?.type === 'response_item') && payload ? payload : null;
 }
@@ -4742,7 +4770,14 @@ function readProviderWorkerResponseItemGoalToolName(
   );
 }
 
-function readProviderWorkerGoalToolOutputValue(input: Record<string, unknown>): unknown {
+type ProviderWorkerGoalToolOutputParseOptions = {
+  includeStatus?: boolean;
+};
+
+function readProviderWorkerGoalToolOutputValue(
+  input: Record<string, unknown>,
+  options: ProviderWorkerGoalToolOutputParseOptions = {}
+): unknown {
   const payload = readProviderWorkerResponseItemPayload(input);
   const outputCandidates = [
     input.output,
@@ -4753,31 +4788,51 @@ function readProviderWorkerGoalToolOutputValue(input: Record<string, unknown>): 
     payload?.content
   ];
   let firstDefined: unknown = undefined;
+  let firstStatusPayload: Record<string, unknown> | undefined = undefined;
   for (const candidate of outputCandidates) {
     if (candidate === undefined) {
       continue;
     }
     firstDefined ??= candidate;
-    const parsed = parseProviderWorkerGoalToolOutputValue(candidate);
+    const parsed = parseProviderWorkerGoalToolOutputValue(candidate, options);
     if (isRecord(parsed) && isProviderWorkerGoalToolPayloadRecord(parsed)) {
       return parsed;
     }
+    if (
+      options.includeStatus === true &&
+      isRecord(parsed) &&
+      isProviderWorkerGoalToolPayloadRecord(parsed, options)
+    ) {
+      firstStatusPayload = parsed;
+    }
   }
-  return firstDefined;
+  return firstStatusPayload ?? firstDefined;
 }
 
-function parseProviderWorkerGoalToolOutputValue(value: unknown): unknown {
+function parseProviderWorkerGoalToolOutputValue(
+  value: unknown,
+  options: ProviderWorkerGoalToolOutputParseOptions = {}
+): unknown {
   if (isRecord(value)) {
     if (isRecord(value.goal) || isRecord(value.threadGoal) || isRecord(value.thread_goal)) {
       return value;
     }
+    let statusFallback: Record<string, unknown> | null = null;
     for (const nested of [value.text, value.output_text, value.output, value.result, value.content]) {
-      const parsed = parseProviderWorkerGoalToolOutputValue(nested);
-      if (isRecord(parsed) && isProviderWorkerGoalToolPayloadRecord(parsed)) {
-        return parsed;
+      const parsed = parseProviderWorkerGoalToolOutputValue(nested, options);
+      if (isRecord(parsed)) {
+        if (isProviderWorkerGoalToolPayloadRecord(parsed)) {
+          return parsed;
+        }
+        if (options.includeStatus === true && isProviderWorkerGoalToolPayloadRecord(parsed, options)) {
+          statusFallback = parsed;
+        }
       }
     }
-    if (isProviderWorkerGoalSnapshotRecord(value)) {
+    if (statusFallback) {
+      return statusFallback;
+    }
+    if (hasProviderWorkerGoalSnapshotContent(value, options)) {
       return value;
     }
     return value;
@@ -4789,18 +4844,25 @@ function parseProviderWorkerGoalToolOutputValue(value: unknown): unknown {
     }
     try {
       const parsed = JSON.parse(trimmed) as unknown;
-      return parseProviderWorkerGoalToolOutputValue(parsed) ?? parsed;
+      return parseProviderWorkerGoalToolOutputValue(parsed, options) ?? parsed;
     } catch {
       return null;
     }
   }
   if (Array.isArray(value)) {
+    let statusFallback: Record<string, unknown> | null = null;
     for (const item of value) {
-      const parsed = parseProviderWorkerGoalToolOutputValue(item);
-      if (isRecord(parsed) && isProviderWorkerGoalToolPayloadRecord(parsed)) {
-        return parsed;
+      const parsed = parseProviderWorkerGoalToolOutputValue(item, options);
+      if (isRecord(parsed)) {
+        if (isProviderWorkerGoalToolPayloadRecord(parsed)) {
+          return parsed;
+        }
+        if (options.includeStatus === true && isProviderWorkerGoalToolPayloadRecord(parsed, options)) {
+          statusFallback = parsed;
+        }
       }
     }
+    return statusFallback;
   }
   return null;
 }
@@ -4820,21 +4882,23 @@ function hasProviderWorkerGoalSnapshotContent(
   );
 }
 
-function isProviderWorkerGoalSnapshotRecord(value: Record<string, unknown>): boolean {
-  return hasProviderWorkerGoalSnapshotContent(value);
-}
-
-function isProviderWorkerGoalToolPayloadRecord(value: Record<string, unknown>): boolean {
+function isProviderWorkerGoalToolPayloadRecord(
+  value: Record<string, unknown>,
+  options: ProviderWorkerGoalToolOutputParseOptions = {}
+): boolean {
   return (
     isRecord(value.goal) ||
     isRecord(value.threadGoal) ||
     isRecord(value.thread_goal) ||
-    isProviderWorkerGoalSnapshotRecord(value)
+    hasProviderWorkerGoalSnapshotContent(value, options)
   );
 }
 
-function selectProviderWorkerGoalToolSnapshotRecord(value: unknown): Record<string, unknown> | null {
-  const parsed = parseProviderWorkerGoalToolOutputValue(value);
+function selectProviderWorkerGoalToolSnapshotRecord(
+  value: unknown,
+  options: { includeStatus?: boolean } = {}
+): Record<string, unknown> | null {
+  const parsed = parseProviderWorkerGoalToolOutputValue(value, options);
   if (!isRecord(parsed)) {
     return null;
   }
@@ -4847,7 +4911,7 @@ function selectProviderWorkerGoalToolSnapshotRecord(value: unknown): Record<stri
   if (isRecord(parsed.thread_goal)) {
     return parsed.thread_goal;
   }
-  return isProviderWorkerGoalSnapshotRecord(parsed) ? parsed : null;
+  return hasProviderWorkerGoalSnapshotContent(parsed, options) ? parsed : null;
 }
 
 function isProviderWorkerGoalToolResponseItemSource(input: Record<string, unknown>): boolean {
@@ -4892,18 +4956,22 @@ function extractProviderWorkerGoalToolEvidence(
   const payloadType = normalizeOptionalString(payload?.type);
   const hasSupportedPayloadType =
     !payloadType || payloadType === 'function_call_output' || payloadType === 'tool_result' || payloadType === 'response_item';
-  const outputValue = readProviderWorkerGoalToolOutputValue(parsed);
-  if (outputValue === undefined) {
-    return null;
-  }
   const toolName =
     directToolName ?? (callId ? normalizeProviderWorkerGoalToolName(state.goalToolCallNames?.[callId]) : null);
   if (!toolName || !hasSupportedPayloadType) {
     return null;
   }
+  const outputValue = readProviderWorkerGoalToolOutputValue(parsed, {
+    includeStatus: toolName === 'get_goal'
+  });
+  if (outputValue === undefined) {
+    return null;
+  }
   const capturedAt = extractProviderWorkerEventTimestamp(parsed);
   const turnId = extractProviderWorkerActivityTurnId(parsed) ?? state.turnId;
-  const goal = selectProviderWorkerGoalToolSnapshotRecord(outputValue);
+  const goal = selectProviderWorkerGoalToolSnapshotRecord(outputValue, {
+    includeStatus: toolName === 'get_goal'
+  });
   if (!goal || !hasProviderWorkerGoalSnapshotContent(goal, { includeStatus: true })) {
     if (toolName === 'create_goal' || toolName === 'update_goal') {
       return null;
@@ -5130,6 +5198,7 @@ function normalizeProviderLinearGoalIsoTimestamp(value: unknown): string | null 
 
 function extractProviderWorkerEventTimestamp(input: Record<string, unknown>): string | null {
   const payload = isRecord(input.payload) ? input.payload : null;
+  const responsePayload = readProviderWorkerResponseItemPayload(input);
   return (
     normalizeOptionalString(input.timestamp) ??
     normalizeOptionalString(input.created_at) ??
@@ -5138,7 +5207,11 @@ function extractProviderWorkerEventTimestamp(input: Record<string, unknown>): st
     normalizeOptionalString(payload?.timestamp) ??
     normalizeOptionalString(payload?.created_at) ??
     normalizeOptionalString(payload?.createdAt) ??
-    normalizeOptionalString(payload?.at)
+    normalizeOptionalString(payload?.at) ??
+    normalizeOptionalString(responsePayload?.timestamp) ??
+    normalizeOptionalString(responsePayload?.created_at) ??
+    normalizeOptionalString(responsePayload?.createdAt) ??
+    normalizeOptionalString(responsePayload?.at)
   );
 }
 
@@ -5283,8 +5356,31 @@ export function normalizeProviderLinearGoalEvidenceValue(value: unknown): Provid
       reason: 'goal_feature_enabled_malformed'
     });
   }
-  if (captureMode === 'captured') {
+  if (
+    captureMode === 'captured' &&
+    hasProviderWorkerGoalSnapshotContent(capturedEvidence as unknown as Record<string, unknown>, {
+      includeStatus: true
+    })
+  ) {
     return capturedEvidence;
+  }
+  if (captureMode === 'captured') {
+    return buildProviderLinearGoalEvidence({
+      featureAvailable: capturedEvidence.feature_available,
+      featureEnabled: capturedEvidence.feature_enabled,
+      captureMode: 'unavailable',
+      captureTimestamp: capturedEvidence.capture_timestamp,
+      threadId: capturedEvidence.thread_id,
+      turnId: capturedEvidence.turn_id,
+      objective: null,
+      status: null,
+      tokenBudget: null,
+      tokensUsed: null,
+      elapsedSeconds: null,
+      createdAt: null,
+      updatedAt: null,
+      reason: 'goal_captured_payload_missing'
+    });
   }
   return buildProviderLinearGoalEvidence({
     featureAvailable: capturedEvidence.feature_available,
