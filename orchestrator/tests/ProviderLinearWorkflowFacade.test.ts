@@ -125,6 +125,7 @@ async function seedFollowUpPacketReadiness(repoRoot: string, followUpTaskId: str
     `.agent/task/${followUpTaskId}.md`
   ];
   const canonicalTaskId = `20260508-${followUpTaskId}`;
+  const lastReview = new Date().toISOString().slice(0, 10);
   await Promise.all([
     writeFile(join(repoRoot, `docs/PRD-${followUpTaskId}.md`), followUpTaskId),
     writeFile(join(repoRoot, `docs/TECH_SPEC-${followUpTaskId}.md`), followUpTaskId),
@@ -138,7 +139,15 @@ async function seedFollowUpPacketReadiness(repoRoot: string, followUpTaskId: str
         items: [
           {
             id: canonicalTaskId,
-            relates_to: `tasks/tasks-${followUpTaskId}.md`
+            relates_to: `tasks/tasks-${followUpTaskId}.md`,
+            paths: {
+              spec: `tasks/specs/${followUpTaskId}.md`,
+              task: `tasks/tasks-${followUpTaskId}.md`,
+              agent_task: `.agent/task/${followUpTaskId}.md`,
+              prd: `docs/PRD-${followUpTaskId}.md`,
+              docs: `docs/TECH_SPEC-${followUpTaskId}.md`,
+              action_plan: `docs/ACTION_PLAN-${followUpTaskId}.md`
+            }
           }
         ]
       })
@@ -157,7 +166,7 @@ async function seedFollowUpPacketReadiness(repoRoot: string, followUpTaskId: str
           path,
           owner: 'Codex (top-level agent), Review agent',
           status: 'active',
-          last_review: '2026-05-08',
+          last_review: lastReview,
           cadence_days: 30
         }))
       })
@@ -16508,8 +16517,8 @@ describe('providerLinearWorkflowFacade', () => {
         description: canonicalOwnerDescription
       },
       relations: {
-        related: true,
-        blocked_by_source: true
+        related: false,
+        blocked_by_source: false
       }
     });
     if (!result.ok) {
@@ -16872,6 +16881,7 @@ describe('providerLinearWorkflowFacade', () => {
       '## Immediate Traceability',
       '- Follow-up packet prefix: `linear-lin-issue-254`'
     ].join('\n');
+    const currentReviewDate = new Date().toISOString().slice(0, 10);
     const runWithRepoRoot = async (repoRoot: string) => {
       const calls: string[] = [];
       const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
@@ -16973,7 +16983,7 @@ describe('providerLinearWorkflowFacade', () => {
           path,
           owner: 'Codex (top-level agent), Review agent',
           status: 'preserved_historical_stub',
-          last_review: '2026-05-08',
+          last_review: currentReviewDate,
           cadence_days: 30
         }))
       })
@@ -17006,7 +17016,7 @@ describe('providerLinearWorkflowFacade', () => {
           path,
           owner: 'tbd',
           status: 'active',
-          last_review: '2026-05-08',
+          last_review: currentReviewDate,
           cadence_days: 30
         }))
       })
@@ -17018,6 +17028,107 @@ describe('providerLinearWorkflowFacade', () => {
           readiness: {
             ready: false,
             missing_registry_mirrors: ['docs/docs-freshness-registry.json']
+          },
+          queue_admission_blocker: {
+            reason: 'backlog_head_follow_up_traceability_pending',
+            state: 'Backlog'
+          }
+        }
+      }
+    });
+
+    const staleRegistryRoot = await mkdtemp(join(tmpdir(), 'provider-linear-follow-up-stale-registry-'));
+    tempDirs.push(staleRegistryRoot);
+    await seedFollowUpPacketReadiness(staleRegistryRoot, followUpTaskId);
+    await writeFile(
+      join(staleRegistryRoot, 'docs/docs-freshness-registry.json'),
+      JSON.stringify({
+        entries: requiredPaths.map((path) => ({
+          path,
+          owner: 'Codex (top-level agent), Review agent',
+          status: 'active',
+          last_review: '2000-01-01',
+          cadence_days: 30
+        }))
+      })
+    );
+    await expect(runWithRepoRoot(staleRegistryRoot)).resolves.toMatchObject({
+      ok: true,
+      traceability: {
+        packet: {
+          readiness: {
+            ready: false,
+            missing_registry_mirrors: ['docs/docs-freshness-registry.json']
+          },
+          queue_admission_blocker: {
+            reason: 'backlog_head_follow_up_traceability_pending',
+            state: 'Backlog'
+          }
+        }
+      }
+    });
+
+    const duplicateRegistryRoot = await mkdtemp(join(tmpdir(), 'provider-linear-follow-up-duplicate-registry-'));
+    tempDirs.push(duplicateRegistryRoot);
+    await seedFollowUpPacketReadiness(duplicateRegistryRoot, followUpTaskId);
+    await writeFile(
+      join(duplicateRegistryRoot, 'docs/docs-freshness-registry.json'),
+      JSON.stringify({
+        entries: [
+          ...requiredPaths.map((path) => ({
+            path,
+            owner: 'Codex (top-level agent), Review agent',
+            status: 'active',
+            last_review: currentReviewDate,
+            cadence_days: 30
+          })),
+          {
+            path: requiredPaths[0],
+            owner: 'Codex (top-level agent), Review agent',
+            status: 'active',
+            last_review: currentReviewDate,
+            cadence_days: 30
+          }
+        ]
+      })
+    );
+    await expect(runWithRepoRoot(duplicateRegistryRoot)).resolves.toMatchObject({
+      ok: true,
+      traceability: {
+        packet: {
+          readiness: {
+            ready: false,
+            missing_registry_mirrors: ['docs/docs-freshness-registry.json']
+          },
+          queue_admission_blocker: {
+            reason: 'backlog_head_follow_up_traceability_pending',
+            state: 'Backlog'
+          }
+        }
+      }
+    });
+
+    const incompleteIndexRoot = await mkdtemp(join(tmpdir(), 'provider-linear-follow-up-incomplete-index-'));
+    tempDirs.push(incompleteIndexRoot);
+    await seedFollowUpPacketReadiness(incompleteIndexRoot, followUpTaskId);
+    await writeFile(
+      join(incompleteIndexRoot, 'tasks/index.json'),
+      JSON.stringify({
+        items: [
+          {
+            id: `20260508-${followUpTaskId}`,
+            relates_to: `tasks/tasks-${followUpTaskId}.md`
+          }
+        ]
+      })
+    );
+    await expect(runWithRepoRoot(incompleteIndexRoot)).resolves.toMatchObject({
+      ok: true,
+      traceability: {
+        packet: {
+          readiness: {
+            ready: false,
+            missing_registry_mirrors: ['tasks/index.json']
           },
           queue_admission_blocker: {
             reason: 'backlog_head_follow_up_traceability_pending',

@@ -148,6 +148,7 @@ export function deriveDeterministicProviderMutationSuppressions(
   options: {
     recordedAtNotBefore?: string | null;
     issueId?: string | null;
+    followUpIntentKey?: string | null;
   } = {}
 ): ProviderLinearMutationSuppression[] {
   if (!audit) {
@@ -167,9 +168,15 @@ export function deriveDeterministicProviderMutationSuppressions(
     return [];
   }
   const issueId = normalizeOptionalString(options.issueId);
+  const followUpIntentKey = normalizeOptionalString(options.followUpIntentKey);
   const entries = selectProviderLinearMutationEntries(audit, latestByOperation)
     .filter((entry): entry is ProviderLinearAuditEntry => Boolean(entry))
     .filter((entry) => !issueId || entry.issue_id === issueId)
+    .filter((entry) => (
+      entry.operation !== 'create-follow-up'
+      || !followUpIntentKey
+      || entry.follow_up_intent_key === followUpIntentKey
+    ))
     .filter((entry) =>
       readTimestampMs(entry as unknown as Record<string, unknown>, 'recorded_at') >= recordedAtNotBeforeMs
     )
@@ -198,6 +205,7 @@ export function findDeterministicProviderMutationSuppression(
     recordedAtNotBefore?: string | null;
     action?: string | null;
     issueId?: string | null;
+    followUpIntentKey?: string | null;
   } = {}
 ): ProviderLinearMutationSuppression | null {
   const requestedAction = normalizeAuditAction(options.action);
@@ -525,7 +533,11 @@ function selectProviderLinearMutationEntries(
 }
 
 function buildProviderLinearMutationEntryKey(entry: ProviderLinearAuditEntry): string {
-  return `${entry.operation}:${normalizeAuditAction(entry.action) ?? ''}`;
+  return [
+    entry.operation,
+    normalizeAuditAction(entry.action) ?? '',
+    entry.operation === 'create-follow-up' ? normalizeOptionalString(entry.follow_up_intent_key) ?? '' : ''
+  ].join(':');
 }
 
 function normalizeAuditAction(value: string | null | undefined): string | null {

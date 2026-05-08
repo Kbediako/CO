@@ -615,7 +615,14 @@ function buildCreateFollowUpPacket({ candidate, sourceIssueId, currentCo, upstre
 }
 
 function parseLinearIssueFromResult(result) {
-  const issue = result.follow_up_issue ?? result.selected_issue ?? result.created_issue ?? result.issue ?? null;
+  const issue = result.follow_up_issue
+    ?? result.error?.details?.follow_up_issue
+    ?? result.error?.details?.selected_issue
+    ?? result.error?.details?.created_issue
+    ?? result.selected_issue
+    ?? result.created_issue
+    ?? result.issue
+    ?? null;
   return {
     id: issue?.id ?? result.issue_id ?? result.id ?? null,
     identifier: issue?.identifier ?? result.identifier ?? null,
@@ -636,13 +643,22 @@ function parseLinearJson(stdout, stderr, commandName) {
 
 export function defaultLinearRunner({ nodePath = process.execPath, scriptPath = join(process.cwd(), 'dist/bin/codex-orchestrator.js') } = {}) {
   return async (args, options = {}) => {
-    const { stdout, stderr } = await execFileAsync(nodePath, [scriptPath, 'linear', ...args], {
-      cwd: options.cwd ?? process.cwd(),
-      env: options.env ?? process.env,
-      timeout: options.timeout ?? 120_000,
-      maxBuffer: 10 * 1024 * 1024
-    });
-    return { stdout, stderr };
+    try {
+      const { stdout, stderr } = await execFileAsync(nodePath, [scriptPath, 'linear', ...args], {
+        cwd: options.cwd ?? process.cwd(),
+        env: options.env ?? process.env,
+        timeout: options.timeout ?? 120_000,
+        maxBuffer: 10 * 1024 * 1024
+      });
+      return { stdout, stderr };
+    } catch (error) {
+      const stdout = typeof error?.stdout === 'string' ? error.stdout : '';
+      const stderr = typeof error?.stderr === 'string' ? error.stderr : '';
+      if (stdout.trim().startsWith('{')) {
+        return { stdout, stderr };
+      }
+      throw error;
+    }
   };
 }
 
@@ -721,7 +737,7 @@ export async function runLinearMutation({
     );
     const upsertResult = parseLinearJson(upsertResultRaw.stdout, upsertResultRaw.stderr, 'Linear upsert-workpad');
     return {
-      action: createResult.action ?? createResult.operation ?? 'created_or_reused',
+      action: createResult.action ?? createResult.error?.details?.action ?? createResult.operation ?? 'created_or_reused',
       canonical_owner_key: packet.canonicalOwnerKey,
       selected_issue: selectedIssue,
       create_follow_up: createResult,

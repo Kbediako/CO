@@ -563,7 +563,7 @@ export type ProviderLinearCreateFollowUpResult =
         marker: string;
       } | null;
       relations: {
-        related: true;
+        related: boolean;
         blocked_by_source: boolean;
       };
       traceability: ProviderLinearFollowUpCreationTraceability;
@@ -3009,8 +3009,8 @@ export async function createProviderLinearFollowUpIssue(input: {
         marker: canonicalOwnerMarker
       },
       relations: {
-        related: true,
-        blocked_by_source: blockedBySource
+        related: relationResult.relations.related.satisfied,
+        blocked_by_source: relationResult.relations.blocked_by_source.satisfied
       },
       traceability: await buildFollowUpCreationTraceability({
         sourceIssue: issueSummary.issue,
@@ -3273,8 +3273,8 @@ export async function createProviderLinearFollowUpIssue(input: {
         }
       : null,
     relations: {
-      related: true,
-      blocked_by_source: blockedBySource
+      related: relationResult.relations.related.satisfied,
+      blocked_by_source: relationResult.relations.blocked_by_source.satisfied
     },
     traceability: await buildFollowUpCreationTraceability({
       sourceIssue: issueSummary.issue,
@@ -9060,7 +9060,7 @@ function buildFollowUpPacketPaths(followUpTaskId: string): string[] {
   ];
 }
 
-async function buildFollowUpPacketTraceabilityEvidence(
+export async function buildFollowUpPacketTraceabilityEvidence(
   issue: Pick<ProviderLinearCreatedIssue, 'id' | 'description'>
     & {
       state?: ProviderLinearWorkflowState | null;
@@ -9229,7 +9229,7 @@ function registryMirrorContainsFollowUpTaskId(
   requiredPaths: readonly string[]
 ): { matched: boolean; canonicalTaskId: string | null } {
   if (path === 'tasks/index.json') {
-    const canonicalTaskId = findCanonicalFollowUpTaskIdInIndex(content, followUpTaskId);
+    const canonicalTaskId = findCanonicalFollowUpTaskIdInIndex(content, followUpTaskId, requiredPaths);
     return { matched: canonicalTaskId !== null, canonicalTaskId };
   }
   if (path === 'docs/docs-freshness-registry.json') {
@@ -9244,7 +9244,11 @@ function registryMirrorContainsFollowUpTaskId(
   };
 }
 
-function findCanonicalFollowUpTaskIdInIndex(content: string, followUpTaskId: string): string | null {
+function findCanonicalFollowUpTaskIdInIndex(
+  content: string,
+  followUpTaskId: string,
+  requiredPaths: readonly string[]
+): string | null {
   const parsed = parseJsonRecord(content);
   const items = Array.isArray(parsed?.items) ? parsed.items : [];
   const idPattern = new RegExp(buildFollowUpCanonicalTaskIdPattern(followUpTaskId), 'u');
@@ -9255,17 +9259,53 @@ function findCanonicalFollowUpTaskIdInIndex(content: string, followUpTaskId: str
     const record = item as Record<string, unknown>;
     const id = typeof record.id === 'string' ? normalizeOptionalString(record.id) : null;
     const relatesTo = typeof record.relates_to === 'string' ? normalizeOptionalString(record.relates_to) : null;
-    if (id && idPattern.test(id) && relatesTo === `tasks/tasks-${followUpTaskId}.md`) {
+    if (
+      id
+      && idPattern.test(id)
+      && relatesTo === `tasks/tasks-${followUpTaskId}.md`
+      && taskIndexRecordHasRequiredFollowUpPacketPaths(record, followUpTaskId, requiredPaths)
+    ) {
       return id;
     }
   }
   return null;
 }
 
+function taskIndexRecordHasRequiredFollowUpPacketPaths(
+  record: Record<string, unknown>,
+  followUpTaskId: string,
+  requiredPaths: readonly string[]
+): boolean {
+  const paths = record.paths;
+  if (!paths || typeof paths !== 'object') {
+    return false;
+  }
+  const pathRecord = paths as Record<string, unknown>;
+  const expectedPathsByField: Record<string, string> = {
+    spec: `tasks/specs/${followUpTaskId}.md`,
+    task: `tasks/tasks-${followUpTaskId}.md`,
+    agent_task: `.agent/task/${followUpTaskId}.md`,
+    prd: `docs/PRD-${followUpTaskId}.md`,
+    docs: `docs/TECH_SPEC-${followUpTaskId}.md`,
+    action_plan: `docs/ACTION_PLAN-${followUpTaskId}.md`
+  };
+  const expectedPathValues = new Set(Object.values(expectedPathsByField));
+  if (!requiredPaths.every((path) => expectedPathValues.has(path))) {
+    return false;
+  }
+  return Object.entries(expectedPathsByField).every(([field, expectedPath]) => {
+    const observedPath = typeof pathRecord[field] === 'string'
+      ? normalizeOptionalString(pathRecord[field])
+      : null;
+    return observedPath === expectedPath;
+  });
+}
+
 function docsFreshnessRegistryContainsRequiredPaths(content: string, requiredPaths: readonly string[]): boolean {
   const parsed = parseJsonRecord(content);
   const entries = Array.isArray(parsed?.entries) ? parsed.entries : [];
   const paths = new Set<string>();
+  const duplicatePaths = new Set<string>();
   for (const entry of entries) {
     if (!entry || typeof entry !== 'object') {
       continue;
@@ -9273,10 +9313,13 @@ function docsFreshnessRegistryContainsRequiredPaths(content: string, requiredPat
     const rawPath = (entry as Record<string, unknown>).path;
     const path = typeof rawPath === 'string' ? normalizeOptionalString(rawPath) : null;
     if (path && docsFreshnessRegistryEntryHasValidMetadata(entry as Record<string, unknown>)) {
+      if (paths.has(path)) {
+        duplicatePaths.add(path);
+      }
       paths.add(path);
     }
   }
-  return requiredPaths.every((path) => paths.has(path));
+  return requiredPaths.every((path) => paths.has(path) && !duplicatePaths.has(path));
 }
 
 function docsFreshnessRegistryEntryHasValidMetadata(entry: Record<string, unknown>): boolean {
@@ -9292,6 +9335,7 @@ function docsFreshnessRegistryEntryHasValidMetadata(entry: Record<string, unknow
     && cadenceDays > 0
     && lastReview
     && isIsoDateString(lastReview)
+    && !isIsoDateStale(lastReview, cadenceDays)
     && owner
     && !FOLLOW_UP_DOCS_FRESHNESS_OWNER_PLACEHOLDERS.has(owner.toLowerCase())
   );
@@ -9319,6 +9363,18 @@ function isIsoDateString(value: string): boolean {
   }
   const parsed = new Date(`${value}T00:00:00.000Z`);
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function isIsoDateStale(value: string, cadenceDays: number): boolean {
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return true;
+  }
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const ageMs = today.getTime() - parsed.getTime();
+  const ageDays = Math.floor(ageMs / (24 * 60 * 60 * 1000));
+  return ageDays > cadenceDays;
 }
 
 function parseJsonRecord(content: string): Record<string, unknown> | null {
