@@ -12,12 +12,15 @@ const FOLLOW_UP_PARITY_MATRIX_MISSING_MESSAGE =
   'Parity/alignment follow-up issues require a parity matrix.';
 const FOLLOW_UP_PACKET_TRACEABILITY_PENDING_MESSAGE =
   'Backlog admission remains blocked until follow-up packet files, registry mirrors, and the Linear packet prefix are present.';
+const DEFAULT_FOLLOW_UP_INTENT_CHECKSUM = '- Preserve exact `CO STATUS` wording.';
+const DEFAULT_FOLLOW_UP_INTENT_KEY_PART =
+  'intent=-%20preserve%20exact%20%60co%20status%60%20wording.';
 const DEFAULT_PARITY_FOLLOW_UP_FLAGS = {
   format: 'json',
   'issue-id': 'lin-issue-1',
   title: 'Parity follow-up',
   description: 'Close the remaining parity gap.',
-  'intent-checksum': '- Preserve exact `CO STATUS` wording.',
+  'intent-checksum': DEFAULT_FOLLOW_UP_INTENT_CHECKSUM,
   'non-goals': '- [ ] Do not reopen the browser surface.',
   'not-done-if': '- [ ] The issue still allows browser-first parity.',
   'acceptance-criteria': '- [ ] Captured',
@@ -81,7 +84,8 @@ function buildParityMatrixMissingAuditEntry(overrides: Record<string, unknown> =
     state: null,
     follow_up_issue_id: null,
     follow_up_issue_identifier: null,
-    follow_up_intent_key: 'title=parity%20follow-up;canonical=;blocked=0;parity=1',
+    follow_up_intent_key:
+      `title=parity%20follow-up;${DEFAULT_FOLLOW_UP_INTENT_KEY_PART};canonical=;blocked=0;parity=1`,
     failed_relation_type: null,
     comment_id: null,
     attachment_id: null,
@@ -104,7 +108,8 @@ function buildPacketTraceabilityPendingAuditEntry(overrides: Record<string, unkn
     state: 'Backlog',
     follow_up_issue_id: 'lin-issue-2',
     follow_up_issue_identifier: 'CO-2',
-    follow_up_intent_key: 'title=follow-up;canonical=;blocked=0;parity=0',
+    follow_up_intent_key:
+      `title=follow-up;${DEFAULT_FOLLOW_UP_INTENT_KEY_PART};canonical=;blocked=0;parity=0`,
     failed_relation_type: null,
     comment_id: null,
     attachment_id: null,
@@ -1592,7 +1597,7 @@ describe('runLinearCliShell', () => {
       follow_up_issue_id: 'lin-issue-2',
       follow_up_issue_identifier: 'CO-2',
       follow_up_intent_key:
-        'title=follow-up;canonical=baseline_cohort_id%3Aco-175-apr-14-march-14-tasks-1164-1195;blocked=1;parity=1',
+        `title=follow-up;${DEFAULT_FOLLOW_UP_INTENT_KEY_PART};canonical=baseline_cohort_id%3Aco-175-apr-14-march-14-tasks-1164-1195;blocked=1;parity=1`,
       failed_relation_type: null,
       comment_id: null,
       attachment_id: null,
@@ -1709,7 +1714,8 @@ describe('runLinearCliShell', () => {
       state: 'Backlog',
       follow_up_issue_id: 'lin-issue-2',
       follow_up_issue_identifier: 'CO-2',
-      follow_up_intent_key: 'title=follow-up;canonical=;blocked=0;parity=0',
+      follow_up_intent_key:
+        `title=follow-up;${DEFAULT_FOLLOW_UP_INTENT_KEY_PART};canonical=;blocked=0;parity=0`,
       error_code: 'linear_follow_up_packet_traceability_pending',
       error_message: FOLLOW_UP_PACKET_TRACEABILITY_PENDING_MESSAGE
     }));
@@ -1797,7 +1803,8 @@ describe('runLinearCliShell', () => {
       state: null,
       follow_up_issue_id: 'lin-issue-2',
       follow_up_issue_identifier: 'CO-2',
-      follow_up_intent_key: 'title=follow-up;canonical=;blocked=0;parity=0',
+      follow_up_intent_key:
+        `title=follow-up;${DEFAULT_FOLLOW_UP_INTENT_KEY_PART};canonical=;blocked=0;parity=0`,
       failed_relation_type: 'blocks',
       comment_id: null,
       attachment_id: null,
@@ -1875,7 +1882,8 @@ describe('runLinearCliShell', () => {
       state: null,
       follow_up_issue_id: 'lin-issue-254',
       follow_up_issue_identifier: 'CO-254',
-      follow_up_intent_key: 'title=follow-up;canonical=;blocked=0;parity=0',
+      follow_up_intent_key:
+        `title=follow-up;${DEFAULT_FOLLOW_UP_INTENT_KEY_PART};canonical=;blocked=0;parity=0`,
       failed_relation_type: 'related',
       comment_id: null,
       attachment_id: null,
@@ -2025,7 +2033,8 @@ describe('runLinearCliShell', () => {
       operation: 'create-follow-up',
       ok: false,
       issue_id: 'lin-issue-1',
-      follow_up_intent_key: 'title=parity%20follow-up;canonical=baseline_cohort_id%3Aco-175;blocked=0;parity=1',
+      follow_up_intent_key:
+        `title=parity%20follow-up;${DEFAULT_FOLLOW_UP_INTENT_KEY_PART};canonical=baseline_cohort_id%3Aco-175;blocked=0;parity=1`,
       error_code: 'linear_follow_up_parity_matrix_missing',
       error_message: FOLLOW_UP_PARITY_MATRIX_MISSING_MESSAGE
     });
@@ -2086,7 +2095,8 @@ describe('runLinearCliShell', () => {
       state: null,
       follow_up_issue_id: null,
       follow_up_issue_identifier: null,
-      follow_up_intent_key: 'title=parity%20follow-up;canonical=;blocked=0;parity=1',
+      follow_up_intent_key:
+        `title=parity%20follow-up;${DEFAULT_FOLLOW_UP_INTENT_KEY_PART};canonical=;blocked=0;parity=1`,
       failed_relation_type: null,
       comment_id: null,
       attachment_id: null,
@@ -2155,7 +2165,8 @@ describe('runLinearCliShell', () => {
             action: 'created',
             via: 'related',
             state: 'Backlog',
-            follow_up_intent_key: 'title=follow-up;canonical=;blocked=0;parity=0',
+            follow_up_intent_key:
+              `title=follow-up;${DEFAULT_FOLLOW_UP_INTENT_KEY_PART};canonical=;blocked=0;parity=0`,
             error_code: 'linear_follow_up_packet_traceability_pending'
           }
         }
@@ -2167,6 +2178,76 @@ describe('runLinearCliShell', () => {
       ok: false,
       issue_id: 'lin-issue-1',
       error_code: 'linear_follow_up_packet_traceability_retry_suppressed'
+    }));
+  });
+
+  it('does not suppress same-title follow-up retries with a different intent checksum', async () => {
+    const log = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const setExitCode = vi.fn();
+    const createProviderLinearFollowUpIssueMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>()
+        .mockResolvedValue({
+          ok: false,
+          operation: 'create-follow-up',
+          error: {
+            code: 'linear_follow_up_label_resolution_failed',
+            message: 'Required follow-up labels were not available.',
+            status: 422
+          }
+        } as never);
+    const { auditPath, loadProviderLinearWorkerContextMock } = await createSameAttemptFollowUpFixture(
+      'linear-cli-follow-up-packet-distinct-intent-',
+      [buildPacketTraceabilityPendingAuditEntry()]
+    );
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          title: 'Follow-up',
+          description: 'Investigate a distinct improvement',
+          'intent-checksum': '- Track a distinct follow-up intent.',
+          'non-goals': '- [ ] Do not reopen the browser surface.',
+          'not-done-if': '- [ ] The issue still allows browser-first parity.',
+          'acceptance-criteria': '- [ ] Captured'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        loadProviderLinearWorkerContext: loadProviderLinearWorkerContextMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: auditPath
+        }),
+        now: () => '2026-04-22T08:06:00.000Z',
+        appendAuditEntry,
+        log,
+        setExitCode
+      }
+    );
+
+    expect(createProviderLinearFollowUpIssueMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Follow-up',
+        intentChecksum: '- Track a distinct follow-up intent.'
+      })
+    );
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_label_resolution_failed'
+      }
+    });
+    expect(appendAuditEntry).toHaveBeenCalledWith(auditPath, expect.objectContaining({
+      follow_up_intent_key:
+        'title=follow-up;intent=-%20track%20a%20distinct%20follow-up%20intent.;canonical=;blocked=0;parity=0',
+      error_code: 'linear_follow_up_label_resolution_failed'
     }));
   });
 
@@ -2192,7 +2273,8 @@ describe('runLinearCliShell', () => {
       'linear-cli-follow-up-parity-packet-retry-',
       [
         buildPacketTraceabilityPendingAuditEntry({
-          follow_up_intent_key: 'title=parity%20follow-up;canonical=;blocked=0;parity=1'
+          follow_up_intent_key:
+            `title=parity%20follow-up;${DEFAULT_FOLLOW_UP_INTENT_KEY_PART};canonical=;blocked=0;parity=1`
         })
       ]
     );
@@ -2238,7 +2320,8 @@ describe('runLinearCliShell', () => {
       operation: 'create-follow-up',
       ok: false,
       issue_id: 'lin-issue-1',
-      follow_up_intent_key: 'title=parity%20follow-up;canonical=;blocked=0;parity=1',
+      follow_up_intent_key:
+        `title=parity%20follow-up;${DEFAULT_FOLLOW_UP_INTENT_KEY_PART};canonical=;blocked=0;parity=1`,
       error_code: 'linear_follow_up_parity_matrix_missing',
       error_message: FOLLOW_UP_PARITY_MATRIX_MISSING_MESSAGE
     }));

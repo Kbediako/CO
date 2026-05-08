@@ -483,6 +483,7 @@ export async function runLinearCliShell(
         const retrySuppressed = await resolveCreateFollowUpRetrySuppression({
           issueId,
           title,
+          intentChecksum,
           canonicalOwnerKey,
           blockedBySource,
           parityLane,
@@ -493,7 +494,8 @@ export async function runLinearCliShell(
         });
         if (retrySuppressed) {
           await recordAuditResult(retrySuppressed, params.flags, env, dependencies, {
-            createFollowUpCanonicalOwnerKey: canonicalOwnerKey
+            createFollowUpCanonicalOwnerKey: canonicalOwnerKey,
+            createFollowUpIntentChecksum: intentChecksum
           });
           emitJsonResult(retrySuppressed, dependencies);
           return;
@@ -517,7 +519,8 @@ export async function runLinearCliShell(
           })
         );
         await recordAuditResult(result, params.flags, env, dependencies, {
-          createFollowUpCanonicalOwnerKey: canonicalOwnerKey
+          createFollowUpCanonicalOwnerKey: canonicalOwnerKey,
+          createFollowUpIntentChecksum: intentChecksum
         });
         emitJsonResult(result, dependencies);
         return;
@@ -768,6 +771,7 @@ async function resolveProviderLinearWorkerAttemptStartedAtForIssue(
 async function resolveCreateFollowUpRetrySuppression(input: {
   issueId: string;
   title: string;
+  intentChecksum: string;
   canonicalOwnerKey: string | null;
   blockedBySource: boolean;
   parityLane: boolean;
@@ -883,12 +887,14 @@ async function resolveCreateFollowUpRetrySuppression(input: {
 
 function buildFollowUpIntentKey(input: {
   title: string;
+  intentChecksum: string;
   canonicalOwnerKey: string | null;
   blockedBySource: boolean;
   parityLane: boolean;
 }): string {
   return [
     `title=${normalizeFollowUpIntentKeyPart(input.title)}`,
+    `intent=${normalizeFollowUpIntentKeyPart(input.intentChecksum)}`,
     `canonical=${normalizeFollowUpIntentKeyPart(input.canonicalOwnerKey ?? '')}`,
     `blocked=${input.blockedBySource ? '1' : '0'}`,
     `parity=${input.parityLane ? '1' : '0'}`
@@ -1520,6 +1526,7 @@ type LinearCliResult =
 
 interface LinearCliAuditContext {
   createFollowUpCanonicalOwnerKey?: string | null;
+  createFollowUpIntentChecksum?: string | null;
 }
 
 async function recordAuditResult(
@@ -2067,6 +2074,12 @@ function resolveFollowUpIntentAuditField(
   if (!title) {
     return {};
   }
+  const intentChecksum = context.createFollowUpIntentChecksum
+    ?? readStringFlag(flags, 'intent-checksum')
+    ?? null;
+  if (!intentChecksum) {
+    return {};
+  }
   const canonicalOwnerKey = (
     result.ok
       ? result.canonical_owner?.key ?? null
@@ -2078,6 +2091,7 @@ function resolveFollowUpIntentAuditField(
   return {
     follow_up_intent_key: buildFollowUpIntentKey({
       title,
+      intentChecksum,
       canonicalOwnerKey,
       blockedBySource: readBooleanFlag(flags, 'blocked-by-source'),
       parityLane: readBooleanFlag(flags, 'parity-lane')
