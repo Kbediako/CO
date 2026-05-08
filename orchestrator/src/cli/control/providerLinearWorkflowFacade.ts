@@ -528,21 +528,24 @@ export interface ProviderLinearFollowUpRelationEvidenceEntry {
 }
 
 export interface ProviderLinearFollowUpPacketTraceabilityEvidence {
-  task_id: string;
+  packet_prefix: string;
+  canonical_task_id: string | null;
+  canonical_task_id_pattern: string;
   required_paths: string[];
   registry_mirrors: string[];
   observed_state: ProviderLinearWorkflowState | null;
   readiness: {
     checked: boolean;
     repo_root: string | null;
+    description_has_packet_prefix: boolean;
     ready: boolean;
     missing_paths: string[];
     missing_registry_mirrors: string[];
   };
   queue_admission_blocker: {
     reason: 'backlog_head_follow_up_traceability_pending';
-    state: 'Backlog';
-    enforced_by: 'provider-operator-autopilot';
+    state: string;
+    enforced_by: 'provider-operator-autopilot' | 'create-follow-up';
     summary: string;
   } | null;
 }
@@ -3485,6 +3488,10 @@ function resolveFollowUpTraceabilityUpdate(input: {
   observedDescription: string;
 } {
   const observedDescription = input.followUpIssue.description ?? '';
+  const traceability = buildFollowUpTraceabilitySection({
+    sourceIssue: input.sourceIssue,
+    followUpIssue: input.followUpIssue
+  });
   const finalizedDescription = buildFollowUpIssueDescription({
     description: input.description,
     intentChecksum: input.intentChecksum,
@@ -3493,10 +3500,7 @@ function resolveFollowUpTraceabilityUpdate(input: {
     acceptanceCriteria: input.acceptanceCriteria,
     parityMatrix: input.parityMatrix,
     canonicalOwner: input.canonicalOwner,
-    traceability: buildFollowUpTraceabilitySection({
-      sourceIssue: input.sourceIssue,
-      followUpIssue: input.followUpIssue
-    })
+    traceability
   });
   if (observedDescription === finalizedDescription) {
     return {
@@ -3514,7 +3518,6 @@ function resolveFollowUpTraceabilityUpdate(input: {
       observedDescription
     };
   }
-
   const unfinishedDescription = buildFollowUpIssueDescription({
     description: input.description,
     intentChecksum: input.intentChecksum,
@@ -4468,7 +4471,7 @@ function buildFollowUpRelationEvidence(input: {
     related: {
       type: 'related',
       requested: true,
-      satisfied: true,
+      satisfied: input.relatedAction !== 'skipped_self',
       action: input.relatedAction,
       issue_id: input.sourceIssue.id,
       related_issue_id: input.followUpIssue.id
@@ -4476,7 +4479,7 @@ function buildFollowUpRelationEvidence(input: {
     blocked_by_source: {
       type: 'blocks',
       requested: input.blockedBySource,
-      satisfied: input.blockedBySource,
+      satisfied: input.blockedBySource && input.blockedAction !== 'skipped_self',
       action: input.blockedAction,
       issue_id: input.sourceIssue.id,
       related_issue_id: input.followUpIssue.id
@@ -9056,45 +9059,59 @@ function buildFollowUpPacketPaths(followUpTaskId: string): string[] {
 }
 
 async function buildFollowUpPacketTraceabilityEvidence(
-  issue: Pick<ProviderLinearCreatedIssue, 'id'>
+  issue: Pick<ProviderLinearCreatedIssue, 'id' | 'description'>
     & {
       state?: ProviderLinearWorkflowState | null;
     },
   repoRoot: string | null | undefined
 ): Promise<ProviderLinearFollowUpPacketTraceabilityEvidence> {
-  const taskId = buildFollowUpTaskId(issue);
-  const requiredPaths = buildFollowUpPacketPaths(taskId);
+  const packetPrefix = buildFollowUpTaskId(issue);
+  const requiredPaths = buildFollowUpPacketPaths(packetPrefix);
   const registryMirrors = [...FOLLOW_UP_REGISTRY_MIRRORS];
-  const readiness = await resolveFollowUpPacketReadiness({
-    followUpTaskId: taskId,
+  const packetReadiness = await resolveFollowUpPacketReadiness({
+    followUpTaskId: packetPrefix,
+    issueDescription: issue.description,
     requiredPaths,
     registryMirrors,
     repoRoot
   });
+  const { canonical_task_id: canonicalTaskId, ...readiness } = packetReadiness;
+  const queueAdmissionBlocker = resolveFollowUpPacketQueueAdmissionBlocker(issue.state, readiness);
   return {
-    task_id: taskId,
+    packet_prefix: packetPrefix,
+    canonical_task_id: canonicalTaskId,
+    canonical_task_id_pattern: buildFollowUpCanonicalTaskIdPattern(packetPrefix),
     required_paths: requiredPaths,
     registry_mirrors: registryMirrors,
     observed_state: issue.state ?? null,
     readiness,
-    queue_admission_blocker: isBacklogWorkflowState(issue.state) && !readiness.ready
-      ? {
-          reason: 'backlog_head_follow_up_traceability_pending',
-          state: 'Backlog',
-          enforced_by: 'provider-operator-autopilot',
-          summary: 'Backlog promotion remains blocked until follow-up packet files and registry mirrors exist.'
-        }
-      : null
+    queue_admission_blocker: queueAdmissionBlocker
   };
 }
 
 async function resolveFollowUpPacketReadiness(input: {
   followUpTaskId: string;
+  issueDescription: string | null | undefined;
   requiredPaths: readonly string[];
   registryMirrors: readonly string[];
   repoRoot: string | null | undefined;
-}): Promise<ProviderLinearFollowUpPacketTraceabilityEvidence['readiness']> {
-  const normalizedRepoRoot = normalizeOptionalString(input.repoRoot ?? null) ?? process.cwd();
+}): Promise<ProviderLinearFollowUpPacketTraceabilityEvidence['readiness'] & { canonical_task_id: string | null }> {
+  const descriptionHasPacketPrefix = followUpDescriptionHasPacketPrefix(
+    input.issueDescription,
+    input.followUpTaskId
+  );
+  const normalizedRepoRoot = normalizeOptionalString(input.repoRoot ?? null);
+  if (!normalizedRepoRoot) {
+    return {
+      checked: false,
+      repo_root: null,
+      description_has_packet_prefix: descriptionHasPacketPrefix,
+      canonical_task_id: null,
+      ready: false,
+      missing_paths: [...input.requiredPaths],
+      missing_registry_mirrors: [...input.registryMirrors]
+    };
+  }
   const repoRoot = resolvePath(normalizedRepoRoot);
   const missingPaths: string[] = [];
   for (const path of input.requiredPaths) {
@@ -9103,19 +9120,129 @@ async function resolveFollowUpPacketReadiness(input: {
     }
   }
   const missingRegistryMirrors: string[] = [];
+  let canonicalTaskId: string | null = null;
   for (const path of input.registryMirrors) {
     const content = await readTextFileIfPresent(join(repoRoot, path));
-    if (!content?.includes(input.followUpTaskId)) {
+    const mirrorMatch = content
+      ? registryMirrorContainsFollowUpTaskId(path, content, input.followUpTaskId, input.requiredPaths)
+      : { matched: false, canonicalTaskId: null };
+    canonicalTaskId ??= mirrorMatch.canonicalTaskId;
+    if (!mirrorMatch.matched) {
       missingRegistryMirrors.push(path);
     }
   }
   return {
     checked: true,
     repo_root: repoRoot,
-    ready: missingPaths.length === 0 && missingRegistryMirrors.length === 0,
+    description_has_packet_prefix: descriptionHasPacketPrefix,
+    canonical_task_id: canonicalTaskId,
+    ready: descriptionHasPacketPrefix && missingPaths.length === 0 && missingRegistryMirrors.length === 0,
     missing_paths: missingPaths,
     missing_registry_mirrors: missingRegistryMirrors
   };
+}
+
+function resolveFollowUpPacketQueueAdmissionBlocker(
+  state: ProviderLinearWorkflowState | null | undefined,
+  readiness: ProviderLinearFollowUpPacketTraceabilityEvidence['readiness']
+): ProviderLinearFollowUpPacketTraceabilityEvidence['queue_admission_blocker'] {
+  if (readiness.ready) {
+    return null;
+  }
+  const stateName = normalizeOptionalString(state?.name);
+  const stateBlocksAdmission = stateName === null || isBacklogWorkflowState(state);
+  if (!stateBlocksAdmission) {
+    return null;
+  }
+  return {
+    reason: 'backlog_head_follow_up_traceability_pending',
+    state: stateName ?? 'unknown',
+    enforced_by: readiness.description_has_packet_prefix ? 'provider-operator-autopilot' : 'create-follow-up',
+    summary: 'Backlog admission remains blocked until follow-up packet files, registry mirrors, and the Linear packet prefix are present.'
+  };
+}
+
+function followUpDescriptionHasPacketPrefix(description: string | null | undefined, followUpTaskId: string): boolean {
+  const value = normalizeOptionalString(description);
+  if (!value) {
+    return false;
+  }
+  return new RegExp(`^- Follow-up packet prefix: \`${escapeRegExp(followUpTaskId)}\`$`, 'mu').test(value);
+}
+
+function buildFollowUpCanonicalTaskIdPattern(followUpTaskId: string): string {
+  return `^\\d{8}-${escapeRegExp(followUpTaskId)}$`;
+}
+
+function registryMirrorContainsFollowUpTaskId(
+  path: string,
+  content: string,
+  followUpTaskId: string,
+  requiredPaths: readonly string[]
+): { matched: boolean; canonicalTaskId: string | null } {
+  if (path === 'tasks/index.json') {
+    const canonicalTaskId = findCanonicalFollowUpTaskIdInIndex(content, followUpTaskId);
+    return { matched: canonicalTaskId !== null, canonicalTaskId };
+  }
+  if (path === 'docs/docs-freshness-registry.json') {
+    return {
+      matched: docsFreshnessRegistryContainsRequiredPaths(content, requiredPaths),
+      canonicalTaskId: null
+    };
+  }
+  return {
+    matched: markdownContainsExactFollowUpTaskId(content, followUpTaskId),
+    canonicalTaskId: null
+  };
+}
+
+function findCanonicalFollowUpTaskIdInIndex(content: string, followUpTaskId: string): string | null {
+  const parsed = parseJsonRecord(content);
+  const items = Array.isArray(parsed?.items) ? parsed.items : [];
+  const idPattern = new RegExp(buildFollowUpCanonicalTaskIdPattern(followUpTaskId), 'u');
+  for (const item of items) {
+    if (!item || typeof item !== 'object') {
+      continue;
+    }
+    const record = item as Record<string, unknown>;
+    const id = typeof record.id === 'string' ? normalizeOptionalString(record.id) : null;
+    const relatesTo = typeof record.relates_to === 'string' ? normalizeOptionalString(record.relates_to) : null;
+    if (id && idPattern.test(id) && relatesTo === `tasks/tasks-${followUpTaskId}.md`) {
+      return id;
+    }
+  }
+  return null;
+}
+
+function docsFreshnessRegistryContainsRequiredPaths(content: string, requiredPaths: readonly string[]): boolean {
+  const parsed = parseJsonRecord(content);
+  const entries = Array.isArray(parsed?.entries) ? parsed.entries : [];
+  const paths = new Set<string>();
+  for (const entry of entries) {
+    if (!entry || typeof entry !== 'object') {
+      continue;
+    }
+    const rawPath = (entry as Record<string, unknown>).path;
+    const path = typeof rawPath === 'string' ? normalizeOptionalString(rawPath) : null;
+    if (path) {
+      paths.add(path);
+    }
+  }
+  return requiredPaths.every((path) => paths.has(path));
+}
+
+function markdownContainsExactFollowUpTaskId(content: string, followUpTaskId: string): boolean {
+  const escapedTaskId = escapeRegExp(followUpTaskId);
+  return new RegExp(`(^|[^A-Za-z0-9-])${escapedTaskId}([^A-Za-z0-9-]|$)`, 'u').test(content);
+}
+
+function parseJsonRecord(content: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
 }
 
 async function fileExists(path: string): Promise<boolean> {

@@ -1364,6 +1364,90 @@ describe('runLinearCliShell', () => {
     });
   });
 
+  it('sets a non-zero exit code when create-follow-up returns a packet queue blocker', async () => {
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+    const createProviderLinearFollowUpIssueMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>()
+        .mockResolvedValue({
+          ok: true,
+          operation: 'create-follow-up',
+          action: 'created',
+          issue: {
+            id: 'lin-issue-1',
+            identifier: 'CO-1'
+          },
+          follow_up_issue: {
+            id: 'lin-issue-2',
+            identifier: 'CO-2',
+            title: 'Follow-up',
+            description: 'Do the thing',
+            url: 'https://linear.app/example/issue/CO-2',
+            state: {
+              id: 'state-backlog',
+              name: 'Backlog',
+              type: 'unstarted'
+            }
+          },
+          relations: {
+            related: true,
+            blocked_by_source: false
+          },
+          traceability: {
+            packet: {
+              queue_admission_blocker: {
+                reason: 'backlog_head_follow_up_traceability_pending',
+                state: 'Backlog',
+                enforced_by: 'create-follow-up',
+                summary:
+                  'Backlog admission remains blocked until follow-up packet files, registry mirrors, and the Linear packet prefix are present.'
+              }
+            }
+          },
+          source_setup: null
+        } as never);
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          title: 'Follow-up',
+          description: 'Investigate the remaining improvement',
+          'intent-checksum': '- Preserve exact `CO STATUS` wording.',
+          'non-goals': '- [ ] Do not reopen the browser surface.',
+          'not-done-if': '- [ ] The issue still allows browser-first parity.',
+          'acceptance-criteria': '- [ ] Captured'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token'
+        }),
+        log,
+        setExitCode
+      }
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      ok: true,
+      operation: 'create-follow-up',
+      traceability: {
+        packet: {
+          queue_admission_blocker: {
+            reason: 'backlog_head_follow_up_traceability_pending',
+            state: 'Backlog',
+            enforced_by: 'create-follow-up'
+          }
+        }
+      }
+    });
+  });
+
   it('records follow-up recovery metadata when create-follow-up fails after issue creation', async () => {
     const log = vi.fn();
     const setExitCode = vi.fn();

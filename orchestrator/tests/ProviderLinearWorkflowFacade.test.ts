@@ -116,6 +116,15 @@ async function seedFollowUpPacketReadiness(repoRoot: string, followUpTaskId: str
     mkdir(join(repoRoot, 'tasks', 'specs'), { recursive: true }),
     mkdir(join(repoRoot, '.agent', 'task'), { recursive: true })
   ]);
+  const requiredPaths = [
+    `docs/PRD-${followUpTaskId}.md`,
+    `docs/TECH_SPEC-${followUpTaskId}.md`,
+    `docs/ACTION_PLAN-${followUpTaskId}.md`,
+    `tasks/specs/${followUpTaskId}.md`,
+    `tasks/tasks-${followUpTaskId}.md`,
+    `.agent/task/${followUpTaskId}.md`
+  ];
+  const canonicalTaskId = `20260508-${followUpTaskId}`;
   await Promise.all([
     writeFile(join(repoRoot, `docs/PRD-${followUpTaskId}.md`), followUpTaskId),
     writeFile(join(repoRoot, `docs/TECH_SPEC-${followUpTaskId}.md`), followUpTaskId),
@@ -123,9 +132,24 @@ async function seedFollowUpPacketReadiness(repoRoot: string, followUpTaskId: str
     writeFile(join(repoRoot, `tasks/specs/${followUpTaskId}.md`), followUpTaskId),
     writeFile(join(repoRoot, `tasks/tasks-${followUpTaskId}.md`), followUpTaskId),
     writeFile(join(repoRoot, `.agent/task/${followUpTaskId}.md`), followUpTaskId),
-    writeFile(join(repoRoot, 'tasks/index.json'), followUpTaskId),
-    writeFile(join(repoRoot, 'docs/TASKS.md'), followUpTaskId),
-    writeFile(join(repoRoot, 'docs/docs-freshness-registry.json'), followUpTaskId)
+    writeFile(
+      join(repoRoot, 'tasks/index.json'),
+      JSON.stringify({
+        items: [
+          {
+            id: canonicalTaskId,
+            relates_to: `tasks/tasks-${followUpTaskId}.md`
+          }
+        ]
+      })
+    ),
+    writeFile(join(repoRoot, 'docs/TASKS.md'), `Task packet ${followUpTaskId}\n`),
+    writeFile(
+      join(repoRoot, 'docs/docs-freshness-registry.json'),
+      JSON.stringify({
+        entries: requiredPaths.map((path) => ({ path }))
+      })
+    )
   ]);
 }
 
@@ -12680,7 +12704,7 @@ describe('providerLinearWorkflowFacade', () => {
       }
     });
     expect(result.traceability.packet).toMatchObject({
-      task_id: 'linear-lin-issue-2',
+      packet_prefix: 'linear-lin-issue-2',
       observed_state: {
         id: 'state-backlog',
         name: 'Backlog',
@@ -12878,7 +12902,7 @@ describe('providerLinearWorkflowFacade', () => {
         }
       },
       packet: {
-        task_id: 'linear-lin-issue-2',
+        packet_prefix: 'linear-lin-issue-2',
         observed_state: {
           id: 'state-backlog',
           name: 'Backlog',
@@ -14771,7 +14795,7 @@ describe('providerLinearWorkflowFacade', () => {
         }
       },
       packet: {
-        task_id: 'linear-lin-owner-issue',
+        packet_prefix: 'linear-lin-owner-issue',
         observed_state: {
           id: 'state-backlog',
           name: 'Backlog',
@@ -16092,7 +16116,10 @@ describe('providerLinearWorkflowFacade', () => {
       'Apr 19 baseline owner.',
       '## Canonical Owner',
       `- Canonical owner key: \`${canonicalOwnerKey}\``,
-      `- Canonical owner marker: \`${canonicalOwnerMarker}\``
+      `- Canonical owner marker: \`${canonicalOwnerMarker}\``,
+      '',
+      '## Immediate Traceability',
+      '- Follow-up packet prefix: `linear-lin-issue-254`'
     ].join('\n');
     const longerCanonicalOwnerMarker = `${canonicalOwnerMarker}-other`;
     const calls: string[] = [];
@@ -16207,7 +16234,7 @@ describe('providerLinearWorkflowFacade', () => {
       },
       traceability: {
         packet: {
-          task_id: 'linear-lin-issue-254',
+          packet_prefix: 'linear-lin-issue-254',
           observed_state: {
             id: 'state-backlog',
             name: 'Backlog',
@@ -16391,7 +16418,10 @@ describe('providerLinearWorkflowFacade', () => {
       'Apr 19 baseline owner.',
       '## Canonical Owner',
       `- Canonical owner key: \`${canonicalOwnerKey}\``,
-      `- Canonical owner marker: \`${canonicalOwnerMarker}\``
+      `- Canonical owner marker: \`${canonicalOwnerMarker}\``,
+      '',
+      '## Immediate Traceability',
+      '- Follow-up packet prefix: `linear-lin-issue-254`'
     ].join('\n');
     const calls: string[] = [];
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
@@ -16470,6 +16500,25 @@ describe('providerLinearWorkflowFacade', () => {
         blocked_by_source: true
       }
     });
+    if (!result.ok) {
+      throw new Error('expected source owner reuse to return traceability evidence');
+    }
+    expect(result.traceability.relations).toMatchObject({
+      related: {
+        requested: true,
+        satisfied: false,
+        action: 'skipped_self',
+        issue_id: 'lin-issue-254',
+        related_issue_id: 'lin-issue-254'
+      },
+      blocked_by_source: {
+        requested: true,
+        satisfied: false,
+        action: 'skipped_self',
+        issue_id: 'lin-issue-254',
+        related_issue_id: 'lin-issue-254'
+      }
+    });
     expect(calls).toEqual(['issue-summary', 'owner-search']);
   });
 
@@ -16480,7 +16529,10 @@ describe('providerLinearWorkflowFacade', () => {
       'Apr 19 baseline owner.',
       '## Canonical Owner',
       `- Canonical owner key: \`${canonicalOwnerKey}\``,
-      `- Canonical owner marker: \`${canonicalOwnerMarker}\``
+      `- Canonical owner marker: \`${canonicalOwnerMarker}\``,
+      '',
+      '## Immediate Traceability',
+      '- Follow-up packet prefix: `linear-lin-issue-254`'
     ].join('\n');
     const calls: string[] = [];
     const relationInputs: Record<string, unknown>[] = [];
@@ -16586,7 +16638,10 @@ describe('providerLinearWorkflowFacade', () => {
       'Apr 19 baseline owner.',
       '## Canonical Owner',
       `- Canonical owner key: \`${canonicalOwnerKey}\``,
-      `- Canonical owner marker: \`${canonicalOwnerMarker}\``
+      `- Canonical owner marker: \`${canonicalOwnerMarker}\``,
+      '',
+      '## Immediate Traceability',
+      '- Follow-up packet prefix: `linear-lin-issue-254`'
     ].join('\n');
     const calls: string[] = [];
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
@@ -16663,7 +16718,7 @@ describe('providerLinearWorkflowFacade', () => {
       },
       traceability: {
         packet: {
-          task_id: 'linear-lin-issue-254',
+          packet_prefix: 'linear-lin-issue-254',
           observed_state: {
             id: 'state-backlog',
             name: 'Backlog',
@@ -16671,10 +16726,13 @@ describe('providerLinearWorkflowFacade', () => {
           },
           readiness: {
             checked: true,
+            description_has_packet_prefix: true,
             ready: true,
             missing_paths: [],
             missing_registry_mirrors: []
           },
+          canonical_task_id: '20260508-linear-lin-issue-254',
+          canonical_task_id_pattern: '^\\d{8}-linear-lin-issue-254$',
           queue_admission_blocker: null
         }
       }
@@ -16874,7 +16932,7 @@ describe('providerLinearWorkflowFacade', () => {
       },
       traceability: {
         packet: {
-          task_id: 'linear-lin-issue-254',
+          packet_prefix: 'linear-lin-issue-254',
           observed_state: {
             id: 'state-backlog',
             name: 'Backlog',
@@ -16883,7 +16941,7 @@ describe('providerLinearWorkflowFacade', () => {
           queue_admission_blocker: {
             reason: 'backlog_head_follow_up_traceability_pending',
             state: 'Backlog',
-            enforced_by: 'provider-operator-autopilot'
+            enforced_by: 'create-follow-up'
           }
         }
       }
@@ -17197,7 +17255,7 @@ describe('providerLinearWorkflowFacade', () => {
       },
       traceability: {
         packet: {
-          task_id: 'linear-lin-issue-254',
+          packet_prefix: 'linear-lin-issue-254',
           observed_state: {
             id: 'state-in-progress',
             name: 'In Progress',

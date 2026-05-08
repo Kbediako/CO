@@ -835,9 +835,25 @@ function emitJsonResult(
   dependencies: Pick<LinearCliShellDependencies, 'log' | 'setExitCode'>
 ): void {
   dependencies.log(JSON.stringify(result, null, 2));
-  if (!result.ok) {
+  if (!result.ok || isCreateFollowUpPacketAdmissionBlocked(result)) {
     dependencies.setExitCode(1);
   }
+}
+
+function isCreateFollowUpPacketAdmissionBlocked(result: { ok: boolean }): boolean {
+  if (!result.ok || !('operation' in result) || result.operation !== 'create-follow-up') {
+    return false;
+  }
+  const traceability = (result as { traceability?: unknown }).traceability;
+  if (!traceability || typeof traceability !== 'object') {
+    return false;
+  }
+  const packet = (traceability as Record<string, unknown>).packet;
+  if (!packet || typeof packet !== 'object') {
+    return false;
+  }
+  return (packet as Record<string, unknown>).queue_admission_blocker !== null
+    && (packet as Record<string, unknown>).queue_admission_blocker !== undefined;
 }
 
 function assertAllowedFlags(flags: ArgMap, allowed: string[]): void {
