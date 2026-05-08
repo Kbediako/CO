@@ -1791,6 +1791,7 @@ interface ProviderWorkerConfigModelDefaults {
   reasoning_effort: string | null;
   config_path: string | null;
   goals_feature_enabled?: boolean | null;
+  root_goals_feature_enabled?: boolean | null;
   root_model?: string | null;
   root_review_model?: string | null;
   root_reasoning_effort?: string | null;
@@ -1856,6 +1857,7 @@ function readProviderWorkerConfigModelDefaultsFromToml(
     reasoning_effort: null,
     config_path: configPath,
     goals_feature_enabled: null,
+    root_goals_feature_enabled: null,
     root_model: null,
     root_review_model: null,
     root_reasoning_effort: null,
@@ -1919,6 +1921,7 @@ function readProviderWorkerConfigModelDefaultsFromToml(
   defaults.root_model = defaults.model;
   defaults.root_review_model = defaults.review_model;
   defaults.root_reasoning_effort = defaults.reasoning_effort;
+  defaults.root_goals_feature_enabled = defaults.goals_feature_enabled;
   return defaults;
 }
 
@@ -1996,7 +1999,8 @@ function selectProviderWorkerConfigModelDefaultsForProfile(
   const rootDefaults = {
     model: defaults.root_model ?? defaults.model,
     review_model: defaults.root_review_model ?? defaults.review_model,
-    reasoning_effort: defaults.root_reasoning_effort ?? defaults.reasoning_effort
+    reasoning_effort: defaults.root_reasoning_effort ?? defaults.reasoning_effort,
+    goals_feature_enabled: defaults.root_goals_feature_enabled ?? defaults.goals_feature_enabled ?? null
   };
   const profileDefaults = defaults.profiles?.[activeProfile];
   if (!profileDefaults) {
@@ -2005,7 +2009,8 @@ function selectProviderWorkerConfigModelDefaultsForProfile(
       review_model: null,
       reasoning_effort: null,
       config_path: defaults.config_path,
-      goals_feature_enabled: defaults.goals_feature_enabled ?? null,
+      goals_feature_enabled: rootDefaults.goals_feature_enabled,
+      root_goals_feature_enabled: rootDefaults.goals_feature_enabled,
       root_model: rootDefaults.model,
       root_review_model: rootDefaults.review_model,
       root_reasoning_effort: rootDefaults.reasoning_effort,
@@ -2018,7 +2023,8 @@ function selectProviderWorkerConfigModelDefaultsForProfile(
     review_model: profileDefaults.review_model ?? rootDefaults.review_model,
     reasoning_effort: profileDefaults.reasoning_effort ?? rootDefaults.reasoning_effort,
     config_path: defaults.config_path,
-    goals_feature_enabled: profileDefaults.goals_feature_enabled ?? defaults.goals_feature_enabled ?? null,
+    goals_feature_enabled: profileDefaults.goals_feature_enabled ?? rootDefaults.goals_feature_enabled,
+    root_goals_feature_enabled: rootDefaults.goals_feature_enabled,
     root_model: rootDefaults.model,
     root_review_model: rootDefaults.review_model,
     root_reasoning_effort: rootDefaults.reasoning_effort,
@@ -4304,7 +4310,8 @@ function resetProviderLinearWorkerTurnScopedTelemetry(
 ): void {
   const preservedGoalEvidence = shouldPreserveProviderLinearGoalEvidenceAcrossTurnReset(
     state.goalEvidence ?? null,
-    preserveGoalEvidenceForTurnId
+    preserveGoalEvidenceForTurnId,
+    state.turnId ?? null
   )
     ? state.goalEvidence ?? null
     : null;
@@ -4326,13 +4333,14 @@ function resetProviderLinearWorkerTurnScopedTelemetry(
 
 function shouldPreserveProviderLinearGoalEvidenceAcrossTurnReset(
   goalEvidence: ProviderLinearGoalEvidence | null,
-  nextTurnId: string | null
+  nextTurnId: string | null,
+  currentTurnId: string | null
 ): boolean {
   if (!goalEvidence || !nextTurnId) {
     return false;
   }
   const evidenceTurnId = normalizeOptionalString(goalEvidence.turn_id);
-  return evidenceTurnId === null || evidenceTurnId === nextTurnId;
+  return evidenceTurnId === nextTurnId || (evidenceTurnId === null && currentTurnId === null);
 }
 
 function isProviderLinearWorkerBookkeepingRecord(parsed: Record<string, unknown>): boolean {
@@ -4571,13 +4579,7 @@ function extractProviderWorkerEventSummary(input: Record<string, unknown>): {
   at: string | null;
 } {
   const payload = isRecord(input.payload) ? input.payload : null;
-  const timestamp =
-    normalizeOptionalString(input.timestamp) ??
-    (payload
-      ? normalizeOptionalString(payload.timestamp) ??
-        normalizeOptionalString(payload.created_at) ??
-        normalizeOptionalString(payload.at)
-      : null);
+  const timestamp = extractProviderWorkerEventTimestamp(input);
   if (input.type === 'event_msg' && payload) {
     return {
       event: normalizeOptionalString(payload.type),
@@ -4695,7 +4697,17 @@ function readProviderWorkerResponseItemPayload(input: Record<string, unknown>): 
     }
   }
   if (payload?.type === 'response_item' && payloadWrappedPayload) {
-    return payloadWrappedPayload;
+    return {
+      ...payload,
+      ...payloadWrappedPayload,
+      call_id: payloadWrappedPayload.call_id ?? payload.call_id,
+      callId: payloadWrappedPayload.callId ?? payload.callId,
+      tool_call_id: payloadWrappedPayload.tool_call_id ?? payload.tool_call_id,
+      toolCallId: payloadWrappedPayload.toolCallId ?? payload.toolCallId,
+      name: payloadWrappedPayload.name ?? payload.name,
+      tool_name: payloadWrappedPayload.tool_name ?? payload.tool_name,
+      toolName: payloadWrappedPayload.toolName ?? payload.toolName
+    };
   }
   return (input.type === 'response_item' || payload?.type === 'response_item') && payload ? payload : null;
 }
@@ -4793,9 +4805,13 @@ function parseProviderWorkerGoalToolOutputValue(value: unknown): unknown {
   return null;
 }
 
-function hasProviderWorkerGoalSnapshotContent(value: Record<string, unknown>): boolean {
+function hasProviderWorkerGoalSnapshotContent(
+  value: Record<string, unknown>,
+  options: { includeStatus?: boolean } = {}
+): boolean {
   return (
     normalizeOptionalString(value.objective) !== null ||
+    (options.includeStatus === true && normalizeOptionalString(value.status) !== null) ||
     normalizeNonNegativeInteger(value.tokenBudget ?? value.token_budget) !== null ||
     normalizeNonNegativeInteger(value.tokensUsed ?? value.tokens_used) !== null ||
     normalizeNonNegativeNumber(
@@ -4888,7 +4904,7 @@ function extractProviderWorkerGoalToolEvidence(
   const capturedAt = extractProviderWorkerEventTimestamp(parsed);
   const turnId = extractProviderWorkerActivityTurnId(parsed) ?? state.turnId;
   const goal = selectProviderWorkerGoalToolSnapshotRecord(outputValue);
-  if (!goal || !isProviderWorkerGoalSnapshotRecord(goal)) {
+  if (!goal || !hasProviderWorkerGoalSnapshotContent(goal, { includeStatus: true })) {
     if (toolName === 'create_goal' || toolName === 'update_goal') {
       return null;
     }
@@ -4918,7 +4934,8 @@ function extractProviderWorkerGoalToolEvidence(
     captureTimestamp: capturedAt,
     threadId:
       normalizeOptionalString(goal.threadId) ??
-      normalizeOptionalString(goal.thread_id),
+      normalizeOptionalString(goal.thread_id) ??
+      state.threadId,
     turnId,
     objective: normalizeOptionalString(goal.objective),
     status: normalizeOptionalString(goal.status),
@@ -4981,7 +4998,7 @@ function extractProviderWorkerGoalEvidence(
       reason: 'goal_cleared'
     });
   }
-  if (!goal || !isProviderWorkerGoalSnapshotRecord(goal)) {
+  if (!goal || !hasProviderWorkerGoalSnapshotContent(goal, { includeStatus: true })) {
     return buildProviderLinearGoalEvidence({
       featureAvailable: true,
       featureEnabled: null,
@@ -5116,9 +5133,11 @@ function extractProviderWorkerEventTimestamp(input: Record<string, unknown>): st
   return (
     normalizeOptionalString(input.timestamp) ??
     normalizeOptionalString(input.created_at) ??
+    normalizeOptionalString(input.createdAt) ??
     normalizeOptionalString(input.at) ??
     normalizeOptionalString(payload?.timestamp) ??
     normalizeOptionalString(payload?.created_at) ??
+    normalizeOptionalString(payload?.createdAt) ??
     normalizeOptionalString(payload?.at)
   );
 }
@@ -8088,16 +8107,7 @@ function providerWorkerSessionJsonlLineTimestamp(line: string): string | null {
   if (!parsed) {
     return null;
   }
-  const lineTimestamp = normalizeOptionalString(parsed.timestamp);
-  if (lineTimestamp) {
-    return lineTimestamp;
-  }
-  const payload = isRecord(parsed.payload) ? parsed.payload : null;
-  return payload
-    ? normalizeOptionalString(payload.timestamp) ??
-      normalizeOptionalString(payload.created_at) ??
-      normalizeOptionalString(payload.at)
-    : null;
+  return extractProviderWorkerEventTimestamp(parsed);
 }
 
 function isProviderWorkerSessionBootstrapLineAtOrAfter(
