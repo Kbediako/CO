@@ -4731,7 +4731,7 @@ function readProviderWorkerGoalToolOutputValue(input: Record<string, unknown>): 
 
 function parseProviderWorkerGoalToolOutputValue(value: unknown): unknown {
   if (isRecord(value)) {
-    if (isProviderWorkerGoalToolPayloadRecord(value)) {
+    if (isRecord(value.goal) || isRecord(value.threadGoal) || isRecord(value.thread_goal)) {
       return value;
     }
     for (const nested of [value.text, value.output_text, value.output, value.result, value.content]) {
@@ -4739,6 +4739,9 @@ function parseProviderWorkerGoalToolOutputValue(value: unknown): unknown {
       if (isRecord(parsed) && isProviderWorkerGoalToolPayloadRecord(parsed)) {
         return parsed;
       }
+    }
+    if (isProviderWorkerGoalSnapshotRecord(value)) {
+      return value;
     }
     return value;
   }
@@ -5015,6 +5018,18 @@ function selectPreferredProviderLinearGoalEvidence(
   const currentTimestamp = selectProviderLinearGoalEvidenceFreshnessTimestamp(current);
   const observedTimestamp = selectProviderLinearGoalEvidenceFreshnessTimestamp(observed);
   const observedCaptureTimestamp = normalizeOptionalString(observed.capture_timestamp);
+  const observedIsCurrentTurnCapture =
+    (observed.capture_mode === 'captured' || observed.capture_mode === 'cleared') &&
+    !observedCaptureTimestamp;
+  if (
+    options.preserveTimestampedCurrentFromTimestamplessObserved === true &&
+    currentTimestamp &&
+    current.capture_mode !== 'captured' &&
+    current.capture_mode !== 'cleared' &&
+    observedIsCurrentTurnCapture
+  ) {
+    return observed;
+  }
   if (
     options.preserveTimestampedCurrentFromTimestamplessObserved === true &&
     currentTimestamp &&
@@ -5224,9 +5239,11 @@ export function normalizeProviderLinearGoalEvidenceForProof(input: {
       reason: 'goals_feature_disabled'
     });
   }
+  const candidateBase = candidate?.capture_mode === 'disabled' ? null : candidate;
+  const previousBase = previous?.capture_mode === 'disabled' ? null : previous;
   const base =
-    candidate ??
-    previous ??
+    candidateBase ??
+    previousBase ??
     buildProviderLinearGoalEvidence({
       featureAvailable: runtimeMode === 'appserver' ? featureEnabled ?? null : false,
       featureEnabled,
@@ -5257,7 +5274,14 @@ export function normalizeProviderLinearGoalEvidenceForProof(input: {
         normalizeOptionalString(base.updated_at) ??
         normalizeOptionalString(base.created_at)
       : null;
-  if (goalThreadId && proofThreadId && goalThreadId !== proofThreadId) {
+  if (
+    (captureMode === 'captured' || captureMode === 'cleared') &&
+    goalThreadId &&
+    !proofThreadId
+  ) {
+    captureMode = 'thread_mismatch';
+    reason = `goal_thread_unverified:${goalThreadId}`;
+  } else if (goalThreadId && proofThreadId && goalThreadId !== proofThreadId) {
     captureMode = 'thread_mismatch';
     reason = `goal_thread_mismatch:${goalThreadId}->${proofThreadId}`;
   } else if (!goalThreadId && (captureMode === 'captured' || captureMode === 'cleared')) {

@@ -13761,6 +13761,53 @@ for await (const line of rl) {
     });
   });
 
+  it('keeps scanning thread-scoped model-tool wrappers until nested goal content is found', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-nested-wrapper-goal"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-nested-wrapper-goal-1"}}',
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:00.900Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call',
+            name: 'get_goal',
+            call_id: 'call-nested-wrapper-goal'
+          }
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:01.250Z',
+          type: 'response_item',
+          payload: {
+            type: 'function_call_output',
+            call_id: 'call-nested-wrapper-goal',
+            output: {
+              threadId: 'thread-nested-wrapper-goal',
+              content: {
+                goal: {
+                  threadId: 'thread-nested-wrapper-goal',
+                  objective: 'nested wrapper goal evidence',
+                  status: 'active',
+                  updatedAt: '2026-03-21T09:00:01.000Z'
+                }
+              }
+            }
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:01.250Z',
+      thread_id: 'thread-nested-wrapper-goal',
+      objective: 'nested wrapper goal evidence',
+      status: 'active',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
   it('reads raw response item goal tool payloads from app-server notifications', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [
@@ -14120,6 +14167,103 @@ for await (const line of rl) {
       objective: 'fresher hydrated goal evidence',
       status: 'active',
       updated_at: '2026-05-05T04:45:04.000Z',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('uses observation time when hydrated goal metadata predates the turn', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '05', '05');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-05-05T04-46-00-thread-proof-goal.jsonl');
+    const sessionLog = [
+      JSON.stringify({
+        type: 'session_meta',
+        payload: {
+          id: 'thread-proof-goal',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        },
+        timestamp: '2026-05-05T04:46:00.000Z'
+      }),
+      JSON.stringify({
+        type: 'turn_context',
+        payload: {
+          turn_id: 'turn-proof-goal-1'
+        },
+        timestamp: '2026-05-05T04:46:01.000Z'
+      }),
+      JSON.stringify({
+        type: 'notification',
+        method: 'thread/goal/updated',
+        params: {
+          threadId: 'thread-proof-goal',
+          goal: {
+            threadId: 'thread-proof-goal',
+            objective: 'current turn re-emitted goal evidence',
+            status: 'active',
+            updatedAt: '2026-05-05T04:45:59.000Z'
+          }
+        }
+      })
+    ].join('\n');
+
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(sessionLogPath, `${sessionLog}\n`, 'utf8');
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          thread_id: 'thread-proof-goal',
+          latest_turn_id: 'turn-proof-goal-1',
+          latest_session_id: 'thread-proof-goal-turn-proof-goal-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          attempt_started_at: '2026-05-05T04:46:00.000Z',
+          current_turn_started_at: '2026-05-05T04:46:00.000Z',
+          updated_at: '2026-05-05T04:46:04.500Z',
+          workspace_path: tempRoot,
+          goal_evidence: {
+            source: 'codex-goals',
+            feature_available: true,
+            feature_enabled: true,
+            capture_mode: 'unavailable',
+            capture_timestamp: '2026-05-05T04:46:00.000Z',
+            thread_id: 'thread-proof-goal',
+            turn_id: 'turn-proof-goal-1',
+            objective: null,
+            status: null,
+            token_budget: null,
+            tokens_used: null,
+            elapsed_seconds: null,
+            created_at: null,
+            updated_at: null,
+            authority: 'advisory_only',
+            linear_authority_preserved: true,
+            not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+            reason: 'goal_state_not_observed'
+          }
+        })
+      ),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-05-05T04:46:05.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+
+    expect(refreshed?.goal_evidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-05-05T04:46:04.500Z',
+      thread_id: 'thread-proof-goal',
+      objective: 'current turn re-emitted goal evidence',
+      status: 'active',
+      updated_at: '2026-05-05T04:45:59.000Z',
+      reason: null,
       authority: 'advisory_only',
       linear_authority_preserved: true
     });
@@ -14744,6 +14888,52 @@ for await (const line of rl) {
     });
   });
 
+  it('resets carried disabled goal evidence when the current profile enables goals', () => {
+    const proofGoalEvidence = normalizeProviderLinearGoalEvidenceForProof({
+      candidate: null,
+      previous: {
+        source: 'codex-goals',
+        feature_available: true,
+        feature_enabled: false,
+        capture_mode: 'disabled',
+        capture_timestamp: '2026-03-21T08:59:00.000Z',
+        thread_id: 'thread-disabled-reset',
+        turn_id: 'turn-disabled-reset-1',
+        objective: null,
+        status: null,
+        token_budget: null,
+        tokens_used: null,
+        elapsed_seconds: null,
+        created_at: null,
+        updated_at: null,
+        authority: 'advisory_only',
+        linear_authority_preserved: true,
+        not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+        reason: 'goals_feature_disabled'
+      },
+      proofThreadId: 'thread-disabled-reset',
+      proofTurnId: 'turn-disabled-reset-2',
+      observedAt: '2026-03-21T09:00:01.000Z',
+      currentTurnStartedAt: '2026-03-21T09:00:00.000Z',
+      featureEnabled: true,
+      runtimeMode: 'appserver'
+    });
+
+    expect(proofGoalEvidence).toMatchObject({
+      feature_available: true,
+      feature_enabled: true,
+      capture_mode: 'unavailable',
+      capture_timestamp: '2026-03-21T09:00:01.000Z',
+      thread_id: 'thread-disabled-reset',
+      turn_id: 'turn-disabled-reset-2',
+      objective: null,
+      status: null,
+      reason: 'goal_state_not_observed',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
   it('fails closed when carried captured goal evidence says the goals surface is unavailable', async () => {
     const { runDir } = await createManifestRoot();
     const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
@@ -15014,6 +15204,50 @@ for await (const line of rl) {
       status: null,
       updated_at: null,
       reason: 'goal_thread_mismatch:thread-other->thread-current',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('fails closed when captured goal evidence lacks a proven worker thread', () => {
+    const proofGoalEvidence = normalizeProviderLinearGoalEvidenceForProof({
+      candidate: {
+        source: 'codex-goals',
+        feature_available: true,
+        feature_enabled: true,
+        capture_mode: 'captured',
+        capture_timestamp: '2026-03-21T09:00:00.250Z',
+        thread_id: 'thread-unverified',
+        turn_id: 'turn-unverified-1',
+        objective: 'unverified thread goal evidence',
+        status: 'active',
+        token_budget: null,
+        tokens_used: null,
+        elapsed_seconds: null,
+        created_at: null,
+        updated_at: '2026-03-21T09:00:00.000Z',
+        authority: 'advisory_only',
+        linear_authority_preserved: true,
+        not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+        reason: null
+      },
+      previous: null,
+      proofThreadId: null,
+      proofTurnId: 'turn-unverified-1',
+      observedAt: '2026-03-21T09:00:01.000Z',
+      currentTurnStartedAt: '2026-03-21T09:00:00.000Z',
+      featureEnabled: true,
+      runtimeMode: 'appserver'
+    });
+
+    expect(proofGoalEvidence).toMatchObject({
+      capture_mode: 'thread_mismatch',
+      capture_timestamp: '2026-03-21T09:00:00.250Z',
+      thread_id: 'thread-unverified',
+      objective: null,
+      status: null,
+      updated_at: null,
+      reason: 'goal_thread_unverified:thread-unverified',
       authority: 'advisory_only',
       linear_authority_preserved: true
     });

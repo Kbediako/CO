@@ -1416,6 +1416,8 @@ describe('runCommandStage review evidence consistency', () => {
         owner_phase: 'ended',
         owner_status: 'succeeded',
         end_reason: 'issue_inactive',
+        thread_id: 'thread-goal',
+        latest_turn_id: 'turn-goal-1',
         current_turn_started_at: '2026-03-21T08:58:00.000Z',
         goal_evidence: {
           source: 'codex-goals',
