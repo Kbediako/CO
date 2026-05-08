@@ -17084,9 +17084,9 @@ describe('providerLinearWorkflowFacade', () => {
           })),
           {
             path: requiredPaths[0],
-            owner: 'Codex (top-level agent), Review agent',
-            status: 'active',
-            last_review: currentReviewDate,
+            owner: 'tbd',
+            status: 'preserved_historical_stub',
+            last_review: '2000-01-01',
             cadence_days: 30
           }
         ]

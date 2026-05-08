@@ -9304,7 +9304,8 @@ function taskIndexRecordHasRequiredFollowUpPacketPaths(
 function docsFreshnessRegistryContainsRequiredPaths(content: string, requiredPaths: readonly string[]): boolean {
   const parsed = parseJsonRecord(content);
   const entries = Array.isArray(parsed?.entries) ? parsed.entries : [];
-  const paths = new Set<string>();
+  const seenPaths = new Set<string>();
+  const validPaths = new Set<string>();
   const duplicatePaths = new Set<string>();
   for (const entry of entries) {
     if (!entry || typeof entry !== 'object') {
@@ -9312,14 +9313,17 @@ function docsFreshnessRegistryContainsRequiredPaths(content: string, requiredPat
     }
     const rawPath = (entry as Record<string, unknown>).path;
     const path = typeof rawPath === 'string' ? normalizeOptionalString(rawPath) : null;
-    if (path && docsFreshnessRegistryEntryHasValidMetadata(entry as Record<string, unknown>)) {
-      if (paths.has(path)) {
+    if (path) {
+      if (seenPaths.has(path)) {
         duplicatePaths.add(path);
       }
-      paths.add(path);
+      seenPaths.add(path);
+      if (docsFreshnessRegistryEntryHasValidMetadata(entry as Record<string, unknown>)) {
+        validPaths.add(path);
+      }
     }
   }
-  return requiredPaths.every((path) => paths.has(path) && !duplicatePaths.has(path));
+  return requiredPaths.every((path) => validPaths.has(path) && !duplicatePaths.has(path));
 }
 
 function docsFreshnessRegistryEntryHasValidMetadata(entry: Record<string, unknown>): boolean {
