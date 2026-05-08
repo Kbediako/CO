@@ -2679,6 +2679,89 @@ describe('runLinearCliShell', () => {
     }));
   });
 
+  it('normalizes canonical owner keys before packet retry marker verification', async () => {
+    const log = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const repoRoot = await mkdtemp(join(tmpdir(), 'linear-cli-follow-up-canonical-marker-normalized-'));
+    tempDirs.push(repoRoot);
+    await seedCliFollowUpPacketReadiness(repoRoot, 'linear-lin-issue-2');
+    const createProviderLinearFollowUpIssueMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>();
+    const canonicalOwnerKey = 'baseline_cohort_id:co-175';
+    const canonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
+    const getProviderLinearIssueContextMock = buildRetryIssueContextMock({
+      followUpDescription: [
+        '## Canonical Owner',
+        `- Canonical owner marker: \`${canonicalOwnerMarker}\``,
+        '',
+        '## Immediate Traceability',
+        '- Follow-up packet prefix: `linear-lin-issue-2`'
+      ].join('\n')
+    });
+    const { auditPath, loadProviderLinearWorkerContextMock } = await createSameAttemptFollowUpFixture(
+      'linear-cli-follow-up-canonical-marker-normalized-',
+      [
+        buildPacketTraceabilityPendingAuditEntry({
+          follow_up_intent_key:
+            `title=follow-up;${DEFAULT_FOLLOW_UP_INTENT_KEY_PART};canonical=baseline_cohort_id%3Aco-175;blocked=0;parity=0`
+        })
+      ]
+    );
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          title: 'Follow-up',
+          description: 'Investigate the remaining improvement',
+          'intent-checksum': '- Preserve exact `CO STATUS` wording.',
+          'non-goals': '- [ ] Do not reopen the browser surface.',
+          'not-done-if': '- [ ] The issue still allows browser-first parity.',
+          'acceptance-criteria': '- [ ] Captured',
+          'canonical-owner-key': ` ${canonicalOwnerKey}\n`
+        },
+        printHelp: vi.fn()
+      },
+      {
+        createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        getProviderLinearIssueContext: getProviderLinearIssueContextMock,
+        loadProviderLinearWorkerContext: loadProviderLinearWorkerContextMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: auditPath
+        }),
+        getCwd: () => repoRoot,
+        now: () => '2026-04-22T08:06:00.000Z',
+        appendAuditEntry,
+        log
+      }
+    );
+
+    expect(createProviderLinearFollowUpIssueMock).not.toHaveBeenCalled();
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      ok: true,
+      operation: 'create-follow-up',
+      action: 'reused',
+      canonical_owner: {
+        key: canonicalOwnerKey,
+        marker: canonicalOwnerMarker
+      },
+      follow_up_issue: {
+        id: 'lin-issue-2',
+        identifier: 'CO-2'
+      }
+    });
+    expect(appendAuditEntry).toHaveBeenCalledWith(auditPath, expect.objectContaining({
+      operation: 'create-follow-up',
+      ok: true,
+      action: 'reused',
+      follow_up_issue_id: 'lin-issue-2',
+      follow_up_issue_identifier: 'CO-2'
+    }));
+  });
+
   it('does not reuse packet-blocked retries until the live follow-up description has the packet prefix', async () => {
     const log = vi.fn();
     const appendAuditEntry = vi.fn();

@@ -990,8 +990,9 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
   if (!packetTraceability.readiness.ready) {
     return null;
   }
-  const canonicalOwnerMarker = input.canonicalOwnerKey
-    ? buildCanonicalOwnerMarker(input.canonicalOwnerKey)
+  const canonicalOwnerKey = normalizeOptionalString(input.canonicalOwnerKey);
+  const canonicalOwnerMarker = canonicalOwnerKey
+    ? buildCanonicalOwnerMarker(canonicalOwnerKey)
     : null;
   if (
     canonicalOwnerMarker &&
@@ -1007,7 +1008,7 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
         retryable: false,
         details: {
           canonical_owner: {
-            key: input.canonicalOwnerKey,
+            key: canonicalOwnerKey,
             marker: canonicalOwnerMarker
           },
           follow_up_issue: {
@@ -1088,9 +1089,9 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
       team: followUpTeam,
       project: followUpContext.issue.project
     },
-    canonical_owner: input.canonicalOwnerKey && canonicalOwnerMarker
+    canonical_owner: canonicalOwnerKey && canonicalOwnerMarker
       ? {
-          key: input.canonicalOwnerKey,
+          key: canonicalOwnerKey,
           marker: canonicalOwnerMarker
         }
       : null,
