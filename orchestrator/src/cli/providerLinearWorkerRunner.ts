@@ -4708,40 +4708,136 @@ function mergeProviderWorkerResponseItemPayloadMetadata(
   };
 }
 
-function hasProviderWorkerResponseItemOutputPayload(value: Record<string, unknown>): boolean {
+const PROVIDER_WORKER_RESPONSE_ITEM_UNWRAP_DEPTH_LIMIT = 4;
+
+function hasProviderWorkerResponseItemOutputPayload(
+  value: Record<string, unknown>,
+  depth = 0
+): boolean {
   const type = normalizeOptionalString(value.type)?.toLowerCase();
-  return (
+  if (
     type === 'function_call_output' ||
     type === 'tool_result' ||
     value.output !== undefined ||
-    value.result !== undefined ||
-    value.content !== undefined
+    value.result !== undefined
+  ) {
+    return true;
+  }
+  if (depth >= PROVIDER_WORKER_RESPONSE_ITEM_UNWRAP_DEPTH_LIMIT) {
+    return false;
+  }
+  const payload = isRecord(value.payload) ? value.payload : null;
+  const params = isRecord(value.params) ? value.params : null;
+  const payloadParams = isRecord(payload?.params) ? payload.params : null;
+  return [
+    value.item,
+    value.response_item,
+    params?.item,
+    params?.response_item,
+    payload,
+    payload?.item,
+    payload?.response_item,
+    payload?.payload,
+    payloadParams?.item,
+    payloadParams?.response_item
+  ].some(
+    (candidate) =>
+      isRecord(candidate) && hasProviderWorkerResponseItemOutputPayload(candidate, depth + 1)
   );
+}
+
+function unwrapProviderWorkerResponseItemPayloadCandidate(
+  candidate: Record<string, unknown>,
+  depth = 0
+): Record<string, unknown> {
+  if (depth >= PROVIDER_WORKER_RESPONSE_ITEM_UNWRAP_DEPTH_LIMIT) {
+    return candidate;
+  }
+  const params = isRecord(candidate.params) ? candidate.params : null;
+  const directNestedCandidates = [
+    isRecord(candidate.item) ? candidate.item : null,
+    isRecord(candidate.response_item) ? candidate.response_item : null,
+    isRecord(params?.item) ? params.item : null,
+    isRecord(params?.response_item) ? params.response_item : null
+  ];
+  const hasOutputBearingDirectNestedCandidate = directNestedCandidates.some((nested) =>
+    nested ? hasProviderWorkerResponseItemOutputPayload(nested, depth + 1) : false
+  );
+  if (hasOutputBearingDirectNestedCandidate) {
+    const selectedDirectNested = selectProviderWorkerNestedResponseItemPayload(
+      candidate,
+      directNestedCandidates,
+      depth + 1
+    );
+    if (selectedDirectNested) {
+      return mergeProviderWorkerResponseItemPayloadMetadata(candidate, selectedDirectNested);
+    }
+  }
+  const payload = isRecord(candidate.payload) ? candidate.payload : null;
+  if (!payload) {
+    return candidate;
+  }
+  const payloadParams = isRecord(payload.params) ? payload.params : null;
+  const selectedNested = selectProviderWorkerNestedResponseItemPayload(
+    payload,
+    [
+      isRecord(payload.item) ? payload.item : null,
+      isRecord(payload.response_item) ? payload.response_item : null,
+      isRecord(payload.payload) ? payload.payload : null,
+      isRecord(payloadParams?.item) ? payloadParams.item : null,
+      isRecord(payloadParams?.response_item) ? payloadParams.response_item : null
+    ],
+    depth + 1
+  );
+  if (selectedNested) {
+    return mergeProviderWorkerResponseItemPayloadMetadata(candidate, selectedNested);
+  }
+  if (
+    normalizeOptionalString(candidate.type)?.toLowerCase() === 'response_item' ||
+    normalizeOptionalString(payload.type)?.toLowerCase() === 'response_item' ||
+    hasProviderWorkerResponseItemOutputPayload(payload, depth + 1)
+  ) {
+    return mergeProviderWorkerResponseItemPayloadMetadata(candidate, payload);
+  }
+  return candidate;
 }
 
 function selectProviderWorkerNestedResponseItemPayload(
   wrapper: Record<string, unknown>,
-  nestedCandidates: Array<Record<string, unknown> | null>
+  nestedCandidates: Array<Record<string, unknown> | null>,
+  depth = 0
 ): Record<string, unknown> | null {
   const candidates = nestedCandidates.filter(
     (candidate): candidate is Record<string, unknown> => candidate !== null
   );
-  const outputCandidate = candidates.find(hasProviderWorkerResponseItemOutputPayload);
+  const outputCandidate = candidates.find((candidate) =>
+    hasProviderWorkerResponseItemOutputPayload(candidate, depth)
+  );
   if (!outputCandidate) {
     const firstCandidate = candidates[0] ?? null;
     return firstCandidate
-      ? mergeProviderWorkerResponseItemPayloadMetadata(wrapper, firstCandidate)
+      ? mergeProviderWorkerResponseItemPayloadMetadata(
+          wrapper,
+          unwrapProviderWorkerResponseItemPayloadCandidate(firstCandidate, depth + 1)
+        )
       : null;
   }
+  const normalizedOutputCandidate = unwrapProviderWorkerResponseItemPayloadCandidate(
+    outputCandidate,
+    depth + 1
+  );
   const selectedOutputCandidate = mergeProviderWorkerResponseItemPayloadMetadata(
     wrapper,
-    outputCandidate
+    normalizedOutputCandidate
   );
   return candidates.reduce(
     (selected, candidate) =>
       candidate === outputCandidate
         ? selected
-        : mergeProviderWorkerResponseItemPayloadMetadata(candidate, selected),
+        : mergeProviderWorkerResponseItemPayloadMetadata(
+            unwrapProviderWorkerResponseItemPayloadCandidate(candidate, depth + 1),
+            selected
+          ),
     selectedOutputCandidate
   );
 }
@@ -4756,11 +4852,25 @@ function readProviderWorkerResponseItemPayload(input: Record<string, unknown>): 
   if (payload) {
     const selectedNested = selectProviderWorkerNestedResponseItemPayload(payload, [
       payloadItem,
-      payloadResponseItem
+      payloadResponseItem,
+      payloadWrappedPayload,
+      isRecord(payloadParams?.item) ? payloadParams.item : null,
+      isRecord(payloadParams?.response_item) ? payloadParams.response_item : null
     ]);
     if (selectedNested) {
       return selectedNested;
     }
+  }
+  const selectedOuterNested = selectProviderWorkerNestedResponseItemPayload(input, [
+    input.item,
+    input.response_item,
+    params?.item,
+    params?.response_item,
+    payloadParams?.item,
+    payloadParams?.response_item
+  ].map((candidate) => (isRecord(candidate) ? candidate : null)));
+  if (selectedOuterNested) {
+    return selectedOuterNested;
   }
   for (const candidate of [
     input.item,
@@ -4771,7 +4881,7 @@ function readProviderWorkerResponseItemPayload(input: Record<string, unknown>): 
     payloadParams?.response_item
   ]) {
     if (isRecord(candidate)) {
-      return candidate;
+      return unwrapProviderWorkerResponseItemPayloadCandidate(candidate);
     }
   }
   if (payload?.type === 'response_item' && payloadWrappedPayload) {
@@ -9518,7 +9628,7 @@ async function hydrateProviderLinearWorkerProofFromSessionLog(
       parseState.resolvedModelProvenance
     ),
     goal_evidence:
-      proof.goal_evidence === undefined
+      proof.goal_evidence === undefined && hydratedGoalEvidenceCandidate === null
         ? undefined
         : normalizeProviderLinearGoalEvidenceForProof({
             candidate: hydratedGoalEvidenceCandidate,

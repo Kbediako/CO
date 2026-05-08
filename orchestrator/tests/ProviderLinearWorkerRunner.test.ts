@@ -2914,6 +2914,288 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
+  it('does not treat incidental payload.item content as goal tool output', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-nested-item-content-goal"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-nested-item-content-goal-1"}}',
+        JSON.stringify({
+          type: 'event_msg',
+          payload: {
+            type: 'response_item',
+            item: {
+              type: 'function_call',
+              name: 'get_goal',
+              call_id: 'call-nested-item-content-goal',
+              content: [{ type: 'input_text', text: 'metadata only' }]
+            },
+            response_item: {
+              type: 'function_call_output',
+              call_id: 'call-nested-item-content-goal',
+              createdAt: '2026-03-21T09:00:03.000Z',
+              output: JSON.stringify({
+                goal: {
+                  threadId: 'thread-nested-item-content-goal',
+                  objective: 'response item beats incidental content',
+                  status: 'active',
+                  updatedAt: '2026-03-21T09:00:00.000Z'
+                }
+              })
+            }
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:03.000Z',
+      thread_id: 'thread-nested-item-content-goal',
+      objective: 'response item beats incidental content',
+      status: 'active',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('prefers params.response_item goal output over params.item metadata', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-params-response-item-goal"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-params-response-item-goal-1"}}',
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:02.900Z',
+          type: 'notification',
+          method: 'rawResponseItem/completed',
+          params: {
+            item: {
+              type: 'function_call',
+              name: 'get_goal',
+              call_id: 'call-params-response-item-goal'
+            },
+            response_item: {
+              type: 'function_call_output',
+              call_id: 'call-params-response-item-goal',
+              output: JSON.stringify({
+                goal: {
+                  threadId: 'thread-params-response-item-goal',
+                  objective: 'params response item goal evidence',
+                  status: 'active',
+                  updatedAt: '2026-03-21T09:00:00.000Z'
+                }
+              })
+            }
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:02.900Z',
+      thread_id: 'thread-params-response-item-goal',
+      objective: 'params response item goal evidence',
+      status: 'active',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('prefers payload.payload goal output over payload.item metadata', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-payload-payload-goal"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-payload-payload-goal-1"}}',
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:03.250Z',
+          type: 'event_msg',
+          payload: {
+            type: 'response_item',
+            item: {
+              type: 'function_call',
+              name: 'get_goal',
+              call_id: 'call-payload-payload-goal'
+            },
+            payload: {
+              type: 'function_call_output',
+              call_id: 'call-payload-payload-goal',
+              output: JSON.stringify({
+                goal: {
+                  threadId: 'thread-payload-payload-goal',
+                  objective: 'payload payload goal evidence',
+                  status: 'active',
+                  updatedAt: '2026-03-21T09:00:00.000Z'
+                }
+              })
+            }
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:03.250Z',
+      thread_id: 'thread-payload-payload-goal',
+      objective: 'payload payload goal evidence',
+      status: 'active',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('unwraps params-scoped response_item wrappers before parsing goal output', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-params-wrapper-goal"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-params-wrapper-goal-1"}}',
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:03.500Z',
+          type: 'notification',
+          method: 'rawResponseItem/completed',
+          params: {
+            item: {
+              type: 'function_call',
+              name: 'get_goal',
+              call_id: 'call-params-wrapper-goal'
+            },
+            response_item: {
+              type: 'response_item',
+              payload: {
+                type: 'function_call_output',
+                call_id: 'call-params-wrapper-goal',
+                output: JSON.stringify({
+                  goal: {
+                    threadId: 'thread-params-wrapper-goal',
+                    objective: 'params wrapper goal evidence',
+                    status: 'active',
+                    updatedAt: '2026-03-21T09:00:00.000Z'
+                  }
+                })
+              }
+            }
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:03.500Z',
+      thread_id: 'thread-params-wrapper-goal',
+      objective: 'params wrapper goal evidence',
+      status: 'active',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('prefers payload params response_item wrapper output over payload metadata', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-payload-params-wrapper-goal"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-payload-params-wrapper-goal-1"}}',
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:03.750Z',
+          type: 'event_msg',
+          payload: {
+            type: 'response_item',
+            item: {
+              type: 'function_call',
+              name: 'get_goal',
+              call_id: 'call-payload-params-wrapper-goal'
+            },
+            response_item: {
+              type: 'function_call',
+              call_id: 'call-payload-params-wrapper-goal'
+            },
+            payload: {
+              type: 'function_call',
+              call_id: 'call-payload-params-wrapper-goal'
+            },
+            params: {
+              item: {
+                type: 'function_call',
+                call_id: 'call-payload-params-wrapper-goal'
+              },
+              response_item: {
+                type: 'response_item',
+                payload: {
+                  type: 'function_call_output',
+                  call_id: 'call-payload-params-wrapper-goal',
+                  output: JSON.stringify({
+                    goal: {
+                      threadId: 'thread-payload-params-wrapper-goal',
+                      objective: 'payload params wrapper goal evidence',
+                      status: 'active',
+                      updatedAt: '2026-03-21T09:00:00.000Z'
+                    }
+                  })
+                }
+              }
+            }
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:03.750Z',
+      thread_id: 'thread-payload-params-wrapper-goal',
+      objective: 'payload params wrapper goal evidence',
+      status: 'active',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('unwraps params-scoped direct response_item children before parsing goal output', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-direct-child-wrapper-goal"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-direct-child-wrapper-goal-1"}}',
+        JSON.stringify({
+          timestamp: '2026-03-21T09:00:04.000Z',
+          type: 'notification',
+          method: 'rawResponseItem/completed',
+          params: {
+            item: {
+              type: 'function_call',
+              name: 'get_goal',
+              call_id: 'call-direct-child-wrapper-goal'
+            },
+            response_item: {
+              type: 'response_item',
+              response_item: {
+                type: 'function_call_output',
+                call_id: 'call-direct-child-wrapper-goal',
+                output: JSON.stringify({
+                  goal: {
+                    threadId: 'thread-direct-child-wrapper-goal',
+                    objective: 'direct child wrapper goal evidence',
+                    status: 'active',
+                    updatedAt: '2026-03-21T09:00:00.000Z'
+                  }
+                })
+              }
+            }
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:04.000Z',
+      thread_id: 'thread-direct-child-wrapper-goal',
+      objective: 'direct child wrapper goal evidence',
+      status: 'active',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
   it('keeps scanning wrapper output candidates until the payload goal is found', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [
@@ -14705,6 +14987,80 @@ for await (const line of rl) {
     });
   });
 
+  it('backfills goal evidence for legacy proofs when session-log hydration observes it', async () => {
+    const { runDir } = await createManifestRoot();
+    const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
+    const sessionDir = join(tempRoot!, 'sessions', '2026', '05', '05');
+    const sessionLogPath = join(sessionDir, 'rollout-2026-05-05T04-40-30-thread-legacy-goal.jsonl');
+    const sessionLog = [
+      JSON.stringify({
+        type: 'session_meta',
+        payload: {
+          id: 'thread-legacy-goal',
+          cwd: tempRoot,
+          initial_prompt: 'You are the provider worker for Linear issue CO-2: Example title'
+        },
+        timestamp: '2026-05-05T04:40:30.000Z'
+      }),
+      JSON.stringify({
+        type: 'turn_context',
+        payload: {
+          turn_id: 'turn-legacy-goal-1'
+        },
+        timestamp: '2026-05-05T04:40:31.000Z'
+      }),
+      JSON.stringify({
+        timestamp: '2026-05-05T04:40:32.000Z',
+        type: 'notification',
+        method: 'thread/goal/updated',
+        params: {
+          threadId: 'thread-legacy-goal',
+          goal: {
+            threadId: 'thread-legacy-goal',
+            objective: 'legacy proof hydrated goal evidence',
+            status: 'active',
+            updatedAt: '2026-05-05T04:40:32.000Z'
+          }
+        }
+      })
+    ].join('\n');
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(sessionLogPath, `${sessionLog}\n`, 'utf8');
+    await writeFile(
+      proofPath,
+      JSON.stringify(
+        buildInProgressProof({
+          thread_id: 'thread-legacy-goal',
+          latest_turn_id: 'turn-legacy-goal-1',
+          latest_session_id: 'thread-legacy-goal-turn-legacy-goal-1',
+          latest_session_id_source: 'derived_from_thread_and_turn',
+          attempt_started_at: '2026-05-05T04:40:30.000Z',
+          current_turn_started_at: '2026-05-05T04:40:30.000Z',
+          workspace_path: tempRoot
+        })
+      ),
+      'utf8'
+    );
+
+    const refreshed = await refreshProviderLinearWorkerProofSnapshot(
+      runDir,
+      null,
+      () => '2026-05-05T04:40:33.000Z',
+      undefined,
+      { CODEX_HOME: tempRoot! }
+    );
+
+    expect(refreshed?.goal_evidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-05-05T04:40:32.000Z',
+      thread_id: 'thread-legacy-goal',
+      objective: 'legacy proof hydrated goal evidence',
+      status: 'active',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
   it('keeps newer proof goal evidence when session-log hydration replays older records', async () => {
     const { runDir } = await createManifestRoot();
     const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
@@ -17521,7 +17877,7 @@ for await (const line of rl) {
     });
   });
 
-  it('does not backfill advisory goal evidence into legacy proofs during session-log hydration', async () => {
+  it('backfills advisory goal evidence into legacy proofs during session-log hydration', async () => {
     const { runDir } = await createManifestRoot();
     const proofPath = join(runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME);
     await writeFile(
@@ -17573,7 +17929,7 @@ for await (const line of rl) {
             threadId: 'thread-legacy',
             goal: {
               threadId: 'thread-legacy',
-              objective: 'should not be backfilled',
+              objective: 'legacy session-log goal evidence',
               status: 'active',
               updatedAt: '2026-03-21T09:00:00.150Z'
             }
@@ -17592,8 +17948,22 @@ for await (const line of rl) {
     );
     const onDisk = JSON.parse(await readFile(proofPath, 'utf8')) as ProviderLinearWorkerProof;
 
-    expect(refreshed?.goal_evidence).toBeUndefined();
-    expect(Object.prototype.hasOwnProperty.call(onDisk, 'goal_evidence')).toBe(false);
+    expect(refreshed?.goal_evidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:00.300Z',
+      thread_id: 'thread-legacy',
+      turn_id: 'turn-legacy',
+      objective: 'legacy session-log goal evidence',
+      status: 'active',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+    expect(onDisk.goal_evidence).toMatchObject({
+      capture_mode: 'captured',
+      objective: 'legacy session-log goal evidence',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
   });
 
   it('deduplicates app-server streamed deltas seen from stdout and session-log hydration', async () => {
