@@ -102,6 +102,59 @@ function buildPacketTraceabilityPendingAuditEntry(overrides: Record<string, unkn
   };
 }
 
+function buildReadyFollowUpTraceability(input: {
+  blockedBySource?: boolean;
+  observedState?: Record<string, unknown> | null;
+} = {}) {
+  const blockedBySource = input.blockedBySource === true;
+  return {
+    labels: {
+      source_issue: {
+        id: 'lin-issue-1',
+        identifier: 'CO-1'
+      },
+      requested_labels: [],
+      observed_labels: [],
+      missing_label_ids: []
+    },
+    relations: {
+      related: {
+        type: 'related',
+        requested: true,
+        satisfied: true,
+        action: 'created',
+        issue_id: 'lin-issue-1',
+        related_issue_id: 'lin-issue-2'
+      },
+      blocked_by_source: {
+        type: 'blocks',
+        requested: blockedBySource,
+        satisfied: blockedBySource,
+        action: blockedBySource ? 'created' : 'not_requested',
+        issue_id: 'lin-issue-1',
+        related_issue_id: 'lin-issue-2'
+      }
+    },
+    packet: {
+      packet_prefix: 'linear-lin-issue-2',
+      canonical_task_id: '20260508-linear-lin-issue-2',
+      canonical_task_id_pattern: '^\\d{8}-linear-lin-issue-2$',
+      required_paths: [],
+      registry_mirrors: [],
+      observed_state: input.observedState ?? null,
+      readiness: {
+        checked: true,
+        repo_root: '/repo',
+        description_has_packet_prefix: true,
+        ready: true,
+        missing_paths: [],
+        missing_registry_mirrors: []
+      },
+      queue_admission_blocker: null
+    }
+  };
+}
+
 async function createSameAttemptFollowUpFixture(prefix: string, auditEntries: Record<string, unknown>[] = []) {
   const { auditPath, tempDir } = await createProviderLinearAuditFixture(prefix);
   if (auditEntries.length > 0) {
@@ -1269,6 +1322,14 @@ describe('runLinearCliShell', () => {
             related: true,
             blocked_by_source: true
           },
+          traceability: buildReadyFollowUpTraceability({
+            blockedBySource: true,
+            observedState: {
+              id: 'state-backlog',
+              name: 'Backlog',
+              type: 'unstarted'
+            }
+          }),
           source_setup: {
             provider: 'linear',
             workspace_id: 'lin-workspace-1',
@@ -1912,6 +1973,7 @@ describe('runLinearCliShell', () => {
             related: true,
             blocked_by_source: false
           },
+          traceability: buildReadyFollowUpTraceability(),
           source_setup: null
         } as never);
     const { auditPath, loadProviderLinearWorkerContextMock } = await createSameAttemptFollowUpFixture(

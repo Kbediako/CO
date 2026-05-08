@@ -864,14 +864,8 @@ function normalizeCreateFollowUpResultForCli(
   if (!result.ok) {
     return result;
   }
-  const traceability = (result as {
-    traceability?: {
-      packet?: {
-        queue_admission_blocker?: unknown;
-      };
-    };
-  }).traceability;
-  const blocker = traceability?.packet?.queue_admission_blocker;
+  const traceability = result.traceability;
+  const blocker = traceability.packet.queue_admission_blocker;
   if (!blocker || typeof blocker !== 'object') {
     return result;
   }
