@@ -20,6 +20,7 @@ last_review: 2026-05-08
 - Explicit non-goals carried forward: No broad Linear workflow rewrite, WIP cap changes, provider-intake redesign, label taxonomy redesign, or review-contract implementation.
 
 ## Parity / Alignment Matrix
+
 | Surface | Current | Reference | Target |
 | --- | --- | --- | --- |
 | Label readiness | CO-482 derives labels, but partial paths still need end-to-end proof. | Source issue labels are the authority for type, area, lifecycle, and priority. | Created/reused follow-ups return observed label evidence or fail closed. |
@@ -35,7 +36,7 @@ last_review: 2026-05-08
 - Functional requirements:
   - Derive required label ids from live source issue labels and verify them on the target issue.
   - Create or verify a `related` relation between source issue and follow-up issue for creation and canonical-owner reuse paths.
-  - Ensure provider-created follow-ups either have packet/mirror scaffolding evidence or return an explicit machine-readable blocker before leaving Backlog.
+  - Ensure provider-created follow-ups either have packet/mirror scaffolding evidence or return an explicit machine-readable blocker before Backlog admission is accepted.
   - Preserve details for partial paths such as `linear_follow_up_description_update_incomplete`.
 - Non-functional requirements:
   - Fail closed on missing, paginated, stale, or malformed label/relation/packet evidence.
@@ -46,6 +47,7 @@ last_review: 2026-05-08
   - Task packet file paths and registry mirrors
 
 ## Fallback Expiry / Refactor Decision
+
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Provider-created issue readiness | Treating partial description-update success as enough even when relations or packet traces are unproven | remove fallback | CO-509 | `create-follow-up` creation/reuse | 2026-05-08 evidence | 2026-05-08 | No retained fallback | Relation and packet readiness are proven or helper fails closed | Focused facade tests and live machine output |

@@ -9,7 +9,7 @@
 - Intent checksum / protected terms carried forward: `create-follow-up`, provider-created follow-ups, canonical-owner reuse, labels, related links, packet/mirror traceability, Backlog.
 - Not done if: Auto-created issues can still enter Backlog with missing required labels, source/follow-up relation, or packet/mirror traceability without explicit fail-closed evidence.
 - Pre-implementation issue-quality review: CO-509 is broader than manual cleanup because current queue admission is parked by missing packet/mirror traces on auto-created follow-ups. This issue is not the same as CO-512 review contract work.
-- Fallback / refactor decision: The lane touches a stale/partial-success seam. Decision is remove fallback: partial creation must not be treated as ready unless labels, relation, and packet/mirror evidence are proven.
+- Fallback / refactor decision: The lane touches a stale/partial-success seam. Decision is to remove the fallback: partial creation must not be treated as ready unless labels, relation, and packet/mirror evidence are proven.
 - Durable retention evidence: Not applicable; no retained fallback is intended.
 - Large-refactor check: Keep implementation bounded to `create-follow-up` unless packet scaffolding cannot be cleanly owned there.
 

@@ -15,11 +15,12 @@
 - Nearby wrong interpretations to reject: Do not only document manual label cleanup. Do not create relations only after a worker has already started. Do not rely on stale packet prefixes without real files and registry mirrors. Do not broaden into unrelated provider-intake admission policy.
 
 ## Parity / Alignment Matrix
+
 | Surface | Current Truth | Reference Truth | Target Truth | Explicitly Out Of Scope |
 | --- | --- | --- | --- | --- |
 | Labels | CO-482 added live-label derivation for `create-follow-up`, but follow-up label evidence still needs end-to-end verification across reuse and partial failure paths. | Source issue labels define type, area, lifecycle, and priority expectations. | Created/reused issues carry required labels at creation or immediate reconciliation time and report missing labels fail-closed. | Label taxonomy redesign. |
 | Related links | CO-514 and CO-517 showed relation reconciliation can be skipped when description update verification returns incomplete. | Same-project follow-ups should be related to their source issue, with optional blocker linkage only when requested. | Relation creation/reconciliation runs for created and canonical-owner reuse paths, even after recoverable description normalization drift. | Changing issue dependency semantics. |
-| Packet/mirror traceability | Queue audit after CO-508 found multiple Backlog follow-ups with packet prefixes but missing six packet files and registry mirrors. | Backlog promotion expects follow-up packet and registry mirrors before automatic admission. | Auto-created issues either scaffold or require the six packet files and three registry mirrors before leaving Backlog, or return explicit fail-closed evidence. | Implementing every existing Backlog packet manually in this lane. |
+| Packet/mirror traceability | Queue audit after CO-508 found multiple Backlog follow-ups with packet prefixes but missing six packet files and registry mirrors. | Backlog creation/admission expects follow-up packet and registry mirrors before the issue can be treated as queue-ready. | Auto-created issues either prove the six packet files and three registry mirrors at creation or immediate reconciliation time, or return explicit fail-closed evidence before Backlog admission is accepted. | Implementing every existing Backlog packet manually in this lane. |
 
 ## Not Done If
 - Automatically created issues can be created without required type, area, lifecycle, or priority labels.
