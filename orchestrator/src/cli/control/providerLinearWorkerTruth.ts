@@ -169,7 +169,7 @@ export function deriveDeterministicProviderMutationSuppressions(
   }
   const issueId = normalizeOptionalString(options.issueId);
   const followUpIntentKey = normalizeOptionalString(options.followUpIntentKey);
-  const entries = selectProviderLinearMutationEntries(audit, latestByOperation)
+  const scopedEntries = selectProviderLinearMutationEntries(audit, latestByOperation)
     .filter((entry): entry is ProviderLinearAuditEntry => Boolean(entry))
     .filter((entry) => !issueId || entry.issue_id === issueId)
     .filter((entry) => (
@@ -179,8 +179,30 @@ export function deriveDeterministicProviderMutationSuppressions(
     ))
     .filter((entry) =>
       readTimestampMs(entry as unknown as Record<string, unknown>, 'recorded_at') >= recordedAtNotBeforeMs
-    )
+    );
+  const latestCreateFollowUpEntriesByIntent = scopedEntries
+    .filter((entry) => entry.operation === 'create-follow-up')
+    .reduce<Map<string, ProviderLinearAuditEntry>>((latestByIntent, entry) => {
+      const key = buildProviderLinearMutationEntryKey(entry);
+      const current = latestByIntent.get(key);
+      const entryMs = readTimestampMs(entry as unknown as Record<string, unknown>, 'recorded_at');
+      const currentMs = current
+        ? readTimestampMs(current as unknown as Record<string, unknown>, 'recorded_at')
+        : Number.NEGATIVE_INFINITY;
+      if (!current || entryMs >= currentMs) {
+        latestByIntent.set(key, entry);
+      }
+      return latestByIntent;
+    }, new Map<string, ProviderLinearAuditEntry>());
+  const entries = scopedEntries
     .filter((entry) => entry.ok === false && isDeterministicProviderMutationFailure(entry))
+    .filter((entry) => {
+      if (entry.operation !== 'create-follow-up') {
+        return true;
+      }
+      const latestForIntent = latestCreateFollowUpEntriesByIntent.get(buildProviderLinearMutationEntryKey(entry));
+      return latestForIntent?.ok !== true;
+    })
     .reduce<Map<string, ProviderLinearAuditEntry>>((latestByOperationAndAction, entry) => {
       latestByOperationAndAction.set(buildProviderLinearMutationEntryKey(entry), entry);
       return latestByOperationAndAction;

@@ -1,6 +1,6 @@
 /* eslint-disable patterns/prefer-logger-over-console */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import process from 'node:process';
@@ -948,9 +948,17 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
   if (!sourceIssueId || !sourceIssueIdentifier || !followUpIssueIdentifier) {
     return null;
   }
+  const selfRelationSkipped = sourceIssueId === followUpIssueId && entry.via === 'none';
   const relatedSatisfied = entry.via === 'related' || entry.via === 'related+blocks';
   const blockedSatisfied = entry.via === 'related+blocks';
-  if (!relatedSatisfied || (input.blockedBySource && !blockedSatisfied)) {
+  const relatedAction = selfRelationSkipped ? 'skipped_self' : 'already_satisfied';
+  const blockedAction = input.blockedBySource
+    ? relatedAction
+    : 'not_requested';
+  if (
+    (!relatedSatisfied && !selfRelationSkipped)
+    || (input.blockedBySource && !blockedSatisfied && !selfRelationSkipped)
+  ) {
     return null;
   }
   const localPacketTraceability = await buildFollowUpPacketTraceabilityEvidence({
@@ -1076,7 +1084,7 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
           type: 'related',
           requested: true,
           satisfied: relatedSatisfied,
-          action: 'already_satisfied',
+          action: relatedAction,
           issue_id: sourceIssueId,
           related_issue_id: followUpIssueId
         },
@@ -1084,7 +1092,7 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
           type: 'blocks',
           requested: input.blockedBySource,
           satisfied: blockedSatisfied,
-          action: input.blockedBySource ? 'already_satisfied' : 'not_requested',
+          action: blockedAction,
           issue_id: sourceIssueId,
           related_issue_id: followUpIssueId
         }
@@ -2164,10 +2172,11 @@ function resolveRuntimeProofRepoRoot(cwd: string, env: NodeJS.ProcessEnv): strin
 function resolveRepoRootFromHint(rootHint: string): string {
   const normalizedHint = resolve(rootHint);
   const gitBoundary = findNearestGitBoundary(normalizedHint);
+  const taskRegistryRoots: string[] = [];
   let current: string | null = normalizedHint;
   while (current) {
     if (existsSync(join(current, 'tasks', 'index.json'))) {
-      return current;
+      taskRegistryRoots.push(current);
     }
     const parent = dirname(current);
     if (parent === current) {
@@ -2175,7 +2184,12 @@ function resolveRepoRootFromHint(rootHint: string): string {
     }
     current = parent;
   }
-  return gitBoundary ?? normalizedHint;
+  return (
+    taskRegistryRoots.find(isCodexOrchestratorRepoRoot)
+    ?? taskRegistryRoots[0]
+    ?? gitBoundary
+    ?? normalizedHint
+  );
 }
 
 function findNearestGitBoundary(start: string): string | null {
@@ -2191,6 +2205,19 @@ function findNearestGitBoundary(start: string): string | null {
     current = parent;
   }
   return null;
+}
+
+function isCodexOrchestratorRepoRoot(root: string): boolean {
+  try {
+    const packageJsonPath = join(root, 'package.json');
+    if (!existsSync(packageJsonPath)) {
+      return false;
+    }
+    const parsed = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as { name?: unknown };
+    return parsed.name === '@kbediako/codex-orchestrator';
+  } catch {
+    return false;
+  }
 }
 
 function normalizeEnvPath(value: string | undefined): string | null {

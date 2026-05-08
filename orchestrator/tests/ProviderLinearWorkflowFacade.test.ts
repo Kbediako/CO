@@ -12734,7 +12734,7 @@ describe('providerLinearWorkflowFacade', () => {
       queue_admission_blocker: {
         reason: 'backlog_head_follow_up_traceability_pending',
         state: 'Backlog',
-        enforced_by: 'provider-operator-autopilot'
+        enforced_by: 'create-follow-up'
       }
     });
   });
@@ -12945,7 +12945,7 @@ describe('providerLinearWorkflowFacade', () => {
         queue_admission_blocker: {
           reason: 'backlog_head_follow_up_traceability_pending',
           state: 'Backlog',
-          enforced_by: 'provider-operator-autopilot'
+          enforced_by: 'create-follow-up'
         }
       }
     });
@@ -14825,7 +14825,7 @@ describe('providerLinearWorkflowFacade', () => {
         queue_admission_blocker: {
           reason: 'backlog_head_follow_up_traceability_pending',
           state: 'Backlog',
-          enforced_by: 'provider-operator-autopilot'
+          enforced_by: 'create-follow-up'
         }
       }
     });
@@ -16264,7 +16264,7 @@ describe('providerLinearWorkflowFacade', () => {
           queue_admission_blocker: {
             reason: 'backlog_head_follow_up_traceability_pending',
             state: 'Backlog',
-            enforced_by: 'provider-operator-autopilot'
+            enforced_by: 'create-follow-up'
           }
         }
       }
@@ -17093,6 +17093,81 @@ describe('providerLinearWorkflowFacade', () => {
       })
     );
     await expect(runWithRepoRoot(duplicateRegistryRoot)).resolves.toMatchObject({
+      ok: true,
+      traceability: {
+        packet: {
+          readiness: {
+            ready: false,
+            missing_registry_mirrors: ['docs/docs-freshness-registry.json']
+          },
+          queue_admission_blocker: {
+            reason: 'backlog_head_follow_up_traceability_pending',
+            state: 'Backlog'
+          }
+        }
+      }
+    });
+
+    const normalizedDuplicateRegistryRoot = await mkdtemp(
+      join(tmpdir(), 'provider-linear-follow-up-normalized-duplicate-registry-')
+    );
+    tempDirs.push(normalizedDuplicateRegistryRoot);
+    await seedFollowUpPacketReadiness(normalizedDuplicateRegistryRoot, followUpTaskId);
+    await writeFile(
+      join(normalizedDuplicateRegistryRoot, 'docs/docs-freshness-registry.json'),
+      JSON.stringify({
+        entries: [
+          ...requiredPaths.map((path) => ({
+            path,
+            owner: 'Codex (top-level agent), Review agent',
+            status: 'active',
+            last_review: currentReviewDate,
+            cadence_days: 30
+          })),
+          {
+            path: `./${requiredPaths[0]}`,
+            owner: 'Codex (top-level agent), Review agent',
+            status: 'active',
+            last_review: currentReviewDate,
+            cadence_days: 30
+          }
+        ]
+      })
+    );
+    await expect(runWithRepoRoot(normalizedDuplicateRegistryRoot)).resolves.toMatchObject({
+      ok: true,
+      traceability: {
+        packet: {
+          readiness: {
+            ready: false,
+            missing_registry_mirrors: ['docs/docs-freshness-registry.json']
+          },
+          queue_admission_blocker: {
+            reason: 'backlog_head_follow_up_traceability_pending',
+            state: 'Backlog'
+          }
+        }
+      }
+    });
+
+    const whitespaceMetadataRegistryRoot = await mkdtemp(
+      join(tmpdir(), 'provider-linear-follow-up-whitespace-metadata-registry-')
+    );
+    tempDirs.push(whitespaceMetadataRegistryRoot);
+    await seedFollowUpPacketReadiness(whitespaceMetadataRegistryRoot, followUpTaskId);
+    await writeFile(
+      join(whitespaceMetadataRegistryRoot, 'docs/docs-freshness-registry.json'),
+      JSON.stringify({
+        entries: requiredPaths.map((path, index) => ({
+          path,
+          owner: 'Codex (top-level agent), Review agent',
+          status: index === 0 ? 'active ' : 'active',
+          last_review: index === 1 ? `${currentReviewDate} ` : currentReviewDate,
+          cadence_days: 30
+        }))
+      })
+    );
+    await expect(runWithRepoRoot(whitespaceMetadataRegistryRoot)).resolves.toMatchObject({
       ok: true,
       traceability: {
         packet: {

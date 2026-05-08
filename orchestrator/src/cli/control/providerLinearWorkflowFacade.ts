@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { basename, dirname, extname, join, resolve as resolvePath } from 'node:path';
+import { basename, dirname, extname, join, posix, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -9159,7 +9159,7 @@ function resolveFollowUpPacketQueueAdmissionBlocker(
   return {
     reason: 'backlog_head_follow_up_traceability_pending',
     state: stateName ?? 'unknown',
-    enforced_by: readiness.description_has_packet_prefix ? 'provider-operator-autopilot' : 'create-follow-up',
+    enforced_by: 'create-follow-up',
     summary: 'Backlog admission remains blocked until follow-up packet files, registry mirrors, and the Linear packet prefix are present.'
   };
 }
@@ -9312,7 +9312,7 @@ function docsFreshnessRegistryContainsRequiredPaths(content: string, requiredPat
       continue;
     }
     const rawPath = (entry as Record<string, unknown>).path;
-    const path = typeof rawPath === 'string' ? normalizeOptionalString(rawPath) : null;
+    const path = normalizeDocsFreshnessRegistryPath(rawPath);
     if (path) {
       if (seenPaths.has(path)) {
         duplicatePaths.add(path);
@@ -9323,15 +9323,18 @@ function docsFreshnessRegistryContainsRequiredPaths(content: string, requiredPat
       }
     }
   }
-  return requiredPaths.every((path) => validPaths.has(path) && !duplicatePaths.has(path));
+  return requiredPaths.every((path) => {
+    const normalizedPath = normalizeDocsFreshnessRegistryPath(path);
+    return normalizedPath !== null && validPaths.has(normalizedPath) && !duplicatePaths.has(normalizedPath);
+  });
 }
 
 function docsFreshnessRegistryEntryHasValidMetadata(entry: Record<string, unknown>): boolean {
-  const status = typeof entry.status === 'string' ? normalizeOptionalString(entry.status) : null;
+  const status = typeof entry.status === 'string' ? entry.status : null;
   const cadenceDays = typeof entry.cadence_days === 'number' && Number.isInteger(entry.cadence_days)
     ? entry.cadence_days
     : null;
-  const lastReview = typeof entry.last_review === 'string' ? normalizeOptionalString(entry.last_review) : null;
+  const lastReview = typeof entry.last_review === 'string' ? entry.last_review : null;
   const owner = typeof entry.owner === 'string' ? normalizeOptionalString(entry.owner) : null;
   return Boolean(
     status === FOLLOW_UP_REQUIRED_DOCS_FRESHNESS_STATUS
@@ -9343,6 +9346,19 @@ function docsFreshnessRegistryEntryHasValidMetadata(entry: Record<string, unknow
     && owner
     && !FOLLOW_UP_DOCS_FRESHNESS_OWNER_PLACEHOLDERS.has(owner.toLowerCase())
   );
+}
+
+function normalizeDocsFreshnessRegistryPath(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim().replace(/\\/g, '/');
+  if (!trimmed) {
+    return null;
+  }
+  const withoutDotPrefix = trimmed.replace(/^\.\//u, '');
+  const normalized = posix.normalize(withoutDotPrefix).replace(/^\.\//u, '');
+  return normalized === '.' ? null : normalized;
 }
 
 function markdownContainsFollowUpPacketSnapshot(
