@@ -16963,6 +16963,37 @@ describe('providerLinearWorkflowFacade', () => {
       }
     });
 
+    const inactiveRegistryRoot = await mkdtemp(join(tmpdir(), 'provider-linear-follow-up-inactive-registry-'));
+    tempDirs.push(inactiveRegistryRoot);
+    await seedFollowUpPacketReadiness(inactiveRegistryRoot, followUpTaskId);
+    await writeFile(
+      join(inactiveRegistryRoot, 'docs/docs-freshness-registry.json'),
+      JSON.stringify({
+        entries: requiredPaths.map((path) => ({
+          path,
+          owner: 'Codex (top-level agent), Review agent',
+          status: 'preserved_historical_stub',
+          last_review: '2026-05-08',
+          cadence_days: 30
+        }))
+      })
+    );
+    await expect(runWithRepoRoot(inactiveRegistryRoot)).resolves.toMatchObject({
+      ok: true,
+      traceability: {
+        packet: {
+          readiness: {
+            ready: false,
+            missing_registry_mirrors: ['docs/docs-freshness-registry.json']
+          },
+          queue_admission_blocker: {
+            reason: 'backlog_head_follow_up_traceability_pending',
+            state: 'Backlog'
+          }
+        }
+      }
+    });
+
     const incompleteTasksRoot = await mkdtemp(join(tmpdir(), 'provider-linear-follow-up-incomplete-tasks-'));
     tempDirs.push(incompleteTasksRoot);
     await seedFollowUpPacketReadiness(incompleteTasksRoot, followUpTaskId);

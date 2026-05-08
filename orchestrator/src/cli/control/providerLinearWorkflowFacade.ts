@@ -9042,12 +9042,7 @@ const FOLLOW_UP_REGISTRY_MIRRORS = [
   'docs/TASKS.md',
   'docs/docs-freshness-registry.json'
 ] as const;
-const DOCS_FRESHNESS_REGISTRY_STATUSES = new Set([
-  'active',
-  'archived',
-  'deprecated',
-  'preserved_historical_stub'
-]);
+const FOLLOW_UP_REQUIRED_DOCS_FRESHNESS_STATUS = 'active';
 
 function buildFollowUpTaskId(issue: Pick<ProviderLinearCreatedIssue, 'id'>): string {
   return `linear-${issue.id}`;
@@ -9290,8 +9285,7 @@ function docsFreshnessRegistryEntryHasValidMetadata(entry: Record<string, unknow
     : null;
   const lastReview = typeof entry.last_review === 'string' ? normalizeOptionalString(entry.last_review) : null;
   return Boolean(
-    status
-    && DOCS_FRESHNESS_REGISTRY_STATUSES.has(status)
+    status === FOLLOW_UP_REQUIRED_DOCS_FRESHNESS_STATUS
     && cadenceDays !== null
     && cadenceDays > 0
     && lastReview
