@@ -4708,6 +4708,44 @@ function mergeProviderWorkerResponseItemPayloadMetadata(
   };
 }
 
+function hasProviderWorkerResponseItemOutputPayload(value: Record<string, unknown>): boolean {
+  const type = normalizeOptionalString(value.type)?.toLowerCase();
+  return (
+    type === 'function_call_output' ||
+    type === 'tool_result' ||
+    value.output !== undefined ||
+    value.result !== undefined ||
+    value.content !== undefined
+  );
+}
+
+function selectProviderWorkerNestedResponseItemPayload(
+  wrapper: Record<string, unknown>,
+  nestedCandidates: Array<Record<string, unknown> | null>
+): Record<string, unknown> | null {
+  const candidates = nestedCandidates.filter(
+    (candidate): candidate is Record<string, unknown> => candidate !== null
+  );
+  const outputCandidate = candidates.find(hasProviderWorkerResponseItemOutputPayload);
+  if (!outputCandidate) {
+    const firstCandidate = candidates[0] ?? null;
+    return firstCandidate
+      ? mergeProviderWorkerResponseItemPayloadMetadata(wrapper, firstCandidate)
+      : null;
+  }
+  const selectedOutputCandidate = mergeProviderWorkerResponseItemPayloadMetadata(
+    wrapper,
+    outputCandidate
+  );
+  return candidates.reduce(
+    (selected, candidate) =>
+      candidate === outputCandidate
+        ? selected
+        : mergeProviderWorkerResponseItemPayloadMetadata(candidate, selected),
+    selectedOutputCandidate
+  );
+}
+
 function readProviderWorkerResponseItemPayload(input: Record<string, unknown>): Record<string, unknown> | null {
   const payload = isRecord(input.payload) ? input.payload : null;
   const params = isRecord(input.params) ? input.params : null;
@@ -4716,10 +4754,12 @@ function readProviderWorkerResponseItemPayload(input: Record<string, unknown>): 
   const payloadItem = isRecord(payload?.item) ? payload.item : null;
   const payloadResponseItem = isRecord(payload?.response_item) ? payload.response_item : null;
   if (payload) {
-    for (const nested of [payloadItem, payloadResponseItem]) {
-      if (nested) {
-        return mergeProviderWorkerResponseItemPayloadMetadata(payload, nested);
-      }
+    const selectedNested = selectProviderWorkerNestedResponseItemPayload(payload, [
+      payloadItem,
+      payloadResponseItem
+    ]);
+    if (selectedNested) {
+      return selectedNested;
     }
   }
   for (const candidate of [

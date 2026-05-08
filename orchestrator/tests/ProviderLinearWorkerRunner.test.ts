@@ -2827,6 +2827,93 @@ describe('provider linear worker runner', { timeout: providerLinearWorkerRunnerT
     });
   });
 
+  it('prefers nested response_item goal output over metadata-only payload.item', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-nested-response-item-output-goal"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-nested-response-item-output-goal-1"}}',
+        JSON.stringify({
+          type: 'event_msg',
+          payload: {
+            type: 'response_item',
+            item: {
+              type: 'function_call',
+              name: 'get_goal',
+              call_id: 'call-nested-response-item-output-goal'
+            },
+            response_item: {
+              type: 'function_call_output',
+              call_id: 'call-nested-response-item-output-goal',
+              createdAt: '2026-03-21T09:00:02.250Z',
+              output: JSON.stringify({
+                goal: {
+                  threadId: 'thread-nested-response-item-output-goal',
+                  objective: 'nested response item output goal evidence',
+                  status: 'active',
+                  updatedAt: '2026-03-21T08:59:59.000Z'
+                }
+              })
+            }
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:02.250Z',
+      thread_id: 'thread-nested-response-item-output-goal',
+      objective: 'nested response item output goal evidence',
+      status: 'active',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
+  it('prefers nested response_item goal output when wrapper has placeholder output', () => {
+    const parsed = parseProviderLinearWorkerJsonl(
+      [
+        '{"type":"thread.started","thread_id":"thread-nested-wrapper-output-goal"}',
+        '{"type":"turn_context","payload":{"turn_id":"turn-nested-wrapper-output-goal-1"}}',
+        JSON.stringify({
+          type: 'event_msg',
+          payload: {
+            type: 'response_item',
+            output: 'wrapper status without goal payload',
+            item: {
+              type: 'function_call',
+              name: 'get_goal',
+              call_id: 'call-nested-wrapper-output-goal'
+            },
+            response_item: {
+              type: 'function_call_output',
+              call_id: 'call-nested-wrapper-output-goal',
+              createdAt: '2026-03-21T09:00:02.750Z',
+              output: JSON.stringify({
+                goal: {
+                  threadId: 'thread-nested-wrapper-output-goal',
+                  objective: 'nested response item beats wrapper output',
+                  status: 'active',
+                  updatedAt: '2026-03-21T09:00:00.000Z'
+                }
+              })
+            }
+          }
+        })
+      ].join('\n')
+    );
+
+    expect(parsed.goalEvidence).toMatchObject({
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T09:00:02.750Z',
+      thread_id: 'thread-nested-wrapper-output-goal',
+      objective: 'nested response item beats wrapper output',
+      status: 'active',
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+  });
+
   it('keeps scanning wrapper output candidates until the payload goal is found', () => {
     const parsed = parseProviderLinearWorkerJsonl(
       [
