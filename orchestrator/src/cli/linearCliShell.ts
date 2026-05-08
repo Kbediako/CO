@@ -489,7 +489,9 @@ export async function runLinearCliShell(
           dependencies
         });
         if (retrySuppressed) {
-          await recordAuditResult(retrySuppressed, params.flags, env, dependencies);
+          await recordAuditResult(retrySuppressed, params.flags, env, dependencies, {
+            createFollowUpCanonicalOwnerKey: canonicalOwnerKey
+          });
           emitJsonResult(retrySuppressed, dependencies);
           return;
         }
@@ -511,7 +513,9 @@ export async function runLinearCliShell(
             env
           })
         );
-        await recordAuditResult(result, params.flags, env, dependencies);
+        await recordAuditResult(result, params.flags, env, dependencies, {
+          createFollowUpCanonicalOwnerKey: canonicalOwnerKey
+        });
         emitJsonResult(result, dependencies);
         return;
       }
@@ -1361,18 +1365,23 @@ type LinearCliResult =
   | ProviderLinearChildStreamResult
   | ProviderLinearChildLaneResult;
 
+interface LinearCliAuditContext {
+  createFollowUpCanonicalOwnerKey?: string | null;
+}
+
 async function recordAuditResult(
   result: LinearCliResult,
   flags: ArgMap,
   env: NodeJS.ProcessEnv,
-  dependencies: Pick<LinearCliShellDependencies, 'appendAuditEntry' | 'now' | 'warn'>
+  dependencies: Pick<LinearCliShellDependencies, 'appendAuditEntry' | 'now' | 'warn'>,
+  context: LinearCliAuditContext = {}
 ): Promise<void> {
   const auditPath = resolveProviderLinearAuditPath(env);
   if (!auditPath) {
     return;
   }
   try {
-    await dependencies.appendAuditEntry(auditPath, buildAuditEntry(result, flags, env, dependencies.now()));
+    await dependencies.appendAuditEntry(auditPath, buildAuditEntry(result, flags, env, dependencies.now(), context));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     dependencies.warn(`linear audit warning: failed to append audit entry to ${auditPath}: ${message}`);
@@ -1383,11 +1392,12 @@ function buildAuditEntry(
   result: LinearCliResult,
   flags: ArgMap,
   env: NodeJS.ProcessEnv,
-  recordedAt: string
+  recordedAt: string,
+  context: LinearCliAuditContext = {}
 ): ProviderLinearAuditEntry {
   const requestedIssueId = readStringFlag(flags, 'issue-id') ?? null;
   const sourceSetup = resolveAuditSourceSetup(flags, env);
-  const followUpAuditFields = resolveFollowUpAuditFields(result, flags);
+  const followUpAuditFields = resolveFollowUpAuditFields(result, flags, context);
   const followUpFailureAuditFields = resolveFollowUpFailureAuditFields(result);
   if (!result.ok) {
     if (result.operation === 'child-stream') {
@@ -1812,7 +1822,8 @@ function sanitizeLineageIdPart(value: string): string {
 
 function resolveFollowUpAuditFields(
   result: LinearCliResult,
-  flags: ArgMap
+  flags: ArgMap,
+  context: LinearCliAuditContext = {}
 ): Pick<
   ProviderLinearAuditEntry,
   'follow_up_issue_id' | 'follow_up_issue_identifier' | 'failed_relation_type'
@@ -1828,7 +1839,7 @@ function resolveFollowUpAuditFields(
     return {
       follow_up_issue_id: result.follow_up_issue.id,
       follow_up_issue_identifier: result.follow_up_issue.identifier,
-      ...resolveFollowUpIntentAuditField(result, flags),
+      ...resolveFollowUpIntentAuditField(result, flags, context),
       failed_relation_type: null
     };
   }
@@ -1845,7 +1856,7 @@ function resolveFollowUpAuditFields(
   return {
     follow_up_issue_id: readRecordString(followUpIssue, 'id'),
     follow_up_issue_identifier: readRecordString(followUpIssue, 'identifier'),
-    ...resolveFollowUpIntentAuditField(result, flags),
+    ...resolveFollowUpIntentAuditField(result, flags, context),
     failed_relation_type: readUnknownString(details?.failed_relation_type)
   };
 }
@@ -1885,7 +1896,8 @@ function formatFollowUpRelationsAuditVia(relations: Record<string, unknown> | nu
 
 function resolveFollowUpIntentAuditField(
   result: LinearCliResult,
-  flags: ArgMap
+  flags: ArgMap,
+  context: LinearCliAuditContext = {}
 ): Partial<Pick<ProviderLinearAuditEntry, 'follow_up_intent_key'>> {
   if (result.operation !== 'create-follow-up') {
     return {};
@@ -1899,6 +1911,7 @@ function resolveFollowUpIntentAuditField(
       ? result.canonical_owner?.key ?? null
       : readRecordString(readIssueLikeRecord(result.error.details?.canonical_owner), 'key')
   )
+    ?? context.createFollowUpCanonicalOwnerKey
     ?? readStringFlag(flags, 'canonical-owner-key')
     ?? null;
   return {

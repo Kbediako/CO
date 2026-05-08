@@ -1897,6 +1897,59 @@ describe('runLinearCliShell', () => {
     });
   });
 
+  it('records file-backed canonical owner keys in parity failure retry intent audit', async () => {
+    const log = vi.fn();
+    const setExitCode = vi.fn();
+    const { auditPath } = await createProviderLinearAuditFixture('linear-cli-follow-up-parity-key-file-');
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: buildParityFollowUpFlags({
+          'canonical-owner-key-file': '/tmp/canonical-owner-key.txt'
+        }),
+        printHelp: vi.fn()
+      },
+      {
+        readTextFile: vi.fn(async (path: string) => {
+          if (path === '/tmp/canonical-owner-key.txt') {
+            return 'baseline_cohort_id:co-175';
+          }
+          throw new Error(`unexpected read: ${path}`);
+        }),
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: auditPath
+        }),
+        now: () => '2026-04-22T08:05:00.000Z',
+        log,
+        setExitCode
+      }
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_parity_matrix_missing',
+        message: 'Parity/alignment follow-up issues require a parity matrix.',
+        status: 422
+      }
+    });
+    const auditContents = await readOptionalTextFile(auditPath);
+    expect(auditContents).not.toBeNull();
+    expect(JSON.parse(auditContents ?? '')).toMatchObject({
+      recorded_at: '2026-04-22T08:05:00.000Z',
+      operation: 'create-follow-up',
+      ok: false,
+      issue_id: 'lin-issue-1',
+      follow_up_intent_key: 'title=parity%20follow-up;canonical=baseline_cohort_id%3Aco-175;blocked=0;parity=1',
+      error_code: 'linear_follow_up_parity_matrix_missing',
+      error_message: FOLLOW_UP_PARITY_MATRIX_MISSING_MESSAGE
+    });
+  });
+
   it('suppresses same-attempt parity follow-up retries when the inputs remain unchanged', async () => {
     const log = vi.fn();
     const appendAuditEntry = vi.fn();

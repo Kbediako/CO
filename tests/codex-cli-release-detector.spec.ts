@@ -493,6 +493,139 @@ describe('codex CLI release detector', () => {
     expect(workpads[0]).toContain('> ## Closure Gate');
   });
 
+  it('upserts the workpad for packet-blocked create-follow-up JSON', async () => {
+    const repo = await writeFixtureRepo();
+    const calls: string[][] = [];
+    const runner = async (args: string[]) => {
+      calls.push(args);
+      if (args[0] === 'create-follow-up') {
+        return {
+          stdout: JSON.stringify({
+            ok: false,
+            operation: 'create-follow-up',
+            error: {
+              code: 'linear_follow_up_packet_traceability_pending',
+              message: 'Backlog admission remains blocked until packet evidence is ready.',
+              status: 409,
+              details: {
+                action: 'created',
+                follow_up_issue: {
+                  id: 'packet-blocked-linear-id',
+                  identifier: 'CO-400',
+                  url: 'https://linear.app/asabeko/issue/CO-400'
+                }
+              }
+            }
+          }),
+          stderr: ''
+        };
+      }
+      if (args[0] === 'upsert-workpad') {
+        return { stdout: JSON.stringify({ ok: true, action: 'updated' }), stderr: '' };
+      }
+      throw new Error(`unexpected linear command: ${args.join(' ')}`);
+    };
+
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: repo,
+      artifactPath: 'out/detection.json',
+      fetchImpl: mockFetch({ stable: '0.126.0' }),
+      env: { CO_LINEAR_API_TOKEN: 'test-token' },
+      linearRunner: runner
+    });
+
+    expect(exitCode).toBe(0);
+    expect(artifact.mutation_result.action).toBe('created');
+    expect(artifact.mutation_result.create_follow_up.ok).toBe(false);
+    expect(artifact.mutation_result.selected_issue.id).toBe('packet-blocked-linear-id');
+    expect(calls.some((args) => args[0] === 'upsert-workpad' && args.includes('packet-blocked-linear-id'))).toBe(true);
+  });
+
+  it('fails closed when create-follow-up returns non-packet failure JSON', async () => {
+    const repo = await writeFixtureRepo();
+    const runner = async (args: string[]) => {
+      if (args[0] === 'create-follow-up') {
+        return {
+          stdout: JSON.stringify({
+            ok: false,
+            operation: 'create-follow-up',
+            error: {
+              code: 'linear_graphql_error',
+              message: 'Linear relation creation failed.',
+              status: 502,
+              details: {
+                follow_up_issue: {
+                  id: 'created-linear-id',
+                  identifier: 'CO-400'
+                }
+              }
+            }
+          }),
+          stderr: ''
+        };
+      }
+      throw new Error(`unexpected linear command: ${args.join(' ')}`);
+    };
+
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: repo,
+      artifactPath: 'out/detection.json',
+      fetchImpl: mockFetch({ stable: '0.126.0' }),
+      env: { CO_LINEAR_API_TOKEN: 'test-token' },
+      linearRunner: runner
+    });
+
+    expect(exitCode).toBe(2);
+    expect(artifact.decision_state).toBe('blocked_detector_error');
+    expect(artifact.blocker_reason).toContain('Linear create-follow-up failed: linear_graphql_error');
+  });
+
+  it('fails closed when upsert-workpad returns failed JSON', async () => {
+    const repo = await writeFixtureRepo();
+    const runner = async (args: string[]) => {
+      if (args[0] === 'create-follow-up') {
+        return {
+          stdout: JSON.stringify({
+            ok: true,
+            action: 'created',
+            follow_up_issue: {
+              id: 'created-linear-id',
+              identifier: 'CO-400'
+            }
+          }),
+          stderr: ''
+        };
+      }
+      if (args[0] === 'upsert-workpad') {
+        return {
+          stdout: JSON.stringify({
+            ok: false,
+            operation: 'upsert-workpad',
+            error: {
+              code: 'linear_workpad_update_failed',
+              message: 'Linear workpad update failed.',
+              status: 503
+            }
+          }),
+          stderr: ''
+        };
+      }
+      throw new Error(`unexpected linear command: ${args.join(' ')}`);
+    };
+
+    const { artifact, exitCode } = await runCodexCliReleaseDetector({
+      repoRoot: repo,
+      artifactPath: 'out/detection.json',
+      fetchImpl: mockFetch({ stable: '0.126.0' }),
+      env: { CO_LINEAR_API_TOKEN: 'test-token' },
+      linearRunner: runner
+    });
+
+    expect(exitCode).toBe(2);
+    expect(artifact.decision_state).toBe('blocked_detector_error');
+    expect(artifact.blocker_reason).toContain('Linear upsert-workpad failed: linear_workpad_update_failed');
+  });
+
   it('records prerelease-only movement without Linear mutation', async () => {
     const repo = await writeFixtureRepo();
 

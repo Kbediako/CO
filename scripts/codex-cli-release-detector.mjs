@@ -641,6 +641,30 @@ function parseLinearJson(stdout, stderr, commandName) {
   }
 }
 
+function assertLinearJsonSuccess(result, commandName) {
+  if (!result || result.ok !== false) {
+    return;
+  }
+  const code = result.error?.code ?? 'linear_command_failed';
+  const message = result.error?.message ?? `${commandName} returned ok:false.`;
+  throw new Error(`${commandName} failed: ${code}: ${message}`);
+}
+
+function isExpectedPacketBlockedCreateFollowUpResult(result) {
+  if (!result || result.ok !== false || result.operation !== 'create-follow-up') {
+    return false;
+  }
+  const code = result.error?.code;
+  if (
+    code !== 'linear_follow_up_packet_traceability_pending' &&
+    code !== 'linear_follow_up_packet_traceability_retry_suppressed'
+  ) {
+    return false;
+  }
+  const issue = parseLinearIssueFromResult(result);
+  return Boolean(issue.id || issue.identifier);
+}
+
 export function defaultLinearRunner({ nodePath = process.execPath, scriptPath = join(process.cwd(), 'dist/bin/codex-orchestrator.js') } = {}) {
   return async (args, options = {}) => {
     try {
@@ -725,6 +749,9 @@ export async function runLinearMutation({
     ];
     const createResultRaw = await linearRunner(createArgs, { cwd: repoRoot, env });
     const createResult = parseLinearJson(createResultRaw.stdout, createResultRaw.stderr, 'Linear create-follow-up');
+    if (!isExpectedPacketBlockedCreateFollowUpResult(createResult)) {
+      assertLinearJsonSuccess(createResult, 'Linear create-follow-up');
+    }
     const selectedIssue = parseLinearIssueFromResult(createResult);
     if (!selectedIssue.id && !selectedIssue.identifier) {
       throw new Error('Linear create-follow-up did not return a selected issue id or identifier.');
@@ -736,6 +763,7 @@ export async function runLinearMutation({
       { cwd: repoRoot, env }
     );
     const upsertResult = parseLinearJson(upsertResultRaw.stdout, upsertResultRaw.stderr, 'Linear upsert-workpad');
+    assertLinearJsonSuccess(upsertResult, 'Linear upsert-workpad');
     return {
       action: createResult.action ?? createResult.error?.details?.action ?? createResult.operation ?? 'created_or_reused',
       canonical_owner_key: packet.canonicalOwnerKey,
