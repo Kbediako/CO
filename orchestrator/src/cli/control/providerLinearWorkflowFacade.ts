@@ -4136,7 +4136,10 @@ async function findCanonicalFollowUpOwnerIssues(input: {
   };
 }
 
-function descriptionHasExactCanonicalOwnerMarker(description: string | null | undefined, marker: string): boolean {
+export function descriptionHasExactCanonicalOwnerMarker(
+  description: string | null | undefined,
+  marker: string
+): boolean {
   const markerLines = new Set([
     `- Canonical owner marker: \`${marker}\``,
     `* Canonical owner marker: \`${marker}\``,

@@ -13,6 +13,7 @@ import {
   buildFollowUpPacketTraceabilityEvidence,
   createProviderLinearFollowUpIssue,
   deleteProviderLinearWorkpadComment,
+  descriptionHasExactCanonicalOwnerMarker,
   findMissingFollowUpLabelIds,
   getProviderLinearIssueContext,
   resolveFollowUpLabelsFromSourceIssue,
@@ -996,7 +997,7 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
     : null;
   if (
     canonicalOwnerMarker &&
-    !(followUpContext.issue.description ?? '').includes(canonicalOwnerMarker)
+    !descriptionHasExactCanonicalOwnerMarker(followUpContext.issue.description, canonicalOwnerMarker)
   ) {
     return {
       ok: false,

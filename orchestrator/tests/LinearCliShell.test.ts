@@ -2601,11 +2601,18 @@ describe('runLinearCliShell', () => {
     await seedCliFollowUpPacketReadiness(repoRoot, 'linear-lin-issue-2');
     const createProviderLinearFollowUpIssueMock =
       vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>();
-    const getProviderLinearIssueContextMock = buildRetryIssueContextMock({
-      followUpDescription: '## Immediate Traceability\n- Follow-up packet prefix: `linear-lin-issue-2`'
-    });
     const canonicalOwnerKey = 'baseline_cohort_id:co-175';
     const canonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
+    const getProviderLinearIssueContextMock = buildRetryIssueContextMock({
+      followUpDescription: [
+        `The marker ${canonicalOwnerMarker} appears only in prose and must not satisfy managed evidence.`,
+        '```md',
+        `- Canonical owner marker: \`${canonicalOwnerMarker}\``,
+        '```',
+        '## Immediate Traceability',
+        '- Follow-up packet prefix: `linear-lin-issue-2`'
+      ].join('\n')
+    });
     const { auditPath, loadProviderLinearWorkerContextMock } = await createSameAttemptFollowUpFixture(
       'linear-cli-follow-up-canonical-marker-missing-',
       [
