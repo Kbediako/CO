@@ -990,6 +990,35 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
   if (!packetTraceability.readiness.ready) {
     return null;
   }
+  const canonicalOwnerMarker = input.canonicalOwnerKey
+    ? buildCanonicalOwnerMarker(input.canonicalOwnerKey)
+    : null;
+  if (
+    canonicalOwnerMarker &&
+    !(followUpContext.issue.description ?? '').includes(canonicalOwnerMarker)
+  ) {
+    return {
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_canonical_owner_marker_missing',
+        message: 'Linear follow-up canonical owner marker is missing from the live follow-up issue description.',
+        status: 409,
+        retryable: false,
+        details: {
+          canonical_owner: {
+            key: input.canonicalOwnerKey,
+            marker: canonicalOwnerMarker
+          },
+          follow_up_issue: {
+            id: followUpContext.issue.id,
+            identifier: followUpContext.issue.identifier
+          },
+          failed_step: 'packet_retry_canonical_owner_marker_verification'
+        }
+      }
+    };
+  }
   const sourceContext = await input.dependencies.getProviderLinearIssueContext({
     issueId: sourceIssueId,
     env: input.env
@@ -1059,10 +1088,10 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
       team: followUpTeam,
       project: followUpContext.issue.project
     },
-    canonical_owner: input.canonicalOwnerKey
+    canonical_owner: input.canonicalOwnerKey && canonicalOwnerMarker
       ? {
           key: input.canonicalOwnerKey,
-          marker: `${LINEAR_CANONICAL_OWNER_MARKER_PREFIX}${input.canonicalOwnerKey}`
+          marker: canonicalOwnerMarker
         }
       : null,
     relations: {
@@ -1101,6 +1130,10 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
     },
     source_setup: null
   };
+}
+
+function buildCanonicalOwnerMarker(canonicalOwnerKey: string): string {
+  return `${LINEAR_CANONICAL_OWNER_MARKER_PREFIX}${canonicalOwnerKey}`;
 }
 
 async function refreshParallelizationProofSnapshotBestEffort(
