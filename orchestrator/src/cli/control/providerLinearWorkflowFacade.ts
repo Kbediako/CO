@@ -3287,7 +3287,7 @@ export async function createProviderLinearFollowUpIssue(input: {
   };
 }
 
-function resolveFollowUpLabelsFromSourceIssue(issue: ProviderLinearIssueSummary):
+export function resolveFollowUpLabelsFromSourceIssue(issue: ProviderLinearIssueSummary):
   | {
       ok: true;
       labels: ProviderLinearIssueLabel[];
@@ -3833,7 +3833,7 @@ function verifyFollowUpIssueLabels(input: {
   };
 }
 
-function findMissingFollowUpLabelIds(
+export function findMissingFollowUpLabelIds(
   currentLabels: readonly ProviderLinearIssueLabel[] | undefined,
   requestedLabels: readonly ProviderLinearIssueLabel[]
 ): string[] {

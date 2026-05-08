@@ -13,7 +13,9 @@ import {
   buildFollowUpPacketTraceabilityEvidence,
   createProviderLinearFollowUpIssue,
   deleteProviderLinearWorkpadComment,
+  findMissingFollowUpLabelIds,
   getProviderLinearIssueContext,
+  resolveFollowUpLabelsFromSourceIssue,
   type ProviderLinearAttachPrResult,
   type ProviderLinearCreateFollowUpResult,
   type ProviderLinearDeleteWorkpadResult,
@@ -974,6 +976,50 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
   if (!packetTraceability.readiness.ready) {
     return null;
   }
+  const sourceContext = await input.dependencies.getProviderLinearIssueContext({
+    issueId: sourceIssueId,
+    env: input.env
+  });
+  if (!sourceContext.ok) {
+    return null;
+  }
+  const requestedLabels = resolveFollowUpLabelsFromSourceIssue(sourceContext.issue);
+  if (!requestedLabels.ok) {
+    return {
+      ok: false,
+      operation: 'create-follow-up',
+      error: requestedLabels.error
+    };
+  }
+  const missingLabelIds = findMissingFollowUpLabelIds(
+    followUpContext.issue.labels,
+    requestedLabels.labels
+  );
+  if (missingLabelIds.length > 0) {
+    return {
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_label_assignment_incomplete',
+        message: 'Linear follow-up issue label assignment did not return all requested live labels.',
+        status: 409,
+        retryable: false,
+        details: {
+          issue: {
+            id: sourceContext.issue.id,
+            identifier: sourceContext.issue.identifier
+          },
+          follow_up_issue: {
+            id: followUpContext.issue.id,
+            identifier: followUpContext.issue.identifier
+          },
+          requested_labels: requestedLabels.labels,
+          observed_labels: followUpContext.issue.labels,
+          missing_label_ids: missingLabelIds
+        }
+      }
+    };
+  }
   const followUpTeam = followUpContext.issue.team
     ? {
         id: followUpContext.issue.team.id,
@@ -986,8 +1032,8 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
     operation: 'create-follow-up',
     action: 'reused',
     issue: {
-      id: sourceIssueId,
-      identifier: sourceIssueIdentifier
+      id: sourceContext.issue.id,
+      identifier: sourceContext.issue.identifier
     },
     follow_up_issue: {
       id: followUpContext.issue.id,
@@ -1012,11 +1058,11 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
     traceability: {
       labels: {
         source_issue: {
-          id: sourceIssueId,
-          identifier: sourceIssueIdentifier
+          id: sourceContext.issue.id,
+          identifier: sourceContext.issue.identifier
         },
-        requested_labels: [],
-        observed_labels: null,
+        requested_labels: requestedLabels.labels,
+        observed_labels: followUpContext.issue.labels,
         missing_label_ids: []
       },
       relations: {
