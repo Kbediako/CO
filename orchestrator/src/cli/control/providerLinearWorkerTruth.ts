@@ -11,6 +11,10 @@ const FOLLOW_UP_PARITY_MATRIX_SUPPRESSION_CODES = new Set([
   'linear_follow_up_parity_matrix_missing',
   'linear_follow_up_parity_matrix_retry_suppressed'
 ]);
+const FOLLOW_UP_PACKET_TRACEABILITY_SUPPRESSION_CODES = new Set([
+  'linear_follow_up_packet_traceability_pending',
+  'linear_follow_up_packet_traceability_retry_suppressed'
+]);
 const CHILD_LANE_PARENT_DIRTY_SUPPRESSION_CODES = new Set([
   'provider_worker_child_lane_parent_dirty',
   'provider_worker_child_lane_parent_dirty_retry_suppressed'
@@ -144,6 +148,7 @@ export function deriveDeterministicProviderMutationSuppressions(
   options: {
     recordedAtNotBefore?: string | null;
     issueId?: string | null;
+    followUpIntentKey?: string | null;
   } = {}
 ): ProviderLinearMutationSuppression[] {
   if (!audit) {
@@ -163,13 +168,43 @@ export function deriveDeterministicProviderMutationSuppressions(
     return [];
   }
   const issueId = normalizeOptionalString(options.issueId);
-  const entries = selectProviderLinearMutationEntries(audit, latestByOperation)
+  const followUpIntentKey = normalizeOptionalString(options.followUpIntentKey);
+  const scopedEntries = selectProviderLinearMutationEntries(audit, latestByOperation)
     .filter((entry): entry is ProviderLinearAuditEntry => Boolean(entry))
     .filter((entry) => !issueId || entry.issue_id === issueId)
+    .filter((entry) => (
+      entry.operation !== 'create-follow-up'
+      || !followUpIntentKey
+      || entry.follow_up_intent_key === followUpIntentKey
+    ))
     .filter((entry) =>
       readTimestampMs(entry as unknown as Record<string, unknown>, 'recorded_at') >= recordedAtNotBeforeMs
-    )
+    );
+  const latestCreateFollowUpEntriesByIntent = scopedEntries
+    .filter((entry) => entry.operation === 'create-follow-up')
+    .reduce<Map<string, ProviderLinearAuditEntry>>((latestByIntent, entry) => {
+      const key = buildProviderLinearCreateFollowUpIntentKey(entry);
+      const current = latestByIntent.get(key);
+      const entryMs = readTimestampMs(entry as unknown as Record<string, unknown>, 'recorded_at');
+      const currentMs = current
+        ? readTimestampMs(current as unknown as Record<string, unknown>, 'recorded_at')
+        : Number.NEGATIVE_INFINITY;
+      if (!current || entryMs >= currentMs) {
+        latestByIntent.set(key, entry);
+      }
+      return latestByIntent;
+    }, new Map<string, ProviderLinearAuditEntry>());
+  const entries = scopedEntries
     .filter((entry) => entry.ok === false && isDeterministicProviderMutationFailure(entry))
+    .filter((entry) => {
+      if (entry.operation !== 'create-follow-up') {
+        return true;
+      }
+      const latestForIntent = latestCreateFollowUpEntriesByIntent.get(
+        buildProviderLinearCreateFollowUpIntentKey(entry)
+      );
+      return latestForIntent?.ok !== true;
+    })
     .reduce<Map<string, ProviderLinearAuditEntry>>((latestByOperationAndAction, entry) => {
       latestByOperationAndAction.set(buildProviderLinearMutationEntryKey(entry), entry);
       return latestByOperationAndAction;
@@ -194,6 +229,7 @@ export function findDeterministicProviderMutationSuppression(
     recordedAtNotBefore?: string | null;
     action?: string | null;
     issueId?: string | null;
+    followUpIntentKey?: string | null;
   } = {}
 ): ProviderLinearMutationSuppression | null {
   const requestedAction = normalizeAuditAction(options.action);
@@ -211,6 +247,13 @@ export function isFollowUpParityMatrixSuppressionCode(
 ): boolean {
   const normalized = normalizeOptionalString(errorCode);
   return normalized ? FOLLOW_UP_PARITY_MATRIX_SUPPRESSION_CODES.has(normalized) : false;
+}
+
+export function isFollowUpPacketTraceabilitySuppressionCode(
+  errorCode: string | null | undefined
+): boolean {
+  const normalized = normalizeOptionalString(errorCode);
+  return normalized ? FOLLOW_UP_PACKET_TRACEABILITY_SUPPRESSION_CODES.has(normalized) : false;
 }
 
 export function isChildLaneParentDirtySuppressionCode(
@@ -249,11 +292,15 @@ function buildDeterministicProviderMutationSuppression(
         error_code: errorCode,
         error_message: errorMessage,
         instruction:
-          isFollowUpParityMatrixSuppressionCode(errorCode)
+          isFollowUpPacketTraceabilitySuppressionCode(errorCode)
+            ? 'Do not retry `create-follow-up` in this attempt until you reconcile the existing follow-up issue from the error details and prove its packet prefix, packet files, docs/TASKS.md mirror, tasks/index.json entry, and docs-freshness registry entries are ready.'
+            : isFollowUpParityMatrixSuppressionCode(errorCode)
             ? 'Do not retry `create-follow-up` in this attempt unless you first add the required parity matrix or explicitly reclassify the follow-up as non-parity/alignment and omit `--parity-lane`.'
             : buildGenericSuppressionInstruction(entry.operation, errorCode, errorMessage),
         summary:
-          isFollowUpParityMatrixSuppressionCode(errorCode)
+          isFollowUpPacketTraceabilitySuppressionCode(errorCode)
+            ? 'deterministic provider mutation suppressed: create-follow-up retry is blocked until the existing follow-up packet and registry mirrors are ready'
+            : isFollowUpParityMatrixSuppressionCode(errorCode)
             ? 'deterministic provider mutation suppressed: create-follow-up retry is blocked until a parity matrix is added or the follow-up is reclassified as non-parity/alignment with --parity-lane omitted'
             : buildGenericSuppressionSummary(entry.operation, errorCode, errorMessage)
       };
@@ -383,6 +430,9 @@ function isDeterministicProviderMutationFailure(entry: ProviderLinearAuditEntry)
   if (isFollowUpParityMatrixSuppressionCode(errorCode)) {
     return true;
   }
+  if (isFollowUpPacketTraceabilitySuppressionCode(errorCode)) {
+    return true;
+  }
   if (isChildLaneParentDirtySuppressionCode(errorCode)) {
     return true;
   }
@@ -507,7 +557,18 @@ function selectProviderLinearMutationEntries(
 }
 
 function buildProviderLinearMutationEntryKey(entry: ProviderLinearAuditEntry): string {
-  return `${entry.operation}:${normalizeAuditAction(entry.action) ?? ''}`;
+  return [
+    entry.operation,
+    normalizeAuditAction(entry.action) ?? '',
+    entry.operation === 'create-follow-up' ? normalizeOptionalString(entry.follow_up_intent_key) ?? '' : ''
+  ].join(':');
+}
+
+function buildProviderLinearCreateFollowUpIntentKey(entry: ProviderLinearAuditEntry): string {
+  return [
+    entry.operation,
+    normalizeOptionalString(entry.follow_up_intent_key) ?? ''
+  ].join(':');
 }
 
 function normalizeAuditAction(value: string | null | undefined): string | null {

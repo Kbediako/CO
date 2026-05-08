@@ -1,6 +1,6 @@
 /* eslint-disable patterns/prefer-logger-over-console */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import process from 'node:process';
@@ -10,9 +10,14 @@ import {
 } from './control/linearDispatchSource.js';
 import {
   attachProviderLinearIssuePr,
+  buildFollowUpPacketTraceabilityEvidence,
   createProviderLinearFollowUpIssue,
   deleteProviderLinearWorkpadComment,
+  descriptionHasExactCanonicalOwnerMarker,
+  findMissingFollowUpLabelIds,
   getProviderLinearIssueContext,
+  reconcileProviderLinearFollowUpRelations,
+  resolveFollowUpLabelsFromSourceIssue,
   type ProviderLinearAttachPrResult,
   type ProviderLinearCreateFollowUpResult,
   type ProviderLinearDeleteWorkpadResult,
@@ -32,11 +37,13 @@ import {
   type ProviderLinearDecisionLineage,
   type ProviderLinearParallelizationDecision,
   type ProviderLinearParallelizationReason,
-  type ProviderLinearAuditEntry
+  type ProviderLinearAuditEntry,
+  type ProviderLinearAuditSummary
 } from './control/providerLinearWorkflowAudit.js';
 import {
   findDeterministicProviderMutationSuppression,
   isFollowUpParityMatrixSuppressionCode,
+  isFollowUpPacketTraceabilitySuppressionCode,
   resolveProviderLinearWorkerAttemptStartedAt
 } from './control/providerLinearWorkerTruth.js';
 import {
@@ -82,6 +89,7 @@ interface LinearCliShellDependencies {
   runProviderLinearChildStreamShell: typeof runProviderLinearChildStreamShell;
   runProviderLinearChildLaneShell: typeof runProviderLinearChildLaneShell;
   createProviderLinearFollowUpIssue: typeof createProviderLinearFollowUpIssue;
+  reconcileProviderLinearFollowUpRelations: typeof reconcileProviderLinearFollowUpRelations;
   resolveProviderLinearRuntimeProof: typeof resolveProviderLinearRuntimeProof;
   resolveProviderLinearScreenshotProof: typeof resolveProviderLinearScreenshotProof;
   loadProviderLinearWorkerContext: typeof loadProviderLinearWorkerContext;
@@ -198,6 +206,7 @@ const DEFAULT_DEPENDENCIES: LinearCliShellDependencies = {
   runProviderLinearChildStreamShell,
   runProviderLinearChildLaneShell,
   createProviderLinearFollowUpIssue,
+  reconcileProviderLinearFollowUpRelations,
   resolveProviderLinearRuntimeProof,
   resolveProviderLinearScreenshotProof,
   loadProviderLinearWorkerContext,
@@ -224,6 +233,7 @@ const LINEAR_MUTATING_SUBCOMMANDS = new Set([
   'child-stream',
   'child-lane'
 ]);
+const LINEAR_CANONICAL_OWNER_MARKER_PREFIX = 'codex-orchestrator:canonical-owner-key=';
 
 export async function runLinearCliShell(
   params: RunLinearCliShellParams,
@@ -457,6 +467,8 @@ export async function runLinearCliShell(
           'acceptance-criteria',
           'acceptance-criteria-file'
         );
+        const issueId = requireFlag(params.flags, 'issue-id');
+        const title = requireFlag(params.flags, 'title');
         const parityLane = readBooleanFlag(params.flags, 'parity-lane');
         const parityMatrix = await resolveOptionalText(
           params.flags,
@@ -464,39 +476,58 @@ export async function runLinearCliShell(
           'parity-matrix',
           'parity-matrix-file'
         );
+        const canonicalOwnerKey = await resolveOptionalText(
+          params.flags,
+          dependencies.readTextFile,
+          'canonical-owner-key',
+          'canonical-owner-key-file'
+        );
+        const blockedBySource = readBooleanFlag(params.flags, 'blocked-by-source');
+        const sourceSetup = readSourceSetup(params.flags);
+        const repoRoot = resolveFollowUpPacketRepoRoot(dependencies.getCwd(), env);
         const retrySuppressed = await resolveCreateFollowUpRetrySuppression({
-          issueId: requireFlag(params.flags, 'issue-id'),
+          issueId,
+          title,
+          intentChecksum,
+          canonicalOwnerKey,
+          blockedBySource,
           parityLane,
           parityMatrix,
+          repoRoot,
+          sourceSetup,
           env,
           dependencies
         });
         if (retrySuppressed) {
-          await recordAuditResult(retrySuppressed, params.flags, env, dependencies);
+          await recordAuditResult(retrySuppressed, params.flags, env, dependencies, {
+            createFollowUpCanonicalOwnerKey: canonicalOwnerKey,
+            createFollowUpIntentChecksum: intentChecksum
+          });
           emitJsonResult(retrySuppressed, dependencies);
           return;
         }
-        const result = await dependencies.createProviderLinearFollowUpIssue({
-          issueId: requireFlag(params.flags, 'issue-id'),
-          title: requireFlag(params.flags, 'title'),
-          description,
-          intentChecksum,
-          nonGoals,
-          notDoneIf,
-          acceptanceCriteria,
-          parityLane,
-          parityMatrix,
-          canonicalOwnerKey: await resolveOptionalText(
-            params.flags,
-            dependencies.readTextFile,
-            'canonical-owner-key',
-            'canonical-owner-key-file'
-          ),
-          blockedBySource: readBooleanFlag(params.flags, 'blocked-by-source'),
-          sourceSetup: readSourceSetup(params.flags),
-          env
+        const result = normalizeCreateFollowUpResultForCli(
+          await dependencies.createProviderLinearFollowUpIssue({
+            issueId,
+            title,
+            description,
+            intentChecksum,
+            nonGoals,
+            notDoneIf,
+            acceptanceCriteria,
+            parityLane,
+            parityMatrix,
+            canonicalOwnerKey,
+            blockedBySource,
+            repoRoot,
+            sourceSetup,
+            env
+          })
+        );
+        await recordAuditResult(result, params.flags, env, dependencies, {
+          createFollowUpCanonicalOwnerKey: canonicalOwnerKey,
+          createFollowUpIntentChecksum: intentChecksum
         });
-        await recordAuditResult(result, params.flags, env, dependencies);
         emitJsonResult(result, dependencies);
         return;
       }
@@ -745,17 +776,24 @@ async function resolveProviderLinearWorkerAttemptStartedAtForIssue(
 
 async function resolveCreateFollowUpRetrySuppression(input: {
   issueId: string;
+  title: string;
+  intentChecksum: string;
+  canonicalOwnerKey: string | null;
+  blockedBySource: boolean;
   parityLane: boolean;
   parityMatrix: string | null;
+  repoRoot: string;
+  sourceSetup: DispatchPilotSourceSetup | null;
   env: NodeJS.ProcessEnv;
   dependencies: Pick<
     LinearCliShellDependencies,
-    'loadProviderLinearWorkerContext' | 'readTextFile' | 'warn'
+    | 'getProviderLinearIssueContext'
+    | 'reconcileProviderLinearFollowUpRelations'
+    | 'loadProviderLinearWorkerContext'
+    | 'readTextFile'
+    | 'warn'
   >;
 }): Promise<ProviderLinearCreateFollowUpResult | null> {
-  if (!input.parityLane || (input.parityMatrix?.trim().length ?? 0) > 0) {
-    return null;
-  }
   const auditPath = resolveProviderLinearAuditPath(input.env);
   if (!auditPath) {
     return null;
@@ -778,26 +816,360 @@ async function resolveCreateFollowUpRetrySuppression(input: {
     );
     return null;
   }
+  const followUpIntentKey = buildFollowUpIntentKey(input);
   const suppression = findDeterministicProviderMutationSuppression(
     audit,
     'create-follow-up',
     {
       recordedAtNotBefore: attemptStartedAt,
-      issueId: input.issueId
+      issueId: input.issueId,
+      followUpIntentKey
     }
   );
-  if (!suppression || !isFollowUpParityMatrixSuppressionCode(suppression.error_code)) {
+  if (!suppression) {
+    return null;
+  }
+  if (input.parityLane && (input.parityMatrix?.trim().length ?? 0) === 0) {
+    if (!isFollowUpParityMatrixSuppressionCode(suppression.error_code)) {
+      return null;
+    }
+    return {
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_parity_matrix_retry_suppressed',
+        message: `Same-attempt retry suppressed: ${suppression.instruction}`,
+        status: 409
+      }
+    };
+  }
+  if (isFollowUpPacketTraceabilitySuppressionCode(suppression.error_code)) {
+    const suppressionEntry = findLatestCreateFollowUpSuppressionAuditEntry({
+      audit,
+      issueId: input.issueId,
+      recordedAtNotBefore: attemptStartedAt,
+      followUpIntentKey,
+      matchesErrorCode: isFollowUpPacketTraceabilityPendingCode
+    });
+    const reconciledRetry = suppressionEntry
+      ? await buildLocallyReconciledFollowUpPacketRetryResult({
+          entry: suppressionEntry,
+          title: input.title,
+          canonicalOwnerKey: input.canonicalOwnerKey,
+          blockedBySource: input.blockedBySource,
+          repoRoot: input.repoRoot,
+          sourceSetup: input.sourceSetup,
+          env: input.env,
+          dependencies: input.dependencies
+        })
+      : null;
+    if (reconciledRetry) {
+      return reconciledRetry;
+    }
+    return {
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_packet_traceability_retry_suppressed',
+        message: `Same-attempt retry suppressed: ${suppression.instruction}`,
+        status: 409,
+        details: {
+          follow_up_issue: suppressionEntry
+            ? {
+                id: suppressionEntry.follow_up_issue_id,
+                identifier: suppressionEntry.follow_up_issue_identifier
+              }
+            : null,
+          audit_entry: suppressionEntry
+            ? {
+                recorded_at: suppressionEntry.recorded_at,
+                action: suppressionEntry.action,
+                via: suppressionEntry.via,
+                state: suppressionEntry.state,
+                follow_up_intent_key: suppressionEntry.follow_up_intent_key ?? null,
+                error_code: suppressionEntry.error_code
+              }
+            : null
+        }
+      }
+    };
+  }
+  return null;
+}
+
+function buildFollowUpIntentKey(input: {
+  title: string;
+  intentChecksum: string;
+  canonicalOwnerKey: string | null;
+  blockedBySource: boolean;
+  parityLane: boolean;
+}): string {
+  return [
+    `title=${normalizeFollowUpIntentKeyPart(input.title)}`,
+    `intent=${normalizeFollowUpIntentKeyPart(input.intentChecksum)}`,
+    `canonical=${normalizeFollowUpIntentKeyPart(input.canonicalOwnerKey ?? '')}`,
+    `blocked=${input.blockedBySource ? '1' : '0'}`,
+    `parity=${input.parityLane ? '1' : '0'}`
+  ].join(';');
+}
+
+function normalizeFollowUpIntentKeyPart(value: string): string {
+  return encodeURIComponent(value.trim().toLowerCase());
+}
+
+function findLatestCreateFollowUpSuppressionAuditEntry(input: {
+  audit: ProviderLinearAuditSummary;
+  issueId: string;
+  recordedAtNotBefore: string;
+  followUpIntentKey: string;
+  matchesErrorCode: (errorCode: string | null | undefined) => boolean;
+}): ProviderLinearAuditEntry | null {
+  const lowerBoundMs = Date.parse(input.recordedAtNotBefore);
+  if (!Number.isFinite(lowerBoundMs) || !Array.isArray(input.audit.entries)) {
+    return null;
+  }
+  return input.audit.entries
+    .filter((entry) => (
+      entry.operation === 'create-follow-up'
+      && entry.ok === false
+      && entry.issue_id === input.issueId
+      && entry.follow_up_intent_key === input.followUpIntentKey
+      && input.matchesErrorCode(entry.error_code)
+      && Date.parse(entry.recorded_at) >= lowerBoundMs
+    ))
+    .sort((left, right) => Date.parse(right.recorded_at) - Date.parse(left.recorded_at))[0] ?? null;
+}
+
+async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
+  entry: ProviderLinearAuditEntry;
+  title: string;
+  canonicalOwnerKey: string | null;
+  blockedBySource: boolean;
+  repoRoot: string;
+  sourceSetup: DispatchPilotSourceSetup | null;
+  env: NodeJS.ProcessEnv;
+  dependencies: Pick<
+    LinearCliShellDependencies,
+    'getProviderLinearIssueContext' | 'reconcileProviderLinearFollowUpRelations'
+  >;
+}): Promise<ProviderLinearCreateFollowUpResult | null> {
+  const entry = input.entry;
+  const followUpIssueId = normalizeOptionalString(entry.follow_up_issue_id);
+  if (!followUpIssueId) {
+    return null;
+  }
+  const sourceIssueId = normalizeOptionalString(entry.issue_id);
+  const sourceIssueIdentifier = normalizeOptionalString(entry.issue_identifier) ?? sourceIssueId;
+  const followUpIssueIdentifier = normalizeOptionalString(entry.follow_up_issue_identifier);
+  if (!sourceIssueId || !sourceIssueIdentifier || !followUpIssueIdentifier) {
+    return null;
+  }
+  const localPacketTraceability = await buildFollowUpPacketTraceabilityEvidence({
+    id: followUpIssueId,
+    description: null,
+    state: {
+      id: 'audit-backlog-state',
+      name: entry.state ?? 'Backlog',
+      type: null
+    }
+  }, input.repoRoot);
+  if (
+    localPacketTraceability.readiness.missing_paths.length > 0
+    || localPacketTraceability.readiness.missing_registry_mirrors.length > 0
+  ) {
+    return null;
+  }
+  const sourceScopedInput = input.sourceSetup
+    ? { sourceSetup: input.sourceSetup }
+    : {};
+  const followUpContext = await input.dependencies.getProviderLinearIssueContext({
+    issueId: followUpIssueId,
+    ...sourceScopedInput,
+    env: input.env
+  });
+  if (!followUpContext.ok) {
+    return null;
+  }
+  const followUpMutabilityFailure = buildCreateFollowUpIssueNotMutableResult(followUpContext.issue);
+  if (followUpMutabilityFailure) {
+    return followUpMutabilityFailure;
+  }
+  const packetTraceability = await buildFollowUpPacketTraceabilityEvidence(
+    followUpContext.issue,
+    input.repoRoot
+  );
+  if (!packetTraceability.readiness.ready) {
+    return null;
+  }
+  const canonicalOwnerKey = normalizeOptionalString(input.canonicalOwnerKey);
+  const canonicalOwnerMarker = canonicalOwnerKey
+    ? buildCanonicalOwnerMarker(canonicalOwnerKey)
+    : null;
+  if (
+    canonicalOwnerMarker &&
+    !descriptionHasExactCanonicalOwnerMarker(followUpContext.issue.description, canonicalOwnerMarker)
+  ) {
+    return {
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_canonical_owner_marker_missing',
+        message: 'Linear follow-up canonical owner marker is missing from the live follow-up issue description.',
+        status: 409,
+        retryable: false,
+        details: {
+          canonical_owner: {
+            key: canonicalOwnerKey,
+            marker: canonicalOwnerMarker
+          },
+          follow_up_issue: {
+            id: followUpContext.issue.id,
+            identifier: followUpContext.issue.identifier
+          },
+          failed_step: 'packet_retry_canonical_owner_marker_verification'
+        }
+      }
+    };
+  }
+  const sourceContext = await input.dependencies.getProviderLinearIssueContext({
+    issueId: sourceIssueId,
+    ...sourceScopedInput,
+    env: input.env
+  });
+  if (!sourceContext.ok) {
+    return null;
+  }
+  const requestedLabels = resolveFollowUpLabelsFromSourceIssue(sourceContext.issue);
+  if (!requestedLabels.ok) {
+    return {
+      ok: false,
+      operation: 'create-follow-up',
+      error: requestedLabels.error
+    };
+  }
+  const missingLabelIds = findMissingFollowUpLabelIds(
+    followUpContext.issue.labels,
+    requestedLabels.labels
+  );
+  if (missingLabelIds.length > 0) {
+    return {
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_label_assignment_incomplete',
+        message: 'Linear follow-up issue label assignment did not return all requested live labels.',
+        status: 409,
+        retryable: false,
+        details: {
+          issue: {
+            id: sourceContext.issue.id,
+            identifier: sourceContext.issue.identifier
+          },
+          follow_up_issue: {
+            id: followUpContext.issue.id,
+            identifier: followUpContext.issue.identifier
+          },
+          requested_labels: requestedLabels.labels,
+          observed_labels: followUpContext.issue.labels,
+          missing_label_ids: missingLabelIds
+        }
+      }
+    };
+  }
+  const relationResult = await input.dependencies.reconcileProviderLinearFollowUpRelations({
+    sourceIssue: sourceContext.issue,
+    followUpIssue: followUpContext.issue,
+    blockedBySource: input.blockedBySource,
+    sourceSetup: input.sourceSetup,
+    env: input.env
+  });
+  if (!relationResult.ok) {
+    return relationResult.result;
+  }
+  const followUpTeam = followUpContext.issue.team
+    ? {
+        id: followUpContext.issue.team.id,
+        key: followUpContext.issue.team.key,
+        name: followUpContext.issue.team.name
+      }
+    : null;
+  return {
+    ok: true,
+    operation: 'create-follow-up',
+    action: 'reused',
+    issue: {
+      id: sourceContext.issue.id,
+      identifier: sourceContext.issue.identifier
+    },
+    follow_up_issue: {
+      id: followUpContext.issue.id,
+      identifier: followUpContext.issue.identifier,
+      title: followUpContext.issue.title,
+      description: followUpContext.issue.description,
+      url: followUpContext.issue.url,
+      state: followUpContext.issue.state,
+      team: followUpTeam,
+      project: followUpContext.issue.project
+    },
+    canonical_owner: canonicalOwnerKey && canonicalOwnerMarker
+      ? {
+          key: canonicalOwnerKey,
+          marker: canonicalOwnerMarker
+        }
+      : null,
+    relations: {
+      related: relationResult.relations.related.satisfied,
+      blocked_by_source: relationResult.relations.blocked_by_source.satisfied
+    },
+    traceability: {
+      labels: {
+        source_issue: {
+          id: sourceContext.issue.id,
+          identifier: sourceContext.issue.identifier
+        },
+        requested_labels: requestedLabels.labels,
+        observed_labels: followUpContext.issue.labels,
+        missing_label_ids: []
+      },
+      relations: relationResult.relations,
+      packet: packetTraceability
+    },
+    source_setup: relationResult.source_setup
+  };
+}
+
+function buildCreateFollowUpIssueNotMutableResult(issue: {
+  id: string;
+  identifier: string;
+  archived_at?: string | null;
+  trashed?: boolean | null;
+}): Extract<ProviderLinearCreateFollowUpResult, { ok: false }> | null {
+  const states = [
+    issue.archived_at ? 'archived' : null,
+    issue.trashed === true ? 'trashed' : null
+  ].filter((value): value is string => Boolean(value));
+  if (states.length === 0) {
     return null;
   }
   return {
     ok: false,
     operation: 'create-follow-up',
     error: {
-      code: 'linear_follow_up_parity_matrix_retry_suppressed',
-      message: `Same-attempt retry suppressed: ${suppression.instruction}`,
-      status: 409
+      code: 'linear_issue_not_mutable',
+      message: `Linear issue ${issue.identifier} is ${states.join(' and ')} and cannot accept provider mutations.`,
+      status: 409,
+      details: {
+        issue_id: issue.id,
+        issue_identifier: issue.identifier,
+        archived_at: issue.archived_at ?? null,
+        trashed: issue.trashed ?? null
+      }
     }
   };
+}
+
+function buildCanonicalOwnerMarker(canonicalOwnerKey: string): string {
+  return `${LINEAR_CANONICAL_OWNER_MARKER_PREFIX}${canonicalOwnerKey}`;
 }
 
 async function refreshParallelizationProofSnapshotBestEffort(
@@ -837,6 +1209,42 @@ function emitJsonResult(
   if (!result.ok) {
     dependencies.setExitCode(1);
   }
+}
+
+function normalizeCreateFollowUpResultForCli(
+  result: ProviderLinearCreateFollowUpResult
+): ProviderLinearCreateFollowUpResult {
+  if (!result.ok) {
+    return result;
+  }
+  const traceability = result.traceability;
+  const blocker = traceability.packet.queue_admission_blocker;
+  if (!blocker || typeof blocker !== 'object') {
+    return result;
+  }
+  const blockerRecord = blocker as Record<string, unknown>;
+  const summary = typeof blockerRecord.summary === 'string'
+    ? blockerRecord.summary
+    : 'Backlog admission remains blocked until follow-up packet traceability evidence is ready.';
+  return {
+    ok: false,
+    operation: 'create-follow-up',
+    error: {
+      code: 'linear_follow_up_packet_traceability_pending',
+      message: summary,
+      status: 409,
+      retryable: false,
+      details: {
+        issue: result.issue,
+        follow_up_issue: result.follow_up_issue,
+        action: result.action,
+        canonical_owner: result.canonical_owner,
+        relations: result.relations,
+        traceability,
+        queue_admission_blocker: blocker
+      }
+    }
+  };
 }
 
 function assertAllowedFlags(flags: ArgMap, allowed: string[]): void {
@@ -1193,18 +1601,24 @@ type LinearCliResult =
   | ProviderLinearChildStreamResult
   | ProviderLinearChildLaneResult;
 
+interface LinearCliAuditContext {
+  createFollowUpCanonicalOwnerKey?: string | null;
+  createFollowUpIntentChecksum?: string | null;
+}
+
 async function recordAuditResult(
   result: LinearCliResult,
   flags: ArgMap,
   env: NodeJS.ProcessEnv,
-  dependencies: Pick<LinearCliShellDependencies, 'appendAuditEntry' | 'now' | 'warn'>
+  dependencies: Pick<LinearCliShellDependencies, 'appendAuditEntry' | 'now' | 'warn'>,
+  context: LinearCliAuditContext = {}
 ): Promise<void> {
   const auditPath = resolveProviderLinearAuditPath(env);
   if (!auditPath) {
     return;
   }
   try {
-    await dependencies.appendAuditEntry(auditPath, buildAuditEntry(result, flags, env, dependencies.now()));
+    await dependencies.appendAuditEntry(auditPath, buildAuditEntry(result, flags, env, dependencies.now(), context));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     dependencies.warn(`linear audit warning: failed to append audit entry to ${auditPath}: ${message}`);
@@ -1215,11 +1629,13 @@ function buildAuditEntry(
   result: LinearCliResult,
   flags: ArgMap,
   env: NodeJS.ProcessEnv,
-  recordedAt: string
+  recordedAt: string,
+  context: LinearCliAuditContext = {}
 ): ProviderLinearAuditEntry {
   const requestedIssueId = readStringFlag(flags, 'issue-id') ?? null;
   const sourceSetup = resolveAuditSourceSetup(flags, env);
-  const followUpAuditFields = resolveFollowUpAuditFields(result);
+  const followUpAuditFields = resolveFollowUpAuditFields(result, flags, context);
+  const followUpFailureAuditFields = resolveFollowUpFailureAuditFields(result);
   if (!result.ok) {
     if (result.operation === 'child-stream') {
       return {
@@ -1283,14 +1699,14 @@ function buildAuditEntry(
     }
     return {
       recorded_at: recordedAt,
-      operation: result.operation,
-      ok: false,
-      issue_id: requestedIssueId,
-      issue_identifier: null,
-      source_setup: sourceSetup,
-      action: null,
-      via: null,
-      state: null,
+        operation: result.operation,
+        ok: false,
+        issue_id: requestedIssueId,
+        issue_identifier: resolveFailureIssueIdentifier(result),
+        source_setup: sourceSetup,
+        action: followUpFailureAuditFields.action,
+      via: followUpFailureAuditFields.via,
+      state: followUpFailureAuditFields.state,
       ...followUpAuditFields,
       comment_id: null,
       attachment_id: null,
@@ -1424,7 +1840,11 @@ function buildAuditEntry(
         issue_identifier: result.issue.identifier,
         source_setup: result.source_setup,
         action: result.action,
-        via: result.relations.blocked_by_source ? 'related+blocks' : 'related',
+        via: result.relations.blocked_by_source
+          ? 'related+blocks'
+          : result.relations.related
+            ? 'related'
+            : 'none',
         state: result.follow_up_issue.state?.name ?? null,
         ...followUpAuditFields,
         comment_id: null,
@@ -1638,11 +2058,13 @@ function sanitizeLineageIdPart(value: string): string {
 }
 
 function resolveFollowUpAuditFields(
-  result: LinearCliResult
+  result: LinearCliResult,
+  flags: ArgMap,
+  context: LinearCliAuditContext = {}
 ): Pick<
   ProviderLinearAuditEntry,
   'follow_up_issue_id' | 'follow_up_issue_identifier' | 'failed_relation_type'
-> {
+> & Partial<Pick<ProviderLinearAuditEntry, 'follow_up_intent_key'>> {
   if (result.ok) {
     if (result.operation !== 'create-follow-up') {
       return {
@@ -1654,6 +2076,7 @@ function resolveFollowUpAuditFields(
     return {
       follow_up_issue_id: result.follow_up_issue.id,
       follow_up_issue_identifier: result.follow_up_issue.identifier,
+      ...resolveFollowUpIntentAuditField(result, flags, context),
       failed_relation_type: null
     };
   }
@@ -1670,7 +2093,86 @@ function resolveFollowUpAuditFields(
   return {
     follow_up_issue_id: readRecordString(followUpIssue, 'id'),
     follow_up_issue_identifier: readRecordString(followUpIssue, 'identifier'),
+    ...resolveFollowUpIntentAuditField(result, flags, context),
     failed_relation_type: readUnknownString(details?.failed_relation_type)
+  };
+}
+
+function resolveFollowUpFailureAuditFields(
+  result: LinearCliResult
+): Pick<ProviderLinearAuditEntry, 'action' | 'via' | 'state'> {
+  if (result.ok || result.operation !== 'create-follow-up') {
+    return {
+      action: null,
+      via: null,
+      state: null
+    };
+  }
+  const details = result.error.details;
+  const action = readUnknownString(details?.action);
+  const relations = readIssueLikeRecord(details?.relations);
+  const queueAdmissionBlocker = readIssueLikeRecord(details?.queue_admission_blocker);
+  return {
+    action,
+    via: formatFollowUpRelationsAuditVia(relations),
+    state: readRecordString(queueAdmissionBlocker, 'state')
+  };
+}
+
+function formatFollowUpRelationsAuditVia(relations: Record<string, unknown> | null): string | null {
+  if (!relations) {
+    return null;
+  }
+  const blockedBySource = relations.blocked_by_source === true;
+  const related = relations.related === true;
+  if (blockedBySource) {
+    return 'related+blocks';
+  }
+  return related ? 'related' : 'none';
+}
+
+function resolveFailureIssueIdentifier(result: LinearCliResult): string | null {
+  if (result.ok || result.operation !== 'create-follow-up') {
+    return null;
+  }
+  const issue = readIssueLikeRecord(result.error.details?.issue);
+  return readRecordString(issue, 'identifier');
+}
+
+function resolveFollowUpIntentAuditField(
+  result: LinearCliResult,
+  flags: ArgMap,
+  context: LinearCliAuditContext = {}
+): Partial<Pick<ProviderLinearAuditEntry, 'follow_up_intent_key'>> {
+  if (result.operation !== 'create-follow-up') {
+    return {};
+  }
+  const title = readStringFlag(flags, 'title');
+  if (!title) {
+    return {};
+  }
+  const intentChecksum = context.createFollowUpIntentChecksum
+    ?? readStringFlag(flags, 'intent-checksum')
+    ?? null;
+  if (!intentChecksum) {
+    return {};
+  }
+  const canonicalOwnerKey = (
+    result.ok
+      ? result.canonical_owner?.key ?? null
+      : readRecordString(readIssueLikeRecord(result.error.details?.canonical_owner), 'key')
+  )
+    ?? context.createFollowUpCanonicalOwnerKey
+    ?? readStringFlag(flags, 'canonical-owner-key')
+    ?? null;
+  return {
+    follow_up_intent_key: buildFollowUpIntentKey({
+      title,
+      intentChecksum,
+      canonicalOwnerKey,
+      blockedBySource: readBooleanFlag(flags, 'blocked-by-source'),
+      parityLane: readBooleanFlag(flags, 'parity-lane')
+    })
   };
 }
 
@@ -1691,6 +2193,14 @@ function readUnknownString(value: unknown): string | null {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  return readUnknownString(value);
+}
+
+function isFollowUpPacketTraceabilityPendingCode(errorCode: string | null | undefined): boolean {
+  return normalizeOptionalString(errorCode) === 'linear_follow_up_packet_traceability_pending';
 }
 
 function readUnknownInteger(value: unknown): number | null {
@@ -1719,7 +2229,7 @@ function resolveAuditSourceSetup(flags: ArgMap, env: NodeJS.ProcessEnv): Dispatc
   return resolved.workspace_id || resolved.team_id || resolved.project_id ? resolved : null;
 }
 
-function resolveRuntimeProofRepoRoot(cwd: string, env: NodeJS.ProcessEnv): string {
+function resolveFollowUpPacketRepoRoot(cwd: string, env: NodeJS.ProcessEnv): string {
   const configuredRoot = normalizeEnvPath(env.CODEX_ORCHESTRATOR_ROOT);
   if (!configuredRoot) {
     return resolveRepoRootFromHint(cwd);
@@ -1728,16 +2238,42 @@ function resolveRuntimeProofRepoRoot(cwd: string, env: NodeJS.ProcessEnv): strin
   return resolveRepoRootFromHint(configuredHint);
 }
 
+function resolveRuntimeProofRepoRoot(cwd: string, env: NodeJS.ProcessEnv): string {
+  const configuredRoot = normalizeEnvPath(env.CODEX_ORCHESTRATOR_ROOT);
+  if (!configuredRoot) {
+    return resolveNearestProjectRootFromHint(cwd);
+  }
+  const configuredHint = isAbsolute(configuredRoot) ? configuredRoot : resolve(cwd, configuredRoot);
+  return resolveNearestProjectRootFromHint(configuredHint);
+}
+
 function resolveRepoRootFromHint(rootHint: string): string {
   const normalizedHint = resolve(rootHint);
   const gitBoundary = findNearestGitBoundary(normalizedHint);
-  let current: string | null = normalizedHint;
+  const taskRegistryRoots = findTaskRegistryRoots(normalizedHint);
+  return (
+    taskRegistryRoots.find(isCodexOrchestratorRepoRoot)
+    ?? taskRegistryRoots[0]
+    ?? gitBoundary
+    ?? normalizedHint
+  );
+}
+
+function resolveNearestProjectRootFromHint(rootHint: string): string {
+  const normalizedHint = resolve(rootHint);
+  const gitBoundary = findNearestGitBoundary(normalizedHint);
+  if (gitBoundary) {
+    return gitBoundary;
+  }
+  return findTaskRegistryRoots(normalizedHint)[0] ?? normalizedHint;
+}
+
+function findTaskRegistryRoots(start: string): string[] {
+  const roots: string[] = [];
+  let current: string | null = resolve(start);
   while (current) {
     if (existsSync(join(current, 'tasks', 'index.json'))) {
-      return current;
-    }
-    if (gitBoundary && current === gitBoundary) {
-      break;
+      roots.push(current);
     }
     const parent = dirname(current);
     if (parent === current) {
@@ -1745,7 +2281,7 @@ function resolveRepoRootFromHint(rootHint: string): string {
     }
     current = parent;
   }
-  return gitBoundary ?? normalizedHint;
+  return roots;
 }
 
 function findNearestGitBoundary(start: string): string | null {
@@ -1761,6 +2297,19 @@ function findNearestGitBoundary(start: string): string | null {
     current = parent;
   }
   return null;
+}
+
+function isCodexOrchestratorRepoRoot(root: string): boolean {
+  try {
+    const packageJsonPath = join(root, 'package.json');
+    if (!existsSync(packageJsonPath)) {
+      return false;
+    }
+    const parsed = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as { name?: unknown };
+    return parsed.name === '@kbediako/codex-orchestrator';
+  } catch {
+    return false;
+  }
 }
 
 function normalizeEnvPath(value: string | undefined): string | null {

@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { basename, dirname, extname, join, resolve as resolvePath } from 'node:path';
+import { basename, dirname, extname, join, posix, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -258,6 +258,7 @@ const PROVIDER_LINEAR_SUPERSEDED_CANONICAL_OWNER_MARKER_PREFIX =
   'codex-orchestrator:superseded-canonical-owner-key=';
 const FOLLOW_UP_REQUIRED_LIFECYCLE_LABEL = 'Lifecycle: Implementation';
 const FOLLOW_UP_TYPE_LABEL_NAMES = new Set(['Bug', 'Improvement', 'Feature']);
+const FOLLOW_UP_DOCS_FRESHNESS_OWNER_PLACEHOLDERS = new Set(['tbd', 'unassigned', 'owner']);
 const PROVIDER_LINEAR_CANONICAL_OWNER_SEARCH_LIMIT = 50;
 
 type ProviderLinearOperation =
@@ -502,6 +503,54 @@ export interface ProviderLinearCreatedIssue {
   labels?: ProviderLinearIssueLabel[];
 }
 
+export interface ProviderLinearFollowUpCreationTraceability {
+  labels: {
+    source_issue: Pick<ProviderLinearIssueContext, 'id' | 'identifier'>;
+    requested_labels: ProviderLinearIssueLabel[];
+    observed_labels: ProviderLinearIssueLabel[] | null;
+    missing_label_ids: string[];
+  };
+  relations: ProviderLinearFollowUpRelationEvidence;
+  packet: ProviderLinearFollowUpPacketTraceabilityEvidence;
+}
+
+export interface ProviderLinearFollowUpRelationEvidence {
+  related: ProviderLinearFollowUpRelationEvidenceEntry;
+  blocked_by_source: ProviderLinearFollowUpRelationEvidenceEntry;
+}
+
+export interface ProviderLinearFollowUpRelationEvidenceEntry {
+  type: 'related' | 'blocks';
+  requested: boolean;
+  satisfied: boolean;
+  action: 'created' | 'already_satisfied' | 'not_requested' | 'skipped_self';
+  issue_id: string;
+  related_issue_id: string;
+}
+
+export interface ProviderLinearFollowUpPacketTraceabilityEvidence {
+  packet_prefix: string;
+  canonical_task_id: string | null;
+  canonical_task_id_pattern: string;
+  required_paths: string[];
+  registry_mirrors: string[];
+  observed_state: ProviderLinearWorkflowState | null;
+  readiness: {
+    checked: boolean;
+    repo_root: string | null;
+    description_has_packet_prefix: boolean;
+    ready: boolean;
+    missing_paths: string[];
+    missing_registry_mirrors: string[];
+  };
+  queue_admission_blocker: {
+    reason: 'backlog_head_follow_up_traceability_pending';
+    state: string;
+    enforced_by: 'provider-operator-autopilot' | 'create-follow-up';
+    summary: string;
+  } | null;
+}
+
 export type ProviderLinearCreateFollowUpResult =
   | {
       ok: true;
@@ -514,9 +563,10 @@ export type ProviderLinearCreateFollowUpResult =
         marker: string;
       } | null;
       relations: {
-        related: true;
+        related: boolean;
         blocked_by_source: boolean;
       };
+      traceability: ProviderLinearFollowUpCreationTraceability;
       source_setup: DispatchPilotSourceSetup | null;
     }
   | {
@@ -2700,6 +2750,7 @@ export async function createProviderLinearFollowUpIssue(input: {
   parityMatrix?: string | null;
   canonicalOwnerKey?: string | null;
   blockedBySource?: boolean;
+  repoRoot?: string | null;
   sourceSetup?: DispatchPilotSourceSetup | null;
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
@@ -2958,9 +3009,16 @@ export async function createProviderLinearFollowUpIssue(input: {
         marker: canonicalOwnerMarker
       },
       relations: {
-        related: true,
-        blocked_by_source: blockedBySource
+        related: relationResult.relations.related.satisfied,
+        blocked_by_source: relationResult.relations.blocked_by_source.satisfied
       },
+      traceability: await buildFollowUpCreationTraceability({
+        sourceIssue: issueSummary.issue,
+        followUpIssue: labeledOwner.issue,
+        requestedLabels: followUpLabels.labels,
+        relationEvidence: relationResult.relations,
+        repoRoot: input.repoRoot
+      }),
       source_setup: session.session.sourceSetup
     };
   }
@@ -3215,14 +3273,80 @@ export async function createProviderLinearFollowUpIssue(input: {
         }
       : null,
     relations: {
-      related: true,
-      blocked_by_source: blockedBySource
+      related: relationResult.relations.related.satisfied,
+      blocked_by_source: relationResult.relations.blocked_by_source.satisfied
     },
+    traceability: await buildFollowUpCreationTraceability({
+      sourceIssue: issueSummary.issue,
+      followUpIssue,
+      requestedLabels: followUpLabels.labels,
+      relationEvidence: relationResult.relations,
+      repoRoot: input.repoRoot
+    }),
     source_setup: session.session.sourceSetup
   };
 }
 
-function resolveFollowUpLabelsFromSourceIssue(issue: ProviderLinearIssueSummary):
+export async function reconcileProviderLinearFollowUpRelations(input: {
+  sourceIssue: Pick<ProviderLinearIssueContext, 'id' | 'identifier' | 'archived_at' | 'trashed'>;
+  followUpIssue: ProviderLinearIssueContext;
+  blockedBySource?: boolean;
+  sourceSetup?: DispatchPilotSourceSetup | null;
+  env?: NodeJS.ProcessEnv;
+  fetchImpl?: typeof fetch;
+}): Promise<
+  | {
+      ok: true;
+      relations: ProviderLinearFollowUpRelationEvidence;
+      source_setup: DispatchPilotSourceSetup | null;
+    }
+  | {
+      ok: false;
+      result: Extract<ProviderLinearCreateFollowUpResult, { ok: false }>;
+    }
+> {
+  const followUpMutabilityFailure = failureIfIssueNotMutable('create-follow-up', input.followUpIssue);
+  if (followUpMutabilityFailure) {
+    return {
+      ok: false,
+      result: followUpMutabilityFailure
+    };
+  }
+  const session = resolveLinearWorkflowSession(input.env, input.fetchImpl, input.sourceSetup);
+  if (!session.ok) {
+    return {
+      ok: false,
+      result: failureFromWorkflowError('create-follow-up', session.error)
+    };
+  }
+  const budgetError = await preflightProviderLinearBudget({
+    session: session.session,
+    operation: 'create-follow-up',
+    minimumRequestsRemaining: input.blockedBySource === true ? 2 : 1
+  });
+  if (budgetError) {
+    return {
+      ok: false,
+      result: failureFromWorkflowError('create-follow-up', budgetError)
+    };
+  }
+  const relationResult = await createFollowUpRelations({
+    session: session.session,
+    sourceIssue: input.sourceIssue,
+    followUpIssue: input.followUpIssue,
+    blockedBySource: input.blockedBySource === true
+  });
+  if (!relationResult.ok) {
+    return relationResult;
+  }
+  return {
+    ok: true,
+    relations: relationResult.relations,
+    source_setup: session.session.sourceSetup
+  };
+}
+
+export function resolveFollowUpLabelsFromSourceIssue(issue: ProviderLinearIssueSummary):
   | {
       ok: true;
       labels: ProviderLinearIssueLabel[];
@@ -3424,6 +3548,10 @@ function resolveFollowUpTraceabilityUpdate(input: {
   observedDescription: string;
 } {
   const observedDescription = input.followUpIssue.description ?? '';
+  const traceability = buildFollowUpTraceabilitySection({
+    sourceIssue: input.sourceIssue,
+    followUpIssue: input.followUpIssue
+  });
   const finalizedDescription = buildFollowUpIssueDescription({
     description: input.description,
     intentChecksum: input.intentChecksum,
@@ -3432,10 +3560,7 @@ function resolveFollowUpTraceabilityUpdate(input: {
     acceptanceCriteria: input.acceptanceCriteria,
     parityMatrix: input.parityMatrix,
     canonicalOwner: input.canonicalOwner,
-    traceability: buildFollowUpTraceabilitySection({
-      sourceIssue: input.sourceIssue,
-      followUpIssue: input.followUpIssue
-    })
+    traceability
   });
   if (observedDescription === finalizedDescription) {
     return {
@@ -3453,7 +3578,6 @@ function resolveFollowUpTraceabilityUpdate(input: {
       observedDescription
     };
   }
-
   const unfinishedDescription = buildFollowUpIssueDescription({
     description: input.description,
     intentChecksum: input.intentChecksum,
@@ -3768,7 +3892,7 @@ function verifyFollowUpIssueLabels(input: {
   };
 }
 
-function findMissingFollowUpLabelIds(
+export function findMissingFollowUpLabelIds(
   currentLabels: readonly ProviderLinearIssueLabel[] | undefined,
   requestedLabels: readonly ProviderLinearIssueLabel[]
 ): string[] {
@@ -4071,7 +4195,10 @@ async function findCanonicalFollowUpOwnerIssues(input: {
   };
 }
 
-function descriptionHasExactCanonicalOwnerMarker(description: string | null | undefined, marker: string): boolean {
+export function descriptionHasExactCanonicalOwnerMarker(
+  description: string | null | undefined,
+  marker: string
+): boolean {
   const markerLines = new Set([
     `- Canonical owner marker: \`${marker}\``,
     `* Canonical owner marker: \`${marker}\``,
@@ -4190,13 +4317,14 @@ function isIssueRelationAlreadySatisfiedError(
 
 async function createFollowUpRelations(input: {
   session: ResolvedLinearWorkflowSession;
-  sourceIssue: ProviderLinearIssueSummary;
+  sourceIssue: Pick<ProviderLinearIssueSummary, 'id' | 'identifier'>;
   followUpIssue: ProviderLinearCreatedIssue;
   createdIssue?: ProviderLinearCreatedIssue | null;
   blockedBySource: boolean;
 }): Promise<
   | {
       ok: true;
+      relations: ProviderLinearFollowUpRelationEvidence;
     }
   | {
       ok: false;
@@ -4204,9 +4332,19 @@ async function createFollowUpRelations(input: {
     }
 > {
   if (input.sourceIssue.id === input.followUpIssue.id) {
-    return { ok: true };
+    return {
+      ok: true,
+      relations: buildFollowUpRelationEvidence({
+        sourceIssue: input.sourceIssue,
+        followUpIssue: input.followUpIssue,
+        blockedBySource: input.blockedBySource,
+        relatedAction: 'skipped_self',
+        blockedAction: input.blockedBySource ? 'skipped_self' : 'not_requested'
+      })
+    };
   }
 
+  let relatedAction: ProviderLinearFollowUpRelationEvidenceEntry['action'] = 'created';
   const relatedRelationResult = await executeProviderLinearGraphql<IssueRelationMutationResponse>({
     session: input.session,
     operation: 'create-follow-up',
@@ -4222,8 +4360,18 @@ async function createFollowUpRelations(input: {
   });
   if (!relatedRelationResult.ok) {
     if (isIssueRelationAlreadySatisfiedError(relatedRelationResult.error, 'related')) {
+      relatedAction = 'already_satisfied';
       if (!input.blockedBySource) {
-        return { ok: true };
+        return {
+          ok: true,
+          relations: buildFollowUpRelationEvidence({
+            sourceIssue: input.sourceIssue,
+            followUpIssue: input.followUpIssue,
+            blockedBySource: false,
+            relatedAction,
+            blockedAction: 'not_requested'
+          })
+        };
       }
     } else {
       return {
@@ -4264,9 +4412,19 @@ async function createFollowUpRelations(input: {
   }
 
   if (!input.blockedBySource) {
-    return { ok: true };
+    return {
+      ok: true,
+      relations: buildFollowUpRelationEvidence({
+        sourceIssue: input.sourceIssue,
+        followUpIssue: input.followUpIssue,
+        blockedBySource: false,
+        relatedAction,
+        blockedAction: 'not_requested'
+      })
+    };
   }
 
+  let blockedAction: ProviderLinearFollowUpRelationEvidenceEntry['action'] = 'created';
   const blockingRelationResult = await executeProviderLinearGraphql<IssueRelationMutationResponse>({
     session: input.session,
     operation: 'create-follow-up',
@@ -4282,7 +4440,17 @@ async function createFollowUpRelations(input: {
   });
   if (!blockingRelationResult.ok) {
     if (isIssueRelationAlreadySatisfiedError(blockingRelationResult.error, 'blocks')) {
-      return { ok: true };
+      blockedAction = 'already_satisfied';
+      return {
+        ok: true,
+        relations: buildFollowUpRelationEvidence({
+          sourceIssue: input.sourceIssue,
+          followUpIssue: input.followUpIssue,
+          blockedBySource: true,
+          relatedAction,
+          blockedAction
+        })
+      };
     }
     return {
       ok: false,
@@ -4321,7 +4489,65 @@ async function createFollowUpRelations(input: {
     };
   }
 
-  return { ok: true };
+  return {
+    ok: true,
+    relations: buildFollowUpRelationEvidence({
+      sourceIssue: input.sourceIssue,
+      followUpIssue: input.followUpIssue,
+      blockedBySource: true,
+      relatedAction,
+      blockedAction
+    })
+  };
+}
+
+async function buildFollowUpCreationTraceability(input: {
+  sourceIssue: ProviderLinearIssueSummary;
+  followUpIssue: ProviderLinearCreatedIssue;
+  requestedLabels: ProviderLinearIssueLabel[];
+  relationEvidence: ProviderLinearFollowUpRelationEvidence;
+  repoRoot?: string | null;
+}): Promise<ProviderLinearFollowUpCreationTraceability> {
+  return {
+    labels: {
+      source_issue: {
+        id: input.sourceIssue.id,
+        identifier: input.sourceIssue.identifier
+      },
+      requested_labels: input.requestedLabels,
+      observed_labels: input.followUpIssue.labels ?? null,
+      missing_label_ids: findMissingFollowUpLabelIds(input.followUpIssue.labels, input.requestedLabels)
+    },
+    relations: input.relationEvidence,
+    packet: await buildFollowUpPacketTraceabilityEvidence(input.followUpIssue, input.repoRoot)
+  };
+}
+
+function buildFollowUpRelationEvidence(input: {
+  sourceIssue: Pick<ProviderLinearIssueSummary, 'id' | 'identifier'>;
+  followUpIssue: ProviderLinearCreatedIssue;
+  blockedBySource: boolean;
+  relatedAction: ProviderLinearFollowUpRelationEvidenceEntry['action'];
+  blockedAction: ProviderLinearFollowUpRelationEvidenceEntry['action'];
+}): ProviderLinearFollowUpRelationEvidence {
+  return {
+    related: {
+      type: 'related',
+      requested: true,
+      satisfied: input.relatedAction !== 'skipped_self',
+      action: input.relatedAction,
+      issue_id: input.sourceIssue.id,
+      related_issue_id: input.followUpIssue.id
+    },
+    blocked_by_source: {
+      type: 'blocks',
+      requested: input.blockedBySource,
+      satisfied: input.blockedBySource && input.blockedAction !== 'skipped_self',
+      action: input.blockedAction,
+      issue_id: input.sourceIssue.id,
+      related_issue_id: input.followUpIssue.id
+    }
+  };
 }
 
 function buildFollowUpRelationFailureDetails(input: {
@@ -8860,15 +9086,8 @@ function buildFollowUpTraceabilitySection(input: {
   sourceIssue: ProviderLinearIssueSummary;
   followUpIssue: ProviderLinearCreatedIssue;
 }): string {
-  const followUpTaskId = `linear-${input.followUpIssue.id}`;
-  const repoPacketPaths = [
-    `docs/PRD-${followUpTaskId}.md`,
-    `docs/TECH_SPEC-${followUpTaskId}.md`,
-    `docs/ACTION_PLAN-${followUpTaskId}.md`,
-    `tasks/specs/${followUpTaskId}.md`,
-    `tasks/tasks-${followUpTaskId}.md`,
-    `.agent/task/${followUpTaskId}.md`
-  ];
+  const followUpTaskId = buildFollowUpTaskId(input.followUpIssue);
+  const repoPacketPaths = buildFollowUpPacketPaths(followUpTaskId);
   const formatIssueReference = (identifier: string, id: string, url: string | null | undefined): string =>
     url ? `\`${identifier}\` / \`${id}\` (${url})` : `\`${identifier}\` / \`${id}\``;
   return [
@@ -8877,8 +9096,397 @@ function buildFollowUpTraceabilitySection(input: {
     `- Follow-up packet prefix: \`${followUpTaskId}\``,
     '- Canonical registry task id: see `tasks/index.json` (format `YYYYMMDD-linear-<linear-issue-id>`)',
     `- Create before active work: ${repoPacketPaths.map((path) => `\`${path}\``).join(', ')}`,
-    '- Update registry mirrors before the issue leaves `Backlog`: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`'
+    `- Update registry mirrors before the issue leaves \`Backlog\`: ${FOLLOW_UP_REGISTRY_MIRRORS.map((path) => `\`${path}\``).join(', ')}`
   ].join('\n');
+}
+
+const FOLLOW_UP_REGISTRY_MIRRORS = [
+  'tasks/index.json',
+  'docs/TASKS.md',
+  'docs/docs-freshness-registry.json'
+] as const;
+const FOLLOW_UP_REQUIRED_DOCS_FRESHNESS_STATUS = 'active';
+
+function buildFollowUpTaskId(issue: Pick<ProviderLinearCreatedIssue, 'id'>): string {
+  return `linear-${issue.id}`;
+}
+
+function buildFollowUpPacketPaths(followUpTaskId: string): string[] {
+  return [
+    `docs/PRD-${followUpTaskId}.md`,
+    `docs/TECH_SPEC-${followUpTaskId}.md`,
+    `docs/ACTION_PLAN-${followUpTaskId}.md`,
+    `tasks/specs/${followUpTaskId}.md`,
+    `tasks/tasks-${followUpTaskId}.md`,
+    `.agent/task/${followUpTaskId}.md`
+  ];
+}
+
+export async function buildFollowUpPacketTraceabilityEvidence(
+  issue: Pick<ProviderLinearCreatedIssue, 'id' | 'description'>
+    & {
+      state?: ProviderLinearWorkflowState | null;
+    },
+  repoRoot: string | null | undefined
+): Promise<ProviderLinearFollowUpPacketTraceabilityEvidence> {
+  const packetPrefix = buildFollowUpTaskId(issue);
+  const requiredPaths = buildFollowUpPacketPaths(packetPrefix);
+  const registryMirrors = [...FOLLOW_UP_REGISTRY_MIRRORS];
+  const packetReadiness = await resolveFollowUpPacketReadiness({
+    followUpTaskId: packetPrefix,
+    issueDescription: issue.description,
+    requiredPaths,
+    registryMirrors,
+    repoRoot
+  });
+  const { canonical_task_id: canonicalTaskId, ...readiness } = packetReadiness;
+  const queueAdmissionBlocker = resolveFollowUpPacketQueueAdmissionBlocker(issue.state, readiness);
+  return {
+    packet_prefix: packetPrefix,
+    canonical_task_id: canonicalTaskId,
+    canonical_task_id_pattern: buildFollowUpCanonicalTaskIdPattern(packetPrefix),
+    required_paths: requiredPaths,
+    registry_mirrors: registryMirrors,
+    observed_state: issue.state ?? null,
+    readiness,
+    queue_admission_blocker: queueAdmissionBlocker
+  };
+}
+
+async function resolveFollowUpPacketReadiness(input: {
+  followUpTaskId: string;
+  issueDescription: string | null | undefined;
+  requiredPaths: readonly string[];
+  registryMirrors: readonly string[];
+  repoRoot: string | null | undefined;
+}): Promise<ProviderLinearFollowUpPacketTraceabilityEvidence['readiness'] & { canonical_task_id: string | null }> {
+  const descriptionHasPacketPrefix = followUpDescriptionHasPacketPrefix(
+    input.issueDescription,
+    input.followUpTaskId
+  );
+  const normalizedRepoRoot = normalizeOptionalString(input.repoRoot ?? null);
+  if (!normalizedRepoRoot) {
+    return {
+      checked: false,
+      repo_root: null,
+      description_has_packet_prefix: descriptionHasPacketPrefix,
+      canonical_task_id: null,
+      ready: false,
+      missing_paths: [...input.requiredPaths],
+      missing_registry_mirrors: [...input.registryMirrors]
+    };
+  }
+  const repoRoot = resolvePath(normalizedRepoRoot);
+  const missingPaths: string[] = [];
+  for (const path of input.requiredPaths) {
+    if (!await fileExists(join(repoRoot, path))) {
+      missingPaths.push(path);
+    }
+  }
+  const missingRegistryMirrors: string[] = [];
+  let canonicalTaskId: string | null = null;
+  for (const path of input.registryMirrors) {
+    const content = await readTextFileIfPresent(join(repoRoot, path));
+    const mirrorMatch = content
+      ? registryMirrorContainsFollowUpTaskId(path, content, input.followUpTaskId, input.requiredPaths)
+      : { matched: false, canonicalTaskId: null };
+    canonicalTaskId ??= mirrorMatch.canonicalTaskId;
+    if (!mirrorMatch.matched) {
+      missingRegistryMirrors.push(path);
+    }
+  }
+  return {
+    checked: true,
+    repo_root: repoRoot,
+    description_has_packet_prefix: descriptionHasPacketPrefix,
+    canonical_task_id: canonicalTaskId,
+    ready: descriptionHasPacketPrefix && missingPaths.length === 0 && missingRegistryMirrors.length === 0,
+    missing_paths: missingPaths,
+    missing_registry_mirrors: missingRegistryMirrors
+  };
+}
+
+function resolveFollowUpPacketQueueAdmissionBlocker(
+  state: ProviderLinearWorkflowState | null | undefined,
+  readiness: ProviderLinearFollowUpPacketTraceabilityEvidence['readiness']
+): ProviderLinearFollowUpPacketTraceabilityEvidence['queue_admission_blocker'] {
+  if (readiness.ready) {
+    return null;
+  }
+  const stateName = normalizeOptionalString(state?.name);
+  const stateBlocksAdmission = stateName === null || isBacklogWorkflowState(state);
+  if (!stateBlocksAdmission) {
+    return null;
+  }
+  return {
+    reason: 'backlog_head_follow_up_traceability_pending',
+    state: stateName ?? 'unknown',
+    enforced_by: 'create-follow-up',
+    summary: 'Backlog admission remains blocked until follow-up packet files, registry mirrors, and the Linear packet prefix are present.'
+  };
+}
+
+function followUpDescriptionHasPacketPrefix(description: string | null | undefined, followUpTaskId: string): boolean {
+  const packetPrefixLines = new Set([
+    `- Follow-up packet prefix: \`${followUpTaskId}\``,
+    `* Follow-up packet prefix: \`${followUpTaskId}\``
+  ]);
+  const normalizedDescription = normalizeOptionalString(description);
+  if (!normalizedDescription) {
+    return false;
+  }
+  const traceabilitySectionTitle = normalizeComparableValue('Immediate Traceability');
+  let activeSection: string | null = null;
+  let activeCodeFenceDelimiter: string | null = null;
+  let activeCodeFenceContainerIndent = 0;
+  const listContinuationIndents: number[] = [];
+
+  for (const line of normalizedDescription.split(/\r?\n/u)) {
+    const { containerIndent, structuralLine } = getMarkdownFenceAwareStructuralLine(
+      listContinuationIndents,
+      line,
+      activeCodeFenceDelimiter,
+      activeCodeFenceContainerIndent
+    );
+    const codeFenceTransition = getCodeFenceTransition(activeCodeFenceDelimiter, structuralLine);
+    if (codeFenceTransition.isBoundary) {
+      activeCodeFenceDelimiter = codeFenceTransition.nextDelimiter;
+      activeCodeFenceContainerIndent = activeCodeFenceDelimiter === null ? 0 : containerIndent;
+      continue;
+    }
+    if (activeCodeFenceDelimiter) {
+      continue;
+    }
+
+    const headingMatch = structuralLine.match(/^[ ]{0,3}#{1,6}\s+(.+?)\s*$/u);
+    if (headingMatch) {
+      const headingTitle = headingMatch[1].replace(/\s+#+\s*$/u, '').trim();
+      activeSection = containerIndent === 0 ? normalizeComparableValue(headingTitle) : null;
+      listContinuationIndents.length = 0;
+      continue;
+    }
+
+    if (
+      activeSection === traceabilitySectionTitle &&
+      containerIndent === 0 &&
+      /^[ ]{0,3}[-*]\s+/u.test(structuralLine) &&
+      packetPrefixLines.has(structuralLine.trim())
+    ) {
+      return true;
+    }
+    recordMarkdownListContinuationIndent(listContinuationIndents, structuralLine, containerIndent);
+  }
+
+  return false;
+}
+
+function buildFollowUpCanonicalTaskIdPattern(followUpTaskId: string): string {
+  return `^\\d{8}-${escapeRegExp(followUpTaskId)}$`;
+}
+
+function registryMirrorContainsFollowUpTaskId(
+  path: string,
+  content: string,
+  followUpTaskId: string,
+  requiredPaths: readonly string[]
+): { matched: boolean; canonicalTaskId: string | null } {
+  if (path === 'tasks/index.json') {
+    const canonicalTaskId = findCanonicalFollowUpTaskIdInIndex(content, followUpTaskId, requiredPaths);
+    return { matched: canonicalTaskId !== null, canonicalTaskId };
+  }
+  if (path === 'docs/docs-freshness-registry.json') {
+    return {
+      matched: docsFreshnessRegistryContainsRequiredPaths(content, requiredPaths),
+      canonicalTaskId: null
+    };
+  }
+  return {
+    matched: markdownContainsFollowUpPacketSnapshot(content, followUpTaskId, requiredPaths),
+    canonicalTaskId: null
+  };
+}
+
+function findCanonicalFollowUpTaskIdInIndex(
+  content: string,
+  followUpTaskId: string,
+  requiredPaths: readonly string[]
+): string | null {
+  const parsed = parseJsonRecord(content);
+  const items = Array.isArray(parsed?.items) ? parsed.items : [];
+  const idPattern = new RegExp(buildFollowUpCanonicalTaskIdPattern(followUpTaskId), 'u');
+  for (const item of items) {
+    if (!item || typeof item !== 'object') {
+      continue;
+    }
+    const record = item as Record<string, unknown>;
+    const id = typeof record.id === 'string' ? normalizeOptionalString(record.id) : null;
+    const relatesTo = typeof record.relates_to === 'string' ? normalizeOptionalString(record.relates_to) : null;
+    if (
+      id
+      && idPattern.test(id)
+      && relatesTo === `tasks/tasks-${followUpTaskId}.md`
+      && taskIndexRecordHasRequiredFollowUpPacketPaths(record, followUpTaskId, requiredPaths)
+    ) {
+      return id;
+    }
+  }
+  return null;
+}
+
+function taskIndexRecordHasRequiredFollowUpPacketPaths(
+  record: Record<string, unknown>,
+  followUpTaskId: string,
+  requiredPaths: readonly string[]
+): boolean {
+  const paths = record.paths;
+  if (!paths || typeof paths !== 'object') {
+    return false;
+  }
+  const pathRecord = paths as Record<string, unknown>;
+  const expectedPathsByField: Record<string, string> = {
+    spec: `tasks/specs/${followUpTaskId}.md`,
+    task: `tasks/tasks-${followUpTaskId}.md`,
+    agent_task: `.agent/task/${followUpTaskId}.md`,
+    prd: `docs/PRD-${followUpTaskId}.md`,
+    docs: `docs/TECH_SPEC-${followUpTaskId}.md`,
+    action_plan: `docs/ACTION_PLAN-${followUpTaskId}.md`
+  };
+  const expectedPathValues = new Set(Object.values(expectedPathsByField));
+  if (!requiredPaths.every((path) => expectedPathValues.has(path))) {
+    return false;
+  }
+  return Object.entries(expectedPathsByField).every(([field, expectedPath]) => {
+    const observedPath = typeof pathRecord[field] === 'string'
+      ? normalizeOptionalString(pathRecord[field])
+      : null;
+    return observedPath === expectedPath;
+  });
+}
+
+function docsFreshnessRegistryContainsRequiredPaths(content: string, requiredPaths: readonly string[]): boolean {
+  const parsed = parseJsonRecord(content);
+  const entries = Array.isArray(parsed?.entries) ? parsed.entries : [];
+  const seenPaths = new Set<string>();
+  const validPaths = new Set<string>();
+  const duplicatePaths = new Set<string>();
+  for (const entry of entries) {
+    if (!entry || typeof entry !== 'object') {
+      continue;
+    }
+    const rawPath = (entry as Record<string, unknown>).path;
+    const path = normalizeDocsFreshnessRegistryPath(rawPath);
+    if (path) {
+      if (seenPaths.has(path)) {
+        duplicatePaths.add(path);
+      }
+      seenPaths.add(path);
+      if (docsFreshnessRegistryEntryHasValidMetadata(entry as Record<string, unknown>)) {
+        validPaths.add(path);
+      }
+    }
+  }
+  return requiredPaths.every((path) => {
+    const normalizedPath = normalizeDocsFreshnessRegistryPath(path);
+    return normalizedPath !== null && validPaths.has(normalizedPath) && !duplicatePaths.has(normalizedPath);
+  });
+}
+
+function docsFreshnessRegistryEntryHasValidMetadata(entry: Record<string, unknown>): boolean {
+  const status = typeof entry.status === 'string' ? entry.status : null;
+  const cadenceDays = typeof entry.cadence_days === 'number' && Number.isInteger(entry.cadence_days)
+    ? entry.cadence_days
+    : null;
+  const lastReview = typeof entry.last_review === 'string' ? entry.last_review : null;
+  const owner = typeof entry.owner === 'string' ? normalizeOptionalString(entry.owner) : null;
+  return Boolean(
+    status === FOLLOW_UP_REQUIRED_DOCS_FRESHNESS_STATUS
+    && cadenceDays !== null
+    && cadenceDays > 0
+    && lastReview
+    && isIsoDateString(lastReview)
+    && !isIsoDateStale(lastReview, cadenceDays)
+    && owner
+    && !FOLLOW_UP_DOCS_FRESHNESS_OWNER_PLACEHOLDERS.has(owner.toLowerCase())
+  );
+}
+
+function normalizeDocsFreshnessRegistryPath(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim().replace(/\\/g, '/');
+  if (!trimmed) {
+    return null;
+  }
+  const withoutDotPrefix = trimmed.replace(/^\.\//u, '');
+  const normalized = posix.normalize(withoutDotPrefix).replace(/^\.\//u, '');
+  return normalized === '.' ? null : normalized;
+}
+
+function markdownContainsFollowUpPacketSnapshot(
+  content: string,
+  followUpTaskId: string,
+  requiredPaths: readonly string[]
+): boolean {
+  if (!markdownContainsExactFollowUpTaskId(content, followUpTaskId)) {
+    return false;
+  }
+  return requiredPaths.every((path) => content.includes(path));
+}
+
+function markdownContainsExactFollowUpTaskId(content: string, followUpTaskId: string): boolean {
+  const escapedTaskId = escapeRegExp(followUpTaskId);
+  return new RegExp(`(^|[^A-Za-z0-9-])${escapedTaskId}([^A-Za-z0-9-]|$)`, 'u').test(content);
+}
+
+function isIsoDateString(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) {
+    return false;
+  }
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function isIsoDateStale(value: string, cadenceDays: number): boolean {
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return true;
+  }
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const ageMs = today.getTime() - parsed.getTime();
+  const ageDays = Math.floor(ageMs / (24 * 60 * 60 * 1000));
+  return ageDays > cadenceDays;
+}
+
+function parseJsonRecord(content: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile();
+  } catch {
+    return false;
+  }
+}
+
+async function readTextFileIfPresent(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+function isBacklogWorkflowState(state: ProviderLinearWorkflowState | null | undefined): boolean {
+  const name = normalizeOptionalString(state?.name);
+  return name !== null && normalizeComparableValue(name) === normalizeComparableValue('Backlog');
 }
 
 function escapeRegExp(value: string): string {

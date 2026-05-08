@@ -80,6 +80,7 @@ export interface ProviderLinearAuditEntry {
   state: string | null;
   follow_up_issue_id: string | null;
   follow_up_issue_identifier: string | null;
+  follow_up_intent_key?: string | null;
   failed_relation_type: string | null;
   comment_id: string | null;
   attachment_id: string | null;
@@ -306,6 +307,9 @@ function normalizeProviderLinearAuditEntry(value: unknown): ProviderLinearAuditE
     state: normalizeOptionalString(entry.state),
     follow_up_issue_id: normalizeOptionalString(entry.follow_up_issue_id),
     follow_up_issue_identifier: normalizeOptionalString(entry.follow_up_issue_identifier),
+    ...(Object.prototype.hasOwnProperty.call(entry, 'follow_up_intent_key')
+      ? { follow_up_intent_key: normalizeOptionalString(entry.follow_up_intent_key) }
+      : {}),
     failed_relation_type: normalizeOptionalString(entry.failed_relation_type),
     comment_id: normalizeOptionalString(entry.comment_id),
     attachment_id: normalizeOptionalString(entry.attachment_id),
