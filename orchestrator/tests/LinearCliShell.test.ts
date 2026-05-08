@@ -157,6 +157,48 @@ function buildReadyFollowUpTraceability(input: {
   };
 }
 
+function buildIssueContextResult(input: {
+  id?: string;
+  identifier?: string;
+  title?: string;
+  description?: string | null;
+} = {}) {
+  return {
+    ok: true,
+    operation: 'issue-context',
+    issue: {
+      id: input.id ?? 'lin-issue-2',
+      identifier: input.identifier ?? 'CO-2',
+      title: input.title ?? 'Follow-up',
+      description: input.description
+        ?? '## Immediate Traceability\n- Follow-up packet prefix: `linear-lin-issue-2`',
+      url: 'https://linear.app/example/issue/CO-2',
+      updated_at: null,
+      archived_at: null,
+      trashed: false,
+      workspace_id: null,
+      state: {
+        id: 'state-backlog',
+        name: 'Backlog',
+        type: 'unstarted'
+      },
+      team: null,
+      project: null,
+      labels: [],
+      comments: [],
+      attachments: [],
+      pull_request_attachments: {
+        current: null,
+        historical: [],
+        conflicting: [],
+        unknown: []
+      },
+      workpad_comment: null
+    },
+    source_setup: null
+  } as const;
+}
+
 async function createSameAttemptFollowUpFixture(prefix: string, auditEntries: Record<string, unknown>[] = []) {
   const { auditPath, tempDir } = await createProviderLinearAuditFixture(prefix);
   if (auditEntries.length > 0) {
@@ -2171,6 +2213,9 @@ describe('runLinearCliShell', () => {
     await seedCliFollowUpPacketReadiness(repoRoot, 'linear-lin-issue-2');
     const createProviderLinearFollowUpIssueMock =
       vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>();
+    const getProviderLinearIssueContextMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').getProviderLinearIssueContext>()
+        .mockResolvedValue(buildIssueContextResult() as never);
     const { auditPath, loadProviderLinearWorkerContextMock } = await createSameAttemptFollowUpFixture(
       'linear-cli-follow-up-packet-ready-retry-',
       [buildPacketTraceabilityPendingAuditEntry({ issue_identifier: null })]
@@ -2193,6 +2238,7 @@ describe('runLinearCliShell', () => {
       },
       {
         createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        getProviderLinearIssueContext: getProviderLinearIssueContextMock,
         loadProviderLinearWorkerContext: loadProviderLinearWorkerContextMock,
         getEnv: () => ({
           CO_LINEAR_API_TOKEN: 'lin-api-token',
@@ -2206,6 +2252,13 @@ describe('runLinearCliShell', () => {
     );
 
     expect(createProviderLinearFollowUpIssueMock).not.toHaveBeenCalled();
+    expect(getProviderLinearIssueContextMock).toHaveBeenCalledWith({
+      issueId: 'lin-issue-2',
+      env: expect.objectContaining({
+        CO_LINEAR_API_TOKEN: 'lin-api-token',
+        CODEX_PROVIDER_LINEAR_AUDIT_PATH: auditPath
+      })
+    });
     expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
       ok: true,
       operation: 'create-follow-up',
@@ -2251,6 +2304,9 @@ describe('runLinearCliShell', () => {
     await seedCliFollowUpPacketReadiness(repoRoot, 'linear-lin-issue-2');
     const createProviderLinearFollowUpIssueMock =
       vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>();
+    const getProviderLinearIssueContextMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').getProviderLinearIssueContext>()
+        .mockResolvedValue(buildIssueContextResult() as never);
     const { auditPath, loadProviderLinearWorkerContextMock } = await createSameAttemptFollowUpFixture(
       'linear-cli-follow-up-packet-suppressed-then-ready-',
       [
@@ -2284,6 +2340,7 @@ describe('runLinearCliShell', () => {
       },
       {
         createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        getProviderLinearIssueContext: getProviderLinearIssueContextMock,
         loadProviderLinearWorkerContext: loadProviderLinearWorkerContextMock,
         getEnv: () => ({
           CO_LINEAR_API_TOKEN: 'lin-api-token',
@@ -2297,6 +2354,7 @@ describe('runLinearCliShell', () => {
     );
 
     expect(createProviderLinearFollowUpIssueMock).not.toHaveBeenCalled();
+    expect(getProviderLinearIssueContextMock).toHaveBeenCalledTimes(1);
     expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
       ok: true,
       operation: 'create-follow-up',
@@ -2307,6 +2365,98 @@ describe('runLinearCliShell', () => {
       },
       relations: {
         related: true
+      }
+    });
+  });
+
+  it('does not reuse packet-blocked retries until the live follow-up description has the packet prefix', async () => {
+    const log = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const setExitCode = vi.fn();
+    const repoRoot = await mkdtemp(join(tmpdir(), 'linear-cli-follow-up-live-prefix-missing-'));
+    tempDirs.push(repoRoot);
+    await seedCliFollowUpPacketReadiness(repoRoot, 'linear-lin-issue-2');
+    const createProviderLinearFollowUpIssueMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>()
+        .mockResolvedValue({
+          ok: false,
+          operation: 'create-follow-up',
+          error: {
+            code: 'linear_follow_up_packet_traceability_pending',
+            message: FOLLOW_UP_PACKET_TRACEABILITY_PENDING_MESSAGE,
+            status: 409,
+            details: {
+              follow_up_issue: {
+                id: 'lin-issue-2',
+                identifier: 'CO-2'
+              }
+            }
+          }
+        } as never);
+    const getProviderLinearIssueContextMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').getProviderLinearIssueContext>()
+        .mockResolvedValue(buildIssueContextResult({
+          description: [
+            '## Immediate Traceability',
+            '```md',
+            '- Follow-up packet prefix: `linear-lin-issue-2`',
+            '```'
+          ].join('\n')
+        }) as never);
+    const { auditPath, loadProviderLinearWorkerContextMock } = await createSameAttemptFollowUpFixture(
+      'linear-cli-follow-up-live-prefix-missing-',
+      [buildPacketTraceabilityPendingAuditEntry()]
+    );
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          title: 'Follow-up',
+          description: 'Investigate the remaining improvement',
+          'intent-checksum': '- Preserve exact `CO STATUS` wording.',
+          'non-goals': '- [ ] Do not reopen the browser surface.',
+          'not-done-if': '- [ ] The issue still allows browser-first parity.',
+          'acceptance-criteria': '- [ ] Captured'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        getProviderLinearIssueContext: getProviderLinearIssueContextMock,
+        loadProviderLinearWorkerContext: loadProviderLinearWorkerContextMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: auditPath
+        }),
+        getCwd: () => repoRoot,
+        now: () => '2026-04-22T08:06:00.000Z',
+        appendAuditEntry,
+        log,
+        setExitCode
+      }
+    );
+
+    expect(getProviderLinearIssueContextMock).toHaveBeenCalledTimes(1);
+    expect(createProviderLinearFollowUpIssueMock).not.toHaveBeenCalled();
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_packet_traceability_retry_suppressed',
+        status: 409,
+        details: {
+          follow_up_issue: {
+            id: 'lin-issue-2',
+            identifier: 'CO-2'
+          },
+          audit_entry: {
+            error_code: 'linear_follow_up_packet_traceability_pending'
+          }
+        }
       }
     });
   });

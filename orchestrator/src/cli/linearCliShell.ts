@@ -774,7 +774,7 @@ async function resolveCreateFollowUpRetrySuppression(input: {
   env: NodeJS.ProcessEnv;
   dependencies: Pick<
     LinearCliShellDependencies,
-    'loadProviderLinearWorkerContext' | 'readTextFile' | 'warn'
+    'getProviderLinearIssueContext' | 'loadProviderLinearWorkerContext' | 'readTextFile' | 'warn'
   >;
 }): Promise<ProviderLinearCreateFollowUpResult | null> {
   const auditPath = resolveProviderLinearAuditPath(input.env);
@@ -840,7 +840,9 @@ async function resolveCreateFollowUpRetrySuppression(input: {
           title: input.title,
           canonicalOwnerKey: input.canonicalOwnerKey,
           blockedBySource: input.blockedBySource,
-          repoRoot: input.repoRoot
+          repoRoot: input.repoRoot,
+          env: input.env,
+          dependencies: input.dependencies
         })
       : null;
     if (reconciledRetry) {
@@ -924,6 +926,8 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
   canonicalOwnerKey: string | null;
   blockedBySource: boolean;
   repoRoot: string;
+  env: NodeJS.ProcessEnv;
+  dependencies: Pick<LinearCliShellDependencies, 'getProviderLinearIssueContext'>;
 }): Promise<ProviderLinearCreateFollowUpResult | null> {
   const entry = input.entry;
   const followUpIssueId = normalizeOptionalString(entry.follow_up_issue_id);
@@ -941,22 +945,42 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
   if (!relatedSatisfied || (input.blockedBySource && !blockedSatisfied)) {
     return null;
   }
-  const packetPrefix = `linear-${followUpIssueId}`;
-  const packetTraceability = await buildFollowUpPacketTraceabilityEvidence({
+  const localPacketTraceability = await buildFollowUpPacketTraceabilityEvidence({
     id: followUpIssueId,
-    description: [
-      '## Immediate Traceability',
-      `- Follow-up packet prefix: \`${packetPrefix}\``
-    ].join('\n'),
+    description: null,
     state: {
       id: 'audit-backlog-state',
       name: entry.state ?? 'Backlog',
       type: null
     }
   }, input.repoRoot);
+  if (
+    localPacketTraceability.readiness.missing_paths.length > 0
+    || localPacketTraceability.readiness.missing_registry_mirrors.length > 0
+  ) {
+    return null;
+  }
+  const followUpContext = await input.dependencies.getProviderLinearIssueContext({
+    issueId: followUpIssueId,
+    env: input.env
+  });
+  if (!followUpContext.ok) {
+    return null;
+  }
+  const packetTraceability = await buildFollowUpPacketTraceabilityEvidence(
+    followUpContext.issue,
+    input.repoRoot
+  );
   if (!packetTraceability.readiness.ready) {
     return null;
   }
+  const followUpTeam = followUpContext.issue.team
+    ? {
+        id: followUpContext.issue.team.id,
+        key: followUpContext.issue.team.key,
+        name: followUpContext.issue.team.name
+      }
+    : null;
   return {
     ok: true,
     operation: 'create-follow-up',
@@ -966,18 +990,14 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
       identifier: sourceIssueIdentifier
     },
     follow_up_issue: {
-      id: followUpIssueId,
-      identifier: followUpIssueIdentifier,
-      title: input.title,
-      description: null,
-      url: null,
-      state: {
-        id: 'audit-backlog-state',
-        name: entry.state ?? 'Backlog',
-        type: null
-      },
-      team: null,
-      project: null
+      id: followUpContext.issue.id,
+      identifier: followUpContext.issue.identifier,
+      title: followUpContext.issue.title,
+      description: followUpContext.issue.description,
+      url: followUpContext.issue.url,
+      state: followUpContext.issue.state,
+      team: followUpTeam,
+      project: followUpContext.issue.project
     },
     canonical_owner: input.canonicalOwnerKey
       ? {
