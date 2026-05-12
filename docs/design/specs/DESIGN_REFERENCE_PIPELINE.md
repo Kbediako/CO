@@ -1,6 +1,7 @@
 ---
-last_review: 2026-04-10
+last_review: 2026-05-13
 ---
+
 
 # Technical Spec — Design Reference Pipeline (Task 0401)
 
@@ -189,3 +190,6 @@ last_review: 2026-04-10
 - Phase 1: Internal pilot with single project; manual retention cleanup.
 - Phase 2: Broader rollout after retention automation & FFmpeg gating validated.
 - Success requires documentation updates (`docs/design/PRD-design-reference-pipeline.md`, checklists) and at least one diagnostic run captured in manifest.
+
+## CO-523 Review Evidence
+- 2026-05-13: Reviewed for the strict spec-guard freshness baseline. The document already scopes itself as design-reference pipeline intent and notes that the checked-in design-system package remains scaffold-level after CO-88; it remains an active design spec and was not archived or deleted.

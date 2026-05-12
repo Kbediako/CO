@@ -1,10 +1,10 @@
 ---
 id: 20260409-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad
 title: CO: automate truthful In Review -> Merging promotion after clean review handoff
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-09
-last_review: 2026-04-09
+last_review: 2026-05-13
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md
@@ -17,6 +17,7 @@ review_notes:
   - 2026-04-09: Current code audit confirms the exact seam from the issue report: `providerLinearWorkflowStates.ts` still classifies `Human Review` / `In Review` as handoff-only, `providerIssueHandoff.ts` preserves handoff-owned claims but never promotes them into `Merging`, `providerMergeCloseout.ts` only runs when the live state already normalizes to `merging`, and `pr-watch-merge.js` already exposes the blocker classifier for draft, required checks, review state, unresolved threads, and merge-state readiness.
   - 2026-04-09: Pre-implementation review approves the bounded path: add one explicit review-handoff promotion record and control-plane bridge that reuses the existing attached-PR selector and readiness classifier, preserves explicit refusal reasons, and leaves ordinary `Merging` closeout semantics unchanged.
   - 2026-04-09: Audited `docs-review` child stream `co-116-docs-review` succeeded with `review/telemetry.json` status `succeeded` / `review_outcome=clean-success`, but the review itself flagged one P1 ambiguity: whether `review=REVIEW_REQUIRED` should block review-handoff promotion. This spec resolves that ambiguity by requiring full merge-mode readiness for the bridge, so `REVIEW_REQUIRED` remains an explicit refusal reason until the PR is actually merge-shepherd-ready.
+  - 2026-05-13: CO-523 live Linear audit verified CO-116 is Done/completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence. Evidence: out/linear-8573da42-d9f9-44ce-a24e-224984539044/manual/20260512T1850Z-baseline/live-linear-states.json.
 ---
 
 # Technical Specification

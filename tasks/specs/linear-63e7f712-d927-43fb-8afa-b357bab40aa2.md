@@ -1,10 +1,10 @@
 ---
 id: 20260410-linear-63e7f712-d927-43fb-8afa-b357bab40aa2
 title: CO: Harden hot-suite dist freshness heuristics for transitive CLI/runtime dependencies
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-10
-last_review: 2026-04-11
+last_review: 2026-05-13
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md
@@ -33,6 +33,7 @@ review_notes:
   - 2026-04-10: The latest focused hot-suite rerun passed with `268` tests, the full repo validation floor passed with `324` files / `3365` tests, and the exact command outcomes are recorded in `out/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/manual/20260410T113724Z-validation-closeout.json`.
   - 2026-04-10: The latest wrapper-led standalone review at `.runs/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/cli/2026-04-10T09-55-25-068Z-984357be/review/telemetry.json` failed closed with `review_outcome: failed-boundary` / `termination_boundary: command-intent` after the reviewer launched a focused validation suite; the required manual correctness review and explicit elegance pass are therefore recorded in `out/linear-63e7f712-d927-43fb-8afa-b357bab40aa2/manual/20260410T113724Z-validation-closeout.json`.
   - 2026-04-10: Explicit elegance pass kept the final design at one shared test-local helper, one disappearance-token invalidation path, and paired hot-suite regressions while still rejecting broader product/runtime extraction or whole-repo invalidation as unnecessary scope growth.
+  - 2026-05-13: CO-523 live Linear audit verified CO-123 is Done/completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence. Evidence: out/linear-8573da42-d9f9-44ce-a24e-224984539044/manual/20260512T1850Z-baseline/live-linear-states.json.
 ---
 
 # Technical Specification

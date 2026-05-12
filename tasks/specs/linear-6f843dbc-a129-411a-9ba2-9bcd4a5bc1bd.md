@@ -1,10 +1,10 @@
 ---
 id: 20260408-linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd
 title: CO: Make ordinary eligible provider-worker issues actually leverage parent-owned same-issue child-lane parallelisation
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-08
-last_review: 2026-04-08
+last_review: 2026-05-13
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd.md
@@ -17,6 +17,7 @@ review_notes:
   - 2026-04-08: Required predecessor slices are already present in the active tree and must be reused directly: `CO-35` child-lane runtime and parent authority, `CO-52` phase-path verification, `CO-56` workspace-scoped delegation evidence, `CO-68` shared child-lane parsing helper, and `CO-82` proof/debug observability surfaces.
   - 2026-04-08: Pre-implementation approval is the narrow ordinary-adoption seam only: add one structured parent-only ordinary-worker decision helper plus bounded reason codes, hydrate that decision into proof/debug surfaces through the existing audit refresh path, and fail the worker turn closed when `parallelize_now` does not launch a child lane or when no explicit decision exists.
   - 2026-04-08: The first audited `docs-review` child stream failed only because `docs/TASKS.md` exceeded the archive-policy line cap by one line. After `npm run docs:archive-tasks` trimmed `docs/TASKS.md` from `451` to `450` lines, the rerun passed `spec-guard` and `docs:check` and then failed only on the standing repo-wide `docs:freshness` baseline (`Task Packet 205`, `Task Mirror 41`, `Report Only 36`). None of the CO-101 packet paths appear in the stale-entry list, so the rerun is recorded as a truthful manual fallback instead of a packet-shape blocker. Evidence: `.runs/linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd-co-101-docs-review-rerun/cli/2026-04-08T02-39-52-501Z-2a53de89/manifest.json`, `out/linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd/manual/20260408T024100Z-docs-review-fallback.md`.
+  - 2026-05-13: CO-523 live Linear audit verified CO-101 is Done/completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence. Evidence: out/linear-8573da42-d9f9-44ce-a24e-224984539044/manual/20260512T1850Z-baseline/live-linear-states.json.
 ---
 
 # Technical Specification

@@ -1,10 +1,10 @@
 ---
 id: 20260411-linear-acc07ffc-06ac-4649-a235-1bf37c13cc51
 title: CO: prevent archived or trashed Linear issues from being claimed or mutated as active provider lanes
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-11
-last_review: 2026-04-11
+last_review: 2026-05-13
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-acc07ffc-06ac-4649-a235-1bf37c13cc51.md
@@ -16,6 +16,7 @@ review_notes:
   - 2026-04-11: Preserved patch audit confirms the re-home direction and the missing final scope. `co-32-linear-issue-not-mutable.patch` already carries issue-context/cache truth, restored-cache revalidation, `linear_issue_not_mutable` fail-closed mutation behavior, and prompt/selected-run suppression work, but it does not cover the missing admission boundary and it would regress `docs/TASKS.md` by dropping the `CO-68` snapshot if applied blindly.
   - 2026-04-11: Baseline audit confirms the live admission gap. `linearDispatchSource.ts` currently normalizes tracked issues without `archivedAt` / `trashed`, fresh-dispatch eligibility only checks workflow state/ownership, `providerIssueHandoff.ts` claim/start eligibility only checks workflow state/blockers/assignee, and `providerLinearWorkerTruth.ts` does not yet treat `linear_issue_not_mutable` as a same-attempt deterministic suppression.
   - 2026-04-11: Pre-implementation issue-quality review approves this as broader than CO-32 mutation classification alone but still bounded to archived/trashed mutability truth and provider admission. The lane must cover admission, persisted claim truth, restored rereads, and suppression surfaces while explicitly excluding auto-unarchive or broad provider-worker redesign.
+  - 2026-05-13: CO-523 live Linear audit verified CO-153 is Done/completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence. Evidence: out/linear-8573da42-d9f9-44ce-a24e-224984539044/manual/20260512T1850Z-baseline/live-linear-states.json.
 ---
 
 # Technical Specification

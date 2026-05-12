@@ -1,13 +1,15 @@
 ---
 id: 20260309-1074-coordinator-symphony-aligned-question-read-retry-deduplication
 title: Coordinator Symphony-Aligned Question-Read Retry Deduplication
-status: draft
+status: done
 owners:
   - Codex
 created: 2026-03-09
-last_review: 2026-04-09
+last_review: 2026-05-13
 review_cadence_days: 30
 relates_to: docs/PRD-coordinator-symphony-aligned-question-read-retry-deduplication.md
+review_notes:
+  - 2026-05-13: CO-523 review found same-file 2026-03-09 closeout notes marking task 1074 completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence.
 ---
 
 # Spec Snapshot

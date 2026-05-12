@@ -1,6 +1,7 @@
 ---
-last_review: 2026-04-09
+last_review: 2026-05-13
 ---
+
 
 # Technical Spec — Hi-Fi Design Toolkit (Task 0410)
 
@@ -135,3 +136,6 @@ last_review: 2026-04-09
   - Permit `soil-net-2025-11-07` now authorizes live assets + optional video capture. Manifest approvals show `playwright-soil-net`; FFmpeg remains off but can be toggled later.
   - `live_assets.keep_scripts=true` and `max_stylesheets=24` ensure scroll-triggered animations, carousels, and sticky nav transitions replay when serving the reference folder locally.
 - **Next steps**: derive semantic token aliases (CTA, surface, border), add localization metadata for Japanese sections, and trial `self_correction.enabled=true` + screenshot diffs to keep the live-clone fidelity without hitting soil-net.jp during downstream publish stages.
+
+## CO-523 Review Evidence
+- 2026-05-13: Reviewed for the strict spec-guard freshness baseline. The document already scopes itself as hi-fi design toolkit intent and notes that the checked-in design-system package remains scaffold-level after CO-88; it remains an active design spec and was not archived or deleted.

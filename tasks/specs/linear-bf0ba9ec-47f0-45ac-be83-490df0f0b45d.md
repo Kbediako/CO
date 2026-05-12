@@ -1,10 +1,10 @@
 ---
 id: 20260409-linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d
 title: CO: Fix launchd-supervised control-host child runtime PATH so provider-worker launches resolve node and appserver/login probes truthfully
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-09
-last_review: 2026-04-09
+last_review: 2026-05-13
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d.md
@@ -17,6 +17,7 @@ review_notes:
   - 2026-04-09: Artifact audit confirms this is the bounded launchd child-runtime seam, not the older `CO-41` stale-refresh wedge. The current `CO-87` reproducer admitted the issue and created the child run manifest, but the provider-worker stage failed immediately at `/Users/kbediako/Code/CO/.runs/linear-885a6ce9-7766-4296-be19-57e624769d46/cli/2026-04-08T16-41-34-176Z-49e7f08a/manifest.json` with `/bin/sh: node: command not found` from the stage command recorded in `commands/01-provider-linear-worker.ndjson`.
   - 2026-04-09: Current code audit narrows the concrete seams to runtime-contract truth rather than dispatch or intake logic: `codex.orchestrator.json` still launches `providerLinearWorkerRunner.js` through bare `node`, `commandRunner.ts` injects package-root metadata but not an explicit Node executable path, and `runtime/provider.ts` plus `utils/codexCli.ts` can still classify missing executable resolution too generically for truthful launchd-owned appserver/login fallback behavior.
   - 2026-04-09: Docs-first approval is recorded via the audited child-stream manifest `.runs/linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d-co-115-docs-review/cli/2026-04-08T17-32-15-382Z-fc180ff1/manifest.json`. After the repo-supported `npm run docs:archive-tasks` trim returned `docs/TASKS.md` from `451` to `450` lines, the child stream passed `spec-guard` and `docs:check` and then failed only on the standing repo-wide `docs:freshness` baseline (`stale docs: 282`; Task Packet stale=`205`, Task Mirror stale=`41`, Report Only stale=`36`). Manual fallback is accepted and recorded in `out/linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d/manual/20260408T173215Z-docs-review-fallback.md`.
+  - 2026-05-13: CO-523 live Linear audit verified CO-115 is Done/completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence. Evidence: out/linear-8573da42-d9f9-44ce-a24e-224984539044/manual/20260512T1850Z-baseline/live-linear-states.json.
 ---
 
 # Technical Specification
