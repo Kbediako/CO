@@ -4,7 +4,7 @@ title: CO: Emit structured pointer-based block memory from run lifecycle seams
 status: done
 owner: Codex
 created: 2026-04-09
-last_review: 2026-05-13
+last_review: 2026-05-12
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-a87ae732-0cf0-475e-b7af-a2dec20933e1.md
@@ -18,7 +18,7 @@ review_notes:
   - 2026-04-09: `orchestrator/src/cli/events/runEventStream.ts` already exposes the drill-down event vocabulary (`run_started`, `step_started`, `step_completed`, `step_failed`, `run_completed`) needed for block-memory traceability without replacing `events.jsonl` as source truth.
   - 2026-04-09: The first consumer can stay intentionally narrow. `scripts/lib/review-prompt-context.ts` already reads `memory.source_0` from manifests and is a suitable proof surface for block-memory discovery without reopening broader worker or cloud contracts.
   - 2026-04-09: The first docs-review child stream failed only because the spec referenced the planned helper path before the file existed; after narrowing that reference, the rerun passed `spec-guard`, `docs:check`, and `docs:freshness` and then stalled in nested forced review without terminal telemetry. Manual fallback is accepted and recorded in `out/linear-a87ae732-0cf0-475e-b7af-a2dec20933e1/manual/20260409T084843Z-docs-review-fallback.md` with rerun manifest `.runs/linear-a87ae732-0cf0-475e-b7af-a2dec20933e1-co-93-docs-review-rerun/cli/2026-04-09T08-45-44-860Z-1bacbce2/manifest.json`.
-  - 2026-05-13: CO-523 live Linear audit verified CO-93 is Done/completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence. Evidence: out/linear-8573da42-d9f9-44ce-a24e-224984539044/manual/20260512T1850Z-baseline/live-linear-states.json.
+  - 2026-05-12: CO-523 live Linear audit verified CO-93 is Done/completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence. Evidence: .runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-a87ae732-0cf0-475e-b7af-a2dec20933e1.json.
 ---
 
 # Technical Specification

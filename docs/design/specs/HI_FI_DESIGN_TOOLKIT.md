@@ -1,5 +1,5 @@
 ---
-last_review: 2026-05-13
+last_review: 2026-05-12
 ---
 
 
@@ -138,4 +138,4 @@ last_review: 2026-05-13
 - **Next steps**: derive semantic token aliases (CTA, surface, border), add localization metadata for Japanese sections, and trial `self_correction.enabled=true` + screenshot diffs to keep the live-clone fidelity without hitting soil-net.jp during downstream publish stages.
 
 ## CO-523 Review Evidence
-- 2026-05-13: Reviewed for the strict spec-guard freshness baseline. The document already scopes itself as hi-fi design toolkit intent and notes that the checked-in design-system package remains scaffold-level after CO-88; it remains an active design spec and was not archived or deleted.
+- 2026-05-12: Reviewed for the strict spec-guard freshness baseline. The document already scopes itself as hi-fi design toolkit intent and notes that the checked-in design-system package remains scaffold-level after CO-88; it remains an active design spec and was not archived or deleted.

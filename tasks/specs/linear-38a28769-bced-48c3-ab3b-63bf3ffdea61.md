@@ -4,7 +4,7 @@ title: CO: repair fresh-issue Linear workpad and PR-attachment writes
 status: done
 owner: Codex
 created: 2026-04-11
-last_review: 2026-05-13
+last_review: 2026-05-12
 review_cadence_days: 30
 risk_level: medium
 related_prd: docs/PRD-linear-38a28769-bced-48c3-ab3b-63bf3ffdea61.md
@@ -16,7 +16,7 @@ review_notes:
   - 2026-04-11: Fresh live verification disproved the broad reported hypothesis. `linear upsert-workpad` on `CO-154` succeeded and created the first workpad comment, so fresh mutable workpad creation is not broken on current main.
   - 2026-04-11: Live incident verification narrowed the remaining defect. `CO-36` now reads as archived and trashed; `linear upsert-workpad` on `CO-36` fails closed with `linear_issue_not_mutable`, but `linear attach-pr` still reproduces the raw `attachmentLinkURL` / `Entity not found: Issue` error.
   - 2026-04-11: Pre-implementation issue-quality review approves a bounded scope change from "fresh issue writes are broken" to "align `attach-pr` mutability/noop handling with the existing helper contract while preserving the verified fresh mutable path." No broader provider workflow redesign is justified.
-  - 2026-05-13: CO-523 live Linear audit verified CO-154 is Done/completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence. Evidence: out/linear-8573da42-d9f9-44ce-a24e-224984539044/manual/20260512T1850Z-baseline/live-linear-states.json.
+  - 2026-05-12: CO-523 live Linear audit verified CO-154 is Done/completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence. Evidence: .runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-38a28769-bced-48c3-ab3b-63bf3ffdea61.json.
 ---
 
 # Technical Specification

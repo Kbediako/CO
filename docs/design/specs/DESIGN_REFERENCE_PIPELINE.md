@@ -1,5 +1,5 @@
 ---
-last_review: 2026-05-13
+last_review: 2026-05-12
 ---
 
 
@@ -192,4 +192,4 @@ last_review: 2026-05-13
 - Success requires documentation updates (`docs/design/PRD-design-reference-pipeline.md`, checklists) and at least one diagnostic run captured in manifest.
 
 ## CO-523 Review Evidence
-- 2026-05-13: Reviewed for the strict spec-guard freshness baseline. The document already scopes itself as design-reference pipeline intent and notes that the checked-in design-system package remains scaffold-level after CO-88; it remains an active design spec and was not archived or deleted.
+- 2026-05-12: Reviewed for the strict spec-guard freshness baseline. The document already scopes itself as design-reference pipeline intent and notes that the checked-in design-system package remains scaffold-level after CO-88; it remains an active design spec and was not archived or deleted.

@@ -5,11 +5,11 @@ status: done
 owners:
   - Codex
 created: 2026-03-09
-last_review: 2026-05-13
+last_review: 2026-05-12
 review_cadence_days: 30
 relates_to: docs/PRD-coordinator-symphony-aligned-question-read-retry-deduplication.md
 review_notes:
-  - 2026-05-13: CO-523 review found same-file 2026-03-09 closeout notes marking task 1074 completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence.
+  - 2026-05-12: CO-523 review found same-file 2026-03-09 closeout notes marking task 1074 completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence.
 ---
 
 # Spec Snapshot

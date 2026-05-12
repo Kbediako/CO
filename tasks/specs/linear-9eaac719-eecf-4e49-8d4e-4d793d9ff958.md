@@ -4,7 +4,7 @@ title: CO: Make planner memory selection real instead of leaving TaskContext as 
 status: done
 owner: Codex
 created: 2026-04-09
-last_review: 2026-05-13
+last_review: 2026-05-12
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md
@@ -16,7 +16,7 @@ review_notes:
   - 2026-04-09: Pre-implementation audit confirms the current seam is a dead earliest-orchestration input, not a missing manifest contract. `TaskContext` still carries only task identity plus loose metadata, `createTaskContext(...)` only loads id/title/slug, and `CommandPlanner.plan(...)` still discards the task input entirely.
   - 2026-04-09: Adjacent `CO-91` already landed the shared `source 0` contract and helper-backed read path, so this slice stays bounded to planner-memory input, selected ref emission, and downstream cloud-prompt consumption rather than reopening the contract layer.
   - 2026-04-09: Current code audit shows `orchestrator/src/cli/services/orchestratorCloudPromptBuilder.ts` still performs local prompt-pack experience selection after planning, making it the smallest truthful downstream consumer for this planner-owned selection seam.
-  - 2026-05-13: CO-523 live Linear audit verified CO-92 is Done/completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence. Evidence: out/linear-8573da42-d9f9-44ce-a24e-224984539044/manual/20260512T1850Z-baseline/live-linear-states.json.
+  - 2026-05-12: CO-523 live Linear audit verified CO-92 is Done/completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence. Evidence: .runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-9eaac719-eecf-4e49-8d4e-4d793d9ff958.json.
 ---
 
 # Technical Specification
