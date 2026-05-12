@@ -1,13 +1,15 @@
 ---
 id: 20260309-1075-coordinator-symphony-aligned-shared-question-read-sequencing-extraction
 title: Coordinator Symphony-Aligned Shared Question-Read Sequencing Extraction
-status: draft
+status: done
 owners:
   - Codex
 created: 2026-03-09
-last_review: 2026-04-09
+last_review: 2026-05-12
 review_cadence_days: 30
 relates_to: docs/PRD-coordinator-symphony-aligned-shared-question-read-sequencing-extraction.md
+review_notes:
+  - 2026-05-12: CO-523 review found same-file 2026-03-09 closeout notes marking task 1075 completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence.
 ---
 
 # Spec Snapshot
