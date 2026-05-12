@@ -55,6 +55,71 @@ describe('run manifest file writes', () => {
     });
   });
 
+  it('keeps concurrent provider-worker metadata patches when advisory goal evidence is patched', async () => {
+    const manifestPath = await createManifest({
+      version: 1,
+      run_id: 'run-1',
+      task_id: 'task-1',
+      pipeline_id: 'provider-linear-worker',
+      status: 'in_progress',
+      summary: null,
+      provider_launch_source: null,
+      provider_control_host_task_id: null,
+      provider_control_host_run_id: null,
+      provider_worker_control: {
+        authority: 'appserver',
+        transport: 'app-server',
+        state_read_model: 'provider-linear-worker-proof'
+      }
+    });
+    const goalEvidence = buildGoalEvidence('provider-worker advisory goal evidence');
+
+    await Promise.all([
+      patchRunManifestFile(
+        manifestPath,
+        (manifest) => {
+          manifest.goal_evidence = goalEvidence;
+          return true;
+        },
+        { taskId: 'provider-linear-worker-goal-evidence', missing: 'skip' }
+      ),
+      patchRunManifestFile(
+        manifestPath,
+        (manifest) => {
+          manifest.provider_launch_source = 'control-host';
+          manifest.provider_control_host_task_id = 'control-task-1';
+          manifest.provider_control_host_run_id = 'control-run-1';
+          manifest.summary = 'control host locator backfilled';
+          return true;
+        },
+        { taskId: 'provider-linear-worker-control-host', missing: 'error' }
+      )
+    ]);
+
+    const persisted = await readManifest(manifestPath);
+    expect(persisted).toMatchObject({
+      pipeline_id: 'provider-linear-worker',
+      status: 'in_progress',
+      summary: 'control host locator backfilled',
+      provider_launch_source: 'control-host',
+      provider_control_host_task_id: 'control-task-1',
+      provider_control_host_run_id: 'control-run-1',
+      provider_worker_control: {
+        authority: 'appserver',
+        transport: 'app-server',
+        state_read_model: 'provider-linear-worker-proof'
+      },
+      goal_evidence: goalEvidence
+    });
+
+    const persistedGoalEvidence = persisted.goal_evidence as Record<string, unknown>;
+    expect(persistedGoalEvidence).toMatchObject({
+      authority: 'advisory_only',
+      linear_authority_preserved: true
+    });
+    expect(persistedGoalEvidence.not_authorized_for).toEqual(goalEvidence.not_authorized_for);
+  });
+
   it('preserves current goal evidence when saveManifest writes a stale null snapshot', async () => {
     const goalEvidence = buildGoalEvidence('preserved advisory goal evidence');
     const manifestPath = await createManifest({
