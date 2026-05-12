@@ -1,10 +1,10 @@
 ---
 id: 20260410-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc
 title: CO STATUS: clear stale retry state when active claims rehydrate so one issue cannot appear in both Running and Backoff
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-10
-last_review: 2026-04-10
+last_review: 2026-05-12
 review_cadence_days: 30
 risk_level: medium
 related_prd: docs/PRD-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc.md
@@ -17,6 +17,7 @@ review_notes:
   - 2026-04-10: The lane remains narrower than generic retry redesign. Real `resumable` / `handoff_failed` flows still need retry ownership preserved, and the fix should stay focused on stale retry metadata surviving authoritative running rehydrate.
   - 2026-04-10: The first rework `docs-review` child stream stopped only because the replay temporarily pushed `docs/TASKS.md` to `451` lines. After restoring the one-line budget trim, rerun `docs-review-rework-rerun` passed `spec-guard`, `docs:check`, `docs:freshness`, and forced standalone review cleanly. Manifest: `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-docs-review-rework-rerun/cli/2026-04-10T10-09-14-033Z-b783a0b7/manifest.json`.
   - 2026-04-10: The current shared-root intake artifact no longer preserves a live running claim with stale retry queue metadata, so focused regressions are now the authoritative reproducer and proof for the `CO-127` stale-shape contract while the fix remains at the claim-state source seam.
+  - 2026-05-12: CO-523 live Linear audit verified CO-145 is Done/completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence. Evidence: .runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-cb368f80-6d3e-4deb-b89b-4bd3577562cc.json.
 ---
 
 # Technical Specification

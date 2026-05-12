@@ -1,10 +1,10 @@
 ---
 id: 20260408-linear-1c361221-d50a-43bd-aeba-ce6bada3b07f
 title: CO Add a Bounded macOS Screenshot-Proof Capture Path Without External Helper Dependencies
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-08
-last_review: 2026-04-08
+last_review: 2026-05-12
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-1c361221-d50a-43bd-aeba-ce6bada3b07f.md
@@ -17,6 +17,7 @@ review_notes:
   - 2026-04-08: `CO-97` closeout evidence was re-read directly from the prior Linear workpad and preserved here: the local screenshot helper path failed on this host because of a Swift/SDK mismatch, so proof capture used direct macOS `screencapture` plus AppleScript cleanup instead of the helper wrapper.
   - 2026-04-08: Pre-implementation issue-quality review approves one bounded lane only: add a repo-owned built-in macOS screenshot helper, keep upload/embed and reviewer-URL handoff as separate seams, and do not broaden into generic media tooling or cross-platform capture.
   - 2026-04-08: The first audited `docs-review` child stream failed at `docs:check` on two packet-local issues (a speculative missing path reference and a `docs/TASKS.md` line-budget overflow). After removing the missing path reference and running `npm run docs:archive-tasks` to bring `docs/TASKS.md` from 451 to 447 lines, the rerun passed `spec-guard` and `docs:check`, then failed only on the existing repo-wide `docs:freshness` stale-doc baseline (`stale docs: 121`; Task Packet stale=90, Task Mirror stale=18, Report Only stale=13). The CO-105 packet is not listed among the stale entries, so manual fallback is accepted for docs-first approval.
+  - 2026-05-12: CO-523 live Linear audit verified CO-105 is Done/completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence. Evidence: .runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-1c361221-d50a-43bd-aeba-ce6bada3b07f.json.
 ---
 
 # Technical Specification

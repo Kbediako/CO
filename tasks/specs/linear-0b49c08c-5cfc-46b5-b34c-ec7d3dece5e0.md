@@ -1,10 +1,10 @@
 ---
 id: 20260410-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0
 title: CO: Repo-wide cleanup of stale compatibility debt, contradictory docs, and placeholder surfaces
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-10
-last_review: 2026-04-11
+last_review: 2026-05-12
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md
@@ -21,6 +21,7 @@ review_notes:
   - 2026-04-11: The required validation floor is green on `r4`, including focused SDK/RLM checks, full `build`/`lint`/`test`, `docs:check`, `docs:freshness`, diff-budget override acceptance, and `pack:smoke`. Evidence: `out/linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0/manual/validation-summary.md`.
   - 2026-04-11: The standalone review wrapper reached review launch but ended as `failed-boundary` because the bounded reviewer launched a validation suite (`termination_boundary.kind=command-intent`, `provenance=validation-suite`), so `r4` records a manual fallback review with no actionable findings instead of overstating wrapper success. Evidence: `../../.runs/linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0/cli/2026-04-10T15-23-29-613Z-26aa3f5c/review/telemetry.json`, `out/linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0/manual/standalone-review.md`.
   - 2026-04-11: The explicit elegance/minimality pass for `r4` is recorded and did not identify any further simplification that would preserve the required mirrored truth surfaces. Evidence: `out/linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0/manual/elegance-review.md`.
+  - 2026-05-12: CO-523 live Linear audit verified CO-88 is Done/completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence. Evidence: .runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.json.
 ---
 
 # Technical Specification

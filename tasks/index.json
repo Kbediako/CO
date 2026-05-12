@@ -1,6 +1,129 @@
 {
   "items": [
     {
+      "id": "20260512-linear-b642e879-ba50-45ef-b0d9-b059afa9e932",
+      "title": "CO: restore live docs freshness maintenance owner after CO-511 terminal",
+      "relates_to": "tasks/tasks-linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-12",
+      "canonical_owner_key": "docs:freshness:maintain",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO-522 provider worker",
+          "date": "2026-05-12",
+          "status": "ready_to_in_progress",
+          "summary": "linear issue-context found CO-522 Ready/unstarted with In Progress as the live started state, no attached PR, and no prior workpad."
+        },
+        "parallelization": {
+          "reviewer": "linear parallelization helper",
+          "date": "2026-05-12",
+          "decision": "parallelize_now",
+          "reason": "independent_scope_available",
+          "invalidated_child_lane": ".runs/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-co522-packet-docs/cli/2026-05-12T16-58-17-133Z-bf54e44c/manifest.json",
+          "accepted_child_lane": ".runs/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-co522-task-checklist/cli/2026-05-12T17-20-16-231Z-292db3b2/manifest.json",
+          "summary": "Initial packet-docs child lane stalled with no child-worktree changes and was invalidated. A file-scoped docs child created the CO-522 task checklist, its patch passed git apply --check, and the parent accepted it before completing the remaining packet files, owner metadata, and registry mirrors."
+        },
+        "owner_rehome_baseline": {
+          "reviewer": "CO-522 provider worker",
+          "date": "2026-05-12",
+          "status": "owner_rehome_validated_with_existing_baseline_debt",
+          "canonical_owner_key": "docs:freshness:maintain",
+          "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+          "previous_owner_issue": "CO-511",
+          "owner_issue": "CO-522",
+          "validation": "npm run docs:freshness:maintain -- --format json",
+          "before_report": "out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932/before-docs-freshness-maintenance-report.json",
+          "after_report": "out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932/docs-freshness-maintenance.json",
+          "summary": "Baseline reproduced configured_owner_terminal for terminal CO-511 with blocking_changed_paths=[]. After rehoming and merging latest main, docs:freshness:maintain resolves owner_issue=CO-522, owner_issue_action.reason=succeeded, state=In Progress, usable=true, same_project=true, and blocking_changed_paths=[]. The current command reports block_policy_over_budget for the remaining owner-routed stale cohort baseline (551 entries over 300 and 26 cohorts over 2), so that debt remains visible under the live owner instead of being patched through CO-514 or hidden by gate weakening."
+        },
+        "validation": {
+          "reviewer": "CO-522 provider worker",
+          "date": "2026-05-12",
+          "passed": [
+            "node scripts/delegation-guard.mjs",
+            "npm run build",
+            "npm run lint",
+            "npm run test",
+            "npm run docs:check",
+            "npm run repo:stewardship",
+            "node scripts/diff-budget.mjs",
+            "git diff --check"
+          ],
+          "baseline_blockers": [
+            "node scripts/spec-guard.mjs --dry-run reports pre-existing stale specs while preserving guard behavior",
+            "npm run docs:freshness reports 617 stale docs and zero missing registry rows"
+          ],
+          "summary": "Owner-truth acceptance is satisfied; repo-wide stale freshness/spec debt remains out of scope and still blocks freshness gates as intended."
+        },
+        "review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-12",
+          "status": "clean",
+          "review_outcome": "bounded-success",
+          "review_verdict": "clean",
+          "finding_count": 0,
+          "telemetry": ".runs/linear-b642e879-ba50-45ef-b0d9-b059afa9e932/cli/2026-05-12T16-54-21-084Z-f80be04f/review/telemetry.json",
+          "summary": "Manifest-backed review found no actionable issues in the uncommitted docs/metadata owner rehome. The bounded wrapper recorded command-intent boundary preservation, but semantic review verdict is clean."
+        },
+        "elegance": {
+          "reviewer": "CO-522 provider worker",
+          "date": "2026-05-12",
+          "status": "minimal",
+          "evidence": "out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932/elegance-review.txt",
+          "summary": "No helper, abstraction, or extra owner-routing branch was introduced; the live-owner mutation remains the single catalog pointer change plus traceability packet/mirror updates."
+        }
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md",
+        "prd": "docs/PRD-linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md",
+        "docs": "docs/TECH_SPEC-linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md",
+        "action_plan": "docs/ACTION_PLAN-linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md",
+        "spec": "tasks/specs/linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md",
+        "task": "tasks/tasks-linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md"
+      }
+    },
+    {
+      "id": "20260513-linear-8573da42-d9f9-44ce-a24e-224984539044",
+      "title": "CO-523 strict spec-guard stale last_review baseline repair",
+      "relates_to": "tasks/tasks-linear-8573da42-d9f9-44ce-a24e-224984539044.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-12",
+      "approvals": {
+        "docs_packet": {
+          "reviewer": "co523-docs-packet child lane",
+          "date": "2026-05-12",
+          "status": "accepted",
+          "manifest": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044-co523-docs-packet/cli/2026-05-12T18-52-17-405Z-7c08766d/manifest.json",
+          "summary": "Created the six-file CO-523 docs-first packet preserving strict spec-guard, node scripts/spec-guard.mjs, last_review, Core Lane, CO-522, PR #795, docs/design/specs, tasks/specs, stale baseline, no blind bumps, no deletion, and no weakening."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "spec_guard_baseline_repaired",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/manual/20260512T1850Z-baseline/spec-guard-classification.json",
+          "summary": "Reproduced the 52-row April 8-11 strict spec-guard baseline, verified 48 Linear-backed task specs are Done/completed, reclassified two numbered completed specs from same-file closeout notes, reviewed two design specs as still-active design intent, and kept spec-guard unchanged."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-8573da42-d9f9-44ce-a24e-224984539044.md",
+        "task": "tasks/tasks-linear-8573da42-d9f9-44ce-a24e-224984539044.md",
+        "agent_task": ".agent/task/linear-8573da42-d9f9-44ce-a24e-224984539044.md",
+        "prd": "docs/PRD-linear-8573da42-d9f9-44ce-a24e-224984539044.md",
+        "docs": "docs/TECH_SPEC-linear-8573da42-d9f9-44ce-a24e-224984539044.md",
+        "action_plan": "docs/ACTION_PLAN-linear-8573da42-d9f9-44ce-a24e-224984539044.md"
+      }
+    },
+    {
       "id": "20260508-linear-07d1fdee-8a77-4a7f-90fc-0a13fd96c675",
       "title": "CO-509 auto-created issue labels, relations, and traceability",
       "relates_to": "tasks/tasks-linear-07d1fdee-8a77-4a7f-90fc-0a13fd96c675.md",
@@ -8326,7 +8449,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-11",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (manual fallback accepted)",
@@ -8340,6 +8463,14 @@
           "manifest": ".runs/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3/cli/2026-04-11T13-49-50-356Z-aa2ff05d/manifest.json",
           "telemetry": ".runs/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3/cli/2026-04-11T13-49-50-356Z-aa2ff05d/review/telemetry.json",
           "override_reason": "Forced standalone review executed under FORCE_CODEX_REVIEW=1 and failed closed with review_outcome=failed-boundary and termination_boundary.kind=startup-anchor before any verdict. Manual diff review then found and fixed the stale docs/TASKS.md status mirror, and the remaining diff was accepted after manual correctness/regression review plus explicit elegance review. See out/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3/manual/20260411T142419Z-standalone-review-fallback.md and out/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3/manual/20260411T142419Z-elegance-review.md."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-89fa9514-a071-41f0-b54d-3d4e5d4a00b3.json",
+          "summary": "Live Linear issue-context confirmed CO-126 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -8347,7 +8478,8 @@
         "task": "tasks/tasks-linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3.md",
         "agent_task": ".agent/task/linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3.md",
         "docs": "docs/TECH_SPEC-linear-89fa9514-a071-41f0-b54d-3d4e5d4a00b3.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260411-linear-4dd7c20a-3eec-406f-addc-e89948f044f7",
@@ -8357,14 +8489,24 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-11",
-      "approvals": {},
+      "last_review": "2026-05-12",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-4dd7c20a-3eec-406f-addc-e89948f044f7.json",
+          "summary": "Live Linear issue-context confirmed CO-149 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-4dd7c20a-3eec-406f-addc-e89948f044f7.md",
         "task": "tasks/tasks-linear-4dd7c20a-3eec-406f-addc-e89948f044f7.md",
         "agent_task": ".agent/task/linear-4dd7c20a-3eec-406f-addc-e89948f044f7.md",
         "docs": "docs/TECH_SPEC-linear-4dd7c20a-3eec-406f-addc-e89948f044f7.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260411-linear-38a28769-bced-48c3-ab3b-63bf3ffdea61",
@@ -8374,13 +8516,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-11",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (manual fallback accepted)",
           "date": "2026-04-11",
           "manifest": ".runs/linear-38a28769-bced-48c3-ab3b-63bf3ffdea61-co-154-docs-review/cli/2026-04-11T11-49-08-728Z-6a4be6b6/manifest.json",
           "override_reason": "Child docs-review passed delegation guard, spec guard, docs:check, and docs:freshness. The forced review step stalled past four minutes without telemetry or a diff-local verdict, drifting into archive/script heuristics instead, so packet-local fallback was accepted."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-38a28769-bced-48c3-ab3b-63bf3ffdea61.json",
+          "summary": "Live Linear issue-context confirmed CO-154 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -8388,7 +8538,8 @@
         "task": "tasks/tasks-linear-38a28769-bced-48c3-ab3b-63bf3ffdea61.md",
         "agent_task": ".agent/task/linear-38a28769-bced-48c3-ab3b-63bf3ffdea61.md",
         "docs": "docs/TECH_SPEC-linear-38a28769-bced-48c3-ab3b-63bf3ffdea61.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260411-linear-acc07ffc-06ac-4649-a235-1bf37c13cc51",
@@ -8398,14 +8549,24 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-11",
-      "approvals": {},
+      "last_review": "2026-05-12",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-acc07ffc-06ac-4649-a235-1bf37c13cc51.json",
+          "summary": "Live Linear issue-context confirmed CO-153 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-acc07ffc-06ac-4649-a235-1bf37c13cc51.md",
         "task": "tasks/tasks-linear-acc07ffc-06ac-4649-a235-1bf37c13cc51.md",
         "agent_task": ".agent/task/linear-acc07ffc-06ac-4649-a235-1bf37c13cc51.md",
         "docs": "docs/TECH_SPEC-linear-acc07ffc-06ac-4649-a235-1bf37c13cc51.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260411-linear-b0aac010-12ec-4509-88a4-c2dbc6395e19",
@@ -8415,14 +8576,24 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-11",
-      "approvals": {},
+      "last_review": "2026-05-12",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-b0aac010-12ec-4509-88a4-c2dbc6395e19.json",
+          "summary": "Live Linear issue-context confirmed CO-137 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-b0aac010-12ec-4509-88a4-c2dbc6395e19.md",
         "task": "tasks/tasks-linear-b0aac010-12ec-4509-88a4-c2dbc6395e19.md",
         "agent_task": ".agent/task/linear-b0aac010-12ec-4509-88a4-c2dbc6395e19.md",
         "docs": "docs/TECH_SPEC-linear-b0aac010-12ec-4509-88a4-c2dbc6395e19.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260411-linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6",
@@ -8432,12 +8603,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-11",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-04-11",
           "manifest": ".runs/linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6-co-128-docs-review-rework-rerun/cli/2026-04-10T15-48-35-359Z-ace09c6b/manifest.json"
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.json",
+          "summary": "Live Linear issue-context confirmed CO-128 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -8445,7 +8624,8 @@
         "task": "tasks/tasks-linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.md",
         "agent_task": ".agent/task/linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.md",
         "docs": "docs/TECH_SPEC-linear-1cd22f2a-5a12-4d2f-bc32-8289f4d24be6.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260411-linear-0d66d189-fc51-4054-80db-b6990858f33d",
@@ -8455,12 +8635,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-11",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "status": "succeeded",
           "date": "2026-04-11",
           "manifest": ".runs/linear-0d66d189-fc51-4054-80db-b6990858f33d-co-152-docs-review-rerun/cli/2026-04-11T04-06-38-962Z-e07fd549/manifest.json"
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-0d66d189-fc51-4054-80db-b6990858f33d.json",
+          "summary": "Live Linear issue-context confirmed CO-152 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -8468,7 +8656,8 @@
         "task": "tasks/tasks-linear-0d66d189-fc51-4054-80db-b6990858f33d.md",
         "agent_task": ".agent/task/linear-0d66d189-fc51-4054-80db-b6990858f33d.md",
         "docs": "docs/TECH_SPEC-linear-0d66d189-fc51-4054-80db-b6990858f33d.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260411-linear-62898ffa-fbb2-4713-8113-6e05dbabb777",
@@ -8478,14 +8667,24 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-11",
-      "approvals": {},
+      "last_review": "2026-05-12",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-62898ffa-fbb2-4713-8113-6e05dbabb777.json",
+          "summary": "Live Linear issue-context confirmed CO-150 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-62898ffa-fbb2-4713-8113-6e05dbabb777.md",
         "task": "tasks/tasks-linear-62898ffa-fbb2-4713-8113-6e05dbabb777.md",
         "agent_task": ".agent/task/linear-62898ffa-fbb2-4713-8113-6e05dbabb777.md",
         "docs": "docs/TECH_SPEC-linear-62898ffa-fbb2-4713-8113-6e05dbabb777.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260411-linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605",
@@ -8495,13 +8694,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-11",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (repo docs:freshness baseline; manual fallback accepted)",
           "date": "2026-04-11",
           "manifest": ".runs/linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605-co-151-docs-review/cli/2026-04-11T00-57-29-630Z-45cacf66/manifest.json",
           "override_reason": "Child docs-review passed delegation guard, spec-guard, and docs:check for the CO-151 packet, then stopped on the standing repo-wide docs:freshness baseline: 77 stale older docs with no missing registry, missing-on-disk, or invalid entries. CO-151 packet files were registered and not stale."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605.json",
+          "summary": "Live Linear issue-context confirmed CO-151 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -8509,7 +8716,8 @@
         "task": "tasks/tasks-linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605.md",
         "agent_task": ".agent/task/linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605.md",
         "docs": "docs/TECH_SPEC-linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260410-linear-e122d053-40f2-4246-9648-81c9001715f1",
@@ -8519,13 +8727,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (repo docs:freshness baseline; manual fallback accepted)",
           "date": "2026-04-10",
           "manifest": ".runs/linear-e122d053-40f2-4246-9648-81c9001715f1-co-125-docs-review/cli/2026-04-10T08-09-26-011Z-250db16b/manifest.json",
           "override_reason": "Child docs-review passed spec-guard and docs:check for the CO-125 packet but stopped on the standing repo-wide docs:freshness baseline: 119 stale docs across existing task packets, task mirrors, and report-only docs."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-e122d053-40f2-4246-9648-81c9001715f1.json",
+          "summary": "Live Linear issue-context confirmed CO-125 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -8533,7 +8749,8 @@
         "task": "tasks/tasks-linear-e122d053-40f2-4246-9648-81c9001715f1.md",
         "agent_task": ".agent/task/linear-e122d053-40f2-4246-9648-81c9001715f1.md",
         "docs": "docs/TECH_SPEC-linear-e122d053-40f2-4246-9648-81c9001715f1.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260410-linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e",
@@ -8543,13 +8760,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (manual fallback accepted)",
           "date": "2026-04-10",
           "manifest": ".runs/linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e-co-134-docs-review/cli/2026-04-10T00-23-47-516Z-b5b978f9/manifest.json",
           "override_reason": "The audited docs-review child stream passed docs:check and failed before the forced review stage only because the shared repo docs:freshness baseline remained stale (`stale docs: 119`). The CO-134 packet itself is registered and absent from the child-stream stale set, so the manifest-backed run is accepted as truthful packet evidence."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-653a1d08-94a4-47e1-8f63-2232dcaf8f1e.json",
+          "summary": "Live Linear issue-context confirmed CO-134 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -8557,7 +8782,8 @@
         "task": "tasks/tasks-linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e.md",
         "agent_task": ".agent/task/linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e.md",
         "docs": "docs/TECH_SPEC-linear-653a1d08-94a4-47e1-8f63-2232dcaf8f1e.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260410-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58",
@@ -8567,14 +8793,24 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
-      "approvals": {},
+      "last_review": "2026-05-12",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-87d23327-3ee6-429c-a25f-8bd9c84cde58.json",
+          "summary": "Live Linear issue-context confirmed CO-132 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md",
         "task": "tasks/tasks-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md",
         "agent_task": ".agent/task/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md",
         "docs": "docs/TECH_SPEC-linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260410-linear-aa307fdc-53a1-4225-8d09-28457165fbc8",
@@ -8584,14 +8820,24 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
-      "approvals": {},
+      "last_review": "2026-05-12",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-aa307fdc-53a1-4225-8d09-28457165fbc8.json",
+          "summary": "Live Linear issue-context confirmed CO-146 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md",
         "task": "tasks/tasks-linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md",
         "agent_task": ".agent/task/linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md",
         "docs": "docs/TECH_SPEC-linear-aa307fdc-53a1-4225-8d09-28457165fbc8.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260410-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc",
@@ -8601,13 +8847,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (succeeded, clean-success)",
           "date": "2026-04-10",
           "manifest": ".runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-docs-review-rework-rerun/cli/2026-04-10T10-09-14-033Z-b783a0b7/manifest.json",
           "override_reason": "This rerun supersedes the earlier temporary `docs/TASKS.md` line-budget stop; after restoring the one-line budget trim, the rerun passed `spec-guard`, `docs:check`, `docs:freshness`, and forced standalone review cleanly. See `.runs/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc-docs-review-rework-rerun/cli/2026-04-10T10-09-14-033Z-b783a0b7/run-summary.json`."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-cb368f80-6d3e-4deb-b89b-4bd3577562cc.json",
+          "summary": "Live Linear issue-context confirmed CO-145 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -8615,7 +8869,8 @@
         "task": "tasks/tasks-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc.md",
         "agent_task": ".agent/task/linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc.md",
         "docs": "docs/TECH_SPEC-linear-cb368f80-6d3e-4deb-b89b-4bd3577562cc.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260410-linear-0878c751-6534-4352-ad6b-f18f67c239bb",
@@ -8625,14 +8880,24 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
-      "approvals": {},
+      "last_review": "2026-05-12",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-0878c751-6534-4352-ad6b-f18f67c239bb.json",
+          "summary": "Live Linear issue-context confirmed CO-136 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-0878c751-6534-4352-ad6b-f18f67c239bb.md",
         "task": "tasks/tasks-linear-0878c751-6534-4352-ad6b-f18f67c239bb.md",
         "agent_task": ".agent/task/linear-0878c751-6534-4352-ad6b-f18f67c239bb.md",
         "docs": "docs/TECH_SPEC-linear-0878c751-6534-4352-ad6b-f18f67c239bb.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260410-linear-97d69ad8-ba75-432f-b8b2-21ca83754325",
@@ -8642,14 +8907,24 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
-      "approvals": {},
+      "last_review": "2026-05-12",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-97d69ad8-ba75-432f-b8b2-21ca83754325.json",
+          "summary": "Live Linear issue-context confirmed CO-140 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-97d69ad8-ba75-432f-b8b2-21ca83754325.md",
         "task": "tasks/tasks-linear-97d69ad8-ba75-432f-b8b2-21ca83754325.md",
         "agent_task": ".agent/task/linear-97d69ad8-ba75-432f-b8b2-21ca83754325.md",
         "docs": "docs/TECH_SPEC-linear-97d69ad8-ba75-432f-b8b2-21ca83754325.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260410-linear-dd3f4c83-17cf-4668-afb4-978977beb37d",
@@ -8659,13 +8934,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (repo docs:freshness baseline; manual fallback accepted)",
           "date": "2026-04-10",
           "manifest": ".runs/linear-dd3f4c83-17cf-4668-afb4-978977beb37d-co-141-docs-review/cli/2026-04-10T07-01-12-520Z-3922c49d/manifest.json",
           "override_reason": "The audited docs-review child stream passed spec-guard and docs:check, then failed at docs:freshness on the existing repo-wide stale-doc baseline (`stale docs: 119`). The failure is not specific to the CO-141 packet, so the lane records a truthful manual fallback in out/linear-dd3f4c83-17cf-4668-afb4-978977beb37d/manual/20260410T070112Z-docs-review-fallback.md instead of stalling implementation."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-dd3f4c83-17cf-4668-afb4-978977beb37d.json",
+          "summary": "Live Linear issue-context confirmed CO-141 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -8673,7 +8956,8 @@
         "task": "tasks/tasks-linear-dd3f4c83-17cf-4668-afb4-978977beb37d.md",
         "agent_task": ".agent/task/linear-dd3f4c83-17cf-4668-afb4-978977beb37d.md",
         "docs": "docs/TECH_SPEC-linear-dd3f4c83-17cf-4668-afb4-978977beb37d.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260410-linear-d3f1af87-57da-46ab-901d-75a6cc60420e",
@@ -8683,13 +8967,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (repo docs:freshness baseline; manual fallback accepted)",
           "date": "2026-04-10",
           "manifest": ".runs/linear-d3f1af87-57da-46ab-901d-75a6cc60420e-co-143-docs-review/cli/2026-04-10T05-36-42-912Z-892a14b6/manifest.json",
           "override_reason": "The audited docs-review child stream passed delegation-guard, spec-guard, and docs:check, then failed only on the pre-existing repo-wide `docs:freshness` stale-doc baseline (`119` stale docs). The newly added CO-143 packet contributed `0` stale entries, so the manifest-backed run is recorded as truthful manual fallback rather than a packet-shape blocker."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-d3f1af87-57da-46ab-901d-75a6cc60420e.json",
+          "summary": "Live Linear issue-context confirmed CO-143 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -8697,7 +8989,8 @@
         "task": "tasks/tasks-linear-d3f1af87-57da-46ab-901d-75a6cc60420e.md",
         "agent_task": ".agent/task/linear-d3f1af87-57da-46ab-901d-75a6cc60420e.md",
         "docs": "docs/TECH_SPEC-linear-d3f1af87-57da-46ab-901d-75a6cc60420e.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260410-linear-d19bd14e-0604-456d-9a45-e65b898cf7a2",
@@ -8707,13 +9000,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (repo docs:freshness baseline; manual fallback accepted)",
           "date": "2026-04-10",
           "manifest": ".runs/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2-co-138-docs-review/cli/2026-04-10T07-04-13-496Z-80cbb02d/manifest.json",
           "override_reason": "The audited docs-review child stream passed delegation-guard, spec-guard, and docs:check, then failed only on the pre-existing repo-wide `docs:freshness` stale-doc baseline (`119` stale docs). The newly added CO-138 packet contributed `0` stale entries, so the manifest-backed run is recorded as truthful manual fallback rather than a packet-shape blocker."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-d19bd14e-0604-456d-9a45-e65b898cf7a2.json",
+          "summary": "Live Linear issue-context confirmed CO-138 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -8721,7 +9022,8 @@
         "task": "tasks/tasks-linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md",
         "agent_task": ".agent/task/linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md",
         "docs": "docs/TECH_SPEC-linear-d19bd14e-0604-456d-9a45-e65b898cf7a2.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260410-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0",
@@ -8731,14 +9033,24 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-11",
-      "approvals": {},
+      "last_review": "2026-05-12",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.json",
+          "summary": "Live Linear issue-context confirmed CO-88 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
         "task": "tasks/tasks-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
         "agent_task": ".agent/task/linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md",
         "docs": "docs/TECH_SPEC-linear-0b49c08c-5cfc-46b5-b34c-ec7d3dece5e0.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260410-linear-255030bf-bdda-4594-b503-28639a98b9da",
@@ -8748,13 +9060,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
           "date": "2026-04-10",
           "manifest": ".runs/linear-255030bf-bdda-4594-b503-28639a98b9da-co-144-docs-review/cli/2026-04-10T05-40-04-360Z-3844b2a8/manifest.json",
           "override_reason": "The first audited docs-review child stream surfaced a packet-shape issue in `docs/docs-freshness-registry.json` because the CO-144 packet entries were duplicated. After removing the duplicate registry block, the rerun passed spec-guard and docs:check, then failed only on the existing repo-wide docs:freshness stale-doc baseline (`stale docs: 119`; Task Packet stale=85, Task Mirror stale=17, Report Only stale=17). The CO-144 packet is registered and absent from the rerun stale-entry failures, so the manifest-backed rerun is recorded as truthful manual fallback rather than a packet-shape blocker."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-255030bf-bdda-4594-b503-28639a98b9da.json",
+          "summary": "Live Linear issue-context confirmed CO-144 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -8762,7 +9082,8 @@
         "task": "tasks/tasks-linear-255030bf-bdda-4594-b503-28639a98b9da.md",
         "agent_task": ".agent/task/linear-255030bf-bdda-4594-b503-28639a98b9da.md",
         "docs": "docs/TECH_SPEC-linear-255030bf-bdda-4594-b503-28639a98b9da.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260410-linear-7105185a-05da-4f49-89d9-35efbba38f3c",
@@ -8772,12 +9093,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (clean-success)",
           "date": "2026-04-10",
           "manifest": ".runs/linear-7105185a-05da-4f49-89d9-35efbba38f3c-co-147-docs-review-rerun/cli/2026-04-10T16-00-45-369Z-c879ebe1/manifest.json"
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-7105185a-05da-4f49-89d9-35efbba38f3c.json",
+          "summary": "Live Linear issue-context confirmed CO-147 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -8785,7 +9114,8 @@
         "task": "tasks/tasks-linear-7105185a-05da-4f49-89d9-35efbba38f3c.md",
         "agent_task": ".agent/task/linear-7105185a-05da-4f49-89d9-35efbba38f3c.md",
         "docs": "docs/TECH_SPEC-linear-7105185a-05da-4f49-89d9-35efbba38f3c.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260410-linear-710e37a2-a7bb-4976-859f-0378d6a7104f",
@@ -8795,12 +9125,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (repo docs:freshness baseline; manual fallback accepted)",
           "date": "2026-04-10",
           "manifest": ".runs/linear-710e37a2-a7bb-4976-859f-0378d6a7104f-co-142-docs-review/cli/2026-04-10T01-49-53-645Z-585fd8cc/manifest.json"
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-710e37a2-a7bb-4976-859f-0378d6a7104f.json",
+          "summary": "Live Linear issue-context confirmed CO-142 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -8808,7 +9146,8 @@
         "task": "tasks/tasks-linear-710e37a2-a7bb-4976-859f-0378d6a7104f.md",
         "agent_task": ".agent/task/linear-710e37a2-a7bb-4976-859f-0378d6a7104f.md",
         "docs": "docs/TECH_SPEC-linear-710e37a2-a7bb-4976-859f-0378d6a7104f.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260410-linear-63e7f712-d927-43fb-8afa-b357bab40aa2",
@@ -8818,12 +9157,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-11",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator linear child-stream docs-review (manual fallback recorded after forced review stall)",
           "date": "2026-04-11",
           "manifest": ".runs/linear-63e7f712-d927-43fb-8afa-b357bab40aa2-docs-review/cli/2026-04-10T15-54-09-224Z-cab1c2ab/manifest.json"
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-63e7f712-d927-43fb-8afa-b357bab40aa2.json",
+          "summary": "Live Linear issue-context confirmed CO-123 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -8831,7 +9178,8 @@
         "task": "tasks/tasks-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md",
         "agent_task": ".agent/task/linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md",
         "docs": "docs/TECH_SPEC-linear-63e7f712-d927-43fb-8afa-b357bab40aa2.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260411-linear-11faa458-6864-4317-8f28-3fcf606c55a2",
@@ -8841,12 +9189,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-11",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (succeeded, clean-success)",
           "date": "2026-04-11",
           "manifest": ".runs/linear-11faa458-6864-4317-8f28-3fcf606c55a2-co-148-docs-review-r2/cli/2026-04-11T08-05-56-491Z-bce2642d/manifest.json"
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-11faa458-6864-4317-8f28-3fcf606c55a2.json",
+          "summary": "Live Linear issue-context confirmed CO-148 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -8854,7 +9210,8 @@
         "task": "tasks/tasks-linear-11faa458-6864-4317-8f28-3fcf606c55a2.md",
         "agent_task": ".agent/task/linear-11faa458-6864-4317-8f28-3fcf606c55a2.md",
         "docs": "docs/TECH_SPEC-linear-11faa458-6864-4317-8f28-3fcf606c55a2.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260410-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702",
@@ -8864,14 +9221,24 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
-      "approvals": {},
+      "last_review": "2026-05-12",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-cc5c55d9-9145-4fa8-93d9-551a3fff7702.json",
+          "summary": "Live Linear issue-context confirmed CO-120 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md",
         "task": "tasks/tasks-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md",
         "agent_task": ".agent/task/linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md",
         "docs": "docs/TECH_SPEC-linear-cc5c55d9-9145-4fa8-93d9-551a3fff7702.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260409-linear-da009c42-d0fc-4834-be72-f977a778693c",
@@ -8881,13 +9248,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-10",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (repo docs:freshness baseline; manual fallback accepted)",
           "date": "2026-04-10",
           "manifest": ".runs/linear-da009c42-d0fc-4834-be72-f977a778693c-docs-review/cli/2026-04-10T06-30-27-538Z-4c8a90d9/manifest.json",
           "override_reason": "A 2026-04-10 docs-review rerun in the resumed provider-worker turn passed delegation guard, spec-guard --dry-run, and docs:check, then failed only on the unrelated repo-wide docs:freshness baseline (`stale docs: 119`; Task Packet stale=85, Task Mirror stale=17, Report Only stale=17). The CO-119 packet remained fully registered, so the rerun is recorded as truthful repo-baseline fallback rather than a packet-shape blocker."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-da009c42-d0fc-4834-be72-f977a778693c.json",
+          "summary": "Live Linear issue-context confirmed CO-119 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -8895,7 +9270,8 @@
         "task": "tasks/tasks-linear-da009c42-d0fc-4834-be72-f977a778693c.md",
         "agent_task": ".agent/task/linear-da009c42-d0fc-4834-be72-f977a778693c.md",
         "docs": "docs/TECH_SPEC-linear-da009c42-d0fc-4834-be72-f977a778693c.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260409-linear-0af906c6-1f6c-461b-88f7-da67656bcf1b",
@@ -8905,14 +9281,24 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-12",
-      "approvals": {},
+      "last_review": "2026-05-12",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-0af906c6-1f6c-461b-88f7-da67656bcf1b.json",
+          "summary": "Live Linear issue-context confirmed CO-118 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-0af906c6-1f6c-461b-88f7-da67656bcf1b.md",
         "task": "tasks/tasks-linear-0af906c6-1f6c-461b-88f7-da67656bcf1b.md",
         "agent_task": ".agent/task/linear-0af906c6-1f6c-461b-88f7-da67656bcf1b.md",
         "docs": "docs/TECH_SPEC-linear-0af906c6-1f6c-461b-88f7-da67656bcf1b.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260409-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee",
@@ -8922,14 +9308,24 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-09",
-      "approvals": {},
+      "last_review": "2026-05-12",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-0b606d2f-d31c-40a0-8709-e0aec86396ee.json",
+          "summary": "Live Linear issue-context confirmed CO-117 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-0b606d2f-d31c-40a0-8709-e0aec86396ee.md",
         "task": "tasks/tasks-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee.md",
         "agent_task": ".agent/task/linear-0b606d2f-d31c-40a0-8709-e0aec86396ee.md",
         "docs": "docs/TECH_SPEC-linear-0b606d2f-d31c-40a0-8709-e0aec86396ee.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260409-linear-70e83230-4f52-4850-b494-41fd0ec32f13",
@@ -8939,14 +9335,24 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-09",
-      "approvals": {},
+      "last_review": "2026-05-12",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-70e83230-4f52-4850-b494-41fd0ec32f13.json",
+          "summary": "Live Linear issue-context confirmed CO-89 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
         "task": "tasks/tasks-linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
         "agent_task": ".agent/task/linear-70e83230-4f52-4850-b494-41fd0ec32f13.md",
         "docs": "docs/TECH_SPEC-linear-70e83230-4f52-4850-b494-41fd0ec32f13.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260409-linear-a87ae732-0cf0-475e-b7af-a2dec20933e1",
@@ -8956,13 +9362,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-09",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (stalled-review fallback accepted)",
           "date": "2026-04-09",
           "manifest": ".runs/linear-a87ae732-0cf0-475e-b7af-a2dec20933e1-co-93-docs-review-rerun/cli/2026-04-09T08-45-44-860Z-1bacbce2/manifest.json",
           "override_reason": "The first audited docs-review child stream failed only because the task spec referenced the planned helper path before the file existed. After narrowing that path reference, the rerun passed spec-guard, docs:check, and docs:freshness, then stalled in the nested forced-review stage without terminal review telemetry or a concrete verdict during multiple bounded wait windows. The packet-shape defect was fixed and the deterministic docs gates passed, so the rerun is recorded as truthful manual fallback evidence rather than a docs packet blocker. See out/linear-a87ae732-0cf0-475e-b7af-a2dec20933e1/manual/20260409T084843Z-docs-review-fallback.md."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-a87ae732-0cf0-475e-b7af-a2dec20933e1.json",
+          "summary": "Live Linear issue-context confirmed CO-93 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -8970,7 +9384,8 @@
         "task": "tasks/tasks-linear-a87ae732-0cf0-475e-b7af-a2dec20933e1.md",
         "agent_task": ".agent/task/linear-a87ae732-0cf0-475e-b7af-a2dec20933e1.md",
         "docs": "docs/TECH_SPEC-linear-a87ae732-0cf0-475e-b7af-a2dec20933e1.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260409-linear-51baaff3-2c6d-47e4-b668-088763d36197",
@@ -8980,12 +9395,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-09",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (clean-success)",
           "date": "2026-04-09",
           "manifest": ".runs/linear-51baaff3-2c6d-47e4-b668-088763d36197-co-90-docs-review/cli/2026-04-09T08-47-13-195Z-773891e2/manifest.json"
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-51baaff3-2c6d-47e4-b668-088763d36197.json",
+          "summary": "Live Linear issue-context confirmed CO-90 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -8993,7 +9416,8 @@
         "task": "tasks/tasks-linear-51baaff3-2c6d-47e4-b668-088763d36197.md",
         "agent_task": ".agent/task/linear-51baaff3-2c6d-47e4-b668-088763d36197.md",
         "docs": "docs/TECH_SPEC-linear-51baaff3-2c6d-47e4-b668-088763d36197.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260409-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad",
@@ -9003,12 +9427,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-09",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (clean-success)",
           "date": "2026-04-09",
           "manifest": ".runs/linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad-co-116-docs-review/cli/2026-04-09T02-47-50-041Z-2edb5399/manifest.json"
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-a770da1f-7a08-499d-a680-7f1cd8eee4ad.json",
+          "summary": "Live Linear issue-context confirmed CO-116 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -9016,7 +9448,8 @@
         "task": "tasks/tasks-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md",
         "agent_task": ".agent/task/linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md",
         "docs": "docs/TECH_SPEC-linear-a770da1f-7a08-499d-a680-7f1cd8eee4ad.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260409-linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958",
@@ -9026,14 +9459,24 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-09",
-      "approvals": {},
+      "last_review": "2026-05-12",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-9eaac719-eecf-4e49-8d4e-4d793d9ff958.json",
+          "summary": "Live Linear issue-context confirmed CO-92 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md",
         "task": "tasks/tasks-linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md",
         "agent_task": ".agent/task/linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md",
         "docs": "docs/TECH_SPEC-linear-9eaac719-eecf-4e49-8d4e-4d793d9ff958.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260409-linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5",
@@ -9043,13 +9486,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-09",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (clean-success)",
           "date": "2026-04-09",
           "manifest": ".runs/linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5-co-112-docs-review/cli/2026-04-09T05-39-47-373Z-741ea904/manifest.json",
           "telemetry": ".runs/linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5-co-112-docs-review/cli/2026-04-09T05-39-47-373Z-741ea904/review/telemetry.json"
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-4a7e540f-b47d-4fa3-a083-e6e9047e68a5.json",
+          "summary": "Live Linear issue-context confirmed CO-112 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -9057,7 +9508,8 @@
         "task": "tasks/tasks-linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5.md",
         "agent_task": ".agent/task/linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5.md",
         "docs": "docs/TECH_SPEC-linear-4a7e540f-b47d-4fa3-a083-e6e9047e68a5.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260409-linear-54387f04-30aa-436a-9901-690c0e9cfcee",
@@ -9067,12 +9519,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-09",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-04-09",
           "manifest": ".runs/linear-54387f04-30aa-436a-9901-690c0e9cfcee-co-114-docs-review/cli/2026-04-09T04-29-36-631Z-60ef7624/manifest.json"
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-54387f04-30aa-436a-9901-690c0e9cfcee.json",
+          "summary": "Live Linear issue-context confirmed CO-114 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -9080,7 +9540,8 @@
         "task": "tasks/tasks-linear-54387f04-30aa-436a-9901-690c0e9cfcee.md",
         "agent_task": ".agent/task/linear-54387f04-30aa-436a-9901-690c0e9cfcee.md",
         "docs": "docs/TECH_SPEC-linear-54387f04-30aa-436a-9901-690c0e9cfcee.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260409-linear-057747d0-a472-4cba-ac18-2d7342f2a168",
@@ -9090,14 +9551,24 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-09",
-      "approvals": {},
+      "last_review": "2026-05-12",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-057747d0-a472-4cba-ac18-2d7342f2a168.json",
+          "summary": "Live Linear issue-context confirmed CO-113 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-057747d0-a472-4cba-ac18-2d7342f2a168.md",
         "task": "tasks/tasks-linear-057747d0-a472-4cba-ac18-2d7342f2a168.md",
         "agent_task": ".agent/task/linear-057747d0-a472-4cba-ac18-2d7342f2a168.md",
         "docs": "docs/TECH_SPEC-linear-057747d0-a472-4cba-ac18-2d7342f2a168.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260409-linear-bd8ae57a-71b5-4eb9-9b69-70841cc16827",
@@ -9107,13 +9578,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-09",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
           "date": "2026-04-09",
           "manifest": ".runs/linear-bd8ae57a-71b5-4eb9-9b69-70841cc16827-docs-review-rerun/cli/2026-04-08T14-52-46-037Z-dc982d9a/manifest.json",
           "override_reason": "The first audited docs-review child stream failed only because docs/TASKS.md exceeded the 450-line budget; after the repo-supported docs:archive-tasks fallback archived one historical snapshot and restored docs/TASKS.md to 450 lines, the rerun passed spec-guard and docs:check, then failed only on the existing repo-wide docs:freshness stale-doc baseline (`stale docs: 282`; Task Packet stale=205, Task Mirror stale=41, Report Only stale=36). The CO-110 packet is registered in tasks/index, docs/TASKS, and docs/docs-freshness-registry, so the rerun is recorded as a truthful manual fallback rather than a packet-shape blocker."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-bd8ae57a-71b5-4eb9-9b69-70841cc16827.json",
+          "summary": "Live Linear issue-context confirmed CO-110 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -9121,7 +9600,8 @@
         "task": "tasks/tasks-linear-bd8ae57a-71b5-4eb9-9b69-70841cc16827.md",
         "agent_task": ".agent/task/linear-bd8ae57a-71b5-4eb9-9b69-70841cc16827.md",
         "docs": "docs/TECH_SPEC-linear-bd8ae57a-71b5-4eb9-9b69-70841cc16827.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260409-linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d",
@@ -9131,13 +9611,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-09",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
           "date": "2026-04-09",
           "manifest": ".runs/linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d-co-115-docs-review/cli/2026-04-08T17-32-15-382Z-fc180ff1/manifest.json",
           "override_reason": "The audited docs-review child stream passed spec-guard and docs:check after the repo-supported `npm run docs:archive-tasks` trim returned docs/TASKS.md from 451 to 450 lines, then failed only on the existing repo-wide docs:freshness stale-doc baseline (`stale docs: 282`; Task Packet stale=205, Task Mirror stale=41, Report Only stale=36). The CO-115 packet is registered in tasks/index, docs/TASKS, and docs/docs-freshness-registry, so the manifest-backed run is recorded as truthful manual fallback rather than a packet-shape blocker. See out/linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d/manual/20260408T173215Z-docs-review-fallback.md."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-bf0ba9ec-47f0-45ac-be83-490df0f0b45d.json",
+          "summary": "Live Linear issue-context confirmed CO-115 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -9145,7 +9633,8 @@
         "task": "tasks/tasks-linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d.md",
         "agent_task": ".agent/task/linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d.md",
         "docs": "docs/TECH_SPEC-linear-bf0ba9ec-47f0-45ac-be83-490df0f0b45d.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260409-linear-5f850884-855f-41ed-b593-6c2dee5815d2",
@@ -9155,13 +9644,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-09",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
           "date": "2026-04-09",
           "manifest": ".runs/linear-5f850884-855f-41ed-b593-6c2dee5815d2-co-91-docs-review/cli/2026-04-08T14-55-38-137Z-305205e3/manifest.json",
           "override_reason": "The audited docs-review child stream passed spec-guard and docs:check, then failed only on the existing repo-wide docs:freshness stale-doc baseline (`stale docs: 282`; Task Packet stale=205, Task Mirror stale=41, Report Only stale=36). The detailed freshness report contains no `linear-5f850884-855f-41ed-b593-6c2dee5815d2` packet paths in `stale_entries`, so the manifest-backed run is recorded as truthful manual fallback rather than a packet-shape blocker."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-5f850884-855f-41ed-b593-6c2dee5815d2.json",
+          "summary": "Live Linear issue-context confirmed CO-91 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -9169,7 +9666,8 @@
         "task": "tasks/tasks-linear-5f850884-855f-41ed-b593-6c2dee5815d2.md",
         "agent_task": ".agent/task/linear-5f850884-855f-41ed-b593-6c2dee5815d2.md",
         "docs": "docs/TECH_SPEC-linear-5f850884-855f-41ed-b593-6c2dee5815d2.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260409-linear-ff81e5d8-2760-41ec-bdbb-5509ae2faade",
@@ -9179,14 +9677,24 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-09",
-      "approvals": {},
+      "last_review": "2026-05-12",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-ff81e5d8-2760-41ec-bdbb-5509ae2faade.json",
+          "summary": "Live Linear issue-context confirmed CO-111 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-ff81e5d8-2760-41ec-bdbb-5509ae2faade.md",
         "task": "tasks/tasks-linear-ff81e5d8-2760-41ec-bdbb-5509ae2faade.md",
         "agent_task": ".agent/task/linear-ff81e5d8-2760-41ec-bdbb-5509ae2faade.md",
         "docs": "docs/TECH_SPEC-linear-ff81e5d8-2760-41ec-bdbb-5509ae2faade.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260409-linear-d43b6785-88d6-442b-a34e-2ad19d4f723a",
@@ -9196,14 +9704,24 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-09",
-      "approvals": {},
+      "last_review": "2026-05-12",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-d43b6785-88d6-442b-a34e-2ad19d4f723a.json",
+          "summary": "Live Linear issue-context confirmed CO-124 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md",
         "task": "tasks/tasks-linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md",
         "agent_task": ".agent/task/linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md",
         "docs": "docs/TECH_SPEC-linear-d43b6785-88d6-442b-a34e-2ad19d4f723a.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260408-linear-bb472787-be60-44e3-ac83-a3c297dab470",
@@ -9213,13 +9731,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-08",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
           "date": "2026-04-08",
           "manifest": ".runs/linear-bb472787-be60-44e3-ac83-a3c297dab470-co-109-docs-review/cli/2026-04-08T09-38-27-493Z-da4100bc/manifest.json",
           "override_reason": "The audited docs-review child stream passed spec-guard and docs:check after the repo-supported docs/TASKS archive fallback returned the snapshot file to 450 lines, then failed only on the existing repo-wide docs:freshness stale-doc baseline (`stale docs: 282`; Task Packet stale=205, Task Mirror stale=41, Report Only stale=36). The CO-109 packet is registered in tasks/index, docs/TASKS, and docs/docs-freshness-registry, so the manifest-backed run is recorded as a truthful manual fallback rather than a packet-shape blocker."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-bb472787-be60-44e3-ac83-a3c297dab470.json",
+          "summary": "Live Linear issue-context confirmed CO-109 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -9227,7 +9753,8 @@
         "task": "tasks/tasks-linear-bb472787-be60-44e3-ac83-a3c297dab470.md",
         "agent_task": ".agent/task/linear-bb472787-be60-44e3-ac83-a3c297dab470.md",
         "docs": "docs/TECH_SPEC-linear-bb472787-be60-44e3-ac83-a3c297dab470.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260408-linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd",
@@ -9237,14 +9764,24 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-08",
-      "approvals": {},
+      "last_review": "2026-05-12",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd.json",
+          "summary": "Live Linear issue-context confirmed CO-101 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd.md",
         "task": "tasks/tasks-linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd.md",
         "agent_task": ".agent/task/linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd.md",
         "docs": "docs/TECH_SPEC-linear-6f843dbc-a129-411a-9ba2-9bcd4a5bc1bd.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260408-linear-1c361221-d50a-43bd-aeba-ce6bada3b07f",
@@ -9254,13 +9791,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-08",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
           "date": "2026-04-08",
           "manifest": ".runs/linear-1c361221-d50a-43bd-aeba-ce6bada3b07f-co-105-docs-review-rerun/cli/2026-04-07T14-53-48-499Z-d042023d/manifest.json",
           "override_reason": "The initial docs-review child stream surfaced two packet-shape issues: a speculative missing path reference and a `docs/TASKS.md` line-budget overflow. After removing the missing-path reference and using the repo's `docs:archive-tasks` fallback to bring `docs/TASKS.md` from 451 lines down to 447, the rerun passed spec-guard and docs:check, then failed only on the existing repo-wide docs:freshness stale-doc baseline (`stale docs: 121`; Task Packet stale=90, Task Mirror stale=18, Report Only stale=13). The CO-105 packet is registered and absent from the failure report, so the manifest-backed rerun is recorded as a truthful manual fallback rather than a packet-shape blocker."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-1c361221-d50a-43bd-aeba-ce6bada3b07f.json",
+          "summary": "Live Linear issue-context confirmed CO-105 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -9268,7 +9813,8 @@
         "task": "tasks/tasks-linear-1c361221-d50a-43bd-aeba-ce6bada3b07f.md",
         "agent_task": ".agent/task/linear-1c361221-d50a-43bd-aeba-ce6bada3b07f.md",
         "docs": "docs/TECH_SPEC-linear-1c361221-d50a-43bd-aeba-ce6bada3b07f.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260408-linear-8ef95d79-db42-411c-886c-99bdeee6492b",
@@ -9278,12 +9824,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-08",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
           "manifest": ".runs/linear-8ef95d79-db42-411c-886c-99bdeee6492b-co-104-docs-review/cli/2026-04-07T14-47-56-051Z-248c4f90/manifest.json",
           "override_reason": "The audited docs-review child stream passed spec-guard and docs:check after the task-archive line-budget repair and the missing `.agent/task` registry-entry fix, then failed only on the existing repo-wide docs:freshness stale-doc baseline (`stale docs: 121`; Task Packet stale=90, Task Mirror stale=18, Report Only stale=13). The CO-104 packet is fully registered and no longer has missing registry entries, so the manifest-backed run is recorded as truthful manual fallback rather than a packet-shape blocker. See out/linear-8ef95d79-db42-411c-886c-99bdeee6492b/manual/20260407T144756Z-docs-review-fallback.md."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-8ef95d79-db42-411c-886c-99bdeee6492b.json",
+          "summary": "Live Linear issue-context confirmed CO-104 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -9291,7 +9845,8 @@
         "task": "tasks/tasks-linear-8ef95d79-db42-411c-886c-99bdeee6492b.md",
         "agent_task": ".agent/task/linear-8ef95d79-db42-411c-886c-99bdeee6492b.md",
         "docs": "docs/TECH_SPEC-linear-8ef95d79-db42-411c-886c-99bdeee6492b.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260408-linear-0001b15c-e8cc-4ce9-ad45-c898e326420e",
@@ -9301,13 +9856,21 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-08",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (failed-other, manual fallback accepted)",
           "date": "2026-04-08",
           "manifest": ".runs/linear-0001b15c-e8cc-4ce9-ad45-c898e326420e-docs-review/cli/2026-04-07T14-44-58-689Z-5944f158/manifest.json",
           "override_reason": "The first audited docs-review child stream failed only because docs/TASKS.md exceeded the line budget by one line; after the repo-supported `npm run docs:archive-tasks` trim returned docs/TASKS.md to 447/450 lines, the rerun passed spec-guard and docs:check and then failed only on the existing repo-wide docs:freshness stale-doc baseline (`stale docs: 121`, including Task Packet stale=90, Task Mirror stale=18, Report Only stale=13). The CO-107 packet is registered in tasks/index, docs/TASKS, and docs/docs-freshness-registry, so the rerun is recorded as a truthful manual fallback rather than a packet-shape blocker. See out/linear-0001b15c-e8cc-4ce9-ad45-c898e326420e/manual/20260407T144500Z-docs-review-fallback.md."
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-0001b15c-e8cc-4ce9-ad45-c898e326420e.json",
+          "summary": "Live Linear issue-context confirmed CO-107 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -9315,7 +9878,8 @@
         "task": "tasks/tasks-linear-0001b15c-e8cc-4ce9-ad45-c898e326420e.md",
         "agent_task": ".agent/task/linear-0001b15c-e8cc-4ce9-ad45-c898e326420e.md",
         "docs": "docs/TECH_SPEC-linear-0001b15c-e8cc-4ce9-ad45-c898e326420e.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260407-linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844",
@@ -11337,12 +11901,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-27",
+      "last_review": "2026-05-12",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-03-27",
           "manifest": ".runs/linear-e52a7254-f277-4121-b9f9-bf4084c4a473/cli/2026-03-27T04-05-31-200Z-3a5e4dd3/manifest.json"
+        },
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_lane_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": ".runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-e52a7254-f277-4121-b9f9-bf4084c4a473.json",
+          "summary": "Live Linear issue-context confirmed CO-7 is Done/completed; reclassified the April 8-11 task spec row as completed-lane historical metadata without weakening spec-guard or deleting history."
         }
       },
       "paths": {
@@ -11350,7 +11922,8 @@
         "task": "tasks/tasks-linear-e52a7254-f277-4121-b9f9-bf4084c4a473.md",
         "agent_task": ".agent/task/linear-e52a7254-f277-4121-b9f9-bf4084c4a473.md",
         "docs": "docs/TECH_SPEC-linear-e52a7254-f277-4121-b9f9-bf4084c4a473.md"
-      }
+      },
+      "status": "completed"
     },
     {
       "id": "20260327-linear-e913b2ab-2be9-4891-bf54-0ac4642ba012",
@@ -15571,13 +16144,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-09",
+      "last_review": "2026-05-12",
       "paths": {
         "spec": "tasks/specs/1075-coordinator-symphony-aligned-shared-question-read-sequencing-extraction.md",
         "task": "tasks/tasks-1075-coordinator-symphony-aligned-shared-question-read-sequencing-extraction.md",
         "agent_task": ".agent/task/1075-coordinator-symphony-aligned-shared-question-read-sequencing-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-shared-question-read-sequencing-extraction.md"
-      }
+      },
+      "status": "completed",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_task_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": "tasks/specs/1075-coordinator-symphony-aligned-shared-question-read-sequencing-extraction.md",
+          "summary": "Same-file closeout notes show 1075 completed on 2026-03-09; reclassified the April 9 task spec row as completed historical metadata without weakening spec-guard or deleting history."
+        }
+      },
+      "completed_at": "2026-03-09"
     },
     {
       "id": "20260309-1074-coordinator-symphony-aligned-question-read-retry-deduplication",
@@ -15587,13 +16172,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-09",
+      "last_review": "2026-05-12",
       "paths": {
         "spec": "tasks/specs/1074-coordinator-symphony-aligned-question-read-retry-deduplication.md",
         "task": "tasks/tasks-1074-coordinator-symphony-aligned-question-read-retry-deduplication.md",
         "agent_task": ".agent/task/1074-coordinator-symphony-aligned-question-read-retry-deduplication.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-question-read-retry-deduplication.md"
-      }
+      },
+      "status": "completed",
+      "approvals": {
+        "spec_guard_cohort": {
+          "reviewer": "Codex provider worker for CO-523",
+          "date": "2026-05-12",
+          "status": "completed_task_reclassified",
+          "canonical_owner_key": "spec-guard:active-specs:last_review=2026-04-08..2026-04-11",
+          "evidence": "tasks/specs/1074-coordinator-symphony-aligned-question-read-retry-deduplication.md",
+          "summary": "Same-file closeout notes show 1074 completed on 2026-03-09; reclassified the April 9 task spec row as completed historical metadata without weakening spec-guard or deleting history."
+        }
+      },
+      "completed_at": "2026-03-09"
     },
     {
       "id": "20260308-1073-coordinator-symphony-aligned-question-child-resolution-adapter-extraction",

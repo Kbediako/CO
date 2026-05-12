@@ -1,10 +1,10 @@
 ---
 id: 20260411-linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605
 title: CO: Back off GitHub GraphQL and REST polling in PR readiness and merge closeout
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-11
-last_review: 2026-04-11
+last_review: 2026-05-12
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605.md
@@ -16,6 +16,7 @@ review_notes:
   - 2026-04-11: Baseline audit confirms the bounded seam: `scripts/lib/pr-watch-merge.js` performs a GraphQL PR read then fans out to REST-backed required checks, inline bot feedback, rereview comments, reviews, reactions, and comment reactions; `fetchPrStatusSnapshot(...)` is reused by `providerMergeCloseout.ts` for review promotion and deterministic merge closeout.
   - 2026-04-11: Pre-implementation issue-quality review approves this as narrower than Linear budget work or CodeRabbit service cooldown handling. The protected implementation path is GitHub REST/GraphQL classification, reset-aware watcher/provider backoff, and same-head snapshot/fan-out cache reuse without weakening safety gates.
   - 2026-04-11: Audited docs-review child stream `co-151-docs-review` passed delegation guard, spec-guard, and docs:check, then failed only on the standing repo-wide `docs:freshness` stale-doc baseline (`77` stale older docs, `missing_registry=0`, `missing_on_disk=0`, `invalid_entries=0`). CO-151 packet files were present, registered, and not stale, so the fallback is accepted for pre-implementation. Evidence: `.runs/linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605-co-151-docs-review/cli/2026-04-11T00-57-29-630Z-45cacf66/manifest.json`, `out/linear-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605/manual/20260411T005731Z-docs-review-fallback.md`.
+  - 2026-05-12: CO-523 live Linear audit verified CO-151 is Done/completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence. Evidence: .runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-e99b2aec-61dd-4d0d-8c8e-dc78ffbfe605.json.
 ---
 
 # Technical Specification
