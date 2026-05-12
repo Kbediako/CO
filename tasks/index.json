@@ -38,8 +38,8 @@
           "owner_issue": "CO-522",
           "validation": "npm run docs:freshness:maintain -- --format json",
           "before_report": "out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932/before-docs-freshness-maintenance-report.json",
-          "after_report": "out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932/after-docs-freshness-maintenance-report.json",
-          "summary": "Baseline reproduced configured_owner_terminal for terminal CO-511 with blocking_changed_paths=[]. After rehoming, docs:freshness:maintain resolves owner_issue=CO-522, owner_issue_action.reason=succeeded, state=In Progress, usable=true, and same_project=true. The command still reports block_diff_local for the existing repo-wide stale cohort baseline (617 stale entries, 611 blocking candidate entries, 33 candidate cohorts, 6 hard-stale entries), so that debt remains visible under the live owner instead of being patched through CO-514 or hidden by gate weakening."
+          "after_report": "out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932/after-latest-main-docs-freshness-maintenance-report.json",
+          "summary": "Baseline reproduced configured_owner_terminal for terminal CO-511 with blocking_changed_paths=[]. After rehoming and merging latest main, docs:freshness:maintain resolves owner_issue=CO-522, owner_issue_action.reason=succeeded, state=In Progress, usable=true, same_project=true, and blocking_changed_paths=[]. The current command reports block_policy_over_budget for the remaining owner-routed stale cohort baseline (551 entries over 300 and 26 cohorts over 2), so that debt remains visible under the live owner instead of being patched through CO-514 or hidden by gate weakening."
         },
         "validation": {
           "reviewer": "CO-522 provider worker",
