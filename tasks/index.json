@@ -1,6 +1,93 @@
 {
   "items": [
     {
+      "id": "20260512-linear-b642e879-ba50-45ef-b0d9-b059afa9e932",
+      "title": "CO: restore live docs freshness maintenance owner after CO-511 terminal",
+      "relates_to": "tasks/tasks-linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-12",
+      "canonical_owner_key": "docs:freshness:maintain",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO-522 provider worker",
+          "date": "2026-05-12",
+          "status": "ready_to_in_progress",
+          "summary": "linear issue-context found CO-522 Ready/unstarted with In Progress as the live started state, no attached PR, and no prior workpad."
+        },
+        "parallelization": {
+          "reviewer": "linear parallelization helper",
+          "date": "2026-05-12",
+          "decision": "parallelize_now",
+          "reason": "independent_scope_available",
+          "invalidated_child_lane": ".runs/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-co522-packet-docs/cli/2026-05-12T16-58-17-133Z-bf54e44c/manifest.json",
+          "accepted_child_lane": ".runs/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-co522-task-checklist/cli/2026-05-12T17-20-16-231Z-292db3b2/manifest.json",
+          "summary": "Initial packet-docs child lane stalled with no child-worktree changes and was invalidated. A file-scoped docs child created the CO-522 task checklist, its patch passed git apply --check, and the parent accepted it before completing the remaining packet files, owner metadata, and registry mirrors."
+        },
+        "owner_rehome_baseline": {
+          "reviewer": "CO-522 provider worker",
+          "date": "2026-05-12",
+          "status": "owner_rehome_validated_with_existing_baseline_debt",
+          "canonical_owner_key": "docs:freshness:maintain",
+          "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+          "previous_owner_issue": "CO-511",
+          "owner_issue": "CO-522",
+          "validation": "npm run docs:freshness:maintain -- --format json",
+          "before_report": "out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932/before-docs-freshness-maintenance-report.json",
+          "after_report": "out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932/after-docs-freshness-maintenance-report.json",
+          "summary": "Baseline reproduced configured_owner_terminal for terminal CO-511 with blocking_changed_paths=[]. After rehoming, docs:freshness:maintain resolves owner_issue=CO-522, owner_issue_action.reason=succeeded, state=In Progress, usable=true, and same_project=true. The command still reports block_diff_local for the existing repo-wide stale cohort baseline (617 stale entries, 611 blocking candidate entries, 33 candidate cohorts, 6 hard-stale entries), so that debt remains visible under the live owner instead of being patched through CO-514 or hidden by gate weakening."
+        },
+        "validation": {
+          "reviewer": "CO-522 provider worker",
+          "date": "2026-05-12",
+          "passed": [
+            "node scripts/delegation-guard.mjs",
+            "npm run build",
+            "npm run lint",
+            "npm run test",
+            "npm run docs:check",
+            "npm run repo:stewardship",
+            "node scripts/diff-budget.mjs",
+            "git diff --check"
+          ],
+          "baseline_blockers": [
+            "node scripts/spec-guard.mjs --dry-run reports pre-existing stale specs while preserving guard behavior",
+            "npm run docs:freshness reports 617 stale docs and zero missing registry rows"
+          ],
+          "summary": "Owner-truth acceptance is satisfied; repo-wide stale freshness/spec debt remains out of scope and still blocks freshness gates as intended."
+        },
+        "review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-12",
+          "status": "clean",
+          "review_outcome": "bounded-success",
+          "review_verdict": "clean",
+          "finding_count": 0,
+          "telemetry": ".runs/linear-b642e879-ba50-45ef-b0d9-b059afa9e932/cli/2026-05-12T16-54-21-084Z-f80be04f/review/telemetry.json",
+          "summary": "Manifest-backed review found no actionable issues in the uncommitted docs/metadata owner rehome. The bounded wrapper recorded command-intent boundary preservation, but semantic review verdict is clean."
+        },
+        "elegance": {
+          "reviewer": "CO-522 provider worker",
+          "date": "2026-05-12",
+          "status": "minimal",
+          "evidence": "out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932/elegance-review.txt",
+          "summary": "No helper, abstraction, or extra owner-routing branch was introduced; the live-owner mutation remains the single catalog pointer change plus traceability packet/mirror updates."
+        }
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md",
+        "prd": "docs/PRD-linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md",
+        "docs": "docs/TECH_SPEC-linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md",
+        "action_plan": "docs/ACTION_PLAN-linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md",
+        "spec": "tasks/specs/linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md",
+        "task": "tasks/tasks-linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md"
+      }
+    },
+    {
       "id": "20260508-linear-07d1fdee-8a77-4a7f-90fc-0a13fd96c675",
       "title": "CO-509 auto-created issue labels, relations, and traceability",
       "relates_to": "tasks/tasks-linear-07d1fdee-8a77-4a7f-90fc-0a13fd96c675.md",
