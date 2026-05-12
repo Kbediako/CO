@@ -23,7 +23,7 @@
 - [x] Parent records the before/after owner-truth output proving terminal `owner_issue=CO-511` no longer remains the live configured owner.
 - [x] Parent runs broader docs freshness and spec validation in the authoritative issue workspace; both preserve existing stale-baseline blockers without weakening gates.
 - [x] Parent records standalone review and elegance evidence before any review handoff.
-- [ ] Parent records PR and Linear lifecycle validation before any review handoff.
+- [x] Parent records PR and Linear lifecycle validation before any review handoff. Evidence: PR `#795` is attached to Linear `CO-522`; the single Linear workpad comment records the post-`origin/main` owner proof, local validation, standalone review, elegance pass, and the current `pr ready-review` gate; `CO-522` remains in `In Progress` until required checks and automated review feedback drain cleanly.
 
 ## Non-Goals
 - Do not edit parent-owned owner metadata, registry mirrors, `tasks/index.json`, `docs/TASKS.md`, workpad comments, PR state, or Linear state from this child lane.
