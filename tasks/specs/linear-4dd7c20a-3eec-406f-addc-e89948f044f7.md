@@ -1,14 +1,18 @@
 ---
 id: 20260411-linear-4dd7c20a-3eec-406f-addc-e89948f044f7
 title: CO: decide admission posture for unreadable foreign provider manifests
+status: done
 relates_to: docs/PRD-linear-4dd7c20a-3eec-406f-addc-e89948f044f7.md
 related_prd: docs/PRD-linear-4dd7c20a-3eec-406f-addc-e89948f044f7.md
 related_action_plan: docs/ACTION_PLAN-linear-4dd7c20a-3eec-406f-addc-e89948f044f7.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-11
+last_review: 2026-05-12
+review_notes:
+  - 2026-05-12: CO-523 live Linear audit verified CO-149 is Done/completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence. Evidence: .runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-4dd7c20a-3eec-406f-addc-e89948f044f7.json.
 ---
+
 ## Added by Bootstrap (refresh as needed)
 
 ## Summary

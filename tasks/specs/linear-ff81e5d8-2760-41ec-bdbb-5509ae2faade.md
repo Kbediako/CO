@@ -1,10 +1,10 @@
 ---
 id: 20260409-linear-ff81e5d8-2760-41ec-bdbb-5509ae2faade
 title: CO: release rehydrated Merging claims after merged PR when live Linear reads are cooldown-suppressed
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-09
-last_review: 2026-04-09
+last_review: 2026-05-12
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-ff81e5d8-2760-41ec-bdbb-5509ae2faade.md
@@ -15,6 +15,7 @@ review_notes:
   - 2026-04-09: Opened from Linear issue `CO-111` in the provider-worker workspace after rechecking live CO team states with the packaged `linear issue-context` helper, moving the issue from `Ready` to `In Progress`, recording the required same-turn `stay_serial` parallelization decision, creating the required single `## Codex Workpad` comment, and switching the detached workspace at `HEAD` onto branch `linear-ff81e5d8-2760-41ec-bdbb-5509ae2faade`.
   - 2026-04-09: Current code audit confirms two remaining seams that match the issue scope: `providerMergeCloseout.ts` still hard-fails on a fresh live `issue-context` read before it can use cached attached-PR evidence during cooldown, and `providerIssueHandoff.ts` still preserves a rehydrated active run before merged-closeout recovery can override it when the worker itself remains alive.
   - 2026-04-09: Current artifact audit against `/Users/kbediako/Code/CO/.runs/linear-bb472787-be60-44e3-ac83-a3c297dab470/cli/2026-04-08T13-24-10-989Z-40c38f47/provider-linear-worker-linear-audit.jsonl` and `provider-linear-issue-context-cache.json` confirms the incident shape: an immediate post-merge `issue-context` read failed with `linear_rate_limited`, the run-local cache still preserved the attached PR and later closeout narrative, and the shared control-host intake only released the claim after cooldown expiry enabled a later reread.
+  - 2026-05-12: CO-523 live Linear audit verified CO-111 is Done/completed; reclassified this task spec as inactive done metadata for strict spec-guard evidence. Evidence: .runs/linear-8573da42-d9f9-44ce-a24e-224984539044/cli/2026-05-12T18-47-35-293Z-376d8842/provider-linear-issue-context-cache-ff81e5d8-2760-41ec-bdbb-5509ae2faade.json.
 ---
 
 # Technical Specification
