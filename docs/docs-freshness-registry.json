@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-05-08",
+  "generated_at": "2026-05-12",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -3626,6 +3626,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-04-16",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/linear-2be8cd2c-f0c8-4e90-8588-fb70dc387faf.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-12",
       "cadence_days": 30
     },
     {
@@ -8995,6 +9002,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-04-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-2be8cd2c-f0c8-4e90-8588-fb70dc387faf.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-12",
       "cadence_days": 30
     },
     {
@@ -17217,6 +17231,13 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/PRD-linear-2be8cd2c-f0c8-4e90-8588-fb70dc387faf.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-12",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/PRD-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -22996,6 +23017,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-04-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-2be8cd2c-f0c8-4e90-8588-fb70dc387faf.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-12",
       "cadence_days": 30
     },
     {
@@ -29096,6 +29124,13 @@
       "cadence_days": 30
     },
     {
+      "path": "tasks/specs/linear-2be8cd2c-f0c8-4e90-8588-fb70dc387faf.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-12",
+      "cadence_days": 30
+    },
+    {
       "path": "tasks/specs/linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -34847,6 +34882,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-04-16",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-2be8cd2c-f0c8-4e90-8588-fb70dc387faf.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-12",
       "cadence_days": 30
     },
     {
