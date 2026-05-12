@@ -76,7 +76,13 @@ task_checklists:
 | Whole manifest persistence | command-runner/control-host snapshot writes can race outside the patch path | remove fallback | CO-514 | snapshot persistence races with provider-worker patch | 2026-05-12 | 2026-05-12 | this issue | snapshot writes use shared helper or are proven non-overlapping | focused writer test |
 | Linear-first lifecycle authority | goal evidence is advisory beside canonical workflow truth | justify retaining fallback | provider-worker workflow | goal evidence exists or fails closed | existing authority contract predates CO-514 | 2026-05-12 | non-expiring authority contract | separate approved authority redesign | advisory marker tests |
 
-- Large-refactor check: a broad manifest schema redesign is explicitly out of scope; the narrow helper is acceptable because authority remains single-file manifest serialization, not split schema ownership.
+- Large refactor: bounded shared manifest helper is sufficient; no broad manifest schema redesign or lifecycle authority redesign is needed.
+- Minor seam: stale whole-manifest overwrite is removed for goal evidence and known racing writers; the retained Linear-first authority contract is durable governance, not temporary compatibility debt.
+- Contract name: Linear-first advisory goal evidence authority boundary.
+- Owning surface: CO provider-worker workflow and Linear/workpad/PR/review/check lifecycle gates.
+- Steady-state proof: goal evidence can be present, absent, stale, or malformed while lifecycle authority remains with Linear/workpad/PR/review/check gates.
+- Tests/docs: manifest helper tests, command-runner/provider-worker goal evidence tests, and CO-514 packet docs prove advisory markers and authority denial remain intact.
+- Non-expiring rationale: the authority boundary is a supported governance contract and should be removed only by a separate approved lifecycle authority redesign.
 
 ## Validation Plan
 - Focused tests cover concurrent unrelated manifest updates surviving `goal_evidence` patching.

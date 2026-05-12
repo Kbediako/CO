@@ -62,7 +62,14 @@
 | Manifest whole-snapshot persistence | command-runner/control-host writes can race outside the patch contract. | remove fallback | CO-514 | command-runner/control-host/provider-worker manifest persistence | 2026-05-12 | 2026-05-12 | this issue | known racing writers use the shared helper or are proven non-overlapping | focused writer tests plus build |
 | Lifecycle authority | Linear/workpad/PR/review/check truth remains separate from advisory goal evidence. | justify retaining fallback | CO provider-worker workflow | goal evidence present, absent, stale, or malformed | existing authority contract predates CO-514 | 2026-05-12 | non-expiring authority contract | only replaced by a separate approved authority redesign | advisory marker and not-authorized-for tests |
 
+- Large refactor: bounded shared manifest helper is sufficient; no broad manifest schema redesign or lifecycle authority redesign is needed.
+- Minor seam: stale whole-manifest overwrite is removed for goal evidence and known racing writers; the retained Linear-first authority contract is durable governance, not temporary compatibility debt.
+- Contract name: Linear-first advisory goal evidence authority boundary.
+- Owning surface: CO provider-worker workflow and Linear/workpad/PR/review/check lifecycle gates.
+- Steady-state proof: goal evidence can be present, absent, stale, or malformed while lifecycle authority remains with Linear/workpad/PR/review/check gates.
+- Tests/docs: manifest helper tests, command-runner/provider-worker goal evidence tests, and CO-514 packet docs prove advisory markers and authority denial remain intact.
+- Non-expiring rationale: the authority boundary is a supported governance contract and should be removed only by a separate approved lifecycle authority redesign.
+
 ## Metrics & Guardrails
 - Primary success metric: final manifests retain concurrent unrelated fields after `goal_evidence` patching.
 - Guardrail: `goal_evidence.authority` remains `advisory_only`, `linear_authority_preserved` remains true, and not-authorized-for markers remain canonical.
-
