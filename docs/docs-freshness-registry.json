@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-05-08",
+  "generated_at": "2026-05-12",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -1426,16 +1426,16 @@
     {
       "path": ".agent/task/1074-coordinator-symphony-aligned-question-read-retry-deduplication.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-09",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-12",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/1075-coordinator-symphony-aligned-shared-question-read-sequencing-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-09",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-12",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/1076-coordinator-symphony-aligned-telegram-question-read-adapter-assembly-extraction.md",
@@ -7530,9 +7530,9 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-question-read-retry-deduplication.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-09",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-12",
+      "cadence_days": 365
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-resume-cli-shell-extraction.md",
@@ -7712,9 +7712,9 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-shared-question-read-sequencing-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-09",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-12",
+      "cadence_days": 365
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-skills-cli-remaining-boundary-freeze-reassessment.md",
@@ -12304,16 +12304,16 @@
     {
       "path": "docs/findings/1074-question-read-retry-deduplication-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-09",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-12",
+      "cadence_days": 365
     },
     {
       "path": "docs/findings/1075-shared-question-read-sequencing-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-09",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-12",
+      "cadence_days": 365
     },
     {
       "path": "docs/findings/1076-telegram-question-read-adapter-assembly-extraction-deliberation.md",
@@ -15756,9 +15756,9 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-question-read-retry-deduplication.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-09",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-12",
+      "cadence_days": 365
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-resume-cli-shell-extraction.md",
@@ -15938,9 +15938,9 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-shared-question-read-sequencing-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-09",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-12",
+      "cadence_days": 365
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-skills-cli-remaining-boundary-freeze-reassessment.md",
@@ -21559,9 +21559,9 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-question-read-retry-deduplication.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-09",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-12",
+      "cadence_days": 365
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-resume-cli-shell-extraction.md",
@@ -21741,9 +21741,9 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-shared-question-read-sequencing-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-09",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-12",
+      "cadence_days": 365
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-skills-cli-remaining-boundary-freeze-reassessment.md",
@@ -32724,16 +32724,16 @@
     {
       "path": "tasks/tasks-1074-coordinator-symphony-aligned-question-read-retry-deduplication.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-09",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-12",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-1075-coordinator-symphony-aligned-shared-question-read-sequencing-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-09",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-12",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-1076-coordinator-symphony-aligned-telegram-question-read-adapter-assembly-extraction.md",
