@@ -1,6 +1,64 @@
 {
   "items": [
     {
+      "id": "20260513-linear-34ca427e-fb62-430e-9d8f-949a07690542",
+      "title": "CO-489 external agent session import resume continuity",
+      "relates_to": "tasks/tasks-linear-34ca427e-fb62-430e-9d8f-949a07690542.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "status": "backlog",
+      "last_review": "2026-05-13",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO parent orchestrator",
+          "date": "2026-05-13",
+          "status": "backlog_traceability_hold",
+          "summary": "linear issue-context found CO-489 in Backlog with no PR attached and only a triage workpad; the strict backlog head is held until packet and registry mirrors land."
+        },
+        "packet_setup": {
+          "reviewer": "CO parent orchestrator",
+          "date": "2026-05-13",
+          "status": "packet_seeded",
+          "summary": "PRD, TECH_SPEC, ACTION_PLAN, task checklist, agent mirror, task index entry, docs/TASKS snapshot, and docs freshness registry rows created before active import evaluation."
+        },
+        "validation": {
+          "reviewer": "CO parent orchestrator",
+          "date": "2026-05-13",
+          "status": "passed_with_inherited_docs_freshness_baseline",
+          "passing": [
+            "git diff --check",
+            "JSON parse for tasks/index.json and docs/docs-freshness-registry.json",
+            "protected-term scan",
+            "node scripts/spec-guard.mjs --dry-run",
+            "npm run docs:check",
+            "node scripts/diff-budget.mjs"
+          ],
+          "inherited_baseline": {
+            "command": "npm run docs:freshness and docs:freshness:maintain",
+            "owner_issue": "CO-522",
+            "root_owner_issue": "CO-530",
+            "summary": "Inherited repo-wide stale docs baseline remains red; CO-489 adds no missing registry entries, invalid entries, uncatalogued docs, or stale CO-489 rows. Maintenance reports block_policy_over_budget with blocking_changed_paths=[] and 440/300 entries across 28/2 cohorts in the legacy Apr 9-12 task packet family."
+          },
+          "summary": "Packet-local validation is clean; docs:freshness failure is inherited baseline debt already routed to CO-522 and concretely owned by CO-530."
+        }
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-34ca427e-fb62-430e-9d8f-949a07690542.md",
+        "prd": "docs/PRD-linear-34ca427e-fb62-430e-9d8f-949a07690542.md",
+        "docs": "docs/TECH_SPEC-linear-34ca427e-fb62-430e-9d8f-949a07690542.md",
+        "action_plan": "docs/ACTION_PLAN-linear-34ca427e-fb62-430e-9d8f-949a07690542.md",
+        "spec": "tasks/specs/linear-34ca427e-fb62-430e-9d8f-949a07690542.md",
+        "task": "tasks/tasks-linear-34ca427e-fb62-430e-9d8f-949a07690542.md"
+      },
+      "source_issue": {
+        "id": "34ca427e-fb62-430e-9d8f-949a07690542",
+        "identifier": "CO-489",
+        "url": "https://linear.app/asabeko/issue/CO-489/co-evaluate-external-agent-session-import-for-resume-continuity"
+      }
+    },
+    {
       "id": "20260513-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43",
       "title": "CO-488 plugin hook, cache, and external config import governance",
       "relates_to": "tasks/tasks-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
