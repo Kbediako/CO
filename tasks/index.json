@@ -8,7 +8,7 @@
       "owners": [
         "Codex"
       ],
-      "status": "backlog",
+      "status": "in_progress",
       "last_review": "2026-05-13",
       "approvals": {
         "issue_context": {
@@ -22,6 +22,19 @@
           "date": "2026-05-13",
           "status": "packet_seeded",
           "summary": "PRD, TECH_SPEC, ACTION_PLAN, task checklist, agent mirror, task index entry, docs/TASKS snapshot, and docs freshness registry rows created before active import evaluation."
+        },
+        "evaluation": {
+          "reviewer": "CO-489 provider worker",
+          "date": "2026-05-13",
+          "status": "completed",
+          "summary": "Release/source evidence plus current local app-server schema support diagnostics-only advisory adoption; automation is deferred pending fixture canary value; provider-worker resume authority, hook continuation authority, Linear state authority, and broad migration are rejected.",
+          "evidence": [
+            "codex --version => codex-cli 0.130.0",
+            "codex features list => external_migration experimental false",
+            "codex app-server generate-ts --enable external_migration exposes externalAgentConfig/detect, externalAgentConfig/import, externalAgentConfig/import/completed, SESSIONS, path, cwd, title",
+            "openai/codex rust-v0.128.0 release notes and source/tests for external agent session import"
+          ],
+          "follow_up": "none; no canary-proven CO automation gap was identified"
         },
         "validation": {
           "reviewer": "CO parent orchestrator",
