@@ -55,6 +55,14 @@ The shipped marketplace files are:
 
 The plugin launcher reads the `codex-orchestrator` marketplace entry in `${CODEX_HOME:-~/.codex}/config.toml` and resolves the recorded source checkout before starting the packaged CO CLI with `node`. Local-directory sources run from the recorded path. Git-backed sources run from Codex's installed marketplace checkout under `${CODEX_HOME:-~/.codex}/.tmp/marketplaces/codex-orchestrator`.
 
+Downstream packaged plugin governance for Codex CLI `0.128.0`:
+
+- Allowed: the marketplace install flow may use CO's shipped marketplace entry, plugin descriptor, MCP descriptor, launcher, and Codex's remote plugin bundle cache for the registered source checkout. `pack-smoke` governs `codex plugin marketplace add` / `upgrade` / `remove` command support plus cached plugin root shape.
+- Blocked unless governed and validated: plugin-bundled hooks, hook enablement state changes, and external-agent config import must not silently alter packaged CO behavior. If these surfaces are present but not covered by CO hook/config safety checks, they must fail closed or stay disabled for packaged downstream users.
+- Out of scope unless future focused validation covers it: app-server remote plugin uninstall semantics beyond marketplace registration removal. The remote plugin bundle cache is not binary provenance, and remote uninstall is not proof of the active binary or launcher source. CO-450 owns binary provenance; this setup path governs downstream packaged plugin behavior only.
+
+`pack-smoke` must cover any hook/cache/import behavior that can affect packaged downstream users. If a hook, cache, uninstall, or external-agent config import surface is intentionally unsupported, document it as out of scope instead of treating it as trusted package behavior.
+
 Re-run the version-appropriate marketplace add command after moving a local-directory source, replacing it, or removing Codex's installed marketplace checkout.
 
 CO-466 adopts local ChatGPT-auth/appserver posture on Codex CLI `0.128.0` after local command/runtime, package smoke, and review evidence. Release-facing marketplace/downstream-smoke workflow pins still intentionally hold at Codex CLI `0.125.0` until required cloud evidence passes. Model/runtime posture remains governed by `docs/guides/codex-version-policy.md`: use `gpt-5.5` / `xhigh` for validated local ChatGPT-auth/appserver access, and keep `gpt-5.4` / `xhigh` as the portable fallback when access, API/cloud portability, or downstream/no-network evidence is missing.

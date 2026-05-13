@@ -1,4 +1,6 @@
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 
@@ -940,6 +942,145 @@ describe('scripts/pack-smoke env isolation', () => {
     expect(env.CODEX_REVIEW_ALLOW_HEAVY_COMMANDS).toBeUndefined();
     expect(env.CODEX_REVIEW_TIMEOUT_SECONDS).toBeUndefined();
     expect(env.CODEX_REVIEW_NON_INTERACTIVE).toBe('1');
+  });
+});
+
+describe('scripts/pack-smoke packaged plugin governance', () => {
+  async function withPluginRoot(
+    body: (pluginRoot: string) => Promise<void>,
+    pluginManifest: Record<string, unknown> = {}
+  ): Promise<void> {
+    const root = await mkdtemp(join(tmpdir(), 'co-pack-smoke-plugin-governance-'));
+    try {
+      const pluginRoot = join(root, 'plugin');
+      await mkdir(join(pluginRoot, '.codex-plugin'), { recursive: true });
+      await writeFile(
+        join(pluginRoot, '.codex-plugin', 'plugin.json'),
+        `${JSON.stringify({ name: 'codex-orchestrator', version: '0.2.1', ...pluginManifest }, null, 2)}\n`
+      );
+      await body(pluginRoot);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+
+  it('accepts the current packaged plugin when hook and import surfaces are absent', async () => {
+    const { assertPackagedPluginGovernanceShape } = await import('../scripts/pack-smoke.mjs');
+
+    await withPluginRoot(async (pluginRoot) => {
+      await expect(assertPackagedPluginGovernanceShape(pluginRoot, 'fixture plugin')).resolves.toBeUndefined();
+    });
+  });
+
+  it('fails closed when plugin-bundled hooks are declared in plugin.json', async () => {
+    const { assertPackagedPluginGovernanceShape } = await import('../scripts/pack-smoke.mjs');
+
+    await withPluginRoot(
+      async (pluginRoot) => {
+        await expect(assertPackagedPluginGovernanceShape(pluginRoot, 'fixture plugin')).rejects.toThrow(
+          'fixture plugin plugin manifest must not declare plugin-bundled hooks without explicit CO hook governance'
+        );
+      },
+      { hooks: [{ event: 'SessionStart', command: 'echo unsafe' }] }
+    );
+  });
+
+  it('fails closed when default hook or imported external-agent config artifacts are packaged', async () => {
+    const { assertPackagedPluginGovernanceShape } = await import('../scripts/pack-smoke.mjs');
+
+    await withPluginRoot(async (pluginRoot) => {
+      await mkdir(join(pluginRoot, 'hooks'), { recursive: true });
+      await writeFile(join(pluginRoot, 'hooks', 'hooks.json'), '{"hooks":[]}\n');
+
+      await expect(assertPackagedPluginGovernanceShape(pluginRoot, 'fixture plugin')).rejects.toThrow(
+        'fixture plugin default plugin-bundled hooks manifest should be absent'
+      );
+    });
+
+    await withPluginRoot(async (pluginRoot) => {
+      await writeFile(join(pluginRoot, 'hooks.json'), '{"hooks":[]}\n');
+
+      await expect(assertPackagedPluginGovernanceShape(pluginRoot, 'fixture plugin')).rejects.toThrow(
+        'fixture plugin default plugin-bundled hooks config should be absent'
+      );
+    });
+
+    await withPluginRoot(async (pluginRoot) => {
+      await mkdir(join(pluginRoot, '.codex'), { recursive: true });
+      await writeFile(join(pluginRoot, '.codex', 'config.toml'), '[features]\nplugin_hooks = true\n');
+
+      await expect(assertPackagedPluginGovernanceShape(pluginRoot, 'fixture plugin')).rejects.toThrow(
+        'fixture plugin imported Codex config should be absent'
+      );
+    });
+
+    await withPluginRoot(async (pluginRoot) => {
+      await mkdir(join(pluginRoot, '.codex'), { recursive: true });
+      await writeFile(join(pluginRoot, '.codex', 'hooks.json'), '{"hooks":[]}\n');
+
+      await expect(assertPackagedPluginGovernanceShape(pluginRoot, 'fixture plugin')).rejects.toThrow(
+        'fixture plugin imported hooks config should be absent'
+      );
+    });
+
+    await withPluginRoot(async (pluginRoot) => {
+      await mkdir(join(pluginRoot, '.agents', 'skills', 'ordinary-skill'), { recursive: true });
+
+      await expect(assertPackagedPluginGovernanceShape(pluginRoot, 'fixture plugin')).rejects.toThrow(
+        'fixture plugin imported external-agent skills should be absent'
+      );
+    });
+
+    await withPluginRoot(async (pluginRoot) => {
+      await writeFile(join(pluginRoot, 'AGENTS.md'), '# Migrated guidance\n');
+
+      await expect(assertPackagedPluginGovernanceShape(pluginRoot, 'fixture plugin')).rejects.toThrow(
+        'fixture plugin migrated external-agent guidance source should be absent'
+      );
+    });
+  });
+
+  it('fails closed when install config carries hook state or external migration flags', async () => {
+    const { assertPluginInstallConfigGovernance } = await import('../scripts/pack-smoke.mjs');
+    const root = await mkdtemp(join(tmpdir(), 'co-pack-smoke-install-config-'));
+    try {
+      const configPath = join(root, 'config.toml');
+      const unsafeConfigs = [
+        {
+          text: [
+            '[marketplaces.codex-orchestrator]',
+            'source_type = "git"',
+            '[plugins."codex-orchestrator@codex-orchestrator"]',
+            'enabled = true',
+            '[hooks.state."codex-orchestrator-session-start"]',
+            'enabled = true',
+            ''
+          ].join('\n'),
+          expected: 'hooks.state'
+        },
+        {
+          text: ['[features]', 'codex_hooks = true', ''].join('\n'),
+          expected: 'codex_hooks'
+        },
+        {
+          text: ['[features]', 'plugin_hooks = true', ''].join('\n'),
+          expected: 'plugin_hooks'
+        },
+        {
+          text: ['[features]', 'external_migration = true', ''].join('\n'),
+          expected: 'external_migration'
+        }
+      ];
+
+      for (const unsafeConfig of unsafeConfigs) {
+        await writeFile(configPath, unsafeConfig.text);
+        await expect(assertPluginInstallConfigGovernance(configPath, 'fixture')).rejects.toThrow(
+          `fixture plugin install config must not include ungoverned text "${unsafeConfig.expected}"`
+        );
+      }
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 
