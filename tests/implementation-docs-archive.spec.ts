@@ -236,6 +236,8 @@ describe('implementation-docs-archive script', () => {
       kind: 'implementation_docs_archive_self_heal_pr',
       dry_run: true,
       action_required: true,
+      archive_payload_required: true,
+      registry_repair_required: false,
       workflow: '.github/workflows/implementation-docs-archive-automation.yml'
     });
   });
@@ -1168,7 +1170,11 @@ describe('implementation-docs-archive script', () => {
 
     expect(report.totals.archived).toBe(0);
     expect(report.totals.registry_repairs).toBe(1);
-    expect(report.action_path.action_required).toBe(true);
+    expect(report.action_path).toMatchObject({
+      action_required: false,
+      archive_payload_required: false,
+      registry_repair_required: true
+    });
     expect(report.registry_repairs).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

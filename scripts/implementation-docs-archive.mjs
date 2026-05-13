@@ -618,6 +618,8 @@ async function main() {
       archive_branch: policy.archiveBranch,
       pr_branch: 'automation/implementation-docs-archive',
       trigger: 'gh workflow run implementation-docs-archive-automation.yml --ref main',
+      archive_payload_required: false,
+      registry_repair_required: false,
       action_required: false
     },
     totals: {
@@ -922,7 +924,9 @@ async function main() {
   }
 
   report.totals.stray_candidates = report.stray_candidates.length;
-  report.action_path.action_required = report.totals.archived > 0 || report.totals.registry_repairs > 0;
+  report.action_path.archive_payload_required = report.totals.archived > 0;
+  report.action_path.registry_repair_required = report.totals.registry_repairs > 0;
+  report.action_path.action_required = report.action_path.archive_payload_required;
 
   const shouldUpdateRegistry = report.totals.archived > 0 || report.totals.registry_repairs > 0;
   if (shouldUpdateRegistry) {

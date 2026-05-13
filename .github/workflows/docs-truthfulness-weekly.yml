@@ -60,14 +60,21 @@ jobs:
           const fs = require('fs');
           const reportPath = `${process.env.REPORT_DIR}/implementation-docs-archive/docs-archive-report.json`;
           const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-          const actionRequired = report.action_path?.action_required === true;
+          const archived = report.totals?.archived ?? 0;
+          const registryRepairs = report.totals?.registry_repairs ?? 0;
+          const actionRequired =
+            report.action_path?.archive_payload_required === true ||
+            (report.action_path?.archive_payload_required !== false &&
+              report.action_path?.action_required === true &&
+              archived > 0);
           fs.appendFileSync(
             process.env.GITHUB_STEP_SUMMARY,
             [
               '',
               '## Implementation Docs Archive Forecast',
               '',
-              `- Mechanical archive candidates: ${report.totals?.archived ?? 0}`,
+              `- Mechanical archive candidates: ${archived}`,
+              `- Registry-only repairs: ${registryRepairs}`,
               `- Stray candidates: ${report.totals?.stray_candidates ?? 0}`,
               `- Self-heal workflow: ${actionRequired ? 'requested' : 'not required'}`
             ].join('\n') + '\n'
