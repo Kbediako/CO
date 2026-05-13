@@ -1,6 +1,69 @@
 {
   "items": [
     {
+      "id": "20260513-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43",
+      "title": "CO-488 plugin hook, cache, and external config import governance",
+      "relates_to": "tasks/tasks-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "status": "backlog",
+      "last_review": "2026-05-13",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO parent orchestrator",
+          "date": "2026-05-13",
+          "status": "backlog_traceability_hold",
+          "summary": "linear issue-context found CO-488 in Backlog with no PR attached and missing repo-side packet/registry mirrors; autopilot held the backlog head with backlog_head_follow_up_traceability_pending."
+        },
+        "packet_setup": {
+          "reviewer": "CO parent orchestrator",
+          "date": "2026-05-13",
+          "status": "packet_seeded",
+          "summary": "PRD, TECH_SPEC, ACTION_PLAN, task checklist, agent mirror, task index entry, docs/TASKS snapshot, and docs freshness registry rows created before implementation edits."
+        },
+        "parallelization": {
+          "reviewer": "CO parent orchestrator",
+          "date": "2026-05-13",
+          "decision": "stay_serial_packet_only",
+          "reason": "backlog_traceability_setup",
+          "summary": "Packet setup is a docs/registry-only queue-readiness action; implementation can parallelize after the issue leaves Backlog."
+        },
+        "validation": {
+          "reviewer": "CO parent orchestrator",
+          "date": "2026-05-13",
+          "status": "passed_with_inherited_docs_freshness_baseline",
+          "passing": [
+            "git diff --check",
+            "JSON parse for tasks/index.json and docs/docs-freshness-registry.json",
+            "protected-term scan",
+            "node scripts/spec-guard.mjs --dry-run",
+            "npm run docs:check"
+          ],
+          "inherited_baseline": {
+            "command": "npm run docs:freshness",
+            "owner_issue": "CO-522",
+            "summary": "Inherited repo-wide stale docs baseline remains red; CO-488 adds no missing registry entries, invalid entries, uncatalogued docs, or stale CO-488 rows."
+          },
+          "summary": "Packet-local validation is clean; docs:freshness failure is inherited baseline debt already routed to CO-522."
+        }
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
+        "prd": "docs/PRD-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
+        "docs": "docs/TECH_SPEC-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
+        "action_plan": "docs/ACTION_PLAN-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
+        "spec": "tasks/specs/linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
+        "task": "tasks/tasks-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md"
+      },
+      "source_issue": {
+        "id": "4cbc2024-e85b-469d-adbc-7ee6f4ff2d43",
+        "identifier": "CO-488",
+        "url": "https://linear.app/asabeko/issue/CO-488/co-audit-0128-plugin-hook-cache-and-external-config-import-governance"
+      }
+    },
+    {
       "id": "20260513-linear-3abba033-52f0-45f3-af58-cce4939f087f",
       "title": "CO-480 MultiAgentV2 0.128 thread-cap audit",
       "relates_to": "tasks/tasks-linear-3abba033-52f0-45f3-af58-cce4939f087f.md",
