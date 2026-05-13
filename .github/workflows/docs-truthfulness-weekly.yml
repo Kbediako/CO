@@ -64,6 +64,7 @@ jobs:
           const registryRepairs = report.totals?.registry_repairs ?? 0;
           const actionRequired =
             report.action_path?.archive_payload_required === true ||
+            report.action_path?.registry_repair_required === true ||
             (report.action_path?.archive_payload_required !== false &&
               report.action_path?.action_required === true &&
               archived > 0);

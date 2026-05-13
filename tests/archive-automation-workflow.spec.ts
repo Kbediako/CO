@@ -1,7 +1,13 @@
-import { readFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
 
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
+
+const execFileAsync = promisify(execFile);
 
 type WorkflowStep = {
   env?: Record<string, unknown>;
@@ -37,6 +43,57 @@ function getStep(workflow: WorkflowFile, jobName: string, stepName: string): Wor
     throw new Error(`Missing workflow step ${jobName} / ${stepName}`);
   }
   return step;
+}
+
+function extractNodeHereDoc(script: string, marker: string): string {
+  const startMarker = `${marker}="$(node <<'NODE'\n`;
+  const start = script.indexOf(startMarker);
+  if (start < 0) {
+    throw new Error(`Missing Node heredoc marker ${marker}`);
+  }
+
+  const scriptStart = start + startMarker.length;
+  const end = script.indexOf('\nNODE\n)"', scriptStart);
+  if (end < 0) {
+    throw new Error(`Missing Node heredoc terminator for ${marker}`);
+  }
+
+  return script.slice(scriptStart, end);
+}
+
+async function runWeeklyArchiveTrigger(report: unknown): Promise<{ stdout: string; summary: string }> {
+  const workflow = await readWorkflow('.github/workflows/docs-truthfulness-weekly.yml');
+  const triggerStep = getStep(
+    workflow,
+    'docs-truthfulness-maintenance',
+    'Trigger mechanical archive self-heal when needed'
+  );
+  const script = extractNodeHereDoc(triggerStep.run ?? '', 'NEEDS_ARCHIVE');
+  const tempRoot = await mkdtemp(join(tmpdir(), 'weekly-archive-trigger-'));
+
+  try {
+    const reportDir = join(tempRoot, 'reports');
+    const archiveReportDir = join(reportDir, 'implementation-docs-archive');
+    const summaryPath = join(tempRoot, 'step-summary.md');
+    await mkdir(archiveReportDir, { recursive: true });
+    await writeFile(join(archiveReportDir, 'docs-archive-report.json'), `${JSON.stringify(report)}\n`);
+    await writeFile(summaryPath, '');
+
+    const { stdout } = await execFileAsync(process.execPath, ['-e', script], {
+      env: {
+        ...process.env,
+        GITHUB_STEP_SUMMARY: summaryPath,
+        REPORT_DIR: reportDir
+      }
+    });
+
+    return {
+      stdout,
+      summary: await readFile(summaryPath, 'utf8')
+    };
+  } finally {
+    await rm(tempRoot, { force: true, recursive: true });
+  }
 }
 
 describe('archive automation workflow required checks', () => {
@@ -352,5 +409,33 @@ describe('archive automation workflow required checks', () => {
         statuses: 'write'
       });
     }
+  });
+
+  it('routes registry-only implementation docs archive repairs through the weekly self-heal workflow', async () => {
+    const workflow = await readWorkflow('.github/workflows/docs-truthfulness-weekly.yml');
+    const triggerStep = getStep(
+      workflow,
+      'docs-truthfulness-maintenance',
+      'Trigger mechanical archive self-heal when needed'
+    );
+
+    expect(triggerStep.run).toContain('gh workflow run implementation-docs-archive-automation.yml --ref main');
+
+    const result = await runWeeklyArchiveTrigger({
+      totals: {
+        archived: 0,
+        registry_repairs: 1,
+        stray_candidates: 0
+      },
+      action_path: {
+        action_required: false,
+        archive_payload_required: false,
+        registry_repair_required: true
+      }
+    });
+
+    expect(result.stdout).toBe('true');
+    expect(result.summary).toContain('- Registry-only repairs: 1');
+    expect(result.summary).toContain('- Self-heal workflow: requested');
   });
 });
