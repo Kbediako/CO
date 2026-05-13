@@ -10,8 +10,16 @@
 - Not done if: completed task packets can remain ordinary active stale rows, scheduled docs truthfulness is warn-only, status/provider surfaces lack repo-gate context, public/current docs enter rolling deferral, guide/catalog drift can recur, or the fix is another cap/window/date patch.
 - Pre-implementation issue-quality review: self-approved on 2026-05-13 after live `linear issue-context`; issue includes protected terms, non-goals, parity matrix, not-done-if, and concrete acceptance criteria for the root lifecycle refactor.
 - Fallback / refactor decision: this task touches stale and report-only seams. Decision is `remove fallback` for warn-only scheduled maintenance, ordinary active terminal packet rows, and late repo-gate discovery. The large-refactor preference applies and is the chosen approach.
+- Large-refactor decision: required and chosen because lifecycle authority is split across terminal state, registry/catalog metadata, scheduled automation, archive automation, and status/provider handoff.
+- Minor-seam decision: rejected; another bounded stale-doc seam would preserve the warn-only and active-terminal-row failure loop.
 - Durable retention evidence: no new retained temporary fallback is intended. Any dry-run path must be a supported deterministic mode, not an expiring fallback.
 - Large-refactor check: required because authority is split across registry/catalog state, terminal task/Linear state, archive automation, scheduled workflows, and status/provider reporting.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Scheduled docs truthfulness | Warn/report-only result | remove fallback | CO-525 | Report shows actionable stale debt with no action path | 2026-05-13 | 2026-05-13 | immediate | Forecast/action planner replaces warn-only terminal behavior | Scheduled/action tests |
+| Terminal packet registry | Completed packet rows remain `active` | remove fallback | CO-525 | Terminal task/Linear state conflicts with active stale registry row | 2026-05-13 | 2026-05-13 | immediate | Lifecycle classifier reclassifies/archive-plans packet rows before stale blocking | Lifecycle tests |
+| Repo-gate visibility | Provider handoff discovers repo gate late | remove fallback | CO-525 | `docs:freshness:maintain` blocks with `blocking_changed_paths=[]` | 2026-05-13 | 2026-05-13 | immediate | Status/provider surfaces expose repo-gate context early | Status/provider tests |
 
 ## Milestones & Sequencing
 1. Seed docs-first packet, registry mirrors, workpad, baseline artifacts, and docs-review evidence.

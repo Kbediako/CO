@@ -547,6 +547,45 @@ describe('spec-guard script', () => {
     expect(stdout).toContain("tasks/specs/0001-initial.md: last_review 2000-01-01");
   });
 
+  it('skips specs for terminal task-index packet lifecycle rows', async () => {
+    const repo = await initRepository();
+
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      ['---', 'status: in_progress', 'last_review: 2000-01-01', '---', '', 'Terminal packet spec.'].join('\n')
+    );
+    await writeFile(
+      join(repo, 'tasks/index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260513-0001-initial',
+              title: 'Terminal packet fixture',
+              status: 'done',
+              completed_at: '2026-05-13T00:00:00.000Z',
+              paths: {
+                spec: 'tasks/specs/0001-initial.md',
+                task: 'tasks/tasks-0001-initial.md',
+                agent_task: '.agent/task/0001-initial.md',
+                docs: 'docs/TECH_SPEC-0001-initial.md'
+              }
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
   it('reports owner-backed stale active specs as rolling freshness cohort debt', async () => {
     const repo = await initRepository();
     const staleReviewDate = reviewDateDaysAgo(31);

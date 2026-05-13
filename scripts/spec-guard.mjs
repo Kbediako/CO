@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
 import { computeAgeInDays, parseIsoDate } from './lib/docs-helpers.js';
 import { maybeLoadDocsCatalog, resolveDocsCatalogEntry } from './lib/docs-catalog.js';
+import { buildTaskPacketLifecycleIndex } from './lib/docs-freshness-lifecycle.js';
 
 const execFileAsync = promisify(execFile);
 const ARCHIVE_STUB_MARKER = '<!-- docs-archive:stub -->';
@@ -1411,12 +1412,29 @@ async function loadRollingFreshnessCatalog() {
   }
 }
 
+async function loadTerminalTaskLifecycleIndex() {
+  try {
+    const raw = await readFile('tasks/index.json', 'utf8');
+    const parsed = JSON.parse(raw);
+    const items = Array.isArray(parsed?.items) ? parsed.items : Array.isArray(parsed?.tasks) ? parsed.tasks : [];
+    return buildTaskPacketLifecycleIndex(items);
+  } catch (error) {
+    const code =
+      error && typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+    if (code === 'ENOENT') {
+      return buildTaskPacketLifecycleIndex([]);
+    }
+    throw error;
+  }
+}
+
 async function checkSpecFreshness(specFiles) {
   const failures = [];
   const staleSpecs = [];
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
   const docsCatalog = await loadRollingFreshnessCatalog();
+  const terminalTaskLifecycleIndex = await loadTerminalTaskLifecycleIndex();
 
   for (const file of specFiles) {
     let content;
@@ -1440,6 +1458,11 @@ async function checkSpecFreshness(specFiles) {
       continue;
     }
 
+    const normalizedFile = normalizeSpecFilePath(file);
+    if (terminalTaskLifecycleIndex.byPath.has(normalizedFile)) {
+      continue;
+    }
+
     const reviewLine = content
       .split(/\r?\n/)
       .find((line) => line.trim().startsWith('last_review:'));
@@ -1457,7 +1480,6 @@ async function checkSpecFreshness(specFiles) {
 
     const ageDays = computeAgeInDays(reviewDate, today);
     if (ageDays > SPEC_FRESHNESS_CADENCE_DAYS) {
-      const normalizedFile = normalizeSpecFilePath(file);
       staleSpecs.push({
         file: normalizedFile,
         last_review: rawValue,
