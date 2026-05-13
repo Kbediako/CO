@@ -98,10 +98,10 @@
           "node scripts/delegation-guard.mjs",
           "manifest-backed standalone review with review_verdict=clean",
           "explicit elegance/minimality pass",
-          "PR #808 opened on branch linear/co-530-reclassify-legacy-docs-freshness-cohorts after the CO-532 rebase",
-          "PR #808 checks green on head 6312b9f6a2e4c4a69d883cfccdfe3fb0dced3171"
+          "PR #808 opened on branch linear/co-530-reclassify-legacy-docs-freshness-cohorts after the CO-532 rebase"
         ],
         "pending": [
+          "PR #808 checks green on the current head",
           "ready-review drain clean and Linear review handoff"
         ]
       },

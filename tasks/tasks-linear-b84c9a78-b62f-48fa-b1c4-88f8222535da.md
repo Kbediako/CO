@@ -50,10 +50,10 @@ Minor-seam decision: CO-530 aligns the historical packet metadata with live term
 
 ## Handoff
 - [x] PR attached to the issue. Evidence: PR `#456` (`https://github.com/Kbediako/CO/pull/456`).
-- [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: historical terminal classification from CO-530 cleanup; live Linear `issue-context` verified `CO-163` is `Done` / completed on 2026-05-13T19:59Z.
-- [x] PR checks green and `pr ready-review` drain clean before review-state transition. Evidence: historical terminal classification from CO-530 cleanup; the issue is already `Done` / completed and PR `#456` is attached.
-- [x] Unresolved actionable review threads: `0` or explicit pushback recorded. Evidence: historical terminal classification from CO-530 cleanup; the issue is already `Done` / completed and no longer active implementation debt.
-- [x] Issue moved to `In Review`. Evidence: historical terminal classification from CO-530 cleanup; live Linear `issue-context` verified `CO-163` later reached `Done` / completed.
+- [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: historical terminal classification from CO-530 cleanup verified that PR `#456` had already merged and the current branch no longer carries active CO-163 implementation work.
+- [x] PR checks green and `pr ready-review` drain clean before review-state transition. Evidence: historical terminal classification from CO-530 cleanup verified PR `#456` is merged at `8599c8bd28c29e324a354d3c431826edd459b59e`; merged PR state is the terminal PR evidence for this archived packet.
+- [x] Unresolved actionable review threads: `0` or explicit pushback recorded. Evidence: historical terminal classification from CO-530 cleanup verified PR `#456` is merged and live Linear `CO-163` is `Done` / completed, so this packet no longer represents active implementation debt.
+- [x] Issue moved to `In Review`. Evidence: historical terminal classification from CO-530 cleanup verified live Linear `issue-context` had already reached `Done` / completed for `CO-163`.
 
 ## Progress Log
 - 2026-04-12: Issue moved to `In Progress`, same-turn parallelization decision recorded as serial due to overlapping supervision/ownership/polling scope, and branch `linear/co-163-harden-supervise-restart-orphan-burn` created from `main`.
