@@ -97,11 +97,11 @@
           "git diff --check",
           "node scripts/delegation-guard.mjs",
           "manifest-backed standalone review with review_verdict=clean",
-          "explicit elegance/minimality pass"
+          "explicit elegance/minimality pass",
+          "PR #808 opened on branch linear/co-530-reclassify-legacy-docs-freshness-cohorts after the CO-532 rebase",
+          "PR #808 checks green on head 6312b9f6a2e4c4a69d883cfccdfe3fb0dced3171"
         ],
         "pending": [
-          "refreshed PR push on top of CO-532 merge commit f5e9ddcdca42f54ddd95bc0895f2d4426cb48b96",
-          "PR checks green on refreshed head",
           "ready-review drain clean and Linear review handoff"
         ]
       },
