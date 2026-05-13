@@ -71,6 +71,12 @@
           "status": "clean_after_two_simplifications",
           "artifact": "out/linear-b8b18767-1262-442f-84f3-f41b6f758d42/manual/elegance-review.md",
           "summary": "Reused the archive-index marker constant and renamed the helper to match marker detection behavior; no broader abstraction or lifecycle reconciliation was needed."
+        },
+        "pr_feedback": {
+          "reviewer": "chatgpt-codex-connector",
+          "date": "2026-05-13",
+          "status": "p2_terminal_lifecycle_fixed",
+          "summary": "Reclassified the verified completed 0933/0934 packet registry rows as archived historical metadata after Codex review showed they created terminal_pending_archive freshness blockers."
         }
       },
       "validation": {
@@ -91,10 +97,11 @@
           "linear child-lane regression-coverage completed successfully with no patch required",
           "linear child-stream docs-review classified inherited docs:freshness baseline",
           "npm run review -- --base origin/main",
-          "manual elegance review"
+          "manual elegance review",
+          "Codex connector P2 terminal lifecycle feedback addressed"
         ],
         "classified": [
-          "npm run docs:freshness failed only on inherited repo-wide stale-doc baseline with missing_registry=0 and CO-533 packet paths registered.",
+          "npm run docs:freshness failed only on inherited repo-wide stale-doc baseline with missing_registry=0, terminal_lifecycle=0, and CO-533 packet paths registered.",
           "docs:freshness:maintain in docs-review stopped on existing CO-522 owner baseline with blocking_changed_paths=[]."
         ],
         "pending": [
