@@ -38,7 +38,7 @@ See the PRD for the full matrix. The implementation must align task lifecycle, s
 
 ## Technical Requirements
 - Functional requirements:
-  - Every packet creation/registration path must write or validate source issue, doc class, lifecycle state, owner, created_at, last_review, cadence_days, and next_review/expiry metadata.
+  - Every packet creation/registration path must write or validate source issue, doc class, lifecycle state, owner, created_at, last_review, cadence_days, and next_review metadata.
   - Terminal issue/task state must classify all packet surfaces into active reviewed docs, `terminal_pending_archive`, `preserved_historical_stub`, archived, or done-style inactive states before normal stale classification.
   - Mechanical terminal-packet cases must produce deterministic dry-run actions and, where existing workflow credentials allow, a self-heal PR branch/PR path.
   - Public/current/shipped docs must be excluded from rolling deferral and routed to direct pre-expiry action.

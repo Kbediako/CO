@@ -9403,19 +9403,7 @@ function docsFreshnessRegistryEntryHasValidMetadata(entry: Record<string, unknow
   const lifecycleState =
     typeof entry.lifecycle_state === 'string' ? normalizeOptionalString(entry.lifecycle_state) : null;
   const createdAt = typeof entry.created_at === 'string' ? normalizeOptionalString(entry.created_at) : null;
-  // Temporary compatibility fallback per docs/guides/fallback-expiry-and-refactor-policy.md.
-  // Owner: CO-525. Trigger: legacy registry rows may still expose entry.expiry before
-  // creation-time metadata standardizes on entry.next_review. Introduced: 2026-05-13.
-  // Next review: 2026-05-27. Max lifetime: 30 days, remove by 2026-06-12.
-  // Removal condition: all packet creation/migration paths emit entry.next_review and no
-  // active docs-freshness registry rows rely on entry.expiry. Validation: docs:check plus
-  // provider workflow facade tests covering normalizeOptionalString for entry.next_review.
-  const nextReview =
-    typeof entry.next_review === 'string'
-      ? normalizeOptionalString(entry.next_review)
-      : typeof entry.expiry === 'string'
-        ? normalizeOptionalString(entry.expiry)
-        : null;
+  const nextReview = typeof entry.next_review === 'string' ? normalizeOptionalString(entry.next_review) : null;
   return Boolean(
     status === FOLLOW_UP_REQUIRED_DOCS_FRESHNESS_STATUS
     && cadenceDays !== null
