@@ -72,6 +72,123 @@
       }
     },
     {
+      "id": "20260513-linear-b8b18767-1262-442f-84f3-f41b6f758d42",
+      "title": "CO-533 docs/TASKS archive reserve restoration",
+      "relates_to": "tasks/tasks-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-13",
+      "evidence": [
+        "docs/PRD-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+        "docs/TECH_SPEC-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+        "docs/ACTION_PLAN-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+        "tasks/specs/linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+        "tasks/tasks-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+        ".agent/task/linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+        "scripts/tasks-archive.mjs",
+        "tests/tasks-archive.spec.ts",
+        "docs/TASKS.md",
+        "docs/TASKS-archive-2026.md",
+        "tasks/index.json",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO parent orchestrator",
+          "date": "2026-05-13",
+          "status": "reproduced",
+          "summary": "Live current-main evidence reproduced docs/TASKS.md at 448 lines and archive dry-run failing to restore the 440-line reserve target."
+        },
+        "root_cause": {
+          "reviewer": "CO parent orchestrator",
+          "date": "2026-05-13",
+          "status": "identified",
+          "summary": "Archive-index adjacency caused one header-only candidate to be net-negative, and stale nonterminal tasks/index.json status blocked verified completed rows 0933 and 0934."
+        },
+        "parallelization": {
+          "reviewer": "linear parallelization helper",
+          "date": "2026-05-13",
+          "decision": "parallelize_now",
+          "reason": "independent_scope_available",
+          "summary": "Current active turn found a safe tests child lane for tests/tasks-archive.spec.ts while the parent owns archive script/docs validation; clean-baseline relaunch completed with a zero-byte no-change patch and successful child manifest."
+        },
+        "child_lane": {
+          "reviewer": "linear child-lane regression-coverage",
+          "date": "2026-05-13",
+          "status": "completed_no_patch_needed",
+          "manifest": ".runs/linear-b8b18767-1262-442f-84f3-f41b6f758d42-regression-coverage/cli/2026-05-13T18-18-12-011Z-e69db451/manifest.json",
+          "summary": "Tests-only child lane inspected the committed CO-533 regression coverage and completed successfully with no additional patch required."
+        },
+        "docs_review": {
+          "reviewer": "linear child-stream docs-review",
+          "date": "2026-05-13",
+          "status": "packet_gates_clean_baseline_block_classified",
+          "manifest": ".runs/linear-b8b18767-1262-442f-84f3-f41b6f758d42-docs-review/cli/2026-05-13T18-20-08-212Z-10e66182/manifest.json",
+          "summary": "Docs-review passed delegation/spec/docs checks and stopped at docs:freshness:maintain on inherited CO-522 baseline debt with blocking_changed_paths=[]; CO-533 packet paths are registered."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-13",
+          "status": "clean",
+          "telemetry": ".runs/linear-b8b18767-1262-442f-84f3-f41b6f758d42/cli/2026-05-13T18-04-30-883Z-8f5fa60a/review/telemetry.json",
+          "summary": "Manifest-backed review completed with status=succeeded, review_outcome=bounded-success, review_verdict=clean, and finding_count=0."
+        },
+        "elegance_review": {
+          "reviewer": "parent manual elegance pass",
+          "date": "2026-05-13",
+          "status": "clean_after_two_simplifications",
+          "artifact": "out/linear-b8b18767-1262-442f-84f3-f41b6f758d42/manual/elegance-review.md",
+          "summary": "Reused the archive-index marker constant and renamed the helper to match marker detection behavior; no broader abstraction or lifecycle reconciliation was needed."
+        },
+        "pr_feedback": {
+          "reviewer": "chatgpt-codex-connector",
+          "date": "2026-05-13",
+          "status": "p2_terminal_lifecycle_fixed",
+          "summary": "Reclassified the verified completed 0933/0934 packet registry rows as archived historical metadata after Codex review showed they created terminal_pending_archive freshness blockers."
+        }
+      },
+      "validation": {
+        "status": "local_validation_green_pr_pending",
+        "passed": [
+          "npx vitest run tests/tasks-archive.spec.ts",
+          "npm run docs:archive-tasks -- --dry-run",
+          "npm run docs:archive-tasks -- --out docs/TASKS-archive-YYYY.md",
+          "node scripts/delegation-guard.mjs",
+          "node scripts/spec-guard.mjs --dry-run",
+          "npm run build",
+          "npm run lint",
+          "npm run test",
+          "npm run docs:check",
+          "npm run repo:stewardship",
+          "node scripts/diff-budget.mjs",
+          "git diff --check",
+          "linear child-lane regression-coverage completed successfully with no patch required",
+          "linear child-stream docs-review classified inherited docs:freshness baseline",
+          "npm run review -- --base origin/main",
+          "manual elegance review",
+          "Codex connector P2 terminal lifecycle feedback addressed"
+        ],
+        "classified": [
+          "npm run docs:freshness failed only on inherited repo-wide stale-doc baseline with missing_registry=0, terminal_lifecycle=0, and CO-533 packet paths registered.",
+          "docs:freshness:maintain in docs-review stopped on existing CO-522 owner baseline with blocking_changed_paths=[]."
+        ],
+        "pending": [
+          "PR checks and review drain"
+        ]
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+        "task": "tasks/tasks-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+        "agent_task": ".agent/task/linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+        "prd": "docs/PRD-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+        "docs": "docs/TECH_SPEC-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+        "action_plan": "docs/ACTION_PLAN-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md"
+      }
+    },
+    {
       "id": "20260513-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43",
       "title": "CO-488 plugin hook, cache, and external config import governance",
       "relates_to": "tasks/tasks-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
@@ -18104,7 +18221,7 @@
       "title": "ExperienceStore JSONL Line Repair",
       "path": "tasks/tasks-0933-orchestrator-experience-jsonl-repair.md",
       "kind": "prd",
-      "status": "in-progress",
+      "status": "completed",
       "gate": {
         "phase": "orchestrator-experience-jsonl-repair-planning",
         "status": "approved",
@@ -18112,7 +18229,7 @@
         "run_id": "2026-01-05T18-26-16-547Z-91ff2f7d"
       },
       "created_at": "2026-01-05",
-      "completed_at": null
+      "completed_at": "2026-01-05"
     },
     {
       "id": "0934",
@@ -18120,7 +18237,7 @@
       "title": "Orchestrator Persistence Throughput",
       "path": "tasks/tasks-0934-orchestrator-persistence-throughput.md",
       "kind": "prd",
-      "status": "in-progress",
+      "status": "completed",
       "gate": {
         "phase": "orchestrator-persistence-throughput-planning",
         "status": "approved",
@@ -18128,7 +18245,7 @@
         "run_id": "2026-01-05T19-14-40-500Z-2e4b8f16"
       },
       "created_at": "2026-01-05",
-      "completed_at": null
+      "completed_at": "2026-01-05"
     },
     {
       "id": "0935",

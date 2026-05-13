@@ -11,6 +11,8 @@ const DEFAULT_POLICY_PATH = 'docs/tasks-archive-policy.json';
 const TASKS_PATH = 'docs/TASKS.md';
 const SNAPSHOT_HEADER_PREFIX = '# Task List Snapshot';
 const SNAPSHOT_HEADER_SPLIT_PATTERN = /(?=# Task List Snapshot(?: —|-)\s+)/g;
+const TASKS_ARCHIVE_INDEX_BEGIN = '<!-- tasks-archive-index:begin -->';
+const TASKS_ARCHIVE_INDEX_END = '<!-- tasks-archive-index:end -->';
 
 function showUsage() {
   console.log(`Usage: node scripts/tasks-archive.mjs [--policy <path>] [--out <path>] [--dry-run]
@@ -75,6 +77,10 @@ function lineStartsWithSnapshotHeader(line) {
   return typeof line === 'string' && line.startsWith(SNAPSHOT_HEADER_PREFIX);
 }
 
+function lineContainsArchiveIndexBlockStart(line) {
+  return typeof line === 'string' && line.includes(TASKS_ARCHIVE_INDEX_BEGIN);
+}
+
 function normalizeInlineSnapshotHeaders(content) {
   if (typeof content !== 'string' || content.length === 0) {
     return '';
@@ -133,6 +139,14 @@ function parseHeaderSections(lines) {
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
+    if (lineContainsArchiveIndexBlockStart(line)) {
+      if (startIndex !== null && taskKey) {
+        sections.push({ taskKey, start: startIndex, end: index - 1 });
+      }
+      startIndex = null;
+      taskKey = null;
+      continue;
+    }
     if (!lineStartsWithSnapshotHeader(line)) {
       continue;
     }
@@ -361,8 +375,8 @@ function buildArchiveIndexText({ years, policy }) {
 }
 
 function updateArchiveIndex(content, policy, years) {
-  const begin = '<!-- tasks-archive-index:begin -->';
-  const end = '<!-- tasks-archive-index:end -->';
+  const begin = TASKS_ARCHIVE_INDEX_BEGIN;
+  const end = TASKS_ARCHIVE_INDEX_END;
   const existingYears = content.includes(begin)
     ? extractArchiveYears(content)
     : new Set();
@@ -445,6 +459,16 @@ function buildUpdatedTasksContent({ lines, removeMask, policy, archivedYears }) 
   return updateArchiveIndex(updatedLines.join('\n'), policy, archivedYears);
 }
 
+function formatBlockedIndexStatusMessage(blockedSnapshots) {
+  if (!blockedSnapshots || blockedSnapshots.length === 0) {
+    return '';
+  }
+  const formatted = blockedSnapshots
+    .map((snapshot) => `${snapshot.taskKey} (status=${snapshot.status})`)
+    .join(', ');
+  return ` Terminal-looking snapshots blocked by nonterminal tasks/index.json status: ${formatted}.`;
+}
+
 async function main() {
   const { repoRoot, outRoot } = resolveEnvironmentPaths();
   const { args, positionals } = parseArgs(process.argv.slice(2));
@@ -479,7 +503,7 @@ async function main() {
   const lines = normalizedTasks.split('\n');
   const totalLines = countNormalizedLines(normalizedTasks);
   const targetLines = policy.maxLines - policy.reserveLines;
-  const archiveIndexMissing = !normalizedTasks.includes('<!-- tasks-archive-index:begin -->');
+  const archiveIndexMissing = !normalizedTasks.includes(TASKS_ARCHIVE_INDEX_BEGIN);
   const withinArchiveThreshold = (lineCount) =>
     policy.reserveLines === 0 ? lineCount < targetLines : lineCount <= targetLines;
 
@@ -494,10 +518,18 @@ async function main() {
   const sections = parseTaskSections(lines);
 
   const candidates = [];
+  const blockedByIndexStatus = [];
   for (const section of sections) {
     const entry = taskIndex.get(section.taskKey);
     const headerCompletedAt = parseCompletedSnapshotDate(lines, section);
     if (entry?.status && !entry.completedByIndex) {
+      if (headerCompletedAt) {
+        blockedByIndexStatus.push({
+          taskKey: section.taskKey,
+          status: entry.status,
+          completedAt: headerCompletedAt
+        });
+      }
       continue;
     }
     const completedAt = entry
@@ -522,7 +554,8 @@ async function main() {
 
   if (candidates.length === 0) {
     throw new Error(
-      `docs/TASKS.md exceeds the reserve target (${totalLines}/${targetLines}; hard max ${policy.maxLines}) but no eligible tasks can be archived.`
+      `docs/TASKS.md exceeds the reserve target (${totalLines}/${targetLines}; hard max ${policy.maxLines}) but no eligible tasks can be archived.` +
+        formatBlockedIndexStatusMessage(blockedByIndexStatus)
     );
   }
 
@@ -572,7 +605,8 @@ async function main() {
 
   if (!withinArchiveThreshold(updatedLineCount)) {
     throw new Error(
-      `Unable to restore reserve target ${targetLines}; ${updatedLineCount} lines remain after archiving (hard max ${policy.maxLines}).`
+      `Unable to restore reserve target ${targetLines}; ${updatedLineCount} lines remain after archiving (hard max ${policy.maxLines}).` +
+        formatBlockedIndexStatusMessage(blockedByIndexStatus)
     );
   }
 
