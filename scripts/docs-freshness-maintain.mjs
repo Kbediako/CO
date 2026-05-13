@@ -1030,6 +1030,8 @@ function buildConsolidatedOwnerAction(decision, actions) {
     owner_issue: ownerIssues[0],
     owner_issue_action: decision.owner_issue_action ?? null,
     body,
+    // Deliberately emit a reference command even though the consolidated action updates an
+    // existing workpad; operators can reuse the helper's canonical-owner de-dupe path.
     copyable_command: buildCopyableOwnerCommand(
       body,
       decision?.owner_issue ?? '<source-linear-issue-id>',

@@ -1171,7 +1171,7 @@ describe('implementation-docs-archive script', () => {
     expect(report.totals.archived).toBe(0);
     expect(report.totals.registry_repairs).toBe(1);
     expect(report.action_path).toMatchObject({
-      action_required: false,
+      action_required: true,
       archive_payload_required: false,
       registry_repair_required: true
     });

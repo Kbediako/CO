@@ -926,7 +926,8 @@ async function main() {
   report.totals.stray_candidates = report.stray_candidates.length;
   report.action_path.archive_payload_required = report.totals.archived > 0;
   report.action_path.registry_repair_required = report.totals.registry_repairs > 0;
-  report.action_path.action_required = report.action_path.archive_payload_required;
+  report.action_path.action_required =
+    report.action_path.archive_payload_required || report.action_path.registry_repair_required;
 
   const shouldUpdateRegistry = report.totals.archived > 0 || report.totals.registry_repairs > 0;
   if (shouldUpdateRegistry) {
