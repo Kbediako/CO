@@ -104,6 +104,12 @@ const doctor: DoctorResult = {
       co_managed_cleanup: [],
       detail: 'No configured removed Codex feature keys detected.'
     },
+    multi_agent_v2_thread_cap: {
+      status: 'not_applicable',
+      config_path: 'features.multi_agent_v2.max_concurrent_threads_per_session',
+      actual: null,
+      detail: 'stable features.multi_agent guidance continues to use agents.max_threads'
+    },
     guidance: []
   },
   collab: { status: 'ok', enabled: true, feature_key: 'multi_agent', enablement: [] },

@@ -164,7 +164,7 @@ Current `0.128.0` CO-local posture also confirms that:
   - `model = "gpt-5.4"`
   - `review_model = "gpt-5.4"`
   - `model_reasoning_effort = "xhigh"`
-  - For normal `features.multi_agent=true` and older Codex behavior, `[agents] max_threads = 12` is the seeded baseline. For Codex CLI `0.125+` with `features.multi_agent_v2=true`, do not write or recommend `agents.max_threads`; upstream rejects the key, so doctor/default setup must omit it. Keep explicit `max_depth = 4` only when your local Codex parser accepts it, and treat `max_spawn_depth` as a legacy local override rather than current baseline guidance
+  - For normal `features.multi_agent=true` and older Codex behavior, `[agents] max_threads = 12` is the seeded baseline. For Codex CLI `0.125+` with effective `features.multi_agent_v2=true`, do not write or recommend `agents.max_threads`; upstream rejects the key, so doctor/default setup must omit it. For Codex CLI `0.128+`, tune the v2-specific thread cap only through `features.multi_agent_v2.max_concurrent_threads_per_session` (for example `-c features.multi_agent_v2=true -c features.multi_agent_v2.max_concurrent_threads_per_session=<n>`); do not move stable users off the `[agents] max_threads = 12` baseline. Keep explicit `max_depth = 4` only when your local Codex parser accepts it, and treat `max_spawn_depth` as a legacy local override rather than current baseline guidance
   - Leave `[agents.explorer]` undefined unless you intentionally want to override built-in explorer behavior.
   - Add optional `[agents.explorer_fast]` for `gpt-5.3-codex-spark` (file/codebase search only).
   - Add optional `[agents.awaiter]` override for `gpt-5.4` + `high` while preserving awaiter instructions.

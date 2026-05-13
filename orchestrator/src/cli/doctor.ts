@@ -79,6 +79,8 @@ import type { TaskContext } from '../types.js';
 const require = createRequire(import.meta.url);
 let tomlParser: { parse: (source: string) => unknown } | null | undefined;
 const CO_MANAGED_REMOVED_FEATURE_KEY_SET = new Set<string>(CO_MANAGED_REMOVED_FEATURE_KEYS);
+const MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH =
+  'features.multi_agent_v2.max_concurrent_threads_per_session';
 
 const OPTIONAL_DEPENDENCIES = [
   {
@@ -165,6 +167,12 @@ export interface DoctorCodexDefaultsAdvisory {
     actual: number | null;
     detail: string;
   } | null;
+  multi_agent_v2_thread_cap: {
+    status: 'not_applicable' | 'user-owned' | 'configured' | 'advisory';
+    config_path: typeof MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH;
+    actual: number | null;
+    detail: string;
+  };
   removed_features: {
     status: 'ok' | 'advisory' | 'unavailable';
     configured: string[];
@@ -960,6 +968,11 @@ export function formatDoctorSummary(result: DoctorResult): string[] {
       `  - legacy agents.max_spawn_depth: ${result.codex_defaults.legacy_max_spawn_depth.status} (actual: ${result.codex_defaults.legacy_max_spawn_depth.actual ?? '<unset>'}; ${result.codex_defaults.legacy_max_spawn_depth.detail})`
     );
   }
+  if (result.codex_defaults.multi_agent_v2_thread_cap.status !== 'not_applicable') {
+    lines.push(
+      `  - ${result.codex_defaults.multi_agent_v2_thread_cap.config_path}: ${result.codex_defaults.multi_agent_v2_thread_cap.status} (actual: ${result.codex_defaults.multi_agent_v2_thread_cap.actual ?? '<unset>'}; ${result.codex_defaults.multi_agent_v2_thread_cap.detail})`
+    );
+  }
   if (result.codex_defaults.removed_features.status !== 'ok') {
     lines.push(
       `  - removed feature keys: ${result.codex_defaults.removed_features.status} (${result.codex_defaults.removed_features.detail})`
@@ -1256,10 +1269,13 @@ function inspectCodexDefaultsAdvisory(
   }
 
   if (!existsSync(configPath)) {
+    const multiAgentV2ThreadCap = inspectMultiAgentV2ThreadCap(null, featureProbeIndicatesMultiAgentV2);
+    appendMultiAgentV2ThreadCapGuidance(guidance, multiAgentV2ThreadCap);
     return {
       status: 'advisory',
       config: { path: configPath, status: 'missing', detail: 'config.toml not found' },
       checks,
+      multi_agent_v2_thread_cap: multiAgentV2ThreadCap,
       removed_features: inspectConfiguredRemovedFeatures(null, featureProbe),
       guidance
     };
@@ -1274,6 +1290,8 @@ function inspectCodexDefaultsAdvisory(
     }
     parsed = value;
   } catch (error) {
+    const multiAgentV2ThreadCap = inspectMultiAgentV2ThreadCap(null, featureProbeIndicatesMultiAgentV2);
+    appendMultiAgentV2ThreadCapGuidance(guidance, multiAgentV2ThreadCap);
     return {
       status: 'advisory',
       config: {
@@ -1282,6 +1300,7 @@ function inspectCodexDefaultsAdvisory(
         detail: error instanceof Error ? error.message : String(error)
       },
       checks,
+      multi_agent_v2_thread_cap: multiAgentV2ThreadCap,
       removed_features: inspectConfiguredRemovedFeatures(null, featureProbe),
       guidance: [
         `Fix TOML syntax in ${configPath} first, then rerun \`codex-orchestrator codex defaults --yes\`.`,
@@ -1392,19 +1411,89 @@ function inspectCodexDefaultsAdvisory(
         : `older parser/runtime may still treat this as a hard cap below the CO baseline depth; raise it to >= ${BASELINE_AGENTS.max_depth} or remove it`
     };
   }
+  const multiAgentV2ThreadCap = inspectMultiAgentV2ThreadCap(parsed, multiAgentV2Enabled);
+  appendMultiAgentV2ThreadCapGuidance(guidance, multiAgentV2ThreadCap);
 
   const allChecksOk =
     Object.values(checks).every((check) => check.status === 'ok' || check.status === 'skipped')
     && unverifiedLocalModels.length === 0
     && legacyMaxSpawnDepth?.status !== 'advisory'
-    && configuredRemovedFeatures.status !== 'advisory';
+    && configuredRemovedFeatures.status !== 'advisory'
+    && multiAgentV2ThreadCap.status !== 'advisory';
   return {
     status: allChecksOk ? 'ok' : 'advisory',
     config: { path: configPath, status: 'ok' },
     checks,
     legacy_max_spawn_depth: legacyMaxSpawnDepth,
+    multi_agent_v2_thread_cap: multiAgentV2ThreadCap,
     removed_features: configuredRemovedFeatures,
     guidance
+  };
+}
+
+function appendMultiAgentV2ThreadCapGuidance(
+  guidance: string[],
+  threadCap: DoctorCodexDefaultsAdvisory['multi_agent_v2_thread_cap']
+): void {
+  if (threadCap.status === 'not_applicable') {
+    return;
+  }
+  guidance.push(
+    `Codex CLI 0.128+ accepts \`${MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH}\`; CO treats that cap as user-owned and does not seed it through defaults/init.`
+  );
+}
+
+function inspectMultiAgentV2ThreadCap(
+  config: Record<string, unknown> | null,
+  multiAgentV2Enabled: boolean
+): DoctorCodexDefaultsAdvisory['multi_agent_v2_thread_cap'] {
+  const configured = readConfiguredMultiAgentV2ThreadCap(config);
+  if (configured.present) {
+    if (configured.actual !== null && Number.isInteger(configured.actual) && configured.actual > 0) {
+      return {
+        status: 'configured',
+        config_path: MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH,
+        actual: configured.actual,
+        detail:
+          'Codex CLI 0.128+ accepts this feature-specific cap; CO preserves it as user-owned and does not seed it through defaults/init'
+      };
+    }
+    return {
+      status: 'advisory',
+      config_path: MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH,
+      actual: configured.actual,
+      detail:
+        'configured value is not a positive integer; inspect this user-owned MultiAgentV2 cap before relying on it'
+    };
+  }
+  if (multiAgentV2Enabled) {
+    return {
+      status: 'user-owned',
+      config_path: MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH,
+      actual: null,
+      detail:
+        'Codex CLI 0.128+ accepts this optional v2-specific cap; configure it explicitly only when you need a MultiAgentV2 per-session cap'
+    };
+  }
+  return {
+    status: 'not_applicable',
+    config_path: MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH,
+    actual: null,
+    detail: 'stable features.multi_agent guidance continues to use agents.max_threads'
+  };
+}
+
+function readConfiguredMultiAgentV2ThreadCap(config: Record<string, unknown> | null): {
+  present: boolean;
+  actual: number | null;
+} {
+  const capConfig = readRecordValue(readRecordValue(config, 'features'), 'multi_agent_v2');
+  if (!capConfig || !Object.prototype.hasOwnProperty.call(capConfig, 'max_concurrent_threads_per_session')) {
+    return { present: false, actual: null };
+  }
+  return {
+    present: true,
+    actual: readNumberValue(capConfig.max_concurrent_threads_per_session)
   };
 }
 

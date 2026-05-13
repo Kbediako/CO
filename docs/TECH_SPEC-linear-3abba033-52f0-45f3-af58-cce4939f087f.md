@@ -62,7 +62,7 @@ task_checklists:
 - Large-refactor check: a bounded doctor/default/init/docs update is acceptable because the surface is already centralized in CO-354-era feature detection. Escalate only if the implementation discovers multiple competing config authorities.
 
 ## Architecture & Data
-- Architecture / design adjustments: likely extend existing Codex feature parsing and default/doctor messaging rather than adding a parallel config path.
+- Architecture / design adjustments: extend existing doctor/default messaging rather than adding a parallel config authority. `codex-orchestrator doctor` exposes a `multi_agent_v2_thread_cap` classification, while defaults/init preserve user-owned cap config and continue omitting `agents.max_threads` when v2 is effective.
 - Data model changes / migrations: none expected.
 - External dependencies / integrations: local Codex CLI feature/config behavior.
 
@@ -76,7 +76,7 @@ task_checklists:
 - Monitoring / alerts: none beyond docs/check and provider-worker review handoff.
 
 ## Open Questions
-- Should CO seed the v2 cap when explicitly enabled, or only describe it as an optional user-owned setting?
+- Resolved on 2026-05-13: CO describes the v2 cap as optional user-owned configuration and does not seed it.
 
 ## Approvals
 - Reviewer: Pending provider-worker review.

@@ -15,7 +15,7 @@
 
 ## Milestones & Sequencing
 1. Reproduce or fixture current Codex CLI 0.128 behavior for old-path rejection and new-path acceptance/classification.
-2. Update feature parsing, doctor/default/init guidance, and docs wording while preserving stable multi-agent behavior.
+2. Update doctor/default/init posture and docs wording by classifying the v2-specific cap as user-owned while preserving stable multi-agent behavior.
 3. Run focused tests/probes, normal validation, standalone review, PR feedback drain, and Linear handoff.
 
 ## Dependencies
@@ -42,7 +42,7 @@
 - Rollback plan: revert the CO-480 branch; no migrations expected.
 
 ## Risks & Mitigations
-- Risk: generated config starts writing experimental settings by default. Mitigation: only write v2-specific cap when the implementation explicitly decides to support it under v2; otherwise classify as user-owned.
+- Risk: generated config starts writing experimental settings by default. Mitigation: classify the v2-specific cap as user-owned in doctor/docs and do not seed it through defaults/init.
 - Risk: stable users lose the `agents.max_threads` baseline. Mitigation: focused stable-path regression.
 - Risk: docs imply MultiAgentV2 is recommended. Mitigation: keep experimental/default-off wording.
 

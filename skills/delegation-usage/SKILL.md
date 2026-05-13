@@ -132,7 +132,7 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
   - `model = "gpt-5.4"`
   - `review_model = "gpt-5.4"`
   - `model_reasoning_effort = "xhigh"`
-  - For normal `features.multi_agent=true` and older Codex behavior, `[agents] max_threads = 12` is the seeded baseline. For Codex CLI `0.125+` with `features.multi_agent_v2=true`, do not write or recommend `agents.max_threads`; upstream rejects the key, so doctor/default setup must omit it. Keep explicit `max_depth = 4` only when your local Codex parser accepts it, and treat `max_spawn_depth` as a legacy local override rather than current baseline guidance
+  - For normal `features.multi_agent=true` and older Codex behavior, `[agents] max_threads = 12` is the seeded baseline. For Codex CLI `0.125+` with effective `features.multi_agent_v2=true`, do not write or recommend `agents.max_threads`; upstream rejects the key, so doctor/default setup must omit it. For Codex CLI `0.128+`, tune the v2-specific thread cap only through `features.multi_agent_v2.max_concurrent_threads_per_session` (for example `-c features.multi_agent_v2=true -c features.multi_agent_v2.max_concurrent_threads_per_session=<n>`); do not move stable users off the `[agents] max_threads = 12` baseline. Keep explicit `max_depth = 4` only when your local Codex parser accepts it, and treat `max_spawn_depth` as a legacy local override rather than current baseline guidance
   - Leave `[agents.explorer]` undefined unless you intentionally want to override built-in explorer behavior
   - Optional `[agents.explorer_fast]` -> `~/.codex/agents/explorer-fast.toml` (`gpt-5.3-codex-spark`, file/codebase search only)
   - Optional `[agents.awaiter]` override -> `~/.codex/agents/awaiter-high.toml` when you want awaiter at `gpt-5.4` + `high` while preserving awaiter instructions
@@ -140,7 +140,7 @@ For runner + delegation coordination (short `--task` flow), see `docs/delegation
 - Use `gpt-5.5` for delegated/review surfaces when access smoke validates current ChatGPT-auth/appserver availability; otherwise use the portable `gpt-5.4` fallback defaults.
 - Caveat: app-server `isDefault` may still report `gpt-5.4` even when newer local models are available.
 - Fallback posture is contingency-only and applies only to v1/older configs that still accept thread/depth caps: `8/2` for constrained/high-risk lanes, legacy `6/1/1` as break-glass when an older parser/runtime still consumes spawn-depth caps.
-- Downstream users should converge on this baseline via `codex-orchestrator init codex`; when `features.multi_agent_v2=true`, init/default setup must omit `agents.max_threads`.
+- Downstream users should converge on this baseline via `codex-orchestrator init codex`; when `features.multi_agent_v2=true`, init/default setup must omit `agents.max_threads`, and any 0.128+ v2 cap should remain explicit user-owned config under `features.multi_agent_v2.max_concurrent_threads_per_session`.
 - If native `codex` startup fails with `invalid type: integer ... expected struct AgentRoleToml` under `[agents]`, remove only the live `max_depth` and `max_spawn_depth` keys from `~/.codex/config.toml` and leave the role subtables unchanged.
 
 ### 0b) Background terminal bootstrap (required when MCP is disabled)

@@ -59,7 +59,7 @@
 
 ## Technical Considerations
 - Likely surfaces: `orchestrator/src/cli/doctor.ts`, `orchestrator/src/cli/codexDefaultsSetup.ts`, `orchestrator/src/cli/init.ts`, `orchestrator/src/cli/utils/codexFeatures.ts`, docs guidance, and targeted tests.
-- The implementation may decide that CO should not write the new v2 cap by default, but that decision must be explicit and actionable for users.
+- Implementation decision: CO does not seed the experimental v2-specific cap through defaults/init. Doctor and docs classify `features.multi_agent_v2.max_concurrent_threads_per_session` as user-owned, preserve any configured value, and keep stable users on `[agents] max_threads = 12`.
 
 ## Fallback / Refactor Decision
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? Yes.
@@ -73,4 +73,4 @@
 - Validation: focused doctor/default/init and feature-probe tests or command probes.
 
 ## Open Questions
-- Should CO write `features.multi_agent_v2.max_concurrent_threads_per_session` in generated config, or only report it as an optional user-owned knob?
+- Resolved on 2026-05-13: CO reports `features.multi_agent_v2.max_concurrent_threads_per_session` as an optional user-owned knob and does not write it by default.

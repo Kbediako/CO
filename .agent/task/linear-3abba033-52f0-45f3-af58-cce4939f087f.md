@@ -21,18 +21,18 @@
 - [x] Stable multi-agent behavior preserved as an explicit requirement.
 
 ## Implementation Acceptance
-- [ ] Document the 0.128 v2-specific cap path `features.multi_agent_v2.max_concurrent_threads_per_session`.
-- [ ] Preserve and test rejection/omission of `agents.max_threads` when `features.multi_agent_v2=true`.
-- [ ] Update doctor/default/init behavior, or explicitly classify the v2-specific cap as user-owned with actionable doctor guidance.
-- [ ] Add focused tests or command probes for rejected old path and accepted new path.
-- [ ] Keep stable `features.multi_agent=true` `[agents] max_threads = 12` guidance intact.
+- [x] Document the 0.128 v2-specific cap path `features.multi_agent_v2.max_concurrent_threads_per_session`. Evidence: `docs/guides/rlm-recursion-v2.md`, `skills/delegation-usage/SKILL.md`, `skills/delegation-usage/DELEGATION_GUIDE.md`.
+- [x] Preserve and test rejection/omission of `agents.max_threads` when `features.multi_agent_v2=true`. Evidence: `orchestrator/src/cli/doctor.ts`, `orchestrator/tests/Doctor.test.ts`, `orchestrator/tests/CodexDefaultsSetup.test.ts`.
+- [x] Update doctor/default/init behavior, or explicitly classify the v2-specific cap as user-owned with actionable doctor guidance. Evidence: doctor `multi_agent_v2_thread_cap` classification and guidance.
+- [x] Add focused tests or command probes for rejected old path and accepted new path. Evidence: focused vitest pass plus live command probes showing old path rejected and new path accepted on the installed Codex CLI.
+- [x] Keep stable `features.multi_agent=true` `[agents] max_threads = 12` guidance intact. Evidence: stable-path tests unchanged and docs preserve the stable baseline.
 
 ## Validation
 - [x] Packet branch created from current `origin/main` on 2026-05-13.
 - [x] Packet-only validation on 2026-05-13: `npm run docs:check` passed and `node scripts/diff-budget.mjs` passed for the working-tree scope.
 - [x] Repo-wide blocker evidence preserved on 2026-05-13: `node scripts/spec-guard.mjs --dry-run` still reports unrelated stale fallback-expiry metadata for CO-522 packet rows plus unrelated April 12 stale specs, and `npm run docs:freshness` still reports the existing repo-wide stale-doc baseline (`747` stale rows); this packet branch does not weaken either gate.
 - [ ] Docs-review before implementation.
-- [ ] Focused feature parser / doctor / defaults / init tests.
+- [x] Focused feature parser / doctor / defaults / init tests. Evidence: `npm run test -- --run orchestrator/tests/Doctor.test.ts orchestrator/tests/CodexDefaultsSetup.test.ts orchestrator/tests/_reproIssueLogTask.test.ts` passed `102` tests on 2026-05-13.
 - [ ] `node scripts/delegation-guard.mjs`.
 - [ ] `node scripts/spec-guard.mjs --dry-run`.
 - [ ] `npm run build`.

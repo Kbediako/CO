@@ -8,7 +8,7 @@
       "owners": [
         "Codex"
       ],
-      "status": "backlog",
+      "status": "in_progress",
       "last_review": "2026-05-13",
       "approvals": {
         "traceability_packet": {
@@ -16,6 +16,12 @@
           "date": "2026-05-13",
           "status": "produced",
           "summary": "Created the CO-480 docs-first packet and registry mirrors so the backlog promotion guard can admit the valid 0.128 MultiAgentV2 cap audit lane without weakening CO-354 stable/v2 thread-cap semantics."
+        },
+        "implementation": {
+          "reviewer": "CO-480 provider worker",
+          "date": "2026-05-13",
+          "status": "in_progress",
+          "summary": "Classified `features.multi_agent_v2.max_concurrent_threads_per_session` as user-owned doctor/docs guidance, preserved old `agents.max_threads` omission under effective v2, and kept the stable `features.multi_agent=true` `[agents] max_threads = 12` baseline."
         }
       },
       "paths": {
