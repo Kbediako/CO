@@ -65,7 +65,7 @@
 - Owner: CO-488.
 - Trigger: Plugin-bundled hook, hook enablement, remote bundle cache/uninstall, or external-agent config import affects packaged CO behavior.
 - Introduced date: 2026-05-03, when CO-488 was created from Codex CLI 0.128.0 release-intake follow-up evidence.
-- Review date: 2026-05-14.
+- Review date: 2026-05-13.
 - Maximum lifetime: No retained fallback for hook/import silent trust; remote cache/uninstall assumptions expire by 2026-06-12 unless covered by pack-smoke or focused validation.
 - Removal condition: Hook/cache/import behavior has explicit governance, docs, and pack-smoke or focused validation.
 - Validation: Protected-term scan, JSON registry checks, spec guard, docs checks, focused pack-smoke tests, and current-head review gates.
@@ -82,5 +82,5 @@
 
 ## Approvals
 - Product: Active provider-worker implementation lane.
-- Engineering: Packet self-approved for Backlog traceability setup on 2026-05-13; implementation refresh in progress on 2026-05-14.
+- Engineering: Packet self-approved for Backlog traceability setup on 2026-05-13; implementation refresh in progress on 2026-05-13.
 - Design: Not applicable.

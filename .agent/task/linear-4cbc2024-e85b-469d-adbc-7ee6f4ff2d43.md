@@ -72,7 +72,7 @@
 ## Provider-Worker Implementation / Closeout
 - [x] Run provider-worker implementation after packet registration and queue admission. Evidence: live issue-context showed CO-488 in `In Progress`; work continued on PR #802.
 - [x] Audit plugin hook/cache/import source surfaces. Evidence: Codex CLI `0.128.0` npm/version/help evidence and upstream `rust-v0.128.0` release notes cite marketplace installation, remote bundle caching, remote uninstall, plugin-bundled hooks, hook enablement state, and external-agent config import.
-- [x] Add focused tests or pack-smoke coverage for the selected governance contract. Evidence: `scripts/pack-smoke.mjs` now rejects ungoverned packaged/cached hook/import artifacts and `npm run test:core -- tests/pack-smoke.spec.ts` passed 15 tests on 2026-05-14.
+- [x] Add focused tests or pack-smoke coverage for the selected governance contract. Evidence: `scripts/pack-smoke.mjs` now rejects ungoverned packaged/cached hook/import artifacts and `npm run test:core -- tests/pack-smoke.spec.ts` passed 15 tests on 2026-05-13.
 - [x] Document allowed/blocked/out-of-scope hook/cache/import behavior. Evidence: `docs/book/setup.md` and `docs/guides/codex-version-policy.md`.
 - [ ] Run required validation and current-head reviews.
 - [ ] Merge implementation PR and transition CO-488 to Done only after review and merge gates pass.
@@ -85,13 +85,13 @@
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: command returned `Spec guard: OK`.
 - [x] `npm run docs:check`. Evidence: command returned `docs:check: OK`.
 - [x] `npm run docs:freshness` or inherited CO-522 baseline classification. Evidence: `npm run docs:freshness` failed only on inherited baseline stale docs; `out/local/docs-freshness.json` reports zero missing registry entries, zero invalid entries, zero uncatalogued docs, and zero CO-488 stale entries.
-- [x] Focused pack-smoke regression. Evidence: `npm run test:core -- tests/pack-smoke.spec.ts` passed 15 tests on 2026-05-14.
+- [x] Focused pack-smoke regression. Evidence: `npm run test:core -- tests/pack-smoke.spec.ts` passed 15 tests on 2026-05-13.
 
 ## Progress Log
 - 2026-05-13: Parent orchestration created packet branch `kb/co-488-traceability-packet` in a separate worktree from clean latest main.
 - 2026-05-13: Packet preserves plugin-bundled hooks, hook enablement state, remote plugin bundle cache, remote uninstall, external-agent config import, marketplace install flow, pack-smoke, and downstream packaged plugin governance while leaving implementation to the provider-worker lane.
 - 2026-05-13: Packet validation passed diff hygiene, JSON parse, protected-term scan, spec guard, and docs:check. Docs freshness remains red only on inherited CO-522 baseline with no CO-488 packet-local registry failure.
-- 2026-05-14: Provider-worker implementation added pack-smoke governance for ungoverned packaged/cached plugin hooks, hook state, and external-agent import artifacts; docs child lane `docs-governance` was accepted after producing setup/version-policy docs updates.
+- 2026-05-13: Provider-worker implementation added pack-smoke governance for ungoverned packaged/cached plugin hooks, hook state, and external-agent import artifacts; docs child lane `docs-governance` was accepted after producing setup/version-policy docs updates.
 
 ## Notes
 - This packet now tracks the active implementation; review handoff still requires full validation, standalone review, elegance pass, PR checks, and ready-review drain.

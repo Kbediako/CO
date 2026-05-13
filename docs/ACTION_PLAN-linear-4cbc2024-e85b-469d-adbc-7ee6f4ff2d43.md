@@ -29,7 +29,7 @@
   - 2026-05-13: CO-488 is a plugin governance issue, not another marketplace command rebaseline.
   - 2026-05-13: the micro-task path is unavailable because correctness depends on protected terms, exact plugin surfaces, and fail-closed governance for imported hooks/config.
   - 2026-05-13: packet setup happened before implementation admission.
-  - 2026-05-14: provider-worker implementation must update the existing PR with live 0.128 evidence, docs, pack-smoke guardrails, and focused tests.
+  - 2026-05-13: provider-worker implementation must update the existing PR with live 0.128 evidence, docs, pack-smoke guardrails, and focused tests.
 - Fallback / refactor decision: remove the silent-trust hook/import seam and expire any cache/uninstall assumption that lacks validation.
 - Durable retention evidence: Not applicable; no fallback is justified for indefinite retention.
 - Large-refactor check: no large refactor is needed for the selected package-smoke guardrail; if future work intentionally supports packaged hooks/imports, it must consolidate hook/import authority rather than adding another bypass.
