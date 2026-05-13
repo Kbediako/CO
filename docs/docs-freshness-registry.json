@@ -3,144 +3,6 @@
   "generated_at": "2026-05-13",
   "entries": [
     {
-      "path": "docs/PRD-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-13",
-      "cadence_days": 30
-    },
-    {
-      "path": "docs/TECH_SPEC-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-13",
-      "cadence_days": 30
-    },
-    {
-      "path": "docs/ACTION_PLAN-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-13",
-      "cadence_days": 30
-    },
-    {
-      "path": "tasks/specs/linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-13",
-      "cadence_days": 30
-    },
-    {
-      "path": "tasks/tasks-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-13",
-      "cadence_days": 30
-    },
-    {
-      "path": ".agent/task/linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-13",
-      "cadence_days": 30
-    },
-    {
-      "path": ".agent/task/linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-13",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "4cbc2024-e85b-469d-adbc-7ee6f4ff2d43",
-        "identifier": "CO-488",
-        "url": "https://linear.app/asabeko/issue/CO-488/co-audit-0128-plugin-hook-cache-and-external-config-import-governance"
-      },
-      "doc_class": "task_mirror",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-13",
-      "next_review": "2026-06-12"
-    },
-    {
-      "path": "docs/ACTION_PLAN-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-13",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "4cbc2024-e85b-469d-adbc-7ee6f4ff2d43",
-        "identifier": "CO-488",
-        "url": "https://linear.app/asabeko/issue/CO-488/co-audit-0128-plugin-hook-cache-and-external-config-import-governance"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-13",
-      "next_review": "2026-06-12"
-    },
-    {
-      "path": "docs/PRD-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-13",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "4cbc2024-e85b-469d-adbc-7ee6f4ff2d43",
-        "identifier": "CO-488",
-        "url": "https://linear.app/asabeko/issue/CO-488/co-audit-0128-plugin-hook-cache-and-external-config-import-governance"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-13",
-      "next_review": "2026-06-12"
-    },
-    {
-      "path": "docs/TECH_SPEC-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-13",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "4cbc2024-e85b-469d-adbc-7ee6f4ff2d43",
-        "identifier": "CO-488",
-        "url": "https://linear.app/asabeko/issue/CO-488/co-audit-0128-plugin-hook-cache-and-external-config-import-governance"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-13",
-      "next_review": "2026-06-12"
-    },
-    {
-      "path": "tasks/specs/linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-13",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "4cbc2024-e85b-469d-adbc-7ee6f4ff2d43",
-        "identifier": "CO-488",
-        "url": "https://linear.app/asabeko/issue/CO-488/co-audit-0128-plugin-hook-cache-and-external-config-import-governance"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-13",
-      "next_review": "2026-06-12"
-    },
-    {
-      "path": "tasks/tasks-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-13",
-      "cadence_days": 30,
-      "source_issue": {
-        "id": "4cbc2024-e85b-469d-adbc-7ee6f4ff2d43",
-        "identifier": "CO-488",
-        "url": "https://linear.app/asabeko/issue/CO-488/co-audit-0128-plugin-hook-cache-and-external-config-import-governance"
-      },
-      "doc_class": "task_packet",
-      "lifecycle_state": "active",
-      "created_at": "2026-05-13",
-      "next_review": "2026-06-12"
-    },
-    {
       "path": ".agent/AGENTS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -4014,6 +3876,22 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "4cbc2024-e85b-469d-adbc-7ee6f4ff2d43",
+        "identifier": "CO-488",
+        "url": "https://linear.app/asabeko/issue/CO-488/co-audit-0128-plugin-hook-cache-and-external-config-import-governance"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
+    },
+    {
       "path": ".agent/task/linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -5355,6 +5233,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
       "last_review": "2026-05-03",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
       "cadence_days": 30
     },
     {
@@ -9436,6 +9321,22 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/ACTION_PLAN-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "4cbc2024-e85b-469d-adbc-7ee6f4ff2d43",
+        "identifier": "CO-488",
+        "url": "https://linear.app/asabeko/issue/CO-488/co-audit-0128-plugin-hook-cache-and-external-config-import-governance"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
+    },
+    {
       "path": "docs/ACTION_PLAN-linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -10799,6 +10700,13 @@
       "status": "archived",
       "last_review": "2026-05-03",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30
     },
     {
       "path": "docs/ACTION_PLAN-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
@@ -17701,6 +17609,22 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/PRD-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "4cbc2024-e85b-469d-adbc-7ee6f4ff2d43",
+        "identifier": "CO-488",
+        "url": "https://linear.app/asabeko/issue/CO-488/co-audit-0128-plugin-hook-cache-and-external-config-import-governance"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
+    },
+    {
       "path": "docs/PRD-linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -19064,6 +18988,13 @@
       "status": "archived",
       "last_review": "2026-05-03",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/PRD-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30
     },
     {
       "path": "docs/PRD-linear-b9a1044e-03b0-49ef-8435-92840eaf90b9.md",
@@ -23529,6 +23460,22 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/TECH_SPEC-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "4cbc2024-e85b-469d-adbc-7ee6f4ff2d43",
+        "identifier": "CO-488",
+        "url": "https://linear.app/asabeko/issue/CO-488/co-audit-0128-plugin-hook-cache-and-external-config-import-governance"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
+    },
+    {
       "path": "docs/TECH_SPEC-linear-4dd7c20a-3eec-406f-addc-e89948f044f7.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
@@ -24856,6 +24803,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
       "last_review": "2026-05-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
       "cadence_days": 30
     },
     {
@@ -29679,6 +29633,22 @@
       "cadence_days": 30
     },
     {
+      "path": "tasks/specs/linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "4cbc2024-e85b-469d-adbc-7ee6f4ff2d43",
+        "identifier": "CO-488",
+        "url": "https://linear.app/asabeko/issue/CO-488/co-audit-0128-plugin-hook-cache-and-external-config-import-governance"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
+    },
+    {
       "path": "tasks/specs/linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86-co-status-healthy-ui-timeout.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -31041,6 +31011,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
       "last_review": "2026-05-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
       "cadence_days": 30
     },
     {
@@ -35479,6 +35456,22 @@
       "cadence_days": 30
     },
     {
+      "path": "tasks/tasks-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "4cbc2024-e85b-469d-adbc-7ee6f4ff2d43",
+        "identifier": "CO-488",
+        "url": "https://linear.app/asabeko/issue/CO-488/co-audit-0128-plugin-hook-cache-and-external-config-import-governance"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
+    },
+    {
       "path": "tasks/tasks-linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -36841,6 +36834,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
       "last_review": "2026-05-03",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
       "cadence_days": 30
     },
     {
