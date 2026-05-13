@@ -51,6 +51,8 @@ async function writeDocsFreshnessFixture(
           front_door: { label: 'Front Door', report_order: 10 },
           repo_guide: { label: 'Repository Guide', report_order: 20 },
           task_packet: { label: 'Task Packet', report_order: 200 },
+          task_mirror: { label: 'Task Mirror', report_order: 210 },
+          report_only: { label: 'Report Only', report_order: 220 },
           uncatalogued: { label: 'Uncatalogued', report_order: 999 }
         },
         policies: catalogPolicies,
@@ -697,6 +699,89 @@ describe('docs freshness reporting', () => {
       ])
     );
     expect(renderDocsFreshnessMarkdown(report)).toContain('- Terminal lifecycle entries: 7');
+  });
+
+  it('keeps archived legacy task-packet rows out of active stale and lifecycle debt', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-archived-legacy-packets-'));
+    createdDirs.push(repoRoot);
+    const taskKey = '1076-coordinator-symphony-aligned-telegram-question-read-adapter-assembly-extraction';
+    const packetPaths = [
+      `.agent/task/${taskKey}.md`,
+      `docs/PRD-${taskKey}.md`,
+      `docs/TECH_SPEC-${taskKey}.md`,
+      `docs/ACTION_PLAN-${taskKey}.md`,
+      `docs/findings/1076-telegram-question-read-adapter-assembly-extraction-deliberation.md`,
+      `tasks/specs/${taskKey}.md`,
+      `tasks/tasks-${taskKey}.md`
+    ];
+
+    await Promise.all([
+      mkdir(join(repoRoot, '.agent', 'task'), { recursive: true }),
+      mkdir(join(repoRoot, 'docs', 'findings'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks', 'specs'), { recursive: true })
+    ]);
+    for (const packetPath of packetPaths) {
+      await writeFile(join(repoRoot, packetPath), '# Archived historical packet\n', 'utf8');
+    }
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260309-1076-coordinator-symphony-aligned-telegram-question-read-adapter-assembly-extraction',
+              status: 'completed',
+              completed_at: '2026-03-09',
+              paths: {
+                agent_task: `.agent/task/${taskKey}.md`,
+                prd: `docs/PRD-${taskKey}.md`,
+                docs: `docs/TECH_SPEC-${taskKey}.md`,
+                action_plan: `docs/ACTION_PLAN-${taskKey}.md`,
+                spec: `tasks/specs/${taskKey}.md`,
+                task: `tasks/tasks-${taskKey}.md`
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: packetPaths.map((packetPath) => ({
+        path: packetPath,
+        owner: 'Codex',
+        status: 'archived',
+        last_review: reviewDateDaysAgo(45),
+        cadence_days: 30
+      })),
+      catalogPatterns: [
+        { glob: '.agent/task/*.md', doc_class: 'task_mirror' },
+        { glob: 'docs/findings/*.md', doc_class: 'report_only' },
+        { glob: 'docs/*.md', doc_class: 'task_packet' },
+        { glob: 'tasks/**/*.md', doc_class: 'task_packet' }
+      ],
+      catalogPolicies: {
+        rolling_freshness_cohorts: rollingFreshnessPolicy({
+          max_entries: 300,
+          max_cohorts: 2,
+          eligible_doc_classes: ['task_packet', 'task_mirror', 'report_only']
+        })
+      }
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(false);
+    expect(report.totals.stale_entries).toBe(0);
+    expect(report.totals.rolling_cohort_entries).toBe(0);
+    expect(report.totals.terminal_lifecycle_entries).toBe(0);
+    expect(report.totals.invalid_entries).toBe(0);
+    expect(report.totals.missing_on_disk).toBe(0);
   });
 
   it('routes slug-only docs packet rows when terminal task keys carry numeric prefixes', async () => {
