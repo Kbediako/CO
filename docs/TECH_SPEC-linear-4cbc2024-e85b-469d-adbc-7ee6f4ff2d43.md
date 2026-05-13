@@ -6,44 +6,44 @@ related_action_plan: docs/ACTION_PLAN-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d4
 risk: medium
 owners:
   - Codex
-last_review: 2026-05-13
+last_review: 2026-05-14
 ---
 
 ## Summary
-- Objective: Register CO-488 with a complete docs-first packet and bounded implementation contract for plugin hook/cache/import governance.
-- Scope: Packet docs, task mirrors, `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` only.
-- Constraints: No source implementation, Linear transition, GitHub lifecycle, workpad mutation, or plugin behavior change in this packet branch.
+- Objective: Complete CO-488 by hardening packaged-plugin hook/cache/import governance with live 0.128 evidence, docs, pack-smoke guardrails, and focused tests.
+- Scope: Existing CO-488 packet docs/mirrors, packaged plugin setup/version-policy docs, `scripts/pack-smoke.mjs`, and focused `tests/pack-smoke.spec.ts` coverage.
+- Constraints: No broad marketplace command rewrite, no CO-450 binary provenance work, no blanket plugin disablement, and no arbitrary external-agent hook/config adoption.
 
 ## Issue-Shaping Contract
-- User-request translation carried forward: Queue blockers should be addressed at the root cause. CO-488 is currently blocked from leaving Backlog because its traceability packet and mirrors are absent, not because implementation has started.
+- User-request translation carried forward: Queue blockers should be addressed at the root cause. CO-488 is now an active provider-worker lane; the implementation must govern the 0.128 hook/cache/import surfaces instead of treating the traceability packet as completion.
 - Protected terms / exact artifact and surface names: plugin-bundled hooks, hook enablement state, remote plugin bundle cache, remote uninstall, external-agent config import, marketplace install flow, pack-smoke, downstream packaged plugin governance, `codex-cli-0128:plugin-hook-import-governance`, `backlog_head_follow_up_traceability_pending`.
 - Nearby wrong interpretations to reject: Do not duplicate marketplace command rebaseline; do not absorb CO-450 binary provenance; do not trust imported hooks/config without safety checks; do not call packet creation implementation complete.
-- Explicit non-goals carried forward: No broad plugin rewrite, no blanket plugin disablement, no arbitrary imported hook adoption, and no implementation in this packet lane.
+- Explicit non-goals carried forward: No broad plugin rewrite, no blanket plugin disablement, no arbitrary imported hook adoption, and no CO-450 binary provenance work.
 
 ## Parity / Alignment Matrix
 
 | Surface | Current Truth | Reference Truth | Target Truth | Explicitly Out Of Scope |
 | --- | --- | --- | --- | --- |
 | Queue traceability | CO-488 has a well-shaped Linear description but no repo packet/mirrors. | Backlog follow-ups need packet and registry mirrors before admission. | Packet and mirrors exist with protected terms and canonical owner key. | Skipping the Backlog hold. |
-| Plugin hooks | Hook behavior is a new CLI 0.128 surface. | CO hook behavior must be visible and governed. | Provider-worker implementation must audit and validate plugin-bundled hooks and hook enablement state. | Blanket hook disablement. |
-| Cache/uninstall | Remote plugin bundle cache and remote uninstall can affect packaged behavior. | Pack-smoke should protect downstream packaging assumptions. | Implementation must add or justify deterministic governance for cache/uninstall behavior. | Binary provenance. |
-| External config import | Imported external-agent config can change local behavior. | CO config authority should be explicit and fail closed when unsafe. | Implementation must gate or document imported config behavior and add focused validation. | External-agent feature adoption beyond governance. |
+| Plugin hooks | Hook behavior is a new CLI 0.128 surface. | CO hook behavior must be visible and governed. | Pack-smoke rejects packaged/cached plugin-bundled hook declarations and hook enablement state unless explicit CO hook governance is added. | Blanket hook disablement. |
+| Cache/uninstall | Remote plugin bundle cache and remote uninstall can affect packaged behavior. | Pack-smoke should protect downstream packaging assumptions. | Existing cache-shape smoke is retained and docs classify cache/uninstall as packaged behavior, while CO-450 remains separate for provenance. | Binary provenance. |
+| External config import | Imported external-agent config can change local behavior. | CO config authority should be explicit and fail closed when unsafe. | Pack-smoke rejects external-agent import output artifacts inside packaged/cached plugin roots and docs require ungoverned imports to fail closed or stay disabled. | External-agent feature adoption beyond governance. |
 
 ## Readiness Gate
-- Not done if: packet/mirror files are absent; protected plugin governance terms are missing; implementation starts before packet registration; or imported hooks/config remain silently trusted.
-- Pre-implementation issue-quality review evidence: 2026-05-13 parent orchestration confirmed CO-488 is held by `backlog_head_follow_up_traceability_pending` and is narrower than CO-509/CO-531 helper automation fixes.
-- Safeguard ownership split: This branch owns only packet and registry mirror files. Provider-worker implementation owns source/test changes, Linear transitions, PR lifecycle, review, and merge closeout.
+- Not done if: protected plugin governance terms are missing; pack-smoke ignores hook/cache/import surfaces; imported hooks/config remain silently trusted; or CO-450 binary provenance is absorbed into this lane.
+- Pre-implementation issue-quality review evidence: 2026-05-13 parent orchestration confirmed CO-488 is narrower than marketplace command rebaseline and CO-450 binary provenance.
+- Safeguard ownership split: The active provider worker owns source/test/docs updates, Linear workpad, PR lifecycle, review, and merge closeout.
 
 ## Technical Requirements
 - Functional requirements:
-  1. Create PRD, TECH_SPEC mirror, canonical task spec, ACTION_PLAN, task checklist, and `.agent/task` mirror for CO-488.
-  2. Register task id `20260513-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43` in `tasks/index.json`.
-  3. Add a `docs/TASKS.md` snapshot for CO-488.
-  4. Add six active rows to `docs/docs-freshness-registry.json`.
-  5. Preserve canonical owner key `codex-cli-0128:plugin-hook-import-governance`.
-  6. Record packet setup as clearing `backlog_head_follow_up_traceability_pending`.
-- Non-functional requirements: JSON remains parseable; packet diff is docs/registry only; validation should stay scoped to packet readiness.
-- Interfaces / contracts: Later implementation should touch plugin packaging, hook safety/import handling, and pack-smoke only after docs-review or equivalent packet review.
+  1. Preserve the existing PRD, TECH_SPEC mirror, canonical task spec, ACTION_PLAN, task checklist, and `.agent/task` mirror for CO-488.
+  2. Capture live 0.128 release or command evidence for marketplace add/upgrade/remove, plugin-bundled hooks, hook enablement state, remote plugin bundle cache, remote uninstall, and external-agent config import.
+  3. Update packaged-plugin docs so hook/import/cache behavior is allowed, blocked, or explicitly out of scope.
+  4. Update pack-smoke so ungoverned packaged/cached hook or imported-config artifacts fail closed.
+  5. Add focused tests for the selected pack-smoke governance contract.
+  6. Preserve canonical owner key `codex-cli-0128:plugin-hook-import-governance`.
+- Non-functional requirements: JSON remains parseable; implementation stays narrow; validation must not weaken pack-smoke or marketplace command coverage.
+- Interfaces / contracts: `scripts/pack-smoke.mjs` owns packaged downstream smoke expectations for plugin cache shape, plugin-bundled hook absence, hook enablement state absence, and imported external-agent artifact absence.
 
 ## Fallback Expiry / Refactor Decision
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? Yes.
@@ -57,20 +57,19 @@ last_review: 2026-05-13
 - Large-refactor check: If hook/import/cache authority is scattered across multiple plugin loaders or config import paths, implementation should consolidate the authority rather than adding another branch-specific bypass. Packet creation itself does not add a runtime seam.
 
 ## Architecture & Data
-- Architecture / design adjustments: None in packet branch; later implementation should reuse existing plugin marketplace and pack-smoke paths where possible.
-- Data model changes / migrations: None in packet branch.
+- Architecture / design adjustments: Reuse existing plugin marketplace and pack-smoke paths; add no new runtime authority.
+- Data model changes / migrations: None.
 - External dependencies / integrations: Codex CLI 0.128.0 plugin behavior, plugin bundle hooks, remote plugin cache/uninstall, external-agent config import.
 
 ## Validation Plan
 - Tests / checks:
+  - Focused `npm run test:core -- tests/pack-smoke.spec.ts`.
   - JSON parse for `tasks/index.json`.
   - JSON parse for `docs/docs-freshness-registry.json`.
-  - Targeted path scan for `linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43` and `CO-488`.
-  - Protected-term scan across the six packet files and mirrors.
+  - Targeted protected-term scan for CO-488 and 0.128 hook/cache/import terms.
   - `node scripts/spec-guard.mjs --dry-run`.
   - `npm run docs:check`.
-  - `npm run docs:freshness` may remain red on inherited CO-522 baseline, but CO-488 must not introduce missing registry or packet blockers.
-- Rollout verification: After packet PR merge, re-check `co-status`/autopilot to confirm the Backlog traceability hold no longer names CO-488.
+- Rollout verification: Existing PR #802 must be updated, reviewed, and drained before Linear review handoff.
 - Monitoring / alerts: Provider-worker lane should preserve Codex review and CodeRabbit current-head review gates before merge.
 
 ## Open Questions

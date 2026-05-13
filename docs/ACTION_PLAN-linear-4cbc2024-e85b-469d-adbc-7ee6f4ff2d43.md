@@ -1,12 +1,12 @@
 # ACTION_PLAN - CO-488 plugin hook, cache, and external config import governance
 
 ## Summary
-- Goal: create the CO-488 docs-first packet and traceability mirrors so plugin hook/cache/import governance can leave Backlog with its protected boundaries intact.
-- Scope: packet docs, task mirrors, `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json`.
+- Goal: complete CO-488 by hardening packaged-plugin docs and pack-smoke expectations for Codex CLI 0.128 hook/cache/import governance.
+- Scope: packet docs, task mirrors, `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`, packaged plugin setup/version-policy docs, `scripts/pack-smoke.mjs`, and focused `tests/pack-smoke.spec.ts`.
 - Assumptions:
-  - CO-488 remains in Backlog until packet evidence exists on main.
+  - CO-488 is now in active provider-worker implementation with PR #802 already attached.
   - CO-450 remains the binary provenance owner.
-  - CO-509/CO-531 own helper automation gaps; this branch clears the current CO-488 packet debt only.
+  - CO-509/CO-531 own helper automation gaps; this lane only governs packaged plugin hook/cache/import behavior.
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward:
@@ -28,20 +28,21 @@
 - Pre-implementation issue-quality review:
   - 2026-05-13: CO-488 is a plugin governance issue, not another marketplace command rebaseline.
   - 2026-05-13: the micro-task path is unavailable because correctness depends on protected terms, exact plugin surfaces, and fail-closed governance for imported hooks/config.
-  - 2026-05-13: packet setup must happen before the issue leaves Backlog.
+  - 2026-05-13: packet setup happened before implementation admission.
+  - 2026-05-14: provider-worker implementation must update the existing PR with live 0.128 evidence, docs, pack-smoke guardrails, and focused tests.
 - Fallback / refactor decision: remove the silent-trust hook/import seam and expire any cache/uninstall assumption that lacks validation.
 - Durable retention evidence: Not applicable; no fallback is justified for indefinite retention.
-- Large-refactor check: no large refactor is needed for packet setup; provider-worker implementation should consolidate hook/import/cache authority if source audit finds split authority.
+- Large-refactor check: no large refactor is needed for the selected package-smoke guardrail; if future work intentionally supports packaged hooks/imports, it must consolidate hook/import authority rather than adding another bypass.
 
 ## Milestones & Sequencing
-1. Read CO-488 live Linear issue context and confirm labels, canonical owner key, Backlog state, and missing packet files.
-2. Create PRD, TECH_SPEC mirror, ACTION_PLAN, canonical task spec, task checklist, and agent mirror.
-3. Register task id `20260513-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43` in `tasks/index.json`.
-4. Add the CO-488 snapshot to `docs/TASKS.md`.
-5. Add six active rows to `docs/docs-freshness-registry.json`.
-6. Validate JSON parse, protected terms, packet paths, spec guard, and docs checks.
-7. Open a packet-only PR and wait for current-head review/check signals.
-8. After merge, re-check `co-status`; if CO-488 is no longer held, let normal provider intake promote/admit the implementation lane under WIP limits.
+1. Read CO-488 live Linear issue context and attached PR feedback before implementation edits.
+2. Correct detached workspace posture by working from the existing PR head without stealing the sibling worktree branch.
+3. Record provider-worker parallelization and run a bounded docs child lane for setup/version-policy docs.
+4. Capture live Codex CLI 0.128 npm/release/help evidence for marketplace add/upgrade/remove, plugin-bundled hooks, hook enablement state, remote plugin bundle cache, remote uninstall, and external-agent config import.
+5. Add package-smoke guardrails that reject ungoverned packaged/cached plugin-bundled hooks, hook enablement state, and imported external-agent config artifacts.
+6. Add focused `tests/pack-smoke.spec.ts` coverage.
+7. Refresh packet/mirror docs, `tasks/index.json`, `docs/TASKS.md`, and docs freshness registry as needed.
+8. Run focused tests, repo validation gates, standalone review, elegance pass, push PR #802, and drain `pr ready-review` before Linear `In Review` handoff.
 
 ## Dependencies
 - Linear issue `CO-488` / `4cbc2024-e85b-469d-adbc-7ee6f4ff2d43`.
@@ -53,19 +54,20 @@
 
 ## Validation
 - Checks / tests:
+  - `npm run test:core -- tests/pack-smoke.spec.ts`.
   - JSON parse for `tasks/index.json`.
   - JSON parse for `docs/docs-freshness-registry.json`.
-  - targeted path scan for `linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43`.
+  - targeted protected-term scan for `linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43`.
   - targeted protected-term scan for plugin hook/cache/import terms.
   - `node scripts/spec-guard.mjs --dry-run`.
   - `npm run docs:check`.
   - `npm run docs:freshness` with inherited CO-522 baseline classified if still red.
 - Rollback plan:
-  - revert only the CO-488 packet files, task index entry, docs/TASKS snapshot, and registry rows if the packet is rejected.
+  - revert only the CO-488 implementation/doc changes from PR #802 if review rejects the selected package-smoke contract.
 
 ## Risks & Mitigations
-- Risk: packet is mistaken as implementation completion.
-  - Mitigation: all packet surfaces state that source/test/plugin behavior remains parent/provider-worker owned.
+- Risk: package-smoke guard is mistaken as broad plugin hook support.
+  - Mitigation: docs and tests classify ungoverned plugin-bundled hooks/imports as blocked or fail-closed, not supported.
 - Risk: plugin hook/import governance widens into marketplace command work.
   - Mitigation: protected non-goals reject duplicating the marketplace command rebaseline.
 - Risk: imported config or hooks are trusted by default.

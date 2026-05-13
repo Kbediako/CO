@@ -16,8 +16,8 @@
 - [x] Checklist mirrored to `.agent/task`. Evidence: `.agent/task/linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md`.
 - [x] Task registration mirrors updated in declared scope. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
 - [x] Packet validation completed. Evidence: `git diff --check`, `node scripts/spec-guard.mjs --dry-run`, JSON parse for `tasks/index.json` and `docs/docs-freshness-registry.json`, protected-term scan, and `npm run docs:check` passed on 2026-05-13; `npm run docs:freshness` remains red only on inherited CO-522 baseline with zero missing registry entries, zero invalid entries, and no CO-488 stale entries in `out/local/docs-freshness.json`.
-- [ ] Packet PR opened and reviewed. Evidence: pending PR.
-- [ ] Packet merged and CO-488 backlog hold rechecked. Evidence: pending `co-status` after merge.
+- [x] Existing PR opened and attached. Evidence: PR #802 (`CO-488 add plugin governance traceability packet`) is attached to Linear CO-488.
+- [ ] Existing PR reviewed and drained after implementation update. Evidence: pending standalone review, PR checks, and `pr ready-review`.
 
 ## Protected Issue Terms
 - [x] plugin-bundled hooks
@@ -36,7 +36,7 @@
 - [x] No binary provenance work owned by CO-450.
 - [x] No blanket plugin disabling.
 - [x] No arbitrary imported hook/config adoption.
-- [x] No source/test implementation in this packet lane.
+- [x] No source/test implementation before packet registration.
 - [x] No Linear/GitHub/workpad lifecycle mutation from packet setup.
 
 ## Not Done If
@@ -62,10 +62,11 @@
 - [x] Stayed docs/registry only. Evidence: declared files are packet docs, task mirrors, `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json`.
 - [x] Live Linear context checked. Evidence: CO-488 is Backlog, labelled `Lifecycle: Implementation`, `Area: DevOps`, `Area: Docs`, `Area: Agents`, `Priority: P2`, and `Improvement`, with no PR attached.
 
-## Parent-Owned Implementation / Closeout
-- [ ] Run provider-worker implementation after packet merge and queue admission.
-- [ ] Audit plugin hook/cache/import source surfaces.
-- [ ] Add focused tests or pack-smoke coverage for the selected governance contract.
+## Provider-Worker Implementation / Closeout
+- [x] Run provider-worker implementation after packet registration and queue admission. Evidence: live issue-context showed CO-488 in `In Progress`; work continued on PR #802.
+- [x] Audit plugin hook/cache/import source surfaces. Evidence: Codex CLI `0.128.0` npm/version/help evidence and upstream `rust-v0.128.0` release notes cite marketplace installation, remote bundle caching, remote uninstall, plugin-bundled hooks, hook enablement state, and external-agent config import.
+- [x] Add focused tests or pack-smoke coverage for the selected governance contract. Evidence: `scripts/pack-smoke.mjs` now rejects ungoverned packaged/cached hook/import artifacts and `npm run test:core -- tests/pack-smoke.spec.ts` passed 15 tests on 2026-05-14.
+- [x] Document allowed/blocked/out-of-scope hook/cache/import behavior. Evidence: `docs/book/setup.md` and `docs/guides/codex-version-policy.md`.
 - [ ] Run required validation and current-head reviews.
 - [ ] Merge implementation PR and transition CO-488 to Done only after review and merge gates pass.
 
@@ -77,11 +78,13 @@
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: command returned `Spec guard: OK`.
 - [x] `npm run docs:check`. Evidence: command returned `docs:check: OK`.
 - [x] `npm run docs:freshness` or inherited CO-522 baseline classification. Evidence: `npm run docs:freshness` failed only on inherited baseline stale docs; `out/local/docs-freshness.json` reports zero missing registry entries, zero invalid entries, zero uncatalogued docs, and zero CO-488 stale entries.
+- [x] Focused pack-smoke regression. Evidence: `npm run test:core -- tests/pack-smoke.spec.ts` passed 15 tests on 2026-05-14.
 
 ## Progress Log
 - 2026-05-13: Parent orchestration created packet branch `kb/co-488-traceability-packet` in a separate worktree from clean latest main.
 - 2026-05-13: Packet preserves plugin-bundled hooks, hook enablement state, remote plugin bundle cache, remote uninstall, external-agent config import, marketplace install flow, pack-smoke, and downstream packaged plugin governance while leaving implementation to the provider-worker lane.
 - 2026-05-13: Packet validation passed diff hygiene, JSON parse, protected-term scan, spec guard, and docs:check. Docs freshness remains red only on inherited CO-522 baseline with no CO-488 packet-local registry failure.
+- 2026-05-14: Provider-worker implementation added pack-smoke governance for ungoverned packaged/cached plugin hooks, hook state, and external-agent import artifacts; docs child lane `docs-governance` was accepted after producing setup/version-policy docs updates.
 
 ## Notes
-- This packet clears only the repo-side traceability blocker. It does not prove plugin governance has been implemented.
+- This packet now tracks the active implementation; review handoff still requires full validation, standalone review, elegance pass, PR checks, and ready-review drain.

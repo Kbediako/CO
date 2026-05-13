@@ -8,8 +8,8 @@
       "owners": [
         "Codex"
       ],
-      "status": "backlog",
-      "last_review": "2026-05-13",
+      "status": "in_progress",
+      "last_review": "2026-05-14",
       "approvals": {
         "issue_context": {
           "reviewer": "CO parent orchestrator",
@@ -24,11 +24,17 @@
           "summary": "PRD, TECH_SPEC, ACTION_PLAN, task checklist, agent mirror, task index entry, docs/TASKS snapshot, and docs freshness registry rows created before implementation edits."
         },
         "parallelization": {
-          "reviewer": "CO parent orchestrator",
-          "date": "2026-05-13",
-          "decision": "stay_serial_packet_only",
-          "reason": "backlog_traceability_setup",
-          "summary": "Packet setup is a docs/registry-only queue-readiness action; implementation can parallelize after the issue leaves Backlog."
+          "reviewer": "CO-488 provider worker",
+          "date": "2026-05-14",
+          "decision": "parallelize_now",
+          "reason": "independent_scope_available",
+          "summary": "Docs-governance child lane owned packaged setup/version-policy docs while parent owned pack-smoke implementation and tests; child run 2026-05-13T15-24-03-810Z-dc171837 was accepted."
+        },
+        "implementation": {
+          "reviewer": "CO-488 provider worker",
+          "date": "2026-05-14",
+          "status": "in_progress",
+          "summary": "Captured Codex CLI 0.128 npm/version/help evidence and upstream rust-v0.128.0 release notes, documented packaged hook/cache/import governance, and added pack-smoke fail-closed guards plus focused tests for ungoverned packaged/cached hook/import artifacts."
         },
         "validation": {
           "reviewer": "CO parent orchestrator",
