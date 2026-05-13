@@ -474,6 +474,101 @@ describe('docs freshness maintenance decisions', () => {
     expect(decision.recommended_action).toContain('Review or assign direct action for 1 public/current doc');
   });
 
+  it('surfaces hard-stale current docs as direct action outside legacy cohort cleanup', () => {
+    const taskLastReview = reviewDateDaysAgo(31);
+    const publicLastReview = reviewDateDaysAgo(19);
+    const currentDocPath = 'docs/book/operations.md';
+    const repoGuidePath = 'docs/README.md';
+    const legacyTaskPath = 'tasks/tasks-1164-historical.md';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 3,
+          registry_entries: 3,
+          stale_entries: 3,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 0,
+          pre_expiry_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [
+          {
+            path: currentDocPath,
+            doc_class: 'public_guide',
+            doc_class_label: 'Public Guide',
+            path_family: 'docs/book',
+            task_number: null,
+            last_review: publicLastReview,
+            cadence_days: 14,
+            age_days: 19,
+            overdue_days: 5
+          },
+          {
+            path: repoGuidePath,
+            doc_class: 'repo_guide',
+            doc_class_label: 'Repository Guide',
+            path_family: 'docs',
+            task_number: null,
+            last_review: publicLastReview,
+            cadence_days: 14,
+            age_days: 19,
+            overdue_days: 5
+          },
+          {
+            path: legacyTaskPath,
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'tasks/tasks-*',
+            task_number: '1164',
+            last_review: taskLastReview,
+            cadence_days: 30,
+            age_days: 31,
+            overdue_days: 1
+          }
+        ],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [],
+        pre_expiry_entries: [],
+        rolling_freshness_policy: rollingFreshnessPolicy()
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'ok',
+        specGuard: { status: 'succeeded' }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_unowned_repo_debt');
+    expect(decision.candidate_cohorts).toEqual([
+      expect.objectContaining({
+        sample_paths: [legacyTaskPath],
+        class_breakdown: { 'Task Packet': 1 }
+      })
+    ]);
+    expect(decision.public_current_actions).toEqual([
+      expect.objectContaining({
+        type: 'strict_hard_stale_review',
+        path: currentDocPath,
+        doc_class: 'public_guide',
+        overdue_days: 5,
+        rolling_deferral_eligible: false
+      }),
+      expect.objectContaining({
+        type: 'strict_hard_stale_review',
+        path: repoGuidePath,
+        doc_class: 'repo_guide',
+        overdue_days: 5,
+        rolling_deferral_eligible: false
+      })
+    ]);
+    expect(decision.sample_paths.hard_stale_paths).toEqual([currentDocPath, repoGuidePath]);
+    expect(decision.totals.hard_stale_entries).toBe(2);
+  });
+
   it('passes owned in-window historical debt when the current diff is clean', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-owned-'));
     createdDirs.push(repoRoot);

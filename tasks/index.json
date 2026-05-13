@@ -1,6 +1,88 @@
 {
   "items": [
     {
+      "id": "20260513-linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8",
+      "title": "CO-532 hard-stale current book and skill docs",
+      "relates_to": "tasks/tasks-linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-13",
+      "evidence": [
+        "docs/PRD-linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8.md",
+        "docs/TECH_SPEC-linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8.md",
+        "docs/ACTION_PLAN-linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8.md",
+        "tasks/specs/linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8.md",
+        "tasks/tasks-linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8.md",
+        ".agent/task/linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8.md",
+        "docs/book/operations.md",
+        "docs/book/public-posture.md",
+        "docs/book/README.md",
+        "docs/book/skills.md",
+        "skills/README.md",
+        "docs/docs-freshness-registry.json",
+        "docs/docs-catalog.json",
+        "out/linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8/docs-freshness.json",
+        "out/linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8/docs-freshness-maintenance.json"
+      ],
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO-532 provider worker",
+          "date": "2026-05-13",
+          "status": "started",
+          "summary": "linear issue-context found CO-532 Ready/unstarted with In Progress as the live started state, no attached PR, and no prior workpad; issue moved to In Progress before active coding."
+        },
+        "parallelization": {
+          "reviewer": "linear parallelization helper",
+          "date": "2026-05-13",
+          "decision": "parallelize_now",
+          "reason": "independent_scope_available",
+          "summary": "Pre-turn matrix found a safe skills-current-docs child lane for docs/book/skills.md and skills/README.md while parent owns packet, registry, and remaining book/public docs."
+        },
+        "baseline_reproduction": {
+          "reviewer": "CO-532 provider worker",
+          "date": "2026-05-13",
+          "status": "reproduced",
+          "summary": "npm run docs:freshness reported the five current book/skill docs as hard-stale; docs:freshness:maintain preserved them under hard_stale_paths while legacy Apr 9-12 candidate cohorts remained separate."
+        },
+        "docs_first": {
+          "reviewer": "CO-532 provider worker",
+          "date": "2026-05-13",
+          "status": "packet_seeded",
+          "summary": "PRD, TECH_SPEC, ACTION_PLAN, task checklist, agent mirror, task index entry, docs/TASKS snapshot, and docs freshness registry rows created before parent-owned content edits."
+        }
+      },
+      "validation": {
+        "status": "in_progress",
+        "passed": [
+          "Baseline npm run docs:freshness reproduced hard-stale paths: docs/book/operations.md, docs/book/public-posture.md, docs/book/README.md, docs/book/skills.md, skills/README.md",
+          "Baseline docs:freshness:maintain verified CO-522 as live maintenance owner and blocking_changed_paths=[]"
+        ],
+        "pending": [
+          "content refresh/classification",
+          "focused guard test",
+          "full validation floor",
+          "standalone review and elegance pass",
+          "PR checks and ready-review drain"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8.md",
+        "prd": "docs/PRD-linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8.md",
+        "docs": "docs/TECH_SPEC-linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8.md",
+        "action_plan": "docs/ACTION_PLAN-linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8.md",
+        "spec": "tasks/specs/linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8.md",
+        "task": "tasks/tasks-linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8.md"
+      },
+      "source_issue": {
+        "id": "f79825fb-1b0a-46a9-89ec-77738e8ae4c8",
+        "identifier": "CO-532",
+        "url": "https://linear.app/asabeko/issue/CO-532/co-refresh-hard-stale-current-book-and-skill-docs"
+      }
+    },
+    {
       "id": "20260513-linear-34ca427e-fb62-430e-9d8f-949a07690542",
       "title": "CO-489 external agent session import resume continuity",
       "relates_to": "tasks/tasks-linear-34ca427e-fb62-430e-9d8f-949a07690542.md",

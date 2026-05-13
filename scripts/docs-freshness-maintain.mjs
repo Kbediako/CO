@@ -23,6 +23,16 @@ const CANONICAL_OWNER_MARKER_PREFIX = 'codex-orchestrator:canonical-owner-key=';
 const CANONICAL_OWNER_KEY_MAX_LENGTH = 512;
 const TERMINAL_WORKFLOW_STATE_TYPES = new Set(['completed', 'canceled', 'cancelled', 'duplicate']);
 const TERMINAL_WORKFLOW_STATES = new Set(['done', 'completed', 'canceled', 'cancelled', 'duplicate']);
+const CURRENT_DIRECT_ACTION_DOC_CLASSES = new Set([
+  'front_door',
+  'public_guide',
+  'repo_guide',
+  'agent_policy',
+  'active_guide',
+  'shipped_skill',
+  'shipped_companion',
+  'seeded_template'
+]);
 
 function showUsage() {
   console.log(`Usage: node scripts/docs-freshness-maintain.mjs [options]
@@ -1015,9 +1025,9 @@ function buildConsolidatedOwnerAction(decision, actions) {
       'Reject duplicate owner creation, per-cohort owner fanout, blind `last_review` bumps, or rolling-cap widening.',
       '',
       '## Acceptance Criteria',
-      '- [ ] Existing owner workpad records candidate cohort count, lifecycle action count, strict pre-expiry count, and sample paths.',
+      '- [ ] Existing owner workpad records candidate cohort count, lifecycle action count, strict current-doc action count, and sample paths.',
       '- [ ] Mechanical terminal-packet cases route to archive/reclassification automation before stale rows become ordinary debt.',
-      '- [ ] Semantic public/current docs route to direct review/action before expiry.',
+      '- [ ] Semantic public/current docs route to direct review/action before expiry or when hard-stale.',
       '',
       '## Canonical Owner',
       `- Canonical owner key: \`${canonicalOwnerKey}\``,
@@ -1423,6 +1433,11 @@ function summarizePolicyCapacity(candidateEntries, policy, { hasUsableOwnerPath 
 
 function hasProvenDiffStatus(diffStatus) {
   return diffStatus === 'ok' || diffStatus === 'provided';
+}
+
+function isCurrentDirectActionDoc(entry) {
+  const docClass = normalizeOptionalString(entry?.doc_class);
+  return docClass ? CURRENT_DIRECT_ACTION_DOC_CLASSES.has(docClass) : false;
 }
 
 function buildRecommendedAction(
@@ -2084,6 +2099,7 @@ export function buildDocsFreshnessMaintenanceDecision(
   const nonCandidateStaleEntries = staleEntries
     .filter((entry) => !blockingCandidatePaths.has(normalizeDocPath(entry.path)))
     .map((entry) => normalizeCandidateEntry(entry, policy, 'hard_stale'));
+  const hardStaleCurrentEntries = nonCandidateStaleEntries.filter(isCurrentDirectActionDoc);
   const candidateCohorts = [
     ...summarizeCandidateCohorts(
       candidateEntries,
@@ -2167,16 +2183,30 @@ export function buildDocsFreshnessMaintenanceDecision(
       completed_at: entry.completed_at,
       source_issue: entry.source_issue
     })),
-    public_current_actions: preExpiryEntries.map((entry) => ({
-      type: 'strict_pre_expiry_review',
-      path: entry.path,
-      doc_class: entry.doc_class,
-      doc_class_label: entry.doc_class_label,
-      next_review: entry.next_review,
-      days_until_expiry: entry.days_until_expiry,
-      direct_action_required: entry.direct_action_required,
-      rolling_deferral_eligible: false
-    })),
+    public_current_actions: [
+      ...preExpiryEntries.map((entry) => ({
+        type: 'strict_pre_expiry_review',
+        path: entry.path,
+        doc_class: entry.doc_class,
+        doc_class_label: entry.doc_class_label,
+        next_review: entry.next_review,
+        days_until_expiry: entry.days_until_expiry,
+        direct_action_required: entry.direct_action_required,
+        rolling_deferral_eligible: false
+      })),
+      ...hardStaleCurrentEntries.map((entry) => ({
+        type: 'strict_hard_stale_review',
+        path: entry.path,
+        doc_class: entry.doc_class,
+        doc_class_label: entry.doc_class_label,
+        last_review: entry.last_review,
+        cadence_days: entry.cadence_days,
+        age_days: entry.age_days,
+        overdue_days: entry.overdue_days,
+        direct_action_required: true,
+        rolling_deferral_eligible: false
+      }))
+    ],
     blocking_changed_paths: blockingChangedPaths,
     diff_status: diffStatus,
     diff_base_ref: diffBaseRef,
