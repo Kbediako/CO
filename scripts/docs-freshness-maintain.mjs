@@ -1478,7 +1478,7 @@ function resolveRepoGateSeverity(decision, actionRequiredCount = 0) {
   return 'blocking';
 }
 
-function resolveRepoGateOwnerVerification(decision, issue, { canonicalOwnerKey = null } = {}) {
+function resolveRepoGateOwnerVerification(decision, issue, { canonicalOwnerKey = null, ownerSource = null } = {}) {
   const normalizedIssue = normalizeOptionalString(issue);
   if (!normalizedIssue) {
     return null;
@@ -1509,12 +1509,35 @@ function resolveRepoGateOwnerVerification(decision, issue, { canonicalOwnerKey =
   }
   const decisionOwnerKey = normalizeOptionalString(decision?.owner_issue_action?.canonical_owner_key);
   if (normalizeOptionalString(decision?.owner_issue) === normalizedIssue) {
-    if (normalizedCanonicalOwnerKey && decisionOwnerKey && normalizedCanonicalOwnerKey !== decisionOwnerKey) {
+    if (
+      normalizedCanonicalOwnerKey &&
+      decisionOwnerKey &&
+      normalizedCanonicalOwnerKey !== decisionOwnerKey &&
+      !repoGateOwnerSourceUsesPolicyOwner(ownerSource, decision, normalizedIssue)
+    ) {
       return null;
     }
     return decision?.owner_issue_verification ?? null;
   }
   return null;
+}
+
+function repoGateOwnerSourceUsesPolicyOwner(ownerSource, decision, normalizedIssue) {
+  if (!ownerSource) {
+    return false;
+  }
+  const decisionOwnerKey = normalizeOptionalString(decision?.owner_issue_action?.canonical_owner_key);
+  const sourcePolicyOwnerKey = normalizeOptionalString(ownerSource?.owner_issue_action?.canonical_owner_key);
+  const sourceIssue = normalizeOptionalString(ownerSource?.owner_issue ?? ownerSource?.issue);
+  const sourceActionMode =
+    normalizeOptionalString(ownerSource?.mode) ??
+    normalizeOptionalString(ownerSource?.owner_issue_action?.mode);
+  return Boolean(
+    decisionOwnerKey &&
+      sourcePolicyOwnerKey === decisionOwnerKey &&
+      sourceIssue === normalizedIssue &&
+      sourceActionMode === 'update_existing'
+  );
 }
 
 function repoGateOwnerCanonicalKey(ownerSource, decision) {
@@ -1562,7 +1585,8 @@ function resolveRepoGateOwner(decision, ownerActionEvidence) {
     const action = actions.find((candidate) => normalizeOptionalString(candidate?.owner_issue) === issue) ?? null;
     const actionMode = action?.mode ?? action?.owner_issue_action?.mode ?? decision?.owner_issue_action?.mode ?? null;
     const verification = resolveRepoGateOwnerVerification(decision, issue, {
-      canonicalOwnerKey: repoGateOwnerCanonicalKey(action, decision)
+      canonicalOwnerKey: repoGateOwnerCanonicalKey(action, decision),
+      ownerSource: action
     });
     return {
       issue,
@@ -1587,7 +1611,8 @@ function resolveRepoGateOwner(decision, ownerActionEvidence) {
     const cohort = resolvedCohorts.find((candidate) => normalizeOptionalString(candidate?.owner_issue) === issue) ?? null;
     const actionMode = cohort?.owner_issue_action?.mode ?? decision?.owner_issue_action?.mode ?? null;
     const verification = resolveRepoGateOwnerVerification(decision, issue, {
-      canonicalOwnerKey: repoGateOwnerCanonicalKey(cohort, decision)
+      canonicalOwnerKey: repoGateOwnerCanonicalKey(cohort, decision),
+      ownerSource: cohort
     });
     return {
       issue,
@@ -1640,9 +1665,12 @@ export function buildDocsFreshnessRepoGate(decision) {
     ['expired', 'over_budget', 'invalid_policy', 'policy_missing'].includes(
       decision?.policy_capacity_status?.status
     );
+  const hasDiffProofOnlyBlocker =
+    freshnessDecision === 'block_diff_local' && !hasLocalBlocker && !specGuardFailed && !hasRepoWideBlocker;
   const blocksUnrelatedLanes =
     blocksHandoff &&
     !hasLocalBlocker &&
+    !hasDiffProofOnlyBlocker &&
     (hasRepoWideBlocker || (!specGuardFailed && freshnessDecision !== 'block_terminal_lifecycle'));
   const owner = resolveRepoGateOwner(decision, ownerActionEvidence);
 

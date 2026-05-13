@@ -245,6 +245,41 @@ describe('docs freshness maintenance decisions', () => {
     expect(buildDocsFreshnessRepoGate(decision)).toMatchObject(decision.repo_gate);
   });
 
+  it('keeps pure diff-base proof failures local to the current run', () => {
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 0,
+          registry_entries: 0,
+          stale_entries: 0,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [],
+        rolling_freshness_policy: rollingFreshnessPolicy()
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'missing_base',
+        specGuard: { status: 'succeeded' }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_diff_local');
+    expect(decision.repo_gate).toMatchObject({
+      action_required_count: 0,
+      blocks_handoff: true,
+      blocks_unrelated_lanes: false
+    });
+  });
+
   it('keeps unrelated lanes blocked when terminal lifecycle debt coexists with repo-wide debt', () => {
     const lastReview = reviewDateDaysAgo(31);
     const decision = buildDocsFreshnessMaintenanceDecision(
@@ -902,6 +937,99 @@ describe('docs freshness maintenance decisions', () => {
         removal_condition: expect.stringContaining('re-home docs/docs-catalog.json intentionally')
       })
     );
+  });
+
+  it('preserves verified policy-owner state for owned rolling cohorts', () => {
+    const policy = rollingFreshnessPolicy({
+      canonical_owner_key: 'docs:freshness:maintain',
+      require_live_owner_verification: true,
+      owner_issue_project_id: 'project-1'
+    });
+    const baseline = policy.baseline_cohorts[0];
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: policy,
+        stale_entries: [],
+        rolling_cohort_entries: [
+          {
+            path: 'tasks/tasks-1164-historical.md',
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'tasks/tasks-*',
+            task_number: '1164',
+            last_review: baseline.last_review,
+            cadence_days: baseline.cadence_days,
+            age_days: 31,
+            overdue_days: 1,
+            baseline_cohort_id: baseline.id
+          }
+        ],
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 0,
+          rolling_cohort_entries: 1,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: { status: 'succeeded' },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main',
+        ownerIssueVerification: {
+          issue: 'CO-175',
+          issue_id: 'owner-id',
+          state: 'In Progress',
+          state_type: 'started',
+          is_terminal: false,
+          usable: true,
+          workspace_id: 'workspace-1',
+          team_id: 'team-1',
+          project_id: 'project-1',
+          project_name: 'CO Control and Advisory',
+          expected_project_id: 'project-1',
+          same_project: true,
+          verification_status: 'succeeded',
+          checked_at: null,
+          source: 'linear issue-context',
+          error: null
+        }
+      }
+    );
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(decision, {
+      env: { LINEAR_API_KEY: 'token' } as NodeJS.ProcessEnv
+    });
+    const repoGate = buildDocsFreshnessRepoGate({
+      ...decision,
+      owner_action_evidence: ownerActionEvidence
+    });
+
+    expect(decision.freshness_decision).toBe('pass_with_owned_rolling_debt');
+    expect(ownerActionEvidence).toEqual(
+      expect.objectContaining({
+        status: 'resolved',
+        should_block: false,
+        actions: [
+          expect.objectContaining({
+            mode: 'update_existing',
+            owner_issue: 'CO-175',
+            copyable_command: null
+          })
+        ]
+      })
+    );
+    expect(repoGate.owner).toMatchObject({
+      issue: 'CO-175',
+      action: 'update_existing',
+      state: 'In Progress',
+      state_type: 'started',
+      verified: true
+    });
   });
 
   it('reuses an exact canonical owner without repointing the global terminal owner', () => {
