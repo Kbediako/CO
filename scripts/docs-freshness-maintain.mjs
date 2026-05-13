@@ -1478,22 +1478,80 @@ function resolveRepoGateSeverity(decision, actionRequiredCount = 0) {
   return 'blocking';
 }
 
-function resolveRepoGateOwnerVerification(decision, issue) {
+function resolveRepoGateOwnerVerification(decision, issue, { canonicalOwnerKey = null } = {}) {
   const normalizedIssue = normalizeOptionalString(issue);
   if (!normalizedIssue) {
     return null;
   }
-  const canonicalVerification = (Array.isArray(decision?.canonical_owner_issue_verifications)
+  const normalizedCanonicalOwnerKey = normalizeOptionalString(canonicalOwnerKey);
+  const canonicalVerifications = Array.isArray(decision?.canonical_owner_issue_verifications)
     ? decision.canonical_owner_issue_verifications
-    : []
-  ).find((verification) => normalizeOptionalString(verification?.issue) === normalizedIssue);
+    : [];
+  const matchingVerifications = canonicalVerifications.filter(
+    (verification) => normalizeOptionalString(verification?.issue) === normalizedIssue
+  );
+  const exactCanonicalVerification = normalizedCanonicalOwnerKey
+    ? matchingVerifications.find(
+        (verification) => normalizeOptionalString(verification?.canonical_owner_key) === normalizedCanonicalOwnerKey
+      )
+    : null;
+  const unkeyedSingleVerification =
+    matchingVerifications.length === 1 && !normalizeOptionalString(matchingVerifications[0]?.canonical_owner_key)
+      ? matchingVerifications[0]
+      : null;
+  const canonicalVerification = normalizedCanonicalOwnerKey
+    ? exactCanonicalVerification ?? unkeyedSingleVerification
+    : matchingVerifications.length === 1
+      ? matchingVerifications[0]
+      : null;
   if (canonicalVerification) {
     return canonicalVerification;
   }
+  const decisionOwnerKey = normalizeOptionalString(decision?.owner_issue_action?.canonical_owner_key);
   if (normalizeOptionalString(decision?.owner_issue) === normalizedIssue) {
+    if (normalizedCanonicalOwnerKey && decisionOwnerKey && normalizedCanonicalOwnerKey !== decisionOwnerKey) {
+      return null;
+    }
     return decision?.owner_issue_verification ?? null;
   }
   return null;
+}
+
+function repoGateOwnerCanonicalKey(ownerSource, decision) {
+  return (
+    normalizeOptionalString(ownerSource?.canonical_owner_key) ??
+    normalizeOptionalString(ownerSource?.cohort_canonical_owner_key) ??
+    normalizeOptionalString(ownerSource?.owner_issue_action?.canonical_owner_key) ??
+    normalizeOptionalString(decision?.owner_issue_action?.canonical_owner_key)
+  );
+}
+
+function isRepoGateOwnerActionUsable(actionMode) {
+  return !['create_required', 'create_or_update_required', 'replace_terminal_owner'].includes(
+    normalizeOptionalString(actionMode) ?? ''
+  );
+}
+
+function isRepoGateOwnerVerificationUsable(verification) {
+  if (!verification) {
+    return false;
+  }
+  const verificationSucceeded =
+    verification?.status === 'succeeded' || verification?.verification_status === 'succeeded';
+  return (
+    verificationSucceeded &&
+    normalizeOptionalBoolean(verification?.usable) !== false &&
+    normalizeOptionalBoolean(verification?.same_project) !== false &&
+    normalizeOptionalBoolean(verification?.is_terminal) !== true
+  );
+}
+
+function isRepoGateOwnerVerified({ verification, actionMode, ownerIssueAction = null }) {
+  return (
+    isRepoGateOwnerVerificationUsable(verification) &&
+    isRepoGateOwnerActionUsable(actionMode) &&
+    isRepoGateOwnerActionUsable(ownerIssueAction?.mode)
+  );
 }
 
 function resolveRepoGateOwner(decision, ownerActionEvidence) {
@@ -1502,15 +1560,19 @@ function resolveRepoGateOwner(decision, ownerActionEvidence) {
   if (actionIssues.length === 1) {
     const issue = actionIssues[0];
     const action = actions.find((candidate) => normalizeOptionalString(candidate?.owner_issue) === issue) ?? null;
-    const verification = resolveRepoGateOwnerVerification(decision, issue);
+    const actionMode = action?.mode ?? action?.owner_issue_action?.mode ?? decision?.owner_issue_action?.mode ?? null;
+    const verification = resolveRepoGateOwnerVerification(decision, issue, {
+      canonicalOwnerKey: repoGateOwnerCanonicalKey(action, decision)
+    });
     return {
       issue,
-      action: action?.mode ?? action?.owner_issue_action?.mode ?? decision?.owner_issue_action?.mode ?? null,
+      action: actionMode,
       verification,
-      verified:
-        verification?.status === 'succeeded' ||
-        verification?.verification_status === 'succeeded' ||
-        action?.owner_issue_action?.verification_status === 'succeeded'
+      verified: isRepoGateOwnerVerified({
+        verification,
+        actionMode,
+        ownerIssueAction: action?.owner_issue_action
+      })
     };
   }
 
@@ -1523,27 +1585,34 @@ function resolveRepoGateOwner(decision, ownerActionEvidence) {
   if (resolvedIssues.length === 1) {
     const issue = resolvedIssues[0];
     const cohort = resolvedCohorts.find((candidate) => normalizeOptionalString(candidate?.owner_issue) === issue) ?? null;
-    const verification = resolveRepoGateOwnerVerification(decision, issue);
+    const actionMode = cohort?.owner_issue_action?.mode ?? decision?.owner_issue_action?.mode ?? null;
+    const verification = resolveRepoGateOwnerVerification(decision, issue, {
+      canonicalOwnerKey: repoGateOwnerCanonicalKey(cohort, decision)
+    });
     return {
       issue,
-      action: cohort?.owner_issue_action?.mode ?? decision?.owner_issue_action?.mode ?? null,
+      action: actionMode,
       verification,
-      verified:
-        verification?.status === 'succeeded' ||
-        verification?.verification_status === 'succeeded' ||
-        cohort?.owner_issue_action?.verification_status === 'succeeded'
+      verified: isRepoGateOwnerVerified({
+        verification,
+        actionMode,
+        ownerIssueAction: cohort?.owner_issue_action
+      })
     };
   }
 
   const issue = decision?.owner_issue ?? null;
   const verification = decision?.owner_issue_verification ?? null;
+  const actionMode = decision?.owner_issue_action?.mode ?? null;
   return {
     issue,
-    action: decision?.owner_issue_action?.mode ?? null,
+    action: actionMode,
     verification,
-    verified:
-      verification?.status === 'succeeded' ||
-      verification?.verification_status === 'succeeded'
+    verified: isRepoGateOwnerVerified({
+      verification,
+      actionMode,
+      ownerIssueAction: decision?.owner_issue_action
+    })
   };
 }
 

@@ -1443,6 +1443,20 @@ describe('docs freshness maintenance decisions', () => {
         })
       })
     );
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(decision, {
+      env: {} as NodeJS.ProcessEnv
+    });
+    const repoGate = buildDocsFreshnessRepoGate({
+      ...decision,
+      owner_action_evidence: ownerActionEvidence
+    });
+    expect(repoGate.owner).toMatchObject({
+      issue: 'CO-320',
+      action: 'create_required',
+      state: 'In Progress',
+      state_type: 'started',
+      verified: false
+    });
   });
 
   it('does not accept stale same-key canonical owner verification from another scope', () => {
