@@ -1124,6 +1124,44 @@ describe('runCodexDefaultsSetup', () => {
     }
   });
 
+  it('keeps stable max_threads when only top-level multi_agent_v2 settings are configured', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-multi-agent-v2-top-level-settings-'));
+    const configPath = join(tempHome, 'config.toml');
+    try {
+      await writeFile(
+        configPath,
+        [
+          'model = "legacy-model"',
+          '',
+          '[multi_agent_v2]',
+          'enabled = true',
+          'max_concurrent_threads_per_session = 7',
+          '',
+          '[agents]',
+          'max_threads = 2',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
+
+      await runCodexDefaultsSetup({
+        apply: true,
+        env: buildDefaultsEnv(tempHome)
+      });
+
+      const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        multi_agent_v2?: Record<string, unknown>;
+        agents?: Record<string, unknown>;
+      };
+
+      expect(parsed.multi_agent_v2?.enabled).toBe(true);
+      expect(parsed.multi_agent_v2?.max_concurrent_threads_per_session).toBe(7);
+      expect(parsed.agents?.max_threads).toBe(12);
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
   it('reports and prunes only CO-managed removed feature keys through explicit apply', async () => {
     const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-removed-features-'));
     const configPath = join(tempHome, 'config.toml');

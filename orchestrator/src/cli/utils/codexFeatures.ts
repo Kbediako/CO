@@ -84,7 +84,7 @@ export function readConfiguredMultiAgentV2Enabled(config: Record<string, unknown
   if (readRecordValue(featureValue)?.enabled === true) {
     return true;
   }
-  return readRecordValue(config.multi_agent_v2)?.enabled === true;
+  return false;
 }
 
 export function readConfiguredMultiAgentV2ThreadCap(
