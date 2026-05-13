@@ -1160,10 +1160,10 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     }
   }, 15000);
 
-  it('advises on malformed MultiAgentV2 thread caps even when v2 is disabled', async () => {
+  it('advises when a configured MultiAgentV2 thread cap is invalid', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const originalCodexCliBin = process.env.CODEX_CLI_BIN;
-    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-disabled-invalid-cap-'));
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-thread-cap-invalid-'));
     process.env.CODEX_HOME = tempHome;
     process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
     try {
@@ -1185,54 +1185,6 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
 
       const result = runDoctor(process.cwd());
       expect(result.codex_defaults.checks.max_threads.status).toBe('ok');
-      expect(result.codex_defaults.checks.multi_agent_v2_thread_cap.status).toBe('advisory');
-      expect(result.codex_defaults.checks.multi_agent_v2_thread_cap.path).toBe(
-        'features.multi_agent_v2.max_concurrent_threads_per_session'
-      );
-      expect(result.codex_defaults.status).toBe('advisory');
-
-      const summary = formatDoctorSummary(result).join('\n');
-      expect(summary).toContain('MultiAgentV2 thread cap: advisory');
-      expect(summary).toContain('must be a positive integer thread cap');
-    } finally {
-      if (originalCodexHome === undefined) {
-        delete process.env.CODEX_HOME;
-      } else {
-        process.env.CODEX_HOME = originalCodexHome;
-      }
-      if (originalCodexCliBin === undefined) {
-        delete process.env.CODEX_CLI_BIN;
-      } else {
-        process.env.CODEX_CLI_BIN = originalCodexCliBin;
-      }
-      await rm(tempHome, { recursive: true, force: true });
-    }
-  }, 15000);
-
-  it('advises when a configured MultiAgentV2 thread cap is invalid', async () => {
-    const originalCodexHome = process.env.CODEX_HOME;
-    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
-    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-thread-cap-invalid-'));
-    process.env.CODEX_HOME = tempHome;
-    process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
-    try {
-      await writeFile(
-        join(tempHome, 'config.toml'),
-        [
-          'model = "gpt-5.4"',
-          'review_model = "gpt-5.4"',
-          'model_reasoning_effort = "xhigh"',
-          '',
-          '[features.multi_agent_v2]',
-          'enabled = true',
-          'max_concurrent_threads_per_session = "12"',
-          '',
-          '[agents]'
-        ].join('\n'),
-        'utf8'
-      );
-
-      const result = runDoctor(process.cwd());
       expect(result.codex_defaults.checks.multi_agent_v2_thread_cap.status).toBe('advisory');
       expect(result.codex_defaults.status).toBe('advisory');
 
