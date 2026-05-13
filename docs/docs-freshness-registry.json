@@ -3,6 +3,48 @@
   "generated_at": "2026-05-13",
   "entries": [
     {
+      "path": "docs/PRD-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/linear-b8b18767-1262-442f-84f3-f41b6f758d42.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -563,16 +605,16 @@
     {
       "path": ".agent/task/0933-orchestrator-experience-jsonl-repair.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-06",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-05-13",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0934-orchestrator-persistence-throughput.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-06",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-05-13",
+      "cadence_days": 365
     },
     {
       "path": ".agent/task/0935-manifest-persister-throughput.md",
@@ -11533,9 +11575,9 @@
     {
       "path": "docs/ACTION_PLAN-orchestrator-experience-jsonl-repair.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-06",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-05-13",
+      "cadence_days": 365
     },
     {
       "path": "docs/ACTION_PLAN-orchestrator-performance-reliability-loop-2.md",
@@ -11554,9 +11596,9 @@
     {
       "path": "docs/ACTION_PLAN-orchestrator-persistence-throughput.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-06",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-05-13",
+      "cadence_days": 365
     },
     {
       "path": "docs/ACTION_PLAN-orchestrator-refactor-roadmap.md",
@@ -19798,9 +19840,9 @@
     {
       "path": "docs/PRD-orchestrator-experience-jsonl-repair.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-06",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-05-13",
+      "cadence_days": 365
     },
     {
       "path": "docs/PRD-orchestrator-issue-validation.md",
@@ -19826,9 +19868,9 @@
     {
       "path": "docs/PRD-orchestrator-persistence-throughput.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-06",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-05-13",
+      "cadence_days": 365
     },
     {
       "path": "docs/PRD-orchestrator-refactor-roadmap.md",
@@ -25563,9 +25605,9 @@
     {
       "path": "docs/TECH_SPEC-orchestrator-experience-jsonl-repair.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-06",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-05-13",
+      "cadence_days": 365
     },
     {
       "path": "docs/TECH_SPEC-orchestrator-issue-validation.md",
@@ -25591,9 +25633,9 @@
     {
       "path": "docs/TECH_SPEC-orchestrator-persistence-throughput.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-06",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-05-13",
+      "cadence_days": 365
     },
     {
       "path": "docs/TECH_SPEC-orchestrator-refactor-roadmap.md",
@@ -26291,16 +26333,16 @@
     {
       "path": "tasks/specs/0933-orchestrator-experience-jsonl-repair.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-06",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-05-13",
+      "cadence_days": 365
     },
     {
       "path": "tasks/specs/0934-orchestrator-persistence-throughput.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-06",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-05-13",
+      "cadence_days": 365
     },
     {
       "path": "tasks/specs/0935-manifest-persister-throughput.md",
@@ -32021,16 +32063,16 @@
     {
       "path": "tasks/tasks-0933-orchestrator-experience-jsonl-repair.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-06",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-05-13",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-0934-orchestrator-persistence-throughput.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-06",
-      "cadence_days": 90
+      "status": "archived",
+      "last_review": "2026-05-13",
+      "cadence_days": 365
     },
     {
       "path": "tasks/tasks-0935-manifest-persister-throughput.md",
