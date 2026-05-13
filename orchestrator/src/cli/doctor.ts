@@ -1480,6 +1480,9 @@ function inspectMultiAgentV2ThreadCapCheck(
   capSupported: boolean | null,
   codexVersion: string | null
 ): DoctorCodexDefaultsAdvisory['checks']['multi_agent_v2_thread_cap'] {
+  if (!multiAgentV2Enabled) {
+    return buildMissingMultiAgentV2ThreadCapCheck(multiAgentV2Enabled, capSupported, codexVersion);
+  }
   const configured = readConfiguredMultiAgentV2ThreadCap(config);
   if (!configured) {
     return buildMissingMultiAgentV2ThreadCapCheck(multiAgentV2Enabled, capSupported, codexVersion);

@@ -1135,13 +1135,14 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
       const result = runDoctor(process.cwd());
       expect(result.codex_defaults.checks.max_threads.status).toBe('ok');
       expect(result.codex_defaults.checks.max_threads.actual).toBe(12);
-      expect(result.codex_defaults.checks.multi_agent_v2_thread_cap.status).toBe('configured');
+      expect(result.codex_defaults.checks.multi_agent_v2_thread_cap.status).toBe('not_applicable');
       expect(result.codex_defaults.checks.multi_agent_v2_thread_cap.path).toBe(
-        'multi_agent_v2.max_concurrent_threads_per_session'
+        'features.multi_agent_v2.max_concurrent_threads_per_session'
       );
 
       const summary = formatDoctorSummary(result).join('\n');
       expect(summary).toContain('agents.max_threads: ok (actual: 12, expected >= 12)');
+      expect(summary).toContain('MultiAgentV2 thread cap: not_applicable');
       expect(summary).not.toContain('features.multi_agent_v2=true; omit agents.max_threads');
       expect(summary).not.toContain('features.multi_agent_v2=true; remove agents.max_threads');
     } finally {
