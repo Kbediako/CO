@@ -14,6 +14,13 @@ Newer stable and prerelease Codex CLI builds remain evidence-gated. The canonica
 - `explorer_fast` remains the explicit `gpt-5.3-codex-spark` exception for file/codebase search only.
 - Local appserver remains the expected default runtime path.
 - Provider workers keep the current `codex exec` / `codex exec resume` supervision seam until a separate governed lane promotes a replacement.
+- Permission posture uses explicit profiles and trust flows. Built-in profile ids are `:read-only`, `:workspace`, and `:danger-no-sandbox`; `--full-auto` is not normal current guidance.
+
+## Release-Facing Holds
+
+- Release-facing downstream-smoke workflows intentionally hold `@openai/codex@0.125.0`.
+- `cloud-canary` intentionally holds `@openai/codex@0.124.0`.
+- Current local `0.128.0` evidence does not promote cloud execution while the configured cloud environment blocker remains unresolved.
 
 ## Evidence Gates
 

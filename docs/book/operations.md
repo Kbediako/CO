@@ -36,6 +36,12 @@ codex-orchestrator control-host supervise status --format json
 - Local appserver remains the expected default runtime path.
 - `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and should fail fast.
 
+## Permission And Trust Posture
+
+Use explicit permission profiles and trust flows instead of `--full-auto` as normal guidance. Current CO docs recognize the built-in profile ids `:read-only`, `:workspace`, and `:danger-no-sandbox`; `default_permissions = ":danger-no-sandbox"` is local-only no-sandbox advisory evidence and not a cloud-readiness signal.
+
+Keep trust/cwd decisions separate from permission profiles. Provider-worker prompts and generated defaults should preserve that split so downstream operators can reason about what is trusted, where commands run, and which profile gates tool authority.
+
 ## Validation Floor
 
 For implementation work, use the repo-local gate list from `AGENTS.md`. For documentation-only README/book work, the targeted floor is:
@@ -58,3 +64,15 @@ Before handing an issue to `Human Review` or `In Review`, refresh the Linear wor
 - standalone review or fallback review evidence
 - explicit elegance/minimality pass result
 - PR link and ready-review drain result when a PR exists
+
+After opening or updating a PR, use the repo-local ready-review drain before moving an issue to review:
+
+```bash
+codex-orchestrator pr ready-review --pr <number> --quiet-minutes 15
+```
+
+When an attached PR is already in `Merging`, use the merge shepherding loop instead of stopping at handoff:
+
+```bash
+codex-orchestrator pr resolve-merge --pr <number> --quiet-minutes 15
+```
