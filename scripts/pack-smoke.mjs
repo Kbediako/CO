@@ -97,27 +97,6 @@ async function assertPathMissing(filePath, label) {
   throw new Error(`${label} should be absent: ${filePath}`);
 }
 
-async function assertNoImportedCommandSkills(skillsRoot, label) {
-  let entries = [];
-  try {
-    entries = await readdir(skillsRoot, { withFileTypes: true });
-  } catch (error) {
-    if (
-      error &&
-      typeof error === 'object' &&
-      'code' in error &&
-      error.code === 'ENOENT'
-    ) {
-      return;
-    }
-    throw error;
-  }
-  const importedSkill = entries.find((entry) => entry.name.startsWith('source-command-'));
-  if (importedSkill) {
-    throw new Error(`${label} should be absent: ${importedSkill.name}`);
-  }
-}
-
 async function assertFileIncludes(filePath, text, label) {
   const raw = await readFile(filePath, 'utf8');
   if (!raw.includes(text)) {
@@ -602,11 +581,9 @@ export async function assertPackagedPluginGovernanceShape(pluginRoot, label) {
   await assertPathMissing(path.join(pluginRoot, '.codex', 'hooks.json'), `${label} imported hooks config`);
   await assertPathMissing(path.join(pluginRoot, '.codex', 'hooks'), `${label} imported hook scripts`);
   await assertPathMissing(path.join(pluginRoot, '.codex', 'agents'), `${label} imported subagent config`);
-  await assertNoImportedCommandSkills(
-    path.join(pluginRoot, '.agents', 'skills'),
-    `${label} imported external-agent command skill`
-  );
+  await assertPathMissing(path.join(pluginRoot, '.agents', 'skills'), `${label} imported external-agent skills`);
   await assertPathMissing(path.join(pluginRoot, 'CLAUDE.md'), `${label} external-agent guidance source`);
+  await assertPathMissing(path.join(pluginRoot, 'AGENTS.md'), `${label} migrated external-agent guidance source`);
 }
 
 export async function assertPluginInstallConfigGovernance(configPath, label) {

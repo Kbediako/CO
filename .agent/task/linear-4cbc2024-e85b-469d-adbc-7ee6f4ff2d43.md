@@ -56,6 +56,13 @@
 - Maximum lifetime: hook/import silent trust is not retained; cache/uninstall assumption expires by 2026-06-12.
 - Removal condition: Hook/import/cache/uninstall behavior is governed and validated, or fails closed.
 - Validation: protected-term scan, JSON checks, spec guard, docs checks, and later focused plugin/pack-smoke tests.
+- Large-refactor check: bounded guard changes are acceptable while authority remains inside existing `pack-smoke`; future hook/import support must consolidate authority instead of adding another seam.
+- Minor-seam decision: bounded guard changes are acceptable because this lane removes silent trust rather than adding a second runtime path.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Plugin hook/import governance | Plugin-bundled hooks or imported external-agent config can be trusted without CO safety checks. | remove fallback | CO-488 | Plugin hook/config import behavior affects packaged CO behavior. | 2026-05-03 | 2026-05-13 | N/A after implementation | Hook/import behavior is governed and validated, or fails closed. | Focused plugin/hook/import tests plus pack-smoke coverage or explicit non-applicability evidence. |
+| Remote plugin bundle cache/uninstall | Cached remote plugin bundles or uninstall behavior can bypass packaged smoke expectations. | expire fallback | CO-488 | Remote plugin cache or uninstall behavior is used by packaged downstream users without deterministic CO coverage. | 2026-05-03 | 2026-05-13 | 2026-06-12 | Pack-smoke or focused validation covers cache/uninstall semantics, or the surface is documented as out of scope with fail-closed behavior. | Pack-smoke and focused cache/uninstall regression evidence. |
 
 ## Packet Scope
 - [x] Packet branch created from current `main` at `06cdbf961a`.

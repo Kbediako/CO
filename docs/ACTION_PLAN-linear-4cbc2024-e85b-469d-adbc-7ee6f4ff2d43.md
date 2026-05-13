@@ -33,6 +33,12 @@
 - Fallback / refactor decision: remove the silent-trust hook/import seam and expire any cache/uninstall assumption that lacks validation.
 - Durable retention evidence: Not applicable; no fallback is justified for indefinite retention.
 - Large-refactor check: no large refactor is needed for the selected package-smoke guardrail; if future work intentionally supports packaged hooks/imports, it must consolidate hook/import authority rather than adding another bypass.
+- Minor-seam decision: bounded guard changes are acceptable because this lane removes silent trust inside existing `pack-smoke` package authority rather than adding a second runtime path.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Plugin hook/import governance | Plugin-bundled hooks or imported external-agent config can be trusted without CO safety checks. | remove fallback | CO-488 | Plugin hook/config import behavior affects packaged CO behavior. | 2026-05-03 | 2026-05-13 | N/A after implementation | Hook/import behavior is governed and validated, or fails closed. | Focused plugin/hook/import tests plus pack-smoke coverage or explicit non-applicability evidence. |
+| Remote plugin bundle cache/uninstall | Cached remote plugin bundles or uninstall behavior can bypass packaged smoke expectations. | expire fallback | CO-488 | Remote plugin cache or uninstall behavior is used by packaged downstream users without deterministic CO coverage. | 2026-05-03 | 2026-05-13 | 2026-06-12 | Pack-smoke or focused validation covers cache/uninstall semantics, or the surface is documented as out of scope with fail-closed behavior. | Pack-smoke and focused cache/uninstall regression evidence. |
 
 ## Milestones & Sequencing
 1. Read CO-488 live Linear issue context and attached PR feedback before implementation edits.

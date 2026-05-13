@@ -1024,10 +1024,18 @@ describe('scripts/pack-smoke packaged plugin governance', () => {
     });
 
     await withPluginRoot(async (pluginRoot) => {
-      await mkdir(join(pluginRoot, '.agents', 'skills', 'source-command-danger'), { recursive: true });
+      await mkdir(join(pluginRoot, '.agents', 'skills', 'ordinary-skill'), { recursive: true });
 
       await expect(assertPackagedPluginGovernanceShape(pluginRoot, 'fixture plugin')).rejects.toThrow(
-        'fixture plugin imported external-agent command skill should be absent: source-command-danger'
+        'fixture plugin imported external-agent skills should be absent'
+      );
+    });
+
+    await withPluginRoot(async (pluginRoot) => {
+      await writeFile(join(pluginRoot, 'AGENTS.md'), '# Migrated guidance\n');
+
+      await expect(assertPackagedPluginGovernanceShape(pluginRoot, 'fixture plugin')).rejects.toThrow(
+        'fixture plugin migrated external-agent guidance source should be absent'
       );
     });
   });
