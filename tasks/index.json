@@ -1,6 +1,33 @@
 {
   "items": [
     {
+      "id": "20260513-linear-3abba033-52f0-45f3-af58-cce4939f087f",
+      "title": "CO-480 MultiAgentV2 0.128 feature-specific thread cap support",
+      "relates_to": "tasks/tasks-linear-3abba033-52f0-45f3-af58-cce4939f087f.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "status": "backlog",
+      "last_review": "2026-05-13",
+      "approvals": {
+        "traceability_packet": {
+          "reviewer": "CO orchestration parent",
+          "date": "2026-05-13",
+          "status": "produced",
+          "summary": "Created the CO-480 docs-first packet and registry mirrors so the backlog promotion guard can admit the valid 0.128 MultiAgentV2 cap audit lane without weakening CO-354 stable/v2 thread-cap semantics."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-3abba033-52f0-45f3-af58-cce4939f087f.md",
+        "task": "tasks/tasks-linear-3abba033-52f0-45f3-af58-cce4939f087f.md",
+        "agent_task": ".agent/task/linear-3abba033-52f0-45f3-af58-cce4939f087f.md",
+        "prd": "docs/PRD-linear-3abba033-52f0-45f3-af58-cce4939f087f.md",
+        "docs": "docs/TECH_SPEC-linear-3abba033-52f0-45f3-af58-cce4939f087f.md",
+        "action_plan": "docs/ACTION_PLAN-linear-3abba033-52f0-45f3-af58-cce4939f087f.md"
+      }
+    },
+    {
       "id": "20260512-linear-b642e879-ba50-45ef-b0d9-b059afa9e932",
       "title": "CO: restore live docs freshness maintenance owner after CO-511 terminal",
       "relates_to": "tasks/tasks-linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md",
