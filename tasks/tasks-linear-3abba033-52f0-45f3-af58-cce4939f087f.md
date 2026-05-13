@@ -31,21 +31,22 @@
 - [x] Packet branch created from current `origin/main` on 2026-05-13.
 - [x] Packet-only validation on 2026-05-13: `npm run docs:check` passed and `node scripts/diff-budget.mjs` passed for the working-tree scope.
 - [x] Repo-wide blocker evidence preserved on 2026-05-13: `node scripts/spec-guard.mjs --dry-run` still reports unrelated stale fallback-expiry metadata for CO-522 packet rows plus unrelated April 12 stale specs, and `npm run docs:freshness` still reports the existing repo-wide stale-doc baseline (`747` stale rows); this packet branch does not weaken either gate.
-- [ ] Docs-review before implementation.
-- [x] Focused feature parser / doctor / defaults / init tests. Evidence: `npm run test -- --run orchestrator/tests/Doctor.test.ts orchestrator/tests/CodexDefaultsSetup.test.ts orchestrator/tests/_reproIssueLogTask.test.ts` passed `102` tests on 2026-05-13.
-- [ ] `node scripts/delegation-guard.mjs`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`.
-- [ ] `npm run build`.
-- [ ] `npm run lint`.
-- [ ] `npm run test`.
-- [ ] `npm run docs:check`.
-- [ ] `npm run docs:freshness`.
-- [ ] `npm run repo:stewardship`.
-- [ ] `node scripts/diff-budget.mjs`.
-- [ ] Manifest-backed standalone review.
-- [ ] `npm run pack:smoke` if package or CLI distribution surfaces change.
+- [x] Docs-review before implementation attempted; `docs:check` passed and `docs:freshness` preserved the unrelated repo-wide stale-doc baseline.
+- [x] Delegation-evidence gate: spawned same-issue child lane with `MCP_RUNNER_TASK_ID=linear-3abba033-52f0-45f3-af58-cce4939f087f-docs-v2-cap-guidance`; manifest captured at `.runs/linear-3abba033-52f0-45f3-af58-cce4939f087f-docs-v2-cap-guidance/cli/2026-05-13T00-56-18-644Z-50e2d788/manifest.json`; output patch stored at `.runs/linear-3abba033-52f0-45f3-af58-cce4939f087f-docs-v2-cap-guidance/cli/2026-05-13T00-56-18-644Z-50e2d788/provider-linear-child-lane.patch`.
+- [x] Focused feature parser / doctor / defaults / init tests. Evidence: `npm run test -- --run orchestrator/tests/Doctor.test.ts orchestrator/tests/CodexDefaultsSetup.test.ts orchestrator/tests/InitTemplates.test.ts orchestrator/tests/_reproIssueLogTask.test.ts` passed `114` tests on 2026-05-13.
+- [x] `node scripts/delegation-guard.mjs`: passed with two subagent manifests.
+- [x] `node scripts/spec-guard.mjs --dry-run`: exited 0 and preserved unrelated stale-spec baseline rows.
+- [x] `npm run build`: passed.
+- [x] `npm run lint`: passed with existing `no-explicit-any` warnings in `orchestrator/tests/DelegationMcpHealth.test.ts`.
+- [x] `npm run test`: passed, `359` files / `5554` tests.
+- [x] `npm run docs:check`: passed.
+- [x] `npm run docs:freshness`: ran and failed only on the existing repo-wide stale-doc baseline (`747` stale docs).
+- [x] `npm run repo:stewardship`: passed.
+- [x] `node scripts/diff-budget.mjs`: passed.
+- [x] Manifest-backed standalone review: final telemetry reports `review_verdict=clean`, `finding_count=0`, `review_outcome=bounded-success`.
+- [x] `npm run pack:smoke` because package/CLI distribution surfaces changed.
 
 ## Handoff Status
-- [ ] Branch pushed and PR opened for packet repair or implementation.
-- [ ] CO-480 moved from Backlog only after packet and registry traceability are present on main.
-- [ ] Provider worker owns implementation once the issue is Ready/In Progress.
+- [x] Branch pushed and PR opened for packet repair or implementation. Evidence: PR #798 on `kb/co-480-packet-traceability`.
+- [x] CO-480 moved from Backlog only after packet and registry traceability were present. Evidence: Linear state moved Backlog -> In Progress on 2026-05-13 after the packet and registry mirrors existed.
+- [x] Provider worker owns implementation once the issue is Ready/In Progress. Evidence: current provider-worker run owns the implementation, validation, PR feedback, and review-handoff gates for CO-480.

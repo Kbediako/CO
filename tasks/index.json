@@ -21,7 +21,7 @@
           "reviewer": "CO-480 provider worker",
           "date": "2026-05-13",
           "status": "in_progress",
-          "summary": "Classified `features.multi_agent_v2.max_concurrent_threads_per_session` as user-owned doctor/docs guidance, preserved old `agents.max_threads` omission under effective v2, and kept the stable `features.multi_agent=true` `[agents] max_threads = 12` baseline."
+          "summary": "Documented and classified the persisted `multi_agent_v2.max_concurrent_threads_per_session` cap while keeping `features.multi_agent_v2.max_concurrent_threads_per_session` as feature-specific CLI/probe evidence, preserved old `agents.max_threads` omission under effective v2, and kept the stable `features.multi_agent=true` `[agents] max_threads = 12` baseline."
         }
       },
       "paths": {
