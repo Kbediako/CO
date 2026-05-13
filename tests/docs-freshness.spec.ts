@@ -699,6 +699,129 @@ describe('docs freshness reporting', () => {
     expect(renderDocsFreshnessMarkdown(report)).toContain('- Terminal lifecycle entries: 7');
   });
 
+  it('routes slug-only docs packet rows when terminal task keys carry numeric prefixes', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-slug-only-terminal-lifecycle-'));
+    createdDirs.push(repoRoot);
+    const slugOnlyTaskKey = 'terminal-slug-only';
+    const packetPaths = [
+      `docs/PRD-${slugOnlyTaskKey}.md`,
+      `docs/TECH_SPEC-${slugOnlyTaskKey}.md`,
+      `docs/ACTION_PLAN-${slugOnlyTaskKey}.md`
+    ];
+
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
+    for (const packetPath of packetPaths) {
+      await writeFile(join(repoRoot, packetPath), '# Terminal Slug-Only Packet\n', 'utf8');
+    }
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '0981',
+              slug: slugOnlyTaskKey,
+              status: 'done',
+              completed_at: reviewDateDaysAgo(1)
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: packetPaths.map((packetPath) => ({
+        path: packetPath,
+        owner: 'Codex',
+        status: 'active',
+        last_review: reviewDateDaysAgo(45),
+        cadence_days: 30
+      })),
+      catalogPatterns: [{ glob: 'docs/*.md', doc_class: 'task_packet' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.stale_entries).toBe(0);
+    expect(report.totals.terminal_lifecycle_entries).toBe(3);
+    expect(report.terminal_lifecycle_entries).toEqual(
+      expect.arrayContaining(
+        packetPaths.map((packetPath) =>
+          expect.objectContaining({
+            path: packetPath,
+            lifecycle_state: 'terminal_pending_archive',
+            task_key: `0981-${slugOnlyTaskKey}`
+          })
+        )
+      )
+    );
+  });
+
+  it('does not strip numeric-leading task slugs that are not prefixed by task id', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-numeric-leading-slug-'));
+    createdDirs.push(repoRoot);
+    const docPath = 'docs/PRD-roadmap.md';
+
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
+    await writeFile(join(repoRoot, docPath), '# Roadmap\n', 'utf8');
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              slug: '2026-roadmap',
+              status: 'done',
+              completed_at: reviewDateDaysAgo(1)
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: docPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: reviewDateDaysAgo(45),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [{ glob: 'docs/*.md', doc_class: 'task_packet' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.terminal_lifecycle_entries).toBe(0);
+    expect(report.totals.stale_entries).toBe(1);
+    expect(report.stale_entries).toEqual([
+      expect.objectContaining({
+        path: docPath,
+        path_family: 'docs/PRD-*'
+      })
+    ]);
+  });
+
   it('routes fresh terminal task packet rows to lifecycle action before stale age', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-fresh-terminal-lifecycle-'));
     createdDirs.push(repoRoot);

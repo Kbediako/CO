@@ -481,6 +481,95 @@ describe('implementation-docs-archive script', () => {
     });
   });
 
+  it('archives slug-only docs packet rows discovered from numeric task id aliases', async () => {
+    const repo = await initRepository({
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'docs/PRD-archive-test.md',
+            owner: 'Codex (top-level agent), Review agent',
+            status: 'active',
+            last_review: '2025-01-01',
+            cadence_days: 30
+          }
+        ]
+      },
+      taskOverrides: {
+        id: '0981',
+        slug: 'archive-test',
+        relates_to: 'tasks/tasks-0981-archive-test.md',
+        paths: {
+          task: 'tasks/tasks-0981-archive-test.md'
+        },
+        status: 'done',
+        completed_at: '2025-01-01'
+      }
+    });
+
+    await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'docs-truthfulness-maintenance',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const report = JSON.parse(
+      await readFile(join(repo, 'out', 'docs-truthfulness-maintenance', 'docs-archive-report.json'), 'utf8')
+    );
+
+    expect(report.totals.archived).toBe(1);
+    expect(report.archived[0]).toMatchObject({
+      path: 'docs/PRD-archive-test.md',
+      context: {
+        taskKey: '0981-archive-test'
+      }
+    });
+    expect(report.archived[0].reason).toContain('terminal_task_lifecycle');
+  });
+
+  it('does not archive unregistered synthesized slug-only docs aliases', async () => {
+    const repo = await initRepository({
+      policyOverrides: {
+        retain_days: 99999,
+        stray_retain_days: 99999,
+        max_lines: 99999
+      },
+      taskOverrides: {
+        id: '0981',
+        slug: 'archive-test',
+        relates_to: 'tasks/tasks-0981-archive-test.md',
+        paths: {
+          task: 'tasks/tasks-0981-archive-test.md'
+        },
+        status: 'done',
+        completed_at: '2025-01-01'
+      }
+    });
+
+    await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'docs-truthfulness-maintenance',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const report = JSON.parse(
+      await readFile(join(repo, 'out', 'docs-truthfulness-maintenance', 'docs-archive-report.json'), 'utf8')
+    );
+
+    expect(report.archived.map((entry: { path: string }) => entry.path)).not.toContain(
+      'docs/PRD-archive-test.md'
+    );
+    expect(report.totals.archived).toBe(0);
+  });
+
   it('archives explicit terminal_pending_archive packet rows even without task-index linkage', async () => {
     const today = new Date().toISOString().slice(0, 10);
     const repo = await initRepository({

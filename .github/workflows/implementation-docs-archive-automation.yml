@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '30 3 * * *'
   workflow_dispatch:
+    inputs:
+      allow_registry_only:
+        description: Permit registry-only repair PRs when no archive payloads are produced.
+        required: false
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -41,6 +47,6 @@ jobs:
       pr_labels: diff-budget-override
       pr_branch: automation/implementation-docs-archive
       enable_auto_merge: true
-      fail_on_missing_payloads: true
+      fail_on_missing_payloads: ${{ !inputs.allow_registry_only }}
     secrets:
       pr_token: ${{ secrets.ARCHIVE_AUTOMERGE_TOKEN }}

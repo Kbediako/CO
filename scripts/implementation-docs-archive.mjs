@@ -126,11 +126,24 @@ function isFindingsPath(relativePath) {
   return typeof relativePath === 'string' && relativePath.startsWith('docs/findings/');
 }
 
-function collectIndexedDocPaths(item) {
+function collectIndexedDocPaths(item, options = {}) {
   if (!item || typeof item !== 'object') {
     return [];
   }
-  return collectIndexedTaskPacketPaths(item).map((entry) => toPosixPath(entry));
+  return collectIndexedTaskPacketPaths(item, options).map((entry) => toPosixPath(entry));
+}
+
+function collectExplicitIndexedDocPaths(item) {
+  if (!item || typeof item !== 'object') {
+    return [];
+  }
+  const values = [item.path, item.relates_to];
+  if (item.paths && typeof item.paths === 'object') {
+    for (const key of ['docs', 'task', 'spec', 'agent_task', 'prd', 'action_plan', 'findings']) {
+      values.push(item.paths[key]);
+    }
+  }
+  return values.filter((entry) => typeof entry === 'string' && entry.trim().length > 0);
 }
 
 function toContainedRepoRelativePath(repoRoot, absolutePath) {
@@ -429,6 +442,20 @@ async function main() {
     }
     const docPaths = new Set();
     const indexedDocPaths = new Set();
+    const explicitIndexedDocPaths = new Set();
+    const primaryIndexedDocPaths = new Set(
+      collectIndexedDocPaths(item, { includeSlugAliases: false })
+    );
+
+    for (const explicitPath of collectExplicitIndexedDocPaths(item)) {
+      const containedExplicitPath = await resolveContainedPath(repoRoot, explicitPath, {
+        allowMissing: true,
+        resolvedRepoRoot
+      });
+      if (containedExplicitPath) {
+        explicitIndexedDocPaths.add(containedExplicitPath.relativePath);
+      }
+    }
 
     for (const indexedPath of collectIndexedDocPaths(item)) {
       const containedIndexedPath = await resolveContainedPath(repoRoot, indexedPath, {
@@ -436,6 +463,15 @@ async function main() {
         resolvedRepoRoot
       });
       if (!containedIndexedPath) {
+        continue;
+      }
+
+      const isSynthesizedAlias = !primaryIndexedDocPaths.has(containedIndexedPath.relativePath);
+      if (
+        !explicitIndexedDocPaths.has(containedIndexedPath.relativePath) &&
+        !registryMap.has(containedIndexedPath.relativePath) &&
+        (isSynthesizedAlias || !matchesAnyPattern(containedIndexedPath.relativePath, docRegexes))
+      ) {
         continue;
       }
 

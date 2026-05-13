@@ -68,7 +68,7 @@ async function runWeeklyArchiveTrigger(report: unknown): Promise<{ stdout: strin
     'docs-truthfulness-maintenance',
     'Trigger mechanical archive self-heal when needed'
   );
-  const script = extractNodeHereDoc(triggerStep.run ?? '', 'NEEDS_ARCHIVE');
+  const script = extractNodeHereDoc(triggerStep.run ?? '', 'ARCHIVE_SELF_HEAL_MODE');
   const tempRoot = await mkdtemp(join(tmpdir(), 'weekly-archive-trigger-'));
 
   try {
@@ -413,6 +413,7 @@ describe('archive automation workflow required checks', () => {
 
   it('routes registry-only implementation docs archive repairs through the weekly self-heal workflow', async () => {
     const workflow = await readWorkflow('.github/workflows/docs-truthfulness-weekly.yml');
+    const docsArchive = await readWorkflow('.github/workflows/implementation-docs-archive-automation.yml');
     const triggerStep = getStep(
       workflow,
       'docs-truthfulness-maintenance',
@@ -420,6 +421,21 @@ describe('archive automation workflow required checks', () => {
     );
 
     expect(triggerStep.run).toContain('gh workflow run implementation-docs-archive-automation.yml --ref main');
+    expect(triggerStep.run).toContain(
+      'gh workflow run implementation-docs-archive-automation.yml --ref main -f allow_registry_only=true'
+    );
+    expect(docsArchive.on?.workflow_dispatch).toMatchObject({
+      inputs: {
+        allow_registry_only: {
+          required: false,
+          type: 'boolean',
+          default: false
+        }
+      }
+    });
+    expect(docsArchive.jobs?.archive?.with).toMatchObject({
+      fail_on_missing_payloads: '${{ !inputs.allow_registry_only }}'
+    });
 
     const result = await runWeeklyArchiveTrigger({
       totals: {
@@ -434,7 +450,7 @@ describe('archive automation workflow required checks', () => {
       }
     });
 
-    expect(result.stdout).toBe('true');
+    expect(result.stdout).toBe('registry-only');
     expect(result.summary).toContain('- Registry-only repairs: 1');
     expect(result.summary).toContain('- Self-heal workflow: requested');
   });

@@ -114,11 +114,33 @@ function addPath(paths, value) {
   }
 }
 
-export function collectIndexedTaskPacketPaths(item) {
+function slugOnlyTaskKey(taskKey, item) {
+  if (typeof taskKey !== 'string') {
+    return null;
+  }
+  const id = normalizeOptionalString(item?.id);
+  if (!id || !/^\d+$/u.test(id) || !taskKey.startsWith(`${id}-`)) {
+    return null;
+  }
+  const alias = taskKey.slice(id.length + 1);
+  return /^[A-Za-z0-9][A-Za-z0-9-]*$/u.test(alias) ? alias : null;
+}
+
+function addTaskPacketPathAliases(paths, taskKey) {
+  addPath(paths, `tasks/tasks-${taskKey}.md`);
+  addPath(paths, `tasks/specs/${taskKey}.md`);
+  addPath(paths, `.agent/task/${taskKey}.md`);
+  addPath(paths, `docs/PRD-${taskKey}.md`);
+  addPath(paths, `docs/TECH_SPEC-${taskKey}.md`);
+  addPath(paths, `docs/ACTION_PLAN-${taskKey}.md`);
+}
+
+export function collectIndexedTaskPacketPaths(item, options = {}) {
   const paths = new Set();
   if (!item || typeof item !== 'object') {
     return [];
   }
+  const includeSlugAliases = options.includeSlugAliases !== false;
 
   addPath(paths, item.path);
   addPath(paths, item.relates_to);
@@ -132,12 +154,11 @@ export function collectIndexedTaskPacketPaths(item) {
 
   const taskKey = normalizeTaskKey(item);
   if (taskKey) {
-    addPath(paths, `tasks/tasks-${taskKey}.md`);
-    addPath(paths, `tasks/specs/${taskKey}.md`);
-    addPath(paths, `.agent/task/${taskKey}.md`);
-    addPath(paths, `docs/PRD-${taskKey}.md`);
-    addPath(paths, `docs/TECH_SPEC-${taskKey}.md`);
-    addPath(paths, `docs/ACTION_PLAN-${taskKey}.md`);
+    addTaskPacketPathAliases(paths, taskKey);
+    const slugAlias = includeSlugAliases ? slugOnlyTaskKey(taskKey, item) : null;
+    if (slugAlias) {
+      addTaskPacketPathAliases(paths, slugAlias);
+    }
   }
 
   return [...paths].filter(isTaskPacketLifecyclePath).sort();
