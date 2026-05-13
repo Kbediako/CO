@@ -16,6 +16,17 @@ export interface CodexFeatureEntry {
   removed: boolean;
 }
 
+export const MULTI_AGENT_V2_THREAD_CAP_FEATURE_CONFIG_PATH =
+  'features.multi_agent_v2.max_concurrent_threads_per_session';
+export const MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH =
+  'multi_agent_v2.max_concurrent_threads_per_session';
+
+export interface ConfiguredMultiAgentV2ThreadCap {
+  path: typeof MULTI_AGENT_V2_THREAD_CAP_FEATURE_CONFIG_PATH | typeof MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH;
+  actual: number | null;
+  valid: boolean;
+}
+
 export function readCodexFeatureProbe(
   codexBin: string,
   env: NodeJS.ProcessEnv = process.env
@@ -62,6 +73,46 @@ export function codexFeatureProbeRejectsAgentMaxThreads(probe: CodexFeatureProbe
 
 export function codexFeatureProbeDisablesMultiAgentV2(probe: CodexFeatureProbeResult): boolean {
   return probe.flags?.multi_agent_v2 === false;
+}
+
+export function readConfiguredMultiAgentV2Enabled(config: Record<string, unknown>): boolean {
+  const features = readRecordValue(config.features);
+  const featureValue = features?.multi_agent_v2;
+  if (readBooleanValue(featureValue) === true) {
+    return true;
+  }
+  if (readRecordValue(featureValue)?.enabled === true) {
+    return true;
+  }
+  return readRecordValue(config.multi_agent_v2)?.enabled === true;
+}
+
+export function readConfiguredMultiAgentV2ThreadCap(
+  config: Record<string, unknown>
+): ConfiguredMultiAgentV2ThreadCap | null {
+  const featureScopedCap = readNumberLikeValue(
+    readRecordValue(readRecordValue(config.features)?.multi_agent_v2)?.max_concurrent_threads_per_session
+  );
+  if (featureScopedCap.present) {
+    return {
+      path: MULTI_AGENT_V2_THREAD_CAP_FEATURE_CONFIG_PATH,
+      actual: featureScopedCap.actual,
+      valid: featureScopedCap.valid
+    };
+  }
+
+  const topLevelCap = readNumberLikeValue(
+    readRecordValue(config.multi_agent_v2)?.max_concurrent_threads_per_session
+  );
+  if (topLevelCap.present) {
+    return {
+      path: MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH,
+      actual: topLevelCap.actual,
+      valid: topLevelCap.valid
+    };
+  }
+
+  return null;
 }
 
 export function findConfiguredRemovedFeatureKeys(
@@ -114,4 +165,29 @@ function parseFeatureFlagsFromEntries(features: Record<string, CodexFeatureEntry
     flags[feature.name] = feature.enabled;
   }
   return flags;
+}
+
+function readRecordValue(value: unknown): Record<string, unknown> | null {
+  return isRecord(value) ? value : null;
+}
+
+function readBooleanValue(value: unknown): boolean | null {
+  return typeof value === 'boolean' ? value : null;
+}
+
+function readNumberLikeValue(value: unknown): { present: boolean; actual: number | null; valid: boolean } {
+  if (typeof value === 'undefined') {
+    return { present: false, actual: null, valid: false };
+  }
+  if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
+    return { present: true, actual: value, valid: true };
+  }
+  return { present: true, actual: null, valid: false };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object'
+    && value !== null
+    && !Array.isArray(value)
+    && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
 }

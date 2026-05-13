@@ -1013,6 +1013,146 @@ describe('runDoctor', { timeout: RUN_DOCTOR_TEST_TIMEOUT_MS }, () => {
     }
   }, 15000);
 
+  it('classifies missing MultiAgentV2 thread cap as user-owned on 0.128+ when v2 is enabled', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-thread-cap-user-owned-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = await writeFakeCodexBinary(tempHome, 'multi_agent_v2 experimental true', {
+      version: 'codex-cli 0.128.0'
+    });
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[agents]'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.checks.max_threads.status).toBe('skipped');
+      expect(result.codex_defaults.checks.multi_agent_v2_thread_cap.status).toBe('user_owned');
+      expect(result.codex_defaults.checks.multi_agent_v2_thread_cap.actual).toBeNull();
+      expect(result.codex_defaults.checks.multi_agent_v2_thread_cap.path).toBe(
+        'features.multi_agent_v2.max_concurrent_threads_per_session'
+      );
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('MultiAgentV2 thread cap: user_owned');
+      expect(summary).toContain('features.multi_agent_v2.max_concurrent_threads_per_session');
+      expect(summary).toContain('CO does not seed');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('reports configured feature-scoped MultiAgentV2 thread cap and omits agents.max_threads', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-thread-cap-configured-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[features.multi_agent_v2]',
+          'enabled = true',
+          'max_concurrent_threads_per_session = 7',
+          '',
+          '[agents]'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.checks.max_threads.status).toBe('skipped');
+      expect(result.codex_defaults.checks.multi_agent_v2_thread_cap.status).toBe('configured');
+      expect(result.codex_defaults.checks.multi_agent_v2_thread_cap.actual).toBe(7);
+      expect(result.codex_defaults.status).toBe('ok');
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('MultiAgentV2 thread cap: configured (actual: 7');
+      expect(summary).toContain('user-owned MultiAgentV2 cap configured');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  it('advises when a configured MultiAgentV2 thread cap is invalid', async () => {
+    const originalCodexHome = process.env.CODEX_HOME;
+    const originalCodexCliBin = process.env.CODEX_CLI_BIN;
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-home-multi-agent-v2-thread-cap-invalid-'));
+    process.env.CODEX_HOME = tempHome;
+    process.env.CODEX_CLI_BIN = join(tempHome, 'missing-codex');
+    try {
+      await writeFile(
+        join(tempHome, 'config.toml'),
+        [
+          'model = "gpt-5.4"',
+          'review_model = "gpt-5.4"',
+          'model_reasoning_effort = "xhigh"',
+          '',
+          '[features.multi_agent_v2]',
+          'enabled = true',
+          'max_concurrent_threads_per_session = "12"',
+          '',
+          '[agents]'
+        ].join('\n'),
+        'utf8'
+      );
+
+      const result = runDoctor(process.cwd());
+      expect(result.codex_defaults.checks.multi_agent_v2_thread_cap.status).toBe('advisory');
+      expect(result.codex_defaults.status).toBe('advisory');
+
+      const summary = formatDoctorSummary(result).join('\n');
+      expect(summary).toContain('MultiAgentV2 thread cap: advisory');
+      expect(summary).toContain('must be a positive integer thread cap');
+    } finally {
+      if (originalCodexHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodexHome;
+      }
+      if (originalCodexCliBin === undefined) {
+        delete process.env.CODEX_CLI_BIN;
+      } else {
+        process.env.CODEX_CLI_BIN = originalCodexCliBin;
+      }
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  }, 15000);
+
   it('surfaces configured removed feature keys as Codex defaults advisory drift', async () => {
     const originalCodexHome = process.env.CODEX_HOME;
     const originalCodexCliBin = process.env.CODEX_CLI_BIN;
