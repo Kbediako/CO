@@ -9,7 +9,7 @@
 - Intent checksum / protected terms carried forward: Codex CLI 0.128, MultiAgentV2, `features.multi_agent_v2=true`, `agents.max_threads`, `features.multi_agent_v2.max_concurrent_threads_per_session`, CO-354, CO-466, doctor/default/init behavior.
 - Not done if: CO writes invalid `agents.max_threads` under v2, hides the new v2 cap path, weakens stable `[agents] max_threads = 12`, or expands into model/cloud/release/delegation scope.
 - Pre-implementation issue-quality review: CO-480 is a valid 0.128 follow-up because it is narrower than CO-466 release intake and newer than CO-354 MultiAgentV2 rejection handling.
-- Fallback / refactor decision: touches compatibility behavior. Decision is remove the stale "omit only" fallback by either supporting the v2 cap or explicitly marking it user-owned; no hidden retained fallback.
+- Fallback / refactor decision: touches compatibility behavior. Decision is to remove the stale "omit only" fallback by either supporting the v2 cap or explicitly marking it user-owned; no hidden retained fallback.
 - Durable retention evidence: not applicable.
 - Large-refactor check: bounded update is acceptable unless implementation discovers duplicated config authorities.
 
