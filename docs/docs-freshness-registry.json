@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-05-12",
+  "generated_at": "2026-05-13",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -5377,6 +5377,22 @@
       "status": "active",
       "last_review": "2026-04-14",
       "cadence_days": 30
+    },
+    {
+      "path": ".agent/task/linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "ce8a2ed3-ae5c-4c50-87b7-79368ac22f94",
+        "identifier": "CO-525",
+        "url": "https://linear.app/asabeko/issue/CO-525/co-make-docs-freshness-preventive-with-lifecycle-automation"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
     },
     {
       "path": ".agent/task/linear-co-373-cloudpreflight-flake.md",
@@ -10790,6 +10806,22 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/ACTION_PLAN-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "ce8a2ed3-ae5c-4c50-87b7-79368ac22f94",
+        "identifier": "CO-525",
+        "url": "https://linear.app/asabeko/issue/CO-525/co-make-docs-freshness-preventive-with-lifecycle-automation"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
+    },
+    {
       "path": "docs/ACTION_PLAN-linear-co-373-cloudpreflight-flake.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -14125,7 +14157,7 @@
       "path": "docs/guides/docs-freshness-cohorts.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-29",
+      "last_review": "2026-05-13",
       "cadence_days": 30
     },
     {
@@ -19021,6 +19053,22 @@
       "status": "active",
       "last_review": "2026-04-14",
       "cadence_days": 30
+    },
+    {
+      "path": "docs/PRD-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "ce8a2ed3-ae5c-4c50-87b7-79368ac22f94",
+        "identifier": "CO-525",
+        "url": "https://linear.app/asabeko/issue/CO-525/co-make-docs-freshness-preventive-with-lifecycle-automation"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
     },
     {
       "path": "docs/PRD-linear-co-373-cloudpreflight-flake.md",
@@ -24768,6 +24816,22 @@
       "status": "active",
       "last_review": "2026-04-14",
       "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "ce8a2ed3-ae5c-4c50-87b7-79368ac22f94",
+        "identifier": "CO-525",
+        "url": "https://linear.app/asabeko/issue/CO-525/co-make-docs-freshness-preventive-with-lifecycle-automation"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
     },
     {
       "path": "docs/TECH_SPEC-linear-co-373-cloudpreflight-flake.md",
@@ -30937,6 +31001,22 @@
       "cadence_days": 30
     },
     {
+      "path": "tasks/specs/linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "ce8a2ed3-ae5c-4c50-87b7-79368ac22f94",
+        "identifier": "CO-525",
+        "url": "https://linear.app/asabeko/issue/CO-525/co-make-docs-freshness-preventive-with-lifecycle-automation"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
+    },
+    {
       "path": "tasks/specs/linear-co-373-cloudpreflight-flake.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -36710,6 +36790,22 @@
       "status": "active",
       "last_review": "2026-04-14",
       "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "ce8a2ed3-ae5c-4c50-87b7-79368ac22f94",
+        "identifier": "CO-525",
+        "url": "https://linear.app/asabeko/issue/CO-525/co-make-docs-freshness-preventive-with-lifecycle-automation"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
     },
     {
       "path": "tasks/tasks-linear-co-373-cloudpreflight-flake.md",

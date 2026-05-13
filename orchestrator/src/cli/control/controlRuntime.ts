@@ -6,6 +6,7 @@ import {
   cloneProviderWorkflowStatusPayload,
   type ProviderWorkflowConfigStore
 } from './providerWorkflowConfigStore.js';
+import { readDocsFreshnessMaintainRepoGate } from './docsFreshnessRepoGate.js';
 import type { LinearBudgetStatus } from './linearBudgetState.js';
 import {
   readProviderPollingHealth,
@@ -228,13 +229,17 @@ function createControlRuntimeSnapshot(
       const providerWorkflow = context.providerWorkflowConfigStore
         ? await refreshProviderWorkflowStatusPayload(context.providerWorkflowConfigStore)
         : null;
+      const docsFreshnessRepoGate = readRuntimeDocsFreshnessRepoGate(context);
       return {
         selected,
         dispatchPilot: dispatchPilotSummary.configured ? dispatchPilotSummary : null,
         tracked,
         providerIntake,
         providerIntakeUnavailable: providerIntakeAuthority.unavailable,
-        providerWorkflow
+        providerWorkflow,
+        repoGates: {
+          docs_freshness_maintain: docsFreshnessRepoGate
+        }
       };
     })();
     return selectedRunSnapshotPromise;
@@ -297,6 +302,7 @@ function createControlRuntimeSnapshot(
       const providerWorkflow = context.providerWorkflowConfigStore
         ? await refreshProviderWorkflowStatusPayload(context.providerWorkflowConfigStore)
         : null;
+      const docsFreshnessRepoGate = readRuntimeDocsFreshnessRepoGate(context);
       const running = [
         ...(isAuthoritativeSelectedCurrentRunningSource(selected, authorityContext.providerIntakeState)
           ? [selected]
@@ -338,6 +344,9 @@ function createControlRuntimeSnapshot(
         providerIntakeUnavailable: providerIntakeAuthority.unavailable,
         providerIntakeAuthority,
         providerWorkflow,
+        repoGates: {
+          docs_freshness_maintain: docsFreshnessRepoGate
+        },
         polling
       };
     })();
@@ -363,7 +372,10 @@ function createControlRuntimeSnapshot(
       rateLimits,
       polling,
       providerIntake: buildProviderIntakeSummary(providerIntakeAuthority.state),
-      providerIntakeUnavailable: providerIntakeAuthority.unavailable
+      providerIntakeUnavailable: providerIntakeAuthority.unavailable,
+      repoGates: {
+        docs_freshness_maintain: readRuntimeDocsFreshnessRepoGate(context)
+      }
     };
   }
 
@@ -407,6 +419,12 @@ function createControlRuntimeSnapshot(
       await readSelectedRunSnapshot();
     }
   };
+}
+
+function readRuntimeDocsFreshnessRepoGate(
+  context: ControlRuntimeContext
+): ReturnType<typeof readDocsFreshnessMaintainRepoGate> {
+  return readDocsFreshnessMaintainRepoGate({ env: context.env });
 }
 
 function buildProviderIntakeAuthorityContext(

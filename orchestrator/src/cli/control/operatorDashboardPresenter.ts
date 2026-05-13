@@ -17,6 +17,7 @@ import type {
   ControlProviderIntakeUnavailablePayload,
   ControlProviderWorkflowPayload
 } from './observabilityReadModel.js';
+import type { ControlRepoGatesPayload } from './docsFreshnessRepoGate.js';
 import {
   readProviderLinearWorkerWorkspacePath,
   resolveProviderWorkerHost
@@ -153,6 +154,7 @@ export interface OperatorDashboardDataset {
   retrying: OperatorDashboardRetryPayload[];
   issues: OperatorDashboardIssuePayload[];
   provider_workflow?: ControlProviderWorkflowPayload;
+  repo_gates?: ControlRepoGatesPayload | null;
   provider_intake?: ProviderIntakeSummaryPayload | null;
   provider_intake_unavailable?: ControlProviderIntakeUnavailablePayload;
   dispatch_pilot?: ControlDispatchPilotPayload;
@@ -201,6 +203,7 @@ export function buildUiDataset(input: {
     issues: issuePayloads.map((issue) => buildIssuePayload(issue, issue.issue_identifier === selectedIssueIdentifier)),
     ...(input.projection.fallbackExpiry ? { fallback_expiry: input.projection.fallbackExpiry } : {}),
     ...(input.projection.providerWorkflow ? { provider_workflow: input.projection.providerWorkflow } : {}),
+    ...(input.projection.repoGates ? { repo_gates: input.projection.repoGates } : {}),
     ...(input.projection.providerIntake ? { provider_intake: input.projection.providerIntake } : {}),
     ...(input.projection.providerIntakeUnavailable
       ? {

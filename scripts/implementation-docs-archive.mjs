@@ -12,6 +12,11 @@ import {
   pathExists,
   toPosixPath
 } from './lib/docs-helpers.js';
+import {
+  collectIndexedTaskPacketPaths,
+  isTerminalTaskItem,
+  TERMINAL_PENDING_ARCHIVE_STATUS
+} from './lib/docs-freshness-lifecycle.js';
 import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 const DEFAULT_POLICY_PATH = 'docs/implementation-docs-archive-policy.json';
@@ -19,10 +24,13 @@ const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
 const TASKS_INDEX_PATH = 'tasks/index.json';
 const ARCHIVE_MARKER = '<!-- docs-archive:stub -->';
 const DEFAULT_OWNER = 'Codex (top-level agent), Review agent';
-const TERMINAL_TASK_STATUSES = new Set(['succeeded', 'completed']);
-const REPORT_ONLY_FINDINGS_PATTERN = /^docs\/findings\/(\d+)-.*-deliberation\.md$/;
+const REPORT_ONLY_RETENTION_FINDINGS_PATTERN = /^docs\/findings\/(\d+)-.*-deliberation\.md$/;
+const REPORT_ONLY_TERMINAL_FINDINGS_PATTERN = /^docs\/findings\/(\d+)-.*\.md$/;
 const PRESERVED_HISTORICAL_STUB_STATUS = 'preserved_historical_stub';
 const REGISTRY_STATUS_ARCHIVE_ELIGIBLE = new Set(['archived', 'deprecated']);
+const TERMINAL_LIFECYCLE_ARCHIVE_ELIGIBLE_STATUSES = new Set(['active', TERMINAL_PENDING_ARCHIVE_STATUS]);
+const TERMINAL_TASK_LIFECYCLE_REASON = 'terminal_task_lifecycle';
+const ALREADY_ARCHIVED_PRESERVED_FINDINGS_REASON = 'already_archived_preserved_findings';
 const PRESERVED_HISTORICAL_STUB_PATH_PATTERNS = [/^tasks\/tasks-[^/]+\.md$/, /^\.agent\/task\/[^/]+\.md$/];
 const PRESERVED_HISTORICAL_STUB_HEADING_PATTERN = /^\s*#\s+Historical stub\b/i;
 
@@ -69,6 +77,34 @@ function matchesAnyPattern(value, patterns) {
   return patterns.some((regex) => regex.test(value));
 }
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function taskKeyAliases(taskKey) {
+  const normalizedTaskKey = typeof taskKey === 'string' ? taskKey.trim() : '';
+  if (!normalizedTaskKey) {
+    return [];
+  }
+  const aliases = new Set([normalizedTaskKey]);
+  const withoutNumericPrefix = normalizedTaskKey.replace(/^\d+-/u, '');
+  if (withoutNumericPrefix && withoutNumericPrefix !== normalizedTaskKey) {
+    aliases.add(withoutNumericPrefix);
+  }
+  return [...aliases];
+}
+
+function isTaskPacketDocReference(relativePath, taskKey) {
+  const aliases = taskKeyAliases(taskKey);
+  if (aliases.length === 0) {
+    return false;
+  }
+  return aliases.some((alias) => {
+    const escapedAlias = escapeRegExp(alias);
+    return new RegExp(`^docs/(?:PRD|TECH_SPEC|ACTION_PLAN)[_-]${escapedAlias}\\.md$`, 'u').test(relativePath);
+  });
+}
+
 function isPreservedHistoricalStubStatus(status) {
   return status === PRESERVED_HISTORICAL_STUB_STATUS;
 }
@@ -85,32 +121,15 @@ function isApprovedPreservedHistoricalStub(relativePath, content) {
   return isApprovedPreservedHistoricalStubPath(relativePath) && hasPreservedHistoricalStubHeading(content);
 }
 
+function isFindingsPath(relativePath) {
+  return typeof relativePath === 'string' && relativePath.startsWith('docs/findings/');
+}
+
 function collectIndexedDocPaths(item) {
   if (!item || typeof item !== 'object') {
     return [];
   }
-
-  const candidates = [];
-  if (typeof item.path === 'string' && item.path.trim()) {
-    candidates.push(item.path.trim());
-  }
-  if (typeof item.relates_to === 'string' && item.relates_to.trim()) {
-    candidates.push(item.relates_to.trim());
-  }
-
-  if (item.paths && typeof item.paths === 'object') {
-    for (const key of ['docs', 'task', 'spec', 'agent_task']) {
-      const value =
-        typeof item.paths[key] === 'string' && item.paths[key].trim()
-          ? item.paths[key].trim()
-          : '';
-      if (value) {
-        candidates.push(value);
-      }
-    }
-  }
-
-  return [...new Set(candidates.map((entry) => toPosixPath(entry)))];
+  return collectIndexedTaskPacketPaths(item).map((entry) => toPosixPath(entry));
 }
 
 function toContainedRepoRelativePath(repoRoot, absolutePath) {
@@ -264,12 +283,7 @@ function parsePolicy(raw, policyPath) {
 }
 
 function isCompletedTaskItem(item) {
-  if (!item || typeof item !== 'object') {
-    return false;
-  }
-
-  const status = typeof item.status === 'string' ? item.status : '';
-  return TERMINAL_TASK_STATUSES.has(status);
+  return isTerminalTaskItem(item);
 }
 
 function extractNumericTaskId(taskKey) {
@@ -394,7 +408,18 @@ async function main() {
 
   const taskLinkedDocs = new Set();
   const taskCandidates = [];
+  const taskCandidateKeys = new Set();
+  const reportOnlyTerminalEligibility = new Map();
   const reportOnlyRetentionEligibility = new Map();
+
+  function addTaskCandidate(candidate) {
+    const key = `${candidate.taskKey ?? ''}\0${candidate.path}`;
+    if (taskCandidateKeys.has(key)) {
+      return;
+    }
+    taskCandidateKeys.add(key);
+    taskCandidates.push(candidate);
+  }
 
   for (const item of items) {
     const taskKey = normalizeTaskKey(item);
@@ -402,6 +427,7 @@ async function main() {
       continue;
     }
     const docPaths = new Set();
+    const indexedDocPaths = new Set();
 
     for (const indexedPath of collectIndexedDocPaths(item)) {
       const containedIndexedPath = await resolveContainedPath(repoRoot, indexedPath, {
@@ -413,6 +439,7 @@ async function main() {
       }
 
       docPaths.add(containedIndexedPath.relativePath);
+      indexedDocPaths.add(containedIndexedPath.relativePath);
       if (containedIndexedPath.exists && (await pathExists(containedIndexedPath.absolutePath))) {
         const content = await readFile(containedIndexedPath.absolutePath, 'utf8');
         for (const ref of extractDocReferences(content, docRegexes)) {
@@ -422,6 +449,9 @@ async function main() {
           });
           if (normalizedRef) {
             docPaths.add(normalizedRef);
+            if (isTaskPacketDocReference(normalizedRef, taskKey)) {
+              indexedDocPaths.add(normalizedRef);
+            }
           }
         }
       }
@@ -429,10 +459,13 @@ async function main() {
 
     const checklistPath = `tasks/tasks-${taskKey}.md`;
     docPaths.add(checklistPath);
+    indexedDocPaths.add(checklistPath);
     const specPath = `tasks/specs/${taskKey}.md`;
     docPaths.add(specPath);
+    indexedDocPaths.add(specPath);
     const agentPath = `.agent/task/${taskKey}.md`;
     docPaths.add(agentPath);
+    indexedDocPaths.add(agentPath);
 
     for (const pathValue of docPaths) {
       if (excludeSet.has(pathValue)) {
@@ -443,21 +476,38 @@ async function main() {
 
     const completedDate = parseIsoDate(item.completed_at);
     const isTerminalTask = isCompletedTaskItem(item);
+    const fallbackTerminalDate = completedDate ?? parseIsoDate(item.last_review) ?? today;
     const numericTaskId = extractNumericTaskId(taskKey);
     if (numericTaskId) {
+      const existingTerminalEligibility = reportOnlyTerminalEligibility.get(numericTaskId) ?? {
+        candidate: null,
+        hasNonTerminalItem: false
+      };
+      if (!isTerminalTask) {
+        existingTerminalEligibility.hasNonTerminalItem = true;
+      } else if (fallbackTerminalDate) {
+        existingTerminalEligibility.candidate = {
+          taskId: numericTaskId,
+          taskKey,
+          completedAt: completedDate ? formatDate(completedDate) : null,
+          ageDays: computeAgeInDays(fallbackTerminalDate, today)
+        };
+      }
+      reportOnlyTerminalEligibility.set(numericTaskId, existingTerminalEligibility);
+
       const existingEligibility = reportOnlyRetentionEligibility.get(numericTaskId) ?? {
         candidate: null,
         hasNonTerminalItem: false
       };
       if (!isTerminalTask) {
         existingEligibility.hasNonTerminalItem = true;
-      } else if (completedDate) {
-        const ageDays = computeAgeInDays(completedDate, today);
+      } else if (fallbackTerminalDate) {
+        const ageDays = computeAgeInDays(fallbackTerminalDate, today);
         if (ageDays >= policy.retainDays) {
           const nextCandidate = {
             taskId: numericTaskId,
             taskKey,
-            completedAt: formatDate(completedDate),
+            completedAt: completedDate ? formatDate(completedDate) : null,
             ageDays
           };
           if (
@@ -471,19 +521,19 @@ async function main() {
       reportOnlyRetentionEligibility.set(numericTaskId, existingEligibility);
     }
 
-    if (!completedDate || !isTerminalTask) {
+    if (!isTerminalTask) {
       continue;
     }
 
-    const ageDays = computeAgeInDays(completedDate, today);
-    for (const pathValue of docPaths) {
+    const ageDays = computeAgeInDays(fallbackTerminalDate, today);
+    for (const pathValue of indexedDocPaths) {
       if (excludeSet.has(pathValue)) {
         continue;
       }
-      taskCandidates.push({
+      addTaskCandidate({
         path: pathValue,
         taskKey,
-        completedAt: formatDate(completedDate),
+        completedAt: completedDate ? formatDate(completedDate) : null,
         ageDays
       });
     }
@@ -506,15 +556,38 @@ async function main() {
       .map(([taskId, eligibility]) => [taskId, eligibility.candidate])
   );
   const reportOnlyFindingsByTaskId = new Map();
+  const terminalFindingsByTaskId = new Map();
   for (const docPath of allDocs) {
-    const match = docPath.match(REPORT_ONLY_FINDINGS_PATTERN);
-    if (!match) {
+    const terminalMatch = docPath.match(REPORT_ONLY_TERMINAL_FINDINGS_PATTERN);
+    if (terminalMatch?.[1]) {
+      const existing = terminalFindingsByTaskId.get(terminalMatch[1]) ?? [];
+      existing.push(docPath);
+      terminalFindingsByTaskId.set(terminalMatch[1], existing);
+    }
+    const retentionMatch = docPath.match(REPORT_ONLY_RETENTION_FINDINGS_PATTERN);
+    if (retentionMatch?.[1]) {
+      const existing = reportOnlyFindingsByTaskId.get(retentionMatch[1]) ?? [];
+      existing.push(docPath);
+      reportOnlyFindingsByTaskId.set(retentionMatch[1], existing);
+    }
+  }
+  for (const [taskId, eligibility] of reportOnlyTerminalEligibility.entries()) {
+    if (eligibility.hasNonTerminalItem || !eligibility.candidate) {
       continue;
     }
-    const taskId = match[1];
-    const existing = reportOnlyFindingsByTaskId.get(taskId) ?? [];
-    existing.push(docPath);
-    reportOnlyFindingsByTaskId.set(taskId, existing);
+    const taskContext = eligibility.candidate;
+    const findingPaths = terminalFindingsByTaskId.get(taskId) ?? [];
+    for (const relativePath of findingPaths) {
+      if (excludeSet.has(relativePath)) {
+        continue;
+      }
+      addTaskCandidate({
+        path: relativePath,
+        taskKey: taskContext.taskKey,
+        completedAt: taskContext.completedAt,
+        ageDays: taskContext.ageDays
+      });
+    }
   }
   const strayCandidates = allDocs.filter((docPath) => {
     if (excludeSet.has(docPath)) {
@@ -537,13 +610,24 @@ async function main() {
     generated_at: new Date().toISOString(),
     task_id: process.env.MCP_RUNNER_TASK_ID || null,
     policy_path: toPosixPath(path.relative(repoRoot, policyPath)),
+    action_path: {
+      kind: 'implementation_docs_archive_self_heal_pr',
+      dry_run: options.dryRun,
+      workflow: '.github/workflows/implementation-docs-archive-automation.yml',
+      archive_branch: policy.archiveBranch,
+      pr_branch: 'automation/implementation-docs-archive',
+      trigger: 'gh workflow run implementation-docs-archive-automation.yml --ref main',
+      action_required: false
+    },
     totals: {
       task_candidates: taskCandidates.length,
       stray_candidates: strayCandidates.length,
       archived: 0,
+      registry_repairs: 0,
       skipped: 0
     },
     archived: [],
+    registry_repairs: [],
     skipped: [],
     stray_candidates: []
   };
@@ -570,6 +654,30 @@ async function main() {
     };
   }
 
+  function markArchivedRegistryEntry(relativePath, { reason, context, archiveUrl, recordRepair = false }) {
+    const existingEntry = registryMap.get(relativePath);
+    if (existingEntry?.status === 'archived') {
+      return false;
+    }
+    const entry = ensureRegistryEntry(registryMap, relativePath, {
+      owner: DEFAULT_OWNER,
+      status: 'archived',
+      lastReview: todayString,
+      cadenceDays: policy.archivedCadenceDays
+    });
+    entry.status = 'archived';
+    entry.last_review = todayString;
+    entry.cadence_days = policy.archivedCadenceDays;
+    if (!entry.owner || typeof entry.owner !== 'string') {
+      entry.owner = DEFAULT_OWNER;
+    }
+    if (recordRepair) {
+      report.registry_repairs.push({ path: relativePath, reason, context, archive_url: archiveUrl });
+      report.totals.registry_repairs += 1;
+    }
+    return true;
+  }
+
   async function archiveDoc({ relativePath, reason, context, loadedDoc = null, preserveSourceDoc = false }) {
     const loaded = loadedDoc ?? (await loadContainedDoc(relativePath, context));
     if (!loaded) {
@@ -577,16 +685,22 @@ async function main() {
     }
 
     const { containedPath, content } = loaded;
+    const archiveRelativePath = containedPath.relativePath;
+    const archiveUrl = `${policy.repoUrl}/blob/${policy.archiveBranch}/${archiveRelativePath}`;
     if (content.includes(ARCHIVE_MARKER)) {
-      report.skipped.push({ path: relativePath, reason: 'already_stubbed', context });
+      const registryRepaired = markArchivedRegistryEntry(relativePath, {
+        reason: 'already_stubbed_active_registry',
+        context,
+        archiveUrl,
+        recordRepair: true
+      });
+      report.skipped.push({ path: relativePath, reason: 'already_stubbed', context, registry_repaired: registryRepaired });
       report.totals.skipped += 1;
       return;
     }
 
     const lines = content.split('\n');
     const headerLine = lines.find((line) => line.trim().startsWith('# ')) || null;
-    const archiveRelativePath = containedPath.relativePath;
-    const archiveUrl = `${policy.repoUrl}/blob/${policy.archiveBranch}/${archiveRelativePath}`;
     const stub = buildStubContent({
       headerLine,
       archiveUrl,
@@ -607,18 +721,11 @@ async function main() {
       }
     }
 
-    const entry = ensureRegistryEntry(registryMap, relativePath, {
-      owner: DEFAULT_OWNER,
-      status: 'archived',
-      lastReview: todayString,
-      cadenceDays: policy.archivedCadenceDays
+    markArchivedRegistryEntry(relativePath, {
+      reason,
+      context,
+      archiveUrl
     });
-    entry.status = 'archived';
-    entry.last_review = todayString;
-    entry.cadence_days = policy.archivedCadenceDays;
-    if (!entry.owner || typeof entry.owner !== 'string') {
-      entry.owner = DEFAULT_OWNER;
-    }
 
     report.archived.push({ path: relativePath, reason, context, archive_url: archiveUrl });
     report.totals.archived += 1;
@@ -657,7 +764,20 @@ async function main() {
       continue;
     }
 
+    if (status === 'archived' && isFindingsPath(relativePath)) {
+      report.skipped.push({
+        path: relativePath,
+        reason: ALREADY_ARCHIVED_PRESERVED_FINDINGS_REASON,
+        context: { ...candidate, lineCount, status }
+      });
+      report.totals.skipped += 1;
+      continue;
+    }
+
     const eligibleReasons = [];
+    if (TERMINAL_LIFECYCLE_ARCHIVE_ELIGIBLE_STATUSES.has(status)) {
+      eligibleReasons.push(TERMINAL_TASK_LIFECYCLE_REASON);
+    }
     if (REGISTRY_STATUS_ARCHIVE_ELIGIBLE.has(status)) {
       eligibleReasons.push('registry_status');
     }
@@ -682,7 +802,8 @@ async function main() {
       relativePath,
       reason: eligibleReasons.join(','),
       context: { ...candidate, lineCount },
-      loadedDoc
+      loadedDoc,
+      preserveSourceDoc: relativePath.startsWith('docs/findings/')
     });
   }
 
@@ -728,6 +849,9 @@ async function main() {
     }
 
     const eligibleReasons = [];
+    if (status === TERMINAL_PENDING_ARCHIVE_STATUS) {
+      eligibleReasons.push(TERMINAL_TASK_LIFECYCLE_REASON);
+    }
     if (REGISTRY_STATUS_ARCHIVE_ELIGIBLE.has(status)) {
       eligibleReasons.push('registry_status');
     }
@@ -797,16 +921,17 @@ async function main() {
   }
 
   report.totals.stray_candidates = report.stray_candidates.length;
+  report.action_path.action_required = report.totals.archived > 0 || report.totals.registry_repairs > 0;
 
-  const shouldUpdateRegistry = report.totals.archived > 0;
+  const shouldUpdateRegistry = report.totals.archived > 0 || report.totals.registry_repairs > 0;
   if (shouldUpdateRegistry) {
     registry.entries = Array.from(registryMap.values()).sort((a, b) => a.path.localeCompare(b.path));
     registry.generated_at = todayString;
   }
 
+  await mkdir(archiveOutRoot, { recursive: true });
+  await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
   if (!options.dryRun) {
-    await mkdir(archiveOutRoot, { recursive: true });
-    await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
     if (shouldUpdateRegistry) {
       await writeFile(registryPath, `${JSON.stringify(registry, null, 2)}\n`);
     }
@@ -816,7 +941,8 @@ async function main() {
   console.log(`Skipped docs: ${report.totals.skipped}`);
   console.log(`Stray candidates: ${report.totals.stray_candidates}`);
   if (options.dryRun) {
-    console.log('Dry run: no files were written.');
+    console.log('Dry run: no source or archive payload files were written.');
+    console.log(`Report: ${reportPath}`);
   } else {
     console.log(`Archive payload root: ${archivePayloadRoot}`);
     console.log(`Report: ${reportPath}`);

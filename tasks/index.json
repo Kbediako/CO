@@ -1,6 +1,55 @@
 {
   "items": [
     {
+      "id": "20260513-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94",
+      "title": "CO: make docs freshness preventive with lifecycle automation",
+      "relates_to": "tasks/tasks-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-13",
+      "canonical_owner_key": "docs:freshness:preventive-lifecycle",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:preventive-lifecycle",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO-525 provider worker",
+          "date": "2026-05-13",
+          "status": "ready_to_in_progress",
+          "summary": "linear issue-context found CO-525 Ready/unstarted with In Progress as the live started state, no attached PR, and no prior workpad."
+        },
+        "parallelization": {
+          "reviewer": "linear parallelization helper",
+          "date": "2026-05-13",
+          "decision": "parallelize_now",
+          "reason": "independent_scope_available",
+          "child_lane": ".runs/linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94-guide-catalog-parity/cli/2026-05-13T01-08-25-987Z-0db2306b/manifest.json",
+          "patch_artifact": ".runs/linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94-guide-catalog-parity/cli/2026-05-13T01-08-25-987Z-0db2306b/provider-linear-child-lane.patch",
+          "summary": "Child lane succeeded and produced a parity-test patch; the helper failed only while replacing the reserved lane bookkeeping record, so the parent validated with git apply --check and imported the patch manually."
+        },
+        "docs_first": {
+          "reviewer": "CO-525 provider worker",
+          "date": "2026-05-13",
+          "status": "packet_seeded",
+          "summary": "PRD, TECH_SPEC, ACTION_PLAN, task checklist, agent mirror, registry rows, docs/TASKS snapshot, and task index entry created before implementation edits."
+        }
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
+        "prd": "docs/PRD-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
+        "docs": "docs/TECH_SPEC-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
+        "action_plan": "docs/ACTION_PLAN-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
+        "spec": "tasks/specs/linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
+        "task": "tasks/tasks-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md"
+      },
+      "source_issue": {
+        "id": "ce8a2ed3-ae5c-4c50-87b7-79368ac22f94",
+        "identifier": "CO-525",
+        "url": "https://linear.app/asabeko/issue/CO-525/co-make-docs-freshness-preventive-with-lifecycle-automation"
+      }
+    },
+    {
       "id": "20260512-linear-b642e879-ba50-45ef-b0d9-b059afa9e932",
       "title": "CO: restore live docs freshness maintenance owner after CO-511 terminal",
       "relates_to": "tasks/tasks-linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md",

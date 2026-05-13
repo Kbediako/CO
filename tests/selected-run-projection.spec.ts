@@ -403,4 +403,81 @@ describe('createSelectedRunProjectionReader', () => {
       legacyProofFallback
     );
   });
+
+  it('projects docs freshness maintain repo gate separately from provider WIP', () => {
+    const statusProjection = buildCompatibilityProjectionSnapshot({
+      selected: null,
+      running: [],
+      retrying: [],
+      codexTotals: {
+        input_tokens: 0,
+        output_tokens: 0,
+        reasoning_output_tokens: 0,
+        total_tokens: 0,
+        seconds_running: 0
+      },
+      rateLimits: null,
+      dispatchPilot: null,
+      tracked: null,
+      providerIntake: {
+        summary_scope: 'all',
+        selection_strategy: 'none',
+        claim_count: 0,
+        active_claim_count: 0,
+        running_claim_count: 0,
+        active_issue_identifiers: [],
+        running_issue_identifiers: [],
+        selected_claim: null,
+        retry: null,
+        rehydrated_at: null,
+        is_rehydrated: false,
+        updated_at: null
+      },
+      providerIntakeUnavailable: null,
+      providerWorkflow: null,
+      repoGates: {
+        docs_freshness_maintain: {
+          id: 'docs_freshness_maintain',
+          severity: 'blocking',
+          freshness_decision: 'block_policy_over_budget',
+          owner: {
+            issue: 'CO-522',
+            action: 'update_existing',
+            state: 'Blocked',
+            state_type: 'started',
+            verified: true
+          },
+          spec_guard: {
+            status: 'succeeded',
+            action_required_count: 0
+          },
+          capacity: {
+            status: 'over_budget',
+            current_entries: 741,
+            max_entries: 300
+          },
+          next_expiry: '2026-05-20',
+          action_required_count: 33,
+          blocks_unrelated_lanes: true,
+          blocks_handoff: true,
+          provider_wip_impact: 'excluded_repo_gate'
+        }
+      },
+      polling: null
+    });
+
+    const uiDataset = buildUiDataset({
+      projection: statusProjection,
+      generatedAt: '2026-05-13T00:00:00.000Z'
+    });
+
+    expect(statusProjection.running).toHaveLength(0);
+    expect(uiDataset.counts.running).toBe(0);
+    expect(uiDataset.repo_gates?.docs_freshness_maintain).toMatchObject({
+      severity: 'blocking',
+      owner: { issue: 'CO-522' },
+      action_required_count: 33,
+      provider_wip_impact: 'excluded_repo_gate'
+    });
+  });
 });

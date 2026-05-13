@@ -48,6 +48,7 @@ export function summarizeDocsByClass(
   missing_on_disk: number;
   invalid_entries: number;
   stale_entries: number;
+  terminal_lifecycle_entries: number;
   uncatalogued_docs: number;
 }>;
 export function listBundledSkillNames(repoRoot: string): Promise<string[]>;

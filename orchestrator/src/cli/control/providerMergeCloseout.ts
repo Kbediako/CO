@@ -131,6 +131,7 @@ export interface ProviderDocsFreshnessOwnerCloseoutRecord {
   owner_issue: string | null;
   owner_issue_action: Record<string, unknown> | null;
   owner_issue_verification: Record<string, unknown> | null;
+  repo_gate: Record<string, unknown> | null;
   candidate_cohorts: Record<string, unknown>[];
   blocking_changed_paths: string[] | null;
   command: string | null;
@@ -1719,6 +1720,7 @@ async function resolveProviderDocsFreshnessOwnerCloseout(input: {
       owner_issue: null,
       owner_issue_action: null,
       owner_issue_verification: null,
+      repo_gate: null,
       candidate_cohorts: [],
       blocking_changed_paths: null,
       command: null,
@@ -1743,6 +1745,7 @@ async function resolveProviderDocsFreshnessOwnerCloseout(input: {
       owner_issue: null,
       owner_issue_action: null,
       owner_issue_verification: null,
+      repo_gate: null,
       candidate_cohorts: [],
       blocking_changed_paths: null,
       command: null,
@@ -1767,6 +1770,7 @@ async function resolveProviderDocsFreshnessOwnerCloseout(input: {
       owner_issue: null,
       owner_issue_action: null,
       owner_issue_verification: null,
+      repo_gate: null,
       candidate_cohorts: [],
       blocking_changed_paths: null,
       command: null,
@@ -1867,6 +1871,7 @@ async function readDocsFreshnessMaintainOwnerEvidence(input: {
     owner_issue: normalized.owner_issue,
     owner_issue_action: normalized.owner_issue_action,
     owner_issue_verification: normalized.owner_issue_verification,
+    repo_gate: normalized.repo_gate,
     candidate_cohorts: normalized.candidate_cohorts,
     blocking_changed_paths: normalized.blocking_changed_paths,
     command,
@@ -1907,6 +1912,7 @@ function normalizeDocsFreshnessMaintainDecision(value: Record<string, unknown> |
   owner_issue: string | null;
   owner_issue_action: Record<string, unknown> | null;
   owner_issue_verification: Record<string, unknown> | null;
+  repo_gate: Record<string, unknown> | null;
   candidate_cohorts: Record<string, unknown>[];
   blocking_changed_paths: string[] | null;
   report_path: string | null;
@@ -1919,6 +1925,10 @@ function normalizeDocsFreshnessMaintainDecision(value: Record<string, unknown> |
     value?.owner_issue_verification && typeof value.owner_issue_verification === 'object'
       ? (value.owner_issue_verification as Record<string, unknown>)
       : null;
+  const repoGate =
+    value?.repo_gate && typeof value.repo_gate === 'object'
+      ? (value.repo_gate as Record<string, unknown>)
+      : null;
   const candidateCohorts = Array.isArray(value?.candidate_cohorts)
     ? value.candidate_cohorts.filter((cohort): cohort is Record<string, unknown> =>
         Boolean(cohort && typeof cohort === 'object')
@@ -1929,6 +1939,7 @@ function normalizeDocsFreshnessMaintainDecision(value: Record<string, unknown> |
     owner_issue: normalizeOptionalString(value?.owner_issue),
     owner_issue_action: ownerIssueAction,
     owner_issue_verification: ownerIssueVerification,
+    repo_gate: repoGate,
     candidate_cohorts: candidateCohorts,
     blocking_changed_paths: Array.isArray(value?.blocking_changed_paths)
       ? value.blocking_changed_paths.map(normalizeOptionalString).filter((entry): entry is string => Boolean(entry))

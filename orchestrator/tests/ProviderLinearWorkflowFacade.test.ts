@@ -126,6 +126,10 @@ async function seedFollowUpPacketReadiness(repoRoot: string, followUpTaskId: str
   ];
   const canonicalTaskId = `20260508-${followUpTaskId}`;
   const lastReview = new Date().toISOString().slice(0, 10);
+  const nextReview = new Date();
+  nextReview.setUTCHours(0, 0, 0, 0);
+  nextReview.setUTCDate(nextReview.getUTCDate() + 30);
+  const nextReviewDate = nextReview.toISOString().slice(0, 10);
   await Promise.all([
     writeFile(join(repoRoot, `docs/PRD-${followUpTaskId}.md`), followUpTaskId),
     writeFile(join(repoRoot, `docs/TECH_SPEC-${followUpTaskId}.md`), followUpTaskId),
@@ -166,8 +170,16 @@ async function seedFollowUpPacketReadiness(repoRoot: string, followUpTaskId: str
           path,
           owner: 'Codex (top-level agent), Review agent',
           status: 'active',
+          source_issue: {
+            id: 'lin-issue-254',
+            identifier: 'CO-254'
+          },
+          doc_class: path.startsWith('.agent/task/') ? 'task_mirror' : 'task_packet',
+          lifecycle_state: 'active',
+          created_at: lastReview,
           last_review: lastReview,
-          cadence_days: 30
+          cadence_days: 30,
+          next_review: nextReviewDate
         }))
       })
     )
