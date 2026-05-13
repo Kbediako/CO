@@ -1464,6 +1464,85 @@ describe('docs freshness maintenance decisions', () => {
     ]);
   });
 
+  it('routes pathless spec-guard fallback summary failures through owner action evidence', () => {
+    const canonicalOwnerKey =
+      'spec_guard_fallback_seam|path_family:scripts|failure_kind:fallback_seam_decision_missing';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          canonical_owner_key: 'docs:freshness:maintain',
+          owner_issue: 'CO-522',
+          require_live_owner_verification: true,
+          owner_issue_project_id: 'project-1'
+        }),
+        stale_entries: [],
+        rolling_cohort_entries: [],
+        totals: {
+          docs_scanned: 0,
+          registry_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 0,
+          rolling_cohort_entries: 0,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: {
+          status: 'failed',
+          full_output: [
+            'Spec guard failed:',
+            ' - fallback/seam-touching changes require updated PRD decision evidence (scripts/docs-freshness-maintain.mjs, orchestrator/src/cli/control/providerLinearWorkflowFacade.ts)'
+          ].join('\n')
+        },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main',
+        ownerIssueVerification: {
+          issue: 'CO-522',
+          issue_id: 'owner-id',
+          state: 'Blocked',
+          state_type: 'started',
+          is_terminal: false,
+          usable: true,
+          project_id: 'project-1',
+          expected_project_id: 'project-1',
+          same_project: true,
+          verification_status: 'succeeded',
+          checked_at: null,
+          source: 'linear issue-context',
+          error: null
+        }
+      }
+    );
+
+    expect(decision.spec_guard.parsed_failures).toEqual([
+      expect.objectContaining({
+        path: 'scripts/docs-freshness-maintain.mjs',
+        path_family: 'scripts',
+        failure_kind: 'fallback_seam_decision_missing',
+        message:
+          'fallback/seam-touching changes require updated PRD decision evidence (scripts/docs-freshness-maintain.mjs, orchestrator/src/cli/control/providerLinearWorkflowFacade.ts)'
+      })
+    ]);
+    expect(decision.totals.spec_guard_candidate_cohorts).toBe(1);
+    expect(decision.candidate_cohorts).toEqual([
+      expect.objectContaining({
+        route_id: 'co-382-fallback-seam-metadata',
+        status: 'spec_guard_fallback_seam_candidate',
+        canonical_owner_key: canonicalOwnerKey,
+        source_breakdown: { spec_guard: 1 },
+        sample_paths: ['scripts/docs-freshness-maintain.mjs']
+      })
+    ]);
+    expect(decision.repo_gate.spec_guard).toEqual({
+      status: 'failed',
+      action_required_count: 1
+    });
+  });
+
   it('does not reuse canonical owner verification across different scoped configs for the same issue', () => {
     const lastReview = '2026-03-23';
     const tasksCanonicalOwnerKey =

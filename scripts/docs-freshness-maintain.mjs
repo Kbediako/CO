@@ -119,6 +119,8 @@ const SPEC_GUARD_STALE_SPEC_PATTERN =
   /^(?:-\s+)?((?:tasks\/specs|docs\/design\/specs)\/[^:]+): last_review (\d{4}-\d{2}-\d{2}) is (\d+) days old \(must be (?:<=|≤)(\d+) days\)$/u;
 const SPEC_GUARD_FALLBACK_SEAM_PATTERN =
   /^(?:-\s+)?([^:]+\.md):\s+(.*\b(?:fallback|seam)\b.*)$/iu;
+const SPEC_GUARD_FALLBACK_SEAM_SUMMARY_PATTERN = /^(?:-\s+)?(.*\b(?:fallback|seam)\b.*)$/iu;
+const SPEC_GUARD_FALLBACK_SEAM_SUMMARY_PATH = 'spec-guard/fallback-seam';
 
 function specGuardPathFamily(file) {
   if (file.startsWith('docs/design/specs/')) {
@@ -145,6 +147,9 @@ function specGuardPathFamily(file) {
   }
   if (file.startsWith('tasks/tasks-')) {
     return 'tasks/tasks-*';
+  }
+  if (file.startsWith('spec-guard/')) {
+    return 'spec-guard';
   }
   return file.split('/').slice(0, -1).join('/') || 'repo';
 }
@@ -205,19 +210,33 @@ function parseSpecGuardFallbackSeamLine(line) {
   if (!normalizedLine) {
     return null;
   }
-  const match = SPEC_GUARD_FALLBACK_SEAM_PATTERN.exec(normalizedLine);
-  if (!match) {
+  const pathMatch = SPEC_GUARD_FALLBACK_SEAM_PATTERN.exec(normalizedLine);
+  const summaryMatch = pathMatch ? null : SPEC_GUARD_FALLBACK_SEAM_SUMMARY_PATTERN.exec(normalizedLine);
+  if (!pathMatch && !summaryMatch) {
     return null;
   }
-  const [, file, message] = match;
-  const normalizedFile = normalizeDocPath(file);
+  const [, file, pathMessage] = pathMatch ?? [];
+  const summaryMessage = summaryMatch?.[1] ?? null;
+  const message = pathMessage ?? summaryMessage;
+  if (!message) {
+    return null;
+  }
+  const parenthesizedPath = message
+    .match(/\(([^()]+)\)\s*$/u)?.[1]
+    ?.split(',')
+    .map((candidate) => normalizeDocPath(candidate))
+    .find((candidate) => candidate.includes('/'));
+  const failurePath = file ?? parenthesizedPath ?? SPEC_GUARD_FALLBACK_SEAM_SUMMARY_PATH;
+  if (!failurePath) {
+    return null;
+  }
   const normalizedMessage = message.trim();
   const dateMatch = normalizedMessage.match(
     /\b(?:introduced date|review date|maximum lifetime)\s+(\d{4}-\d{2}-\d{2})\b/u
   );
   return {
-    path: normalizedFile,
-    path_family: specGuardPathFamily(normalizedFile),
+    path: normalizeDocPath(failurePath),
+    path_family: specGuardPathFamily(normalizeDocPath(failurePath)),
     failure_kind: classifySpecGuardFallbackSeamMessage(normalizedMessage),
     message: normalizedMessage,
     evidence_date: dateMatch?.[1] ?? null,
