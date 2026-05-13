@@ -1480,20 +1480,20 @@ function inspectMultiAgentV2ThreadCapCheck(
   capSupported: boolean | null,
   codexVersion: string | null
 ): DoctorCodexDefaultsAdvisory['checks']['multi_agent_v2_thread_cap'] {
-  if (!multiAgentV2Enabled) {
-    return buildMissingMultiAgentV2ThreadCapCheck(multiAgentV2Enabled, capSupported, codexVersion);
-  }
   const configured = readConfiguredMultiAgentV2ThreadCap(config);
-  if (!configured) {
-    return buildMissingMultiAgentV2ThreadCapCheck(multiAgentV2Enabled, capSupported, codexVersion);
-  }
-  if (!configured.valid) {
+  if (configured && !configured.valid) {
     return {
       status: 'advisory',
       actual: null,
       path: configured.path,
       detail: `${configured.path} must be a positive integer thread cap`
     };
+  }
+  if (!multiAgentV2Enabled) {
+    return buildMissingMultiAgentV2ThreadCapCheck(multiAgentV2Enabled, capSupported, codexVersion);
+  }
+  if (!configured) {
+    return buildMissingMultiAgentV2ThreadCapCheck(multiAgentV2Enabled, capSupported, codexVersion);
   }
   if (capSupported === false) {
     return {
