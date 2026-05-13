@@ -365,6 +365,67 @@ describe('implementation-docs-archive script', () => {
     });
   });
 
+  it('uses timestamp-form completed_at for terminal lifecycle age evidence', async () => {
+    const now = new Date();
+    now.setUTCHours(0, 0, 0, 0);
+    const completedDate = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+    const completedDay = completedDate.toISOString().slice(0, 10);
+    const repo = await initRepository({
+      policyOverrides: {
+        retain_days: 99999,
+        max_lines: 99999
+      },
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'docs/PRD-archive-test.md',
+            owner: 'Codex (top-level agent), Review agent',
+            status: 'active',
+            last_review: '2025-01-01',
+            cadence_days: 30
+          }
+        ]
+      },
+      taskOverrides: {
+        status: 'done',
+        completed_at: `${completedDay}T06:59:43.056Z`,
+        last_review: '2025-01-01'
+      }
+    });
+
+    await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'docs-truthfulness-maintenance',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const report = JSON.parse(
+      await readFile(
+        join(
+          repo,
+          'out',
+          'docs-truthfulness-maintenance',
+          'docs-archive-report.json'
+        ),
+        'utf8'
+      )
+    );
+
+    expect(report.archived[0]).toMatchObject({
+      path: 'docs/PRD-archive-test.md',
+      reason: 'terminal_task_lifecycle',
+      context: {
+        completedAt: completedDay,
+        ageDays: 3
+      }
+    });
+  });
+
   it('archives terminal_pending_archive packet rows without waiting for age or size triggers', async () => {
     const repo = await initRepository({
       policyOverrides: {

@@ -9,6 +9,7 @@ import {
   computeAgeInDays,
   normalizeTaskKey,
   parseIsoDate,
+  parseIsoDateOrTimestamp,
   pathExists,
   toPosixPath
 } from './lib/docs-helpers.js';
@@ -474,7 +475,7 @@ async function main() {
       taskLinkedDocs.add(pathValue);
     }
 
-    const completedDate = parseIsoDate(item.completed_at);
+    const completedDate = parseIsoDateOrTimestamp(item.completed_at);
     const isTerminalTask = isCompletedTaskItem(item);
     const fallbackTerminalDate = completedDate ?? parseIsoDate(item.last_review) ?? today;
     const numericTaskId = extractNumericTaskId(taskKey);

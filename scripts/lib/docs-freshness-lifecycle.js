@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { normalizeTaskKey, parseIsoDate } from './docs-helpers.js';
+import { normalizeTaskKey, parseIsoDateOrTimestamp } from './docs-helpers.js';
 
 export const TERMINAL_PENDING_ARCHIVE_STATUS = 'terminal_pending_archive';
 export const PRESERVED_HISTORICAL_STUB_STATUS = 'preserved_historical_stub';
@@ -78,6 +78,13 @@ export function classifyTaskPacketPathFamily(docPath) {
   }
   const parts = normalizedPath.split('/').filter(Boolean);
   return parts.length <= 1 ? normalizedPath : `${parts[0]}/${parts[1]}`;
+}
+
+function formatDate(date) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export function isTaskPacketLifecyclePath(docPath) {
@@ -170,13 +177,13 @@ export function buildTaskPacketLifecycleIndex(items) {
     }
 
     const completedAt = normalizeOptionalString(item.completed_at);
-    const completedDate = completedAt ? parseIsoDate(completedAt) : null;
+    const completedDate = completedAt ? parseIsoDateOrTimestamp(completedAt) : null;
     const taskLifecycle = {
       task_id: normalizeOptionalString(item.id) ?? taskKey,
       task_key: taskKey,
       title: normalizeOptionalString(item.title),
       status: normalizeOptionalString(item.status),
-      completed_at: completedDate ? completedAt : null,
+      completed_at: completedDate ? formatDate(completedDate) : null,
       source_issue: readSourceIssue(item)
     };
     terminalItems.push(taskLifecycle);

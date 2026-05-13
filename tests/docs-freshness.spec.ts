@@ -625,7 +625,7 @@ describe('docs freshness reporting', () => {
               id: '1234',
               slug: numericTaskKey,
               status: 'done',
-              completed_at: reviewDateDaysAgo(1),
+              completed_at: `${reviewDateDaysAgo(1)}T06:59:43.056Z`,
               relates_to: `tasks/tasks-${taskKey}.md`,
               paths: {
                 agent_task: `.agent/task/${taskKey}.md`,
@@ -682,6 +682,7 @@ describe('docs freshness reporting', () => {
           lifecycle_state: 'terminal_pending_archive',
           recommended_action: 'archive_or_reclassify_terminal_packet',
           task_key: numericTaskKey,
+          completed_at: reviewDateDaysAgo(1),
           source_issue: expect.objectContaining({ identifier: 'CO-999' })
         })
       ])
