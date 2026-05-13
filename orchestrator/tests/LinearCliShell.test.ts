@@ -332,7 +332,12 @@ async function seedCliFollowUpPacketReadiness(repoRoot: string, followUpTaskId: 
     mkdir(join(repoRoot, '.agent', 'task'), { recursive: true })
   ]);
   await Promise.all(requiredPaths.map((path) => writeFile(join(repoRoot, path), followUpTaskId, 'utf8')));
+  const sourceIssueId = followUpTaskId.replace(/^linear-/u, '');
   const lastReview = new Date().toISOString().slice(0, 10);
+  const nextReview = new Date();
+  nextReview.setUTCHours(0, 0, 0, 0);
+  nextReview.setUTCDate(nextReview.getUTCDate() + 30);
+  const nextReviewDate = nextReview.toISOString().slice(0, 10);
   await Promise.all([
     writeFile(
       join(repoRoot, 'tasks/index.json'),
@@ -366,8 +371,15 @@ async function seedCliFollowUpPacketReadiness(repoRoot: string, followUpTaskId: 
           path,
           owner: 'Codex (top-level agent), Review agent',
           status: 'active',
+          source_issue: {
+            id: sourceIssueId
+          },
+          doc_class: 'task_packet',
+          lifecycle_state: 'active',
+          created_at: lastReview,
           last_review: lastReview,
-          cadence_days: 30
+          cadence_days: 30,
+          next_review: nextReviewDate
         }))
       }),
       'utf8'

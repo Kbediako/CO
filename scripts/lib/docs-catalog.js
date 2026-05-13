@@ -193,6 +193,7 @@ export function summarizeDocsByClass(items, catalog) {
         missing_on_disk: 0,
         invalid_entries: 0,
         stale_entries: 0,
+        terminal_lifecycle_entries: 0,
         uncatalogued_docs: 0
       });
     }
@@ -213,6 +214,8 @@ export function summarizeDocsByClass(items, catalog) {
       bucket.invalid_entries += 1;
     } else if (item.metric === 'stale_entries') {
       bucket.stale_entries += 1;
+    } else if (item.metric === 'terminal_lifecycle_entries') {
+      bucket.terminal_lifecycle_entries += 1;
     } else if (item.metric === 'uncatalogued_docs') {
       bucket.uncatalogued_docs += 1;
     }

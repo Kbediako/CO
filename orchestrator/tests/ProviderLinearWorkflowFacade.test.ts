@@ -126,6 +126,10 @@ async function seedFollowUpPacketReadiness(repoRoot: string, followUpTaskId: str
   ];
   const canonicalTaskId = `20260508-${followUpTaskId}`;
   const lastReview = new Date().toISOString().slice(0, 10);
+  const nextReview = new Date();
+  nextReview.setUTCHours(0, 0, 0, 0);
+  nextReview.setUTCDate(nextReview.getUTCDate() + 30);
+  const nextReviewDate = nextReview.toISOString().slice(0, 10);
   await Promise.all([
     writeFile(join(repoRoot, `docs/PRD-${followUpTaskId}.md`), followUpTaskId),
     writeFile(join(repoRoot, `docs/TECH_SPEC-${followUpTaskId}.md`), followUpTaskId),
@@ -166,8 +170,16 @@ async function seedFollowUpPacketReadiness(repoRoot: string, followUpTaskId: str
           path,
           owner: 'Codex (top-level agent), Review agent',
           status: 'active',
+          source_issue: {
+            id: 'lin-issue-254',
+            identifier: 'CO-254'
+          },
+          doc_class: path.startsWith('.agent/task/') ? 'task_mirror' : 'task_packet',
+          lifecycle_state: 'active',
+          created_at: lastReview,
           last_review: lastReview,
-          cadence_days: 30
+          cadence_days: 30,
+          next_review: nextReviewDate
         }))
       })
     )
@@ -16882,6 +16894,10 @@ describe('providerLinearWorkflowFacade', () => {
       '- Follow-up packet prefix: `linear-lin-issue-254`'
     ].join('\n');
     const currentReviewDate = new Date().toISOString().slice(0, 10);
+    const futureReviewDate = new Date();
+    futureReviewDate.setUTCHours(0, 0, 0, 0);
+    futureReviewDate.setUTCDate(futureReviewDate.getUTCDate() + 30);
+    const futureReviewDateString = futureReviewDate.toISOString().slice(0, 10);
     const runWithRepoRoot = async (repoRoot: string) => {
       const calls: string[] = [];
       const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
@@ -17053,6 +17069,45 @@ describe('providerLinearWorkflowFacade', () => {
       })
     );
     await expect(runWithRepoRoot(staleRegistryRoot)).resolves.toMatchObject({
+      ok: true,
+      traceability: {
+        packet: {
+          readiness: {
+            ready: false,
+            missing_registry_mirrors: ['docs/docs-freshness-registry.json']
+          },
+          queue_admission_blocker: {
+            reason: 'backlog_head_follow_up_traceability_pending',
+            state: 'Backlog'
+          }
+        }
+      }
+    });
+
+    const expiryOnlyRegistryRoot = await mkdtemp(join(tmpdir(), 'provider-linear-follow-up-expiry-registry-'));
+    tempDirs.push(expiryOnlyRegistryRoot);
+    await seedFollowUpPacketReadiness(expiryOnlyRegistryRoot, followUpTaskId);
+    await writeFile(
+      join(expiryOnlyRegistryRoot, 'docs/docs-freshness-registry.json'),
+      JSON.stringify({
+        entries: requiredPaths.map((path) => ({
+          path,
+          owner: 'Codex (top-level agent), Review agent',
+          status: 'active',
+          source_issue: {
+            id: 'lin-issue-254',
+            identifier: 'CO-254'
+          },
+          doc_class: path.startsWith('.agent/task/') ? 'task_mirror' : 'task_packet',
+          lifecycle_state: 'active',
+          created_at: currentReviewDate,
+          last_review: currentReviewDate,
+          cadence_days: 30,
+          expiry: futureReviewDateString
+        }))
+      })
+    );
+    await expect(runWithRepoRoot(expiryOnlyRegistryRoot)).resolves.toMatchObject({
       ok: true,
       traceability: {
         packet: {

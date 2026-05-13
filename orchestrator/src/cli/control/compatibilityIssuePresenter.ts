@@ -238,6 +238,7 @@ export function buildCompatibilityProjectionSnapshot(
     providerIntake: snapshot.providerIntake,
     providerIntakeUnavailable: snapshot.providerIntakeUnavailable,
     providerWorkflow: snapshot.providerWorkflow,
+    repoGates: snapshot.repoGates ?? null,
     polling: snapshot.polling,
     fallbackExpiry: buildControlHostStatusFallbackDecisionSet(
       CONTROL_HOST_STATUS_FALLBACK_DECISION_KEYS

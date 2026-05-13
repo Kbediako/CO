@@ -1,6 +1,55 @@
 {
   "items": [
     {
+      "id": "20260513-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94",
+      "title": "CO: make docs freshness preventive with lifecycle automation",
+      "relates_to": "tasks/tasks-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-13",
+      "canonical_owner_key": "docs:freshness:preventive-lifecycle",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:preventive-lifecycle",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO-525 provider worker",
+          "date": "2026-05-13",
+          "status": "ready_to_in_progress",
+          "summary": "linear issue-context found CO-525 Ready/unstarted with In Progress as the live started state, no attached PR, and no prior workpad."
+        },
+        "parallelization": {
+          "reviewer": "linear parallelization helper",
+          "date": "2026-05-13",
+          "decision": "parallelize_now",
+          "reason": "independent_scope_available",
+          "child_lane": ".runs/linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94-guide-catalog-parity/cli/2026-05-13T01-08-25-987Z-0db2306b/manifest.json",
+          "patch_artifact": ".runs/linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94-guide-catalog-parity/cli/2026-05-13T01-08-25-987Z-0db2306b/provider-linear-child-lane.patch",
+          "summary": "Child lane succeeded and produced a parity-test patch; the helper failed only while replacing the reserved lane bookkeeping record, so the parent validated with git apply --check and imported the patch manually."
+        },
+        "docs_first": {
+          "reviewer": "CO-525 provider worker",
+          "date": "2026-05-13",
+          "status": "packet_seeded",
+          "summary": "PRD, TECH_SPEC, ACTION_PLAN, task checklist, agent mirror, registry rows, docs/TASKS snapshot, and task index entry created before implementation edits."
+        }
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
+        "prd": "docs/PRD-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
+        "docs": "docs/TECH_SPEC-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
+        "action_plan": "docs/ACTION_PLAN-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
+        "spec": "tasks/specs/linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
+        "task": "tasks/tasks-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md"
+      },
+      "source_issue": {
+        "id": "ce8a2ed3-ae5c-4c50-87b7-79368ac22f94",
+        "identifier": "CO-525",
+        "url": "https://linear.app/asabeko/issue/CO-525/co-make-docs-freshness-preventive-with-lifecycle-automation"
+      }
+    },
+    {
       "id": "20260512-linear-b642e879-ba50-45ef-b0d9-b059afa9e932",
       "title": "CO: restore live docs freshness maintenance owner after CO-511 terminal",
       "relates_to": "tasks/tasks-linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md",
@@ -8192,6 +8241,13 @@
         "task": "tasks/tasks-linear-8c691f55-5277-443a-b5dd-1f3f548b1b6d.md",
         "agent_task": ".agent/task/linear-8c691f55-5277-443a-b5dd-1f3f548b1b6d.md",
         "docs": "docs/TECH_SPEC-linear-8c691f55-5277-443a-b5dd-1f3f548b1b6d.md"
+      },
+      "status": "done",
+      "completed_at": "2026-04-17T06:59:43.056Z",
+      "source_issue": {
+        "id": "8c691f55-5277-443a-b5dd-1f3f548b1b6d",
+        "identifier": "CO-162",
+        "url": "https://linear.app/asabeko/issue/CO-162/co-stop-startup-recovery-sweeps-from-burning-issue-by-id-reads-for"
       }
     },
     {
@@ -8209,6 +8265,13 @@
         "task": "tasks/tasks-linear-ea9e2ac7-6072-4f60-bd9c-1ab5d2c9e8cf.md",
         "agent_task": ".agent/task/linear-ea9e2ac7-6072-4f60-bd9c-1ab5d2c9e8cf.md",
         "docs": "docs/TECH_SPEC-linear-ea9e2ac7-6072-4f60-bd9c-1ab5d2c9e8cf.md"
+      },
+      "status": "done",
+      "completed_at": "2026-04-18T05:43:32.883Z",
+      "source_issue": {
+        "id": "ea9e2ac7-6072-4f60-bd9c-1ab5d2c9e8cf",
+        "identifier": "CO-157",
+        "url": "https://linear.app/asabeko/issue/CO-157/co-workflow-add-a-truthful-non-repro-path-for-forced-child-lane"
       }
     },
     {
@@ -8226,6 +8289,13 @@
         "task": "tasks/tasks-linear-b792b517-98e4-4518-9fb2-860996dd62c8.md",
         "agent_task": ".agent/task/linear-b792b517-98e4-4518-9fb2-860996dd62c8.md",
         "docs": "docs/TECH_SPEC-linear-b792b517-98e4-4518-9fb2-860996dd62c8.md"
+      },
+      "status": "done",
+      "completed_at": "2026-04-12T15:25:48.840Z",
+      "source_issue": {
+        "id": "b792b517-98e4-4518-9fb2-860996dd62c8",
+        "identifier": "CO-130",
+        "url": "https://linear.app/asabeko/issue/CO-130/co-validation-stabilize-unrelated-cliruntime-test-timeouts-that-block"
       }
     },
     {
@@ -8243,6 +8313,13 @@
         "task": "tasks/tasks-linear-95011595-52df-4ad8-9cb5-256e7eee5424.md",
         "agent_task": ".agent/task/linear-95011595-52df-4ad8-9cb5-256e7eee5424.md",
         "docs": "docs/TECH_SPEC-linear-95011595-52df-4ad8-9cb5-256e7eee5424.md"
+      },
+      "status": "done",
+      "completed_at": "2026-04-15T01:29:13.162Z",
+      "source_issue": {
+        "id": "95011595-52df-4ad8-9cb5-256e7eee5424",
+        "identifier": "CO-160",
+        "url": "https://linear.app/asabeko/issue/CO-160/co-stop-released-provider-claims-from-burning-linear-issue-by-id-polls"
       }
     },
     {
@@ -8260,6 +8337,13 @@
         "task": "tasks/tasks-linear-74aec03f-253a-4d8e-a713-e1fbd7a1cb47.md",
         "agent_task": ".agent/task/linear-74aec03f-253a-4d8e-a713-e1fbd7a1cb47.md",
         "docs": "docs/TECH_SPEC-linear-74aec03f-253a-4d8e-a713-e1fbd7a1cb47.md"
+      },
+      "status": "done",
+      "completed_at": "2026-04-16T10:16:18.844Z",
+      "source_issue": {
+        "id": "74aec03f-253a-4d8e-a713-e1fbd7a1cb47",
+        "identifier": "CO-159",
+        "url": "https://linear.app/asabeko/issue/CO-159/co-stop-stale-review-and-dead-claim-reconciliation-from-burning-linear"
       }
     },
     {
@@ -8277,6 +8361,13 @@
         "task": "tasks/tasks-linear-e934e6ea-8fdd-480c-9656-22c020cb19cf.md",
         "agent_task": ".agent/task/linear-e934e6ea-8fdd-480c-9656-22c020cb19cf.md",
         "docs": "docs/TECH_SPEC-linear-e934e6ea-8fdd-480c-9656-22c020cb19cf.md"
+      },
+      "status": "done",
+      "completed_at": "2026-04-14T05:04:25.810Z",
+      "source_issue": {
+        "id": "e934e6ea-8fdd-480c-9656-22c020cb19cf",
+        "identifier": "CO-156",
+        "url": "https://linear.app/asabeko/issue/CO-156/co-workflow-hard-gate-all-linear-consumers-on-shared-request-headroom"
       }
     },
     {
@@ -8294,6 +8385,13 @@
         "task": "tasks/tasks-linear-39a7ba03-ca72-4656-8941-f51250b09413.md",
         "agent_task": ".agent/task/linear-39a7ba03-ca72-4656-8941-f51250b09413.md",
         "docs": "docs/TECH_SPEC-linear-39a7ba03-ca72-4656-8941-f51250b09413.md"
+      },
+      "status": "done",
+      "completed_at": "2026-04-14T01:25:50.584Z",
+      "source_issue": {
+        "id": "39a7ba03-ca72-4656-8941-f51250b09413",
+        "identifier": "CO-155",
+        "url": "https://linear.app/asabeko/issue/CO-155/co-workflow-restore-repo-wide-specdocs-freshness-baselines-after-30"
       }
     },
     {
@@ -8317,6 +8415,13 @@
         "task": "tasks/tasks-linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c.md",
         "agent_task": ".agent/task/linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c.md",
         "docs": "docs/TECH_SPEC-linear-99d7fc30-93ab-43fd-94c2-68d604b4f85c.md"
+      },
+      "status": "done",
+      "completed_at": "2026-04-12T10:33:29.717Z",
+      "source_issue": {
+        "id": "99d7fc30-93ab-43fd-94c2-68d604b4f85c",
+        "identifier": "CO-96",
+        "url": "https://linear.app/asabeko/issue/CO-96/add-memory-provenance-and-outcome-schema-to-manifests-events-and"
       }
     },
     {
@@ -8334,6 +8439,13 @@
         "task": "tasks/tasks-linear-b3286a9a-9cef-45a5-bd8a-532856a1188d.md",
         "agent_task": ".agent/task/linear-b3286a9a-9cef-45a5-bd8a-532856a1188d.md",
         "docs": "docs/TECH_SPEC-linear-b3286a9a-9cef-45a5-bd8a-532856a1188d.md"
+      },
+      "status": "done",
+      "completed_at": "2026-04-11T23:20:04.548Z",
+      "source_issue": {
+        "id": "b3286a9a-9cef-45a5-bd8a-532856a1188d",
+        "identifier": "CO-127",
+        "url": "https://linear.app/asabeko/issue/CO-127/co-harden-run-review-direct-exec-symlink-handling-without-regressing"
       }
     },
     {
@@ -8366,6 +8478,13 @@
         "task": "tasks/tasks-linear-01e21df6-6438-4246-a423-a686f6020c5e.md",
         "agent_task": ".agent/task/linear-01e21df6-6438-4246-a423-a686f6020c5e.md",
         "docs": "docs/TECH_SPEC-linear-01e21df6-6438-4246-a423-a686f6020c5e.md"
+      },
+      "status": "done",
+      "completed_at": "2026-04-12T02:50:42.556Z",
+      "source_issue": {
+        "id": "01e21df6-6438-4246-a423-a686f6020c5e",
+        "identifier": "CO-95",
+        "url": "https://linear.app/asabeko/issue/CO-95/add-retrieval-stage-competitive-scoring-and-anti-dominance"
       }
     },
     {
@@ -8401,6 +8520,13 @@
         "task": "tasks/tasks-linear-763df058-1809-457d-823f-f56268fd9dcc.md",
         "agent_task": ".agent/task/linear-763df058-1809-457d-823f-f56268fd9dcc.md",
         "docs": "docs/TECH_SPEC-linear-763df058-1809-457d-823f-f56268fd9dcc.md"
+      },
+      "status": "done",
+      "completed_at": "2026-04-13T11:05:55.884Z",
+      "source_issue": {
+        "id": "763df058-1809-457d-823f-f56268fd9dcc",
+        "identifier": "CO-17",
+        "url": "https://linear.app/asabeko/issue/CO-17/co-evaluate-telemetry-first-dynamic-provider-worker-reasoning"
       }
     },
     {

@@ -9398,6 +9398,12 @@ function docsFreshnessRegistryEntryHasValidMetadata(entry: Record<string, unknow
     : null;
   const lastReview = typeof entry.last_review === 'string' ? entry.last_review : null;
   const owner = typeof entry.owner === 'string' ? normalizeOptionalString(entry.owner) : null;
+  const sourceIssue = normalizeDocsFreshnessSourceIssue(entry.source_issue);
+  const docClass = typeof entry.doc_class === 'string' ? normalizeOptionalString(entry.doc_class) : null;
+  const lifecycleState =
+    typeof entry.lifecycle_state === 'string' ? normalizeOptionalString(entry.lifecycle_state) : null;
+  const createdAt = typeof entry.created_at === 'string' ? normalizeOptionalString(entry.created_at) : null;
+  const nextReview = typeof entry.next_review === 'string' ? normalizeOptionalString(entry.next_review) : null;
   return Boolean(
     status === FOLLOW_UP_REQUIRED_DOCS_FRESHNESS_STATUS
     && cadenceDays !== null
@@ -9407,6 +9413,28 @@ function docsFreshnessRegistryEntryHasValidMetadata(entry: Record<string, unknow
     && !isIsoDateStale(lastReview, cadenceDays)
     && owner
     && !FOLLOW_UP_DOCS_FRESHNESS_OWNER_PLACEHOLDERS.has(owner.toLowerCase())
+    && sourceIssue
+    && docClass
+    && lifecycleState === FOLLOW_UP_REQUIRED_DOCS_FRESHNESS_STATUS
+    && createdAt
+    && isIsoDateString(createdAt)
+    && nextReview
+    && isIsoDateString(nextReview)
+  );
+}
+
+function normalizeDocsFreshnessSourceIssue(value: unknown): string | null {
+  if (typeof value === 'string') {
+    return normalizeOptionalString(value);
+  }
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    (typeof record.identifier === 'string' ? normalizeOptionalString(record.identifier) : null) ??
+    (typeof record.id === 'string' ? normalizeOptionalString(record.id) : null) ??
+    null
   );
 }
 

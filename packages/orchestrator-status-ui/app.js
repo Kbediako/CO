@@ -19,6 +19,8 @@ const elements = {
   pollMeta: document.getElementById('pollMeta'),
   rateLimitStatus: document.getElementById('rateLimitStatus'),
   rateLimitMeta: document.getElementById('rateLimitMeta'),
+  repoGateStatus: document.getElementById('repoGateStatus'),
+  repoGateMeta: document.getElementById('repoGateMeta'),
   runningList: document.getElementById('runningList'),
   retryList: document.getElementById('retryList'),
   statusFilter: document.getElementById('statusFilter'),
@@ -303,6 +305,7 @@ function renderSummary() {
   };
   const polling = state.data?.polling || null;
   const rateLimits = state.data?.rate_limits || null;
+  const docsFreshnessGate = state.data?.repo_gates?.docs_freshness_maintain || null;
 
   elements.runningCount.textContent = String(counts.running || 0);
   elements.runningMeta.textContent =
@@ -324,6 +327,12 @@ function renderSummary() {
   elements.pollMeta.textContent = formatPollMeta(polling);
   elements.rateLimitStatus.textContent = rateLimits ? 'Latest sample' : 'None';
   elements.rateLimitMeta.textContent = rateLimits ? summarizeRateLimits(rateLimits) : 'No latest rate-limit sample';
+  elements.repoGateStatus.textContent = docsFreshnessGate
+    ? formatRepoGateSeverity(docsFreshnessGate.severity)
+    : 'Unknown';
+  elements.repoGateMeta.textContent = docsFreshnessGate
+    ? summarizeDocsFreshnessGate(docsFreshnessGate)
+    : 'No repo-gate sample';
 }
 
 function renderQueues() {
@@ -874,6 +883,41 @@ function summarizeRateLimits(rateLimits) {
     .slice(0, 3)
     .map(([key, value]) => `${key}: ${String(value)}`)
     .join(' • ');
+}
+
+function formatRepoGateSeverity(severity) {
+  if (!severity) {
+    return 'Unknown';
+  }
+  return String(severity)
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function summarizeDocsFreshnessGate(gate) {
+  const parts = [];
+  if (gate.freshness_decision) {
+    parts.push(gate.freshness_decision);
+  }
+  parts.push(`${formatNullableNumber(gate.action_required_count)} actions`);
+  if (gate.owner?.issue) {
+    parts.push(`owner ${gate.owner.issue}`);
+  }
+  if (gate.spec_guard?.status) {
+    parts.push(`spec ${gate.spec_guard.status}`);
+  }
+  if (gate.capacity?.status) {
+    parts.push(`capacity ${gate.capacity.status}`);
+  }
+  if (gate.next_expiry) {
+    parts.push(`next ${gate.next_expiry}`);
+  }
+  if (gate.provider_wip_impact === 'excluded_repo_gate') {
+    parts.push('not WIP');
+  }
+  return parts.join(' • ');
 }
 
 function setSyncStatus(message, syncing, error = false) {

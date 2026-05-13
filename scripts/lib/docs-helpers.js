@@ -215,6 +215,25 @@ export function parseIsoDate(raw) {
   return date;
 }
 
+export function parseIsoDateOrTimestamp(raw) {
+  const dateOnly = parseIsoDate(raw);
+  if (dateOnly) {
+    return dateOnly;
+  }
+  if (typeof raw !== 'string') {
+    return null;
+  }
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})T.+$/);
+  if (!match) {
+    return null;
+  }
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parseIsoDate(match[1]);
+}
+
 export function computeAgeInDays(from, to) {
   const msPerDay = 24 * 60 * 60 * 1000;
   return Math.floor((to.getTime() - from.getTime()) / msPerDay);

@@ -17,14 +17,37 @@ import {
   resolveDocsCatalogEntry,
   summarizeDocsByClass
 } from './lib/docs-catalog.js';
+import {
+  buildTaskPacketLifecycleIndex,
+  classifyTaskPacketPathFamily,
+  normalizeDocPath,
+  PRESERVED_HISTORICAL_STUB_STATUS,
+  TERMINAL_PENDING_ARCHIVE_STATUS
+} from './lib/docs-freshness-lifecycle.js';
 import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
-const PRESERVED_HISTORICAL_STUB_STATUS = 'preserved_historical_stub';
-const STATUS_VALUES = new Set(['active', 'archived', 'deprecated', PRESERVED_HISTORICAL_STUB_STATUS]);
-const OWNER_REQUIRED_STATUSES = new Set(['active', 'deprecated']);
-const STALE_ELIGIBLE_STATUSES = new Set(['active', 'deprecated']);
+const TASKS_INDEX_PATH = 'tasks/index.json';
+const STATUS_VALUES = new Set([
+  'active',
+  'archived',
+  'deprecated',
+  PRESERVED_HISTORICAL_STUB_STATUS,
+  TERMINAL_PENDING_ARCHIVE_STATUS
+]);
+const OWNER_REQUIRED_STATUSES = new Set(['active', 'deprecated', TERMINAL_PENDING_ARCHIVE_STATUS]);
+const STALE_ELIGIBLE_STATUSES = new Set(['active', 'deprecated', TERMINAL_PENDING_ARCHIVE_STATUS]);
 const OWNER_PLACEHOLDERS = new Set(['tbd', 'unassigned', 'owner']);
+const STRICT_PRE_EXPIRY_DOC_CLASSES = new Set([
+  'front_door',
+  'public_guide',
+  'repo_guide',
+  'active_guide',
+  'agent_policy',
+  'shipped_skill',
+  'shipped_companion',
+  'seeded_template'
+]);
 const PRESERVED_HISTORICAL_STUB_PATH_PATTERNS = [/^tasks\/tasks-[^/]+\.md$/, /^\.agent\/task\/[^/]+\.md$/];
 const PRESERVED_HISTORICAL_STUB_HEADING_PATTERN = /^\s*#\s+Historical stub\b/i;
 
@@ -49,21 +72,6 @@ function normalizeOwner(value) {
   return value.trim();
 }
 
-function normalizeDocPath(value) {
-  if (typeof value !== 'string') {
-    return '';
-  }
-
-  const trimmed = value.trim().replace(/\\/g, '/');
-  if (!trimmed) {
-    return '';
-  }
-
-  const withoutDotPrefix = trimmed.replace(/^\.\//, '');
-  const normalized = path.posix.normalize(withoutDotPrefix);
-  return normalized === '.' ? '' : normalized.replace(/^\.\//, '');
-}
-
 function isApprovedPreservedHistoricalStubPath(docPath) {
   const normalizedPath = normalizeDocPath(docPath);
   return PRESERVED_HISTORICAL_STUB_PATH_PATTERNS.some((pattern) => pattern.test(normalizedPath));
@@ -80,6 +88,16 @@ async function loadRegistry(registryPath) {
   return { data, entries };
 }
 
+async function loadTaskLifecycleIndex(repoRoot) {
+  const tasksIndexPath = path.join(repoRoot, TASKS_INDEX_PATH);
+  if (!(await pathExists(tasksIndexPath))) {
+    return buildTaskPacketLifecycleIndex([]);
+  }
+  const raw = await readFile(tasksIndexPath, 'utf8');
+  const parsed = JSON.parse(raw);
+  return buildTaskPacketLifecycleIndex(Array.isArray(parsed?.items) ? parsed.items : []);
+}
+
 function classifyPath(docPath, catalog) {
   const normalizedPath = normalizeDocPath(docPath);
   const entry = catalog ? resolveDocsCatalogEntry(normalizedPath, catalog) : null;
@@ -94,30 +112,7 @@ function getClassLabel(docClass, catalog) {
 }
 
 function classifyPathFamily(docPath) {
-  const normalizedPath = normalizeDocPath(docPath);
-  if (normalizedPath.startsWith('.agent/task/')) {
-    return '.agent/task';
-  }
-  if (normalizedPath.startsWith('tasks/specs/')) {
-    return 'tasks/specs';
-  }
-  if (normalizedPath.startsWith('tasks/tasks-')) {
-    return 'tasks/tasks-*';
-  }
-  if (normalizedPath.startsWith('docs/PRD-')) {
-    return 'docs/PRD-*';
-  }
-  if (normalizedPath.startsWith('docs/TECH_SPEC-')) {
-    return 'docs/TECH_SPEC-*';
-  }
-  if (normalizedPath.startsWith('docs/ACTION_PLAN-')) {
-    return 'docs/ACTION_PLAN-*';
-  }
-  if (normalizedPath.startsWith('docs/findings/')) {
-    return 'docs/findings';
-  }
-  const parts = normalizedPath.split('/').filter(Boolean);
-  return parts.length <= 1 ? normalizedPath : `${parts[0]}/${parts[1]}`;
+  return classifyTaskPacketPathFamily(docPath);
 }
 
 function extractTaskNumber(docPath) {
@@ -129,6 +124,58 @@ function extractTaskNumber(docPath) {
   }
   const pathMatch = normalizedPath.match(/(?:^|\/)(\d{4})-/);
   return pathMatch ? pathMatch[1] : null;
+}
+
+function attachReportOnlyLifecyclePaths(lifecycleIndex, docPaths) {
+  const terminalByTaskNumber = new Map();
+  for (const item of lifecycleIndex.terminalItems ?? []) {
+    const taskNumber = extractTaskNumber(item.task_key);
+    if (taskNumber && !terminalByTaskNumber.has(taskNumber)) {
+      terminalByTaskNumber.set(taskNumber, item);
+    }
+  }
+  if (terminalByTaskNumber.size === 0) {
+    return lifecycleIndex;
+  }
+  for (const docPath of docPaths) {
+    if (lifecycleIndex.byPath.has(docPath)) {
+      continue;
+    }
+    if (!docPath.startsWith('docs/findings/')) {
+      continue;
+    }
+    const taskNumber = extractTaskNumber(docPath);
+    const taskLifecycle = taskNumber ? terminalByTaskNumber.get(taskNumber) : null;
+    if (!taskLifecycle) {
+      continue;
+    }
+    lifecycleIndex.byPath.set(docPath, {
+      ...taskLifecycle,
+      path: docPath,
+      path_family: 'docs/findings',
+      lifecycle_state: TERMINAL_PENDING_ARCHIVE_STATUS,
+      recommended_action: 'archive_or_reclassify_terminal_packet'
+    });
+  }
+  return lifecycleIndex;
+}
+
+function explicitTerminalPendingLifecycle(status, entryPath) {
+  if (status !== TERMINAL_PENDING_ARCHIVE_STATUS || !entryPath) {
+    return null;
+  }
+  return {
+    path: entryPath,
+    path_family: classifyTaskPacketPathFamily(entryPath),
+    lifecycle_state: TERMINAL_PENDING_ARCHIVE_STATUS,
+    recommended_action: 'archive_or_reclassify_terminal_packet',
+    task_id: null,
+    task_key: null,
+    title: null,
+    status: null,
+    completed_at: null,
+    source_issue: null
+  };
 }
 
 function addDaysToIsoDate(isoDate, days) {
@@ -468,6 +515,7 @@ function countClassFailures(entry) {
     Number(entry?.missing_on_disk ?? 0) +
     Number(entry?.invalid_entries ?? 0) +
     Number(entry?.stale_entries ?? 0) +
+    Number(entry?.terminal_lifecycle_entries ?? 0) +
     Number(entry?.uncatalogued_docs ?? 0)
   );
 }
@@ -490,17 +538,19 @@ export function renderDocsFreshnessMarkdown(report) {
     `- Invalid entries: ${report.totals.invalid_entries}`,
     `- Stale entries: ${report.totals.stale_entries}`,
     `- Rolling cohort entries: ${report.totals.rolling_cohort_entries ?? 0}`,
+    `- Terminal lifecycle entries: ${report.totals.terminal_lifecycle_entries ?? 0}`,
+    `- Pre-expiry strict entries: ${report.totals.pre_expiry_entries ?? 0}`,
     `- Uncatalogued docs: ${report.totals.uncatalogued_docs}`,
     '',
     '## Class Summary',
     '',
-    '| Class | Docs | Registry | Missing Registry | Missing On Disk | Invalid | Stale | Uncatalogued |',
-    '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |'
+    '| Class | Docs | Registry | Missing Registry | Missing On Disk | Invalid | Stale | Terminal Lifecycle | Uncatalogued |',
+    '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |'
   ];
 
   for (const entry of report.class_summary ?? []) {
     lines.push(
-      `| ${entry.label} | ${entry.docs_scanned} | ${entry.registry_entries} | ${entry.missing_in_registry} | ${entry.missing_on_disk} | ${entry.invalid_entries} | ${entry.stale_entries} | ${entry.uncatalogued_docs} |`
+      `| ${entry.label} | ${entry.docs_scanned} | ${entry.registry_entries} | ${entry.missing_in_registry} | ${entry.missing_on_disk} | ${entry.invalid_entries} | ${entry.stale_entries} | ${entry.terminal_lifecycle_entries ?? 0} | ${entry.uncatalogued_docs} |`
     );
   }
 
@@ -530,6 +580,19 @@ export function renderDocsFreshnessMarkdown(report) {
     }
   }
 
+  const preExpiryEntries = Array.isArray(report.pre_expiry_entries) ? report.pre_expiry_entries : [];
+  if (preExpiryEntries.length > 0) {
+    lines.push('', '## Strict Pre-Expiry Actions', '');
+    for (const entry of preExpiryEntries.slice(0, 10)) {
+      lines.push(
+        `- \`${entry.path}\`: ${entry.doc_class_label} expires in ${entry.days_until_expiry} day(s), next_review=${entry.next_review}`
+      );
+    }
+    if (preExpiryEntries.length > 10) {
+      lines.push(`- Additional strict entries: ${preExpiryEntries.length - 10}`);
+    }
+  }
+
   lines.push('', '## Drift By Class', '');
 
   if (failingClasses.length === 0) {
@@ -552,6 +615,12 @@ export function renderDocsFreshnessMarkdown(report) {
       `- Stale entries (${entry.stale_entries}): ${summarizeItems(
         failures.stale_entries,
         (item) => `${item.path} (last_review=${item.last_review}, cadence=${item.cadence_days}, age=${item.age_days})`
+      )}`
+    );
+    lines.push(
+      `- Terminal lifecycle entries (${entry.terminal_lifecycle_entries ?? 0}): ${summarizeItems(
+        failures.terminal_lifecycle_entries,
+        (item) => `${item.path} (${item.lifecycle_state}, task=${item.task_id ?? item.task_key ?? 'unknown'})`
       )}`
     );
     lines.push(
@@ -578,16 +647,20 @@ export async function runDocsFreshness(
     throw new Error(`Registry not found: ${registryPath}`);
   }
 
-  const [docFiles, registryResult, docsCatalog] = await Promise.all([
+  const [docFiles, registryResult, docsCatalog, lifecycleIndex] = await Promise.all([
     collectDocFiles(repoRoot),
     loadRegistry(absoluteRegistryPath),
-    loadDocsCatalog(repoRoot)
+    loadDocsCatalog(repoRoot),
+    loadTaskLifecycleIndex(repoRoot)
   ]);
   const normalizedDocFiles = docFiles.map((docPath) => normalizeDocPath(docPath)).filter(Boolean);
+  attachReportOnlyLifecyclePaths(lifecycleIndex, normalizedDocFiles);
 
   const registryEntries = registryResult.entries;
   const invalidEntries = [];
   const rawStaleEntries = [];
+  const terminalLifecycleEntries = [];
+  const preExpiryEntries = [];
   const missingOnDisk = [];
   const registryPaths = new Set();
   const metricsByClass = [];
@@ -669,7 +742,46 @@ export async function runDocsFreshness(
     if (reviewDate && Number.isInteger(cadenceDays) && cadenceDays > 0) {
       if (STALE_ELIGIBLE_STATUSES.has(status)) {
         const ageDays = computeAgeInDays(reviewDate, today);
-        if (ageDays > cadenceDays) {
+        const daysUntilExpiry = cadenceDays - ageDays;
+        const terminalLifecycle =
+          lifecycleIndex.byPath.get(entryPath) ?? explicitTerminalPendingLifecycle(status, entryPath);
+        if (
+          STRICT_PRE_EXPIRY_DOC_CLASSES.has(docClass || '') &&
+          daysUntilExpiry >= 0 &&
+          daysUntilExpiry <= 7
+        ) {
+          preExpiryEntries.push({
+            path: entryPath,
+            last_review: entry.last_review,
+            cadence_days: cadenceDays,
+            age_days: ageDays,
+            days_until_expiry: daysUntilExpiry,
+            next_review: addDaysToIsoDate(entry.last_review, cadenceDays),
+            doc_class: docClass || 'uncatalogued',
+            doc_class_label: docClassLabel,
+            path_family: classifyPathFamily(entryPath),
+            direct_action_required: true,
+            rolling_deferral_eligible: false
+          });
+        }
+        if (terminalLifecycle) {
+          terminalLifecycleEntries.push({
+            path: entryPath,
+            last_review: entry.last_review,
+            cadence_days: cadenceDays,
+            age_days: ageDays,
+            overdue_days: Math.max(0, ageDays - cadenceDays),
+            doc_class: docClass || 'uncatalogued',
+            doc_class_label: docClassLabel,
+            path_family: classifyPathFamily(entryPath),
+            task_number: extractTaskNumber(entryPath),
+            ...terminalLifecycle,
+            registry_status: status,
+            lifecycle_state: TERMINAL_PENDING_ARCHIVE_STATUS,
+            recommended_action:
+              terminalLifecycle.recommended_action ?? 'archive_or_reclassify_terminal_packet'
+          });
+        } else if (ageDays > cadenceDays) {
           rawStaleEntries.push({
             path: entryPath,
             last_review: entry.last_review,
@@ -691,6 +803,9 @@ export async function runDocsFreshness(
   const staleEntries = blockingStaleEntries;
   for (const entry of staleEntries) {
     metricsByClass.push({ doc_class: entry.doc_class, metric: 'stale_entries' });
+  }
+  for (const entry of terminalLifecycleEntries) {
+    metricsByClass.push({ doc_class: entry.doc_class, metric: 'terminal_lifecycle_entries' });
   }
 
   const missingInRegistry = normalizedDocFiles.filter((doc) => !registryPaths.has(doc));
@@ -719,6 +834,9 @@ export async function runDocsFreshness(
             ),
             stale_entries: staleEntries.filter(
               (item) => (classifyPath(item.path, docsCatalog) || 'uncatalogued') === entry.doc_class
+            ),
+            terminal_lifecycle_entries: terminalLifecycleEntries.filter(
+              (item) => (classifyPath(item.path, docsCatalog) || 'uncatalogued') === entry.doc_class
             )
           };
           return result;
@@ -738,6 +856,8 @@ export async function runDocsFreshness(
       invalid_entries: invalidEntries.length,
       stale_entries: staleEntries.length,
       rolling_cohort_entries: rollingCohortEntries.length,
+      terminal_lifecycle_entries: terminalLifecycleEntries.length,
+      pre_expiry_entries: preExpiryEntries.length,
       uncatalogued_docs: uncataloguedDocs.length
     },
     rolling_freshness_policy: rollingFreshnessPolicy,
@@ -748,6 +868,8 @@ export async function runDocsFreshness(
     missing_on_disk: missingOnDisk,
     invalid_entries: invalidEntries,
     stale_entries: staleEntries,
+    terminal_lifecycle_entries: terminalLifecycleEntries,
+    pre_expiry_entries: preExpiryEntries,
     rolling_cohort_entries: rollingCohortEntries,
     rolling_freshness_cohorts: rollingFreshnessCohorts
   };
@@ -772,6 +894,7 @@ export async function runDocsFreshness(
     missingOnDisk.length > 0 ||
     invalidEntries.length > 0 ||
     staleEntries.length > 0 ||
+    terminalLifecycleEntries.length > 0 ||
     uncataloguedDocs.length > 0;
 
   return {
@@ -828,6 +951,12 @@ async function main() {
   if (report.totals.stale_entries > 0) {
     console.log(`- stale docs: ${report.totals.stale_entries}`);
   }
+  if ((report.totals.terminal_lifecycle_entries ?? 0) > 0) {
+    console.log(`- terminal lifecycle entries: ${report.totals.terminal_lifecycle_entries}`);
+  }
+  if ((report.totals.pre_expiry_entries ?? 0) > 0) {
+    console.log(`- strict docs approaching expiry: ${report.totals.pre_expiry_entries}`);
+  }
   if ((report.totals.rolling_cohort_entries ?? 0) > 0) {
     console.log(`- rolling freshness cohort entries: ${report.totals.rolling_cohort_entries}`);
     for (const cohort of report.rolling_freshness_cohorts ?? []) {
@@ -842,7 +971,7 @@ async function main() {
 
   for (const entry of report.class_summary ?? []) {
     console.log(
-      `- ${entry.label}: docs=${entry.docs_scanned} registry=${entry.registry_entries} missing_registry=${entry.missing_in_registry} stale=${entry.stale_entries}`
+      `- ${entry.label}: docs=${entry.docs_scanned} registry=${entry.registry_entries} missing_registry=${entry.missing_in_registry} stale=${entry.stale_entries} terminal_lifecycle=${entry.terminal_lifecycle_entries ?? 0}`
     );
   }
 
