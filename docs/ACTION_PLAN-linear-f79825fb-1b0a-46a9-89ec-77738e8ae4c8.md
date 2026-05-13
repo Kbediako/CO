@@ -34,6 +34,16 @@
 - Risk: date-only refresh hides stale content. Mitigation: record per-file classification and content truth sources.
 - Risk: CO-530 scope is accidentally widened. Mitigation: preserve CO-530 wording as legacy Apr 9-12 only and keep current-doc evidence under CO-532.
 
+## Fallback Expiry / Refactor Decision
+- Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? Yes.
+- Large-refactor check: no broad freshness-policy refactor is needed; the lane repairs current-doc review debt and focused guard evidence only.
+- Minor-seam check: no retained minor seam remains; direct current-doc action routing replaces the stale ambiguous evidence path.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Current book/skill docs | Active public docs stale beyond 14-day cadence | remove fallback | CO-532 | `docs:freshness` hard-stale current-doc paths | 2026-04-24 | 2026-05-13 | removed in this lane | Five paths no longer hard-stale | `npm run docs:freshness` |
+| Maintenance evidence | Hard-stale current docs could be mentally grouped with legacy cohorts | remove fallback | CO-532 | `docs:freshness:maintain` sample paths include current docs | 2026-05-13 | 2026-05-13 | removed in this lane | Guard evidence keeps direct current-doc action explicit | focused docs-freshness maintain test |
+
 ## Approvals
 - Reviewer: pending.
 - Date: 2026-05-13.

@@ -48,6 +48,7 @@ last_review: 2026-05-13
 | Maintenance evidence | Hard-stale current docs could be mentally grouped with legacy cohorts | remove fallback | CO-532 | `docs:freshness:maintain` sample paths include current docs | 2026-05-13 | 2026-05-13 | removed in this lane | Guard evidence keeps direct current-doc action explicit | focused docs-freshness maintain test |
 
 - Large-refactor check: no broad freshness-policy refactor is needed; the lane repairs the current-doc review debt and focused guard evidence only.
+- Minor-seam check: no retained minor seam remains; direct current-doc action routing replaces the stale ambiguous evidence path.
 
 ## Architecture & Data
 - Architecture / design adjustments: update docs and focused freshness-maintenance guard behavior without changing rolling cohort caps.

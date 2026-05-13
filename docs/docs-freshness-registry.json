@@ -5902,7 +5902,16 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-05-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "f79825fb-1b0a-46a9-89ec-77738e8ae4c8",
+        "identifier": "CO-532",
+        "url": "https://linear.app/asabeko/issue/CO-532/co-refresh-hard-stale-current-book-and-skill-docs"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
     },
     {
       "path": ".agent/task/linear-f7b20174-c1f3-4277-a803-e22e643372f4.md",
@@ -11391,7 +11400,16 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-05-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "f79825fb-1b0a-46a9-89ec-77738e8ae4c8",
+        "identifier": "CO-532",
+        "url": "https://linear.app/asabeko/issue/CO-532/co-refresh-hard-stale-current-book-and-skill-docs"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
     },
     {
       "path": "docs/ACTION_PLAN-linear-f7b20174-c1f3-4277-a803-e22e643372f4.md",
@@ -19702,7 +19720,16 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-05-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "f79825fb-1b0a-46a9-89ec-77738e8ae4c8",
+        "identifier": "CO-532",
+        "url": "https://linear.app/asabeko/issue/CO-532/co-refresh-hard-stale-current-book-and-skill-docs"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
     },
     {
       "path": "docs/PRD-linear-f7b20174-c1f3-4277-a803-e22e643372f4.md",
@@ -25513,7 +25540,16 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-05-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "f79825fb-1b0a-46a9-89ec-77738e8ae4c8",
+        "identifier": "CO-532",
+        "url": "https://linear.app/asabeko/issue/CO-532/co-refresh-hard-stale-current-book-and-skill-docs"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
     },
     {
       "path": "docs/TECH_SPEC-linear-f7b20174-c1f3-4277-a803-e22e643372f4.md",
@@ -31772,7 +31808,16 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-05-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "f79825fb-1b0a-46a9-89ec-77738e8ae4c8",
+        "identifier": "CO-532",
+        "url": "https://linear.app/asabeko/issue/CO-532/co-refresh-hard-stale-current-book-and-skill-docs"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
     },
     {
       "path": "tasks/specs/linear-f7b20174-c1f3-4277-a803-e22e643372f4.md",
@@ -37632,7 +37677,16 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-05-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "f79825fb-1b0a-46a9-89ec-77738e8ae4c8",
+        "identifier": "CO-532",
+        "url": "https://linear.app/asabeko/issue/CO-532/co-refresh-hard-stale-current-book-and-skill-docs"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
     },
     {
       "path": "tasks/tasks-linear-f7b20174-c1f3-4277-a803-e22e643372f4.md",

@@ -55,8 +55,13 @@
 
 ## Fallback / Refactor Decision
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? Yes.
-- Decision: remove the stale current-doc condition by direct review/refresh; retain no new fallback.
 - Large-refactor check: a narrow content and guard update is sufficient because rolling freshness policy already separates legacy cohort debt from current hard-stale docs.
+- Minor-seam check: no retained minor seam remains; the stale current-doc condition is removed by direct review and guard evidence.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Current book/skill docs | Active public docs stale beyond 14-day cadence | remove fallback | CO-532 | `docs:freshness` hard-stale current-doc paths | 2026-04-24 | 2026-05-13 | removed in this lane | Five paths no longer hard-stale | `npm run docs:freshness` |
+| Maintenance evidence | Hard-stale current docs could be mentally grouped with legacy cohorts | remove fallback | CO-532 | `docs:freshness:maintain` sample paths include current docs | 2026-05-13 | 2026-05-13 | removed in this lane | Guard evidence keeps direct current-doc action explicit | focused docs-freshness maintain test |
 
 ## Open Questions
 - None blocking.
