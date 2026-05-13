@@ -1,0 +1,23 @@
+# Findings - 1022 Observability Update Notifier Extraction Deliberation
+
+- Proceed with a narrow follow-up slice after `1021` to extract an internal observability update notifier for Telegram projection updates.
+- Keep the slice bounded:
+  - introduce one in-process notifier boundary with generic publish/subscribe semantics,
+  - migrate existing observability update publishers to that boundary,
+  - keep Telegram as the first subscriber only,
+  - keep `/control/action`, auth/session, SSE, webhook shape, and mutation-service extraction out of scope.
+- Real Symphony guidance is structural, not literal:
+  - `ObservabilityPubSub` separates generic update signaling from subscriber-specific rendering,
+  - the dashboard subscriber re-reads the presenter payload after one coarse invalidation signal,
+  - CO should reuse that separation without importing Phoenix or distributed pubsub semantics.
+- The notifier should therefore stay deliberately small:
+  - publish a bounded "something changed" signal with lightweight metadata only,
+  - let Telegram keep re-reading shared state/issue/dispatch/questions through the `1021` bridge adapter and deduping on projection hash locally,
+  - do not widen this slice into a rich internal event bus.
+- Current CO gap after `1021`:
+  - publishers still call `notifyTelegramProjectionDelta(...)` directly from `RequestContext`,
+  - `ControlServer` still owns Telegram as the hard-coded observability update consumer,
+  - that is the highest-leverage remaining coupling before any broader control-surface work.
+- Delegation posture:
+  - a delegated scout confirmed there is no already-registered post-`1021` Symphony slice and recommended this notifier/PubSub direction from current docs,
+  - an additional collab research stream for CO-side mapping was attempted but blocked by the current collab thread limit, so local read-only repo inspection was used as the explicit fallback for that stream.

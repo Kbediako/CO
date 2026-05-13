@@ -1,0 +1,31 @@
+# Findings - 1023 Control Runtime Boundary Extraction Deliberation
+
+- Proceed with a stronger follow-up slice after `1022` to extract a shared control runtime boundary from `controlServer.ts`.
+- Keep the slice bounded:
+  - one internal runtime boundary,
+  - one `controlServer.ts` integration pass,
+  - no new public routes,
+  - no Linear mutations,
+  - no live cache/poller yet.
+- Real Symphony guidance supports this direction as a structural reference:
+  - `Orchestrator` owns runtime state and lifecycle,
+  - `Presenter` reads that state and shapes shared payloads,
+  - controllers and dashboard consumers stay thin,
+  - upstream explicitly recommends building a hardened version rather than shipping the prototype literally.
+- Current CO gap after `1022`:
+  - `controlServer.ts` still owns runtime composition, notifier lifecycle, and Telegram runtime wiring,
+  - read surfaces still depend on runtime pieces assembled inside `ControlServer`,
+  - `POST /api/v1/refresh` still acknowledges without asking any shared runtime to invalidate or reconcile,
+  - that is now the highest-leverage remaining structural mismatch against the real Symphony shape.
+- Delegated evidence:
+  - a bounded CO scout found the remaining concentration centered in `controlServer.ts`,
+  - a real-Symphony scout recommended a supervisor-owned `snapshot()/requestRefresh()/subscribe()` boundary as the strongest next seam,
+  - a second real-Symphony audit confirmed the main semantic mismatch is refresh: Symphony refresh is a real reconcile trigger, while CO still only acknowledges it locally,
+  - the real-Symphony Linear scout confirmed the upstream Linear skill contract is a runtime-injected tool surface plus explicit hardening guidance, not a generic full-tracker write model to copy into CO.
+- Treat `1021` and `1022` as useful CO-specific ergonomics, not the primary upstream alignment target.
+- Do not jump straight to live Linear cache/poller work in this lane:
+  - that follow-up is still attractive,
+  - but extracting the runtime boundary first reduces risk and makes the later Linear follow-up cleaner.
+- Fold real refresh semantics into the runtime-boundary slice rather than deferring them again:
+  - keep it bounded to runtime invalidation and re-warm only,
+  - do not widen authority or add tracker writes.
