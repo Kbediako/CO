@@ -21,7 +21,7 @@
 - [x] Stable multi-agent behavior preserved as an explicit requirement.
 
 ## Implementation Acceptance
-- [x] Document the 0.128 v2-specific cap path `features.multi_agent_v2.max_concurrent_threads_per_session`. Evidence: `docs/guides/rlm-recursion-v2.md`, `skills/delegation-usage/SKILL.md`, `skills/delegation-usage/DELEGATION_GUIDE.md`.
+- [x] Document the 0.128 v2-specific cap surface, including persisted `multi_agent_v2.max_concurrent_threads_per_session` and CLI/probe evidence at `features.multi_agent_v2.max_concurrent_threads_per_session`. Evidence: `docs/guides/rlm-recursion-v2.md`, `skills/delegation-usage/SKILL.md`, `skills/delegation-usage/DELEGATION_GUIDE.md`.
 - [x] Preserve and test rejection/omission of `agents.max_threads` when `features.multi_agent_v2=true`. Evidence: `orchestrator/src/cli/doctor.ts`, `orchestrator/tests/Doctor.test.ts`, `orchestrator/tests/CodexDefaultsSetup.test.ts`.
 - [x] Update doctor/default/init behavior, or explicitly classify the v2-specific cap as user-owned with actionable doctor guidance. Evidence: doctor `multi_agent_v2_thread_cap` classification and guidance.
 - [x] Add focused tests or command probes for rejected old path and accepted new path. Evidence: focused vitest pass plus live command probes showing old path rejected and new path accepted on the installed Codex CLI.

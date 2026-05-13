@@ -12,7 +12,7 @@ task_checklists:
 ---
 
 ## Summary
-- Objective: add truthful CO support or explicit user-owned classification for Codex CLI 0.128 `features.multi_agent_v2.max_concurrent_threads_per_session`.
+- Objective: add truthful CO support or explicit user-owned classification for the Codex CLI 0.128 MultiAgentV2 cap surface, including persisted `multi_agent_v2.max_concurrent_threads_per_session` and the feature-specific CLI/probe path `features.multi_agent_v2.max_concurrent_threads_per_session`.
 - Scope: MultiAgentV2 feature detection, doctor/default/init guidance, docs wording, and focused tests or command probes.
 - Constraints: preserve CO-354 rejection of `agents.max_threads` under v2 and preserve stable `features.multi_agent=true` `[agents] max_threads = 12`.
 
@@ -27,7 +27,7 @@ task_checklists:
 | Surface | Current | Reference | Target |
 | -- | -- | -- | -- |
 | Old cap path | CO omits/rejects `agents.max_threads` when v2 is enabled. | Codex CLI 0.128 rejects that old path. | Keep rejection and tests intact. |
-| New v2 cap path | CO does not classify the feature-specific cap. | Codex CLI 0.128 accepts `features.multi_agent_v2.max_concurrent_threads_per_session`. | Support or explicitly classify the new cap as user-owned with actionable guidance. |
+| New v2 cap path | CO does not classify the v2 cap surface. | Codex CLI 0.128 owns persisted `multi_agent_v2.max_concurrent_threads_per_session` and accepts feature-specific CLI/probe evidence at `features.multi_agent_v2.max_concurrent_threads_per_session`. | Support or explicitly classify the new cap as user-owned with actionable guidance. |
 | Stable multi-agent | CO writes/recommends `[agents] max_threads = 12` for stable `multi_agent`. | Stable `features.multi_agent=true` keeps the old baseline. | Keep stable guidance unchanged. |
 
 ## Readiness Gate

@@ -106,7 +106,7 @@ const doctor: DoctorResult = {
     },
     multi_agent_v2_thread_cap: {
       status: 'not_applicable',
-      config_path: 'features.multi_agent_v2.max_concurrent_threads_per_session',
+      config_path: 'multi_agent_v2.max_concurrent_threads_per_session',
       actual: null,
       detail: 'stable features.multi_agent guidance continues to use agents.max_threads'
     },

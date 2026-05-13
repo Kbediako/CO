@@ -11,6 +11,7 @@ import {
   codexFeatureProbeRejectsAgentMaxThreads,
   findConfiguredRemovedFeatureKeys,
   readCodexFeatureProbe,
+  readConfiguredMultiAgentV2Enabled,
   type CodexFeatureProbeResult
 } from './utils/codexFeatures.js';
 import { findPackageRoot } from './utils/packageInfo.js';
@@ -783,9 +784,5 @@ function isMultiAgentV2Enabled(
   if (!isRecord(config.features)) {
     return false;
   }
-  return readBooleanValue(config.features.multi_agent_v2) === true;
-}
-
-function readBooleanValue(value: unknown): boolean | null {
-  return typeof value === 'boolean' ? value : null;
+  return readConfiguredMultiAgentV2Enabled(config.features.multi_agent_v2);
 }

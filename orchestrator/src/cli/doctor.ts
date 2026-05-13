@@ -26,6 +26,7 @@ import {
   codexFeatureProbeRejectsAgentMaxThreads,
   findConfiguredRemovedFeatureKeys,
   readCodexFeatureProbe,
+  readConfiguredMultiAgentV2Enabled,
   type CodexFeatureProbeResult
 } from './utils/codexFeatures.js';
 import { formatCheckoutPostureSummary, inspectCheckoutPosture, type CheckoutPostureInspection } from './utils/checkoutPosture.js';
@@ -80,6 +81,8 @@ const require = createRequire(import.meta.url);
 let tomlParser: { parse: (source: string) => unknown } | null | undefined;
 const CO_MANAGED_REMOVED_FEATURE_KEY_SET = new Set<string>(CO_MANAGED_REMOVED_FEATURE_KEYS);
 const MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH =
+  'multi_agent_v2.max_concurrent_threads_per_session';
+const MULTI_AGENT_V2_FEATURE_THREAD_CAP_CONFIG_PATH =
   'features.multi_agent_v2.max_concurrent_threads_per_session';
 
 const OPTIONAL_DEPENDENCIES = [
@@ -169,7 +172,7 @@ export interface DoctorCodexDefaultsAdvisory {
   } | null;
   multi_agent_v2_thread_cap: {
     status: 'not_applicable' | 'user-owned' | 'configured' | 'advisory';
-    config_path: typeof MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH;
+    config_path: string;
     actual: number | null;
     detail: string;
   };
@@ -432,7 +435,12 @@ export function runDoctor(
   });
   const featureProbe = readCodexFeatureProbe(codexBin, process.env);
   const features = featureProbe.flags;
-  const codexDefaults = inspectCodexDefaultsAdvisory(process.env, codexBin, featureProbe);
+  const codexDefaults = inspectCodexDefaultsAdvisory(
+    process.env,
+    codexBin,
+    featureProbe,
+    codexCliProvenance.active.version
+  );
   const securityAdvisories = inspectCodexSandboxSecurityAdvisories({ env: process.env });
   const collabFeatureKey: DoctorResult['collab']['feature_key'] =
     features === null
@@ -1233,7 +1241,8 @@ function inspectProviderReadiness(
 function inspectCodexDefaultsAdvisory(
   env: NodeJS.ProcessEnv = process.env,
   codexBin: string = resolveCodexCliBin(env),
-  featureProbe: CodexFeatureProbeResult | null = readCodexFeatureProbe(codexBin, env)
+  featureProbe: CodexFeatureProbeResult | null = readCodexFeatureProbe(codexBin, env),
+  codexCliVersion: string | null = null
 ): DoctorCodexDefaultsAdvisory {
   const configPath = join(resolveCodexHome(env), 'config.toml');
   const checks: DoctorCodexDefaultsAdvisory['checks'] = {
@@ -1261,6 +1270,7 @@ function inspectCodexDefaultsAdvisory(
     !featureProbeDisablesMultiAgentV2
     && (featureProbe?.flags?.multi_agent_v2 === true
       || (featureProbe ? codexFeatureProbeRejectsAgentMaxThreads(featureProbe) : false));
+  const multiAgentV2ThreadCapSupported = codexCliVersionSupportsMultiAgentV2ThreadCap(codexCliVersion);
   if (featureProbeIndicatesMultiAgentV2) {
     checks.max_threads.status = 'skipped';
     checks.max_threads.actual = null;
@@ -1269,7 +1279,11 @@ function inspectCodexDefaultsAdvisory(
   }
 
   if (!existsSync(configPath)) {
-    const multiAgentV2ThreadCap = inspectMultiAgentV2ThreadCap(null, featureProbeIndicatesMultiAgentV2);
+    const multiAgentV2ThreadCap = inspectMultiAgentV2ThreadCap(
+      null,
+      featureProbeIndicatesMultiAgentV2,
+      multiAgentV2ThreadCapSupported
+    );
     appendMultiAgentV2ThreadCapGuidance(guidance, multiAgentV2ThreadCap);
     return {
       status: 'advisory',
@@ -1290,7 +1304,11 @@ function inspectCodexDefaultsAdvisory(
     }
     parsed = value;
   } catch (error) {
-    const multiAgentV2ThreadCap = inspectMultiAgentV2ThreadCap(null, featureProbeIndicatesMultiAgentV2);
+    const multiAgentV2ThreadCap = inspectMultiAgentV2ThreadCap(
+      null,
+      featureProbeIndicatesMultiAgentV2,
+      multiAgentV2ThreadCapSupported
+    );
     appendMultiAgentV2ThreadCapGuidance(guidance, multiAgentV2ThreadCap);
     return {
       status: 'advisory',
@@ -1380,7 +1398,7 @@ function inspectCodexDefaultsAdvisory(
   const multiAgentV2Enabled =
     featureProbeIndicatesMultiAgentV2
     || (!featureProbeDisablesMultiAgentV2
-      && readBooleanValue(readRecordValue(parsed, 'features')?.multi_agent_v2) === true);
+      && readConfiguredMultiAgentV2Enabled(readRecordValue(parsed, 'features')?.multi_agent_v2));
   const maxThreads = readNumberValue(agents.max_threads);
   const maxDepth = readNumberValue(agents.max_depth);
   const maxSpawnDepth = readNumberValue(agents.max_spawn_depth);
@@ -1411,7 +1429,11 @@ function inspectCodexDefaultsAdvisory(
         : `older parser/runtime may still treat this as a hard cap below the CO baseline depth; raise it to >= ${BASELINE_AGENTS.max_depth} or remove it`
     };
   }
-  const multiAgentV2ThreadCap = inspectMultiAgentV2ThreadCap(parsed, multiAgentV2Enabled);
+  const multiAgentV2ThreadCap = inspectMultiAgentV2ThreadCap(
+    parsed,
+    multiAgentV2Enabled,
+    multiAgentV2ThreadCapSupported
+  );
   appendMultiAgentV2ThreadCapGuidance(guidance, multiAgentV2ThreadCap);
 
   const allChecksOk =
@@ -1439,34 +1461,44 @@ function appendMultiAgentV2ThreadCapGuidance(
     return;
   }
   guidance.push(
-    `Codex CLI 0.128+ accepts \`${MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH}\`; CO treats that cap as user-owned and does not seed it through defaults/init.`
+    `Codex CLI 0.128+ owns the persisted MultiAgentV2 cap at \`${MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH}\`; the feature-specific CLI override/probe path \`${MULTI_AGENT_V2_FEATURE_THREAD_CAP_CONFIG_PATH}\` stays user-owned, and CO does not seed either path through defaults/init.`
   );
 }
 
 function inspectMultiAgentV2ThreadCap(
   config: Record<string, unknown> | null,
-  multiAgentV2Enabled: boolean
+  multiAgentV2Enabled: boolean,
+  capSupported: boolean
 ): DoctorCodexDefaultsAdvisory['multi_agent_v2_thread_cap'] {
   const configured = readConfiguredMultiAgentV2ThreadCap(config);
   if (configured.present) {
+    if (!capSupported) {
+      return {
+        status: 'advisory',
+        config_path: configured.path,
+        actual: configured.actual,
+        detail:
+          'configured MultiAgentV2 cap requires Codex CLI 0.128+; the active Codex CLI version did not prove cap support'
+      };
+    }
     if (configured.actual !== null && Number.isInteger(configured.actual) && configured.actual > 0) {
       return {
         status: 'configured',
-        config_path: MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH,
+        config_path: configured.path,
         actual: configured.actual,
         detail:
-          'Codex CLI 0.128+ accepts this feature-specific cap; CO preserves it as user-owned and does not seed it through defaults/init'
+          'Codex CLI 0.128+ accepts this v2-specific cap; CO preserves it as user-owned and does not seed it through defaults/init'
       };
     }
     return {
       status: 'advisory',
-      config_path: MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH,
+      config_path: configured.path,
       actual: configured.actual,
       detail:
         'configured value is not a positive integer; inspect this user-owned MultiAgentV2 cap before relying on it'
     };
   }
-  if (multiAgentV2Enabled) {
+  if (multiAgentV2Enabled && capSupported) {
     return {
       status: 'user-owned',
       config_path: MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH,
@@ -1479,21 +1511,60 @@ function inspectMultiAgentV2ThreadCap(
     status: 'not_applicable',
     config_path: MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH,
     actual: null,
-    detail: 'stable features.multi_agent guidance continues to use agents.max_threads'
+    detail: capSupported
+      ? 'stable features.multi_agent guidance continues to use agents.max_threads'
+      : 'active Codex CLI version does not expose the 0.128+ MultiAgentV2 thread cap'
   };
 }
 
 function readConfiguredMultiAgentV2ThreadCap(config: Record<string, unknown> | null): {
   present: boolean;
+  path: string;
   actual: number | null;
 } {
-  const capConfig = readRecordValue(readRecordValue(config, 'features'), 'multi_agent_v2');
-  if (!capConfig || !Object.prototype.hasOwnProperty.call(capConfig, 'max_concurrent_threads_per_session')) {
-    return { present: false, actual: null };
+  const topLevelConfig = readRecordValue(config, 'multi_agent_v2');
+  if (topLevelConfig && Object.prototype.hasOwnProperty.call(topLevelConfig, 'max_concurrent_threads_per_session')) {
+    return {
+      present: true,
+      path: MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH,
+      actual: readNumberValue(topLevelConfig.max_concurrent_threads_per_session)
+    };
+  }
+
+  const featureConfig = readRecordValue(readRecordValue(config, 'features'), 'multi_agent_v2');
+  if (!featureConfig || !Object.prototype.hasOwnProperty.call(featureConfig, 'max_concurrent_threads_per_session')) {
+    return { present: false, path: MULTI_AGENT_V2_THREAD_CAP_CONFIG_PATH, actual: null };
   }
   return {
     present: true,
-    actual: readNumberValue(capConfig.max_concurrent_threads_per_session)
+    path: MULTI_AGENT_V2_FEATURE_THREAD_CAP_CONFIG_PATH,
+    actual: readNumberValue(featureConfig.max_concurrent_threads_per_session)
+  };
+}
+
+function codexCliVersionSupportsMultiAgentV2ThreadCap(version: string | null): boolean {
+  const parsed = parseSemverFromText(version);
+  if (!parsed) {
+    return false;
+  }
+  if (parsed.major !== 0) {
+    return parsed.major > 0;
+  }
+  if (parsed.minor !== 128) {
+    return parsed.minor > 128;
+  }
+  return parsed.patch >= 0;
+}
+
+function parseSemverFromText(version: string | null): { major: number; minor: number; patch: number } | null {
+  const match = version?.match(/\b(\d+)\.(\d+)\.(\d+)\b/u);
+  if (!match) {
+    return null;
+  }
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3])
   };
 }
 

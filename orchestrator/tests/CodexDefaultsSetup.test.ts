@@ -1093,7 +1093,7 @@ describe('runCodexDefaultsSetup', () => {
         [
           'model = "legacy-model"',
           '',
-          '[features.multi_agent_v2]',
+          '[multi_agent_v2]',
           'max_concurrent_threads_per_session = 8',
           '',
           '[agents]',
@@ -1111,14 +1111,95 @@ describe('runCodexDefaultsSetup', () => {
       });
 
       const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
-        features?: Record<string, unknown>;
+        multi_agent_v2?: Record<string, unknown>;
         agents?: Record<string, unknown>;
       };
-      const multiAgentV2Config = parsed.features?.multi_agent_v2 as Record<string, unknown> | undefined;
 
       expect(parsed.agents?.max_threads).toBeUndefined();
       expect(parsed.agents?.extra_agent_key).toBe('keep');
-      expect(multiAgentV2Config?.max_concurrent_threads_per_session).toBe(8);
+      expect(parsed.multi_agent_v2?.max_concurrent_threads_per_session).toBe(8);
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('omits max_threads when multi_agent_v2 is enabled by feature table config', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-multi-agent-v2-feature-table-'));
+    const configPath = join(tempHome, 'config.toml');
+    try {
+      await writeFile(
+        configPath,
+        [
+          'model = "legacy-model"',
+          '',
+          '[features.multi_agent_v2]',
+          'enabled = true',
+          'max_concurrent_threads_per_session = 8',
+          '',
+          '[agents]',
+          'max_threads = 2',
+          'extra_agent_key = "keep"',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
+      const codexBin = await writeFakeCodexBinary(tempHome, '');
+
+      await runCodexDefaultsSetup({
+        apply: true,
+        env: buildDefaultsEnv(tempHome, codexBin)
+      });
+
+      const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        features?: { multi_agent_v2?: Record<string, unknown> };
+        agents?: Record<string, unknown>;
+      };
+
+      expect(parsed.agents?.max_threads).toBeUndefined();
+      expect(parsed.agents?.extra_agent_key).toBe('keep');
+      expect(parsed.features?.multi_agent_v2?.enabled).toBe(true);
+      expect(parsed.features?.multi_agent_v2?.max_concurrent_threads_per_session).toBe(8);
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps max_threads when feature table disables multi_agent_v2 despite a retained cap', async () => {
+    const tempHome = await mkdtemp(join(tmpdir(), 'codex-defaults-multi-agent-v2-disabled-feature-cap-'));
+    const configPath = join(tempHome, 'config.toml');
+    try {
+      await writeFile(
+        configPath,
+        [
+          'model = "legacy-model"',
+          '',
+          '[features.multi_agent_v2]',
+          'enabled = false',
+          'max_concurrent_threads_per_session = 8',
+          '',
+          '[agents]',
+          'max_threads = 2',
+          'extra_agent_key = "keep"',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
+      const codexBin = await writeFakeCodexBinary(tempHome, '');
+
+      await runCodexDefaultsSetup({
+        apply: true,
+        env: buildDefaultsEnv(tempHome, codexBin)
+      });
+
+      const parsed = toml.parse(await readFile(configPath, 'utf8')) as {
+        features?: { multi_agent_v2?: Record<string, unknown> };
+        agents?: Record<string, unknown>;
+      };
+
+      expect(parsed.agents?.max_threads).toBe(12);
+      expect(parsed.agents?.extra_agent_key).toBe('keep');
+      expect(parsed.features?.multi_agent_v2?.enabled).toBe(false);
+      expect(parsed.features?.multi_agent_v2?.max_concurrent_threads_per_session).toBe(8);
     } finally {
       await rm(tempHome, { recursive: true, force: true });
     }

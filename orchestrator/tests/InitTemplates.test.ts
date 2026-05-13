@@ -182,6 +182,36 @@ describe('initCodexTemplates', () => {
     }
   });
 
+  it('keeps max_threads when feature table disables multi_agent_v2 despite a retained cap', async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-init-multi-agent-v2-disabled-feature-cap-'));
+    const codexHome = await mkdtemp(path.join(os.tmpdir(), 'codex-home-init-v2-disabled-feature-cap-'));
+
+    try {
+      await writeFile(
+        path.join(codexHome, 'config.toml'),
+        [
+          '[features.multi_agent_v2]',
+          'enabled = false',
+          'max_concurrent_threads_per_session = 8'
+        ].join('\n'),
+        'utf8'
+      );
+      const codexBin = await writeFakeCodexBinary(codexHome, '');
+
+      await initCodexTemplates({
+        template: 'codex',
+        cwd: tempDir,
+        force: false,
+        env: buildInitEnv(codexHome, codexBin)
+      });
+
+      const codexConfig = await readFile(path.join(tempDir, '.codex', 'config.toml'), 'utf8');
+      expect(codexConfig).toContain('max_threads = 12');
+    } finally {
+      await rm(codexHome, { recursive: true, force: true });
+    }
+  });
+
   it('uses the target env when probing Codex features during init', async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-init-multi-agent-v2-env-'));
     const codexHome = await mkdtemp(path.join(os.tmpdir(), 'codex-home-init-v2-env-'));

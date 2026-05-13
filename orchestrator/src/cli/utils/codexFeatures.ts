@@ -64,6 +64,19 @@ export function codexFeatureProbeDisablesMultiAgentV2(probe: CodexFeatureProbeRe
   return probe.flags?.multi_agent_v2 === false;
 }
 
+export function readConfiguredMultiAgentV2Enabled(value: unknown): boolean {
+  if (value === true) {
+    return true;
+  }
+  if (!isRecord(value)) {
+    return false;
+  }
+  if (typeof value.enabled === 'boolean') {
+    return value.enabled;
+  }
+  return Object.prototype.hasOwnProperty.call(value, 'max_concurrent_threads_per_session');
+}
+
 export function findConfiguredRemovedFeatureKeys(
   configFeatures: Record<string, unknown> | null | undefined,
   probe: CodexFeatureProbeResult | null | undefined
@@ -114,4 +127,8 @@ function parseFeatureFlagsFromEntries(features: Record<string, CodexFeatureEntry
     flags[feature.name] = feature.enabled;
   }
   return flags;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
