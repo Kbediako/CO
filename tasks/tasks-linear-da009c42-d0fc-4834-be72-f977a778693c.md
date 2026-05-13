@@ -1,46 +1,7 @@
 # Task Checklist - linear-da009c42-d0fc-4834-be72-f977a778693c
 
-- Linear Issue: `CO-119` / `da009c42-d0fc-4834-be72-f977a778693c`
-- MCP Task ID: `linear-da009c42-d0fc-4834-be72-f977a778693c`
-- Primary PRD: `docs/PRD-linear-da009c42-d0fc-4834-be72-f977a778693c.md`
-- TECH_SPEC: `tasks/specs/linear-da009c42-d0fc-4834-be72-f977a778693c.md`
-- ACTION_PLAN: `docs/ACTION_PLAN-linear-da009c42-d0fc-4834-be72-f977a778693c.md`
+<!-- docs-archive:stub -->
+> Archived on 2026-05-13. Full content: https://github.com/Kbediako/CO/blob/doc-archives/tasks/tasks-linear-da009c42-d0fc-4834-be72-f977a778693c.md
 
-## Docs
-- [x] Docs packet created and mirrored in `docs/`, `tasks/`, `.agent/`, `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json`. Evidence: `docs/PRD-linear-da009c42-d0fc-4834-be72-f977a778693c.md`, `docs/TECH_SPEC-linear-da009c42-d0fc-4834-be72-f977a778693c.md`, `docs/ACTION_PLAN-linear-da009c42-d0fc-4834-be72-f977a778693c.md`, `tasks/specs/linear-da009c42-d0fc-4834-be72-f977a778693c.md`, `tasks/tasks-linear-da009c42-d0fc-4834-be72-f977a778693c.md`, `.agent/task/linear-da009c42-d0fc-4834-be72-f977a778693c.md`.
-- [x] docs-review child-stream evidence recorded and the one concrete packet issue it surfaced was resolved before implementation; the 2026-04-10 rerun failed only on the repo-wide `docs:freshness` baseline and is accepted as truthful fallback rather than a packet defect. Evidence: `.runs/linear-da009c42-d0fc-4834-be72-f977a778693c-co-119-docs-review/cli/2026-04-09T08-34-19-507Z-042c1cf5/manifest.json`, `.runs/linear-da009c42-d0fc-4834-be72-f977a778693c-co-119-docs-review/cli/2026-04-09T08-34-19-507Z-042c1cf5/review/telemetry.json`, `.runs/linear-da009c42-d0fc-4834-be72-f977a778693c-docs-review/cli/2026-04-10T06-30-27-538Z-4c8a90d9/manifest.json`, `docs/TECH_SPEC-linear-da009c42-d0fc-4834-be72-f977a778693c.md`.
-- [x] Exactly one persistent Linear workpad comment is current. Evidence: `https://linear.app/asabeko/issue/CO-119/co-102-recover-active-in-progress-worker-claims-when-control-host#comment-7a6cbdf9`, `out/linear-da009c42-d0fc-4834-be72-f977a778693c/manual/workpad.md`.
-
-## Investigation
-- [x] Live Linear workflow states were rechecked and the issue was moved from `Ready` to `In Progress` before active coding. Evidence: `linear issue-context`, `linear transition --state "In Progress"`.
-- [x] Required turn-level parallelization decisions were recorded on both active turns: bootstrap used `stay_serial` / `single_bounded_change`, and the 2026-04-10 resumed validation turn used `stay_serial` / `review_or_validation_only`. Evidence: `linear parallelization --decision stay_serial --reason single_bounded_change`, `linear parallelization --decision stay_serial --reason review_or_validation_only`.
-- [x] The detached workspace was moved onto branch `linear/co-119-refresh-timeout-claim-recovery` before repo edits. Evidence: `git switch -c linear/co-119-refresh-timeout-claim-recovery`.
-- [x] Archived `CO-102` evidence confirmed the bounded seam: repeated refresh request timeouts began at `2026-04-08T22:33:12.454Z`, but the same run later reached `In Review` at `2026-04-09T02:01:24.410Z`, observed `Merging` at `2026-04-09T02:12:44.517Z`, cached `Done` at `2026-04-09T02:14:53.654Z`, and completed `succeeded` at `2026-04-09T02:17:03.958Z`. Evidence: `/Users/kbediako/Code/CO/.runs/linear-f0d312eb-055f-4926-80df-8fcaaf56839c/cli/2026-04-08T22-32-52-844Z-c8d26259/commands/01-provider-linear-worker.ndjson`, `/Users/kbediako/Code/CO/.runs/linear-f0d312eb-055f-4926-80df-8fcaaf56839c/cli/2026-04-08T22-32-52-844Z-c8d26259/provider-linear-worker-linear-audit.jsonl`, `/Users/kbediako/Code/CO/.runs/linear-f0d312eb-055f-4926-80df-8fcaaf56839c/cli/2026-04-08T22-32-52-844Z-c8d26259/provider-linear-issue-context-cache.json`, `/Users/kbediako/Code/CO/.runs/linear-f0d312eb-055f-4926-80df-8fcaaf56839c/cli/2026-04-08T22-32-52-844Z-c8d26259/manifest.json`.
-- [x] Code audit narrowed the likely fix to the refresh acknowledgement contract in `controlServerPublicLifecycle.ts` and `providerLinearWorkerRunner.ts`, with stuck truth preserved in `providerPollingHealth.ts` and attached-PR handling left on the `CO-104` path. Evidence: `orchestrator/src/cli/control/controlServerPublicLifecycle.ts`, `orchestrator/src/cli/providerLinearWorkerRunner.ts`, `orchestrator/src/cli/control/providerPollingHealth.ts`, `orchestrator/src/cli/control/providerIssueHandoff.ts`.
-
-## Implementation
-- [x] Return prompt accepted truth for queued/coalesced control-host refresh requests instead of waiting long enough to trigger repeated provider-worker timeouts. Evidence: `orchestrator/src/cli/control/controlServerPublicLifecycle.ts`, `orchestrator/src/cli/control/controlAuthenticatedRouteHandoff.ts`.
-- [x] Preserve explicit `provider_refresh_lifecycle_stuck` / `restart_required` truth for actual unhealthy refresh lifecycles. Evidence: `orchestrator/src/cli/control/controlServerPublicLifecycle.ts`, `orchestrator/tests/ControlServerPublicLifecycle.test.ts`.
-- [x] Keep the late-turn recovery path compatible with existing historical attached-PR disambiguation. Evidence: existing selector untouched in `orchestrator/src/cli/control/providerMergeCloseout.ts`, plus focused regression rerun `npm run test -- orchestrator/tests/ControlServerPublicLifecycle.test.ts orchestrator/tests/ProviderLinearWorkerRunner.test.ts orchestrator/tests/ProviderMergeCloseout.test.ts`.
-- [x] Add focused regressions for the archived timeout-heavy late-turn recovery shape. Evidence: `orchestrator/tests/ControlServerPublicLifecycle.test.ts`, plus focused regression rerun `npm run test -- orchestrator/tests/ControlServerPublicLifecycle.test.ts orchestrator/tests/ProviderLinearWorkerRunner.test.ts orchestrator/tests/ProviderMergeCloseout.test.ts`.
-
-## Validation
-- [x] `MCP_RUNNER_TASK_ID=linear-da009c42-d0fc-4834-be72-f977a778693c node "/Users/kbediako/Code/CO/dist/bin/codex-orchestrator.js" linear child-stream --pipeline docs-review --stream co-119-docs-review --format json`. Evidence: `.runs/linear-da009c42-d0fc-4834-be72-f977a778693c-co-119-docs-review/cli/2026-04-09T08-34-19-507Z-042c1cf5/manifest.json`, `.runs/linear-da009c42-d0fc-4834-be72-f977a778693c-co-119-docs-review/cli/2026-04-09T08-34-19-507Z-042c1cf5/review/telemetry.json`.
-- [x] Focused regression coverage for queued/coalesced refresh acknowledgement, actual stuck truth, late-turn claim recovery, and the adjacent historical attached-PR selector. Evidence: `npm run test -- orchestrator/tests/ControlServerPublicLifecycle.test.ts orchestrator/tests/ProviderLinearWorkerRunner.test.ts orchestrator/tests/ProviderMergeCloseout.test.ts`.
-- [x] `node scripts/delegation-guard.mjs`. Evidence: `Delegation guard: OK (2 subagent manifest(s) found).`
-- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: dry-run succeeded and surfaced only the unrelated repo-wide 2026-03-10 stale-spec baseline across tasks `1093`-`1109`.
-- [x] `npm run build`. Evidence: `tsc -p tsconfig.build.json` completed successfully on 2026-04-10.
-- [x] `npm run lint`. Evidence: `eslint orchestrator/src orchestrator/tests packages/orchestrator/src packages/orchestrator/tests packages/shared adapters evaluation/harness evaluation/tests --ext .ts,.tsx` completed successfully on 2026-04-10.
-- [x] `npm run test`. Evidence: full Vitest floor passed on rerun (`320` files, `3231` tests). The only observed failure before the rerun was a test isolation defect in `orchestrator/tests/ProviderLinearWorkerRunner.test.ts`; setting `CODEX_HOME` to the temp sandbox for that test removed the host-session scan and restored a clean suite without changing production code.
-- [x] `npm run docs:check`. Evidence: `✅ docs:check: OK` on 2026-04-10.
-- [x] `npm run docs:freshness` or a truthful repo-baseline fallback note. Evidence: `npm run docs:freshness` failed only on the unrelated repo baseline (`stale docs: 119`; Task Packet stale=85, Task Mirror stale=17, Report Only stale=17) and no CO-119 packet path was reported as missing or malformed.
-- [x] `node scripts/diff-budget.mjs`. Evidence: `✅ Diff budget: OK (scope=working-tree, files=12/25, lines=750/1200, +726/-24)`.
-- [x] Manifest-backed standalone review plus explicit elegance review before any review handoff. Evidence: wrapper review at `.runs/linear-da009c42-d0fc-4834-be72-f977a778693c/cli/2026-04-10T05-26-33-984Z-941f68b3/review/telemetry.json` reported `status=failed` / `review_outcome=failed-boundary` with `termination_boundary.kind=startup-anchor`; manual fallback review of `controlAuthenticatedRouteHandoff.ts`, `controlServerPublicLifecycle.ts`, `ControlAuthenticatedRouteHandoff.test.ts`, `ControlServerPublicLifecycle.test.ts`, and `ProviderLinearWorkerRunner.test.ts` found no additional correctness/regression gaps, and the explicit elegance pass kept the solution at one acknowledgement helper plus one test-only `CODEX_HOME` isolation line.
-- [x] `npm run pack:smoke` if the final diff touches downstream-facing CLI/runtime surfaces. Evidence: `✅ pack smoke passed` on 2026-04-10.
-
-## Handoff
-- [x] PR attached to the issue. Evidence: `linear issue-context` confirmed attachment `https://github.com/Kbediako/CO/pull/409` at `2026-04-10T08:07:57Z`.
-- [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: merge-sync commits `6016ca4cd`, `2aba4aeba`, and `f223b36f3` (merging `origin/main` at `2d5655bb4`).
-- [ ] PR checks green and `pr ready-review` drain clean before review-state transition.
-- [ ] Unresolved actionable review threads: `0` (or explicit waiver plus evidence recorded here before handoff).
-- [ ] Issue moved to `Human Review` or `In Review`.
+- Archive branch: doc-archives
+- Archive path: tasks/tasks-linear-da009c42-d0fc-4834-be72-f977a778693c.md
