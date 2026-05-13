@@ -9,6 +9,7 @@ import { resolveCodexCliBin } from './utils/codexCli.js';
 import {
   codexFeatureProbeDisablesMultiAgentV2,
   codexFeatureProbeRejectsAgentMaxThreads,
+  readConfiguredMultiAgentV2Enabled,
   readCodexFeatureProbe
 } from './utils/codexFeatures.js';
 import { findPackageRoot } from './utils/packageInfo.js';
@@ -93,10 +94,10 @@ async function isMultiAgentV2Enabled(env: NodeJS.ProcessEnv): Promise<boolean> {
   } catch {
     return false;
   }
-  if (!isRecord(parsed) || !isRecord(parsed.features)) {
+  if (!isRecord(parsed)) {
     return false;
   }
-  return parsed.features.multi_agent_v2 === true;
+  return readConfiguredMultiAgentV2Enabled(parsed);
 }
 
 async function omitAgentMaxThreads(configPath: string): Promise<void> {

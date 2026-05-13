@@ -3706,6 +3706,22 @@
       "cadence_days": 365
     },
     {
+      "path": ".agent/task/linear-3abba033-52f0-45f3-af58-cce4939f087f.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "3abba033-52f0-45f3-af58-cce4939f087f",
+        "identifier": "CO-480",
+        "url": "https://linear.app/asabeko/issue/CO-480/co-audit-multiagentv2-0128-feature-specific-thread-cap-support"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
+    },
+    {
       "path": ".agent/task/linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -9103,6 +9119,22 @@
       "status": "archived",
       "last_review": "2026-05-13",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-3abba033-52f0-45f3-af58-cce4939f087f.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "3abba033-52f0-45f3-af58-cce4939f087f",
+        "identifier": "CO-480",
+        "url": "https://linear.app/asabeko/issue/CO-480/co-audit-multiagentv2-0128-feature-specific-thread-cap-support"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
     },
     {
       "path": "docs/ACTION_PLAN-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
@@ -17354,6 +17386,22 @@
       "cadence_days": 365
     },
     {
+      "path": "docs/PRD-linear-3abba033-52f0-45f3-af58-cce4939f087f.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "3abba033-52f0-45f3-af58-cce4939f087f",
+        "identifier": "CO-480",
+        "url": "https://linear.app/asabeko/issue/CO-480/co-audit-multiagentv2-0128-feature-specific-thread-cap-support"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
+    },
+    {
       "path": "docs/PRD-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -23164,6 +23212,22 @@
       "status": "archived",
       "last_review": "2026-05-13",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-3abba033-52f0-45f3-af58-cce4939f087f.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "3abba033-52f0-45f3-af58-cce4939f087f",
+        "identifier": "CO-480",
+        "url": "https://linear.app/asabeko/issue/CO-480/co-audit-multiagentv2-0128-feature-specific-thread-cap-support"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
     },
     {
       "path": "docs/TECH_SPEC-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
@@ -29293,6 +29357,22 @@
       "cadence_days": 365
     },
     {
+      "path": "tasks/specs/linear-3abba033-52f0-45f3-af58-cce4939f087f.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "3abba033-52f0-45f3-af58-cce4939f087f",
+        "identifier": "CO-480",
+        "url": "https://linear.app/asabeko/issue/CO-480/co-audit-multiagentv2-0128-feature-specific-thread-cap-support"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
+    },
+    {
       "path": "tasks/specs/linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -35075,6 +35155,22 @@
       "status": "archived",
       "last_review": "2026-05-13",
       "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-linear-3abba033-52f0-45f3-af58-cce4939f087f.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "3abba033-52f0-45f3-af58-cce4939f087f",
+        "identifier": "CO-480",
+        "url": "https://linear.app/asabeko/issue/CO-480/co-audit-multiagentv2-0128-feature-specific-thread-cap-support"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
     },
     {
       "path": "tasks/tasks-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",

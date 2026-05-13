@@ -1,6 +1,123 @@
 {
   "items": [
     {
+      "id": "20260513-linear-3abba033-52f0-45f3-af58-cce4939f087f",
+      "title": "CO-480 MultiAgentV2 0.128 thread-cap audit",
+      "relates_to": "tasks/tasks-linear-3abba033-52f0-45f3-af58-cce4939f087f.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-13",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO-480 provider worker",
+          "date": "2026-05-13",
+          "status": "rework_reset",
+          "summary": "linear issue-context found CO-480 in Rework with attached stale PR #798, stale workpad bc967bbe-2bef-4f52-b7fc-c2a7eb93f812, and live team states including In Progress, In Review, Merging, and Done."
+        },
+        "parallelization": {
+          "reviewer": "linear parallelization helper",
+          "date": "2026-05-13",
+          "decision": "forbid_parallel",
+          "reason": "parent_only_mutation",
+          "summary": "Rework reset required parent-only lifecycle mutation: close stale PR #798, delete old workpad, and rebuild the issue workspace from origin/main before implementation lanes can be safely split."
+        },
+        "rework_reset": {
+          "reviewer": "CO-480 provider worker",
+          "date": "2026-05-13",
+          "status": "fresh_branch_from_origin_main",
+          "pr_closed": "https://github.com/Kbediako/CO/pull/798",
+          "old_workpad_comment": "bc967bbe-2bef-4f52-b7fc-c2a7eb93f812",
+          "new_workpad_comment": "6cb010be-0009-4122-a5e1-e0e3cda21caa",
+          "branch": "linear/co-480-rework",
+          "base": "origin/main@e7ed674534",
+          "summary": "Prior conflicted attempt was discarded only after PR feedback sweep, PR closure, and workpad deletion."
+        },
+        "docs_first": {
+          "reviewer": "CO-480 provider worker",
+          "date": "2026-05-13",
+          "status": "packet_seeded",
+          "summary": "PRD, TECH_SPEC, ACTION_PLAN, task checklist, agent mirror, task index entry, docs/TASKS snapshot, and docs freshness registry rows created before implementation edits."
+        },
+        "docs_review": {
+          "reviewer": "linear child-stream docs-review",
+          "date": "2026-05-13",
+          "status": "failed_on_inherited_docs_freshness_maintain_baseline",
+          "manifest": ".runs/linear-3abba033-52f0-45f3-af58-cce4939f087f-co480-docs-review/cli/2026-05-13T12-46-00-796Z-d9908644/manifest.json",
+          "passing_stages": [
+            "node scripts/spec-guard.mjs --dry-run",
+            "npm run docs:check"
+          ],
+          "failing_stage": "npm run docs:freshness:maintain -- --format json",
+          "owner_issue": "CO-522",
+          "owner_state": "Blocked",
+          "decision": "block_policy_over_budget",
+          "summary": "Docs-review reached terminal failed status because inherited repo-wide docs:freshness:maintain baseline debt remains routed to live owner CO-522; this did not identify a CO-480 packet-local docs failure."
+        },
+        "implementation": {
+          "reviewer": "CO-480 provider worker",
+          "date": "2026-05-13",
+          "status": "implemented",
+          "summary": "Added shared MultiAgentV2 config helpers, doctor multi_agent_v2_thread_cap classification, defaults/init v2 table detection, docs/skill guidance for features.multi_agent_v2.max_concurrent_threads_per_session, and focused regression tests while preserving stable features.multi_agent max_threads guidance.",
+          "probe_artifact": "out/linear-3abba033-52f0-45f3-af58-cce4939f087f/manual/multi-agent-v2-cap-probes.jsonl"
+        },
+        "validation": {
+          "reviewer": "CO-480 provider worker",
+          "date": "2026-05-13",
+          "status": "passed_with_inherited_docs_freshness_baseline",
+          "passing": [
+            "node scripts/delegation-guard.mjs",
+            "node scripts/spec-guard.mjs --dry-run",
+            "npm run build",
+            "npm run lint",
+            "npm run test",
+            "npm run docs:check",
+            "npm run repo:stewardship",
+            "node scripts/diff-budget.mjs",
+            "npm run pack:smoke"
+          ],
+          "failing_baseline": {
+            "command": "npm run docs:freshness",
+            "summary": "Inherited repo-wide docs freshness baseline remains red: 5333 docs, 5336 registry entries, 0 missing registry entries, 446 stale docs.",
+            "owner_issue": "CO-522"
+          },
+          "summary": "Focused tests and full core test suite are green; docs:freshness failure is inherited baseline debt with registry coverage intact, consistent with docs-review child-stream routing to CO-522."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-13",
+          "status": "clean",
+          "review_outcome": "bounded-success",
+          "review_verdict": "clean",
+          "finding_count": 0,
+          "telemetry": ".runs/linear-3abba033-52f0-45f3-af58-cce4939f087f/cli/2026-05-13T12-35-04-200Z-eb104187/review/telemetry.json",
+          "summary": "Manifest-backed standalone review reran after the earlier P2 fixture finding was fixed; wrapper completed as bounded-success via command-intent preservation and semantic verdict is clean."
+        },
+        "elegance_review": {
+          "reviewer": "CO-480 provider worker",
+          "date": "2026-05-13",
+          "status": "clean",
+          "artifact": "out/linear-3abba033-52f0-45f3-af58-cce4939f087f/manual/elegance-review.md",
+          "summary": "Minimality pass kept the shared feature helper plus doctor/default/init callers as the smallest viable shape and found no cleanup patch needed; git diff --check passed."
+        }
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-3abba033-52f0-45f3-af58-cce4939f087f.md",
+        "prd": "docs/PRD-linear-3abba033-52f0-45f3-af58-cce4939f087f.md",
+        "docs": "docs/TECH_SPEC-linear-3abba033-52f0-45f3-af58-cce4939f087f.md",
+        "action_plan": "docs/ACTION_PLAN-linear-3abba033-52f0-45f3-af58-cce4939f087f.md",
+        "spec": "tasks/specs/linear-3abba033-52f0-45f3-af58-cce4939f087f.md",
+        "task": "tasks/tasks-linear-3abba033-52f0-45f3-af58-cce4939f087f.md"
+      },
+      "source_issue": {
+        "id": "3abba033-52f0-45f3-af58-cce4939f087f",
+        "identifier": "CO-480",
+        "url": "https://linear.app/asabeko/issue/CO-480/co-audit-multiagentv2-0128-feature-specific-thread-cap-support"
+      }
+    },
+    {
       "id": "20260513-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94",
       "title": "CO: make docs freshness preventive with lifecycle automation",
       "relates_to": "tasks/tasks-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
