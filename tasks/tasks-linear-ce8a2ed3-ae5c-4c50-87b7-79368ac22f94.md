@@ -51,8 +51,12 @@
 - Do not broaden CO-431, CO-522, CO-519, or CO-516 beyond their stated adjacent scopes.
 
 ## Evidence
-- Workpad comment: `c82ffd2e-8753-4a48-9296-d75ae3595cfa`
+- Rework closeout: Linear moved CO-525 from `Done` to `Rework` on 2026-05-14 because PR #799 merged while the canonical `tasks/index.json` row stayed `in_progress` and the six packet registry rows stayed `active`.
+- Current rework branch reconciles that terminal metadata only: `tasks/index.json` marks the CO-525 row `done`, the six CO-525 registry rows are `archived` retained history, and the task spec frontmatter is terminal.
+- Fresh workpad comment: `f9dabde4-30c3-48b1-b931-e84f3375e683`
+- Prior attempt workpad comment, deleted during Rework reset: `c82ffd2e-8753-4a48-9296-d75ae3595cfa`
 - Parallelization decision: `parallelize_now` / `independent_scope_available` for `guide-catalog-parity`.
+- Rework parallelization decision: `parallelize_now` / `independent_scope_available` for `done-closeout-task-index-guard`.
 - Baseline artifact directory: `out/linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94/`.
 - Final validation artifact directory: `out/linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94/final/`.
 - Standalone review telemetry: `.runs/linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94/cli/2026-05-13T01-04-48-293Z-adc5ba11/review/telemetry.json`.

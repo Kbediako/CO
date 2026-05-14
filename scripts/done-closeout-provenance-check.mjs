@@ -11,7 +11,9 @@ import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 const DEFAULT_MANIFEST_PATH = 'docs/done-closeout-provenance.json';
 const DEFAULT_REPORT_NAME = 'done-closeout-provenance-report.json';
+const TASKS_INDEX_PATH = 'tasks/index.json';
 const DONE_STATE_NAMES = new Set(['done', 'completed']);
+const TERMINAL_TASK_STATUSES = new Set(['succeeded', 'completed', 'done', 'canceled', 'cancelled']);
 const VALID_CLASSIFICATIONS = new Set([
   'stale_mirror_only',
   'validation_only_provenance_gap',
@@ -265,6 +267,14 @@ function isDoneState(value) {
   return DONE_STATE_NAMES.has(String(value ?? '').trim().toLowerCase());
 }
 
+function normalizeTaskStatus(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function isTerminalTaskStatus(value) {
+  return TERMINAL_TASK_STATUSES.has(normalizeTaskStatus(value));
+}
+
 function normalizeCheckName(value) {
   return String(value ?? '').trim();
 }
@@ -404,6 +414,97 @@ function collectHashWaiverMismatches(pathName, rows, waivers) {
     }));
 }
 
+async function loadOptionalTaskIndexRows(repoRoot, report) {
+  const absPath = path.resolve(repoRoot, TASKS_INDEX_PATH);
+  let realRepoRoot;
+  let realPath;
+  try {
+    [realRepoRoot, realPath] = await Promise.all([realpath(repoRoot), realpath(absPath)]);
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
+
+  if (!isInsidePath(realRepoRoot, realPath)) {
+    report.failures.push({
+      issue: null,
+      code: 'tasks_index_symlink_escape',
+      message: `${TASKS_INDEX_PATH} resolves outside the repository.`,
+      path: TASKS_INDEX_PATH,
+      target: realPath
+    });
+    return [];
+  }
+
+  const targetStat = await stat(realPath);
+  if (!targetStat.isFile()) {
+    report.failures.push({
+      issue: null,
+      code: 'tasks_index_non_file_target',
+      message: `${TASKS_INDEX_PATH} is not a regular file.`,
+      path: TASKS_INDEX_PATH,
+      target: realPath
+    });
+    return [];
+  }
+
+  try {
+    const data = JSON.parse(await readFile(realPath, 'utf8'));
+    return Array.isArray(data?.items) ? data.items : [];
+  } catch (error) {
+    report.failures.push({
+      issue: null,
+      code: 'tasks_index_invalid_json',
+      message: `${TASKS_INDEX_PATH} is not valid JSON: ${error.message}`,
+      path: TASKS_INDEX_PATH
+    });
+    return [];
+  }
+}
+
+function taskIndexRowMatchesIssue(task, issueSummary) {
+  const sourceIssue = task?.source_issue;
+  if (!sourceIssue || typeof sourceIssue !== 'object') {
+    return false;
+  }
+  const linearId = normalizeLine(issueSummary.linear_id);
+  const identifier = normalizeLine(issueSummary.identifier);
+  return (
+    (linearId && normalizeLine(sourceIssue.id) === linearId) ||
+    (identifier && normalizeLine(sourceIssue.identifier) === identifier)
+  );
+}
+
+function validateTaskIndexRows(report, issueSummary, taskIndexRows) {
+  if (!isDoneState(issueSummary.linear_state)) {
+    return;
+  }
+
+  for (const task of taskIndexRows) {
+    if (!taskIndexRowMatchesIssue(task, issueSummary)) {
+      continue;
+    }
+    const status = normalizeTaskStatus(task?.status);
+    if (isTerminalTaskStatus(status)) {
+      continue;
+    }
+    const rowSummary = {
+      task_id: normalizeLine(task?.id) || null,
+      status: status || null
+    };
+    issueSummary.task_index_nonterminal_rows.push(rowSummary);
+    pushFailure(
+      report,
+      issueSummary,
+      'done_issue_nonterminal_task_index_row',
+      'Done issue has a matching tasks/index.json row with nonterminal status.',
+      rowSummary
+    );
+  }
+}
+
 async function validateMirrorPath(repoRoot, report, issueSummary, pathName, waivers) {
   const content = await readCheckedRepoFile(repoRoot, pathName, report, issueSummary, {
     missingCode: 'missing_mirror_path',
@@ -493,7 +594,7 @@ async function validateLocalCloseoutPointers(repoRoot, report, issueSummary, iss
   }
 }
 
-async function validateIssue(repoRoot, report, issue, requiredChecks) {
+async function validateIssue(repoRoot, report, issue, requiredChecks, taskIndexRows) {
   const issueSummary = {
     identifier: String(issue?.identifier ?? '').trim(),
     linear_id: String(issue?.linear_id ?? '').trim(),
@@ -505,6 +606,7 @@ async function validateIssue(repoRoot, report, issue, requiredChecks) {
     missing_mirror_paths: [],
     invalid_mirror_paths: [],
     waiver_mismatches: [],
+    task_index_nonterminal_rows: [],
     failures: []
   };
   report.issues.push(issueSummary);
@@ -550,6 +652,8 @@ async function validateIssue(repoRoot, report, issue, requiredChecks) {
     validateWaiverMetadata(report, issueSummary, waiver);
   }
 
+  validateTaskIndexRows(report, issueSummary, taskIndexRows);
+
   for (const mirrorPath of mirrorPaths) {
     await validateMirrorPath(repoRoot, report, issueSummary, mirrorPath, waivers);
   }
@@ -587,11 +691,14 @@ export async function runDoneCloseoutProvenanceCheck(repoRoot, options = {}) {
       invalid_mirror_paths: 0,
       missing_local_closeout_pointers: 0,
       waiver_mismatches: 0,
+      task_index_nonterminal_rows: 0,
       failures: 0
     },
     issues: [],
     failures: []
   };
+
+  const taskIndexRows = await loadOptionalTaskIndexRows(repoRoot, report);
 
   if (manifest?.version !== 1) {
     report.failures.push({
@@ -609,7 +716,7 @@ export async function runDoneCloseoutProvenanceCheck(repoRoot, options = {}) {
   }
 
   for (const issue of issues) {
-    await validateIssue(repoRoot, report, issue, requiredChecks);
+    await validateIssue(repoRoot, report, issue, requiredChecks, taskIndexRows);
   }
 
   report.totals.pending_rows = report.issues.reduce((sum, issue) => sum + issue.pending_rows.length, 0);
@@ -634,6 +741,10 @@ export async function runDoneCloseoutProvenanceCheck(repoRoot, options = {}) {
   ).length;
   report.totals.waiver_mismatches = report.issues.reduce(
     (sum, issue) => sum + issue.waiver_mismatches.length,
+    0
+  );
+  report.totals.task_index_nonterminal_rows = report.issues.reduce(
+    (sum, issue) => sum + issue.task_index_nonterminal_rows.length,
     0
   );
   report.totals.failures = report.failures.length;

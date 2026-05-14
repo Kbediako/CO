@@ -66,6 +66,11 @@ async function writeManifest(repoRoot: string, issues: Array<Record<string, unkn
   );
 }
 
+async function writeTaskIndex(repoRoot: string, items: Array<Record<string, unknown>>) {
+  await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+  await writeFile(join(repoRoot, 'tasks', 'index.json'), JSON.stringify({ items }, null, 2), 'utf8');
+}
+
 async function writeMirror(repoRoot: string, relPath: string, content: string) {
   await mkdir(join(repoRoot, relPath.split('/').slice(0, -1).join('/')), { recursive: true });
   await writeFile(join(repoRoot, relPath), content, 'utf8');
@@ -109,6 +114,46 @@ describe('done closeout provenance check', () => {
     const written = JSON.parse(await readFile(join(repoRoot, report.report_path), 'utf8'));
     expect(written.ok).toBe(false);
     expect(written.status).toBe('failed');
+  });
+
+  it('fails when a Done issue has a matching nonterminal tasks/index row', async () => {
+    const repoRoot = await makeRepo();
+    await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
+    await writeManifest(repoRoot, [staleIssue({ identifier: 'CO-525', linear_id: 'linear-done' })]);
+    await writeTaskIndex(repoRoot, [
+      {
+        id: '20260514-linear-done',
+        title: 'CO-525 done closeout guard',
+        status: 'in_progress',
+        source_issue: {
+          id: 'linear-done',
+          identifier: 'CO-525'
+        }
+      }
+    ]);
+
+    const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.task_index_nonterminal_rows).toBe(1);
+    expect(report.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'done_issue_nonterminal_task_index_row',
+          task_id: '20260514-linear-done',
+          status: 'in_progress'
+        })
+      ])
+    );
+    expect(report.issues[0].task_index_nonterminal_rows).toEqual([
+      {
+        task_id: '20260514-linear-done',
+        status: 'in_progress'
+      }
+    ]);
   });
 
   it('requires at least one valid mirror path for stale mirror entries', async () => {
