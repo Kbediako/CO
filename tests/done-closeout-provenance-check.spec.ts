@@ -256,6 +256,64 @@ describe('done closeout provenance check', () => {
     );
   });
 
+  it('keeps an empty provenance manifest failure when live task-index authority is provided', async () => {
+    const repoRoot = await makeRepo();
+    await writeManifest(repoRoot, []);
+    await writeTaskIndex(repoRoot, []);
+
+    const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture',
+      taskIndexIssues: [
+        {
+          identifier: 'CO-525',
+          linear_id: 'linear-live',
+          linear_state: 'Done'
+        }
+      ]
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.issues).toBe(1);
+    expect(report.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          issue: null,
+          code: 'manifest_has_no_issues'
+        })
+      ])
+    );
+  });
+
+  it('fails closed when live task-index validation is requested without tasks/index.json', async () => {
+    const repoRoot = await makeRepo();
+    await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
+    await writeManifest(repoRoot, [staleIssue()]);
+
+    const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture',
+      taskIndexIssues: [
+        {
+          identifier: 'CO-525',
+          linear_id: 'linear-live',
+          linear_state: 'Done'
+        }
+      ]
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          issue: null,
+          code: 'tasks_index_missing',
+          path: 'tasks/index.json'
+        })
+      ])
+    );
+  });
+
   it('deduplicates task-index-only authorities already present in the manifest', async () => {
     const repoRoot = await makeRepo();
     await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');

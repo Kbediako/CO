@@ -427,7 +427,7 @@ function collectHashWaiverMismatches(pathName, rows, waivers) {
     }));
 }
 
-async function loadOptionalTaskIndexRows(repoRoot, report) {
+async function loadOptionalTaskIndexRows(repoRoot, report, options = {}) {
   const absPath = path.resolve(repoRoot, TASKS_INDEX_PATH);
   let realRepoRoot;
   let realPath;
@@ -435,6 +435,14 @@ async function loadOptionalTaskIndexRows(repoRoot, report) {
     [realRepoRoot, realPath] = await Promise.all([realpath(repoRoot), realpath(absPath)]);
   } catch (error) {
     if (error?.code === 'ENOENT') {
+      if (options.required) {
+        report.failures.push({
+          issue: null,
+          code: 'tasks_index_missing',
+          message: `${TASKS_INDEX_PATH} is required for live task-index closeout validation.`,
+          path: TASKS_INDEX_PATH
+        });
+      }
       return [];
     }
     throw error;
@@ -808,7 +816,9 @@ export async function runDoneCloseoutProvenanceCheck(repoRoot, options = {}) {
     failures: []
   };
 
-  const taskIndexRows = await loadOptionalTaskIndexRows(repoRoot, report);
+  const taskIndexRows = await loadOptionalTaskIndexRows(repoRoot, report, {
+    required: taskIndexOnlyIssues.length > 0
+  });
 
   if (manifest?.version !== 1) {
     report.failures.push({
@@ -817,7 +827,7 @@ export async function runDoneCloseoutProvenanceCheck(repoRoot, options = {}) {
       message: 'Manifest version must be 1.'
     });
   }
-  if (issues.length === 0) {
+  if (manifestIssues.length === 0) {
     report.failures.push({
       issue: null,
       code: 'manifest_has_no_issues',
