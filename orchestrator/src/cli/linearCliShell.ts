@@ -42,6 +42,7 @@ import {
 } from './control/providerLinearWorkflowAudit.js';
 import {
   findDeterministicProviderMutationSuppression,
+  isFollowUpLabelResolutionSuppressionCode,
   isFollowUpParityMatrixSuppressionCode,
   isFollowUpPacketTraceabilitySuppressionCode,
   resolveProviderLinearWorkerAttemptStartedAt
@@ -828,6 +829,17 @@ async function resolveCreateFollowUpRetrySuppression(input: {
   );
   if (!suppression) {
     return null;
+  }
+  if (isFollowUpLabelResolutionSuppressionCode(suppression.error_code)) {
+    return {
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_label_resolution_retry_suppressed',
+        message: `Same-attempt retry suppressed: ${suppression.instruction}`,
+        status: 409
+      }
+    };
   }
   if (input.parityLane && (input.parityMatrix?.trim().length ?? 0) === 0) {
     if (!isFollowUpParityMatrixSuppressionCode(suppression.error_code)) {
