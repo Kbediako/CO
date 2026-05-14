@@ -71,6 +71,15 @@ async function writeTaskIndex(repoRoot: string, items: Array<Record<string, unkn
   await writeFile(join(repoRoot, 'tasks', 'index.json'), JSON.stringify({ items }, null, 2), 'utf8');
 }
 
+async function copyDoneCloseoutCli(repoRoot: string) {
+  await mkdir(join(repoRoot, 'scripts', 'lib'), { recursive: true });
+  await Promise.all([
+    copyFile(join(process.cwd(), 'scripts', 'done-closeout-provenance-check.mjs'), join(repoRoot, 'scripts', 'done-closeout-provenance-check.mjs')),
+    copyFile(join(process.cwd(), 'scripts', 'lib', 'cli-args.js'), join(repoRoot, 'scripts', 'lib', 'cli-args.js')),
+    copyFile(join(process.cwd(), 'scripts', 'lib', 'run-manifests.js'), join(repoRoot, 'scripts', 'lib', 'run-manifests.js'))
+  ]);
+}
+
 async function writeMirror(repoRoot: string, relPath: string, content: string) {
   await mkdir(join(repoRoot, relPath.split('/').slice(0, -1).join('/')), { recursive: true });
   await writeFile(join(repoRoot, relPath), content, 'utf8');
@@ -601,6 +610,51 @@ describe('done closeout provenance check', () => {
     );
   });
 
+  it('keeps manifest classification validation strict when live authority deduplicates', async () => {
+    const repoRoot = await makeRepo();
+    await writeManifest(repoRoot, [
+      {
+        identifier: 'CO-525',
+        linear_id: 'linear-live',
+        linear_state: 'Done',
+        classification: 'task_index_only',
+        mirror_paths: [],
+        waivers: []
+      }
+    ]);
+    await writeTaskIndex(repoRoot, [
+      {
+        id: '20260514-linear-live',
+        title: 'CO-525 live closeout row',
+        status: 'done',
+        relates_to: 'tasks/tasks-linear-live.md'
+      }
+    ]);
+
+    const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture',
+      taskIndexIssues: [
+        {
+          identifier: 'CO-525',
+          linear_id: 'linear-live',
+          linear_state: 'Done'
+        }
+      ]
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          issue: 'CO-525',
+          code: 'invalid_classification',
+          classification: 'task_index_only'
+        })
+      ])
+    );
+  });
+
   it('does not match title-only issue references when legacy ids point elsewhere', async () => {
     const repoRoot = await makeRepo();
     await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
@@ -1006,16 +1060,7 @@ describe('done closeout provenance check', () => {
 
   it('runs the CLI entrypoint from a checkout path with spaces', async () => {
     const repoRoot = await makeRepo('done closeout ');
-    await mkdir(join(repoRoot, 'scripts', 'lib'), { recursive: true });
-    await copyFile(
-      join(process.cwd(), 'scripts', 'done-closeout-provenance-check.mjs'),
-      join(repoRoot, 'scripts', 'done-closeout-provenance-check.mjs')
-    );
-    await copyFile(join(process.cwd(), 'scripts', 'lib', 'cli-args.js'), join(repoRoot, 'scripts', 'lib', 'cli-args.js'));
-    await copyFile(
-      join(process.cwd(), 'scripts', 'lib', 'run-manifests.js'),
-      join(repoRoot, 'scripts', 'lib', 'run-manifests.js')
-    );
+    await copyDoneCloseoutCli(repoRoot);
 
     const result = spawnSync(process.execPath, [join(repoRoot, 'scripts', 'done-closeout-provenance-check.mjs'), '--help'], {
       encoding: 'utf8'
@@ -1027,16 +1072,7 @@ describe('done closeout provenance check', () => {
 
   it('reads provider issue authority from environment for CLI closeout checks', async () => {
     const repoRoot = await makeRepo('done closeout env ');
-    await mkdir(join(repoRoot, 'scripts', 'lib'), { recursive: true });
-    await copyFile(
-      join(process.cwd(), 'scripts', 'done-closeout-provenance-check.mjs'),
-      join(repoRoot, 'scripts', 'done-closeout-provenance-check.mjs')
-    );
-    await copyFile(join(process.cwd(), 'scripts', 'lib', 'cli-args.js'), join(repoRoot, 'scripts', 'lib', 'cli-args.js'));
-    await copyFile(
-      join(process.cwd(), 'scripts', 'lib', 'run-manifests.js'),
-      join(repoRoot, 'scripts', 'lib', 'run-manifests.js')
-    );
+    await copyDoneCloseoutCli(repoRoot);
     await writeManifest(repoRoot, [staleIssue()]);
     await writeTaskIndex(repoRoot, [
       {
@@ -1081,16 +1117,7 @@ describe('done closeout provenance check', () => {
 
   it('lets explicit CLI live issue authority override partial provider env', async () => {
     const repoRoot = await makeRepo('done closeout explicit ');
-    await mkdir(join(repoRoot, 'scripts', 'lib'), { recursive: true });
-    await copyFile(
-      join(process.cwd(), 'scripts', 'done-closeout-provenance-check.mjs'),
-      join(repoRoot, 'scripts', 'done-closeout-provenance-check.mjs')
-    );
-    await copyFile(join(process.cwd(), 'scripts', 'lib', 'cli-args.js'), join(repoRoot, 'scripts', 'lib', 'cli-args.js'));
-    await copyFile(
-      join(process.cwd(), 'scripts', 'lib', 'run-manifests.js'),
-      join(repoRoot, 'scripts', 'lib', 'run-manifests.js')
-    );
+    await copyDoneCloseoutCli(repoRoot);
     await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
     await writeManifest(repoRoot, [staleIssue()]);
     await writeTaskIndex(repoRoot, [
@@ -1135,16 +1162,7 @@ describe('done closeout provenance check', () => {
 
   it('rejects partial CLI live issue authority before validation', async () => {
     const repoRoot = await makeRepo('done closeout cli ');
-    await mkdir(join(repoRoot, 'scripts', 'lib'), { recursive: true });
-    await copyFile(
-      join(process.cwd(), 'scripts', 'done-closeout-provenance-check.mjs'),
-      join(repoRoot, 'scripts', 'done-closeout-provenance-check.mjs')
-    );
-    await copyFile(join(process.cwd(), 'scripts', 'lib', 'cli-args.js'), join(repoRoot, 'scripts', 'lib', 'cli-args.js'));
-    await copyFile(
-      join(process.cwd(), 'scripts', 'lib', 'run-manifests.js'),
-      join(repoRoot, 'scripts', 'lib', 'run-manifests.js')
-    );
+    await copyDoneCloseoutCli(repoRoot);
 
     const result = spawnSync(
       process.execPath,
@@ -1163,5 +1181,28 @@ describe('done closeout provenance check', () => {
 
     expect(result.status).toBe(2);
     expect(result.stderr).toContain('Both --issue-id and --issue-identifier are required');
+  });
+
+  it('rejects valueless CLI live issue authority flags before validation', async () => {
+    const repoRoot = await makeRepo('done closeout valueless ');
+    await copyDoneCloseoutCli(repoRoot);
+
+    const result = spawnSync(
+      process.execPath,
+      [join(repoRoot, 'scripts', 'done-closeout-provenance-check.mjs'), '--issue-id', '--format', 'json'],
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CODEX_ORCHESTRATOR_ROOT: repoRoot,
+          CODEX_ORCHESTRATOR_OUT_DIR: join(repoRoot, 'out'),
+          CODEX_ORCHESTRATOR_RUNS_DIR: join(repoRoot, '.runs')
+        }
+      }
+    );
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('--issue-id and --issue-identifier require non-empty values');
   });
 });

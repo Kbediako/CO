@@ -15,6 +15,7 @@ const TASKS_INDEX_PATH = 'tasks/index.json';
 const DONE_STATE_NAMES = new Set(['done', 'completed']);
 const TERMINAL_TASK_STATUSES = new Set(['succeeded', 'completed', 'done', 'canceled', 'cancelled']);
 const TASK_INDEX_ONLY_AUTHORITY = Symbol('taskIndexOnlyAuthority');
+const LIVE_TASK_INDEX_AUTHORITY = Symbol('liveTaskIndexAuthority');
 const VALID_MANIFEST_CLASSIFICATIONS = new Set([
   'stale_mirror_only',
   'validation_only_provenance_gap',
@@ -712,7 +713,7 @@ async function validateIssue(repoRoot, report, issue, requiredChecks, taskIndexR
   }
 
   validateTaskIndexRows(report, issueSummary, taskIndexRows, {
-    requireMatch: Boolean(issue?.[TASK_INDEX_ONLY_AUTHORITY])
+    requireMatch: Boolean(issue?.[LIVE_TASK_INDEX_AUTHORITY])
   });
 
   for (const mirrorPath of mirrorPaths) {
@@ -740,7 +741,8 @@ function normalizeTaskIndexOnlyIssues(issues) {
         classification: 'task_index_only',
         mirror_paths: [],
         waivers: [],
-        [TASK_INDEX_ONLY_AUTHORITY]: true
+        [TASK_INDEX_ONLY_AUTHORITY]: true,
+        [LIVE_TASK_INDEX_AUTHORITY]: true
       };
     })
     .filter(Boolean);
@@ -771,7 +773,7 @@ function mergeIssueAuthorities(manifestIssues, taskIndexOnlyIssues) {
     // authority unless both issue identities agree.
     const existingIssue = merged.find((candidate) => issueIdentitiesMatch(candidate, issue));
     if (existingIssue) {
-      existingIssue[TASK_INDEX_ONLY_AUTHORITY] = true;
+      existingIssue[LIVE_TASK_INDEX_AUTHORITY] = true;
       continue;
     }
     merged.push(issue);
@@ -937,9 +939,16 @@ async function main() {
   }
 
   const { repoRoot, outRoot, taskId } = resolveEnvironmentPaths();
+  const hasExplicitIssueId = Object.prototype.hasOwnProperty.call(args, 'issue-id');
+  const hasExplicitIssueIdentifier = Object.prototype.hasOwnProperty.call(args, 'issue-identifier');
   const explicitIssueId = typeof args['issue-id'] === 'string' ? normalizeLine(args['issue-id']) : '';
   const explicitIssueIdentifier =
     typeof args['issue-identifier'] === 'string' ? normalizeLine(args['issue-identifier']) : '';
+  if ((hasExplicitIssueId && !explicitIssueId) || (hasExplicitIssueIdentifier && !explicitIssueIdentifier)) {
+    console.error('--issue-id and --issue-identifier require non-empty values for task-index-only validation.');
+    process.exitCode = 2;
+    return;
+  }
   if ((explicitIssueId && !explicitIssueIdentifier) || (!explicitIssueId && explicitIssueIdentifier)) {
     console.error('Both --issue-id and --issue-identifier are required for task-index-only validation.');
     process.exitCode = 2;
