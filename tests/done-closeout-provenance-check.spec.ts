@@ -185,6 +185,99 @@ describe('done closeout provenance check', () => {
     );
   });
 
+  it('matches legacy rows when source_issue metadata is stale but legacy fields still identify the issue', async () => {
+    const repoRoot = await makeRepo();
+    await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
+    await writeManifest(repoRoot, [staleIssue({ identifier: 'CO-525', linear_id: 'linear-legacy' })]);
+    await writeTaskIndex(repoRoot, [
+      {
+        id: '20260514-linear-legacy',
+        title: 'CO-525 legacy row',
+        status: 'in_progress',
+        relates_to: 'tasks/tasks-linear-legacy.md',
+        source_issue: {
+          id: 'linear-other',
+          identifier: 'CO-999'
+        }
+      }
+    ]);
+
+    const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'done_issue_nonterminal_task_index_row',
+          task_id: '20260514-linear-legacy'
+        })
+      ])
+    );
+  });
+
+  it('validates task-index-only live issue authorities outside the waiver manifest', async () => {
+    const repoRoot = await makeRepo();
+    await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
+    await writeManifest(repoRoot, [staleIssue()]);
+    await writeTaskIndex(repoRoot, [
+      {
+        id: '20260514-linear-live',
+        title: 'CO-525 live closeout row',
+        status: 'in_progress',
+        relates_to: 'tasks/tasks-linear-live.md'
+      }
+    ]);
+
+    const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture',
+      taskIndexIssues: [
+        {
+          identifier: 'CO-525',
+          linear_id: 'linear-live',
+          linear_state: 'Done'
+        }
+      ]
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.issues).toBe(2);
+    expect(report.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          issue: 'CO-525',
+          code: 'done_issue_nonterminal_task_index_row',
+          task_id: '20260514-linear-live'
+        })
+      ])
+    );
+  });
+
+  it('does not match title-only issue references when legacy ids point elsewhere', async () => {
+    const repoRoot = await makeRepo();
+    await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
+    await writeManifest(repoRoot, [staleIssue({ identifier: 'CO-525', linear_id: 'linear-done' })]);
+    await writeTaskIndex(repoRoot, [
+      {
+        id: '20260514-linear-other',
+        title: 'Follow-up from CO-525',
+        status: 'in_progress',
+        relates_to: 'tasks/tasks-linear-other.md'
+      }
+    ]);
+
+    const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(false);
+    expect(report.totals.task_index_nonterminal_rows).toBe(0);
+  });
+
   it('does not match near issue identifiers in legacy tasks/index titles', async () => {
     const repoRoot = await makeRepo();
     await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');

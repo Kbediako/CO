@@ -17,7 +17,8 @@ const TERMINAL_TASK_STATUSES = new Set(['succeeded', 'completed', 'done', 'cance
 const VALID_CLASSIFICATIONS = new Set([
   'stale_mirror_only',
   'validation_only_provenance_gap',
-  'true_follow_up_needed'
+  'true_follow_up_needed',
+  'task_index_only'
 ]);
 const SUCCESSFUL_CHECK_STATES = new Set(['SUCCESS', 'SKIPPED']);
 
@@ -29,6 +30,9 @@ Checks local Done issue closeout provenance without calling Linear or GitHub.
 Options:
   --manifest <path>   Provenance manifest path (default: ${DEFAULT_MANIFEST_PATH})
   --report <path>     Report JSON path (default: out/<task-id>/${DEFAULT_REPORT_NAME})
+  --issue-id <uuid>   Add a live terminal issue authority for task-index-only validation
+  --issue-identifier <id>  Human-readable issue key for --issue-id (for example CO-525)
+  --issue-state <state>    Live issue state for --issue-id (default: Done)
   --format json       Print the full JSON report
   --warn              Emit failures but exit 0
   --check             Alias for default behavior
@@ -482,25 +486,26 @@ function taskIndexRowMatchesIssue(task, issueSummary) {
   const linearId = normalizeLine(issueSummary.linear_id);
   const identifier = normalizeLine(issueSummary.identifier);
   if (sourceIssue && typeof sourceIssue === 'object') {
-    return (
+    if (
       (linearId && normalizeLine(sourceIssue.id) === linearId) ||
       (identifier && normalizeLine(sourceIssue.identifier) === identifier)
-    );
+    ) {
+      return true;
+    }
   }
 
   const taskId = normalizeLine(task?.id);
   const relatesTo = normalizeLine(task?.relates_to);
-  const title = normalizeLine(task?.title);
   const lowerLinearId = linearId.toLowerCase();
   if (
     lowerLinearId &&
-    [taskId, relatesTo].some((value) => normalizeLine(value).toLowerCase().includes(lowerLinearId))
+    [taskId, relatesTo].some((value) => lineContainsTokenCaseInsensitive(value, lowerLinearId))
   ) {
     return true;
   }
   return Boolean(
     identifier &&
-      [taskId, relatesTo, title].some((value) => lineContainsTokenCaseInsensitive(value, identifier))
+      [taskId, relatesTo].some((value) => lineContainsTokenCaseInsensitive(value, identifier))
   );
 }
 
@@ -688,6 +693,22 @@ async function validateIssue(repoRoot, report, issue, requiredChecks, taskIndexR
   await validateLocalCloseoutPointers(repoRoot, report, issueSummary, issue);
 }
 
+function normalizeTaskIndexOnlyIssues(issues) {
+  if (!Array.isArray(issues)) {
+    return [];
+  }
+  return issues
+    .map((issue) => ({
+      identifier: normalizeLine(issue?.identifier),
+      linear_id: normalizeLine(issue?.linear_id),
+      linear_state: normalizeLine(issue?.linear_state) || 'Done',
+      classification: 'task_index_only',
+      mirror_paths: [],
+      waivers: []
+    }))
+    .filter((issue) => issue.identifier || issue.linear_id);
+}
+
 export async function runDoneCloseoutProvenanceCheck(repoRoot, options = {}) {
   const manifestPath = normalizeRepoPath(options.manifestPath ?? DEFAULT_MANIFEST_PATH);
   if (!manifestPath) {
@@ -699,7 +720,9 @@ export async function runDoneCloseoutProvenanceCheck(repoRoot, options = {}) {
   }
 
   const manifest = await loadJson(absoluteManifestPath, manifestPath);
-  const issues = Array.isArray(manifest?.issues) ? manifest.issues : [];
+  const manifestIssues = Array.isArray(manifest?.issues) ? manifest.issues : [];
+  const taskIndexOnlyIssues = normalizeTaskIndexOnlyIssues(options.taskIndexIssues);
+  const issues = [...manifestIssues, ...taskIndexOnlyIssues];
   const requiredChecks = Array.isArray(manifest?.required_pr_checks)
     ? manifest.required_pr_checks.map(normalizeCheckName).filter(Boolean)
     : [];
@@ -803,7 +826,18 @@ async function main() {
     return;
   }
 
-  const knownFlags = new Set(['manifest', 'report', 'format', 'warn', 'check', 'h', 'help']);
+  const knownFlags = new Set([
+    'manifest',
+    'report',
+    'issue-id',
+    'issue-identifier',
+    'issue-state',
+    'format',
+    'warn',
+    'check',
+    'h',
+    'help'
+  ]);
   const unknown = Object.keys(args).filter((key) => !knownFlags.has(key));
   if (unknown.length > 0 || positionals.length > 0) {
     const label = unknown[0] ? `--${unknown[0]}` : positionals[0];
@@ -813,11 +847,22 @@ async function main() {
   }
 
   const { repoRoot, outRoot, taskId } = resolveEnvironmentPaths();
+  const taskIndexIssue =
+    typeof args['issue-id'] === 'string' || typeof args['issue-identifier'] === 'string'
+      ? [
+          {
+            linear_id: typeof args['issue-id'] === 'string' ? args['issue-id'] : '',
+            identifier: typeof args['issue-identifier'] === 'string' ? args['issue-identifier'] : '',
+            linear_state: typeof args['issue-state'] === 'string' ? args['issue-state'] : 'Done'
+          }
+        ]
+      : [];
   const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
     manifestPath: typeof args.manifest === 'string' ? args.manifest : DEFAULT_MANIFEST_PATH,
     reportPath: typeof args.report === 'string' ? args.report : null,
     outRoot,
-    taskId
+    taskId,
+    taskIndexIssues: taskIndexIssue
   });
 
   if (args.format === 'json') {
