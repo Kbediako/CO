@@ -576,8 +576,10 @@ describe('ControlRuntime', () => {
         }) as NodeJS.ProcessEnv
     });
     const localReport = join(fixture.root, 'out', 'local', 'docs-freshness-maintenance.json');
+    const initialGeneratedAt = new Date(Date.now() - 60_000).toISOString();
+    const refreshedGeneratedAt = new Date(Date.now() - 30_000).toISOString();
     await writeDocsFreshnessMaintenanceReport(localReport, {
-      generatedAt: '2099-01-01T00:00:00.000Z',
+      generatedAt: initialGeneratedAt,
       severity: 'warning',
       freshnessDecision: 'clean',
       actionRequiredCount: 0
@@ -590,7 +592,7 @@ describe('ControlRuntime', () => {
       updated_at: '2026-03-07T00:12:00.000Z'
     });
     await writeDocsFreshnessMaintenanceReport(localReport, {
-      generatedAt: '2099-01-01T00:01:00.000Z',
+      generatedAt: refreshedGeneratedAt,
       severity: 'blocking',
       freshnessDecision: 'block_policy_over_budget',
       actionRequiredCount: 12

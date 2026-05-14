@@ -177,6 +177,48 @@ describe('readDocsFreshnessMaintainRepoGate', () => {
     });
   });
 
+  it('does not let a future-dated report mask current local evidence', async () => {
+    const repoRoot = await mkTempRoot();
+    const outRoot = join(repoRoot, 'out');
+    const scheduledReport = join(outRoot, 'docs-truthfulness-maintenance', 'docs-freshness-maintenance.json');
+    const localReport = join(outRoot, 'local', 'docs-freshness-maintenance.json');
+    await writeReport(scheduledReport, {
+      generated_at: '2026-05-15T00:00:00.000Z',
+      severity: 'blocking',
+      freshness_decision: 'block_policy_over_budget',
+      action_required_count: 99
+    });
+    await writeReport(localReport, {
+      generated_at: '2026-05-14T00:45:00.000Z',
+      severity: 'warning',
+      freshness_decision: 'clean',
+      action_required_count: 10
+    });
+
+    const gate = readDocsFreshnessMaintainRepoGate({
+      repoRoot,
+      env: { CODEX_ORCHESTRATOR_ROOT: repoRoot } as NodeJS.ProcessEnv,
+      now: '2026-05-14T01:00:00.000Z'
+    });
+
+    expect(gate).toMatchObject({
+      severity: 'warning',
+      freshness_decision: 'clean',
+      action_required_count: 10,
+      source_path: localReport
+    });
+    expect(gate?.report_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: scheduledReport,
+          status: 'invalid',
+          reason: 'generated_at_in_future'
+        }),
+        expect.objectContaining({ path: localReport, status: 'valid' })
+      ])
+    );
+  });
+
   it('selects the freshest supplied task-scoped report', async () => {
     const repoRoot = await mkTempRoot();
     const outRoot = join(repoRoot, 'out');
@@ -389,6 +431,45 @@ describe('readDocsFreshnessMaintainRepoGate', () => {
       evidence_status: 'invalid',
       evidence_reason: 'generated_at_missing_or_invalid',
       source_path: localReport
+    });
+  });
+
+  it('selects the newest invalid evidence when multiple invalid reports exist', async () => {
+    const repoRoot = await mkTempRoot();
+    const scheduledReport = join(repoRoot, 'out', 'docs-truthfulness-maintenance', 'docs-freshness-maintenance.json');
+    const localReport = join(repoRoot, 'out', 'local', 'docs-freshness-maintenance.json');
+    await mkdir(dirname(scheduledReport), { recursive: true });
+    await mkdir(dirname(localReport), { recursive: true });
+    await writeFile(
+      scheduledReport,
+      JSON.stringify({
+        generated_at: '2026-05-14T00:10:00.000Z',
+        repo_gate: {}
+      }),
+      'utf8'
+    );
+    await writeFile(
+      localReport,
+      JSON.stringify({
+        generated_at: '2026-05-14T00:45:00.000Z',
+        repo_gate: {}
+      }),
+      'utf8'
+    );
+
+    const gate = readDocsFreshnessMaintainRepoGate({
+      repoRoot,
+      env: { CODEX_ORCHESTRATOR_ROOT: repoRoot } as NodeJS.ProcessEnv,
+      now: '2026-05-14T01:00:00.000Z'
+    });
+
+    expect(gate).toMatchObject({
+      severity: 'degraded',
+      freshness_decision: 'report_invalid',
+      evidence_status: 'invalid',
+      evidence_reason: 'repo_gate_missing_or_invalid',
+      source_path: localReport,
+      generated_at: '2026-05-14T00:45:00.000Z'
     });
   });
 

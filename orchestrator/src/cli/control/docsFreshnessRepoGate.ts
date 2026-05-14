@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { sanitizeTaskId } from '../../persistence/sanitizeTaskId.js';
 
 const DEFAULT_REPORT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const REPORT_FUTURE_SKEW_TOLERANCE_MS = 5 * 60 * 1000;
 const REPORT_FILENAME = 'docs-freshness-maintenance.json';
 const SCHEDULED_REPORT_DIR = 'docs-truthfulness-maintenance';
 const LOCAL_REPORT_DIR = 'local';
@@ -113,6 +114,8 @@ export function normalizeDocsFreshnessMaintainRepoGate(
   }
   const owner = readRecord(record.owner) ?? {};
   const specGuard = readRecord(record.spec_guard) ?? {};
+  const samplePaths = readRecord(record.sample_paths);
+  const sourcePath = readNullableString(record.source_path);
   return {
     id: 'docs_freshness_maintain',
     severity: readString(record.severity),
@@ -134,8 +137,8 @@ export function normalizeDocsFreshnessMaintainRepoGate(
     blocks_unrelated_lanes: readBoolean(record.blocks_unrelated_lanes),
     blocks_handoff: readBoolean(record.blocks_handoff),
     provider_wip_impact: 'excluded_repo_gate',
-    ...(readRecord(record.sample_paths) ? { sample_paths: readRecord(record.sample_paths) ?? undefined } : {}),
-    ...(readNullableString(record.source_path) ? { source_path: readNullableString(record.source_path) ?? undefined } : {})
+    ...(samplePaths ? { sample_paths: samplePaths } : {}),
+    ...(sourcePath ? { source_path: sourcePath } : {})
   };
 }
 
@@ -309,7 +312,19 @@ function readDocsFreshnessMaintainRepoGateCandidate(
         gate
       };
     }
-    const ageMs = Math.max(0, nowMs - generatedAtMs);
+    const rawAgeMs = nowMs - generatedAtMs;
+    if (rawAgeMs < -REPORT_FUTURE_SKEW_TOLERANCE_MS) {
+      return {
+        path: reportPath,
+        status: 'invalid',
+        reason: 'generated_at_in_future',
+        generated_at: generatedAt,
+        generated_at_ms: generatedAtMs,
+        age_ms: rawAgeMs,
+        gate
+      };
+    }
+    const ageMs = Math.max(0, rawAgeMs);
     if (ageMs > maxAgeMs) {
       return {
         path: reportPath,
@@ -359,7 +374,9 @@ function buildDegradedDocsFreshnessRepoGate(
   candidates: DocsFreshnessMaintainRepoGateCandidateReadResult[],
   candidatePayloads: DocsFreshnessMaintainRepoGateCandidate[]
 ): DocsFreshnessMaintainRepoGatePayload {
-  const invalid = candidates.find((candidate) => candidate.status === 'invalid');
+  const invalid = candidates
+    .filter((candidate) => candidate.status === 'invalid')
+    .sort((left, right) => (right.generated_at_ms ?? 0) - (left.generated_at_ms ?? 0))[0] ?? null;
   const stale = candidates
     .filter((candidate) => candidate.status === 'stale')
     .sort((left, right) => (right.generated_at_ms ?? 0) - (left.generated_at_ms ?? 0))[0] ?? null;
