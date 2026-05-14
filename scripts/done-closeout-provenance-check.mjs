@@ -769,7 +769,9 @@ function mergeIssueAuthorities(manifestIssues, taskIndexOnlyIssues) {
   for (const issue of Array.isArray(taskIndexOnlyIssues) ? taskIndexOnlyIssues : []) {
     // Partial identity overlap can indicate stale manifest metadata; keep the live
     // authority unless both issue identities agree.
-    if (merged.some((existingIssue) => issueIdentitiesMatch(existingIssue, issue))) {
+    const existingIssue = merged.find((candidate) => issueIdentitiesMatch(candidate, issue));
+    if (existingIssue) {
+      existingIssue[TASK_INDEX_ONLY_AUTHORITY] = true;
       continue;
     }
     merged.push(issue);

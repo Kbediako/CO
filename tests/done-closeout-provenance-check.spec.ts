@@ -413,6 +413,36 @@ describe('done closeout provenance check', () => {
     expect(report.failures.filter((failure) => failure.code === 'done_issue_nonterminal_task_index_row')).toHaveLength(1);
   });
 
+  it('preserves live task-index authority when deduplicating a matching manifest issue', async () => {
+    const repoRoot = await makeRepo();
+    await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
+    await writeManifest(repoRoot, [staleIssue({ identifier: 'CO-525', linear_id: 'linear-live' })]);
+    await writeTaskIndex(repoRoot, []);
+
+    const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture',
+      taskIndexIssues: [
+        {
+          identifier: 'CO-525',
+          linear_id: 'linear-live',
+          linear_state: 'Done'
+        }
+      ]
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.issues).toBe(1);
+    expect(report.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          issue: 'CO-525',
+          code: 'done_issue_missing_task_index_row'
+        })
+      ])
+    );
+  });
+
   it('keeps live task-index authority when manifest identity only partially overlaps', async () => {
     const repoRoot = await makeRepo();
     await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
