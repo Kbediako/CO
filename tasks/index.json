@@ -9,11 +9,11 @@
         "Codex"
       ],
       "status": "in_progress",
-      "last_review": "2026-05-15",
+      "last_review": "2026-05-14",
       "approvals": {
         "issue_context": {
           "reviewer": "CO provider worker",
-          "date": "2026-05-15",
+          "date": "2026-05-14",
           "status": "transitioned_in_progress",
           "summary": "Live issue-context verified CO-513 in Ready with no PR attached; provider worker moved it to In Progress and recorded the required parallelization decision."
         }

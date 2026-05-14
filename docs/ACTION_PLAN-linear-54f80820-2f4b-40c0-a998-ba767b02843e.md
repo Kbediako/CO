@@ -32,4 +32,4 @@
 
 ## Approvals
 - Reviewer: standalone review executed under `FORCE_CODEX_REVIEW=1`; post-fix output reported no actionable issues, but telemetry classified the clean prose as `review_verdict=unknown`, so the handoff uses a bounded review-verdict parser waiver recorded in the workpad.
-- Date: 2026-05-15.
+- Date: 2026-05-14.
