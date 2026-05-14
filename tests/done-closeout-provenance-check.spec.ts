@@ -314,6 +314,45 @@ describe('done closeout provenance check', () => {
     );
   });
 
+  it('fails closed when live task-index validation has no matching row', async () => {
+    const repoRoot = await makeRepo();
+    await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
+    await writeManifest(repoRoot, [staleIssue()]);
+    await writeTaskIndex(repoRoot, [
+      {
+        id: '20260514-linear-other',
+        title: 'CO-999 unrelated row',
+        status: 'done',
+        source_issue: {
+          id: 'linear-other',
+          identifier: 'CO-999'
+        }
+      }
+    ]);
+
+    const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture',
+      taskIndexIssues: [
+        {
+          identifier: 'CO-525',
+          linear_id: 'linear-live',
+          linear_state: 'Done'
+        }
+      ]
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          issue: 'CO-525',
+          code: 'done_issue_missing_task_index_row'
+        })
+      ])
+    );
+  });
+
   it('deduplicates task-index-only authorities already present in the manifest', async () => {
     const repoRoot = await makeRepo();
     await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
@@ -447,6 +486,30 @@ describe('done closeout provenance check', () => {
     expect(hasFailures).toBe(false);
     expect(report.totals.issues).toBe(1);
     expect(report.failures.map((failure) => failure.code)).not.toContain('issue_identity_incomplete');
+  });
+
+  it('rejects partial provider issue env in CLI mode', async () => {
+    const repoRoot = await makeRepo();
+    await writeManifest(repoRoot, [staleIssue()]);
+
+    const result = spawnSync(process.execPath, [join(process.cwd(), 'scripts', 'done-closeout-provenance-check.mjs')], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        CODEX_ORCHESTRATOR_PIPELINE_ID: '',
+        CODEX_ORCHESTRATOR_ROOT: repoRoot,
+        CODEX_ORCHESTRATOR_TASK_ID: 'fixture',
+        MCP_RUNNER_TASK_ID: 'fixture',
+        CODEX_ORCHESTRATOR_ISSUE_ID: 'linear-live',
+        CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER: ''
+      }
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain(
+      'Both CODEX_ORCHESTRATOR_ISSUE_ID and CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER are required'
+    );
   });
 
   it('rejects task-index-only classifications from the manifest', async () => {

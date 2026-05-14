@@ -522,15 +522,17 @@ function taskIndexRowMatchesIssue(task, issueSummary) {
   );
 }
 
-function validateTaskIndexRows(report, issueSummary, taskIndexRows) {
+function validateTaskIndexRows(report, issueSummary, taskIndexRows, options = {}) {
   if (!isDoneState(issueSummary.linear_state)) {
     return;
   }
 
+  let matchedRow = false;
   for (const task of taskIndexRows) {
     if (!taskIndexRowMatchesIssue(task, issueSummary)) {
       continue;
     }
+    matchedRow = true;
     const status = normalizeTaskStatus(task?.status);
     if (isTerminalTaskStatus(status)) {
       continue;
@@ -546,6 +548,15 @@ function validateTaskIndexRows(report, issueSummary, taskIndexRows) {
       'done_issue_nonterminal_task_index_row',
       'Done issue has a matching tasks/index.json row with nonterminal status.',
       rowSummary
+    );
+  }
+
+  if (options.requireMatch && taskIndexRows.length > 0 && !matchedRow) {
+    pushFailure(
+      report,
+      issueSummary,
+      'done_issue_missing_task_index_row',
+      'Done issue has no matching tasks/index.json row for live task-index validation.'
     );
   }
 }
@@ -700,7 +711,9 @@ async function validateIssue(repoRoot, report, issue, requiredChecks, taskIndexR
     validateWaiverMetadata(report, issueSummary, waiver);
   }
 
-  validateTaskIndexRows(report, issueSummary, taskIndexRows);
+  validateTaskIndexRows(report, issueSummary, taskIndexRows, {
+    requireMatch: Boolean(issue?.[TASK_INDEX_ONLY_AUTHORITY])
+  });
 
   for (const mirrorPath of mirrorPaths) {
     await validateMirrorPath(repoRoot, report, issueSummary, mirrorPath, waivers);
@@ -767,6 +780,11 @@ function mergeIssueAuthorities(manifestIssues, taskIndexOnlyIssues) {
 function taskIndexIssueFromEnvironment(env, issueState) {
   const linearId = normalizeLine(env.CODEX_ORCHESTRATOR_ISSUE_ID);
   const identifier = normalizeLine(env.CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER);
+  if ((linearId && !identifier) || (!linearId && identifier)) {
+    throw new Error(
+      'Both CODEX_ORCHESTRATOR_ISSUE_ID and CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER are required for provider task-index-only validation.'
+    );
+  }
   if (!linearId || !identifier) {
     return null;
   }
@@ -926,7 +944,14 @@ async function main() {
     return;
   }
   const issueState = typeof args['issue-state'] === 'string' ? normalizeLine(args['issue-state']) : '';
-  const environmentIssue = taskIndexIssueFromEnvironment(process.env, issueState);
+  let environmentIssue = null;
+  try {
+    environmentIssue = taskIndexIssueFromEnvironment(process.env, issueState);
+  } catch (error) {
+    console.error(error.message);
+    process.exitCode = 2;
+    return;
+  }
   const taskIndexIssue =
     explicitIssueId && explicitIssueIdentifier
       ? [
