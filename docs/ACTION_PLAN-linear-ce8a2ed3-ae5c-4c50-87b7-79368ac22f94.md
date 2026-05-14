@@ -12,6 +12,7 @@
 - Fallback / refactor decision: this task touches stale and report-only seams. Decision is `remove fallback` for warn-only scheduled maintenance, ordinary active terminal packet rows, and late repo-gate discovery. The large-refactor preference applies and is the chosen approach.
 - Large-refactor decision: required and chosen because lifecycle authority is split across terminal state, registry/catalog metadata, scheduled automation, archive automation, and status/provider handoff.
 - Minor-seam decision: rejected; another bounded stale-doc seam would preserve the warn-only and active-terminal-row failure loop.
+- Rework closeout fallback / refactor decision: the May 14 `done-closeout-provenance-check` change removes the terminal closeout seam that let a Done issue retain a nonterminal `tasks/index.json` row when the live issue was not present in `docs/done-closeout-provenance.json`. The accepted path requires complete live authority, keeps `task_index_only` runtime-only, preserves partial-overlap live UUID evidence, and fails closed instead of adding another waiver or freshness exception.
 - Durable retention evidence: no new retained temporary fallback is intended. Any dry-run path must be a supported deterministic mode, not an expiring fallback.
 - Large-refactor check: required because authority is split across registry/catalog state, terminal task/Linear state, archive automation, scheduled workflows, and status/provider reporting.
 
@@ -20,6 +21,7 @@
 | Scheduled docs truthfulness | Warn/report-only result | remove fallback | CO-525 | Report shows actionable stale debt with no action path | 2026-05-13 | 2026-05-13 | immediate | Forecast/action planner replaces warn-only terminal behavior | Scheduled/action tests |
 | Terminal packet registry | Completed packet rows remain `active` | remove fallback | CO-525 | Terminal task/Linear state conflicts with active stale registry row | 2026-05-13 | 2026-05-13 | immediate | Lifecycle classifier reclassifies/archive-plans packet rows before stale blocking | Lifecycle tests |
 | Repo-gate visibility | Provider handoff discovers repo gate late | remove fallback | CO-525 | `docs:freshness:maintain` blocks with `blocking_changed_paths=[]` | 2026-05-13 | 2026-05-13 | immediate | Status/provider surfaces expose repo-gate context early | Status/provider tests |
+| Done closeout provenance | Live Done issue task-index row can be missed when only waiver manifest rows are checked or live authority partially overlaps stale manifest identity | remove fallback | CO-525 | PR #799 merged but CO-525 canonical task metadata remained nonterminal until Rework | 2026-05-14 | 2026-05-14 | immediate | Provider-worker env/CLI authority drives the checker, partial authorities are rejected, manifest-only `task_index_only` is invalid, and partial overlap does not suppress live UUID evidence | Focused provenance tests, full test, standalone review, Core Lane spec guard |
 
 ## Milestones & Sequencing
 1. Seed docs-first packet, registry mirrors, workpad, baseline artifacts, and docs-review evidence.

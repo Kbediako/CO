@@ -5774,8 +5774,8 @@
     {
       "path": ".agent/task/linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-13",
+      "status": "archived",
+      "last_review": "2026-05-14",
       "cadence_days": 30,
       "source_issue": {
         "id": "ce8a2ed3-ae5c-4c50-87b7-79368ac22f94",
@@ -5783,9 +5783,11 @@
         "url": "https://linear.app/asabeko/issue/CO-525/co-make-docs-freshness-preventive-with-lifecycle-automation"
       },
       "doc_class": "task_mirror",
-      "lifecycle_state": "active",
+      "lifecycle_state": "archived",
       "created_at": "2026-05-13",
-      "next_review": "2026-06-12"
+      "next_review": "2026-06-12",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-525 rework reconciled the prior terminal closeout after PR #799 merged and Linear Done exposed active packet metadata drift; historical packet retained."
     },
     {
       "path": ".agent/task/linear-co-373-cloudpreflight-flake.md",
@@ -11613,8 +11615,8 @@
     {
       "path": "docs/ACTION_PLAN-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-13",
+      "status": "archived",
+      "last_review": "2026-05-14",
       "cadence_days": 30,
       "source_issue": {
         "id": "ce8a2ed3-ae5c-4c50-87b7-79368ac22f94",
@@ -11622,9 +11624,11 @@
         "url": "https://linear.app/asabeko/issue/CO-525/co-make-docs-freshness-preventive-with-lifecycle-automation"
       },
       "doc_class": "task_packet",
-      "lifecycle_state": "active",
+      "lifecycle_state": "archived",
       "created_at": "2026-05-13",
-      "next_review": "2026-06-12"
+      "next_review": "2026-06-12",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-525 rework reconciled the prior terminal closeout after PR #799 merged and Linear Done exposed active packet metadata drift; historical packet retained."
     },
     {
       "path": "docs/ACTION_PLAN-linear-co-373-cloudpreflight-flake.md",
@@ -15258,7 +15262,7 @@
       "path": "docs/guides/done-closeout-provenance.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-14",
+      "last_review": "2026-05-14",
       "cadence_days": 30
     },
     {
@@ -20541,8 +20545,8 @@
     {
       "path": "docs/PRD-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-13",
+      "status": "archived",
+      "last_review": "2026-05-14",
       "cadence_days": 30,
       "source_issue": {
         "id": "ce8a2ed3-ae5c-4c50-87b7-79368ac22f94",
@@ -20550,9 +20554,11 @@
         "url": "https://linear.app/asabeko/issue/CO-525/co-make-docs-freshness-preventive-with-lifecycle-automation"
       },
       "doc_class": "task_packet",
-      "lifecycle_state": "active",
+      "lifecycle_state": "archived",
       "created_at": "2026-05-13",
-      "next_review": "2026-06-12"
+      "next_review": "2026-06-12",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-525 rework reconciled the prior terminal closeout after PR #799 merged and Linear Done exposed active packet metadata drift; historical packet retained."
     },
     {
       "path": "docs/PRD-linear-co-373-cloudpreflight-flake.md",
@@ -26719,8 +26725,8 @@
     {
       "path": "docs/TECH_SPEC-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-13",
+      "status": "archived",
+      "last_review": "2026-05-14",
       "cadence_days": 30,
       "source_issue": {
         "id": "ce8a2ed3-ae5c-4c50-87b7-79368ac22f94",
@@ -26728,9 +26734,11 @@
         "url": "https://linear.app/asabeko/issue/CO-525/co-make-docs-freshness-preventive-with-lifecycle-automation"
       },
       "doc_class": "task_packet",
-      "lifecycle_state": "active",
+      "lifecycle_state": "archived",
       "created_at": "2026-05-13",
-      "next_review": "2026-06-12"
+      "next_review": "2026-06-12",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-525 rework reconciled the prior terminal closeout after PR #799 merged and Linear Done exposed active packet metadata drift; historical packet retained."
     },
     {
       "path": "docs/TECH_SPEC-linear-co-373-cloudpreflight-flake.md",
@@ -33314,8 +33322,8 @@
     {
       "path": "tasks/specs/linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-13",
+      "status": "archived",
+      "last_review": "2026-05-14",
       "cadence_days": 30,
       "source_issue": {
         "id": "ce8a2ed3-ae5c-4c50-87b7-79368ac22f94",
@@ -33323,9 +33331,11 @@
         "url": "https://linear.app/asabeko/issue/CO-525/co-make-docs-freshness-preventive-with-lifecycle-automation"
       },
       "doc_class": "task_packet",
-      "lifecycle_state": "active",
+      "lifecycle_state": "archived",
       "created_at": "2026-05-13",
-      "next_review": "2026-06-12"
+      "next_review": "2026-06-12",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-525 rework reconciled the prior terminal closeout after PR #799 merged and Linear Done exposed active packet metadata drift; historical packet retained."
     },
     {
       "path": "tasks/specs/linear-co-373-cloudpreflight-flake.md",
@@ -39520,8 +39530,8 @@
     {
       "path": "tasks/tasks-linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-05-13",
+      "status": "archived",
+      "last_review": "2026-05-14",
       "cadence_days": 30,
       "source_issue": {
         "id": "ce8a2ed3-ae5c-4c50-87b7-79368ac22f94",
@@ -39529,9 +39539,11 @@
         "url": "https://linear.app/asabeko/issue/CO-525/co-make-docs-freshness-preventive-with-lifecycle-automation"
       },
       "doc_class": "task_packet",
-      "lifecycle_state": "active",
+      "lifecycle_state": "archived",
       "created_at": "2026-05-13",
-      "next_review": "2026-06-12"
+      "next_review": "2026-06-12",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-525 rework reconciled the prior terminal closeout after PR #799 merged and Linear Done exposed active packet metadata drift; historical packet retained."
     },
     {
       "path": "tasks/tasks-linear-co-373-cloudpreflight-flake.md",
