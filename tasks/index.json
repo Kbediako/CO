@@ -807,8 +807,8 @@
       "owners": [
         "Codex"
       ],
-      "status": "in_progress",
-      "last_review": "2026-05-13",
+      "status": "done",
+      "last_review": "2026-05-14",
       "canonical_owner_key": "docs:freshness:preventive-lifecycle",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:preventive-lifecycle",
       "approvals": {
@@ -832,6 +832,12 @@
           "date": "2026-05-13",
           "status": "packet_seeded",
           "summary": "PRD, TECH_SPEC, ACTION_PLAN, task checklist, agent mirror, registry rows, docs/TASKS snapshot, and task index entry created before implementation edits."
+        },
+        "rework_terminal_metadata": {
+          "reviewer": "CO-525 provider worker",
+          "date": "2026-05-14",
+          "status": "terminal_metadata_reconciled",
+          "summary": "Rework from Linear Done drift: PR #799 had merged but task metadata remained in_progress; this branch marks the packet terminal and archives registry rows as retained historical evidence."
         }
       },
       "paths": {
@@ -846,7 +852,8 @@
         "id": "ce8a2ed3-ae5c-4c50-87b7-79368ac22f94",
         "identifier": "CO-525",
         "url": "https://linear.app/asabeko/issue/CO-525/co-make-docs-freshness-preventive-with-lifecycle-automation"
-      }
+      },
+      "completed_at": "2026-05-14"
     },
     {
       "id": "20260512-linear-b642e879-ba50-45ef-b0d9-b059afa9e932",
