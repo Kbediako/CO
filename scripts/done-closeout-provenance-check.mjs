@@ -452,12 +452,21 @@ async function loadOptionalTaskIndexRows(repoRoot, report) {
 
   try {
     const data = JSON.parse(await readFile(realPath, 'utf8'));
-    return Array.isArray(data?.items) ? data.items : [];
+    if (!Array.isArray(data?.items)) {
+      throw Object.assign(
+        new Error(`${realPath} has unexpected shape: missing or non-array items.`),
+        { code: 'TASKS_INDEX_INVALID_SHAPE' }
+      );
+    }
+    return data.items;
   } catch (error) {
+    const invalidShape = error?.code === 'TASKS_INDEX_INVALID_SHAPE';
     report.failures.push({
       issue: null,
-      code: 'tasks_index_invalid_json',
-      message: `${TASKS_INDEX_PATH} is not valid JSON: ${error.message}`,
+      code: invalidShape ? 'tasks_index_invalid_shape' : 'tasks_index_invalid_json',
+      message: invalidShape
+        ? `${TASKS_INDEX_PATH} has unexpected shape: ${error.message}`
+        : `${TASKS_INDEX_PATH} is not valid JSON: ${error.message}`,
       path: TASKS_INDEX_PATH
     });
     return [];

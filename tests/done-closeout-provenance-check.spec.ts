@@ -156,6 +156,29 @@ describe('done closeout provenance check', () => {
     ]);
   });
 
+  it('fails when tasks/index.json is present without an items array', async () => {
+    const repoRoot = await makeRepo();
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(join(repoRoot, 'tasks', 'index.json'), JSON.stringify({ tasks: [] }, null, 2), 'utf8');
+    await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
+    await writeManifest(repoRoot, [staleIssue()]);
+
+    const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'tasks_index_invalid_shape',
+          path: 'tasks/index.json'
+        })
+      ])
+    );
+  });
+
   it('requires at least one valid mirror path for stale mirror entries', async () => {
     const repoRoot = await makeRepo();
     await writeManifest(repoRoot, [staleIssue({ mirror_paths: [] })]);
