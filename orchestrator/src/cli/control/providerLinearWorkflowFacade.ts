@@ -3570,7 +3570,22 @@ function mergeLiveFollowUpIssueSummary(
     ...followUpIssue,
     ...(matchedLiveIssue
       ? {
-          description: liveIssue.description
+          description: liveIssue.description,
+          url: liveIssue.url,
+          state: liveIssue.state,
+          team: liveIssue.team
+            ? {
+                id: liveIssue.team.id,
+                key: liveIssue.team.key,
+                name: liveIssue.team.name
+              }
+            : null,
+          project: liveIssue.project
+            ? {
+                id: liveIssue.project.id,
+                name: liveIssue.project.name
+              }
+            : null
         }
       : {}),
     labels: orderObservedFollowUpLabels(matchedLiveIssue ? liveIssue.labels : (followUpIssue.labels ?? []), requestedLabels)

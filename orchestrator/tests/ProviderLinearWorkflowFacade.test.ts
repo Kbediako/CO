@@ -12833,7 +12833,12 @@ describe('providerLinearWorkflowFacade', () => {
           return jsonResponse(
             buildFollowUpIssueContextBody({
               description: finalDescription,
-              labels: liveSourceLabels
+              labels: liveSourceLabels,
+              state: {
+                id: 'state-in-progress',
+                name: 'In Progress',
+                type: 'started'
+              }
             })
           );
         }
@@ -12947,6 +12952,11 @@ describe('providerLinearWorkflowFacade', () => {
         id: 'lin-issue-2',
         identifier: 'CO-2',
         description: finalDescription,
+        state: {
+          id: 'state-in-progress',
+          name: 'In Progress',
+          type: 'started'
+        },
         labels: liveSourceLabels
       },
       relations: {
@@ -12988,9 +12998,9 @@ describe('providerLinearWorkflowFacade', () => {
       packet: {
         packet_prefix: 'linear-lin-issue-2',
         observed_state: {
-          id: 'state-backlog',
-          name: 'Backlog',
-          type: 'unstarted'
+          id: 'state-in-progress',
+          name: 'In Progress',
+          type: 'started'
         },
         required_paths: [
           'docs/PRD-linear-lin-issue-2.md',
@@ -13005,11 +13015,7 @@ describe('providerLinearWorkflowFacade', () => {
           'docs/TASKS.md',
           'docs/docs-freshness-registry.json'
         ],
-        queue_admission_blocker: {
-          reason: 'backlog_head_follow_up_traceability_pending',
-          state: 'Backlog',
-          enforced_by: 'create-follow-up'
-        }
+        queue_admission_blocker: null
       }
     });
     expect(result.follow_up_issue.description).toContain('- Follow-up packet prefix: `linear-lin-issue-2`');
