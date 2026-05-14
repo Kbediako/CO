@@ -348,7 +348,9 @@ function buildDegradedDocsFreshnessRepoGate(
   candidatePayloads: DocsFreshnessMaintainRepoGateCandidate[]
 ): DocsFreshnessMaintainRepoGatePayload {
   const invalid = candidates.find((candidate) => candidate.status === 'invalid');
-  const stale = candidates.find((candidate) => candidate.status === 'stale');
+  const stale = candidates
+    .filter((candidate) => candidate.status === 'stale')
+    .sort((left, right) => (right.generated_at_ms ?? 0) - (left.generated_at_ms ?? 0))[0] ?? null;
   const selectedEvidence = invalid ?? stale;
   const status: DocsFreshnessMaintainRepoGateEvidenceStatus = invalid ? 'invalid' : stale ? 'stale' : 'missing';
   const reason = selectedEvidence?.reason ?? 'report_missing';

@@ -361,7 +361,9 @@ describe('readDocsFreshnessMaintainRepoGate', () => {
 
   it('emits degraded evidence when reports exist but are stale', async () => {
     const repoRoot = await mkTempRoot();
+    const scheduledReport = join(repoRoot, 'out', 'docs-truthfulness-maintenance', 'docs-freshness-maintenance.json');
     const localReport = join(repoRoot, 'out', 'local', 'docs-freshness-maintenance.json');
+    await writeReport(scheduledReport, { generated_at: '2026-05-11T00:00:00.000Z', severity: 'warning', freshness_decision: 'clean', action_required_count: 10 });
     await writeReport(localReport, {
       generated_at: '2026-05-12T00:00:00.000Z',
       severity: 'blocking',
