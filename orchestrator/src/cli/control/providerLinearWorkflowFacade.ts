@@ -389,8 +389,8 @@ export interface ProviderLinearIssueContext {
 
 type ProviderLinearIssueSummary = Pick<
   ProviderLinearIssueContext,
-  'id' | 'identifier' | 'url' | 'updated_at' | 'archived_at' | 'trashed' | 'workspace_id' | 'state' | 'team' | 'project'
-  | 'labels'
+  'id' | 'identifier' | 'description' | 'url' | 'updated_at' | 'archived_at' | 'trashed'
+  | 'workspace_id' | 'state' | 'team' | 'project' | 'labels'
 >;
 
 export type ProviderLinearIssueContextResult =
@@ -668,6 +668,7 @@ interface LinearIssueSummaryQueryResponse {
   issue?: {
     id?: string | null;
     identifier?: string | null;
+    description?: string | null;
     url?: string | null;
     updatedAt?: string | null;
     archivedAt?: string | null;
@@ -2851,7 +2852,7 @@ export async function createProviderLinearFollowUpIssue(input: {
     operation: 'create-follow-up',
     minimumRequestsRemaining: canonicalOwnerKey
       ? (blockedBySource ? 4 : 3)
-      : (blockedBySource ? 6 : 5)
+      : (blockedBySource ? 8 : 7)
   });
   if (budgetError) {
     return failureFromWorkflowError('create-follow-up', budgetError);
@@ -2953,8 +2954,6 @@ export async function createProviderLinearFollowUpIssue(input: {
     if (!tracedOwner.ok) {
       return tracedOwner.result;
     }
-    const ownerLabelRepairNeeded =
-      findMissingFollowUpLabelIds(tracedOwner.issue.labels, followUpLabels.labels).length > 0;
     const labeledOwner = await ensureFollowUpIssueLabels({
       session: session.session,
       followUpIssue: tracedOwner.issue,
@@ -2965,7 +2964,7 @@ export async function createProviderLinearFollowUpIssue(input: {
     if (!labeledOwner.ok) {
       return labeledOwner.result;
     }
-    if (ownerLabelRepairNeeded) {
+    if (labeledOwner.repaired || labeledOwner.issue.description !== tracedOwner.issue.description) {
       const traceableLabeledOwner = verifyFollowUpIssueTraceability({
         sourceIssue: issueSummary.issue,
         followUpIssue: labeledOwner.issue,
@@ -3037,7 +3036,7 @@ export async function createProviderLinearFollowUpIssue(input: {
     const createPathBudgetError = await preflightProviderLinearBudget({
       session: session.session,
       operation: 'create-follow-up',
-      minimumRequestsRemaining: blockedBySource ? 8 : 7
+      minimumRequestsRemaining: blockedBySource ? 11 : 10
     });
     if (createPathBudgetError) {
       return failureFromWorkflowError('create-follow-up', createPathBudgetError);
@@ -3194,8 +3193,6 @@ export async function createProviderLinearFollowUpIssue(input: {
     followUpIssue = tracedFollowUpIssue.issue;
   }
   const followUpIssueBeforeLabelRepair = followUpIssue;
-  const followUpLabelRepairNeeded =
-    findMissingFollowUpLabelIds(followUpIssue.labels, followUpLabels.labels).length > 0;
   const labeledFollowUpIssue = await ensureFollowUpIssueLabels({
     session: session.session,
     followUpIssue,
@@ -3208,7 +3205,7 @@ export async function createProviderLinearFollowUpIssue(input: {
     return labeledFollowUpIssue.result;
   }
   followUpIssue = labeledFollowUpIssue.issue;
-  if (canonicalOwnerKey && canonicalOwnerMarker && followUpLabelRepairNeeded) {
+  if (canonicalOwnerKey && canonicalOwnerMarker && (labeledFollowUpIssue.repaired || followUpIssue.description !== followUpIssueBeforeLabelRepair.description)) {
     const traceableFollowUpIssue = verifyFollowUpIssueTraceability({
       sourceIssue: issueSummary.issue,
       followUpIssue,
@@ -3417,17 +3414,30 @@ async function ensureFollowUpIssueLabels(input: {
   | {
       ok: true;
       issue: ProviderLinearCreatedIssue;
+      repaired: boolean;
     }
   | {
       ok: false;
       result: Extract<ProviderLinearCreateFollowUpResult, { ok: false }>;
     }
 > {
-  const missingLabelIds = findMissingFollowUpLabelIds(input.followUpIssue.labels, input.requestedLabels);
+  const liveIssue = await readLiveFollowUpIssueForLabelVerification({
+    session: input.session,
+    followUpIssue: input.followUpIssue,
+    createdIssue: input.createdIssue ?? null,
+    requestedLabels: input.requestedLabels,
+    failedStep: input.failedStep
+  });
+  if (!liveIssue.ok) {
+    return liveIssue;
+  }
+
+  const missingLabelIds = findMissingFollowUpLabelIds(liveIssue.issue.labels, input.requestedLabels);
   if (missingLabelIds.length === 0) {
     return {
       ok: true,
-      issue: input.followUpIssue
+      issue: liveIssue.issue,
+      repaired: false
     };
   }
 
@@ -3451,7 +3461,7 @@ async function ensureFollowUpIssueLabels(input: {
         input.retryableUpdateFailures === true ? updateResult.error.status : 409,
         {
           ...(updateResult.error.details ?? {}),
-          ...buildFollowUpLabelFailureDetails(input.followUpIssue, input.createdIssue ?? null, input.requestedLabels),
+          ...buildFollowUpLabelFailureDetails(liveIssue.issue, input.createdIssue ?? null, input.requestedLabels),
           failed_step: input.failedStep
         },
         input.retryableUpdateFailures === true ? updateResult.error.retryable : false
@@ -3469,7 +3479,7 @@ async function ensureFollowUpIssueLabels(input: {
         'Linear follow-up issue label update did not succeed.',
         409,
         {
-          ...buildFollowUpLabelFailureDetails(input.followUpIssue, input.createdIssue ?? null, input.requestedLabels),
+          ...buildFollowUpLabelFailureDetails(liveIssue.issue, input.createdIssue ?? null, input.requestedLabels),
           failed_step: input.failedStep
         },
         false
@@ -3477,8 +3487,19 @@ async function ensureFollowUpIssueLabels(input: {
     };
   }
 
-  const verification = verifyFollowUpIssueLabels({
+  const finalLiveIssue = await readLiveFollowUpIssueForLabelVerification({
+    session: input.session,
     followUpIssue: updatedIssue,
+    createdIssue: input.createdIssue ?? null,
+    requestedLabels: input.requestedLabels,
+    failedStep: input.failedStep
+  });
+  if (!finalLiveIssue.ok) {
+    return finalLiveIssue;
+  }
+
+  const verification = verifyFollowUpIssueLabels({
+    followUpIssue: finalLiveIssue.issue,
     createdIssue: input.createdIssue ?? null,
     requestedLabels: input.requestedLabels,
     failedStep: input.failedStep
@@ -3489,8 +3510,93 @@ async function ensureFollowUpIssueLabels(input: {
 
   return {
     ok: true,
-    issue: updatedIssue
+    issue: finalLiveIssue.issue,
+    repaired: true
   };
+}
+
+async function readLiveFollowUpIssueForLabelVerification(input: {
+  session: ResolvedLinearWorkflowSession;
+  followUpIssue: ProviderLinearCreatedIssue;
+  createdIssue: ProviderLinearCreatedIssue | null;
+  requestedLabels: ProviderLinearIssueLabel[];
+  failedStep: string;
+}): Promise<
+  | {
+      ok: true;
+      issue: ProviderLinearCreatedIssue;
+    }
+  | {
+      ok: false;
+      result: Extract<ProviderLinearCreateFollowUpResult, { ok: false }>;
+    }
+> {
+  const liveIssue = await readIssueSummary(input.session, 'create-follow-up', input.followUpIssue.id);
+  if (!liveIssue.ok) {
+    return {
+      ok: false,
+      result: failure(
+        'create-follow-up',
+        liveIssue.error.code,
+        liveIssue.error.message,
+        liveIssue.error.status,
+        {
+          ...(liveIssue.error.details ?? {}),
+          ...buildFollowUpLabelFailureDetails(
+            input.followUpIssue,
+            input.createdIssue ?? input.followUpIssue,
+            input.requestedLabels
+          ),
+          failed_step: `${input.failedStep}_live_read`
+        },
+        liveIssue.error.retryable
+      )
+    };
+  }
+
+  return {
+    ok: true,
+    issue: mergeLiveFollowUpIssueSummary(input.followUpIssue, liveIssue.issue, input.requestedLabels)
+  };
+}
+
+function mergeLiveFollowUpIssueSummary(
+  followUpIssue: ProviderLinearCreatedIssue,
+  liveIssue: ProviderLinearIssueSummary,
+  requestedLabels: readonly ProviderLinearIssueLabel[]
+): ProviderLinearCreatedIssue {
+  const matchedLiveIssue = liveIssue.id === followUpIssue.id;
+  return {
+    ...followUpIssue,
+    ...(matchedLiveIssue
+      ? {
+          description: liveIssue.description,
+          url: liveIssue.url,
+          state: liveIssue.state,
+          team: liveIssue.team
+            ? {
+                id: liveIssue.team.id,
+                key: liveIssue.team.key,
+                name: liveIssue.team.name
+              }
+            : null,
+          project: liveIssue.project
+            ? {
+                id: liveIssue.project.id,
+                name: liveIssue.project.name
+              }
+            : null
+        }
+      : {}),
+    labels: orderObservedFollowUpLabels(matchedLiveIssue ? liveIssue.labels : (followUpIssue.labels ?? []), requestedLabels)
+  };
+}
+
+function orderObservedFollowUpLabels(observedLabels: readonly ProviderLinearIssueLabel[], requestedLabels: readonly ProviderLinearIssueLabel[]): ProviderLinearIssueLabel[] {
+  const observedById = new Map(observedLabels.map((label) => [label.id, label]));
+  const ordered = requestedLabels.flatMap((label) => observedById.get(label.id) ?? []);
+  const seen = new Set(ordered.map((label) => label.id));
+  return [...ordered, ...observedLabels.filter((label) => !seen.has(label.id))];
 }
 
 function countCanonicalOwnerReuseRequests(input: {
@@ -3514,18 +3620,15 @@ function countCanonicalOwnerReuseRequests(input: {
     return 0;
   }
   const traceabilityUpdateRequests = traceabilityUpdate.shouldUpdate ? 1 : 0;
-  const labelUpdateRequests =
-    traceabilityUpdateRequests === 0 && findMissingFollowUpLabelIds(input.followUpIssue.labels, input.requestedLabels).length > 0
-      ? 1
-      : 0;
-  const postTraceabilityLabelRepairRequests = traceabilityUpdateRequests > 0 ? 1 : 0;
+  const labelVerificationRequests = traceabilityUpdateRequests > 0 ? 2 : 1;
+  const possibleLabelRepairRequests = labelVerificationRequests * 2;
   const relationRequests =
     input.sourceIssue.id === input.followUpIssue.id
       ? 0
       : input.blockedBySource
         ? 2
         : 1;
-  return labelUpdateRequests + traceabilityUpdateRequests + postTraceabilityLabelRepairRequests + relationRequests;
+  return traceabilityUpdateRequests + labelVerificationRequests + possibleLabelRepairRequests + relationRequests;
 }
 
 function resolveFollowUpTraceabilityUpdate(input: {
@@ -3907,12 +4010,14 @@ function buildFollowUpLabelFailureDetails(
   createdIssue: ProviderLinearCreatedIssue | null,
   requestedLabels: readonly ProviderLinearIssueLabel[]
 ): Record<string, unknown> {
+  const missingLabelIds = findMissingFollowUpLabelIds(followUpIssue.labels, requestedLabels);
   return {
     follow_up_issue: followUpIssue,
     ...(createdIssue ? { created_issue: createdIssue } : {}),
     requested_labels: requestedLabels,
     observed_labels: followUpIssue.labels ?? null,
-    missing_label_ids: findMissingFollowUpLabelIds(followUpIssue.labels, requestedLabels)
+    missing_label_ids: missingLabelIds,
+    missing_labels: requestedLabels.filter((label) => missingLabelIds.includes(label.id))
   };
 }
 
@@ -5540,6 +5645,7 @@ function summarizeIssueContext(issue: ProviderLinearIssueContext): ProviderLinea
   return {
     id: issue.id,
     identifier: issue.identifier,
+    description: issue.description,
     url: issue.url,
     updated_at: issue.updated_at,
     archived_at: issue.archived_at,
@@ -5558,6 +5664,7 @@ function mergeCachedIssueContextSummary(
 ): ProviderLinearIssueContext {
   return {
     ...issue,
+    description: summary.description,
     url: summary.url,
     updated_at: summary.updated_at,
     archived_at: summary.archived_at,
@@ -6583,6 +6690,7 @@ function parseIssueSummary(
     issue: {
       id,
       identifier,
+      description: normalizeOptionalString(issueNode.description),
       url: normalizeOptionalString(issueNode.url),
       updated_at: normalizeIso(issueNode.updatedAt),
       archived_at: normalizeIso(issueNode.archivedAt),
@@ -6826,6 +6934,7 @@ function buildIssueSummaryQuery(): string {
     issue(id: $issueId) {
       id
       identifier
+      description
       url
       updatedAt
       archivedAt

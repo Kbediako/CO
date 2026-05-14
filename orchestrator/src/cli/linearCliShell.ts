@@ -1071,7 +1071,8 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
           },
           requested_labels: requestedLabels.labels,
           observed_labels: followUpContext.issue.labels,
-          missing_label_ids: missingLabelIds
+          missing_label_ids: missingLabelIds,
+          missing_labels: requestedLabels.labels.filter((label) => missingLabelIds.includes(label.id))
         }
       }
     };
@@ -1109,7 +1110,8 @@ async function buildLocallyReconciledFollowUpPacketRetryResult(input: {
       url: followUpContext.issue.url,
       state: followUpContext.issue.state,
       team: followUpTeam,
-      project: followUpContext.issue.project
+      project: followUpContext.issue.project,
+      labels: followUpContext.issue.labels
     },
     canonical_owner: canonicalOwnerKey && canonicalOwnerMarker
       ? {

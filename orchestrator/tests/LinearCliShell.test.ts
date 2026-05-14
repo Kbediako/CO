@@ -3320,7 +3320,8 @@ describe('runLinearCliShell', () => {
             id: 'lin-issue-2',
             identifier: 'CO-2'
           },
-          missing_label_ids: ['label-priority-medium']
+          missing_label_ids: ['label-priority-medium'],
+          missing_labels: [{ id: 'label-priority-medium', name: 'Priority: Medium' }]
         }
       }
     });
