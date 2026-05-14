@@ -1,12 +1,21 @@
 ---
 id: 20260413-linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb
 title: CO fix delegation MCP startup perf and stale delegate-server process lifecycle
+status: completed
 relates_to: docs/PRD-linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-13
+last_review: 2026-05-14
+review_notes:
+  - 2026-05-14: CO-530 current-head root-cause reclassification verified live Linear CO-168 remains Done/completed and archived this historical packet out of active docs freshness lifecycle debt; no implementation scope reopened.
 ---
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| docs freshness | Completed Linear task spec remained active in freshness/spec guard metadata after issue closeout | remove fallback | CO-530 | May 14 current-head reclassification of recurring historical packet freshness debt for CO-168 | 2026-04-13 | N/A after removal | N/A after removal | Spec frontmatter is terminal and registry row is archived as historical metadata | `node scripts/spec-guard.mjs`; `npm run docs:freshness -- --warn`; `node scripts/docs-freshness-maintain.mjs --check --format json --warn` |
+
 
 ## Canonical Reference
 - Canonical TECH_SPEC: `tasks/specs/linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md`

@@ -1,10 +1,10 @@
 ---
 id: 20260413-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd
 title: CO: narrow generic control-host forced cleanup to avoid detached provider-worker collateral
-status: in_progress
+status: completed
 owner: Codex
 created: 2026-04-13
-last_review: 2026-04-13
+last_review: 2026-05-14
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md
@@ -19,7 +19,14 @@ review_notes:
   - 2026-04-13: The first audited `docs-review` child stream failed closed on the repo line-budget guard (`docs/TASKS.md` at `452 > 450`); `npm run docs:archive-tasks` restored compliance, displaced snapshots `1014` and `1015` were restored into tracked `docs/TASKS-archive-2026.md`, and the rerun child stream succeeded with `review_outcome: clean-success` under `.runs/linear-abca2add-198d-40a6-b1c0-35e49f4c78cd-docs-review/cli/2026-04-12T20-59-41-592Z-468ab71c/manifest.json`.
   - 2026-04-13: Implementation landed exactly on the intended seam: `terminateChildProcess(...)` now keeps descendant inspection diagnostic-only after process-group cleanup, the dead `killProcess` option was removed during the elegance pass, and the focused `ControlHostSupervision.test.ts` regression proves detached-worker survival.
   - 2026-04-13: Wrapper-led standalone review drifted without terminal telemetry or a concrete diff-local verdict, so manual review and elegance fallback notes were recorded instead of stalling the lane.
+  - 2026-05-14: CO-530 current-head root-cause reclassification verified live Linear CO-164 remains Done/completed and archived this historical packet out of active docs freshness lifecycle debt; no implementation scope reopened.
 ---
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| docs freshness | Completed Linear task spec remained active in freshness/spec guard metadata after issue closeout | remove fallback | CO-530 | May 14 current-head reclassification of recurring historical packet freshness debt for CO-164 | 2026-04-13 | N/A after removal | N/A after removal | Spec frontmatter is terminal and registry row is archived as historical metadata | `node scripts/spec-guard.mjs`; `npm run docs:freshness -- --warn`; `node scripts/docs-freshness-maintain.mjs --check --format json --warn` |
+
 
 # Technical Specification
 

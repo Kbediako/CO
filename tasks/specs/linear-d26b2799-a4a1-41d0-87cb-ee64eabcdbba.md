@@ -1,10 +1,10 @@
 ---
 id: 20260413-linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba
 title: CO: decouple released-claim deferred-poll suppression from unrelated fresh discovery
-status: in_progress
+status: completed
 owner: Codex
 created: 2026-04-13
-last_review: 2026-04-13
+last_review: 2026-05-14
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba.md
@@ -18,7 +18,14 @@ review_notes:
   - 2026-04-13: `runRefreshCycle(...)` now routes global discovery suppression through `shouldSuppressFreshDiscoveryForPollFailClosedReason(...)`, which preserves non-released cached suppression while excluding `provider_issue_poll_cached_released_*`; retained released claims remain local-first and zero-direct-read on deferred polls.
   - 2026-04-13: Standalone review surfaced one follow-on correctness hole after that split: deferred `fresh_discovery` could replay the same released issue and demote it out of `released`. The final tree closes that by tracking current-cycle `provider_issue_poll_cached_released_*` skips as replay-blocked deferred fresh-discovery targets while still allowing unrelated runnable issues through the same query.
   - 2026-04-13: The audited docs-review child stream completed under `.runs/linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba-co-161-docs-review/cli/2026-04-13T10-22-31-837Z-45c76cb6/manifest.json` and surfaced a stale packet claim after the code change; this spec refresh addresses that truthfulness gap before handoff.
+  - 2026-05-14: CO-530 current-head root-cause reclassification verified live Linear CO-161 remains Done/completed and archived this historical packet out of active docs freshness lifecycle debt; no implementation scope reopened.
 ---
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| docs freshness | Completed Linear task spec remained active in freshness/spec guard metadata after issue closeout | remove fallback | CO-530 | May 14 current-head reclassification of recurring historical packet freshness debt for CO-161 | 2026-04-13 | N/A after removal | N/A after removal | Spec frontmatter is terminal and registry row is archived as historical metadata | `node scripts/spec-guard.mjs`; `npm run docs:freshness -- --warn`; `node scripts/docs-freshness-maintain.mjs --check --format json --warn` |
+
 
 # Technical Specification
 

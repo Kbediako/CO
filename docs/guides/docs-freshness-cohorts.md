@@ -477,6 +477,12 @@ CO-530 reproduced the live owner-routed blocker after CO-522 was restored as the
 - All 28 candidate cohorts routed through `co-429-completed-lane-registry-residue` with `last_review=2026-04-09..2026-04-12`, path families `.agent/task`, `docs/ACTION_PLAN-*`, `docs/PRD-*`, `docs/TECH_SPEC-*`, `docs/findings`, `tasks/specs`, and `tasks/tasks-*`, and task lineages `1076-1137`.
 - The same report separately showed 5 hard-stale current/public docs; CO-530 does not classify those rows as historical task-packet debt.
 
+### May 14 Recurrence / Root Cause Expansion
+
+Current-head review on May 14 proved the same completed-packet root cause one day later: the Apr 13 `1138-1163` cohort, January delegation release packets `0942-0944`, CO-94, and several terminal Linear task specs had aged back into `docs:freshness` or `spec-guard` failure because their terminal lifecycle truth was not recorded consistently. CO-530 therefore owns this current-head recurrence as part of the root-cause reclassification, not as another review-date refresh.
+
+The repair must record terminal truth in `tasks/index.json`, align the archived registry rows, and update any affected spec frontmatter that still says `in_progress`. It must not hide active public/current docs, widen caps, or delete historical packets; rows without terminal evidence stay eligible for strict freshness action.
+
 ### Rolling Disposition
 
 CO-530 keeps `docs:freshness:maintain` and the live CO-522 owner marker unchanged. The Apr 9-12 residue is not active product guidance: the affected Task Packet, Task Mirror, and Report Only registry rows are archived as completed-lane historical metadata, and the numbered task-index rows `1076-1137` are marked completed from their existing closeout/spec evidence. The adjacent `CO-163` packet is classified separately under CO-536 from live Linear `Done` evidence and merged PR #456. This preserves historical files on disk, avoids blind `last_review` churn, avoids cap/window widening, and keeps unrelated hard-stale current docs visible to strict freshness gates.

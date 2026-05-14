@@ -28148,11 +28148,11 @@
       "path": "tasks/specs/0944-delegation-mcp-framing-compat-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
-      "last_review": "2026-04-13",
+      "last_review": "2026-05-14",
       "cadence_days": 90,
       "lifecycle_state": "archived",
       "archived_at": "2026-05-14",
-      "archive_reason": "CO-530 current-head validation classified the completed January delegation release packet out of active rolling debt after release/tag/publish checklist evidence; historical packet retained."
+      "archive_reason": "CO-530 current-head validation classified this completed release task spec out of terminal lifecycle debt after tag/publish checklist evidence; historical packet retained."
     },
     {
       "path": "tasks/specs/0953-standalone-review-docs-first-ship.md",
@@ -33302,11 +33302,11 @@
       "path": "tasks/specs/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "archived",
-      "last_review": "2026-04-13",
+      "last_review": "2026-05-14",
       "cadence_days": 30,
       "lifecycle_state": "archived",
       "archived_at": "2026-05-14",
-      "archive_reason": "CO-530 current-head validation classified the completed CO-94 run-memory-controller packet out of active rolling debt after live Linear Done evidence; historical packet retained."
+      "archive_reason": "CO-530 current-head validation classified this completed Linear task spec out of terminal lifecycle debt after live Linear Done evidence; historical packet retained."
     },
     {
       "path": "tasks/specs/linear-ce8a2ed3-ae5c-4c50-87b7-79368ac22f94.md",
