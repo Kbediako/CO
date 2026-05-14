@@ -551,7 +551,7 @@ function validateTaskIndexRows(report, issueSummary, taskIndexRows, options = {}
     );
   }
 
-  if (options.requireMatch && taskIndexRows.length > 0 && !matchedRow) {
+  if (options.requireMatch && !matchedRow) {
     pushFailure(
       report,
       issueSummary,
@@ -945,12 +945,14 @@ async function main() {
   }
   const issueState = typeof args['issue-state'] === 'string' ? normalizeLine(args['issue-state']) : '';
   let environmentIssue = null;
-  try {
-    environmentIssue = taskIndexIssueFromEnvironment(process.env, issueState);
-  } catch (error) {
-    console.error(error.message);
-    process.exitCode = 2;
-    return;
+  if (!explicitIssueId && !explicitIssueIdentifier) {
+    try {
+      environmentIssue = taskIndexIssueFromEnvironment(process.env, issueState);
+    } catch (error) {
+      console.error(error.message);
+      process.exitCode = 2;
+      return;
+    }
   }
   const taskIndexIssue =
     explicitIssueId && explicitIssueIdentifier

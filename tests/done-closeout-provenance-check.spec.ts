@@ -353,6 +353,35 @@ describe('done closeout provenance check', () => {
     );
   });
 
+  it('fails closed when live task-index validation sees an empty task index', async () => {
+    const repoRoot = await makeRepo();
+    await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
+    await writeManifest(repoRoot, [staleIssue()]);
+    await writeTaskIndex(repoRoot, []);
+
+    const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture',
+      taskIndexIssues: [
+        {
+          identifier: 'CO-525',
+          linear_id: 'linear-live',
+          linear_state: 'Done'
+        }
+      ]
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          issue: 'CO-525',
+          code: 'done_issue_missing_task_index_row'
+        })
+      ])
+    );
+  });
+
   it('deduplicates task-index-only authorities already present in the manifest', async () => {
     const repoRoot = await makeRepo();
     await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
@@ -1018,6 +1047,60 @@ describe('done closeout provenance check', () => {
         })
       ])
     );
+  });
+
+  it('lets explicit CLI live issue authority override partial provider env', async () => {
+    const repoRoot = await makeRepo('done closeout explicit ');
+    await mkdir(join(repoRoot, 'scripts', 'lib'), { recursive: true });
+    await copyFile(
+      join(process.cwd(), 'scripts', 'done-closeout-provenance-check.mjs'),
+      join(repoRoot, 'scripts', 'done-closeout-provenance-check.mjs')
+    );
+    await copyFile(join(process.cwd(), 'scripts', 'lib', 'cli-args.js'), join(repoRoot, 'scripts', 'lib', 'cli-args.js'));
+    await copyFile(
+      join(process.cwd(), 'scripts', 'lib', 'run-manifests.js'),
+      join(repoRoot, 'scripts', 'lib', 'run-manifests.js')
+    );
+    await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
+    await writeManifest(repoRoot, [staleIssue()]);
+    await writeTaskIndex(repoRoot, [
+      {
+        id: '20260514-linear-live',
+        title: 'CO-525 live closeout row',
+        status: 'done',
+        relates_to: 'tasks/tasks-linear-live.md'
+      }
+    ]);
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        join(repoRoot, 'scripts', 'done-closeout-provenance-check.mjs'),
+        '--issue-id',
+        'linear-live',
+        '--issue-identifier',
+        'CO-525',
+        '--format',
+        'json'
+      ],
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CODEX_ORCHESTRATOR_ROOT: repoRoot,
+          CODEX_ORCHESTRATOR_OUT_DIR: join(repoRoot, 'out'),
+          CODEX_ORCHESTRATOR_RUNS_DIR: join(repoRoot, '.runs'),
+          CODEX_ORCHESTRATOR_ISSUE_ID: 'linear-live',
+          CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER: ''
+        }
+      }
+    );
+
+    expect(result.status).toBe(0);
+    const report = JSON.parse(result.stdout);
+    expect(report.totals.issues).toBe(2);
+    expect(report.failures).toEqual([]);
   });
 
   it('rejects partial CLI live issue authority before validation', async () => {
