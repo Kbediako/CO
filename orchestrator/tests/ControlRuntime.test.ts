@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, mkdir, realpath, rm, symlink, unlink, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { ControlStateStore } from '../src/cli/control/controlState.js';
@@ -43,7 +43,7 @@ interface CreateFixtureOptions {
   providerIntakeState?: ProviderIntakeState;
   readPersistedProviderIntakeState?: () => ProviderIntakeState | null;
   questions?: QuestionRecord[];
-  env?: NodeJS.ProcessEnv;
+  env?: NodeJS.ProcessEnv | ((root: string) => NodeJS.ProcessEnv);
 }
 
 const cleanupRoots: string[] = [];
@@ -86,7 +86,7 @@ async function createFixture(options: CreateFixtureOptions = {}): Promise<TestFi
     linearAdvisoryState: options.linearAdvisoryState ?? { tracked_issue: null },
     providerIntakeState: options.providerIntakeState,
     readPersistedProviderIntakeState: options.readPersistedProviderIntakeState,
-    env: options.env
+    env: typeof options.env === 'function' ? options.env(root) : options.env
   });
 
   return { root, paths, controlStore, runtime };
@@ -124,6 +124,48 @@ async function seedControlState(
       run_id: 'run-1',
       control_seq: 0,
       ...overrides
+    }),
+    'utf8'
+  );
+}
+
+async function writeDocsFreshnessMaintenanceReport(
+  reportPath: string,
+  options: {
+    generatedAt: string;
+    severity: string;
+    freshnessDecision: string;
+    actionRequiredCount: number;
+  }
+): Promise<void> {
+  await mkdir(dirname(reportPath), { recursive: true });
+  await writeFile(
+    reportPath,
+    JSON.stringify({
+      generated_at: options.generatedAt,
+      repo_gate: {
+        severity: options.severity,
+        freshness_decision: options.freshnessDecision,
+        owner: {
+          issue: 'CO-522',
+          action: 'update_existing',
+          state: 'Blocked',
+          state_type: 'started',
+          verified: true
+        },
+        spec_guard: {
+          status: 'succeeded',
+          action_required_count: 0
+        },
+        capacity: {
+          status: 'ok'
+        },
+        next_expiry: null,
+        action_required_count: options.actionRequiredCount,
+        blocks_unrelated_lanes: false,
+        blocks_handoff: options.severity === 'blocking',
+        provider_wip_impact: 'excluded_repo_gate'
+      }
     }),
     'utf8'
   );
@@ -361,6 +403,211 @@ describe('ControlRuntime', () => {
     expect(selectedSnapshot.providerWorkflow?.pipeline_id).toBe('provider-linear-worker');
     expect(providerWorkflowConfigStore.refreshStatus).toHaveBeenCalledTimes(1);
     expect(providerWorkflowConfigStore.refresh).not.toHaveBeenCalled();
+  });
+
+  it('passes provider-intake task ids into docs freshness repo-gate discovery', async () => {
+    const activeTaskId = 'linear-current-docs-gate';
+    const generatedAt = new Date().toISOString();
+    const providerIntakeState = createProviderIntakeState([
+      {
+        provider: 'linear',
+        provider_key: 'linear:CO-535',
+        issue_id: 'issue-current',
+        issue_identifier: 'CO-535',
+        issue_title: 'Current docs gate issue',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-14T00:50:00.000Z',
+        task_id: activeTaskId,
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-05-14T00:50:00.000Z',
+        updated_at: '2026-05-14T00:50:00.000Z',
+        last_delivery_id: 'delivery-current',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_778_700_000_000,
+        run_id: 'run-1',
+        run_manifest_path: null,
+        launch_source: 'control-host',
+        launch_token: 'current-launch'
+      },
+      {
+        provider: 'linear',
+        provider_key: 'linear:CO-534',
+        issue_id: 'issue-completed',
+        issue_identifier: 'CO-534',
+        issue_title: 'Completed docs gate issue',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-05-14T00:59:00.000Z',
+        task_id: 'linear-completed-docs-gate',
+        mapping_source: 'provider_id_fallback',
+        state: 'completed',
+        reason: 'provider_issue_terminal',
+        accepted_at: '2026-05-14T00:40:00.000Z',
+        updated_at: '2026-05-14T00:59:00.000Z',
+        last_delivery_id: 'delivery-completed',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_778_700_001_000,
+        run_id: 'run-completed',
+        run_manifest_path: null,
+        launch_source: 'control-host',
+        launch_token: 'completed-launch'
+      }
+    ]);
+    const fixture = await createFixture({
+      providerIntakeState,
+      env: (root) =>
+        ({
+          CODEX_ORCHESTRATOR_ROOT: root,
+          CODEX_ORCHESTRATOR_OUT_DIR: join(root, 'out')
+        }) as NodeJS.ProcessEnv
+    });
+    const currentReport = join(fixture.root, 'out', activeTaskId, 'docs-freshness-maintenance.json');
+    const completedReport = join(fixture.root, 'out', 'linear-completed-docs-gate', 'docs-freshness-maintenance.json');
+    const unrelatedReport = join(fixture.root, 'out', 'linear-unrelated', 'docs-freshness-maintenance.json');
+    await writeDocsFreshnessMaintenanceReport(currentReport, {
+      generatedAt,
+      severity: 'warning',
+      freshnessDecision: 'clean',
+      actionRequiredCount: 2
+    });
+    await writeDocsFreshnessMaintenanceReport(unrelatedReport, {
+      generatedAt,
+      severity: 'blocking',
+      freshnessDecision: 'block_policy_over_budget',
+      actionRequiredCount: 99
+    });
+    await writeDocsFreshnessMaintenanceReport(completedReport, {
+      generatedAt,
+      severity: 'blocking',
+      freshnessDecision: 'block_policy_over_budget',
+      actionRequiredCount: 98
+    });
+
+    const selectedSnapshot = await fixture.runtime.snapshot().readSelectedRunSnapshot();
+    const gate = selectedSnapshot.repoGates?.docs_freshness_maintain;
+
+    expect(gate).toMatchObject({
+      severity: 'warning',
+      freshness_decision: 'clean',
+      source_path: currentReport
+    });
+    expect(gate?.report_candidates).not.toEqual(expect.arrayContaining([expect.objectContaining({ path: unrelatedReport })]));
+    expect(gate?.report_candidates).not.toEqual(expect.arrayContaining([expect.objectContaining({ path: completedReport })]));
+  });
+
+  it('includes the selected run task id in docs freshness repo-gate discovery', async () => {
+    const selectedTaskId = 'selected-docs-gate';
+    const completedTaskId = 'completed-docs-gate';
+    const providerIntakeState = createProviderIntakeState([
+      {
+        provider: 'linear',
+        provider_key: 'linear:CO-534',
+        issue_id: 'issue-completed',
+        issue_identifier: 'CO-534',
+        issue_title: 'Completed docs gate issue',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-05-14T00:59:00.000Z',
+        task_id: completedTaskId,
+        mapping_source: 'provider_id_fallback',
+        state: 'completed',
+        reason: 'provider_issue_terminal',
+        accepted_at: '2026-05-14T00:40:00.000Z',
+        updated_at: '2026-05-14T00:59:00.000Z',
+        last_delivery_id: 'delivery-completed',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_778_700_001_000,
+        run_id: 'run-completed',
+        run_manifest_path: null,
+        launch_source: 'control-host',
+        launch_token: 'completed-launch'
+      }
+    ]);
+    const fixture = await createFixture({
+      taskId: selectedTaskId,
+      providerIntakeState,
+      env: (root) =>
+        ({
+          CODEX_ORCHESTRATOR_ROOT: root,
+          CODEX_ORCHESTRATOR_OUT_DIR: join(root, 'out')
+        }) as NodeJS.ProcessEnv
+    });
+    const selectedReport = join(fixture.root, 'out', selectedTaskId, 'docs-freshness-maintenance.json');
+    const completedReport = join(fixture.root, 'out', completedTaskId, 'docs-freshness-maintenance.json');
+    await writeDocsFreshnessMaintenanceReport(selectedReport, {
+      generatedAt: '2026-05-14T00:30:00.000Z',
+      severity: 'blocking',
+      freshnessDecision: 'block_policy_over_budget',
+      actionRequiredCount: 7
+    });
+    await writeDocsFreshnessMaintenanceReport(completedReport, {
+      generatedAt: '2026-05-14T00:59:00.000Z',
+      severity: 'blocking',
+      freshnessDecision: 'block_policy_over_budget',
+      actionRequiredCount: 99
+    });
+
+    const selectedSnapshot = await fixture.runtime.snapshot().readSelectedRunSnapshot();
+    const gate = selectedSnapshot.repoGates?.docs_freshness_maintain;
+
+    expect(gate).toMatchObject({
+      severity: 'blocking',
+      freshness_decision: 'block_policy_over_budget',
+      action_required_count: 7,
+      source_path: selectedReport
+    });
+    expect(gate?.report_candidates).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: completedReport })])
+    );
+  });
+
+  it('refreshes docs freshness repo-gate evidence across cached selected-run reads', async () => {
+    const fixture = await createFixture({
+      env: (root) =>
+        ({
+          CODEX_ORCHESTRATOR_ROOT: root,
+          CODEX_ORCHESTRATOR_OUT_DIR: join(root, 'out')
+        }) as NodeJS.ProcessEnv
+    });
+    const localReport = join(fixture.root, 'out', 'local', 'docs-freshness-maintenance.json');
+    const initialGeneratedAt = new Date(Date.now() - 60_000).toISOString();
+    const refreshedGeneratedAt = new Date(Date.now() - 30_000).toISOString();
+    await writeDocsFreshnessMaintenanceReport(localReport, {
+      generatedAt: initialGeneratedAt,
+      severity: 'warning',
+      freshnessDecision: 'clean',
+      actionRequiredCount: 0
+    });
+    const snapshot = fixture.runtime.snapshot();
+
+    const initialSelectedRun = await snapshot.readSelectedRunSnapshot();
+    await seedManifest(fixture.paths, {
+      summary: 'selected summary should remain cached',
+      updated_at: '2026-03-07T00:12:00.000Z'
+    });
+    await writeDocsFreshnessMaintenanceReport(localReport, {
+      generatedAt: refreshedGeneratedAt,
+      severity: 'blocking',
+      freshnessDecision: 'block_policy_over_budget',
+      actionRequiredCount: 12
+    });
+
+    const repeatedSelectedRun = await snapshot.readSelectedRunSnapshot();
+
+    expect(initialSelectedRun.selected?.summary).toBe('initial summary');
+    expect(repeatedSelectedRun.selected?.summary).toBe('initial summary');
+    expect(repeatedSelectedRun.repoGates?.docs_freshness_maintain).toMatchObject({
+      severity: 'blocking',
+      freshness_decision: 'block_policy_over_budget',
+      action_required_count: 12,
+      source_path: localReport
+    });
   });
 
   it('reads max concurrent agents from control feature toggles into the compatibility projection', async () => {

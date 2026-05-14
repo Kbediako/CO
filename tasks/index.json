@@ -1,6 +1,70 @@
 {
   "items": [
     {
+      "id": "20260514-linear-7988f236-b499-4790-895d-1ec8c94e46d6",
+      "title": "CO-535 surface fresh docs freshness repo gate in co-status",
+      "relates_to": "tasks/tasks-linear-7988f236-b499-4790-895d-1ec8c94e46d6.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-14",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs-freshness:co-status-repo-gate-visibility:v1",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO parent orchestrator",
+          "date": "2026-05-14",
+          "status": "transitioned_in_progress",
+          "summary": "Live CO-535 issue-context verified Backlog state, parent created the workpad, transitioned through Ready to In Progress, and opened an isolated issue worktree from current origin/main."
+        },
+        "root_cause_reproduction": {
+          "reviewer": "CO parent orchestrator plus read-only planning agent",
+          "date": "2026-05-14",
+          "status": "verified",
+          "summary": "Fresh out/local/docs-freshness-maintenance.json contains repo_gate.id=docs_freshness_maintain while co-status reports repo_gates.docs_freshness_maintain=null because the reader only checks the scheduled docs-truthfulness-maintenance path by default."
+        }
+      },
+      "validation": {
+        "status": "implementation_validated",
+        "passed": [
+          "live issue-context",
+          "workpad creation",
+          "Backlog -> Ready -> In Progress guarded transition",
+          "root-cause reproduction",
+          "repo-gate reader implementation",
+          "focused tests",
+          "delegation guard",
+          "spec-guard",
+          "build",
+          "lint",
+          "focused tests plus Doctor timeout-cluster exact rerun",
+          "docs:check",
+          "docs:freshness",
+          "repo:stewardship",
+          "diff-budget",
+          "docs-freshness-maintain",
+          "manual repo-gate proof",
+          "pack:smoke",
+          "read-only subagent review rework",
+          "current-head Codex PR review rework",
+          "standalone review",
+          "elegance review"
+        ],
+        "pending": [
+          "PR Core Lane full test/checks and review drain"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-7988f236-b499-4790-895d-1ec8c94e46d6.md",
+        "prd": "docs/PRD-linear-7988f236-b499-4790-895d-1ec8c94e46d6.md",
+        "docs": "docs/TECH_SPEC-linear-7988f236-b499-4790-895d-1ec8c94e46d6.md",
+        "action_plan": "docs/ACTION_PLAN-linear-7988f236-b499-4790-895d-1ec8c94e46d6.md",
+        "spec": "tasks/specs/linear-7988f236-b499-4790-895d-1ec8c94e46d6.md",
+        "task": "tasks/tasks-linear-7988f236-b499-4790-895d-1ec8c94e46d6.md"
+      }
+    },
+    {
       "id": "20260513-linear-a5183441-3f28-4bf5-91e2-9c987b277924",
       "title": "CO-536 classify CO-163 terminal docs packet outside CO-530 lineage cleanup",
       "relates_to": "tasks/tasks-linear-a5183441-3f28-4bf5-91e2-9c987b277924.md",
