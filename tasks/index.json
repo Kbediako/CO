@@ -8695,6 +8695,17 @@
         "task": "tasks/tasks-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md",
         "agent_task": ".agent/task/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md",
         "docs": "docs/TECH_SPEC-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-04-14",
+      "source_issue": {
+        "id": "ce6f26d0-029a-40d9-8ffe-289cd40cde8d",
+        "identifier": "CO-94",
+        "url": "https://linear.app/asabeko/issue/CO-94/add-run-memory-controller-with-role-specific-retrieval-profiles"
+      },
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
+        "evidence": "Live Linear issue-context verified CO-94 is Done/completed on 2026-05-14; registry rows are archived as historical packets rather than refreshed or deleted."
       }
     },
     {
@@ -8747,7 +8758,7 @@
         "url": "https://linear.app/asabeko/issue/CO-169/co-workflow-make-provider-worker-issue-worktree-root-authoritative-for"
       },
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Live Linear issue-context verified CO-169 is Done/completed on 2026-05-14; registry rows are archived as historical packets rather than refreshed or deleted."
       }
     },
@@ -8775,7 +8786,7 @@
         "url": "https://linear.app/asabeko/issue/CO-164/co-narrow-generic-control-host-forced-cleanup-to-avoid-detached"
       },
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Live Linear issue-context verified CO-164 is Done/completed on 2026-05-14; registry rows are archived as historical packets rather than refreshed or deleted."
       }
     },
@@ -8803,7 +8814,7 @@
         "url": "https://linear.app/asabeko/issue/CO-161/co-decouple-released-claim-deferred-poll-suppression-from-unrelated"
       },
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Live Linear issue-context verified CO-161 is Done/completed on 2026-05-14; registry rows are archived as historical packets rather than refreshed or deleted."
       }
     },
@@ -8847,7 +8858,7 @@
         "url": "https://linear.app/asabeko/issue/CO-131/co-stabilize-timeout-sensitive-repo-validation-suites-blocking-handoff"
       },
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Live Linear issue-context verified CO-131 is Done/completed on 2026-05-14; registry rows are archived as historical packets rather than refreshed or deleted."
       }
     },
@@ -8882,7 +8893,7 @@
         "url": "https://linear.app/asabeko/issue/CO-167/co-workflow-refresh-current-main-docsfreshness-stale-cohorts-1138-1163"
       },
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Live Linear issue-context verified CO-167 is Done/completed on 2026-05-14; registry rows are archived as historical packets rather than refreshed or deleted."
       }
     },
@@ -8925,7 +8936,7 @@
         "url": "https://linear.app/asabeko/issue/CO-168/co-fix-delegation-mcp-startupperf-and-stale-delegate-server-process"
       },
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Live Linear issue-context verified CO-168 is Done/completed on 2026-05-14; registry rows are archived as historical packets rather than refreshed or deleted."
       }
     },
@@ -8968,7 +8979,7 @@
         "url": "https://linear.app/asabeko/issue/CO-139/co-audit-remaining-top-level-non-doc-and-config-stewardship-surfaces"
       },
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Live Linear issue-context verified CO-139 is Done/completed on 2026-05-14; registry rows are archived as historical packets rather than refreshed or deleted."
       }
     },
@@ -15608,7 +15619,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -15630,7 +15641,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -15652,7 +15663,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -15674,7 +15685,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -15696,7 +15707,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -15718,7 +15729,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -15740,7 +15751,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -15762,7 +15773,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -15784,7 +15795,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -15806,7 +15817,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -15828,7 +15839,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -15850,7 +15861,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -15872,7 +15883,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -15894,7 +15905,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -15916,7 +15927,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -15938,7 +15949,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -15960,7 +15971,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -15982,7 +15993,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -16004,7 +16015,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -16026,7 +16037,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -16048,7 +16059,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -16070,7 +16081,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -16092,7 +16103,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -16114,7 +16125,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -16136,7 +16147,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -16158,7 +16169,7 @@
       "status": "completed",
       "completed_at": "2026-03-13",
       "completion_classification": {
-        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
         "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
@@ -19293,7 +19304,7 @@
       "title": "Delegation NPM Release Plan",
       "path": "tasks/tasks-0942-delegation-release-plan.md",
       "kind": "prd",
-      "status": "approved",
+      "status": "completed",
       "gate": {
         "phase": "delegation-release-plan-planning",
         "status": "approved",
@@ -19301,7 +19312,11 @@
         "run_id": "2026-01-12T07-13-22-468Z-3877ad2f"
       },
       "created_at": "2026-01-12",
-      "completed_at": null
+      "completed_at": "2026-01-12",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
+        "evidence": "Task checklist release evidence is fully checked off with tag/publish evidence; registry rows are historical release packet metadata rather than active rolling debt."
+      }
     },
     {
       "id": "0943",
@@ -19309,7 +19324,7 @@
       "title": "Release Notes Template + Signed Tags",
       "path": "tasks/tasks-0943-release-notes-template-signing.md",
       "kind": "prd",
-      "status": "approved",
+      "status": "completed",
       "gate": {
         "phase": "release-notes-template-signing-planning",
         "status": "approved",
@@ -19317,7 +19332,11 @@
         "run_id": "2026-01-12T06-29-14-923Z-c4423862"
       },
       "created_at": "2026-01-12",
-      "completed_at": null
+      "completed_at": "2026-01-12",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
+        "evidence": "Task checklist implementation and validation evidence is fully checked off; registry rows are historical release packet metadata rather than active rolling debt."
+      }
     },
     {
       "id": "0944",
@@ -19325,7 +19344,7 @@
       "title": "Delegation MCP Framing Compatibility Fix",
       "path": "tasks/tasks-0944-delegation-mcp-framing-compat-fix.md",
       "kind": "prd",
-      "status": "approved",
+      "status": "completed",
       "gate": {
         "phase": "delegation-mcp-framing-compat-fix-planning",
         "status": "approved",
@@ -19333,7 +19352,11 @@
         "run_id": "2026-01-12T10-33-01-419Z-2b3cd73f"
       },
       "created_at": "2026-01-12",
-      "completed_at": null
+      "completed_at": "2026-01-12",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness root-cause reclassification",
+        "evidence": "Task checklist framing-fix release evidence is fully checked off with tag/publish evidence; registry rows are historical release packet metadata rather than active rolling debt."
+      }
     },
     {
       "id": "0945",

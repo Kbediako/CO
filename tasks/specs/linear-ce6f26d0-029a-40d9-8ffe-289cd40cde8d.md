@@ -4,7 +4,7 @@ title: CO: Add run memory controller with role-specific retrieval profiles
 status: in_progress
 owner: Codex
 created: 2026-04-09
-last_review: 2026-05-14
+last_review: 2026-04-13
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md
