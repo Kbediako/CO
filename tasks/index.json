@@ -1,6 +1,55 @@
 {
   "items": [
     {
+      "id": "20260514-linear-31958d87-e472-4c3f-a1e2-ab7adb3646b5",
+      "title": "CO-538 verify create-follow-up labels with live post-mutation reads",
+      "relates_to": "tasks/tasks-linear-31958d87-e472-4c3f-a1e2-ab7adb3646b5.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-14",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet-local-2026-05-14T03-58-04-115Z-a02ced60",
+          "date": "2026-05-14",
+          "status": "produced_for_parent_import",
+          "manifest": ".runs/linear-31958d87-e472-4c3f-a1e2-ab7adb3646b5-docs-packet-local/cli/2026-05-14T03-58-04-115Z-a02ced60/manifest.json",
+          "source_anchor": "ctx:sha256:0b7864e23887d0b023799ab19858917af9f490c4a4e62af57b5913aebe5861dc#chunk:c000001",
+          "summary": "Docs-only child lane created the CO-538 packet and registry mirrors for post-create/post-reuse live label verification in create-follow-up, preserving CO-482, CO-537, source-derived labels, fail-closed behavior, and explicit non-goals around label taxonomy, CO-400 projection semantics, provider admission, queue prioritization, manual labeling sweeps, and cached/mutation-return label authority."
+        }
+      },
+      "validation": {
+        "status": "docs_packet_created_pending_parent_implementation",
+        "passed": [
+          "docs-first packet created",
+          "registry mirrors created",
+          "child-lane JSON parse checks",
+          "child-lane file presence checks",
+          "git diff --check"
+        ],
+        "pending": [
+          "parent implementation",
+          "focused create-follow-up live label verification tests",
+          "parent-required validation and review gates"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-31958d87-e472-4c3f-a1e2-ab7adb3646b5.md",
+        "prd": "docs/PRD-linear-31958d87-e472-4c3f-a1e2-ab7adb3646b5.md",
+        "docs": "docs/TECH_SPEC-linear-31958d87-e472-4c3f-a1e2-ab7adb3646b5.md",
+        "action_plan": "docs/ACTION_PLAN-linear-31958d87-e472-4c3f-a1e2-ab7adb3646b5.md",
+        "spec": "tasks/specs/linear-31958d87-e472-4c3f-a1e2-ab7adb3646b5.md",
+        "task": "tasks/tasks-linear-31958d87-e472-4c3f-a1e2-ab7adb3646b5.md"
+      },
+      "source_issue": {
+        "id": "31958d87-e472-4c3f-a1e2-ab7adb3646b5",
+        "identifier": "CO-538",
+        "url": "https://linear.app/asabeko/issue/CO-538"
+      }
+    },
+    {
       "id": "20260514-linear-7988f236-b499-4790-895d-1ec8c94e46d6",
       "title": "CO-535 surface fresh docs freshness repo gate in co-status",
       "relates_to": "tasks/tasks-linear-7988f236-b499-4790-895d-1ec8c94e46d6.md",
