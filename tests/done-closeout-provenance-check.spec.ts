@@ -256,6 +256,171 @@ describe('done closeout provenance check', () => {
     );
   });
 
+  it('deduplicates task-index-only authorities already present in the manifest', async () => {
+    const repoRoot = await makeRepo();
+    await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
+    await writeManifest(repoRoot, [staleIssue({ identifier: 'CO-525', linear_id: 'linear-live' })]);
+    await writeTaskIndex(repoRoot, [
+      {
+        id: '20260514-linear-live',
+        title: 'CO-525 live closeout row',
+        status: 'in_progress',
+        relates_to: 'tasks/tasks-linear-live.md'
+      }
+    ]);
+
+    const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture',
+      taskIndexIssues: [
+        {
+          identifier: 'CO-525',
+          linear_id: 'linear-live',
+          linear_state: 'Done'
+        }
+      ]
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.issues).toBe(1);
+    expect(report.totals.task_index_nonterminal_rows).toBe(1);
+    expect(report.failures.filter((failure) => failure.code === 'done_issue_nonterminal_task_index_row')).toHaveLength(1);
+  });
+
+  it('keeps live task-index authority when manifest identity only partially overlaps', async () => {
+    const repoRoot = await makeRepo();
+    await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
+    await writeManifest(repoRoot, [staleIssue({ identifier: 'CO-525', linear_id: 'stale-linear-id' })]);
+    await writeTaskIndex(repoRoot, [
+      {
+        id: '20260514-linear-live',
+        title: 'live closeout row',
+        status: 'in_progress',
+        relates_to: 'tasks/tasks-linear-live.md'
+      }
+    ]);
+
+    const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture',
+      taskIndexIssues: [
+        {
+          identifier: 'CO-525',
+          linear_id: 'linear-live',
+          linear_state: 'Done'
+        }
+      ]
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.issues).toBe(2);
+    expect(report.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          issue: 'CO-525',
+          code: 'done_issue_nonterminal_task_index_row',
+          task_id: '20260514-linear-live'
+        })
+      ])
+    );
+  });
+
+  it('does not collapse duplicate manifest entries while deduplicating runtime authorities', async () => {
+    const repoRoot = await makeRepo();
+    await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
+    await writeManifest(repoRoot, [
+      staleIssue({ identifier: 'CO-525', linear_id: 'linear-live' }),
+      staleIssue({
+        identifier: 'CO-525',
+        linear_id: 'linear-live',
+        classification: 'true_follow_up_needed',
+        mirror_paths: []
+      })
+    ]);
+
+    const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture',
+      taskIndexIssues: [
+        {
+          identifier: 'CO-525',
+          linear_id: 'linear-live',
+          linear_state: 'Done'
+        }
+      ]
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.issues).toBe(2);
+    expect(report.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          issue: 'CO-525',
+          code: 'true_follow_up_needed'
+        })
+      ])
+    );
+  });
+
+  it('ignores partial task-index-only authorities before issue validation', async () => {
+    const repoRoot = await makeRepo();
+    await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
+    await writeManifest(repoRoot, [staleIssue()]);
+    await writeTaskIndex(repoRoot, [
+      {
+        id: '20260514-linear-live',
+        title: 'CO-525 live closeout row',
+        status: 'in_progress',
+        relates_to: 'tasks/tasks-linear-live.md'
+      }
+    ]);
+
+    const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture',
+      taskIndexIssues: [
+        {
+          identifier: 'CO-525',
+          linear_state: 'Done'
+        }
+      ]
+    });
+
+    expect(hasFailures).toBe(false);
+    expect(report.totals.issues).toBe(1);
+    expect(report.failures.map((failure) => failure.code)).not.toContain('issue_identity_incomplete');
+  });
+
+  it('rejects task-index-only classifications from the manifest', async () => {
+    const repoRoot = await makeRepo();
+    await writeManifest(repoRoot, [
+      {
+        identifier: 'CO-525',
+        linear_id: 'linear-live',
+        linear_state: 'Done',
+        classification: 'task_index_only',
+        mirror_paths: [],
+        waivers: []
+      }
+    ]);
+
+    const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          issue: 'CO-525',
+          code: 'invalid_classification',
+          classification: 'task_index_only'
+        })
+      ])
+    );
+  });
+
   it('does not match title-only issue references when legacy ids point elsewhere', async () => {
     const repoRoot = await makeRepo();
     await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
@@ -678,5 +843,91 @@ describe('done closeout provenance check', () => {
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('Usage: node scripts/done-closeout-provenance-check.mjs');
+  });
+
+  it('reads provider issue authority from environment for CLI closeout checks', async () => {
+    const repoRoot = await makeRepo('done closeout env ');
+    await mkdir(join(repoRoot, 'scripts', 'lib'), { recursive: true });
+    await copyFile(
+      join(process.cwd(), 'scripts', 'done-closeout-provenance-check.mjs'),
+      join(repoRoot, 'scripts', 'done-closeout-provenance-check.mjs')
+    );
+    await copyFile(join(process.cwd(), 'scripts', 'lib', 'cli-args.js'), join(repoRoot, 'scripts', 'lib', 'cli-args.js'));
+    await copyFile(
+      join(process.cwd(), 'scripts', 'lib', 'run-manifests.js'),
+      join(repoRoot, 'scripts', 'lib', 'run-manifests.js')
+    );
+    await writeManifest(repoRoot, [staleIssue()]);
+    await writeTaskIndex(repoRoot, [
+      {
+        id: '20260514-linear-live',
+        title: 'CO-525 live closeout row',
+        status: 'in_progress',
+        relates_to: 'tasks/tasks-linear-live.md'
+      }
+    ]);
+
+    const result = spawnSync(
+      process.execPath,
+      [join(repoRoot, 'scripts', 'done-closeout-provenance-check.mjs'), '--format', 'json'],
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CODEX_ORCHESTRATOR_ROOT: repoRoot,
+          CODEX_ORCHESTRATOR_OUT_DIR: join(repoRoot, 'out'),
+          CODEX_ORCHESTRATOR_RUNS_DIR: join(repoRoot, '.runs'),
+          CODEX_ORCHESTRATOR_ISSUE_ID: 'linear-live',
+          CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER: 'CO-525',
+          CODEX_ORCHESTRATOR_ISSUE_STATE: 'Done'
+        }
+      }
+    );
+
+    expect(result.status).toBe(1);
+    const report = JSON.parse(result.stdout);
+    expect(report.totals.issues).toBe(2);
+    expect(report.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          issue: 'CO-525',
+          code: 'done_issue_nonterminal_task_index_row',
+          task_id: '20260514-linear-live'
+        })
+      ])
+    );
+  });
+
+  it('rejects partial CLI live issue authority before validation', async () => {
+    const repoRoot = await makeRepo('done closeout cli ');
+    await mkdir(join(repoRoot, 'scripts', 'lib'), { recursive: true });
+    await copyFile(
+      join(process.cwd(), 'scripts', 'done-closeout-provenance-check.mjs'),
+      join(repoRoot, 'scripts', 'done-closeout-provenance-check.mjs')
+    );
+    await copyFile(join(process.cwd(), 'scripts', 'lib', 'cli-args.js'), join(repoRoot, 'scripts', 'lib', 'cli-args.js'));
+    await copyFile(
+      join(process.cwd(), 'scripts', 'lib', 'run-manifests.js'),
+      join(repoRoot, 'scripts', 'lib', 'run-manifests.js')
+    );
+
+    const result = spawnSync(
+      process.execPath,
+      [join(repoRoot, 'scripts', 'done-closeout-provenance-check.mjs'), '--issue-id', 'linear-live'],
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CODEX_ORCHESTRATOR_ROOT: repoRoot,
+          CODEX_ORCHESTRATOR_OUT_DIR: join(repoRoot, 'out'),
+          CODEX_ORCHESTRATOR_RUNS_DIR: join(repoRoot, '.runs')
+        }
+      }
+    );
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('Both --issue-id and --issue-identifier are required');
   });
 });

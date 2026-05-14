@@ -14,12 +14,13 @@ const DEFAULT_REPORT_NAME = 'done-closeout-provenance-report.json';
 const TASKS_INDEX_PATH = 'tasks/index.json';
 const DONE_STATE_NAMES = new Set(['done', 'completed']);
 const TERMINAL_TASK_STATUSES = new Set(['succeeded', 'completed', 'done', 'canceled', 'cancelled']);
-const VALID_CLASSIFICATIONS = new Set([
+const TASK_INDEX_ONLY_AUTHORITY = Symbol('taskIndexOnlyAuthority');
+const VALID_MANIFEST_CLASSIFICATIONS = new Set([
   'stale_mirror_only',
   'validation_only_provenance_gap',
-  'true_follow_up_needed',
-  'task_index_only'
+  'true_follow_up_needed'
 ]);
+const VALID_RUNTIME_CLASSIFICATIONS = new Set([...VALID_MANIFEST_CLASSIFICATIONS, 'task_index_only']);
 const SUCCESSFUL_CHECK_STATES = new Set(['SUCCESS', 'SKIPPED']);
 
 function showUsage() {
@@ -31,12 +32,16 @@ Options:
   --manifest <path>   Provenance manifest path (default: ${DEFAULT_MANIFEST_PATH})
   --report <path>     Report JSON path (default: out/<task-id>/${DEFAULT_REPORT_NAME})
   --issue-id <uuid>   Add a live terminal issue authority for task-index-only validation
-  --issue-identifier <id>  Human-readable issue key for --issue-id (for example CO-525)
+  --issue-identifier <id>  Human-readable issue key for --issue-id (required with --issue-id)
   --issue-state <state>    Live issue state for --issue-id (default: Done)
   --format json       Print the full JSON report
   --warn              Emit failures but exit 0
   --check             Alias for default behavior
-  -h, --help          Show this help message`);
+  -h, --help          Show this help message
+
+Provider-worker runs also read CODEX_ORCHESTRATOR_ISSUE_ID and
+CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER as live task-index-only authority when both
+are present and explicit --issue-* flags are absent.`);
 }
 
 function normalizeRepoPath(value) {
@@ -646,8 +651,11 @@ async function validateIssue(repoRoot, report, issue, requiredChecks, taskIndexR
   if (!issueSummary.identifier || !issueSummary.linear_id) {
     pushFailure(report, issueSummary, 'issue_identity_incomplete', 'Manifest issue entry must include identifier and linear_id.');
   }
-  if (!VALID_CLASSIFICATIONS.has(issueSummary.classification)) {
-    pushFailure(report, issueSummary, 'invalid_classification', 'Manifest issue entry has an invalid classification.', {
+  const validClassifications = issue?.[TASK_INDEX_ONLY_AUTHORITY]
+    ? VALID_RUNTIME_CLASSIFICATIONS
+    : VALID_MANIFEST_CLASSIFICATIONS;
+  if (!validClassifications.has(issueSummary.classification)) {
+    pushFailure(report, issueSummary, 'invalid_classification', 'Issue entry has an invalid classification.', {
       classification: issueSummary.classification
     });
   }
@@ -698,15 +706,67 @@ function normalizeTaskIndexOnlyIssues(issues) {
     return [];
   }
   return issues
-    .map((issue) => ({
-      identifier: normalizeLine(issue?.identifier),
-      linear_id: normalizeLine(issue?.linear_id),
-      linear_state: normalizeLine(issue?.linear_state) || 'Done',
-      classification: 'task_index_only',
-      mirror_paths: [],
-      waivers: []
-    }))
-    .filter((issue) => issue.identifier || issue.linear_id);
+    .map((issue) => {
+      const identifier = normalizeLine(issue?.identifier);
+      const linearId = normalizeLine(issue?.linear_id);
+      if (!identifier || !linearId) {
+        return null;
+      }
+      return {
+        identifier,
+        linear_id: linearId,
+        linear_state: normalizeLine(issue?.linear_state) || 'Done',
+        classification: 'task_index_only',
+        mirror_paths: [],
+        waivers: [],
+        [TASK_INDEX_ONLY_AUTHORITY]: true
+      };
+    })
+    .filter(Boolean);
+}
+
+function issueIdentity(issue) {
+  return {
+    identifier: normalizeLine(issue?.identifier).toLowerCase(),
+    linearId: normalizeLine(issue?.linear_id).toLowerCase()
+  };
+}
+
+function issueIdentitiesMatch(left, right) {
+  const leftIdentity = issueIdentity(left);
+  const rightIdentity = issueIdentity(right);
+  return Boolean(
+    leftIdentity.identifier &&
+      leftIdentity.linearId &&
+      leftIdentity.identifier === rightIdentity.identifier &&
+      leftIdentity.linearId === rightIdentity.linearId
+  );
+}
+
+function mergeIssueAuthorities(manifestIssues, taskIndexOnlyIssues) {
+  const merged = Array.isArray(manifestIssues) ? [...manifestIssues] : [];
+  for (const issue of Array.isArray(taskIndexOnlyIssues) ? taskIndexOnlyIssues : []) {
+    // Partial identity overlap can indicate stale manifest metadata; keep the live
+    // authority unless both issue identities agree.
+    if (merged.some((existingIssue) => issueIdentitiesMatch(existingIssue, issue))) {
+      continue;
+    }
+    merged.push(issue);
+  }
+  return merged;
+}
+
+function taskIndexIssueFromEnvironment(env, issueState) {
+  const linearId = normalizeLine(env.CODEX_ORCHESTRATOR_ISSUE_ID);
+  const identifier = normalizeLine(env.CODEX_ORCHESTRATOR_ISSUE_IDENTIFIER);
+  if (!linearId || !identifier) {
+    return null;
+  }
+  return {
+    linear_id: linearId,
+    identifier,
+    linear_state: issueState || normalizeLine(env.CODEX_ORCHESTRATOR_ISSUE_STATE) || 'Done'
+  };
 }
 
 export async function runDoneCloseoutProvenanceCheck(repoRoot, options = {}) {
@@ -722,7 +782,7 @@ export async function runDoneCloseoutProvenanceCheck(repoRoot, options = {}) {
   const manifest = await loadJson(absoluteManifestPath, manifestPath);
   const manifestIssues = Array.isArray(manifest?.issues) ? manifest.issues : [];
   const taskIndexOnlyIssues = normalizeTaskIndexOnlyIssues(options.taskIndexIssues);
-  const issues = [...manifestIssues, ...taskIndexOnlyIssues];
+  const issues = mergeIssueAuthorities(manifestIssues, taskIndexOnlyIssues);
   const requiredChecks = Array.isArray(manifest?.required_pr_checks)
     ? manifest.required_pr_checks.map(normalizeCheckName).filter(Boolean)
     : [];
@@ -847,16 +907,28 @@ async function main() {
   }
 
   const { repoRoot, outRoot, taskId } = resolveEnvironmentPaths();
+  const explicitIssueId = typeof args['issue-id'] === 'string' ? normalizeLine(args['issue-id']) : '';
+  const explicitIssueIdentifier =
+    typeof args['issue-identifier'] === 'string' ? normalizeLine(args['issue-identifier']) : '';
+  if ((explicitIssueId && !explicitIssueIdentifier) || (!explicitIssueId && explicitIssueIdentifier)) {
+    console.error('Both --issue-id and --issue-identifier are required for task-index-only validation.');
+    process.exitCode = 2;
+    return;
+  }
+  const issueState = typeof args['issue-state'] === 'string' ? normalizeLine(args['issue-state']) : '';
+  const environmentIssue = taskIndexIssueFromEnvironment(process.env, issueState);
   const taskIndexIssue =
-    typeof args['issue-id'] === 'string' || typeof args['issue-identifier'] === 'string'
+    explicitIssueId && explicitIssueIdentifier
       ? [
           {
-            linear_id: typeof args['issue-id'] === 'string' ? args['issue-id'] : '',
-            identifier: typeof args['issue-identifier'] === 'string' ? args['issue-identifier'] : '',
-            linear_state: typeof args['issue-state'] === 'string' ? args['issue-state'] : 'Done'
+            linear_id: explicitIssueId,
+            identifier: explicitIssueIdentifier,
+            linear_state: issueState || 'Done'
           }
         ]
-      : [];
+      : environmentIssue
+        ? [environmentIssue]
+        : [];
   const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
     manifestPath: typeof args.manifest === 'string' ? args.manifest : DEFAULT_MANIFEST_PATH,
     reportPath: typeof args.report === 'string' ? args.report : null,
