@@ -22043,6 +22043,38 @@
         "docs": "docs/TECH_SPEC-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md",
         "action_plan": "docs/ACTION_PLAN-linear-d412792b-9a2a-43d9-96dc-ca021e728d09.md"
       }
+    },
+    {
+      "id": "20260514-linear-1e25073c-5587-4732-89ec-e27e5d167747",
+      "title": "CO-510 recognize common clean review wording in semantic telemetry",
+      "status": "backlog",
+      "relates_to": "tasks/tasks-linear-1e25073c-5587-4732-89ec-e27e5d167747.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-14",
+      "approvals": {
+        "traceability_packet": {
+          "reviewer": "parent orchestration traceability repair",
+          "date": "2026-05-14",
+          "status": "produced",
+          "summary": "Created the CO-510 docs-first packet and registry mirrors to clear backlog_head_follow_up_traceability_pending without starting a worker or weakening review gates."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-1e25073c-5587-4732-89ec-e27e5d167747.md",
+        "task": "tasks/tasks-linear-1e25073c-5587-4732-89ec-e27e5d167747.md",
+        "agent_task": ".agent/task/linear-1e25073c-5587-4732-89ec-e27e5d167747.md",
+        "prd": "docs/PRD-linear-1e25073c-5587-4732-89ec-e27e5d167747.md",
+        "docs": "docs/TECH_SPEC-linear-1e25073c-5587-4732-89ec-e27e5d167747.md",
+        "action_plan": "docs/ACTION_PLAN-linear-1e25073c-5587-4732-89ec-e27e5d167747.md"
+      },
+      "source_issue": {
+        "id": "1e25073c-5587-4732-89ec-e27e5d167747",
+        "identifier": "CO-510",
+        "url": "https://linear.app/asabeko/issue/CO-510/co-recognize-common-clean-review-wording-in-semantic-telemetry"
+      }
     }
   ]
 }
