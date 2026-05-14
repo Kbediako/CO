@@ -25,6 +25,15 @@
 - [x] Stuck refresh aborts further issue-by-id reads or fresh discovery after the stuck boundary. Evidence: `orchestrator/src/cli/control/providerIssueHandoff.ts` adds `shouldAbortRefreshCycle()` guards around tracked-issue resolution, queued retry rereads, and fresh discovery.
 - [x] Operator-facing status/runbook guidance distinguishes supervised control-host pids from provider workers. Evidence: `formatControlHostSupervisionStatus(...)` now prints the supervised child pid and `docs/public/provider-onboarding.md` documents `co-status --format json` owner diagnostics plus the detached provider-worker exclusion.
 
+## CO-382 Fallback Decision Table
+
+Large-refactor check: A broad control-host restart refactor is not required for this historical packet classification; CO-536 only removes stale active-debt treatment from already-terminal docs metadata.
+Minor-seam decision: CO-536 aligns historical packet metadata with live terminal evidence and does not add a new runtime or validation branch.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| docs freshness | Already-terminal CO-163 packet still treated as active docs-freshness debt | remove fallback | CO-536 | `docs:freshness` fails on six CO-163 packet rows | 2026-04-12 | N/A after removal | N/A after removal | Packet metadata is terminal/archived and no longer appears as active debt | CO-163 terminal Linear evidence, merged PR #456, `spec-guard`, and `docs:freshness` |
+
 ## Validation
 - [x] Focused regression tests for supervision restart/orphan cleanup and stuck-refresh abort. Evidence: the earlier `npx vitest run orchestrator/tests/ControlServerPublicLifecycle.test.ts orchestrator/tests/ControlHostSupervision.test.ts orchestrator/tests/ProviderIssueHandoff.test.ts` runtime set remained green with `343` tests, the later rereview patch added `keeps lifecycle-stuck polling fail-closed when later schedules arrive` with `npx vitest run orchestrator/tests/ControlServerPublicLifecycle.test.ts` passing `42` tests, the supervision cleanup follow-ups added `skips force cleanup when the tracked process group exits before the kill step`, `fails closed when the tracked process-group recheck errors before force cleanup`, `rejects overlapping task and run prefixes when verifying the supervised control-host command`, and `matches the supervised control-host when the CLI entrypoint path contains spaces`, and the final focused reruns passed with `npx vitest run orchestrator/tests/ControlHostSupervision.test.ts` at `57` tests and `npx vitest run orchestrator/tests/ProviderIssueHandoff.test.ts` at `250` tests on the current head.
 - [x] `node scripts/delegation-guard.mjs`. Evidence: `Delegation guard: OK (2 subagent manifest(s) found).`
@@ -41,10 +50,10 @@
 
 ## Handoff
 - [x] PR attached to the issue. Evidence: PR `#456` (`https://github.com/Kbediako/CO/pull/456`).
-- [ ] Latest `origin/main` merged into the branch before review-state transition. Evidence: pending.
-- [ ] PR checks green and `pr ready-review` drain clean before review-state transition. Evidence: pending.
-- [ ] Unresolved actionable review threads: `0` or explicit pushback recorded. Evidence: pending.
-- [ ] Issue moved to `In Review`. Evidence: pending.
+- [x] Latest `origin/main` merged into the branch before review-state transition. Evidence: CO-536 terminal packet classification verified the already-merged PR #456 and live Linear `CO-163` `Done` state on current `origin/main`.
+- [x] PR checks green and `pr ready-review` drain clean before review-state transition. Evidence: PR #456 is merged at `8599c8bd28c29e324a354d3c431826edd459b59e`; CO-536 does not reopen implementation work.
+- [x] Unresolved actionable review threads: `0` or explicit pushback recorded. Evidence: historical implementation PR #456 is merged; CO-536 owns only metadata classification.
+- [x] Issue moved to `In Review`. Evidence: live Linear `CO-163` is already `Done` / completed.
 
 ## Progress Log
 - 2026-04-12: Issue moved to `In Progress`, same-turn parallelization decision recorded as serial due to overlapping supervision/ownership/polling scope, and branch `linear/co-163-harden-supervise-restart-orphan-burn` created from `main`.
@@ -59,6 +68,7 @@
 - 2026-04-13: A final current-head Codex review thread found one last supervision cleanup race: after timeout, the code could still call `SIGKILL` even if the tracked process group had already disappeared between identity verification and the kill step. The fix now re-enumerates the tracked group immediately before force cleanup, skips the kill when the group is already gone, adds a focused `ControlHostSupervision.test.ts` regression for that path, reruns the full validation floor (`3659` tests), and records a third bounded standalone-review wrapper failure before closing with a no-new-findings manual fallback plus elegance pass.
 - 2026-04-13: The subsequent current-head Codex rereview found one final fail-closed gap in that follow-up: the new pre-kill re-enumeration checks still mapped `listProcessGroupPids` probe errors to `[]`, which could incorrectly report `exited_after_kickstart` when `ps` failed. The lane removed those false-success fallbacks, added `fails closed when the tracked process-group recheck errors before force cleanup`, reran the full validation floor (`3660` tests), and recorded a fourth bounded standalone-review wrapper failure before closing with a no-new-findings manual fallback plus elegance pass.
 - 2026-04-13: The latest standalone-review wrapper rerun independently reproduced the macOS `ps -o args=` path-with-spaces behavior for `cliEntrypoint`, which exposed that the new token parser would stop matching legitimate supervised hosts in that environment before the wrapper again hit the bounded `command-intent` review boundary. The final diff restored `command.includes(config.cliEntrypoint)` compatibility while keeping exact task/run/pipeline matching, added the focused supervision compatibility regression plus the final provider-handoff refresh regression, reran the full validation floor (`3663` tests), and closed with a fifth bounded wrapper failure followed by a no-new-findings manual fallback plus elegance pass.
+- 2026-05-13: CO-536 terminal packet classification verified live Linear `CO-163` as `Done` / completed and PR #456 as merged, so the packet no longer presents pending handoff rows while its registry entries are archived as completed-lane historical metadata.
 
 ## Relevant Files
 - `orchestrator/src/cli/controlHostSupervisionCliShell.ts`

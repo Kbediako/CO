@@ -1,12 +1,21 @@
 ---
 id: 20260112-0944-delegation-mcp-framing-compat-fix
 title: Delegation MCP Framing Compatibility Fix
+status: completed
 relates_to: tasks/tasks-0944-delegation-mcp-framing-compat-fix.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-04-13
+last_review: 2026-05-14
+review_notes:
+  - 2026-05-14: CO-530 current-head root-cause reclassification verified this January delegation release packet is completed from checked tag/publish evidence and archived it out of active docs freshness lifecycle debt; no implementation scope reopened.
 ---
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| docs freshness | Completed release task spec remained active in freshness/spec guard metadata after release closeout | remove fallback | CO-530 | May 14 current-head reclassification of recurring January release packet freshness debt | 2026-01-12 | N/A after removal | N/A after removal | Spec frontmatter is terminal and registry row is archived as historical metadata | `node scripts/spec-guard.mjs`; `npm run docs:freshness -- --warn`; `node scripts/docs-freshness-maintain.mjs --check --format json --warn` |
+
 
 ## Summary
 - Objective: Ensure delegation MCP responds with JSONL when the Codex MCP client sends JSONL over stdio.

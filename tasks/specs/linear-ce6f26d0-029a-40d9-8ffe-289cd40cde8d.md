@@ -1,10 +1,10 @@
 ---
 id: 20260409-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d
 title: CO: Add run memory controller with role-specific retrieval profiles
-status: in_progress
+status: completed
 owner: Codex
 created: 2026-04-09
-last_review: 2026-04-13
+last_review: 2026-05-14
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md
@@ -22,7 +22,14 @@ review_notes:
   - 2026-04-09: The unrelated repo-wide test-lane blocker is now tracked separately as `CO-132` / `87d23327-3ee6-429c-a25f-8bd9c84cde58`, and `CO-94` moved from `In Progress` to `Blocked` pending that follow-up or an explicit validation waiver.
   - 2026-04-13 UTC: Resumed after the team moved `CO-94` back to `Ready`; rechecked live workflow states, moved the issue to `In Progress`, recorded the required `stay_serial` / `overlapping_scope` parallelization decision, committed the existing controller patch as `6d21d49de`, and merged current `origin/main` so validation can run against the current base instead of the older repo-wide blocker snapshot.
   - 2026-04-13 UTC: Manifest-backed standalone review executed with `FORCE_CODEX_REVIEW=1` against `.runs/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d/cli/2026-04-13T21-16-33-613Z-65c7afb2/manifest.json` and truthfully stopped at `review_outcome: failed-boundary` / `termination_boundary.kind: command-intent` from a validation-suite command attempt. Manual fallback review then found and fixed one provenance bug: prompt-pack `experience_index` now preserves the original manifest `prompt_packs[].experiences` index instead of the filtered candidate index. Focused controller/consumer tests reran green (`7` files / `198` tests), the full validation floor reran green (`npm run test`: `337` files / `3757` tests), and the elegance pass kept the additive controller seam with no extra abstraction.
+  - 2026-05-14: CO-530 current-head root-cause reclassification verified live Linear CO-94 remains Done/completed and archived this historical packet out of active docs freshness lifecycle debt; no implementation scope reopened.
 ---
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| docs freshness | Completed Linear task spec remained active in freshness/spec guard metadata after issue closeout | remove fallback | CO-530 | May 14 current-head reclassification of recurring historical packet freshness debt for CO-94 | 2026-04-09 | N/A after removal | N/A after removal | Spec frontmatter is terminal and registry row is archived as historical metadata | `node scripts/spec-guard.mjs`; `npm run docs:freshness -- --warn`; `node scripts/docs-freshness-maintain.mjs --check --format json --warn` |
+
 
 # Technical Specification
 
