@@ -496,12 +496,8 @@ describe('ControlRuntime', () => {
       freshness_decision: 'clean',
       source_path: currentReport
     });
-    expect(gate?.report_candidates).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ path: unrelatedReport }),
-        expect.objectContaining({ path: completedReport })
-      ])
-    );
+    expect(gate?.report_candidates).not.toEqual(expect.arrayContaining([expect.objectContaining({ path: unrelatedReport })]));
+    expect(gate?.report_candidates).not.toEqual(expect.arrayContaining([expect.objectContaining({ path: completedReport })]));
   });
 
   it('reads max concurrent agents from control feature toggles into the compatibility projection', async () => {

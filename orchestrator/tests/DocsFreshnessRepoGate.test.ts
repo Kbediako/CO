@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -413,7 +413,7 @@ async function writeReport(
     owner_action?: string;
   }
 ): Promise<void> {
-  await mkdir(reportPath.split('/').slice(0, -1).join('/'), { recursive: true });
+  await mkdir(dirname(reportPath), { recursive: true });
   await writeFile(
     reportPath,
     JSON.stringify(
