@@ -78,12 +78,16 @@
 ## Fallback / Refactor Decision
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? Yes.
 - Large-refactor check: the issue explicitly requires a root lifecycle refactor. A minor cap/window/date patch is rejected because authority is split across terminal state, active registry rows, scheduled warning artifacts, and status/provider gate reporting.
+- Rework closeout decision: `scripts/done-closeout-provenance-check.mjs` is a terminal closeout provenance guard, not a retained fallback. The May 14 rework hardens the existing guard so live provider-worker issue authority cannot be half-specified, hidden in manifest-only classifications, or suppressed by partial identity overlap.
+- Large-refactor decision: the original CO-525 lifecycle refactor remains the chosen root fix; this rework adds a fail-closed terminal metadata guard so the refactor cannot regress at Done closeout.
+- Minor-seam decision: rejected for this rework. A new waiver, rolling freshness exception, or title-only matcher would preserve the terminal active-row seam; the accepted guard must fail closed on live UUID evidence and preserve historical manifest evidence.
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Docs truthfulness schedule | Warn/report-only maintenance as sufficient closure | remove fallback | CO-525 | Scheduled maintenance reports stale debt but opens no action path | 2026-05-13 | 2026-05-13 | immediate removal in this lane | Forecast output either opens/updates a self-heal PR path or exactly one owner/workpad path | Scheduled/action tests and dry-run artifacts |
 | Terminal task packets | Terminal packets remain ordinary `active` registry rows | remove fallback | CO-525 | Task/Linear terminal state exists while packet rows age as active stale debt | 2026-05-13 | 2026-05-13 | immediate removal in this lane | Lifecycle classifier emits archive/reclassify/review state for every packet surface | Focused terminal lifecycle tests |
 | Public/current docs | Public/current stale rows discovered only at validation time | remove fallback | CO-525 | Strict docs near expiry without pre-expiry action routing | 2026-05-13 | 2026-05-13 | immediate removal in this lane | Pre-expiry direct action routing and no rolling eligibility | Public/shipped docs freshness tests |
+| Done closeout provenance | Terminal task-index rows can remain nonterminal after Linear Done because live issue authority is absent, partial, or stale in manifests | remove fallback | CO-525 | Rework found PR #799 merged while CO-525 task metadata stayed `in_progress`/`active` | 2026-05-14 | 2026-05-14 | immediate removal in this lane | Provider-worker closeout passes both live issue identifiers, rejects manifest `task_index_only`, and keeps partial-overlap live authority so nonterminal rows fail closed | `tests/done-closeout-provenance-check.spec.ts`, standalone review, Core Lane |
 
 ## Open Questions
 - Whether GitHub PR creation for scheduled self-heal should be fully automatic in this lane or exposed as deterministic dry-run plus workflow PR creation using existing repo credentials.
