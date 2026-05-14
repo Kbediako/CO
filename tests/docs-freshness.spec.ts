@@ -784,6 +784,85 @@ describe('docs freshness reporting', () => {
     expect(report.totals.missing_on_disk).toBe(0);
   });
 
+  it('keeps archived terminal packet rows out of active docs freshness debt', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-archived-terminal-'));
+    createdDirs.push(repoRoot);
+    const taskKey = 'linear-archived-terminal';
+    const packetPaths = [
+      `.agent/task/${taskKey}.md`,
+      `docs/PRD-${taskKey}.md`,
+      `docs/TECH_SPEC-${taskKey}.md`,
+      `docs/ACTION_PLAN-${taskKey}.md`,
+      `tasks/specs/${taskKey}.md`,
+      `tasks/tasks-${taskKey}.md`
+    ];
+
+    await Promise.all([
+      mkdir(join(repoRoot, '.agent', 'task'), { recursive: true }),
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks', 'specs'), { recursive: true })
+    ]);
+    for (const packetPath of packetPaths) {
+      await writeFile(join(repoRoot, packetPath), '# Archived Terminal Packet\n', 'utf8');
+    }
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: `20260513-${taskKey}`,
+              status: 'completed',
+              completed_at: reviewDateDaysAgo(1),
+              relates_to: `tasks/tasks-${taskKey}.md`,
+              paths: {
+                agent_task: `.agent/task/${taskKey}.md`,
+                prd: `docs/PRD-${taskKey}.md`,
+                docs: `docs/TECH_SPEC-${taskKey}.md`,
+                action_plan: `docs/ACTION_PLAN-${taskKey}.md`,
+                spec: `tasks/specs/${taskKey}.md`,
+                task: `tasks/tasks-${taskKey}.md`
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: packetPaths.map((packetPath) => ({
+        path: packetPath,
+        owner: 'Codex',
+        status: 'archived',
+        lifecycle_state: 'archived',
+        last_review: reviewDateDaysAgo(45),
+        cadence_days: 30,
+        archived_at: reviewDateDaysAgo(1),
+        archive_reason: 'Fixture terminal packet retained as history.'
+      })),
+      catalogPatterns: [
+        { glob: '.agent/task/*.md', doc_class: 'task_mirror' },
+        { glob: 'docs/*.md', doc_class: 'task_packet' },
+        { glob: 'tasks/**/*.md', doc_class: 'task_packet' }
+      ],
+      catalogPolicies: {
+        rolling_freshness_cohorts: rollingFreshnessPolicy({ max_entries: 300 })
+      }
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(false);
+    expect(report.totals.stale_entries).toBe(0);
+    expect(report.totals.rolling_cohort_entries).toBe(0);
+    expect(report.totals.terminal_lifecycle_entries).toBe(0);
+  });
+
   it('routes slug-only docs packet rows when terminal task keys carry numeric prefixes', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-slug-only-terminal-lifecycle-'));
     createdDirs.push(repoRoot);

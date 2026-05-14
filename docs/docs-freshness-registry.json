@@ -3,6 +3,102 @@
   "generated_at": "2026-05-13",
   "entries": [
     {
+      "path": ".agent/task/linear-a5183441-3f28-4bf5-91e2-9c987b277924.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "a5183441-3f28-4bf5-91e2-9c987b277924",
+        "identifier": "CO-536",
+        "url": "https://linear.app/asabeko/issue/CO-536/co-classify-co-163-terminal-docs-packet-outside-co-530-lineage-cleanup"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
+    },
+    {
+      "path": "docs/PRD-linear-a5183441-3f28-4bf5-91e2-9c987b277924.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "a5183441-3f28-4bf5-91e2-9c987b277924",
+        "identifier": "CO-536",
+        "url": "https://linear.app/asabeko/issue/CO-536/co-classify-co-163-terminal-docs-packet-outside-co-530-lineage-cleanup"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-a5183441-3f28-4bf5-91e2-9c987b277924.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "a5183441-3f28-4bf5-91e2-9c987b277924",
+        "identifier": "CO-536",
+        "url": "https://linear.app/asabeko/issue/CO-536/co-classify-co-163-terminal-docs-packet-outside-co-530-lineage-cleanup"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-a5183441-3f28-4bf5-91e2-9c987b277924.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "a5183441-3f28-4bf5-91e2-9c987b277924",
+        "identifier": "CO-536",
+        "url": "https://linear.app/asabeko/issue/CO-536/co-classify-co-163-terminal-docs-packet-outside-co-530-lineage-cleanup"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
+    },
+    {
+      "path": "tasks/specs/linear-a5183441-3f28-4bf5-91e2-9c987b277924.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "a5183441-3f28-4bf5-91e2-9c987b277924",
+        "identifier": "CO-536",
+        "url": "https://linear.app/asabeko/issue/CO-536/co-classify-co-163-terminal-docs-packet-outside-co-530-lineage-cleanup"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
+    },
+    {
+      "path": "tasks/tasks-linear-a5183441-3f28-4bf5-91e2-9c987b277924.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-13",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "a5183441-3f28-4bf5-91e2-9c987b277924",
+        "identifier": "CO-536",
+        "url": "https://linear.app/asabeko/issue/CO-536/co-classify-co-163-terminal-docs-packet-outside-co-530-lineage-cleanup"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-13",
+      "next_review": "2026-06-12"
+    },
+    {
       "path": ".agent/task/linear-cb563473-9819-445d-9870-44b88c184c16.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -5527,7 +5623,12 @@
       "cadence_days": 30,
       "lifecycle_state": "archived",
       "archived_at": "2026-05-13",
-      "archive_reason": "CO-530 classified the Apr 9-12 legacy completed-lane docs freshness cohort out of active rolling debt; historical packet retained."
+      "archive_reason": "CO-536 classified the terminal CO-163 packet out of active docs freshness debt; historical packet retained.",
+      "source_issue": {
+        "id": "b84c9a78-b62f-48fa-b1c4-88f8222535da",
+        "identifier": "CO-163",
+        "url": "https://linear.app/asabeko/issue/CO-163/co-harden-control-host-supervise-restart-against-orphaned-duplicate"
+      }
     },
     {
       "path": ".agent/task/linear-b8a32c11-cfc6-4556-b783-f59b290fe67d.md",
@@ -11214,7 +11315,12 @@
       "cadence_days": 30,
       "lifecycle_state": "archived",
       "archived_at": "2026-05-13",
-      "archive_reason": "CO-530 classified the Apr 9-12 legacy completed-lane docs freshness cohort out of active rolling debt; historical packet retained."
+      "archive_reason": "CO-536 classified the terminal CO-163 packet out of active docs freshness debt; historical packet retained.",
+      "source_issue": {
+        "id": "b84c9a78-b62f-48fa-b1c4-88f8222535da",
+        "identifier": "CO-163",
+        "url": "https://linear.app/asabeko/issue/CO-163/co-harden-control-host-supervise-restart-against-orphaned-duplicate"
+      }
     },
     {
       "path": "docs/ACTION_PLAN-linear-b8a32c11-cfc6-4556-b783-f59b290fe67d.md",
@@ -19909,7 +20015,12 @@
       "cadence_days": 30,
       "lifecycle_state": "archived",
       "archived_at": "2026-05-13",
-      "archive_reason": "CO-530 classified the Apr 9-12 legacy completed-lane docs freshness cohort out of active rolling debt; historical packet retained."
+      "archive_reason": "CO-536 classified the terminal CO-163 packet out of active docs freshness debt; historical packet retained.",
+      "source_issue": {
+        "id": "b84c9a78-b62f-48fa-b1c4-88f8222535da",
+        "identifier": "CO-163",
+        "url": "https://linear.app/asabeko/issue/CO-163/co-harden-control-host-supervise-restart-against-orphaned-duplicate"
+      }
     },
     {
       "path": "docs/PRD-linear-b8a32c11-cfc6-4556-b783-f59b290fe67d.md",
@@ -25946,7 +26057,12 @@
       "cadence_days": 30,
       "lifecycle_state": "archived",
       "archived_at": "2026-05-13",
-      "archive_reason": "CO-530 classified the Apr 9-12 legacy completed-lane docs freshness cohort out of active rolling debt; historical packet retained."
+      "archive_reason": "CO-536 classified the terminal CO-163 packet out of active docs freshness debt; historical packet retained.",
+      "source_issue": {
+        "id": "b84c9a78-b62f-48fa-b1c4-88f8222535da",
+        "identifier": "CO-163",
+        "url": "https://linear.app/asabeko/issue/CO-163/co-harden-control-host-supervise-restart-against-orphaned-duplicate"
+      }
     },
     {
       "path": "docs/TECH_SPEC-linear-b8a32c11-cfc6-4556-b783-f59b290fe67d.md",
@@ -32375,7 +32491,12 @@
       "cadence_days": 30,
       "lifecycle_state": "archived",
       "archived_at": "2026-05-13",
-      "archive_reason": "CO-530 classified the Apr 9-12 legacy completed-lane docs freshness cohort out of active rolling debt; historical packet retained."
+      "archive_reason": "CO-536 classified the terminal CO-163 packet out of active docs freshness debt; historical packet retained.",
+      "source_issue": {
+        "id": "b84c9a78-b62f-48fa-b1c4-88f8222535da",
+        "identifier": "CO-163",
+        "url": "https://linear.app/asabeko/issue/CO-163/co-harden-control-host-supervise-restart-against-orphaned-duplicate"
+      }
     },
     {
       "path": "tasks/specs/linear-b8a32c11-cfc6-4556-b783-f59b290fe67d.md",
@@ -38419,7 +38540,12 @@
       "cadence_days": 30,
       "lifecycle_state": "archived",
       "archived_at": "2026-05-13",
-      "archive_reason": "CO-530 classified the Apr 9-12 legacy completed-lane docs freshness cohort out of active rolling debt; historical packet retained."
+      "archive_reason": "CO-536 classified the terminal CO-163 packet out of active docs freshness debt; historical packet retained.",
+      "source_issue": {
+        "id": "b84c9a78-b62f-48fa-b1c4-88f8222535da",
+        "identifier": "CO-163",
+        "url": "https://linear.app/asabeko/issue/CO-163/co-harden-control-host-supervise-restart-against-orphaned-duplicate"
+      }
     },
     {
       "path": "tasks/tasks-linear-b8a32c11-cfc6-4556-b783-f59b290fe67d.md",

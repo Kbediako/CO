@@ -1,6 +1,107 @@
 {
   "items": [
     {
+      "id": "20260513-linear-a5183441-3f28-4bf5-91e2-9c987b277924",
+      "title": "CO-536 classify CO-163 terminal docs packet outside CO-530 lineage cleanup",
+      "relates_to": "tasks/tasks-linear-a5183441-3f28-4bf5-91e2-9c987b277924.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-13",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:linear-packet:CO-163:last_review=2026-04-12",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-13",
+          "status": "already_in_progress",
+          "summary": "Live CO-536 issue-context read in this worker run; the issue was already In Progress with no attached PR and no existing workpad, so no state transition was required before implementation."
+        },
+        "parallelization": {
+          "reviewer": "linear parallelization helper",
+          "date": "2026-05-13",
+          "decision": "parallelize_now",
+          "reason": "independent_scope_available",
+          "summary": "Pre-turn matrix found an independent focused tests slice; parent owns docs packet and registry classification while same-issue child lane co163-freshness-test owns tests/docs-freshness*.spec.ts."
+        },
+        "terminal_evidence": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-13",
+          "status": "verified",
+          "summary": "Live Linear reports CO-163 Done/completed and GitHub PR #456 merged at 8599c8bd28c29e324a354d3c431826edd459b59e."
+        },
+        "implementation": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-13",
+          "status": "implemented",
+          "summary": "Archived the six CO-163 packet registry rows as historical metadata, updated CO-163 task metadata with CO-536 terminal classification evidence, and added the CO-536 docs packet."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-13",
+          "status": "succeeded",
+          "review_outcome": "bounded-success",
+          "review_verdict": "clean",
+          "telemetry": ".runs/linear-a5183441-3f28-4bf5-91e2-9c987b277924/cli/2026-05-13T23-29-47-923Z-60966e7b/review/telemetry.json",
+          "summary": "Manifest-backed standalone review completed under FORCE_CODEX_REVIEW=1; wrapper preserved a command-intent boundary on the first pass, retried in bounded read-only mode, and produced semantic review_verdict=clean."
+        },
+        "elegance_review": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-13",
+          "status": "clean",
+          "artifact": "out/linear-a5183441-3f28-4bf5-91e2-9c987b277924/manual/elegance-review.md",
+          "summary": "Manual minimality pass confirmed the diff is limited to CO-536 packet metadata, CO-163 historical classification, registry rows, and focused tests, with no cap/window/runtime or CO-530 lineage changes."
+        }
+      },
+      "validation": {
+        "status": "local_validation_clean_pending_current_head_pr_review",
+        "passed": [
+          "node scripts/spec-guard.mjs --dry-run",
+          "npm run docs:freshness",
+          "node scripts/docs-freshness-maintain.mjs --check --format json --warn",
+          "focused docs-freshness assertions",
+          "npm run docs:check",
+          "git diff --cached --check",
+          "node scripts/diff-budget.mjs --base origin/main with explicit CO-530/CO-536 metadata repair override",
+          "npm run build",
+          "npm run lint",
+          "npm run test: 360 files / 5596 tests passed"
+        ],
+        "pending": [
+          "PR #808 current-head checks green",
+          "current-head Codex review clean",
+          "CodeRabbit review after draft exit or explicit waiver",
+          "ready-review drain and Linear review handoff"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-a5183441-3f28-4bf5-91e2-9c987b277924.md",
+        "prd": "docs/PRD-linear-a5183441-3f28-4bf5-91e2-9c987b277924.md",
+        "docs": "docs/TECH_SPEC-linear-a5183441-3f28-4bf5-91e2-9c987b277924.md",
+        "action_plan": "docs/ACTION_PLAN-linear-a5183441-3f28-4bf5-91e2-9c987b277924.md",
+        "spec": "tasks/specs/linear-a5183441-3f28-4bf5-91e2-9c987b277924.md",
+        "task": "tasks/tasks-linear-a5183441-3f28-4bf5-91e2-9c987b277924.md"
+      },
+      "source_issue": {
+        "id": "a5183441-3f28-4bf5-91e2-9c987b277924",
+        "identifier": "CO-536",
+        "url": "https://linear.app/asabeko/issue/CO-536/co-classify-co-163-terminal-docs-packet-outside-co-530-lineage-cleanup"
+      },
+      "related_issues": [
+        {
+          "id": "b84c9a78-b62f-48fa-b1c4-88f8222535da",
+          "identifier": "CO-163",
+          "url": "https://linear.app/asabeko/issue/CO-163/co-harden-control-host-supervise-restart-against-orphaned-duplicate"
+        },
+        {
+          "id": "cb563473-9819-445d-9870-44b88c184c16",
+          "identifier": "CO-530",
+          "url": "https://linear.app/asabeko/issue/CO-530/co-reclassify-apr-9-12-legacy-docs-freshness-cohorts-out-of-active"
+        }
+      ]
+    },
+    {
       "id": "20260513-linear-cb563473-9819-445d-9870-44b88c184c16",
       "title": "CO-530 Apr 9-12 legacy docs freshness cohort reclassification",
       "relates_to": "tasks/tasks-linear-cb563473-9819-445d-9870-44b88c184c16.md",
@@ -40,8 +141,8 @@
         "implementation": {
           "reviewer": "CO provider worker",
           "date": "2026-05-13",
-          "status": "implemented",
-          "summary": "Reclassified exactly 440 Apr 9-12 legacy completed-lane Task Packet, Task Mirror, and Report Only registry rows as archived historical metadata; marked task lineages 1076-1137 completed from existing closeout/spec evidence; added focused archived legacy task-packet regression coverage."
+          "status": "implemented_after_co536_scope_split",
+          "summary": "CO-530 now owns the 434 Apr 9-12 task-lineage rows under 1076-1137; linked CO-536 owns the adjacent six CO-163 terminal packet rows so the review boundary is explicit."
         },
         "co532_current_doc_dependency": {
           "reviewer": "Linear CO-532 issue-context and PR parent review",
@@ -79,30 +180,28 @@
           "reviewer": "CO provider worker",
           "date": "2026-05-13",
           "status": "complete",
-          "summary": "Bounded-diff pass kept the fix to the CO-530 docs packet, exact 440-row registry reclassification, CO-163 terminal-metadata alignment, CO-532 current-doc preservation, and focused docs-freshness regression coverage; no broader classifier refactor was introduced."
+          "summary": "Bounded-diff pass kept CO-530 scoped to 434 Apr 9-12 task-lineage rows, preserved CO-532 current-doc ownership, and links the adjacent six CO-163 terminal packet rows to CO-536 instead of absorbing them into CO-530."
         }
       },
       "validation": {
-        "status": "ready_for_pr_handoff_after_co532_rebase",
+        "status": "local_validation_clean_pending_current_head_pr_review",
         "passed": [
+          "node scripts/delegation-guard.mjs --task linear-cb563473-9819-445d-9870-44b88c184c16",
           "node scripts/spec-guard.mjs --dry-run",
           "npm run build",
           "npm run lint",
-          "npm run test",
+          "npm run test: 360 files / 5596 tests passed",
           "npm run docs:check",
-          "npm run docs:freshness after CO-532 rebase: docs:freshness OK - 5363 docs, 5366 registry entries",
-          "docs:freshness:maintain after CO-532 rebase: freshness_decision=clean, policy_capacity_status.status=no_candidates, current_entries=0, current_cohorts=0, blocking_changed_paths=[]",
-          "npm run repo:stewardship",
-          "node scripts/diff-budget.mjs (with explicit CO-530 metadata repair override)",
-          "git diff --check",
-          "node scripts/delegation-guard.mjs",
-          "manifest-backed standalone review with review_verdict=clean",
-          "explicit elegance/minimality pass",
-          "PR #808 opened on branch linear/co-530-reclassify-legacy-docs-freshness-cohorts after the CO-532 rebase"
+          "npm run docs:freshness after CO-536 split: docs:freshness OK - 5369 docs, 5372 registry entries",
+          "docs:freshness:maintain after CO-536 split: freshness_decision=clean, policy_capacity_status.status=no_candidates, current_entries=0, current_cohorts=0, blocking_changed_paths=[]",
+          "git diff --cached --check",
+          "node scripts/diff-budget.mjs --base origin/main with explicit CO-530/CO-536 metadata repair override"
         ],
         "pending": [
-          "PR #808 checks green on the current head",
-          "ready-review drain clean and Linear review handoff"
+          "PR #808 current-head checks green",
+          "current-head Codex review clean",
+          "CodeRabbit review after draft exit or explicit waiver",
+          "ready-review drain and Linear review handoff"
         ]
       },
       "paths": {
@@ -117,7 +216,19 @@
         "id": "cb563473-9819-445d-9870-44b88c184c16",
         "identifier": "CO-530",
         "url": "https://linear.app/asabeko/issue/CO-530/co-reclassify-apr-9-12-legacy-docs-freshness-cohorts-out-of-active"
-      }
+      },
+      "related_issues": [
+        {
+          "id": "a5183441-3f28-4bf5-91e2-9c987b277924",
+          "identifier": "CO-536",
+          "url": "https://linear.app/asabeko/issue/CO-536/co-classify-co-163-terminal-docs-packet-outside-co-530-lineage-cleanup"
+        },
+        {
+          "id": "b84c9a78-b62f-48fa-b1c4-88f8222535da",
+          "identifier": "CO-163",
+          "url": "https://linear.app/asabeko/issue/CO-163/co-harden-control-host-supervise-restart-against-orphaned-duplicate"
+        }
+      ]
     },
     {
       "id": "20260513-linear-f79825fb-1b0a-46a9-89ec-77738e8ae4c8",
@@ -8808,8 +8919,8 @@
         "url": "https://linear.app/asabeko/issue/CO-163/co-harden-control-host-supervise-restart-against-orphaned-duplicate"
       },
       "completion_classification": {
-        "source": "CO-530 Apr 9-12 legacy docs freshness cohort cleanup",
-        "evidence": "Live Linear issue-context verified CO-163 is Done/completed on 2026-05-13T19:59Z."
+        "source": "CO-536 terminal docs packet classification",
+        "evidence": "Live Linear issue-context verified CO-163 is Done/completed and PR #456 is merged at 8599c8bd28c29e324a354d3c431826edd459b59e."
       }
     },
     {

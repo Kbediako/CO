@@ -595,6 +595,107 @@ describe('docs freshness maintenance decisions', () => {
     ]);
   });
 
+  it('routes the CO-163 terminal packet to lifecycle action instead of owned rolling debt', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-co-163-terminal-'));
+    createdDirs.push(repoRoot);
+    const issueId = 'b84c9a78-b62f-48fa-b1c4-88f8222535da';
+    const taskKey = `linear-${issueId}`;
+    const taskId = `20260412-${taskKey}`;
+    const lastReview = reviewDateDaysAgo(31);
+    const packetPaths = [
+      `.agent/task/${taskKey}.md`,
+      `docs/ACTION_PLAN-${taskKey}.md`,
+      `docs/PRD-${taskKey}.md`,
+      `docs/TECH_SPEC-${taskKey}.md`,
+      `tasks/specs/${taskKey}.md`,
+      `tasks/tasks-${taskKey}.md`
+    ];
+
+    await writeFixture(repoRoot, {
+      entries: packetPaths.map((path) => ({ path, lastReview })),
+      policy: rollingFreshnessPolicy({
+        owner_issue: 'CO-536',
+        baseline_cohorts: [
+          {
+            id: 'co-163-terminal-packet-active-rows',
+            last_review: lastReview,
+            cadence_days: 30,
+            path_families: [
+              '.agent/task',
+              'docs/ACTION_PLAN-*',
+              'docs/PRD-*',
+              'docs/TECH_SPEC-*',
+              'tasks/specs',
+              'tasks/tasks-*'
+            ]
+          }
+        ]
+      }),
+      catalogPatterns: [
+        { glob: '.agent/task/*.md', doc_class: 'task_mirror' },
+        { glob: 'docs/ACTION_PLAN-*.md', doc_class: 'task_packet' },
+        { glob: 'docs/PRD-*.md', doc_class: 'task_packet' },
+        { glob: 'docs/TECH_SPEC-*.md', doc_class: 'task_packet' },
+        { glob: 'tasks/specs/*.md', doc_class: 'task_packet' },
+        { glob: 'tasks/tasks-*.md', doc_class: 'task_packet' }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: taskId,
+              title: 'CO: harden control-host supervise restart against orphaned duplicate host burn',
+              status: 'done',
+              completed_at: `${reviewDateDaysAgo(1)}T06:59:43.056Z`,
+              relates_to: `tasks/tasks-${taskKey}.md`,
+              paths: {
+                spec: `tasks/specs/${taskKey}.md`,
+                task: `tasks/tasks-${taskKey}.md`,
+                agent_task: `.agent/task/${taskKey}.md`,
+                prd: `docs/PRD-${taskKey}.md`,
+                action_plan: `docs/ACTION_PLAN-${taskKey}.md`,
+                docs: `docs/TECH_SPEC-${taskKey}.md`
+              },
+              source_issue: {
+                id: issueId,
+                identifier: 'CO-163'
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const { decision, shouldBlock } = await runMaintain(repoRoot);
+
+    expect(shouldBlock).toBe(true);
+    expect(decision.freshness_decision).toBe('block_terminal_lifecycle');
+    expect(decision.totals.rolling_cohort_entries).toBe(0);
+    expect(decision.totals.owned_rolling_entries).toBe(0);
+    expect(decision.totals.terminal_lifecycle_entries).toBe(packetPaths.length);
+    expect(decision.candidate_cohorts).toEqual([]);
+    expect(decision.lifecycle_actions).toEqual(
+      expect.arrayContaining(
+        packetPaths.map((path) =>
+          expect.objectContaining({
+            path,
+            task_key: taskKey,
+            task_status: 'done',
+            source_issue: expect.objectContaining({ identifier: 'CO-163' })
+          })
+        )
+      )
+    );
+    expect(decision.sample_paths.terminal_lifecycle_paths).toHaveLength(packetPaths.length);
+    expect(decision.sample_paths.terminal_lifecycle_paths).toEqual(expect.arrayContaining(packetPaths));
+  });
+
   it('blocks owned rolling debt when the diff base is unavailable', () => {
     const policy = rollingFreshnessPolicy();
     const baseline = policy.baseline_cohorts[0];
