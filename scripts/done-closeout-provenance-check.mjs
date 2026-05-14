@@ -102,6 +102,10 @@ function lineContainsToken(line, token) {
   return new RegExp(`(^|[^A-Za-z0-9])${escapeRegExp(normalizedToken)}([^A-Za-z0-9]|$)`).test(line);
 }
 
+function lineContainsTokenCaseInsensitive(line, token) {
+  return lineContainsToken(normalizeLine(line).toLowerCase(), normalizeLine(token).toLowerCase());
+}
+
 function taskSnapshotIdentitySegment(line) {
   const updateMarker = ' - Update ';
   const markerIndex = line.indexOf(updateMarker);
@@ -475,14 +479,28 @@ async function loadOptionalTaskIndexRows(repoRoot, report) {
 
 function taskIndexRowMatchesIssue(task, issueSummary) {
   const sourceIssue = task?.source_issue;
-  if (!sourceIssue || typeof sourceIssue !== 'object') {
-    return false;
-  }
   const linearId = normalizeLine(issueSummary.linear_id);
   const identifier = normalizeLine(issueSummary.identifier);
-  return (
-    (linearId && normalizeLine(sourceIssue.id) === linearId) ||
-    (identifier && normalizeLine(sourceIssue.identifier) === identifier)
+  if (sourceIssue && typeof sourceIssue === 'object') {
+    return (
+      (linearId && normalizeLine(sourceIssue.id) === linearId) ||
+      (identifier && normalizeLine(sourceIssue.identifier) === identifier)
+    );
+  }
+
+  const taskId = normalizeLine(task?.id);
+  const relatesTo = normalizeLine(task?.relates_to);
+  const title = normalizeLine(task?.title);
+  const lowerLinearId = linearId.toLowerCase();
+  if (
+    lowerLinearId &&
+    [taskId, relatesTo].some((value) => normalizeLine(value).toLowerCase().includes(lowerLinearId))
+  ) {
+    return true;
+  }
+  return Boolean(
+    identifier &&
+      [taskId, relatesTo, title].some((value) => lineContainsTokenCaseInsensitive(value, identifier))
   );
 }
 

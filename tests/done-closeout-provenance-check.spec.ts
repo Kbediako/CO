@@ -156,6 +156,57 @@ describe('done closeout provenance check', () => {
     ]);
   });
 
+  it('matches legacy tasks/index rows without source_issue metadata', async () => {
+    const repoRoot = await makeRepo();
+    await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
+    await writeManifest(repoRoot, [staleIssue({ identifier: 'CO-525', linear_id: 'linear-legacy' })]);
+    await writeTaskIndex(repoRoot, [
+      {
+        id: '20260514-linear-legacy',
+        title: 'CO-525 legacy row',
+        status: 'in_progress',
+        relates_to: 'tasks/tasks-linear-legacy.md'
+      }
+    ]);
+
+    const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'done_issue_nonterminal_task_index_row',
+          task_id: '20260514-linear-legacy'
+        })
+      ])
+    );
+  });
+
+  it('does not match near issue identifiers in legacy tasks/index titles', async () => {
+    const repoRoot = await makeRepo();
+    await writeMirror(repoRoot, 'tasks/tasks-linear-id.md', '# Task\n\n- [x] PR attached.\n');
+    await writeManifest(repoRoot, [staleIssue({ identifier: 'CO-43', linear_id: 'linear-43' })]);
+    await writeTaskIndex(repoRoot, [
+      {
+        id: '20260514-linear-other',
+        title: 'CO-430 unrelated row',
+        status: 'in_progress',
+        relates_to: 'tasks/tasks-linear-other.md'
+      }
+    ]);
+
+    const { report, hasFailures } = await runDoneCloseoutProvenanceCheck(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(false);
+    expect(report.totals.task_index_nonterminal_rows).toBe(0);
+  });
+
   it('fails when tasks/index.json is present without an items array', async () => {
     const repoRoot = await makeRepo();
     await mkdir(join(repoRoot, 'tasks'), { recursive: true });
