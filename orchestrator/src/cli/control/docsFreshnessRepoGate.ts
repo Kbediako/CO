@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import { sanitizeTaskId } from '../../persistence/sanitizeTaskId.js';
+
 const DEFAULT_REPORT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const REPORT_FILENAME = 'docs-freshness-maintenance.json';
 const SCHEDULED_REPORT_DIR = 'docs-truthfulness-maintenance';
@@ -242,12 +244,22 @@ function resolveCandidateReportPaths(options: {
     env.TASK
   ]
     .map((value) => (typeof value === 'string' ? value.trim() : ''))
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((taskId) => safeSanitizeTaskId(taskId))
+    .filter((taskId): taskId is string => taskId !== null);
   return uniqueStrings([
     join(options.outRoot, SCHEDULED_REPORT_DIR, REPORT_FILENAME),
     join(options.outRoot, LOCAL_REPORT_DIR, REPORT_FILENAME),
     ...taskIds.map((taskId) => join(options.outRoot, taskId, REPORT_FILENAME))
   ]);
+}
+
+function safeSanitizeTaskId(taskId: string): string | null {
+  try {
+    return sanitizeTaskId(taskId);
+  } catch {
+    return null;
+  }
 }
 
 function uniqueStrings(values: Array<string | null | undefined>): string[] {

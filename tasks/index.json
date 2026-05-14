@@ -34,6 +34,7 @@
           "root-cause reproduction",
           "repo-gate reader implementation",
           "focused tests",
+          "delegation guard",
           "spec-guard",
           "build",
           "lint",
@@ -46,6 +47,7 @@
           "manual repo-gate proof",
           "pack:smoke",
           "read-only subagent review rework",
+          "current-head Codex PR review rework",
           "standalone review",
           "elegance review"
         ],

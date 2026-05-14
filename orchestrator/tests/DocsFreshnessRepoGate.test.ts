@@ -236,6 +236,39 @@ describe('readDocsFreshnessMaintainRepoGate', () => {
     );
   });
 
+  it('rejects invalid task ids before joining report paths', async () => {
+    const repoRoot = await mkTempRoot();
+    const outRoot = join(repoRoot, 'out');
+    const escapedReport = join(repoRoot, 'escaped-task', 'docs-freshness-maintenance.json');
+    await writeReport(escapedReport, {
+      generated_at: '2026-05-14T00:59:00.000Z',
+      severity: 'blocking',
+      freshness_decision: 'block_policy_over_budget',
+      action_required_count: 99
+    });
+
+    const gate = readDocsFreshnessMaintainRepoGate({
+      repoRoot,
+      env: {
+        CODEX_ORCHESTRATOR_ROOT: repoRoot,
+        CODEX_ORCHESTRATOR_OUT_DIR: outRoot,
+        TASK: '../escaped-task'
+      } as NodeJS.ProcessEnv,
+      taskIds: ['../escaped-task'],
+      now: '2026-05-14T01:00:00.000Z'
+    });
+
+    expect(gate).toMatchObject({
+      severity: 'degraded',
+      freshness_decision: 'report_missing',
+      evidence_status: 'missing'
+    });
+    expect(gate?.source_path).not.toBe(escapedReport);
+    expect(gate?.report_candidates).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: escapedReport })])
+    );
+  });
+
   it('emits degraded evidence when no candidate report exists', async () => {
     const repoRoot = await mkTempRoot();
 

@@ -500,6 +500,114 @@ describe('ControlRuntime', () => {
     expect(gate?.report_candidates).not.toEqual(expect.arrayContaining([expect.objectContaining({ path: completedReport })]));
   });
 
+  it('includes the selected run task id in docs freshness repo-gate discovery', async () => {
+    const selectedTaskId = 'selected-docs-gate';
+    const completedTaskId = 'completed-docs-gate';
+    const providerIntakeState = createProviderIntakeState([
+      {
+        provider: 'linear',
+        provider_key: 'linear:CO-534',
+        issue_id: 'issue-completed',
+        issue_identifier: 'CO-534',
+        issue_title: 'Completed docs gate issue',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-05-14T00:59:00.000Z',
+        task_id: completedTaskId,
+        mapping_source: 'provider_id_fallback',
+        state: 'completed',
+        reason: 'provider_issue_terminal',
+        accepted_at: '2026-05-14T00:40:00.000Z',
+        updated_at: '2026-05-14T00:59:00.000Z',
+        last_delivery_id: 'delivery-completed',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_778_700_001_000,
+        run_id: 'run-completed',
+        run_manifest_path: null,
+        launch_source: 'control-host',
+        launch_token: 'completed-launch'
+      }
+    ]);
+    const fixture = await createFixture({
+      taskId: selectedTaskId,
+      providerIntakeState,
+      env: (root) =>
+        ({
+          CODEX_ORCHESTRATOR_ROOT: root,
+          CODEX_ORCHESTRATOR_OUT_DIR: join(root, 'out')
+        }) as NodeJS.ProcessEnv
+    });
+    const selectedReport = join(fixture.root, 'out', selectedTaskId, 'docs-freshness-maintenance.json');
+    const completedReport = join(fixture.root, 'out', completedTaskId, 'docs-freshness-maintenance.json');
+    await writeDocsFreshnessMaintenanceReport(selectedReport, {
+      generatedAt: '2026-05-14T00:30:00.000Z',
+      severity: 'blocking',
+      freshnessDecision: 'block_policy_over_budget',
+      actionRequiredCount: 7
+    });
+    await writeDocsFreshnessMaintenanceReport(completedReport, {
+      generatedAt: '2026-05-14T00:59:00.000Z',
+      severity: 'blocking',
+      freshnessDecision: 'block_policy_over_budget',
+      actionRequiredCount: 99
+    });
+
+    const selectedSnapshot = await fixture.runtime.snapshot().readSelectedRunSnapshot();
+    const gate = selectedSnapshot.repoGates?.docs_freshness_maintain;
+
+    expect(gate).toMatchObject({
+      severity: 'blocking',
+      freshness_decision: 'block_policy_over_budget',
+      action_required_count: 7,
+      source_path: selectedReport
+    });
+    expect(gate?.report_candidates).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: completedReport })])
+    );
+  });
+
+  it('refreshes docs freshness repo-gate evidence across cached selected-run reads', async () => {
+    const fixture = await createFixture({
+      env: (root) =>
+        ({
+          CODEX_ORCHESTRATOR_ROOT: root,
+          CODEX_ORCHESTRATOR_OUT_DIR: join(root, 'out')
+        }) as NodeJS.ProcessEnv
+    });
+    const localReport = join(fixture.root, 'out', 'local', 'docs-freshness-maintenance.json');
+    await writeDocsFreshnessMaintenanceReport(localReport, {
+      generatedAt: '2099-01-01T00:00:00.000Z',
+      severity: 'warning',
+      freshnessDecision: 'clean',
+      actionRequiredCount: 0
+    });
+    const snapshot = fixture.runtime.snapshot();
+
+    const initialSelectedRun = await snapshot.readSelectedRunSnapshot();
+    await seedManifest(fixture.paths, {
+      summary: 'selected summary should remain cached',
+      updated_at: '2026-03-07T00:12:00.000Z'
+    });
+    await writeDocsFreshnessMaintenanceReport(localReport, {
+      generatedAt: '2099-01-01T00:01:00.000Z',
+      severity: 'blocking',
+      freshnessDecision: 'block_policy_over_budget',
+      actionRequiredCount: 12
+    });
+
+    const repeatedSelectedRun = await snapshot.readSelectedRunSnapshot();
+
+    expect(initialSelectedRun.selected?.summary).toBe('initial summary');
+    expect(repeatedSelectedRun.selected?.summary).toBe('initial summary');
+    expect(repeatedSelectedRun.repoGates?.docs_freshness_maintain).toMatchObject({
+      severity: 'blocking',
+      freshness_decision: 'block_policy_over_budget',
+      action_required_count: 12,
+      source_path: localReport
+    });
+  });
+
   it('reads max concurrent agents from control feature toggles into the compatibility projection', async () => {
     const fixture = await createFixture({
       featureToggles: {

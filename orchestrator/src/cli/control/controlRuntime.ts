@@ -198,7 +198,7 @@ function createControlRuntimeSnapshot(
     const authorityContext = buildProviderIntakeAuthorityContext(context, providerIntakeAuthority);
     const authorityFingerprint = buildProviderIntakeAuthorityFingerprint(providerIntakeAuthority);
     if (selectedRunSnapshotPromise && selectedRunAuthorityFingerprint === authorityFingerprint) {
-      return selectedRunSnapshotPromise;
+      return refreshSelectedRunSnapshotRepoGates(await selectedRunSnapshotPromise, context, providerIntakeAuthority);
     }
     selectedRunSnapshotPromise = null;
     selectedRunAuthorityFingerprint = authorityFingerprint;
@@ -230,7 +230,6 @@ function createControlRuntimeSnapshot(
       const providerWorkflow = context.providerWorkflowConfigStore
         ? await refreshProviderWorkflowStatusPayload(context.providerWorkflowConfigStore)
         : null;
-      const docsFreshnessRepoGate = readRuntimeDocsFreshnessRepoGate(context, providerIntakeAuthority);
       return {
         selected,
         dispatchPilot: dispatchPilotSummary.configured ? dispatchPilotSummary : null,
@@ -239,11 +238,11 @@ function createControlRuntimeSnapshot(
         providerIntakeUnavailable: providerIntakeAuthority.unavailable,
         providerWorkflow,
         repoGates: {
-          docs_freshness_maintain: docsFreshnessRepoGate
+          docs_freshness_maintain: null
         }
       };
     })();
-    return selectedRunSnapshotPromise;
+    return refreshSelectedRunSnapshotRepoGates(await selectedRunSnapshotPromise, context, providerIntakeAuthority);
   }
 
   async function readCompatibilityRuntimeSnapshot(
@@ -252,7 +251,11 @@ function createControlRuntimeSnapshot(
     const authorityContext = buildProviderIntakeAuthorityContext(context, providerIntakeAuthority);
     const authorityFingerprint = buildProviderIntakeAuthorityFingerprint(providerIntakeAuthority);
     if (compatibilityRuntimeSnapshotPromise && compatibilityAuthorityFingerprint === authorityFingerprint) {
-      return compatibilityRuntimeSnapshotPromise;
+      return refreshCompatibilityRuntimeSnapshotRepoGates(
+        await compatibilityRuntimeSnapshotPromise,
+        context,
+        providerIntakeAuthority
+      );
     }
     compatibilityRuntimeSnapshotPromise = null;
     compatibilityAuthorityFingerprint = authorityFingerprint;
@@ -303,7 +306,6 @@ function createControlRuntimeSnapshot(
       const providerWorkflow = context.providerWorkflowConfigStore
         ? await refreshProviderWorkflowStatusPayload(context.providerWorkflowConfigStore)
         : null;
-      const docsFreshnessRepoGate = readRuntimeDocsFreshnessRepoGate(context, providerIntakeAuthority);
       const running = [
         ...(isAuthoritativeSelectedCurrentRunningSource(selected, authorityContext.providerIntakeState)
           ? [selected]
@@ -346,12 +348,16 @@ function createControlRuntimeSnapshot(
         providerIntakeAuthority,
         providerWorkflow,
         repoGates: {
-          docs_freshness_maintain: docsFreshnessRepoGate
+          docs_freshness_maintain: null
         },
         polling
       };
     })();
-    return compatibilityRuntimeSnapshotPromise;
+    return refreshCompatibilityRuntimeSnapshotRepoGates(
+      await compatibilityRuntimeSnapshotPromise,
+      context,
+      providerIntakeAuthority
+    );
   }
 
   async function readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot> {
@@ -375,7 +381,11 @@ function createControlRuntimeSnapshot(
       providerIntake: buildProviderIntakeSummary(providerIntakeAuthority.state),
       providerIntakeUnavailable: providerIntakeAuthority.unavailable,
       repoGates: {
-        docs_freshness_maintain: readRuntimeDocsFreshnessRepoGate(context, providerIntakeAuthority)
+        docs_freshness_maintain: readRuntimeDocsFreshnessRepoGate(
+          context,
+          providerIntakeAuthority,
+          collectCompatibilityRepoGateTaskIds(runtimeSnapshot)
+        )
       }
     };
   }
@@ -424,14 +434,73 @@ function createControlRuntimeSnapshot(
 
 function readRuntimeDocsFreshnessRepoGate(
   context: ControlRuntimeContext,
-  providerIntakeAuthority: ProviderIntakeAuthoritySnapshot
+  providerIntakeAuthority: ProviderIntakeAuthoritySnapshot,
+  extraTaskIds: Array<string | null | undefined> = []
 ): ReturnType<typeof readDocsFreshnessMaintainRepoGate> {
   const providerIntake = providerIntakeAuthority.state;
-  const taskIds = providerIntake?.claims
-    ?.filter(isActiveProviderIntakeClaim)
-    ?.map((claim) => claim.task_id)
-    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+  const taskIds = uniqueRuntimeTaskIds([
+    ...extraTaskIds,
+    ...(providerIntake?.claims
+      ?.filter(isActiveProviderIntakeClaim)
+      ?.map((claim) => claim.task_id) ?? [])
+  ]);
   return readDocsFreshnessMaintainRepoGate({ env: context.env, taskIds });
+}
+
+function refreshSelectedRunSnapshotRepoGates(
+  snapshot: ControlSelectedRunRuntimeSnapshot,
+  context: ControlRuntimeContext,
+  providerIntakeAuthority: ProviderIntakeAuthoritySnapshot
+): ControlSelectedRunRuntimeSnapshot {
+  return {
+    ...snapshot,
+    repoGates: {
+      ...snapshot.repoGates,
+      docs_freshness_maintain: readRuntimeDocsFreshnessRepoGate(
+        context,
+        providerIntakeAuthority,
+        [snapshot.selected?.taskId]
+      )
+    }
+  };
+}
+
+function refreshCompatibilityRuntimeSnapshotRepoGates(
+  snapshot: InternalControlCompatibilityRuntimeSnapshot,
+  context: ControlRuntimeContext,
+  providerIntakeAuthority: ProviderIntakeAuthoritySnapshot
+): InternalControlCompatibilityRuntimeSnapshot {
+  return {
+    ...snapshot,
+    repoGates: {
+      ...snapshot.repoGates,
+      docs_freshness_maintain: readRuntimeDocsFreshnessRepoGate(
+        context,
+        providerIntakeAuthority,
+        collectCompatibilityRepoGateTaskIds(snapshot)
+      )
+    }
+  };
+}
+
+function collectCompatibilityRepoGateTaskIds(
+  snapshot: Pick<InternalControlCompatibilityRuntimeSnapshot, 'selected' | 'running' | 'retrying'>
+): Array<string | null | undefined> {
+  return [
+    snapshot.selected?.taskId,
+    ...snapshot.running.map((entry) => entry.taskId),
+    ...snapshot.retrying.map((entry) => entry.taskId)
+  ];
+}
+
+function uniqueRuntimeTaskIds(values: Array<string | null | undefined>): string[] {
+  return [
+    ...new Set(
+      values
+        .map((value) => (typeof value === 'string' ? value.trim() : ''))
+        .filter((value) => value.length > 0 && value !== 'local-mcp')
+    )
+  ];
 }
 
 function buildProviderIntakeAuthorityContext(
