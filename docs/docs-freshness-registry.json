@@ -3783,6 +3783,22 @@
       "cadence_days": 365
     },
     {
+      "path": ".agent/task/linear-1e25073c-5587-4732-89ec-e27e5d167747.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-14",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "1e25073c-5587-4732-89ec-e27e5d167747",
+        "identifier": "CO-510",
+        "url": "https://linear.app/asabeko/issue/CO-510/co-recognize-common-clean-review-wording-in-semantic-telemetry"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-14",
+      "next_review": "2026-06-13"
+    },
+    {
       "path": ".agent/task/linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -9601,6 +9617,22 @@
       "status": "archived",
       "last_review": "2026-04-30",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-1e25073c-5587-4732-89ec-e27e5d167747.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-14",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "1e25073c-5587-4732-89ec-e27e5d167747",
+        "identifier": "CO-510",
+        "url": "https://linear.app/asabeko/issue/CO-510/co-recognize-common-clean-review-wording-in-semantic-telemetry"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-14",
+      "next_review": "2026-06-13"
     },
     {
       "path": "docs/ACTION_PLAN-linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514.md",
@@ -18540,6 +18572,22 @@
       "cadence_days": 365
     },
     {
+      "path": "docs/PRD-linear-1e25073c-5587-4732-89ec-e27e5d167747.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-14",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "1e25073c-5587-4732-89ec-e27e5d167747",
+        "identifier": "CO-510",
+        "url": "https://linear.app/asabeko/issue/CO-510/co-recognize-common-clean-review-wording-in-semantic-telemetry"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-14",
+      "next_review": "2026-06-13"
+    },
+    {
       "path": "docs/PRD-linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -24781,6 +24829,22 @@
       "status": "archived",
       "last_review": "2026-04-30",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-1e25073c-5587-4732-89ec-e27e5d167747.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-14",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "1e25073c-5587-4732-89ec-e27e5d167747",
+        "identifier": "CO-510",
+        "url": "https://linear.app/asabeko/issue/CO-510/co-recognize-common-clean-review-wording-in-semantic-telemetry"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-14",
+      "next_review": "2026-06-13"
     },
     {
       "path": "docs/TECH_SPEC-linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514.md",
@@ -31324,6 +31388,22 @@
       "cadence_days": 365
     },
     {
+      "path": "tasks/specs/linear-1e25073c-5587-4732-89ec-e27e5d167747.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-14",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "1e25073c-5587-4732-89ec-e27e5d167747",
+        "identifier": "CO-510",
+        "url": "https://linear.app/asabeko/issue/CO-510/co-recognize-common-clean-review-wording-in-semantic-telemetry"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-14",
+      "next_review": "2026-06-13"
+    },
+    {
       "path": "tasks/specs/linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -37530,6 +37610,22 @@
       "status": "archived",
       "last_review": "2026-04-30",
       "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-linear-1e25073c-5587-4732-89ec-e27e5d167747.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-14",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "1e25073c-5587-4732-89ec-e27e5d167747",
+        "identifier": "CO-510",
+        "url": "https://linear.app/asabeko/issue/CO-510/co-recognize-common-clean-review-wording-in-semantic-telemetry"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-14",
+      "next_review": "2026-06-13"
     },
     {
       "path": "tasks/tasks-linear-1ea6b7f9-ff6f-42b6-af83-a77dce870514.md",
