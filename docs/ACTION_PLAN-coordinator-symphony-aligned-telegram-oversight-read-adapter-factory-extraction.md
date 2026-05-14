@@ -1,9 +1,7 @@
 # ACTION_PLAN - Coordinator Symphony-Aligned Telegram Oversight Read Adapter Factory Extraction
 
-## Steps
+<!-- docs-archive:stub -->
+> Archived on 2026-05-14. Full content: https://github.com/Kbediako/CO/blob/doc-archives/docs/ACTION_PLAN-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction.md
 
-1. Register `1078` docs-first from the `1077` next-slice note and the Symphony thin-shell heuristic.
-2. Extract the remaining Telegram oversight read-adapter factory into one control-local helper.
-3. Keep `controlServer.ts` thin while preserving selected-run, dispatch, and question read behavior.
-4. Add focused regressions for the extracted helper seam.
-5. Run the lane validation bundle, sync mirrors, and queue the next bounded Symphony-aligned seam.
+- Archive branch: doc-archives
+- Archive path: docs/ACTION_PLAN-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction.md
