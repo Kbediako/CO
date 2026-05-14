@@ -18,6 +18,7 @@ import {
 } from './controlHostOwnership.js';
 import {
   buildProviderIntakeSummary,
+  isActiveProviderIntakeClaim,
   isRecordLike,
   type ProviderIntakeClaimRecord,
   type ProviderIntakeState
@@ -229,7 +230,7 @@ function createControlRuntimeSnapshot(
       const providerWorkflow = context.providerWorkflowConfigStore
         ? await refreshProviderWorkflowStatusPayload(context.providerWorkflowConfigStore)
         : null;
-      const docsFreshnessRepoGate = readRuntimeDocsFreshnessRepoGate(context);
+      const docsFreshnessRepoGate = readRuntimeDocsFreshnessRepoGate(context, providerIntakeAuthority);
       return {
         selected,
         dispatchPilot: dispatchPilotSummary.configured ? dispatchPilotSummary : null,
@@ -302,7 +303,7 @@ function createControlRuntimeSnapshot(
       const providerWorkflow = context.providerWorkflowConfigStore
         ? await refreshProviderWorkflowStatusPayload(context.providerWorkflowConfigStore)
         : null;
-      const docsFreshnessRepoGate = readRuntimeDocsFreshnessRepoGate(context);
+      const docsFreshnessRepoGate = readRuntimeDocsFreshnessRepoGate(context, providerIntakeAuthority);
       const running = [
         ...(isAuthoritativeSelectedCurrentRunningSource(selected, authorityContext.providerIntakeState)
           ? [selected]
@@ -374,7 +375,7 @@ function createControlRuntimeSnapshot(
       providerIntake: buildProviderIntakeSummary(providerIntakeAuthority.state),
       providerIntakeUnavailable: providerIntakeAuthority.unavailable,
       repoGates: {
-        docs_freshness_maintain: readRuntimeDocsFreshnessRepoGate(context)
+        docs_freshness_maintain: readRuntimeDocsFreshnessRepoGate(context, providerIntakeAuthority)
       }
     };
   }
@@ -422,9 +423,15 @@ function createControlRuntimeSnapshot(
 }
 
 function readRuntimeDocsFreshnessRepoGate(
-  context: ControlRuntimeContext
+  context: ControlRuntimeContext,
+  providerIntakeAuthority: ProviderIntakeAuthoritySnapshot
 ): ReturnType<typeof readDocsFreshnessMaintainRepoGate> {
-  return readDocsFreshnessMaintainRepoGate({ env: context.env });
+  const providerIntake = providerIntakeAuthority.state;
+  const taskIds = providerIntake?.claims
+    ?.filter(isActiveProviderIntakeClaim)
+    ?.map((claim) => claim.task_id)
+    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+  return readDocsFreshnessMaintainRepoGate({ env: context.env, taskIds });
 }
 
 function buildProviderIntakeAuthorityContext(

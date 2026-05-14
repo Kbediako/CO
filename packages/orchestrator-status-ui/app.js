@@ -898,6 +898,9 @@ function formatRepoGateSeverity(severity) {
 
 function summarizeDocsFreshnessGate(gate) {
   const parts = [];
+  if (gate.evidence_status && gate.evidence_status !== 'fresh') {
+    parts.push(gate.evidence_reason ? `${gate.evidence_status}: ${gate.evidence_reason}` : gate.evidence_status);
+  }
   if (gate.freshness_decision) {
     parts.push(gate.freshness_decision);
   }
@@ -914,10 +917,26 @@ function summarizeDocsFreshnessGate(gate) {
   if (gate.next_expiry) {
     parts.push(`next ${gate.next_expiry}`);
   }
+  if (gate.generated_at) {
+    parts.push(`generated ${formatTimestamp(gate.generated_at)}`);
+  }
+  if (gate.source_path) {
+    parts.push(`source ${formatRepoGateSource(gate.source_path)}`);
+  }
   if (gate.provider_wip_impact === 'excluded_repo_gate') {
     parts.push('not WIP');
   }
   return parts.join(' • ');
+}
+
+function formatRepoGateSource(sourcePath) {
+  const normalized = String(sourcePath || '').replace(/\\/g, '/');
+  if (!normalized) {
+    return 'unknown';
+  }
+  const marker = '/out/';
+  const markerIndex = normalized.lastIndexOf(marker);
+  return markerIndex >= 0 ? normalized.slice(markerIndex + 1) : normalized;
 }
 
 function setSyncStatus(message, syncing, error = false) {

@@ -37,6 +37,8 @@ Those report fields are not waivers. They are the repo-wide freshness debt ledge
 ## Maintenance Decision
 `npm run docs:freshness:maintain` is the provider-gate maintenance entrypoint. It runs `docs:freshness`, runs `spec-guard`, computes the current git diff, and writes `out/<task-id>/docs-freshness-maintenance.json`.
 
+`co-status` surfaces this maintenance decision through `repo_gates.docs_freshness_maintain`. The status reader checks an explicit report path when one is supplied; otherwise it searches scheduled output (`out/docs-truthfulness-maintenance/docs-freshness-maintenance.json`), local output (`out/local/docs-freshness-maintenance.json`), and task-scoped reports only for active task ids from the runtime environment or provider-intake claims. It does not scan arbitrary `out/*/docs-freshness-maintenance.json` reports, so unrelated historical task evidence cannot mask the current gate. It selects the freshest valid explicit candidate by `generated_at`, requires reports to be within `CODEX_DOCS_FRESHNESS_REPO_GATE_MAX_AGE_MS` (default 24 hours), and emits degraded `report_missing`, `report_stale`, or `report_invalid` evidence instead of treating absent/stale reports as clean.
+
 The maintenance report is the machine-readable decision future workers should cite instead of manually reclassifying date-boundary cohorts. It includes:
 
 - `freshness_decision`
