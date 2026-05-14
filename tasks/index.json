@@ -8738,6 +8738,17 @@
         "task": "tasks/tasks-linear-c5182c19-8470-4792-a573-e3873ab22b8f.md",
         "agent_task": ".agent/task/linear-c5182c19-8470-4792-a573-e3873ab22b8f.md",
         "docs": "docs/TECH_SPEC-linear-c5182c19-8470-4792-a573-e3873ab22b8f.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-04-13",
+      "source_issue": {
+        "id": "c5182c19-8470-4792-a573-e3873ab22b8f",
+        "identifier": "CO-169",
+        "url": "https://linear.app/asabeko/issue/CO-169/co-workflow-make-provider-worker-issue-worktree-root-authoritative-for"
+      },
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Live Linear issue-context verified CO-169 is Done/completed on 2026-05-14; registry rows are archived as historical packets rather than refreshed or deleted."
       }
     },
     {
@@ -8755,6 +8766,17 @@
         "task": "tasks/tasks-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md",
         "agent_task": ".agent/task/linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md",
         "docs": "docs/TECH_SPEC-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-04-13",
+      "source_issue": {
+        "id": "abca2add-198d-40a6-b1c0-35e49f4c78cd",
+        "identifier": "CO-164",
+        "url": "https://linear.app/asabeko/issue/CO-164/co-narrow-generic-control-host-forced-cleanup-to-avoid-detached"
+      },
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Live Linear issue-context verified CO-164 is Done/completed on 2026-05-14; registry rows are archived as historical packets rather than refreshed or deleted."
       }
     },
     {
@@ -8772,6 +8794,17 @@
         "task": "tasks/tasks-linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba.md",
         "agent_task": ".agent/task/linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba.md",
         "docs": "docs/TECH_SPEC-linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-04-13",
+      "source_issue": {
+        "id": "d26b2799-a4a1-41d0-87cb-ee64eabcdbba",
+        "identifier": "CO-161",
+        "url": "https://linear.app/asabeko/issue/CO-161/co-decouple-released-claim-deferred-poll-suppression-from-unrelated"
+      },
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Live Linear issue-context verified CO-161 is Done/completed on 2026-05-14; registry rows are archived as historical packets rather than refreshed or deleted."
       }
     },
     {
@@ -8805,6 +8838,17 @@
         "task": "tasks/tasks-linear-6ed6ef11-538e-48f0-936c-8547632bf92e.md",
         "agent_task": ".agent/task/linear-6ed6ef11-538e-48f0-936c-8547632bf92e.md",
         "docs": "docs/TECH_SPEC-linear-6ed6ef11-538e-48f0-936c-8547632bf92e.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-04-13",
+      "source_issue": {
+        "id": "6ed6ef11-538e-48f0-936c-8547632bf92e",
+        "identifier": "CO-131",
+        "url": "https://linear.app/asabeko/issue/CO-131/co-stabilize-timeout-sensitive-repo-validation-suites-blocking-handoff"
+      },
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Live Linear issue-context verified CO-131 is Done/completed on 2026-05-14; registry rows are archived as historical packets rather than refreshed or deleted."
       }
     },
     {
@@ -8829,6 +8873,17 @@
         "task": "tasks/tasks-linear-72e9f13e-0899-4769-9ca3-82586077fca9.md",
         "agent_task": ".agent/task/linear-72e9f13e-0899-4769-9ca3-82586077fca9.md",
         "docs": "docs/TECH_SPEC-linear-72e9f13e-0899-4769-9ca3-82586077fca9.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-04-13",
+      "source_issue": {
+        "id": "72e9f13e-0899-4769-9ca3-82586077fca9",
+        "identifier": "CO-167",
+        "url": "https://linear.app/asabeko/issue/CO-167/co-workflow-refresh-current-main-docsfreshness-stale-cohorts-1138-1163"
+      },
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Live Linear issue-context verified CO-167 is Done/completed on 2026-05-14; registry rows are archived as historical packets rather than refreshed or deleted."
       }
     },
     {
@@ -8861,6 +8916,17 @@
         "task": "tasks/tasks-linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md",
         "agent_task": ".agent/task/linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md",
         "docs": "docs/TECH_SPEC-linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-04-13",
+      "source_issue": {
+        "id": "e1c9b7e2-b142-465e-972d-b9b280cb6cdb",
+        "identifier": "CO-168",
+        "url": "https://linear.app/asabeko/issue/CO-168/co-fix-delegation-mcp-startupperf-and-stale-delegate-server-process"
+      },
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Live Linear issue-context verified CO-168 is Done/completed on 2026-05-14; registry rows are archived as historical packets rather than refreshed or deleted."
       }
     },
     {
@@ -8893,6 +8959,17 @@
         "task": "tasks/tasks-linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59.md",
         "agent_task": ".agent/task/linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59.md",
         "docs": "docs/TECH_SPEC-linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-04-13",
+      "source_issue": {
+        "id": "2136ea50-1fdf-44c2-ae3c-0e8d8a364b59",
+        "identifier": "CO-139",
+        "url": "https://linear.app/asabeko/issue/CO-139/co-audit-remaining-top-level-non-doc-and-config-stewardship-surfaces"
+      },
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Live Linear issue-context verified CO-139 is Done/completed on 2026-05-14; registry rows are archived as historical packets rather than refreshed or deleted."
       }
     },
     {
@@ -15527,6 +15604,12 @@
         "task": "tasks/tasks-1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction.md",
         "agent_task": ".agent/task/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15543,6 +15626,12 @@
         "task": "tasks/tasks-1162-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-task-manager-registration-shell-extraction.md",
         "agent_task": ".agent/task/1162-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-task-manager-registration-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-task-manager-registration-shell-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15559,6 +15648,12 @@
         "task": "tasks/tasks-1161-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-completion-shell-extraction.md",
         "agent_task": ".agent/task/1161-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-completion-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-completion-shell-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15575,6 +15670,12 @@
         "task": "tasks/tasks-1160-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction.md",
         "agent_task": ".agent/task/1160-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15591,6 +15692,12 @@
         "task": "tasks/tasks-1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction.md",
         "agent_task": ".agent/task/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15607,6 +15714,12 @@
         "task": "tasks/tasks-1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
         "agent_task": ".agent/task/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15623,6 +15736,12 @@
         "task": "tasks/tasks-1157-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction.md",
         "agent_task": ".agent/task/1157-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15639,6 +15758,12 @@
         "task": "tasks/tasks-1156-coordinator-symphony-aligned-orchestrator-execution-mode-lifecycle-shell-extraction.md",
         "agent_task": ".agent/task/1156-coordinator-symphony-aligned-orchestrator-execution-mode-lifecycle-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-execution-mode-lifecycle-shell-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15655,6 +15780,12 @@
         "task": "tasks/tasks-1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
         "agent_task": ".agent/task/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15671,6 +15802,12 @@
         "task": "tasks/tasks-1154-coordinator-symphony-aligned-control-server-public-lifecycle-shell-extraction.md",
         "agent_task": ".agent/task/1154-coordinator-symphony-aligned-control-server-public-lifecycle-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-public-lifecycle-shell-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15687,6 +15824,12 @@
         "task": "tasks/tasks-1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction.md",
         "agent_task": ".agent/task/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15703,6 +15846,12 @@
         "task": "tasks/tasks-1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction.md",
         "agent_task": ".agent/task/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15719,6 +15868,12 @@
         "task": "tasks/tasks-1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction.md",
         "agent_task": ".agent/task/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15735,6 +15890,12 @@
         "task": "tasks/tasks-1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction.md",
         "agent_task": ".agent/task/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-oversight-update-contract-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15751,6 +15912,12 @@
         "task": "tasks/tasks-1149-coordinator-symphony-aligned-control-oversight-read-contract-extraction.md",
         "agent_task": ".agent/task/1149-coordinator-symphony-aligned-control-oversight-read-contract-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-oversight-read-contract-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15767,6 +15934,12 @@
         "task": "tasks/tasks-1148-coordinator-symphony-aligned-control-oversight-read-service-boundary-extraction.md",
         "agent_task": ".agent/task/1148-coordinator-symphony-aligned-control-oversight-read-service-boundary-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-oversight-read-service-boundary-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15783,6 +15956,12 @@
         "task": "tasks/tasks-1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction.md",
         "agent_task": ".agent/task/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-control-oversight-service-boundary-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15799,6 +15978,12 @@
         "task": "tasks/tasks-1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction.md",
         "agent_task": ".agent/task/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15815,6 +16000,12 @@
         "task": "tasks/tasks-1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction.md",
         "agent_task": ".agent/task/1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15831,6 +16022,12 @@
         "task": "tasks/tasks-1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction.md",
         "agent_task": ".agent/task/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15847,6 +16044,12 @@
         "task": "tasks/tasks-1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction.md",
         "agent_task": ".agent/task/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-state-store-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15863,6 +16066,12 @@
         "task": "tasks/tasks-1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop.md",
         "agent_task": ".agent/task/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15879,6 +16088,12 @@
         "task": "tasks/tasks-1141-coordinator-symphony-aligned-telegram-projection-notification-state-contract-narrowing.md",
         "agent_task": ".agent/task/1141-coordinator-symphony-aligned-telegram-projection-notification-state-contract-narrowing.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-projection-notification-state-contract-narrowing.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15895,6 +16110,12 @@
         "task": "tasks/tasks-1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction.md",
         "agent_task": ".agent/task/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15911,6 +16132,12 @@
         "task": "tasks/tasks-1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction.md",
         "agent_task": ".agent/task/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {
@@ -15927,6 +16154,12 @@
         "task": "tasks/tasks-1138-coordinator-symphony-aligned-telegram-oversight-command-controller-extraction.md",
         "agent_task": ".agent/task/1138-coordinator-symphony-aligned-telegram-oversight-command-controller-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-command-controller-extraction.md"
+      },
+      "status": "completed",
+      "completed_at": "2026-03-13",
+      "completion_classification": {
+        "source": "CO-530 May 14 current-head docs freshness date-rollover cleanup",
+        "evidence": "Task spec frontmatter and checklist closeout records show completed historical work; CO-167 already refreshed this cohort and is Done, so registry rows are archived rather than refreshed or deleted."
       }
     },
     {

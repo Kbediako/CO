@@ -4,7 +4,7 @@ title: CO: narrow generic control-host forced cleanup to avoid detached provider
 status: in_progress
 owner: Codex
 created: 2026-04-13
-last_review: 2026-04-13
+last_review: 2026-05-14
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-05-13",
+  "generated_at": "2026-05-14",
   "entries": [
     {
       "path": ".agent/task/linear-a5183441-3f28-4bf5-91e2-9c987b277924.md",
@@ -2252,184 +2252,262 @@
     {
       "path": ".agent/task/1138-coordinator-symphony-aligned-telegram-oversight-command-controller-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1141-coordinator-symphony-aligned-telegram-projection-notification-state-contract-narrowing.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1148-coordinator-symphony-aligned-control-oversight-read-service-boundary-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1149-coordinator-symphony-aligned-control-oversight-read-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1154-coordinator-symphony-aligned-control-server-public-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1156-coordinator-symphony-aligned-orchestrator-execution-mode-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1157-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1160-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1161-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-completion-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1162-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-task-manager-registration-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/1164-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
@@ -3918,9 +3996,12 @@
     {
       "path": ".agent/task/linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
@@ -4680,9 +4761,12 @@
     {
       "path": ".agent/task/linear-6ed6ef11-538e-48f0-936c-8547632bf92e.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
@@ -4757,9 +4841,12 @@
     {
       "path": ".agent/task/linear-72e9f13e-0899-4769-9ca3-82586077fca9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/linear-736c3631-341a-4250-875f-e8808ef2a31b.md",
@@ -5492,9 +5579,12 @@
     {
       "path": ".agent/task/linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
@@ -5738,9 +5828,12 @@
     {
       "path": ".agent/task/linear-c5182c19-8470-4792-a573-e3873ab22b8f.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md",
@@ -5866,9 +5959,12 @@
     {
       "path": ".agent/task/linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
@@ -6083,9 +6179,12 @@
     {
       "path": ".agent/task/linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": ".agent/task/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
@@ -7035,30 +7134,42 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-oversight-read-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-oversight-read-service-boundary-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-oversight-service-boundary-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-oversight-update-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-request-and-action-dispatch-boundary-reassessment.md",
@@ -7138,9 +7249,12 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-server-lifecycle-boundary-freeze-reassessment.md",
@@ -7179,9 +7293,12 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-server-public-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-server-public-route-and-ui-asset-helper-extraction.md",
@@ -7196,9 +7313,12 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction.md",
@@ -7313,9 +7433,12 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-controller-owned-compatibility-and-ui-presenters.md",
@@ -7743,9 +7866,12 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
@@ -7771,16 +7897,22 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-execution-mode-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md",
@@ -7827,9 +7959,12 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-local-execution-lifecycle-shell-extraction.md",
@@ -7841,9 +7976,12 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction.md",
@@ -7855,9 +7993,12 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-completion-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
@@ -7869,23 +8010,32 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-task-manager-registration-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction.md",
@@ -8904,16 +9054,22 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-telegram-oversight-command-controller-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction.md",
@@ -8928,51 +9084,72 @@
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-telegram-oversight-state-store-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-telegram-projection-notification-state-contract-narrowing.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-telegram-question-read-adapter-assembly-extraction.md",
@@ -9582,9 +9759,12 @@
     {
       "path": "docs/ACTION_PLAN-linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
@@ -10358,9 +10538,12 @@
     {
       "path": "docs/ACTION_PLAN-linear-6ed6ef11-538e-48f0-936c-8547632bf92e.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
@@ -10435,9 +10618,12 @@
     {
       "path": "docs/ACTION_PLAN-linear-72e9f13e-0899-4769-9ca3-82586077fca9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-linear-736c3631-341a-4250-875f-e8808ef2a31b.md",
@@ -11184,9 +11370,12 @@
     {
       "path": "docs/ACTION_PLAN-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
@@ -11437,9 +11626,12 @@
     {
       "path": "docs/ACTION_PLAN-linear-c5182c19-8470-4792-a573-e3873ab22b8f.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md",
@@ -11558,9 +11750,12 @@
     {
       "path": "docs/ACTION_PLAN-linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
@@ -11782,9 +11977,12 @@
     {
       "path": "docs/ACTION_PLAN-linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/ACTION_PLAN-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
@@ -13692,184 +13890,262 @@
     {
       "path": "docs/findings/1138-telegram-oversight-command-controller-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1139-telegram-oversight-update-handler-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1140-telegram-projection-notification-controller-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1141-telegram-projection-notification-state-contract-narrowing-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1142-telegram-projection-notification-interleaving-backstop-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1143-telegram-oversight-state-store-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1144-telegram-oversight-polling-controller-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1145-telegram-oversight-runtime-lifecycle-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1146-telegram-projection-delivery-queue-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1147-control-oversight-service-boundary-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1148-control-oversight-read-service-boundary-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1149-control-oversight-read-contract-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1150-control-oversight-update-contract-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1151-control-telegram-bridge-bootstrap-oversight-factory-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1152-control-server-bootstrap-start-sequencing-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1153-control-server-ready-instance-lifecycle-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1154-control-server-public-lifecycle-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1155-orchestrator-control-plane-lifecycle-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1156-orchestrator-execution-mode-lifecycle-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1157-orchestrator-cloud-target-executor-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1158-orchestrator-local-pipeline-executor-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1159-orchestrator-execution-routing-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1160-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1161-orchestrator-perform-run-lifecycle-completion-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1162-orchestrator-perform-run-lifecycle-task-manager-registration-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1163-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction-deliberation.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/findings/1164-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction-deliberation.md",
@@ -15728,30 +16004,42 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-control-oversight-read-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-control-oversight-read-service-boundary-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-control-oversight-service-boundary-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-control-oversight-update-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-control-request-and-action-dispatch-boundary-reassessment.md",
@@ -15831,9 +16119,12 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-control-server-lifecycle-boundary-freeze-reassessment.md",
@@ -15872,9 +16163,12 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-control-server-public-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-control-server-public-route-and-ui-asset-helper-extraction.md",
@@ -15889,9 +16183,12 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction.md",
@@ -16006,9 +16303,12 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-controller-owned-compatibility-and-ui-presenters.md",
@@ -16436,9 +16736,12 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
@@ -16464,16 +16767,22 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-execution-mode-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md",
@@ -16520,9 +16829,12 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-local-execution-lifecycle-shell-extraction.md",
@@ -16534,9 +16846,12 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction.md",
@@ -16548,9 +16863,12 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-completion-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
@@ -16562,23 +16880,32 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-task-manager-registration-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction.md",
@@ -17597,16 +17924,22 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-telegram-oversight-command-controller-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction.md",
@@ -17621,51 +17954,72 @@
     {
       "path": "docs/PRD-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-telegram-oversight-state-store-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-telegram-projection-notification-state-contract-narrowing.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-telegram-question-read-adapter-assembly-extraction.md",
@@ -18282,9 +18636,12 @@
     {
       "path": "docs/PRD-linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
@@ -19058,9 +19415,12 @@
     {
       "path": "docs/PRD-linear-6ed6ef11-538e-48f0-936c-8547632bf92e.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
@@ -19135,9 +19495,12 @@
     {
       "path": "docs/PRD-linear-72e9f13e-0899-4769-9ca3-82586077fca9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-linear-736c3631-341a-4250-875f-e8808ef2a31b.md",
@@ -19884,9 +20247,12 @@
     {
       "path": "docs/PRD-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
@@ -20137,9 +20503,12 @@
     {
       "path": "docs/PRD-linear-c5182c19-8470-4792-a573-e3873ab22b8f.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md",
@@ -20258,9 +20627,12 @@
     {
       "path": "docs/PRD-linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
@@ -20482,9 +20854,12 @@
     {
       "path": "docs/PRD-linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/PRD-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
@@ -21812,30 +22187,42 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-oversight-read-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-oversight-read-service-boundary-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-oversight-service-boundary-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-oversight-update-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-request-and-action-dispatch-boundary-reassessment.md",
@@ -21915,9 +22302,12 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-lifecycle-boundary-freeze-reassessment.md",
@@ -21956,9 +22346,12 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-public-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-public-route-and-ui-asset-helper-extraction.md",
@@ -21973,9 +22366,12 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-server-ready-instance-startup-composition-extraction.md",
@@ -22090,9 +22486,12 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-controller-owned-compatibility-and-ui-presenters.md",
@@ -22520,9 +22919,12 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
@@ -22548,16 +22950,22 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-execution-mode-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md",
@@ -22604,9 +23012,12 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-local-execution-lifecycle-shell-extraction.md",
@@ -22618,9 +23029,12 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction.md",
@@ -22632,9 +23046,12 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-completion-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
@@ -22646,23 +23063,32 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-task-manager-registration-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction.md",
@@ -23681,16 +24107,22 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-command-controller-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-read-adapter-factory-extraction.md",
@@ -23705,51 +24137,72 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-state-store-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-projection-notification-state-contract-narrowing.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-telegram-question-read-adapter-assembly-extraction.md",
@@ -24359,9 +24812,12 @@
     {
       "path": "docs/TECH_SPEC-linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
@@ -25107,9 +25563,12 @@
     {
       "path": "docs/TECH_SPEC-linear-6ed6ef11-538e-48f0-936c-8547632bf92e.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
@@ -25184,9 +25643,12 @@
     {
       "path": "docs/TECH_SPEC-linear-72e9f13e-0899-4769-9ca3-82586077fca9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-linear-736c3631-341a-4250-875f-e8808ef2a31b.md",
@@ -25926,9 +26388,12 @@
     {
       "path": "docs/TECH_SPEC-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
@@ -26179,9 +26644,12 @@
     {
       "path": "docs/TECH_SPEC-linear-c5182c19-8470-4792-a573-e3873ab22b8f.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-linear-c9163fc7-832a-45ac-8961-2d6c213e52af.md",
@@ -26286,9 +26754,12 @@
     {
       "path": "docs/TECH_SPEC-linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
@@ -26510,9 +26981,12 @@
     {
       "path": "docs/TECH_SPEC-linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "docs/TECH_SPEC-linear-e3bc507e-c33d-48c7-9474-196a6ef9a28c.md",
@@ -27626,7 +28100,7 @@
       "path": "tasks/specs/0944-delegation-mcp-framing-compat-fix.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-13",
+      "last_review": "2026-05-14",
       "cadence_days": 90
     },
     {
@@ -29085,184 +29559,262 @@
     {
       "path": "tasks/specs/1138-coordinator-symphony-aligned-telegram-oversight-command-controller-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1141-coordinator-symphony-aligned-telegram-projection-notification-state-contract-narrowing.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1148-coordinator-symphony-aligned-control-oversight-read-service-boundary-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1149-coordinator-symphony-aligned-control-oversight-read-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1154-coordinator-symphony-aligned-control-server-public-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1156-coordinator-symphony-aligned-orchestrator-execution-mode-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1157-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1160-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1161-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-completion-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1162-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-task-manager-registration-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/specs/1164-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
@@ -30751,9 +31303,12 @@
     {
       "path": "tasks/specs/linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-13",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-14",
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified this completed Linear task spec out of terminal lifecycle debt after live Linear Done evidence; historical packet retained."
     },
     {
       "path": "tasks/specs/linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
@@ -31534,9 +32089,12 @@
     {
       "path": "tasks/specs/linear-6ed6ef11-538e-48f0-936c-8547632bf92e.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-13",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-14",
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified this completed Linear task spec out of terminal lifecycle debt after live Linear Done evidence; historical packet retained."
     },
     {
       "path": "tasks/specs/linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
@@ -31611,9 +32169,12 @@
     {
       "path": "tasks/specs/linear-72e9f13e-0899-4769-9ca3-82586077fca9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-13",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-14",
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified this completed Linear task spec out of terminal lifecycle debt after live Linear Done evidence; historical packet retained."
     },
     {
       "path": "tasks/specs/linear-736c3631-341a-4250-875f-e8808ef2a31b.md",
@@ -32360,9 +32921,12 @@
     {
       "path": "tasks/specs/linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-13",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-14",
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified this completed Linear task spec out of terminal lifecycle debt after live Linear Done evidence; historical packet retained."
     },
     {
       "path": "tasks/specs/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
@@ -32613,9 +33177,12 @@
     {
       "path": "tasks/specs/linear-c5182c19-8470-4792-a573-e3873ab22b8f.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-13",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-14",
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified this completed Linear task spec out of terminal lifecycle debt after live Linear Done evidence; historical packet retained."
     },
     {
       "path": "tasks/specs/linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md",
@@ -32684,7 +33251,7 @@
       "path": "tasks/specs/linear-ce6f26d0-029a-40d9-8ffe-289cd40cde8d.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-04-14",
+      "last_review": "2026-05-14",
       "cadence_days": 30
     },
     {
@@ -32734,9 +33301,12 @@
     {
       "path": "tasks/specs/linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-13",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-14",
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified this completed Linear task spec out of terminal lifecycle debt after live Linear Done evidence; historical packet retained."
     },
     {
       "path": "tasks/specs/linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
@@ -32958,9 +33528,12 @@
     {
       "path": "tasks/specs/linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-13",
-      "cadence_days": 30
+      "status": "archived",
+      "last_review": "2026-05-14",
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified this completed Linear task spec out of terminal lifecycle debt after live Linear Done evidence; historical packet retained."
     },
     {
       "path": "tasks/specs/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
@@ -35141,184 +35714,262 @@
     {
       "path": "tasks/tasks-1138-coordinator-symphony-aligned-telegram-oversight-command-controller-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1139-coordinator-symphony-aligned-telegram-oversight-update-handler-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1140-coordinator-symphony-aligned-telegram-projection-notification-controller-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1141-coordinator-symphony-aligned-telegram-projection-notification-state-contract-narrowing.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1142-coordinator-symphony-aligned-telegram-projection-notification-interleaving-backstop.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1143-coordinator-symphony-aligned-telegram-oversight-state-store-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1144-coordinator-symphony-aligned-telegram-oversight-polling-controller-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1145-coordinator-symphony-aligned-telegram-oversight-runtime-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1146-coordinator-symphony-aligned-telegram-projection-delivery-queue-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1147-coordinator-symphony-aligned-control-oversight-service-boundary-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1148-coordinator-symphony-aligned-control-oversight-read-service-boundary-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1149-coordinator-symphony-aligned-control-oversight-read-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1150-coordinator-symphony-aligned-control-oversight-update-contract-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1151-coordinator-symphony-aligned-control-telegram-bridge-bootstrap-oversight-factory-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1152-coordinator-symphony-aligned-control-server-bootstrap-start-sequencing-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1153-coordinator-symphony-aligned-control-server-ready-instance-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1154-coordinator-symphony-aligned-control-server-public-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1155-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1156-coordinator-symphony-aligned-orchestrator-execution-mode-lifecycle-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1157-coordinator-symphony-aligned-orchestrator-cloud-target-executor-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1158-coordinator-symphony-aligned-orchestrator-local-pipeline-executor-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1159-coordinator-symphony-aligned-orchestrator-execution-routing-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1160-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-registration-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1161-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-completion-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1162-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-task-manager-registration-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1163-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-guard-and-planning-shell-extraction.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-1164-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
@@ -36800,9 +37451,12 @@
     {
       "path": "tasks/tasks-linear-2136ea50-1fdf-44c2-ae3c-0e8d8a364b59.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-linear-213f6858-ab77-40b9-b80a-f5e5bdde4b37.md",
@@ -37583,9 +38237,12 @@
     {
       "path": "tasks/tasks-linear-6ed6ef11-538e-48f0-936c-8547632bf92e.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
@@ -37660,9 +38317,12 @@
     {
       "path": "tasks/tasks-linear-72e9f13e-0899-4769-9ca3-82586077fca9.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-linear-736c3631-341a-4250-875f-e8808ef2a31b.md",
@@ -38409,9 +39069,12 @@
     {
       "path": "tasks/tasks-linear-abca2add-198d-40a6-b1c0-35e49f4c78cd.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
@@ -38662,9 +39325,12 @@
     {
       "path": "tasks/tasks-linear-c5182c19-8470-4792-a573-e3873ab22b8f.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-linear-c526b756-6cfb-4e5b-b5ec-e7132f253ba1.md",
@@ -38790,9 +39456,12 @@
     {
       "path": "tasks/tasks-linear-d26b2799-a4a1-41d0-87cb-ee64eabcdbba.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
@@ -39014,9 +39683,12 @@
     {
       "path": "tasks/tasks-linear-e1c9b7e2-b142-465e-972d-b9b280cb6cdb.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
+      "status": "archived",
       "last_review": "2026-04-13",
-      "cadence_days": 30
+      "cadence_days": 30,
+      "lifecycle_state": "archived",
+      "archived_at": "2026-05-14",
+      "archive_reason": "CO-530 current-head validation classified the May 14 date-rollover Apr 13 completed-lane docs freshness cohort out of active rolling debt; historical packet/report retained."
     },
     {
       "path": "tasks/tasks-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
