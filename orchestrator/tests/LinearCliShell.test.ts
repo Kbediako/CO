@@ -119,6 +119,31 @@ function buildPacketTraceabilityPendingAuditEntry(overrides: Record<string, unkn
   };
 }
 
+function buildLabelResolutionFailedAuditEntry(overrides: Record<string, unknown> = {}) {
+  return {
+    recorded_at: '2026-04-22T08:05:00.000Z',
+    operation: 'create-follow-up',
+    ok: false,
+    issue_id: 'lin-issue-1',
+    issue_identifier: 'CO-1',
+    source_setup: null,
+    action: 'create',
+    via: 'related',
+    state: null,
+    follow_up_issue_id: null,
+    follow_up_issue_identifier: null,
+    follow_up_intent_key:
+      `title=follow-up;${DEFAULT_FOLLOW_UP_INTENT_KEY_PART};canonical=;blocked=0;parity=0`,
+    failed_relation_type: null,
+    comment_id: null,
+    attachment_id: null,
+    error_code: 'linear_follow_up_label_resolution_failed',
+    error_message:
+      'Linear issue CO-1 is missing live labels required for follow-up creation: Priority:*.',
+    ...overrides
+  };
+}
+
 function buildReadyFollowUpTraceability(input: {
   blockedBySource?: boolean;
   observedState?: Record<string, unknown> | null;
@@ -2312,6 +2337,81 @@ describe('runLinearCliShell', () => {
       issue_id: 'lin-issue-1',
       error_code: 'linear_follow_up_packet_traceability_retry_suppressed'
     }));
+  });
+
+  it('suppresses same-attempt label-resolution follow-up retries across varied intent with source-label guidance', async () => {
+    const log = vi.fn();
+    const appendAuditEntry = vi.fn();
+    const setExitCode = vi.fn();
+    const createProviderLinearFollowUpIssueMock =
+      vi.fn<typeof import('../src/cli/control/providerLinearWorkflowFacade.js').createProviderLinearFollowUpIssue>();
+    const { auditPath, loadProviderLinearWorkerContextMock } = await createSameAttemptFollowUpFixture(
+      'linear-cli-follow-up-label-resolution-retry-',
+      [buildLabelResolutionFailedAuditEntry()]
+    );
+
+    await runLinearCliShell(
+      {
+        positionals: ['create-follow-up'],
+        flags: {
+          format: 'json',
+          'issue-id': 'lin-issue-1',
+          title: 'Different follow-up',
+          description: 'Investigate the remaining improvement',
+          'intent-checksum': '- Track a different follow-up intent.',
+          'non-goals': '- [ ] Do not reopen the browser surface.',
+          'not-done-if': '- [ ] The issue still allows browser-first parity.',
+          'acceptance-criteria': '- [ ] Captured'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        createProviderLinearFollowUpIssue: createProviderLinearFollowUpIssueMock,
+        loadProviderLinearWorkerContext: loadProviderLinearWorkerContextMock,
+        getEnv: () => ({
+          CO_LINEAR_API_TOKEN: 'lin-api-token',
+          CODEX_PROVIDER_LINEAR_AUDIT_PATH: auditPath
+        }),
+        now: () => '2026-04-22T08:06:00.000Z',
+        appendAuditEntry,
+        log,
+        setExitCode
+      }
+    );
+
+    expect(createProviderLinearFollowUpIssueMock).not.toHaveBeenCalled();
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_label_resolution_retry_suppressed',
+        message:
+          'Same-attempt retry suppressed: Do not retry `create-follow-up` in this attempt until you first source-label the Linear issue with the required lifecycle, priority, area, and type labels, then reread issue-context before retrying. Preserve the fail-closed label requirements instead of creating an under-labeled follow-up.',
+        status: 409
+      }
+    });
+    expect(appendAuditEntry).toHaveBeenCalledWith(auditPath, {
+      recorded_at: '2026-04-22T08:06:00.000Z',
+      operation: 'create-follow-up',
+      ok: false,
+      issue_id: 'lin-issue-1',
+      issue_identifier: null,
+      source_setup: null,
+      action: null,
+      via: null,
+      state: null,
+      follow_up_issue_id: null,
+      follow_up_issue_identifier: null,
+      follow_up_intent_key:
+        'title=different%20follow-up;intent=-%20track%20a%20different%20follow-up%20intent.;canonical=;blocked=0;parity=0',
+      failed_relation_type: null,
+      comment_id: null,
+      attachment_id: null,
+      error_code: 'linear_follow_up_label_resolution_retry_suppressed',
+      error_message:
+        'Same-attempt retry suppressed: Do not retry `create-follow-up` in this attempt until you first source-label the Linear issue with the required lifecycle, priority, area, and type labels, then reread issue-context before retrying. Preserve the fail-closed label requirements instead of creating an under-labeled follow-up.'
+    });
   });
 
   it('does not suppress same-title follow-up retries with a different intent checksum', async () => {

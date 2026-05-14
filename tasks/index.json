@@ -1,6 +1,67 @@
 {
   "items": [
     {
+      "id": "20260515-linear-54f80820-2f4b-40c0-a998-ba767b02843e",
+      "title": "CO-513 suppress same-attempt retries for create-follow-up label-resolution failures",
+      "relates_to": "tasks/tasks-linear-54f80820-2f4b-40c0-a998-ba767b02843e.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-15",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-15",
+          "status": "transitioned_in_progress",
+          "summary": "Live issue-context verified CO-513 in Ready with no PR attached; provider worker moved it to In Progress and recorded the required parallelization decision."
+        }
+      },
+      "validation": {
+        "status": "validated_with_review_parser_waiver_pending_pr_handoff",
+        "passed": [
+          "live issue-context",
+          "workpad creation",
+          "Ready -> In Progress guarded transition",
+          "parallelization decision recorded",
+          "docs-first packet created",
+          "same-issue child lane completion proof",
+          "focused varied-intent retry suppression regression",
+          "delegation guard",
+          "spec guard",
+          "build",
+          "lint",
+          "test",
+          "docs:check",
+          "docs:freshness",
+          "repo:stewardship",
+          "diff budget",
+          "pack smoke",
+          "manifest-backed standalone review clean prose with review-verdict parser waiver",
+          "elegance/minimality pass"
+        ],
+        "pending": [
+          "PR create/attach",
+          "ready-review drain",
+          "review-state handoff"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-54f80820-2f4b-40c0-a998-ba767b02843e.md",
+        "prd": "docs/PRD-linear-54f80820-2f4b-40c0-a998-ba767b02843e.md",
+        "docs": "docs/TECH_SPEC-linear-54f80820-2f4b-40c0-a998-ba767b02843e.md",
+        "action_plan": "docs/ACTION_PLAN-linear-54f80820-2f4b-40c0-a998-ba767b02843e.md",
+        "spec": "tasks/specs/linear-54f80820-2f4b-40c0-a998-ba767b02843e.md",
+        "task": "tasks/tasks-linear-54f80820-2f4b-40c0-a998-ba767b02843e.md"
+      },
+      "source_issue": {
+        "id": "54f80820-2f4b-40c0-a998-ba767b02843e",
+        "identifier": "CO-513",
+        "url": "https://linear.app/asabeko/issue/CO-513"
+      }
+    },
+    {
       "id": "20260514-linear-31958d87-e472-4c3f-a1e2-ab7adb3646b5",
       "title": "CO-538 verify create-follow-up labels with live post-mutation reads",
       "relates_to": "tasks/tasks-linear-31958d87-e472-4c3f-a1e2-ab7adb3646b5.md",
