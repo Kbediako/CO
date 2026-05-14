@@ -135,7 +135,9 @@ function buildFollowUpIssueContextBody(input: {
     id,
     identifier,
     title: input.title ?? 'Follow-up issue',
-    description: input.description ?? 'Investigate the remaining improvement.',
+    description: input.description === undefined
+      ? 'Investigate the remaining improvement.'
+      : input.description,
     url: `https://linear.app/example/issue/${identifier}`,
     state: input.state ?? {
       id: 'state-backlog',

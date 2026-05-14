@@ -5649,6 +5649,7 @@ function mergeCachedIssueContextSummary(
 ): ProviderLinearIssueContext {
   return {
     ...issue,
+    description: summary.description,
     url: summary.url,
     updated_at: summary.updated_at,
     archived_at: summary.archived_at,
