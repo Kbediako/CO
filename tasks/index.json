@@ -1,6 +1,93 @@
 {
   "items": [
     {
+      "id": "20260516-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d",
+      "title": "CO-546 attach live Linear state to rehydrated pending-claim revalidation",
+      "relates_to": "tasks/tasks-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-16",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-16",
+          "status": "confirmed_in_progress",
+          "summary": "Live post-CO-544 validation confirmed CO-546 owns the remaining root cause: rehydrated pending-revalidation claims retain cached In Progress metadata while live Linear shows Blocked."
+        },
+        "parallelization": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-16",
+          "status": "stay_serial_single_bounded_change",
+          "summary": "Docs, ProviderIssueHandoff implementation, focused tests, and review all share the same claim-refresh seam; prior worker produced no artifacts and was closed."
+        },
+        "docs_packet": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-16",
+          "status": "created_before_implementation",
+          "summary": "Created the CO-546 docs-first packet to attach live Linear metadata during accepted/running/resumable pending-revalidation rehydrate while preserving fail-closed missing-evidence behavior."
+        }
+      },
+      "validation": {
+        "status": "implemented_review_pending_docs_freshness_baseline_blocked",
+        "passed": [
+          "live post-merge validation evidence",
+          "workpad creation",
+          "parallelization decision recorded",
+          "docs-first packet created",
+          "focused pending-revalidation regressions",
+          "full ProviderIssueHandoff test file",
+          "npm run build",
+          "npm run lint",
+          "npm run test",
+          "npm run docs:check",
+          "npm run repo:stewardship",
+          "node scripts/diff-budget.mjs",
+          "npm run pack:smoke",
+          "node scripts/spec-guard.mjs --dry-run",
+          "git diff --check"
+        ],
+        "blocked": [
+          "npm run docs:freshness fails on existing repo-wide stale-doc baseline debt outside CO-546: 286 stale docs and 10 strict docs approaching expiry"
+        ],
+        "waivers": [
+          "delegation guard passed with desktop spawn_agent override because the read-only CO-542 researcher is not represented by repo-local child manifests and the prior CO-546 worker produced no artifacts before closure"
+        ],
+        "pending": [
+          "PR handoff and model-backed review"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
+        "prd": "docs/PRD-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
+        "docs": "docs/TECH_SPEC-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
+        "action_plan": "docs/ACTION_PLAN-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
+        "spec": "tasks/specs/linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
+        "task": "tasks/tasks-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md"
+      },
+      "source_issue": {
+        "id": "29b67d32-a612-489f-a1ac-8fd9cc4a9b5d",
+        "identifier": "CO-546",
+        "url": "https://linear.app/asabeko/issue/CO-546/co-attach-live-linear-state-to-rehydrated-pending-claim-revalidation"
+      },
+      "related_issues": [
+        {
+          "identifier": "CO-544",
+          "relation": "source_follow_up"
+        },
+        {
+          "identifier": "CO-510",
+          "relation": "affected_issue"
+        },
+        {
+          "identifier": "CO-512",
+          "relation": "affected_issue"
+        }
+      ]
+    },
+    {
       "id": "20260516-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0",
       "title": "CO-544 release rehydrated blocked provider claims from active WIP",
       "relates_to": "tasks/tasks-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md",

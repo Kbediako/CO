@@ -2565,6 +2565,81 @@ export function createProviderIssueHandoffService(
       });
       assertRehydrateLifecycleCurrent();
     };
+    const buildAcceptedPendingRevalidationClaim = async (
+      claim: ProviderIntakeClaimRecord,
+      input?: {
+        reason?: string;
+        extraFields?: Partial<ProviderIntakeClaimRecord>;
+        refreshTrackedIssueMetadata?: boolean;
+      }
+    ): Promise<Parameters<typeof upsertProviderIntakeClaim>[1]> => {
+      const nextReason = input?.reason ?? 'provider_issue_rehydration_pending_revalidation';
+      const baseClaim = {
+        ...claim,
+        ...input?.extraFields,
+        launch_source: undefined,
+        launch_token: undefined,
+        state: 'accepted' as const,
+        reason: nextReason,
+        updated_at: now
+      };
+      const shouldRefreshPendingMetadata =
+        input?.refreshTrackedIssueMetadata === true &&
+        nextReason === 'provider_issue_rehydration_pending_revalidation';
+      if (!shouldRefreshPendingMetadata) {
+        return baseClaim;
+      }
+
+      const freshTrackedIssue = await resolveFreshTrackedIssueForActiveClaim(claim);
+      const handoffReleaseEligibility =
+        freshTrackedIssue.trackedIssue === null
+          ? null
+          : assessProviderTrackedIssueEligibility(freshTrackedIssue.trackedIssue, {
+              hasExistingClaim: true
+            });
+      const shouldReleaseHandoffPendingClaim =
+        handoffReleaseEligibility !== null &&
+        shouldReleaseCachedPendingRevalidationHandoffClaim(
+          { state: 'accepted', reason: nextReason },
+          handoffReleaseEligibility
+        );
+      const releaseReason =
+        freshTrackedIssue.releaseReason ??
+        (shouldReleaseHandoffPendingClaim ? 'provider_issue_released:not_active' : null);
+      if (releaseReason) {
+        const releaseClaimFields = shouldReleaseHandoffPendingClaim
+          ? freshTrackedIssue.claimFields
+          : freshTrackedIssue.releaseClaimFields;
+        const retainedRunIdentity = resolveReleasedClaimRetainedRunIdentity({
+          claim,
+          run: null,
+          trackedIssue: freshTrackedIssue.trackedIssue,
+          issueState: releaseClaimFields.issue_state ?? null,
+          issueStateType: releaseClaimFields.issue_state_type ?? null
+        });
+        const releasedClaim = {
+          ...claim,
+          ...releaseClaimFields,
+          launch_source: undefined,
+          launch_token: undefined,
+          ...retainedRunIdentity,
+          state: 'released' as const,
+          reason: releaseReason,
+          retry_queued: null,
+          retry_attempt: null,
+          retry_due_at: null,
+          retry_error: null,
+          updated_at: now
+        };
+        publishRuntime ||= hasProviderClaimTransitioned(claim, releasedClaim);
+        return releasedClaim;
+      }
+
+      return {
+        ...baseClaim,
+        ...freshTrackedIssue.claimFields
+      };
+    };
 
     const runRehydrate = async (): Promise<{ hasPendingClaims: boolean }> => {
       for (const claim of [...options.state.claims]) {
@@ -3017,56 +3092,39 @@ export function createProviderIssueHandoffService(
                 })
               });
               const nextReason = claim.reason ?? 'provider_issue_rehydration_pending_revalidation';
-              publishRuntime ||= hasProviderClaimTransitioned(claim, {
-                state: 'accepted',
+              const nextClaim = await buildAcceptedPendingRevalidationClaim(claim, {
                 reason: nextReason,
-                task_id: claim.task_id,
-                run_id: claim.run_id,
-                run_manifest_path: claim.run_manifest_path,
-                ...queuedRetryFields
+                extraFields: queuedRetryFields,
+                refreshTrackedIssueMetadata: input?.refreshTrackedIssueMetadata === true
               });
-              upsertRehydratedProviderIntakeClaim({
-                ...claim,
-                launch_source: undefined,
-                launch_token: undefined,
-                state: 'accepted',
+              publishRuntime ||= hasProviderClaimTransitioned(claim, nextClaim);
+              upsertRehydratedProviderIntakeClaim(nextClaim);
+            } else if (input?.refreshTrackedIssueMetadata === true) {
+              const nextReason = claim.reason ?? 'provider_issue_rehydration_pending_revalidation';
+              const nextClaim = await buildAcceptedPendingRevalidationClaim(claim, {
                 reason: nextReason,
-                ...queuedRetryFields,
-                updated_at: now
+                refreshTrackedIssueMetadata: true
               });
+              publishRuntime ||= hasProviderClaimTransitioned(claim, nextClaim);
+              upsertRehydratedProviderIntakeClaim(nextClaim);
             }
             continue;
           }
-          upsertRehydratedProviderIntakeClaim({
-            ...claim,
-            launch_source: undefined,
-            launch_token: undefined,
-            state: 'accepted',
+          const nextClaim = await buildAcceptedPendingRevalidationClaim(claim, {
             reason: 'provider_issue_rehydration_pending_revalidation',
-            updated_at: now
+            refreshTrackedIssueMetadata: input?.refreshTrackedIssueMetadata === true
           });
+          publishRuntime ||= hasProviderClaimTransitioned(claim, nextClaim);
+          upsertRehydratedProviderIntakeClaim(nextClaim);
         }
 
         if (claim.state === 'running' || claim.state === 'resumable') {
-          publishRuntime ||= hasProviderClaimTransitioned(claim, {
-            state: 'accepted',
+          const nextClaim = await buildAcceptedPendingRevalidationClaim(claim, {
             reason: 'provider_issue_rehydration_pending_revalidation',
-            task_id: claim.task_id,
-            run_id: claim.run_id,
-            run_manifest_path: claim.run_manifest_path,
-            retry_queued: claim.retry_queued ?? null,
-            retry_attempt: claim.retry_attempt ?? null,
-            retry_due_at: claim.retry_due_at ?? null,
-            retry_error: claim.retry_error ?? null
+            refreshTrackedIssueMetadata: input?.refreshTrackedIssueMetadata === true
           });
-          upsertRehydratedProviderIntakeClaim({
-            ...claim,
-            launch_source: undefined,
-            launch_token: undefined,
-            state: 'accepted',
-            reason: 'provider_issue_rehydration_pending_revalidation',
-            updated_at: now
-          });
+          publishRuntime ||= hasProviderClaimTransitioned(claim, nextClaim);
+          upsertRehydratedProviderIntakeClaim(nextClaim);
           continue;
         }
       }

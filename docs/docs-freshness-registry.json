@@ -3914,6 +3914,22 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "29b67d32-a612-489f-a1ac-8fd9cc4a9b5d",
+        "identifier": "CO-546",
+        "url": "https://linear.app/asabeko/issue/CO-546/co-attach-live-linear-state-to-rehydrated-pending-claim-revalidation"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-16",
+      "next_review": "2026-06-15"
+    },
+    {
       "path": ".agent/task/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -9778,6 +9794,22 @@
       "status": "active",
       "last_review": "2026-04-16",
       "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "29b67d32-a612-489f-a1ac-8fd9cc4a9b5d",
+        "identifier": "CO-546",
+        "url": "https://linear.app/asabeko/issue/CO-546/co-attach-live-linear-state-to-rehydrated-pending-claim-revalidation"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-16",
+      "next_review": "2026-06-15"
     },
     {
       "path": "docs/ACTION_PLAN-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
@@ -18763,6 +18795,22 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/PRD-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "29b67d32-a612-489f-a1ac-8fd9cc4a9b5d",
+        "identifier": "CO-546",
+        "url": "https://linear.app/asabeko/issue/CO-546/co-attach-live-linear-state-to-rehydrated-pending-claim-revalidation"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-16",
+      "next_review": "2026-06-15"
+    },
+    {
       "path": "docs/PRD-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -25043,6 +25091,22 @@
       "status": "active",
       "last_review": "2026-04-16",
       "cadence_days": 30
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "29b67d32-a612-489f-a1ac-8fd9cc4a9b5d",
+        "identifier": "CO-546",
+        "url": "https://linear.app/asabeko/issue/CO-546/co-attach-live-linear-state-to-rehydrated-pending-claim-revalidation"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-16",
+      "next_review": "2026-06-15"
     },
     {
       "path": "docs/TECH_SPEC-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
@@ -31676,6 +31740,22 @@
       "cadence_days": 30
     },
     {
+      "path": "tasks/specs/linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "29b67d32-a612-489f-a1ac-8fd9cc4a9b5d",
+        "identifier": "CO-546",
+        "url": "https://linear.app/asabeko/issue/CO-546/co-attach-live-linear-state-to-rehydrated-pending-claim-revalidation"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-16",
+      "next_review": "2026-06-15"
+    },
+    {
       "path": "tasks/specs/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -37942,6 +38022,22 @@
       "status": "active",
       "last_review": "2026-04-16",
       "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "29b67d32-a612-489f-a1ac-8fd9cc4a9b5d",
+        "identifier": "CO-546",
+        "url": "https://linear.app/asabeko/issue/CO-546/co-attach-live-linear-state-to-rehydrated-pending-claim-revalidation"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-16",
+      "next_review": "2026-06-15"
     },
     {
       "path": "tasks/tasks-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
