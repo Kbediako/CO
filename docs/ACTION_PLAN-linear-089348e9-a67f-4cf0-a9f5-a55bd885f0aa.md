@@ -13,6 +13,21 @@
 - Durable retention evidence: retained audit row contract is provider-intake terminal closeout audit retention; owning surface is provider-intake control-host; steady-state proof is source-labeled terminal evidence without active work authority.
 - Large-refactor check: broader provider-intake authority cleanup is not required for this bounded lane because it removes a stale terminal authority path rather than adding a new seam.
 
+## Fallback Decision Table
+- Large-refactor decision: not required for this bounded terminal-authority repair.
+- Minor-seam decision: acceptable because it removes stale terminal metadata authority while preserving durable audit evidence.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Terminal closeout metadata | Cached `Merging` / stale non-terminal issue fields survive after merged PR plus Linear `Done`. | `remove fallback` | CO-516 | Live terminal issue truth is available for a claim with merged closeout evidence. | Existing provider closeout behavior | 2026-05-16 | This issue | Claim state/summary no longer treats cached non-terminal closeout metadata as active authority. | Focused provider-intake closeout regression. |
+| Retained closeout audit row | Historical `review_promotion` / `merge_closeout` evidence remains on non-active claims. | `justify retaining fallback` | Provider-intake control-host | Claim has terminal closeout history after PR merge/Done. | Existing provider-intake retention behavior | 2026-05-16 | Durable audit contract | Separate archival policy replaces retained provider-intake audit rows. | Regression asserts audit fields remain present while active counts exclude the claim. |
+
+- Contract name: provider-intake terminal closeout audit retention.
+- Owning surface: provider-intake control-host claim retention and projection.
+- Steady-state proof: terminal source evidence stays visible, but retained rows are not active work authority.
+- Tests/docs: CO-516 packet plus focused ProviderIssueHandoff regressions.
+- Non-expiring rationale: retaining historical closeout evidence is an audit requirement, not temporary compatibility debt.
+
 ## Milestones & Sequencing
 1. Create docs-first packet and register mirrors.
 2. Run docs-review or record unrelated baseline blocker before implementation.

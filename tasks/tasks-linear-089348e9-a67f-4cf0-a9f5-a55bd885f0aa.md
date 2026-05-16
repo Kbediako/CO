@@ -49,6 +49,12 @@
 | Terminal closeout metadata | Cached `Merging` / stale non-terminal issue fields survive after merged PR plus Linear `Done`. | `remove fallback` | CO-516 | Live terminal issue truth is available for a claim with merged closeout evidence. | Existing provider closeout behavior | 2026-05-16 | This issue | Claim state/summary no longer treats cached non-terminal closeout metadata as active authority. | Focused provider-intake closeout regression. |
 | Retained closeout audit row | Historical `review_promotion` / `merge_closeout` evidence remains on non-active claims. | `justify retaining fallback` | Provider-intake control-host | Claim has terminal closeout history after PR merge/Done. | Existing provider-intake retention behavior | 2026-05-16 | Durable audit contract | Separate archival policy replaces retained provider-intake audit rows. | Regression asserts audit fields remain present while active counts exclude the claim. |
 
+- Contract name: provider-intake terminal closeout audit retention.
+- Owning surface: provider-intake control-host claim retention and projection.
+- Steady-state proof: terminal source evidence stays visible, but retained rows are not active work authority.
+- Tests/docs: CO-516 packet plus focused ProviderIssueHandoff regressions.
+- Non-expiring rationale: retaining historical closeout evidence is an audit requirement, not temporary compatibility debt.
+
 ## Implementation
 - [x] Inspect terminal closeout claim reconciliation path. Evidence: `isSupersededTerminalMergeCloseoutClaim`, `buildTrackedIssueMergeCloseoutResetFields`, and `buildProviderCompletedRunRehydrateState`.
 - [x] Add focused failing regression. Evidence: CO-510 released residue, CO-492 completed residue, and failed non-`Done` transition tests in `orchestrator/tests/ProviderIssueHandoff.test.ts`.
@@ -64,6 +70,9 @@
 - [x] `npm run test`. Evidence: passed 360 files / 5856 tests on 2026-05-16.
 - [x] `npm run docs:check`. Evidence: passed after checklist updates on 2026-05-16.
 - [x] `npm run pack:smoke`. Evidence: passed after checklist updates on 2026-05-16.
+- [x] CI rework for strict fallback metadata. Evidence: Core Lane failed on `node scripts/spec-guard.mjs` because fallback/seam packet sources needed parseable CO-382 table and retained-fallback evidence; rework added the table/evidence to `.agent/task`, ACTION_PLAN, TECH_SPEC mirrors, and checklist.
+- [x] Strict post-rework spec guard. Evidence: `node scripts/spec-guard.mjs` passed on 2026-05-16 after the fallback metadata rework.
+- [x] Post-rework docs/diff checks. Evidence: `npm run docs:check`, `git diff --check`, and `node scripts/diff-budget.mjs` passed on 2026-05-16.
 - [x] gpt-5.5/xhigh review. Evidence: `.runs/linear-089348e9-a67f-4cf0-a9f5-a55bd885f0aa/cli/2026-05-16T15-49-15-315Z-0cff6f2f/review/output.log` says no actionable correctness issues; telemetry verdict is `unknown` because the wrapper first blocked a validation-command attempt.
 - [ ] Worktree clean check. Evidence: pending `git status --short`.
 
@@ -72,6 +81,7 @@
 - 2026-05-16: Docs-first packet created before source/test implementation; Linear/GitHub lifecycle intentionally not mutated.
 - 2026-05-16: Hardened terminal merged closeout truth to require a deferred merge closeout reason or a failed Linear transition targeting `Done`; added a negative non-`Done` transition regression.
 - 2026-05-16: `npm run docs:freshness` still fails on known repo-wide CO-522 baseline debt, with no missing registry for CO-516 changed paths; `docs:freshness:maintain` reports `owner issue: CO-522` and `blocking changed paths: 0`.
+- 2026-05-16: PR #823 Core Lane failed only at strict Spec Guard fallback metadata. Rework made CO-382 retained-fallback evidence parseable across packet sources; local strict Spec Guard, docs check, diff check, and diff budget now pass.
 
 ## Notes
 - Parent orchestration remains responsible for Linear/GitHub lifecycle, PR handoff, and any control-host live restart/proof.
