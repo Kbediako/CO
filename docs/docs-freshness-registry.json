@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-05-14",
+  "generated_at": "2026-05-16T00:00:00Z",
   "entries": [
     {
       "path": ".agent/AGENTS.md",
@@ -6232,6 +6232,13 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md",
+      "owner": "Codex",
+      "status": "active",
+      "last_review": "2026-05-16",
+      "cadence_days": 30
+    },
+    {
       "path": ".agent/task/linear-f4469614-cfdf-49a6-a7ff-366f58229816.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -12107,6 +12114,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-05-06",
+      "cadence_days": 30
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md",
+      "owner": "Codex",
+      "status": "active",
+      "last_review": "2026-05-16",
       "cadence_days": 30
     },
     {
@@ -21070,6 +21084,13 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/PRD-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md",
+      "owner": "Codex",
+      "status": "active",
+      "last_review": "2026-05-16",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/PRD-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -27266,6 +27287,13 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/TECH_SPEC-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md",
+      "owner": "Codex",
+      "status": "active",
+      "last_review": "2026-05-16",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/TECH_SPEC-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -30087,227 +30115,259 @@
     },
     {
       "path": "tasks/specs/1182-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-20",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1183-coordinator-symphony-aligned-orchestrator-cloud-route-fallback-contract-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-20",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1184-coordinator-symphony-aligned-orchestrator-execution-routing-decision-shell-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-20",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1185-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-20",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1186-coordinator-symphony-aligned-orchestrator-execution-route-adapter-shell-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-20",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1187-coordinator-symphony-aligned-orchestrator-plan-target-tracker-shell-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-20",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-20",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-20",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-20",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-20",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-20",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-20",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-20",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-20",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1196-coordinator-symphony-aligned-orchestrator-status-shell-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1197-coordinator-symphony-aligned-orchestrator-plan-shell-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1198-coordinator-symphony-aligned-orchestrator-runtime-selection-manifest-mutation-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1200-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-persistence-callback-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1201-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1202-coordinator-symphony-aligned-orchestrator-cloud-prompt-builder-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1203-coordinator-symphony-aligned-orchestrator-cloud-environment-resolution-boundary-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1205-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1207-coordinator-symphony-aligned-standalone-review-prompt-context-builder-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1208-coordinator-symphony-aligned-standalone-review-prompt-context-review-support-classification.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1210-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-review-support-classification.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1211-coordinator-symphony-aligned-standalone-review-shell-command-parser-primitives-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1212-coordinator-symphony-aligned-standalone-review-operand-path-normalization-boundary-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1213-coordinator-symphony-aligned-standalone-review-inspection-target-parsing-pipeline-extraction.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1214-coordinator-symphony-aligned-standalone-review-command-probe-classification-extraction.md",
@@ -30346,10 +30406,11 @@
     },
     {
       "path": "tasks/specs/1219-coordinator-symphony-aligned-standalone-review-remaining-helper-family-freeze-reassessment.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1220-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
@@ -31109,10 +31170,11 @@
     },
     {
       "path": "tasks/specs/linear-0022f975-905a-4974-aa8e-d689df90167c.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-14",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-004edeb8-9641-4a91-8f9b-2d024766c2ac.md",
@@ -31277,10 +31339,11 @@
     },
     {
       "path": "tasks/specs/linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-14",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-104aa410-5c94-457c-bbce-9962c7308ac5.md",
@@ -31403,10 +31466,11 @@
     },
     {
       "path": "tasks/specs/linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-14",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-1e1a879a-42d2-4321-9a43-3ecc0ee7ce60.md",
@@ -31485,10 +31549,11 @@
     },
     {
       "path": "tasks/specs/linear-237c874c-c05f-4947-949a-573043fc575f.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-255030bf-bdda-4594-b503-28639a98b9da.md",
@@ -31583,10 +31648,11 @@
     },
     {
       "path": "tasks/specs/linear-34b60caa-258b-4f18-8d67-cdad3f6352cf.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-34c13c4f-5839-4c64-b6c3-c2b30b7d7fe3.md",
@@ -31685,10 +31751,11 @@
     },
     {
       "path": "tasks/specs/linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-14",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-3ed4e0c0-4a6a-428b-bf31-d6252f230377.md",
@@ -31890,10 +31957,11 @@
     },
     {
       "path": "tasks/specs/linear-4ffb542b-28b2-4530-8630-b79357e306e2.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-50228784-e908-4b2f-81b5-d94dbcf6707c.md",
@@ -32568,10 +32636,11 @@
     },
     {
       "path": "tasks/specs/linear-8720424f-56b0-4539-bebe-041c759fcb74.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-14",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-87d23327-3ee6-429c-a25f-8bd9c84cde58.md",
@@ -32862,10 +32931,11 @@
     },
     {
       "path": "tasks/specs/linear-9a54c7d8-518f-4452-95aa-c5852008b38d.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md",
@@ -32876,10 +32946,11 @@
     },
     {
       "path": "tasks/specs/linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-9b2a195b-4603-4ed4-98c6-20eff87049e4.md",
@@ -33025,10 +33096,11 @@
     },
     {
       "path": "tasks/specs/linear-a560f416-c80a-473b-96fb-9f1ec090c968.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-14",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7.md",
@@ -33102,10 +33174,11 @@
     },
     {
       "path": "tasks/specs/linear-aaa8be94-c82b-40a8-bb19-48343183790e.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-15",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-aadbe46e-9e5a-4810-b9fb-52afe70d73a3.md",
@@ -33140,10 +33213,11 @@
     },
     {
       "path": "tasks/specs/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-14",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-af97d673-43a4-4a36-8738-b7f61e5b71a1.md",
@@ -33154,10 +33228,11 @@
     },
     {
       "path": "tasks/specs/linear-afb6ebc9-1341-4dbd-a522-6531a15aab90.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-14",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-b0aac010-12ec-4509-88a4-c2dbc6395e19.md",
@@ -33288,10 +33363,11 @@
     },
     {
       "path": "tasks/specs/linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964-co-status-prune-terminal-released-issues.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-14",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-bb472787-be60-44e3-ac83-a3c297dab470.md",
@@ -33702,10 +33778,11 @@
     },
     {
       "path": "tasks/specs/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-14",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-e09ce1db-e2f8-4fe7-9509-9f61a02f4844.md",
@@ -33761,10 +33838,11 @@
     },
     {
       "path": "tasks/specs/linear-e3bc507e-c33d-48c7-9474-196a6ef9a28c.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-14",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-e52a7254-f277-4121-b9f9-bf4084c4a473.md",
@@ -33817,10 +33895,11 @@
     },
     {
       "path": "tasks/specs/linear-ea7ddb9e-78a7-4e85-aaa2-f890046d4809.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-14",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "notes": "CO-545 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-ea9e2ac7-6072-4f60-bd9c-1ab5d2c9e8cf.md",
@@ -33904,6 +33983,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-05-06",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/specs/linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md",
+      "owner": "Codex",
+      "status": "active",
+      "last_review": "2026-05-16",
       "cadence_days": 30
     },
     {
@@ -40142,6 +40228,13 @@
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
       "last_review": "2026-05-06",
+      "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md",
+      "owner": "Codex",
+      "status": "active",
+      "last_review": "2026-05-16",
       "cadence_days": 30
     },
     {

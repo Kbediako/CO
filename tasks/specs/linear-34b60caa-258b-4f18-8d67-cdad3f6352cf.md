@@ -1,11 +1,14 @@
 ---
 id: 20260415-linear-34b60caa-258b-4f18-8d67-cdad3f6352cf
 title: CO STATUS: prune stale in_progress provider rows when released terminal claim has no live worker
+status: done
 relates_to: docs/PRD-linear-34b60caa-258b-4f18-8d67-cdad3f6352cf.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-15
+last_review: 2026-05-16
+review_notes:
+  - 2026-05-16: CO-545 strict spec-guard audit reclassified this stale Apr 14/15 row as inactive done; live `node bin/codex-orchestrator.js linear issue-context --issue-id 34b60caa-258b-4f18-8d67-cdad3f6352cf --format json` verified CO-192 is Linear Done/completed and attached/related PR evidence https://github.com/Kbediako/CO/pull/487. No completed_at was inferred or fabricated.
 ---
 
 ## Canonical Reference

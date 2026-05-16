@@ -1,10 +1,10 @@
 ---
 id: 20260414-linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d
 title: CO Codex CLI 0.120.0 Adoption Posture
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-14
-last_review: 2026-04-14
+last_review: 2026-05-16
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d.md
@@ -14,6 +14,7 @@ related_tasks:
 review_notes:
   - 2026-04-14: Issue-quality review approves the lane as a policy/adoption decision rather than a string bump or runtime rewrite. Required evidence covers local command surfaces, runtime-mode canary, cloud canary contract, cloud fallback contract, and provider-worker/review-wrapper assumptions.
   - 2026-04-14: Candidate audit decision holds the current `0.118.0` target. Local `codex-cli 0.120.0` command surfaces and runtime canary are green, but the required cloud canary contract is blocked by missing `CODEX_CLOUD_ENV_ID` in this provider workspace.
+  - 2026-05-16: CO-545 strict spec-guard audit reclassified this stale Apr 14/15 row as inactive done; live `node bin/codex-orchestrator.js linear issue-context --issue-id acdc2c4c-b8b1-46e8-8e21-c9a9c014213d --format json` verified CO-180 is Linear Done/completed. No completed_at was inferred or fabricated.
 ---
 
 # Technical Specification
