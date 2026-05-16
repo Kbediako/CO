@@ -255,7 +255,24 @@ export function analyzeReviewSemanticVerdict(outputText: string): ReviewSemantic
   }
 
   const findings: ParsedReviewFinding[] = [];
+  let pendingActionableDefectHeading = false;
   for (const line of verdictText.split(/\r?\n/u)) {
+    const trimmedLine = line.trim();
+    if (!trimmedLine || isTopLevelReviewRuntimeLine(trimmedLine)) {
+      continue;
+    }
+    if (pendingActionableDefectHeading) {
+      pendingActionableDefectHeading = false;
+      const carriedFinding = parseActionableDefectSummaryFinding(trimmedLine);
+      if (carriedFinding) {
+        findings.push(carriedFinding);
+        continue;
+      }
+    }
+    if (isActionableDefectSplitHeadingLine(trimmedLine)) {
+      pendingActionableDefectHeading = true;
+      continue;
+    }
     const finding = parseReviewFindingLine(line) ?? parseActionableDefectFindingLine(line);
     if (finding) {
       findings.push(finding);
@@ -570,7 +587,8 @@ function stripLeadingReviewRuntimeNoise(value: string): string {
 function parseReviewFindingLine(
   line: string
 ): ParsedReviewFinding | null {
-  const match = line.match(/^\s*(?:[-*]\s*)?(?:\d+[.)]\s*)?(?:>\s*)?\[(P[0-3])\]\s+(.+?)\s*$/u);
+  const candidate = normalizeReviewLabelCandidate(line);
+  const match = candidate.match(/^\s*(?:[-*]\s*)?(?:\d+[.)]\s*)?(?:>\s*)?\[(P[0-3])\]:?\s+(.+?)\s*$/u);
   if (!match) {
     return null;
   }
@@ -584,6 +602,10 @@ function parseReviewFindingLine(
 
 function parseActionableDefectFindingLine(line: string): ParsedReviewFinding | null {
   const text = parseActionableDefectSummaryText(line);
+  return text ? parseActionableDefectSummaryFinding(text) : null;
+}
+
+function parseActionableDefectSummaryFinding(text: string): ParsedReviewFinding | null {
   if (!text || isNoOpActionableDefectSummary(text)) {
     return null;
   }
@@ -609,16 +631,17 @@ function parseActionableDefectFindingLine(line: string): ParsedReviewFinding | n
 }
 
 function parseActionableDefectSummaryText(line: string): string | null {
-  const inlineNeutralPrefaceBody = extractInlineNeutralCleanReviewPrefaceBody(line);
-  if (inlineNeutralPrefaceBody && inlineNeutralPrefaceBody !== line) {
+  const candidate = normalizeReviewLabelCandidate(line);
+  const inlineNeutralPrefaceBody = extractInlineNeutralCleanReviewPrefaceBody(candidate);
+  if (inlineNeutralPrefaceBody && inlineNeutralPrefaceBody !== candidate) {
     return parseActionableDefectSummaryText(inlineNeutralPrefaceBody);
   }
 
-  const directMatch = line.match(/^\s*(?:[-*]\s*)?(?:>\s*)?(?:\d+[.)]\s*)?actionable\s+defects?:\s+(.+?)\s*$/iu);
+  const directMatch = candidate.match(/^\s*(?:[-*]\s*)?(?:>\s*)?(?:\d+[.)]\s*)?actionable\s+defects?:\s+(.+?)\s*$/iu);
   if (directMatch?.[1]) {
     return directMatch[1].trim();
   }
-  const inlineMatch = line.match(/^(?<prefix>.+?)[.!?,;]\s+actionable\s+defects?:\s+(?<summary>.+?)\s*$/iu);
+  const inlineMatch = candidate.match(/^(?<prefix>.+?)[.!?,;]\s+actionable\s+defects?:\s+(?<summary>.+?)\s*$/iu);
   const summary = inlineMatch?.groups?.summary?.trim();
   if (!summary) {
     return null;
@@ -632,6 +655,13 @@ function parseActionableDefectSummaryText(line: string): string | null {
     return `${prefix}, ${summary}`;
   }
   return summary;
+}
+
+function isActionableDefectSplitHeadingLine(line: string): boolean {
+  const candidate = normalizeReviewLabelCandidate(line)
+    .replace(/[:\s]+$/u, '')
+    .trim();
+  return /^actionable\s+defects?$/iu.test(candidate);
 }
 
 function isNoOpActionableDefectSummary(value: string): boolean {
@@ -982,6 +1012,19 @@ function stripReviewListMarker(candidate: string): string {
   return candidate.replace(/^\s*(?:(?:-\s*)|(?:\*(?!\*)\s*))?(?:>\s*)?(?:\d+[.)]\s*)?/u, '').trim();
 }
 
+function normalizeReviewLabelCandidate(candidate: string): string {
+  return stripReviewMarkdownLabelSyntax(stripReviewListMarker(candidate));
+}
+
+function stripReviewMarkdownLabelSyntax(candidate: string): string {
+  return candidate
+    .replace(/^#{1,6}\s*/u, '')
+    .replace(/^\*\*(.+?)\*\*(:?)\s*/u, (_match, label: string, separator: string) => `${label}${separator} `)
+    .replace(/^__(.+?)__(:?)\s*/u, (_match, label: string, separator: string) => `${label}${separator} `)
+    .replace(/\s+:\s*/u, ': ')
+    .trim();
+}
+
 function normalizeCleanReviewVerdictCandidate(candidate: string): string {
   return candidate
     .replace(/(^|[\s("'`])\.(?=(?:\/|[A-Za-z0-9_-]+\/))/gu, '$1_')
@@ -1017,11 +1060,7 @@ function isNonBlockingCleanReviewVerdictCaveat(candidate: string): boolean {
 }
 
 function normalizeReviewVerdictClause(candidate: string): string {
-  return candidate
-    .replace(/^#{1,6}\s*/u, '')
-    .replace(/^\*\*(.+?)\*\*(:?)\s*/u, (_match, label: string, separator: string) => `${label}${separator} `)
-    .replace(/^__(.+?)__(:?)\s*/u, (_match, label: string, separator: string) => `${label}${separator} `)
-    .replace(/\s+:\s*/u, ': ')
+  return stripReviewMarkdownLabelSyntax(candidate)
     .replace(/\b(did|do|have|had)n['’]t\b/giu, '$1 not')
     .replace(/^[.!?;,]\s*/u, '')
     .replace(/[.!]+$/u, '')

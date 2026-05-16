@@ -184,6 +184,48 @@ describe('review-execution-telemetry', () => {
       expectedCount: 1
     },
     {
+      name: 'keeps split actionable defect prose as findings',
+      output: 'Actionable defects:\nThe parser drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'preserves priorities in split actionable defect prose',
+      output: 'Actionable defects:\n- [P1] The parser drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: 'P1',
+      expectedCount: 1
+    },
+    {
+      name: 'keeps Markdown-wrapped actionable defect labels as findings',
+      output: '**Actionable defects:** it drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'preserves priorities in Markdown-wrapped actionable defect labels',
+      output: '**Actionable defects:** [P1] it drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: 'P1',
+      expectedCount: 1
+    },
+    {
+      name: 'preserves Markdown-wrapped inline priorities in actionable defect summaries',
+      output: 'Actionable defects: **[P1]** it drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: 'P1',
+      expectedCount: 1
+    },
+    {
+      name: 'keeps Markdown heading actionable defect labels as findings',
+      output: '### Actionable defects: it drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
       name: 'keeps semicolon-separated actionable defect prose ahead of clean wording',
       output: 'No actionable defects were found in the parser; actionable defect: it drops errors.\n',
       expectedVerdict: 'findings',
@@ -242,6 +284,20 @@ describe('review-execution-telemetry', () => {
     {
       name: 'recognizes numbered no-op actionable defect labels',
       output: '1. Actionable defects: none found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes Markdown-wrapped no-op actionable defect labels',
+      output: '**Actionable defects:** none found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes Markdown heading no-op actionable defect labels',
+      output: '### Actionable defects: none found.\n',
       expectedVerdict: 'clean',
       expectedPriority: null,
       expectedCount: 0
