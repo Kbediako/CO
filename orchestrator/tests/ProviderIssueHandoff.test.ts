@@ -2544,6 +2544,176 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalledTimes(1);
   });
 
+  it('releases accepted pending-revalidation claims during rehydrate when live issue state is Blocked', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-510',
+      issue_identifier: 'CO-510',
+      issue_title: 'Recognize clean review wording',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:00:00.000Z',
+      task_id: 'linear-lin-issue-510',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      run_id: null,
+      run_manifest_path: null
+    }));
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-510',
+        identifier: 'CO-510',
+        title: 'Recognize clean review wording',
+        state: 'Blocked',
+        state_type: 'started',
+        updated_at: '2026-05-16T10:05:00.000Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue
+    });
+
+    await service.rehydrate();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-510'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-510',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T10:05:00.000Z',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: null,
+      run_manifest_path: null
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps accepted pending-revalidation claims fail-closed during rehydrate when live evidence is unavailable', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-512',
+      issue_identifier: 'CO-512',
+      issue_title: 'Handle provider rehydration cache residue',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:30:00.000Z',
+      task_id: 'linear-lin-issue-512',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      run_id: null,
+      run_manifest_path: null
+    }));
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'skip' as const,
+      reason: 'linear_unavailable'
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue
+    });
+
+    await service.rehydrate();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-512'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-512',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:30:00.000Z',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      run_id: null,
+      run_manifest_path: null
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases stale running claims during rehydrate instead of demoting live Blocked work to cached pending revalidation', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-512',
+      issue_identifier: 'CO-512',
+      issue_title: 'Handle provider rehydration cache residue',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:30:00.000Z',
+      task_id: 'linear-lin-issue-512',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'stale-run-co-512',
+      run_manifest_path: '/tmp/stale-run-co-512.json'
+    }));
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-512',
+        identifier: 'CO-512',
+        title: 'Handle provider rehydration cache residue',
+        state: 'Blocked',
+        state_type: 'started',
+        updated_at: '2026-05-16T10:06:00.000Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue
+    });
+
+    await service.rehydrate();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-512'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-512',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T10:06:00.000Z',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: 'stale-run-co-512',
+      run_manifest_path: '/tmp/stale-run-co-512.json'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
   it('does not overwrite known tracked issue metadata during active-run rehydrate when the live updated_at is unknown', async () => {
     const { root, paths } = await createHostPaths();
     const activeEnv = {
