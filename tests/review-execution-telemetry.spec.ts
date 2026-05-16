@@ -226,8 +226,22 @@ describe('review-execution-telemetry', () => {
       expectedCount: 1
     },
     {
+      name: 'skips bare nested findings headings before split actionable defect bodies',
+      output: 'Actionable defects:\nFindings:\nThe parser drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
       name: 'leaves empty split actionable section before recommendation heading unknown without findings',
       output: 'Actionable defects:\nRecommendations:\nNo changes.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves empty split actionable section before recommendation body unknown without findings',
+      output: 'Actionable defects:\nRecommendations: consider refactoring.\n',
       expectedVerdict: 'unknown',
       expectedPriority: null,
       expectedCount: 0
@@ -319,6 +333,13 @@ describe('review-execution-telemetry', () => {
     {
       name: 'keeps relative defect clauses in no-op actionable defect summaries as findings',
       output: 'Actionable defects: No actionable defects were found in the parser where it drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'keeps unsafe state clauses in no-op actionable defect summaries as findings',
+      output: 'Actionable defects: No actionable defects were found in the parser which is incorrect.\n',
       expectedVerdict: 'findings',
       expectedPriority: null,
       expectedCount: 1
@@ -628,6 +649,13 @@ describe('review-execution-telemetry', () => {
       expectedCount: 0
     },
     {
+      name: 'leaves unsafe relative state clause unknown instead of clean',
+      output: 'No actionable defects were found in the parser where it is broken.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
       name: 'leaves contrasting correctness regression clause unknown instead of clean',
       output: 'No concrete correctness regressions were found in the parser, but it drops [P1] findings.\n',
       expectedVerdict: 'unknown',
@@ -758,6 +786,13 @@ describe('review-execution-telemetry', () => {
       name: 'keeps clean verdict when labeled tests not-run shorthand follows',
       output: 'No actionable defects were found.\nTests: not run.\n',
       expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves split no-op actionable section with failed validation unknown',
+      output: 'Actionable defects:\nnone found\nValidation:\nnpm test failed.\n',
+      expectedVerdict: 'unknown',
       expectedPriority: null,
       expectedCount: 0
     },
