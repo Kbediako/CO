@@ -566,6 +566,20 @@ describe('review-execution-telemetry', () => {
       expectedCount: 0
     },
     {
+      name: 'keeps clean verdict when validation caveat and benign follow-up share a line',
+      output: 'No actionable defects were found, but tests not run. The implementation is sound.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps labeled no-op summaries when validation caveat and benign follow-up share a line',
+      output: 'Actionable defects: none found, but tests not run. The implementation is sound.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
       name: 'keeps clean verdict when validation-only shorthand omits auxiliary verb',
       output: 'No actionable defects were found; tests not run.\n',
       expectedVerdict: 'clean',
@@ -603,6 +617,34 @@ describe('review-execution-telemetry', () => {
     {
       name: 'keeps labeled no-op actionable defect summaries with dash-separated validation shorthand',
       output: 'Actionable defects: none found — tests not run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when validation-only shorthand uses did-not contraction',
+      output: "No actionable defects were found. I didn't run tests.\n",
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps labeled no-op summaries when validation-only shorthand uses have-not contraction',
+      output: "Actionable defects: none found. I haven't run tests.\n",
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when benign follow-up is semicolon-separated',
+      output: 'No actionable defects were found; the implementation is sound.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps labeled no-op summaries when benign follow-up is semicolon-separated',
+      output: 'Actionable defects: none found; the implementation is sound.\n',
       expectedVerdict: 'clean',
       expectedPriority: null,
       expectedCount: 0
@@ -821,6 +863,27 @@ describe('review-execution-telemetry', () => {
     {
       name: 'keeps split no-finding headings before clean verdicts clean',
       output: 'Findings:\nNone.\nNo actionable defects were found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps split no-finding headings clean without a second clean sentence',
+      output: 'Findings:\nNone.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps split actionable defect no-op headings clean',
+      output: 'Actionable defects:\nnone found\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdicts followed by no-finding headings clean',
+      output: 'No actionable defects were found.\nFindings: none.\n',
       expectedVerdict: 'clean',
       expectedPriority: null,
       expectedCount: 0

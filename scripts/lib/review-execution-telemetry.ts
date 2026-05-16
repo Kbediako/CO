@@ -909,14 +909,16 @@ function hasCleanReviewVerdict(outputText: string): boolean {
 
 function isAllowedCleanReviewVerdictCompanionLine(line: string): boolean {
   const normalizedLine = normalizeReviewVerdictClause(stripReviewListMarker(line));
-  return isValidationNotRunClause(normalizedLine) || isBenignCleanReviewFollowupClause(normalizedLine);
+  return (
+    isValidationNotRunClause(normalizedLine) ||
+    isBenignCleanReviewFollowupClause(normalizedLine) ||
+    isNeutralCleanReviewPrefaceClause(normalizedLine)
+  );
 }
 
 function isNeutralCleanReviewPrefaceClause(normalized: string): boolean {
   if (
-    /^(?:none|none\s+(?:(?:was|were)\s+)?(?:found|identified|detected|seen)|no\s+findings?|n\/a|not\s+applicable)$/u.test(
-      normalized
-    ) ||
+    isNeutralCleanReviewNoFindingClause(normalized) ||
     /^(?:actionable\s+)?(?:findings?|defects?):$/u.test(normalized) ||
     /^(?:actionable\s+)?(?:findings?|defects?):\s*(?:none|none\s+(?:(?:was|were)\s+)?(?:found|identified|detected|seen)|no\s+findings?|n\/a|not\s+applicable)$/u.test(
       normalized
@@ -940,6 +942,12 @@ function isNeutralCleanReviewPrefaceClause(normalized: string): boolean {
   );
 }
 
+function isNeutralCleanReviewNoFindingClause(normalized: string): boolean {
+  return /^(?:none|none\s+(?:(?:was|were)\s+)?(?:found|identified|detected|seen)|no\s+findings?|n\/a|not\s+applicable)$/u.test(
+    normalized
+  );
+}
+
 function extractInlineNeutralCleanReviewPrefaceBody(candidate: string): string | null {
   const match = candidate.match(
     /^\s*(?:(?:review\s+)?(?:summary|verdict|result)s?|(?:overall|final)\s+(?:summary|verdict|result)):\s+(.+?)\s*$/iu
@@ -951,6 +959,9 @@ function isCleanReviewVerdictCandidate(candidate: string): boolean {
   const verdictCandidate = stripReviewListMarker(candidate);
   const inlineNeutralPrefaceBody = extractInlineNeutralCleanReviewPrefaceBody(verdictCandidate);
   if (inlineNeutralPrefaceBody && isCleanReviewVerdictCandidate(inlineNeutralPrefaceBody)) {
+    return true;
+  }
+  if (isNeutralCleanReviewNoFindingClause(normalizeReviewVerdictClause(verdictCandidate))) {
     return true;
   }
   const actionableDefectSummary = parseActionableDefectSummaryText(verdictCandidate);
@@ -992,11 +1003,20 @@ function isBlockingCleanReviewVerdictCaveat(candidate: string): boolean {
 }
 
 function isNonBlockingCleanReviewVerdictCaveat(candidate: string): boolean {
-  return isValidationNotRunClause(normalizeReviewVerdictClause(candidate));
+  const normalized = normalizeReviewVerdictClause(candidate);
+  if (isValidationNotRunClause(normalized)) {
+    return true;
+  }
+  const prefixBeforeBenignFollowup = getCleanReviewVerdictPrefixBeforeBenignFollowup(candidate);
+  if (!prefixBeforeBenignFollowup || prefixBeforeBenignFollowup === candidate) {
+    return false;
+  }
+  return isNonBlockingCleanReviewVerdictCaveat(prefixBeforeBenignFollowup);
 }
 
 function normalizeReviewVerdictClause(candidate: string): string {
   return candidate
+    .replace(/\b(did|do|have|had)n['’]t\b/giu, '$1 not')
     .replace(/^[.!?;,]\s*/u, '')
     .replace(/[.!]+$/u, '')
     .replace(/\s+/gu, ' ')
@@ -1033,7 +1053,7 @@ function getCleanReviewVerdictPrefixBeforeDashSeparatedValidationOnlyNote(candid
 }
 
 function getCleanReviewVerdictPrefixBeforeBenignFollowup(candidate: string): string | null {
-  return getCleanReviewVerdictPrefixBeforeTrailingClause(candidate, /[.!]/u, isBenignCleanReviewFollowupClause);
+  return getCleanReviewVerdictPrefixBeforeTrailingClause(candidate, /[.!;,]/u, isBenignCleanReviewFollowupClause);
 }
 
 function getCleanReviewVerdictPrefixBeforeTrailingClause(
