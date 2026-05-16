@@ -37,6 +37,12 @@ This lane removes stale cached active-WIP authority for rehydrated pending-reval
 | Accepted pending-revalidation rehydrate | Cached accepted row can be preserved without live Linear metadata. | `remove fallback` | CO-546 | Rehydrate sees accepted `provider_issue_rehydration_pending_revalidation` with no matching run. | Existing provider-intake rehydrate behavior | 2026-05-16 | This issue | Live non-runnable Linear state attaches and releases/downgrades the claim. | Focused CO-510/CO-512-shaped regression. |
 | Missing live issue evidence | Claim remains pending instead of treating cache as clean. | `justify retaining fallback` | Provider-intake control-host | Linear issue lookup is unavailable, skipped, or degraded. | Existing provider-intake safety contract | 2026-05-16 | Durable safety contract | Separate reviewed replacement proves equivalent source-truth-loss behavior. | Regression preserves fail-closed pending state on unavailable evidence. |
 
+- Contract name: provider-intake revalidation fail-closed cache state.
+- Owning surface: provider-intake control-host claim refresh.
+- Steady-state proof: absent live Linear issue evidence remains visible as accepted pending revalidation and never becomes clean active-worker truth.
+- Tests/docs: focused ProviderIssueHandoff regressions plus CO-546 docs packet/checklist.
+- Non-expiring rationale: durable source-truth-loss safety contract; remove only after a reviewed replacement proves equivalent fail-closed behavior.
+
 ## Validation Plan
 - Focused `ProviderIssueHandoff` regressions.
 - `git diff --check`.

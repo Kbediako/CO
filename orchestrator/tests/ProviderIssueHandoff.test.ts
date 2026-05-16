@@ -2603,6 +2603,128 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalledTimes(1);
   });
 
+  it('refreshes accepted claims after assigning the pending-revalidation reason during rehydrate', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-510',
+      issue_identifier: 'CO-510',
+      issue_title: 'Recognize clean review wording',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:00:00.000Z',
+      task_id: 'linear-lin-issue-510',
+      state: 'accepted',
+      reason: null,
+      run_id: null,
+      run_manifest_path: null
+    }));
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-510',
+        identifier: 'CO-510',
+        title: 'Recognize clean review wording',
+        state: 'Blocked',
+        state_type: 'started',
+        updated_at: '2026-05-16T10:05:00.000Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue
+    });
+
+    await service.rehydrate();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-510'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-510',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T10:05:00.000Z',
+      state: 'released',
+      reason: 'provider_issue_released:not_active'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes queued pending-revalidation claims during rehydrate and clears retry state on release', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-512',
+      issue_identifier: 'CO-512',
+      issue_title: 'Handle provider rehydration cache residue',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:30:00.000Z',
+      task_id: 'linear-lin-issue-512',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      retry_queued: true,
+      retry_attempt: 2,
+      retry_due_at: '2026-05-16T10:45:00.000Z',
+      retry_error: 'stale cached retry',
+      run_id: null,
+      run_manifest_path: null
+    }));
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-512',
+        identifier: 'CO-512',
+        title: 'Handle provider rehydration cache residue',
+        state: 'Blocked',
+        state_type: 'started',
+        updated_at: '2026-05-16T10:06:00.000Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue
+    });
+
+    await service.rehydrate();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-512'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-512',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T10:06:00.000Z',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps accepted pending-revalidation claims fail-closed during rehydrate when live evidence is unavailable', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
@@ -3741,7 +3863,7 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
-  it('rolls back earlier rehydrate mutations when a later metadata refresh becomes stale', async () => {
+  it('leaves earlier rehydrate claims unchanged when a later metadata refresh becomes stale', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
 
@@ -3821,8 +3943,10 @@ describe('createProviderIssueHandoffService', () => {
     await waitForMockCalls(resolveTrackedIssue, 1);
     expect(state.claims.find((claim) => claim.issue_id === 'lin-earlier-accepted')).toMatchObject({
       state: 'accepted',
-      reason: 'provider_issue_rehydration_pending_revalidation'
+      reason: null,
+      updated_at: '2026-03-19T03:59:00.000Z'
     });
+    expect(persist).not.toHaveBeenCalled();
 
     service.resetStuckRefreshLifecycle?.();
     releaseTrackedIssue?.();

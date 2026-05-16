@@ -2585,11 +2585,7 @@ export function createProviderIssueHandoffService(
       };
       const shouldRefreshPendingMetadata =
         input?.refreshTrackedIssueMetadata === true &&
-        (
-          isCachedPendingRevalidationClaim(claim) ||
-          claim.state === 'running' ||
-          claim.state === 'resumable'
-        );
+        nextReason === 'provider_issue_rehydration_pending_revalidation';
       if (!shouldRefreshPendingMetadata) {
         return baseClaim;
       }
@@ -2629,6 +2625,10 @@ export function createProviderIssueHandoffService(
           ...retainedRunIdentity,
           state: 'released' as const,
           reason: releaseReason,
+          retry_queued: null,
+          retry_attempt: null,
+          retry_due_at: null,
+          retry_error: null,
           updated_at: now
         };
         publishRuntime ||= hasProviderClaimTransitioned(claim, releasedClaim);
@@ -3096,6 +3096,14 @@ export function createProviderIssueHandoffService(
                 reason: nextReason,
                 extraFields: queuedRetryFields,
                 refreshTrackedIssueMetadata: input?.refreshTrackedIssueMetadata === true
+              });
+              publishRuntime ||= hasProviderClaimTransitioned(claim, nextClaim);
+              upsertRehydratedProviderIntakeClaim(nextClaim);
+            } else if (input?.refreshTrackedIssueMetadata === true) {
+              const nextReason = claim.reason ?? 'provider_issue_rehydration_pending_revalidation';
+              const nextClaim = await buildAcceptedPendingRevalidationClaim(claim, {
+                reason: nextReason,
+                refreshTrackedIssueMetadata: true
               });
               publishRuntime ||= hasProviderClaimTransitioned(claim, nextClaim);
               upsertRehydratedProviderIntakeClaim(nextClaim);
