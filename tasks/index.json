@@ -1,6 +1,71 @@
 {
   "items": [
     {
+      "id": "20260516-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0",
+      "title": "CO-544 release rehydrated blocked provider claims from active WIP",
+      "relates_to": "tasks/tasks-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-16",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-16",
+          "status": "confirmed_in_progress",
+          "summary": "Live issue-context verified CO-544 is In Progress with no attached PR; provider worker created the workpad and recorded the required serial parallelization decision before implementation."
+        },
+        "docs_packet": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-16",
+          "status": "created_before_implementation",
+          "summary": "Created the CO-544 docs-first packet for stale rehydrated accepted provider-intake claims with cached In Progress metadata and live Blocked Linear state, preserving fail-closed unavailable-evidence behavior and status/freshness-gauge distinction requirements."
+        }
+      },
+      "validation": {
+        "status": "implemented_review_clean_docs_freshness_baseline_blocked",
+        "passed": [
+          "live issue-context",
+          "workpad creation",
+          "parallelization decision recorded",
+          "docs-first packet created",
+          "focused provider-intake pending-revalidation tests",
+          "status/freshness-gauge classification tests",
+          "git diff --check",
+          "npm run build",
+          "npm run lint",
+          "npm run docs:check",
+          "npm run repo:stewardship",
+          "node scripts/diff-budget.mjs",
+          "gpt-5.5/xhigh standalone review"
+        ],
+        "blocked": [
+          "npm run docs:freshness fails on existing repo-wide stale-doc baseline debt outside CO-544"
+        ],
+        "waivers": [
+          "delegation guard passed with desktop spawn_agent override because worker_complex 019e2f89-e720-7e40-a32d-087c9c15976f is not represented by repo-local child manifests"
+        ],
+        "pending": [
+          "PR handoff if opened"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md",
+        "prd": "docs/PRD-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md",
+        "docs": "docs/TECH_SPEC-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md",
+        "action_plan": "docs/ACTION_PLAN-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md",
+        "spec": "tasks/specs/linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md",
+        "task": "tasks/tasks-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md"
+      },
+      "source_issue": {
+        "id": "c8f25aac-5bc5-4210-8fc5-a143d6b14df0",
+        "identifier": "CO-544",
+        "url": "https://linear.app/asabeko/issue/CO-544/co-release-rehydrated-blocked-provider-claims-from-active-wip"
+      }
+    },
+    {
       "id": "20260515-linear-54f80820-2f4b-40c0-a998-ba767b02843e",
       "title": "CO-513 suppress same-attempt retries for create-follow-up label-resolution failures",
       "relates_to": "tasks/tasks-linear-54f80820-2f4b-40c0-a998-ba767b02843e.md",

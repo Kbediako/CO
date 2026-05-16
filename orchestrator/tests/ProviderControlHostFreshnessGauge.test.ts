@@ -499,6 +499,62 @@ describe('provider/control-host freshness gauge', () => {
     expect(report.findings.map((finding) => finding.code)).toContain('active_worker_proof_missing');
   });
 
+  it('does not require active worker proof for cached pending-revalidation claims without a run', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'provider-freshness-pending-revalidation-'));
+    cleanupRoots.push(root);
+    const intakePath = join(root, 'provider-intake-state.json');
+    await writeFile(
+      intakePath,
+      JSON.stringify({
+        schema_version: 1,
+        updated_at: NOW,
+        rehydrated_at: NOW,
+        polling: {
+          last_success_at: NOW
+        },
+        claims: [
+          {
+            provider: 'linear',
+            provider_key: 'linear:lin-issue-510',
+            issue_id: 'lin-issue-510',
+            issue_identifier: 'CO-510',
+            issue_title: 'Recognize clean review wording',
+            issue_state: 'In Progress',
+            issue_state_type: 'started',
+            issue_updated_at: '2026-05-14T12:00:00.000Z',
+            task_id: 'linear-lin-issue-510',
+            mapping_source: 'provider_id_fallback',
+            state: 'accepted',
+            reason: 'provider_issue_rehydration_pending_revalidation',
+            accepted_at: NOW,
+            updated_at: NOW,
+            run_id: null,
+            run_manifest_path: null,
+            launch_source: null,
+            launch_token: null
+          }
+        ]
+      })
+    );
+
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      paths: {
+        provider_intake_state: [intakePath]
+      },
+      now: NOW,
+      strict: true
+    });
+
+    expect(report.sources.provider_intake_state).toEqual([intakePath]);
+    expect(report.metrics.active_heartbeat_age_ms).toMatchObject({
+      value: null,
+      verdict: 'unknown',
+      source_field: null,
+      reason: 'no active provider proof observed'
+    });
+    expect(report.findings.map((finding) => finding.code)).not.toContain('active_worker_proof_missing');
+  });
+
   it('follows claim run_manifest_path evidence outside the control-host artifact root', async () => {
     const report = await evaluateProviderControlHostFreshnessGauge({
       artifactRoot: join(FIXTURE_ROOT, 'claim-linked-external-run/control-host'),

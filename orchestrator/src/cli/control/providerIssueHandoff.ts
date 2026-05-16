@@ -9919,7 +9919,10 @@ async function resolveTrackedIssuePollResolutionWithFallback(
     (options?.allowReleasedPollFailClosed === true
       ? resolveReleasedProviderIssuePollFailClosedReason(claim)
       : null);
-  if (failClosedReason) {
+  const shouldRevalidateCachedPendingClaim =
+    failClosedReason === 'provider_issue_poll_cached_revalidation_pending' &&
+    options?.allowDirectIssueById !== false;
+  if (failClosedReason && !shouldRevalidateCachedPendingClaim) {
     return {
       kind: 'skip',
       reason: failClosedReason
@@ -9966,6 +9969,13 @@ async function resolveTrackedIssuePollResolutionWithFallback(
       source: 'direct_issue_by_id',
       trackedIssue: null,
       cleanupWorkspace: false
+    };
+  }
+
+  if (directResolution.kind === 'skip' && shouldRevalidateCachedPendingClaim) {
+    return {
+      kind: 'skip',
+      reason: 'provider_issue_poll_cached_revalidation_pending'
     };
   }
 

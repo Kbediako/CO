@@ -5667,6 +5667,139 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('releases stale pending-revalidation accepted claims when direct live issue state is Blocked', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-510',
+      issue_identifier: 'CO-510',
+      issue_title: 'Recognize clean review wording',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:00:00.000Z',
+      task_id: 'linear-lin-issue-510',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      accepted_at: '2026-05-16T05:59:00.000Z',
+      updated_at: '2026-05-16T05:59:30.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => {
+        throw new Error('blocked pending-revalidation claim must not launch');
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-510',
+        identifier: 'CO-510',
+        title: 'Recognize clean review wording',
+        state: 'Blocked',
+        state_type: 'started',
+        updated_at: '2026-05-16T06:45:00.000Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-issue-510' }]
+    ]);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-510',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T06:45:00.000Z',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
+  it('keeps pending-revalidation accepted claims fail-closed when direct issue evidence is unavailable', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-512',
+      issue_identifier: 'CO-512',
+      issue_title: 'Handle provider rehydration cache residue',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:30:00.000Z',
+      task_id: 'linear-lin-issue-512',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      accepted_at: '2026-05-16T05:59:00.000Z',
+      updated_at: '2026-05-16T05:59:30.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => {
+        throw new Error('unavailable pending-revalidation evidence must not launch');
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'skip' as const,
+      reason: 'linear_unavailable'
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-issue-512' }]
+    ]);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-512',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:30:00.000Z',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
   it('fails closed to cached review-wait truth during poll instead of re-reading the issue or fresh-discovering work', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
