@@ -15,7 +15,7 @@
           "reviewer": "CO provider worker",
           "date": "2026-05-16",
           "status": "confirmed_in_progress",
-          "summary": "Live post-CO-544 validation confirmed CO-546 owns the remaining root cause: rehydrated pending-revalidation claims retain cached In Progress metadata while live Linear shows Blocked."
+          "summary": "Live post-CO-544 validation confirmed CO-546 owns the remaining root cause: rehydrated pending-revalidation claims retain cached In Progress metadata while live Linear shows Blocked. Post-PR #820 rework narrowed the remaining failure to direct issue-by-id source binding being gated by dispatch_pilot.enabled=false."
         },
         "parallelization": {
           "reviewer": "CO provider worker",
@@ -27,11 +27,11 @@
           "reviewer": "CO provider worker",
           "date": "2026-05-16",
           "status": "created_before_implementation",
-          "summary": "Created the CO-546 docs-first packet to attach live Linear metadata during accepted/running/resumable pending-revalidation rehydrate while preserving fail-closed missing-evidence behavior."
+          "summary": "Created and refreshed the CO-546 docs-first packet to attach live Linear metadata during accepted/running/resumable pending-revalidation rehydrate while preserving fail-closed missing-evidence behavior and keeping broad dispatch-pilot admission disabled."
         }
       },
       "validation": {
-        "status": "implemented_review_pending_docs_freshness_baseline_blocked",
+        "status": "implemented_review_pending_live_restart_proof",
         "passed": [
           "live post-merge validation evidence",
           "workpad creation",
@@ -47,7 +47,16 @@
           "node scripts/diff-budget.mjs",
           "npm run pack:smoke",
           "node scripts/spec-guard.mjs --dry-run",
-          "git diff --check"
+          "git diff --check",
+          "post-PR #820 root-cause evidence: direct live issue-by-id lookup works with configured Linear source binding while control-host recover skips with dispatch_source_disabled",
+          "source-binding rework implementation",
+          "TrackerDispatchPilot source-binding tests: 21 passed",
+          "focused ProviderIssueHandoff pending-revalidation slice: 16 passed",
+          "full core test suite: 360 files / 5658 tests",
+          "node scripts/delegation-guard.mjs with desktop subagent override",
+          "npm run repo:stewardship",
+          "JSON parse for tasks/index.json and docs/docs-freshness-registry.json",
+          "gpt-5.5/xhigh codex-orchestrator review clean: .runs/linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d/cli/2026-05-16T12-10-28-410Z-ed2414f2/review/telemetry.json"
         ],
         "blocked": [
           "npm run docs:freshness fails on existing repo-wide stale-doc baseline debt outside CO-546: 286 stale docs and 10 strict docs approaching expiry"
@@ -56,7 +65,8 @@
           "delegation guard passed with desktop spawn_agent override because the read-only CO-542 researcher is not represented by repo-local child manifests and the prior CO-546 worker produced no artifacts before closure"
         ],
         "pending": [
-          "PR handoff and model-backed review"
+          "post-rework control-host restart proof that CO-510/CO-512 stale pending-revalidation claims release",
+          "PR handoff"
         ]
       },
       "paths": {

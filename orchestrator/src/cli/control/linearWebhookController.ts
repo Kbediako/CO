@@ -3,7 +3,10 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import { isoTimestamp } from '../utils/time.js';
 import type { ControlState } from './controlState.js';
-import { evaluateTrackerDispatchPilot } from './trackerDispatchPilot.js';
+import {
+  evaluateTrackerDispatchPilot,
+  resolveTrackerDispatchSourceSetup
+} from './trackerDispatchPilot.js';
 import {
   resolveLiveLinearTrackedIssueById,
   type LiveLinearTrackedIssue
@@ -551,6 +554,15 @@ export function resolveLinearWebhookSourceSetup(
     return { status: 422, error: 'dispatch_source_binding_missing' };
   }
   return { sourceSetup: evaluation.summary.source_setup };
+}
+
+export function resolveLinearConfiguredSourceSetup(
+  featureToggles: ControlState['feature_toggles'],
+  env: NodeJS.ProcessEnv
+):
+  | { sourceSetup: { provider: 'linear'; workspace_id: string | null; team_id: string | null; project_id: string | null } }
+  | { status: number; error: string } {
+  return resolveTrackerDispatchSourceSetup({ featureToggles, env });
 }
 
 function shouldIgnoreLinearResolutionReason(reason: string): boolean {

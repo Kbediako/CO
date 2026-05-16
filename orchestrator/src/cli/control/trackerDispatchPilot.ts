@@ -87,6 +87,11 @@ type DispatchPilotSourceParseResult =
   | DispatchPilotSourceParseUnavailable
   | DispatchPilotSourceParseMalformed;
 
+type DispatchPilotSourceSetupParseResult =
+  | { kind: 'ready'; sourceSetup: DispatchPilotSourceSetup }
+  | DispatchPilotSourceParseUnavailable
+  | DispatchPilotSourceParseMalformed;
+
 export function evaluateTrackerDispatchPilot(input: {
   featureToggles: Record<string, unknown> | null | undefined;
   defaultIssueIdentifier?: string | null;
@@ -166,6 +171,31 @@ export function evaluateTrackerDispatchPilot(input: {
     recommendation: source.recommendation,
     sourceSetup: source.sourceSetup
   });
+}
+
+export function resolveTrackerDispatchSourceSetup(input: {
+  featureToggles: Record<string, unknown> | null | undefined;
+  env?: NodeJS.ProcessEnv;
+}): { sourceSetup: DispatchPilotSourceSetup } | { status: number; error: string } {
+  const resolved = resolveDispatchPilotPolicy(input.featureToggles ?? null);
+  const killSwitch = readBooleanValue(resolved.policy, 'kill_switch', 'killSwitch') ?? false;
+  const source = parseDispatchPilotSourceSetup(resolved.policy);
+
+  if (killSwitch) {
+    return { status: 409, error: 'dispatch_source_kill_switched' };
+  }
+  if (source.kind === 'unavailable') {
+    return { status: 503, error: 'dispatch_source_unavailable' };
+  }
+  if (source.kind === 'malformed') {
+    return { status: 422, error: source.reason };
+  }
+
+  const sourceSetup = resolveLinearSourceSetup(source.sourceSetup, input.env ?? process.env);
+  if (!hasLinearSourceBinding(sourceSetup)) {
+    return { status: 422, error: 'dispatch_source_binding_missing' };
+  }
+  return { sourceSetup };
 }
 
 export function summarizeTrackerDispatchPilotPolicy(input: {
@@ -554,6 +584,37 @@ function parseDispatchPilotSource(
       source_setup: sourceSetup,
       tracked_issue: null
     },
+    sourceSetup
+  };
+}
+
+function parseDispatchPilotSourceSetup(policy: Record<string, unknown>): DispatchPilotSourceSetupParseResult {
+  if (!Object.prototype.hasOwnProperty.call(policy, 'source')) {
+    return { kind: 'unavailable' };
+  }
+  const rawSource = policy.source;
+  if (!rawSource || typeof rawSource !== 'object' || Array.isArray(rawSource)) {
+    return { kind: 'malformed', reason: 'dispatch_source_not_object' };
+  }
+  const source = rawSource as Record<string, unknown>;
+  const provider = readStringValue(source, 'provider', 'source_provider', 'sourceProvider');
+  const normalizedProvider = normalizeDispatchSourceProvider(provider);
+  if (!normalizedProvider) {
+    return {
+      kind: 'malformed',
+      reason: provider ? 'dispatch_source_provider_unsupported' : 'dispatch_source_provider_missing'
+    };
+  }
+
+  const bindingSource = readRecordValue(source, 'linear') ?? source;
+  const sourceSetup: DispatchPilotSourceSetup = {
+    provider: normalizedProvider,
+    workspace_id: readStringValue(bindingSource, 'workspace_id', 'workspaceId') ?? null,
+    team_id: readStringValue(bindingSource, 'team_id', 'teamId') ?? null,
+    project_id: readStringValue(bindingSource, 'project_id', 'projectId') ?? null
+  };
+  return {
+    kind: 'ready',
     sourceSetup
   };
 }
