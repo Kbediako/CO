@@ -95,7 +95,11 @@ describe('review-execution-telemetry', () => {
       'No actionable defects were found in scripts/lib/review-execution-telemetry.ts.',
       'No concrete correctness regressions were found in tests/review-execution-telemetry.spec.ts:91.',
       'No actionable defects were found in .agent/task/linear-1e25073c-5587-4732-89ec-e27e5d167747.md.',
-      'No concrete correctness regressions were found in ./scripts/lib/review-execution-telemetry.ts.'
+      'No concrete correctness regressions were found in ./scripts/lib/review-execution-telemetry.ts.',
+      'No actionable defects were found in docs/exception-handling.md.',
+      'No actionable defects were found in tests/exceptions/foo.ts.',
+      'No actionable defects were found in exception-handler.ts.',
+      'Read-only inspection of the uncommitted diff did not identify actionable regressions in the telemetry parser changes or focused tests.'
     ]
   )('recognizes CO-492 clean semantic review wording: %s', async (cleanOutput) => {
     const sandbox = await makeSandbox();
@@ -166,6 +170,69 @@ describe('review-execution-telemetry', () => {
       expectedCount: 1
     },
     {
+      name: 'keeps comma-separated actionable defect prose ahead of clean wording',
+      output: 'No actionable defects were found in the parser, actionable defect: it drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'keeps unsafe comma-separated no-op actionable defect labels as findings',
+      output: 'The parser drops errors, actionable defects: none found.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'keeps unsafe semicolon-separated no-op actionable defect labels as findings',
+      output: 'The parser drops errors; actionable defects: none found.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'recognizes clean-prefixed comma-separated no-op actionable defect labels',
+      output: 'I found no actionable issues in the parser, actionable defects: none found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes numbered no-op actionable defect labels',
+      output: '1. Actionable defects: none found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes numbered no-op actionable defect labels with dotted paths and validation notes',
+      output: '2) Actionable defects: none found in scripts/lib/foo.ts. Tests not run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes numbered clean verdicts',
+      output: '1. No actionable defects were found in the parser.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes numbered clean-prefixed comma-separated no-op actionable defect labels',
+      output: '1. I found no actionable issues in the parser, actionable defects: none found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps numbered unsafe comma-separated no-op actionable defect labels as findings',
+      output: '1. The parser drops errors, actionable defects: none found.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
       name: 'ignores no-op actionable defect summaries',
       output: [
         'No actionable defects were found in the broad review summary.',
@@ -221,6 +288,78 @@ describe('review-execution-telemetry', () => {
       expectedVerdict: 'clean',
       expectedPriority: null,
       expectedCount: 0
+    },
+    {
+      name: 'recognizes period-separated no-op actionable defect summaries with validation-only notes',
+      output: 'Actionable defects: none found. I did not run tests.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes no-op actionable defect summaries with tests-not-run shorthand',
+      output: 'Actionable defects: none found. Tests not run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes no-op actionable defect summaries with dotted paths before validation-only notes',
+      output: 'Actionable defects: none found in scripts/lib/foo.ts. Tests not run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes no-op actionable defect summaries with benign follow-up prose',
+      output: 'Actionable defects: none found. The implementation is sound.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes no-op actionable defect summaries with dotted paths before benign follow-up prose',
+      output: 'Actionable defects: none found in scripts/lib/foo.ts. The implementation is sound.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps no-op actionable defect summaries with dotted paths before unsafe follow-up prose as findings',
+      output: 'Actionable defects: none found in scripts/lib/foo.ts. I saw it drop errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'recognizes no-op actionable defect summaries before terminal clean verdicts',
+      output: 'Actionable defects: none found. No concrete correctness regressions were found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes no-op actionable defect summaries with benign prefaces before terminal clean verdicts',
+      output:
+        'Actionable defects: none found. The implementation is sound. No concrete correctness regressions were found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps no-op actionable defect summaries with unsafe prefaces before terminal clean verdicts as findings',
+      output:
+        'Actionable defects: none found. The implementation is sound. I saw it drop errors. No concrete correctness regressions were found.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'keeps no-op actionable defect summaries with unsafe follow-up prose as findings',
+      output: 'Actionable defects: none found. I saw it drop errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
     },
     {
       name: 'recognizes labeled no-op actionable defect clean wording',
@@ -341,6 +480,390 @@ describe('review-execution-telemetry', () => {
       expectedVerdict: 'clean',
       expectedPriority: null,
       expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when validation-only shorthand omits auxiliary verb',
+      output: 'No actionable defects were found; tests not run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when followed by benign positive prose',
+      output: 'I found no actionable issues in the diff. The implementation is sound.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict with dotted paths before benign positive prose',
+      output: 'I found no actionable issues in scripts/lib/foo.ts. The implementation is sound.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when terminal split sentence is clean',
+      output: 'No actionable defects were found. No concrete correctness regressions were found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when benign middle prose precedes terminal clean sentence',
+      output: 'No actionable defects were found. The implementation is sound. No concrete correctness regressions were found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when validation-only middle prose precedes terminal clean sentence',
+      output: 'No actionable defects were found. Tests not run. No concrete correctness regressions were found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when benign and validation middle prose precede terminal clean sentence',
+      output:
+        'No actionable defects were found. The implementation is sound. Tests not run. No concrete correctness regressions were found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when followed by benign prose and validation-only shorthand',
+      output: 'No actionable defects were found. The implementation is sound. Tests not run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when followed by validation-only shorthand and benign prose',
+      output: 'No actionable defects were found. Tests not run. The implementation is sound.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps labeled no-op actionable defect summary with benign and validation follow-ups clean',
+      output: 'Actionable defects: none found. The implementation is sound. Tests not run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps labeled no-op actionable defect summary with validation and benign follow-ups clean',
+      output: 'Actionable defects: none found. Tests not run. The implementation is sound.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps review-subject clean verdicts clean',
+      output: 'Review found no actionable diff-local docs/task packet or registry metadata issues.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps article-prefixed reviewer clean verdicts clean',
+      output: 'The reviewer found no actionable issues.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps bounded retry clean verdicts clean',
+      output: 'The bounded retry found no actionable regressions.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps read-only retry did-not-find clean verdicts clean',
+      output: 'Read-only retry did not identify any actionable diff-local regressions.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps labeled no-op followed by terminal review-subject clean sentence clean',
+      output: 'Actionable defects: none found. Review found no actionable issues.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps labeled no-op followed by bare standalone review clean sentence clean',
+      output: 'Actionable defects: none found. Standalone review found no actionable issues.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps labeled no-op followed by bare bounded review clean sentence clean',
+      output: 'Actionable defects: none found. Bounded review found no actionable issues.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps labeled no-op followed by bare read-only review clean sentence clean',
+      output: 'Actionable defects: none found. Read-only review found no actionable issues.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps labeled no-op followed by terminal Codex clean sentence clean',
+      output: 'Actionable defects: none found. Codex found no actionable issues.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps labeled no-op followed by terminal bounded retry clean sentence clean',
+      output: 'Actionable defects: none found. The bounded retry found no actionable regressions.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps direct clean followed by terminal review-subject clean sentence clean',
+      output: 'No actionable defects were found. Review found no actionable issues.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps labeled no-op followed by article-prefixed reviewer clean sentence clean',
+      output: 'Actionable defects: none found. The reviewer found no actionable issues.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps direct clean followed by article-prefixed reviewer clean sentence clean',
+      output: 'No actionable defects were found. The reviewer found no actionable issues.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict with leading thread-not-found runtime noise clean',
+      output: `${THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}\nI found no actionable issues.\n`,
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict with warn-prefixed thread-not-found runtime noise clean',
+      output: `${WARN_THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}\nI found no actionable issues.\n`,
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict with trailing thread-not-found runtime noise clean',
+      output: `I found no actionable issues.\n${THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}\n`,
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps neutral review preamble before clean verdict clean',
+      output: 'Reviewing CO-510 telemetry parser.\n\nNo actionable defects were found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps same-line neutral review preamble before clean verdict clean',
+      output: 'Reviewing CO-510 telemetry parser. No actionable defects were found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps neutral review summary heading before clean verdict clean',
+      output: 'Review summary:\nNo actionable defects were found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps multi-line benign and validation clean follow-ups clean',
+      output: 'No actionable defects were found.\nThe implementation is sound.\nTests not run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves clean verdict plus unsafe period-separated prose unknown',
+      output: 'I found no actionable issues in the diff. The parser drops errors.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves unsafe review preamble before clean verdict unknown',
+      output: 'Reviewing CO-510 parser drops errors.\nNo actionable defects were found.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves defect-prose review preamble before same-line clean verdict unknown',
+      output: 'Reviewing CO-510 parser crashes on empty logs. No actionable defects were found.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves neutral preamble plus unsafe middle sentence before clean verdict unknown',
+      output: 'Reviewing CO-510 telemetry parser.\nI saw it drop errors.\nNo actionable defects were found.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves clean verdict plus benign prose plus trailing unsafe sentence unknown',
+      output: 'I found no actionable issues in the diff. The implementation is sound. I saw it drop errors.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps labeled no-op actionable defect summary plus unsafe suffix as a finding',
+      output: 'Actionable defects: none found. The implementation is sound. I saw it drop errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'keeps labeled no-op with unsafe middle before review-subject clean sentence as a finding',
+      output: 'Actionable defects: none found. The parser drops errors. Review found no actionable issues.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'leaves clean verdict followed by unsafe newline prose unknown',
+      output: 'No actionable defects were found.\nI saw it drop errors.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves labeled no-op followed by unsafe newline prose unknown',
+      output: 'Actionable defects: none found.\nI saw it drop errors.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves unsafe newline preface before review-subject clean wording unknown',
+      output: 'The parser drops errors.\nReview found no actionable issues.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves review-subject clean verdict with exception wording unknown',
+      output: 'Review found no actionable issues with one exception: it drops errors.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps labeled no-op plus exception wording as a finding',
+      output: 'Actionable defects: none found. Review found no actionable issues with one exception: it drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'leaves clean verdict plus I-prefixed unsafe suffix unknown',
+      output: 'No actionable defects were found. I saw it drop errors.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves clean verdict plus No-prefixed unsafe suffix unknown',
+      output: 'No actionable defects were found. No, it drops errors.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves clean verdict plus read-only unsafe suffix unknown',
+      output: 'No actionable defects were found. Read-only inspection saw it drop errors.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves prefixed clean verdict plus unsafe suffix unknown',
+      output:
+        'Read-only inspection of the uncommitted diff did not identify actionable regressions. I saw it drop errors.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves unsafe same-line clause before prefixed did-not clean wording unknown',
+      output:
+        'The parser drops errors; read-only inspection did not identify actionable regressions.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves unsafe period-separated preface before prefixed did-not clean wording unknown',
+      output:
+        'The parser drops errors. Read-only inspection did not identify actionable regressions.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves unsafe same-line clause before prefixed found-no clean wording unknown',
+      output:
+        'The parser drops errors; read-only inspection found no actionable correctness issues.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves unsafe period-separated preface before prefixed found-no clean wording unknown',
+      output:
+        'The parser drops errors. Read-only inspection found no actionable correctness issues.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves question-mark clean prefix before validation shorthand unknown',
+      output: 'No actionable defects were found? Tests not run.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves question-mark clean prefix before review-subject clean wording unknown',
+      output: 'No actionable defects were found? Review found no actionable issues.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps question-mark no-op actionable summary before review-subject clean wording as a finding',
+      output: 'Actionable defects: none found? Review found no actionable issues.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
     },
     {
       name: 'keeps clean verdict when same-line caveat mentions validation suite only',
