@@ -2651,6 +2651,7 @@ describe('createProviderIssueHandoffService', () => {
     await service.rehydrate();
 
     expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(resolveRevalidationTrackedIssue).toHaveBeenCalledTimes(1);
     expect(resolveRevalidationTrackedIssue).toHaveBeenCalledWith({
       provider: 'linear',
       issueId: 'lin-issue-510'
