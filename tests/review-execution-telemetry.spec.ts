@@ -170,6 +170,20 @@ describe('review-execution-telemetry', () => {
       expectedCount: 1
     },
     {
+      name: 'preserves inline priorities in neutral-prefixed actionable defect summaries',
+      output: 'Summary: Actionable defects: [P1] It drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: 'P1',
+      expectedCount: 1
+    },
+    {
+      name: 'keeps neutral-prefixed actionable defect prose as findings',
+      output: 'Final verdict: Actionable defects: it drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
       name: 'keeps semicolon-separated actionable defect prose ahead of clean wording',
       output: 'No actionable defects were found in the parser; actionable defect: it drops errors.\n',
       expectedVerdict: 'findings',
@@ -971,8 +985,22 @@ describe('review-execution-telemetry', () => {
       expectedCount: 0
     },
     {
+      name: 'leaves priority-tagged validation actionable defect summaries unknown without findings',
+      output: 'Actionable defects: [P2] tests not run.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
       name: 'leaves pure benign actionable defect summaries unknown without findings',
       output: 'Actionable defects: the patch looks sound.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves priority-tagged benign actionable defect summaries unknown without findings',
+      output: 'Actionable defects: [P3] the patch looks sound.\n',
       expectedVerdict: 'unknown',
       expectedPriority: null,
       expectedCount: 0

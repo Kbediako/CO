@@ -592,8 +592,15 @@ function parseActionableDefectFindingLine(line: string): ParsedReviewFinding | n
     return null;
   }
   const prioritizedFinding = parseReviewFindingLine(text);
-  if (prioritizedFinding && isNoOpActionableDefectSummary(prioritizedFinding.text)) {
-    return null;
+  if (prioritizedFinding) {
+    const normalizedPrioritizedText = normalizeReviewVerdictClause(prioritizedFinding.text);
+    if (
+      isNoOpActionableDefectSummary(prioritizedFinding.text) ||
+      isValidationNotRunClause(normalizedPrioritizedText) ||
+      isBenignCleanReviewFollowupClause(normalizedPrioritizedText)
+    ) {
+      return null;
+    }
   }
   return {
     priority: prioritizedFinding?.priority ?? null,
@@ -602,6 +609,11 @@ function parseActionableDefectFindingLine(line: string): ParsedReviewFinding | n
 }
 
 function parseActionableDefectSummaryText(line: string): string | null {
+  const inlineNeutralPrefaceBody = extractInlineNeutralCleanReviewPrefaceBody(line);
+  if (inlineNeutralPrefaceBody && inlineNeutralPrefaceBody !== line) {
+    return parseActionableDefectSummaryText(inlineNeutralPrefaceBody);
+  }
+
   const directMatch = line.match(/^\s*(?:[-*]\s*)?(?:>\s*)?(?:\d+[.)]\s*)?actionable\s+defects?:\s+(.+?)\s*$/iu);
   if (directMatch?.[1]) {
     return directMatch[1].trim();
