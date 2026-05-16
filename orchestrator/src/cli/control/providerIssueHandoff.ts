@@ -411,6 +411,12 @@ export interface CreateProviderIssueHandoffServiceOptions {
       issueId: string;
     }
   ) => Promise<ProviderTrackedIssueRefreshResolution>) | null;
+  resolveRevalidationTrackedIssue?: ((
+    input: {
+      provider: 'linear';
+      issueId: string;
+    }
+  ) => Promise<ProviderTrackedIssueRefreshResolution>) | null;
   resolveTrackedIssues?: ProviderTrackedIssueRefetch | null;
   providerWorkflowConfigStore?: ProviderWorkflowConfigStore | null;
   runTerminalCleanup?: typeof runProviderTerminalCleanup;
@@ -604,6 +610,7 @@ export function createProviderIssueHandoffService(
     reason: 'provider_refresh_lifecycle_stuck'
   });
   const resolveTrackedIssue = options.resolveTrackedIssue;
+  const resolveRevalidationTrackedIssue = options.resolveRevalidationTrackedIssue ?? resolveTrackedIssue;
   const resolveTrackedIssueWhenNotStuck =
     !resolveTrackedIssue
       ? null
@@ -614,6 +621,19 @@ export function createProviderIssueHandoffService(
             return buildRefreshCycleStuckSkipResolution();
           }
           const resolution = await resolveTrackedIssue(input);
+          assertRefreshLifecycleCurrent();
+          return resolution;
+        };
+  const resolveRevalidationTrackedIssueWhenNotStuck =
+    !resolveRevalidationTrackedIssue
+      ? null
+      : async (
+          input: Parameters<NonNullable<CreateProviderIssueHandoffServiceOptions['resolveTrackedIssue']>>[0]
+        ): Promise<ProviderTrackedIssueRefreshResolution> => {
+          if (shouldAbortRefreshCycle()) {
+            return buildRefreshCycleStuckSkipResolution();
+          }
+          const resolution = await resolveRevalidationTrackedIssue(input);
           assertRefreshLifecycleCurrent();
           return resolution;
         };
@@ -1885,13 +1905,13 @@ export function createProviderIssueHandoffService(
       | 'review_promotion'
     >
   ): Promise<ActiveClaimFreshTrackedIssueResolution> => {
-    if (!resolveTrackedIssueWhenNotStuck) {
+    if (!resolveRevalidationTrackedIssueWhenNotStuck) {
       return buildActiveClaimFreshTrackedIssueFallback(true);
     }
 
-    let resolution: Awaited<ReturnType<NonNullable<typeof resolveTrackedIssueWhenNotStuck>>>;
+    let resolution: Awaited<ReturnType<NonNullable<typeof resolveRevalidationTrackedIssueWhenNotStuck>>>;
     try {
-      resolution = await resolveTrackedIssueWhenNotStuck({
+      resolution = await resolveRevalidationTrackedIssueWhenNotStuck({
         provider: claim.provider,
         issueId: claim.issue_id
       });
