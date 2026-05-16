@@ -812,6 +812,20 @@ describe('review-execution-telemetry', () => {
       expectedCount: 0
     },
     {
+      name: 'keeps review lead-in clean verdicts clean',
+      output: 'I reviewed the changes and found no actionable issues.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps review lead-in clean verdicts scoped to the diff clean',
+      output: 'I inspected the diff and found no actionable defects.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
       name: 'keeps clean verdict with leading thread-not-found runtime noise clean',
       output: `${THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}\nI found no actionable issues.\n`,
       expectedVerdict: 'clean',
@@ -856,6 +870,27 @@ describe('review-execution-telemetry', () => {
     {
       name: 'keeps no-finding headings before clean verdicts clean',
       output: 'Findings: none.\nNo actionable defects were found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps Markdown no-finding headings before clean verdicts clean',
+      output: '## Findings\nNo actionable defects were found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps bold Markdown no-finding headings before clean verdicts clean',
+      output: '**Findings:** none.\nNo actionable defects were found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps underlined Markdown no-finding headings before clean verdicts clean',
+      output: '__Findings__: none.\nNo actionable defects were found.\n',
       expectedVerdict: 'clean',
       expectedPriority: null,
       expectedCount: 0

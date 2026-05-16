@@ -781,6 +781,7 @@ function compareReviewFindingPriority(
 const reviewFindingPriorityRanks: Record<ReviewFindingPriority, number> = { P0: 0, P1: 1, P2: 2, P3: 3 };
 
 const CLEAN_REVIEW_VERDICT_PATTERNS = [
+  /^\s*(?:[-*]\s*)?i\s+(?:reviewed|checked|inspected|looked\s+over)\s+(?:the\s+)?(?:changes|diff|patch|implementation|code|update)(?:\s+and)?\s+(?:found|find)\s+no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions|defects?)(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?(?:[.!]|\.\.\.|…)?\s*$/iu,
   /^\s*(?:[-*]\s*)?(?:(?:(?:I|read-only\s+(?:diff\s+)?inspection(?:\s+(?:in|for|from|against|with|of)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?)\s+)?(?:found|find)\s+no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions|defects?)(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?(?:[.!]|\.\.\.|…)?|no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions|defects?)(?:\s+(?:found|identified|detected|seen|(?:was|were)\s+(?:found|identified|detected|seen)))?(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?(?:[.!]|\.\.\.|…)?|no\s+findings\.?)\s*$/iu,
   /^\s*(?:[-*]\s*)?no\s+(?:concrete|discrete)\s+correctness\s+regressions?\s+(?:(?:was|were)\s+)?(?:found|identified|detected|seen)(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?(?:[.!]|\.\.\.|…)?\s*$/iu,
   /^\s*(?:[-*]\s*)?(?:(?:I|read-only\s+(?:diff\s+)?inspection(?:\s+(?:in|for|from|against|with|of)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?)\s+)?did\s+not\s+(?:find|identify|detect|see)\s+(?:any\s+|a\s+)?(?:(?:concrete|discrete|actionable|correctness)\s+)*(?:issues?|findings?|regressions?)(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?(?:[.!]|\.\.\.|…)?\s*$/iu,
@@ -919,6 +920,7 @@ function isAllowedCleanReviewVerdictCompanionLine(line: string): boolean {
 function isNeutralCleanReviewPrefaceClause(normalized: string): boolean {
   if (
     isNeutralCleanReviewNoFindingClause(normalized) ||
+    /^(?:actionable\s+)?(?:findings?|defects?)$/u.test(normalized) ||
     /^(?:actionable\s+)?(?:findings?|defects?):$/u.test(normalized) ||
     /^(?:actionable\s+)?(?:findings?|defects?):\s*(?:none|none\s+(?:(?:was|were)\s+)?(?:found|identified|detected|seen)|no\s+findings?|n\/a|not\s+applicable)$/u.test(
       normalized
@@ -977,7 +979,7 @@ function isCleanReviewVerdictCandidate(candidate: string): boolean {
 }
 
 function stripReviewListMarker(candidate: string): string {
-  return candidate.replace(/^\s*(?:[-*]\s*)?(?:>\s*)?(?:\d+[.)]\s*)?/u, '').trim();
+  return candidate.replace(/^\s*(?:(?:-\s*)|(?:\*(?!\*)\s*))?(?:>\s*)?(?:\d+[.)]\s*)?/u, '').trim();
 }
 
 function normalizeCleanReviewVerdictCandidate(candidate: string): string {
@@ -1016,6 +1018,10 @@ function isNonBlockingCleanReviewVerdictCaveat(candidate: string): boolean {
 
 function normalizeReviewVerdictClause(candidate: string): string {
   return candidate
+    .replace(/^#{1,6}\s*/u, '')
+    .replace(/^\*\*(.+?)\*\*(:?)\s*/u, (_match, label: string, separator: string) => `${label}${separator} `)
+    .replace(/^__(.+?)__(:?)\s*/u, (_match, label: string, separator: string) => `${label}${separator} `)
+    .replace(/\s+:\s*/u, ': ')
     .replace(/\b(did|do|have|had)n['’]t\b/giu, '$1 not')
     .replace(/^[.!?;,]\s*/u, '')
     .replace(/[.!]+$/u, '')
