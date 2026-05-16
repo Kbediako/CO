@@ -849,6 +849,7 @@ function getCleanReviewVerdictAllowedPrefixCandidates(candidate: string): string
     const prefix =
       getCleanReviewVerdictPrefixBeforeNonBlockingCaveat(current) ??
       getCleanReviewVerdictPrefixBeforeParenthesizedValidationOnlyNote(current) ??
+      getCleanReviewVerdictPrefixBeforeDashSeparatedValidationOnlyNote(current) ??
       getCleanReviewVerdictPrefixBeforeValidationOnlyNote(current) ??
       getCleanReviewVerdictPrefixBeforeBenignFollowup(current);
     if (!prefix || prefix === current || seen.has(prefix)) {
@@ -872,6 +873,7 @@ function isAllowedCleanReviewVerdictPrefaceCandidate(candidate: string): boolean
   }
   const prefix =
     getCleanReviewVerdictPrefixBeforeParenthesizedValidationOnlyNote(trimmed) ??
+    getCleanReviewVerdictPrefixBeforeDashSeparatedValidationOnlyNote(trimmed) ??
     getCleanReviewVerdictPrefixBeforeValidationOnlyNote(trimmed) ??
     getCleanReviewVerdictPrefixBeforeBenignFollowup(trimmed);
   if (!prefix || prefix === trimmed) {
@@ -911,7 +913,15 @@ function isAllowedCleanReviewVerdictCompanionLine(line: string): boolean {
 }
 
 function isNeutralCleanReviewPrefaceClause(normalized: string): boolean {
-  if (/^(?:actionable\s+)?(?:findings?|defects?):\s*(?:none|none\s+(?:(?:was|were)\s+)?(?:found|identified|detected|seen)|no\s+findings?|n\/a|not\s+applicable)$/u.test(normalized)) {
+  if (
+    /^(?:none|none\s+(?:(?:was|were)\s+)?(?:found|identified|detected|seen)|no\s+findings?|n\/a|not\s+applicable)$/u.test(
+      normalized
+    ) ||
+    /^(?:actionable\s+)?(?:findings?|defects?):$/u.test(normalized) ||
+    /^(?:actionable\s+)?(?:findings?|defects?):\s*(?:none|none\s+(?:(?:was|were)\s+)?(?:found|identified|detected|seen)|no\s+findings?|n\/a|not\s+applicable)$/u.test(
+      normalized
+    )
+  ) {
     return true;
   }
   if (
@@ -995,7 +1005,7 @@ function normalizeReviewVerdictClause(candidate: string): string {
 }
 
 function isValidationNotRunClause(normalized: string): boolean {
-  return /^(?:(?:although|but|however|though|yet|except|unless|nevertheless|nonetheless|conversely|still|that\s+said|even\s+so|on\s+the\s+other\s+hand|in\s+contrast|by\s+contrast)\b|(?:apart|aside)\s+from)\s*,?\s+(?:(?:i\s+)?(?:did|do|have|had)\s+not\s+run\s+(?:the\s+)?(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)|(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)\s+(?:(?:was|were)\s+)?not\s+run|no\s+(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)\s+run)$|^(?:(?:i\s+)?(?:did|do|have|had)\s+not\s+run\s+(?:the\s+)?(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)|(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)\s+(?:(?:was|were)\s+)?not\s+run|no\s+(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)\s+run)$/u.test(normalized);
+  return /^(?:(?:although|but|however|though|yet|except|unless|nevertheless|nonetheless|conversely|still|that\s+said|even\s+so|on\s+the\s+other\s+hand|in\s+contrast|by\s+contrast)\b|(?:apart|aside)\s+from)\s*,?\s+(?:(?:i\s+)?(?:did|do|have|had)\s+not\s+run\s+(?:the\s+)?(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)|(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)\s+(?:(?:was|were)\s+)?not\s+run|no\s+(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)\s+(?:(?:was|were)\s+)?run)$|^(?:(?:i\s+)?(?:did|do|have|had)\s+not\s+run\s+(?:the\s+)?(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)|(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)\s+(?:(?:was|were)\s+)?not\s+run|no\s+(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)\s+(?:(?:was|were)\s+)?run)$/u.test(normalized);
 }
 
 function getCleanReviewVerdictPrefixBeforeValidationOnlyNote(candidate: string): string | null {
@@ -1004,6 +1014,16 @@ function getCleanReviewVerdictPrefixBeforeValidationOnlyNote(candidate: string):
 
 function getCleanReviewVerdictPrefixBeforeParenthesizedValidationOnlyNote(candidate: string): string | null {
   const match = candidate.match(/^(?<prefix>.+?)\s+\((?<note>[^()]+)\)\s*[.!]?$/u);
+  const prefix = match?.groups?.prefix?.trim();
+  const note = match?.groups?.note ? normalizeReviewVerdictClause(match.groups.note) : '';
+  if (!prefix || !isValidationNotRunClause(note)) {
+    return null;
+  }
+  return prefix;
+}
+
+function getCleanReviewVerdictPrefixBeforeDashSeparatedValidationOnlyNote(candidate: string): string | null {
+  const match = candidate.match(/^(?<prefix>.+?)\s+[-–—]\s+(?<note>.+?)\s*$/u);
   const prefix = match?.groups?.prefix?.trim();
   const note = match?.groups?.note ? normalizeReviewVerdictClause(match.groups.note) : '';
   if (!prefix || !isValidationNotRunClause(note)) {

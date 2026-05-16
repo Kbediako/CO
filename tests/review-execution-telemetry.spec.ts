@@ -580,6 +580,34 @@ describe('review-execution-telemetry', () => {
       expectedCount: 0
     },
     {
+      name: 'keeps clean verdict when validation-only shorthand uses no-tests-were-run wording',
+      output: 'No actionable defects were found; no tests were run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps labeled no-op actionable defect summaries with no-tests-were-run shorthand',
+      output: 'Actionable defects: none found; no tests were run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when validation-only shorthand is dash-separated',
+      output: 'No actionable defects were found — tests not run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps labeled no-op actionable defect summaries with dash-separated validation shorthand',
+      output: 'Actionable defects: none found — tests not run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
       name: 'keeps clean verdict when followed by benign positive prose',
       output: 'I found no actionable issues in the diff. The implementation is sound.\n',
       expectedVerdict: 'clean',
@@ -786,6 +814,13 @@ describe('review-execution-telemetry', () => {
     {
       name: 'keeps no-finding headings before clean verdicts clean',
       output: 'Findings: none.\nNo actionable defects were found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps split no-finding headings before clean verdicts clean',
+      output: 'Findings:\nNone.\nNo actionable defects were found.\n',
       expectedVerdict: 'clean',
       expectedPriority: null,
       expectedCount: 0
