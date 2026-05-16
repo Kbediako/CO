@@ -163,6 +163,13 @@ describe('review-execution-telemetry', () => {
       expectedCount: 1
     },
     {
+      name: 'preserves inline priorities in actionable defect summaries',
+      output: 'Actionable defect: [P1] It drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: 'P1',
+      expectedCount: 1
+    },
+    {
       name: 'keeps semicolon-separated actionable defect prose ahead of clean wording',
       output: 'No actionable defects were found in the parser; actionable defect: it drops errors.\n',
       expectedVerdict: 'findings',
@@ -191,6 +198,13 @@ describe('review-execution-telemetry', () => {
       expectedCount: 1
     },
     {
+      name: 'keeps comma-spliced defect clauses in no-op actionable defect summaries as findings',
+      output: 'Actionable defects: No actionable defects were found in the parser, it drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
       name: 'recognizes clean-prefixed comma-separated no-op actionable defect labels',
       output: 'I found no actionable issues in the parser, actionable defects: none found.\n',
       expectedVerdict: 'clean',
@@ -214,6 +228,20 @@ describe('review-execution-telemetry', () => {
     {
       name: 'recognizes numbered clean verdicts',
       output: '1. No actionable defects were found in the parser.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes detected actionable defect clean wording',
+      output: 'No actionable defects detected.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes seen actionable defect clean wording',
+      output: 'No actionable defects seen.\n',
       expectedVerdict: 'clean',
       expectedPriority: null,
       expectedCount: 0
@@ -299,6 +327,13 @@ describe('review-execution-telemetry', () => {
     {
       name: 'recognizes no-op actionable defect summaries with tests-not-run shorthand',
       output: 'Actionable defects: none found. Tests not run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes no-op actionable defect summaries with no-tests-run shorthand',
+      output: 'Actionable defects: none found; no tests run.\n',
       expectedVerdict: 'clean',
       expectedPriority: null,
       expectedCount: 0
@@ -484,6 +519,13 @@ describe('review-execution-telemetry', () => {
     {
       name: 'keeps clean verdict when validation-only shorthand omits auxiliary verb',
       output: 'No actionable defects were found; tests not run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when validation-only shorthand reverses no-tests-run wording',
+      output: 'No actionable defects were found; no tests run.\n',
       expectedVerdict: 'clean',
       expectedPriority: null,
       expectedCount: 0
@@ -688,6 +730,13 @@ describe('review-execution-telemetry', () => {
     {
       name: 'keeps neutral review summary heading before clean verdict clean',
       output: 'Review summary:\nNo actionable defects were found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps no-finding headings before clean verdicts clean',
+      output: 'Findings: none.\nNo actionable defects were found.\n',
       expectedVerdict: 'clean',
       expectedPriority: null,
       expectedCount: 0
