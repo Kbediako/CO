@@ -226,6 +226,13 @@ describe('review-execution-telemetry', () => {
       expectedCount: 1
     },
     {
+      name: 'leaves empty split actionable section before recommendation heading unknown without findings',
+      output: 'Actionable defects:\nRecommendations:\nNo changes.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
       name: 'keeps Markdown-wrapped actionable defect labels as findings',
       output: '**Actionable defects:** it drops errors.\n',
       expectedVerdict: 'findings',
@@ -310,6 +317,13 @@ describe('review-execution-telemetry', () => {
       expectedCount: 1
     },
     {
+      name: 'keeps relative defect clauses in no-op actionable defect summaries as findings',
+      output: 'Actionable defects: No actionable defects were found in the parser where it drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
       name: 'recognizes clean-prefixed comma-separated no-op actionable defect labels',
       output: 'I found no actionable issues in the parser, actionable defects: none found.\n',
       expectedVerdict: 'clean',
@@ -340,6 +354,20 @@ describe('review-execution-telemetry', () => {
     {
       name: 'recognizes there-are-no no-op actionable defect labels',
       output: 'Actionable defects: There are no actionable defects.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes no-defects-found no-op actionable defect labels',
+      output: 'Actionable defects: No defects found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes split no-issues-found no-op actionable defect labels',
+      output: 'Actionable defects:\nNo issues found.\n',
       expectedVerdict: 'clean',
       expectedPriority: null,
       expectedCount: 0
@@ -593,6 +621,13 @@ describe('review-execution-telemetry', () => {
       expectedCount: 0
     },
     {
+      name: 'leaves relative defect clause unknown instead of clean',
+      output: 'No actionable defects were found in the parser where it drops errors.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
       name: 'leaves contrasting correctness regression clause unknown instead of clean',
       output: 'No concrete correctness regressions were found in the parser, but it drops [P1] findings.\n',
       expectedVerdict: 'unknown',
@@ -701,6 +736,27 @@ describe('review-execution-telemetry', () => {
     {
       name: 'keeps clean verdict when labeled validation shorthand follows',
       output: 'No actionable defects were found.\nValidation: tests not run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when split validation shorthand follows',
+      output: 'No actionable defects were found.\nValidation:\nTests not run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when labeled validation not-run shorthand follows',
+      output: 'No actionable defects were found.\nValidation: not run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when labeled tests not-run shorthand follows',
+      output: 'No actionable defects were found.\nTests: not run.\n',
       expectedVerdict: 'clean',
       expectedPriority: null,
       expectedCount: 0

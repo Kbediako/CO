@@ -256,6 +256,7 @@ export function analyzeReviewSemanticVerdict(outputText: string): ReviewSemantic
 
   const findings: ParsedReviewFinding[] = [];
   let inActionableDefectSection = false;
+  let foundNoOpActionableDefectSection = false;
   for (const line of verdictText.split(/\r?\n/u)) {
     const trimmedLine = line.trim();
     if (!trimmedLine) {
@@ -272,9 +273,17 @@ export function analyzeReviewSemanticVerdict(outputText: string): ReviewSemantic
       if (isBareActionableDefectNestedHeadingLine(trimmedLine)) {
         continue;
       }
+      if (isBareReviewSectionBreakHeadingLine(trimmedLine)) {
+        inActionableDefectSection = false;
+        continue;
+      }
       const carriedFinding = parseActionableDefectSummaryFinding(trimmedLine);
       if (carriedFinding) {
         findings.push(carriedFinding);
+        continue;
+      }
+      if (isNoOpActionableDefectSummaryLine(trimmedLine)) {
+        foundNoOpActionableDefectSection = true;
         continue;
       }
       if (isReviewSectionBreakLine(trimmedLine)) {
@@ -294,7 +303,7 @@ export function analyzeReviewSemanticVerdict(outputText: string): ReviewSemantic
   }
 
   return {
-    review_verdict: hasCleanReviewVerdict(verdictText) ? 'clean' : 'unknown',
+    review_verdict: foundNoOpActionableDefectSection || hasCleanReviewVerdict(verdictText) ? 'clean' : 'unknown',
     highest_finding_priority: null,
     finding_count: 0
   };
@@ -646,6 +655,10 @@ function normalizeActionableDefectSummaryBody(text: string): string {
   return summaryMatch?.groups?.body?.trim() ?? candidate;
 }
 
+function isNoOpActionableDefectSummaryLine(line: string): boolean {
+  return isNoOpActionableDefectSummary(normalizeActionableDefectSummaryBody(line));
+}
+
 function parseActionableDefectSummaryText(line: string): string | null {
   const candidate = normalizeReviewLabelCandidate(line);
   const inlineNeutralPrefaceBody = extractInlineNeutralCleanReviewPrefaceBody(candidate);
@@ -685,6 +698,13 @@ function isBareActionableDefectNestedHeadingLine(line: string): boolean {
   return /^(?:review\s+)?summary:$/u.test(normalized);
 }
 
+function isBareReviewSectionBreakHeadingLine(line: string): boolean {
+  const normalized = normalizeReviewVerdictClause(line);
+  return /^(?:validation|verification|checks?|tests?|test\s+suite|findings?|defects?|summary|review\s+summary|notes?|recommendations?):$/u.test(
+    normalized
+  );
+}
+
 function isReviewSectionBreakLine(line: string): boolean {
   const normalized = normalizeReviewVerdictClause(line);
   return (
@@ -722,7 +742,7 @@ function isNoOpActionableDefectSummaryCandidate(candidate: string): boolean {
   }
   return (
     /^(?:i\s+)?did\s+not\s+(?:find|identify|detect|see)\s+(?:any\s+|a\s+)?actionable\s+defects?(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?$/u.test(normalizedCandidate) ||
-    /^(?:none|none (?:(?:was|were) )?(?:found|identified|detected|seen)(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?|(?:there\s+(?:are|were|is|was)\s+)?no actionable defects?(?: (?:(?:was|were) )?(?:found|identified|detected|seen))?(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?|n\/a|not applicable)$/u.test(normalizedCandidate) ||
+    /^(?:none|none (?:(?:was|were) )?(?:found|identified|detected|seen)(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?|(?:there\s+(?:are|were|is|was)\s+)?no (?:actionable\s+)?(?:defects?|issues?)(?: (?:(?:was|were) )?(?:found|identified|detected|seen))?(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?|n\/a|not applicable)$/u.test(normalizedCandidate) ||
     hasCleanReviewVerdict(candidate)
   );
 }
@@ -1103,10 +1123,16 @@ function normalizeReviewVerdictClause(candidate: string): string {
 }
 
 function isValidationNotRunClause(normalized: string): boolean {
+  if (/^(?:validation|verification|checks?|tests?|test\s+suite):$/u.test(normalized)) {
+    return true;
+  }
   const labeledValidationMatch = normalized.match(
     /^(?:validation|verification|checks?|tests?|test\s+suite)\s*:\s*(?<body>.+?)$/u
   );
   if (labeledValidationMatch?.groups?.body) {
+    if (labeledValidationMatch.groups.body === 'not run') {
+      return true;
+    }
     return isValidationNotRunClause(labeledValidationMatch.groups.body);
   }
   return /^(?:(?:although|but|however|though|yet|except|unless|nevertheless|nonetheless|conversely|still|that\s+said|even\s+so|on\s+the\s+other\s+hand|in\s+contrast|by\s+contrast)\b|(?:apart|aside)\s+from)\s*,?\s+(?:(?:i\s+)?(?:did|do|have|had)\s+not\s+run\s+(?:the\s+)?(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)|(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)\s+(?:(?:was|were)\s+)?not\s+run|no\s+(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)\s+(?:(?:was|were)\s+)?run)$|^(?:(?:i\s+)?(?:did|do|have|had)\s+not\s+run\s+(?:the\s+)?(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)|(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)\s+(?:(?:was|were)\s+)?not\s+run|no\s+(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)\s+(?:(?:was|were)\s+)?run)$/u.test(normalized);
@@ -1199,7 +1225,7 @@ function getDisqualifyingCleanReviewVerdictClauses(candidate: string): string[] 
 }
 
 function getDisqualifyingCleanReviewVerdictPattern(): RegExp {
-  return /(?<![\w/-])(?:although|but|however|though|yet|except|unless|nevertheless|nonetheless|conversely|caveats?)(?![\w/-])|(?<![\w/-])(?:with\s+)?one\s+exception\s*[:;,.]|(?<![\w/-])exceptions?\s*:|(?<![\w/-])(?:apart|aside)\s+from|(?:^|[.!?;,]\s+)(?:still|that\s+said|even\s+so|on\s+the\s+other\s+hand|in\s+contrast|by\s+contrast)\b|(?<![\w/-])(?:and|because)\s+(?:(?:it|this|they)\s+|the\s+[A-Za-z0-9._/-]+\s+)(?!(?:is|are|was|were|looks?|appears?|remains?|stays?|has|have)\b)\w+\b/giu;
+  return /(?<![\w/-])(?:although|but|however|though|yet|except|unless|nevertheless|nonetheless|conversely|caveats?)(?![\w/-])|(?<![\w/-])(?:with\s+)?one\s+exception\s*[:;,.]|(?<![\w/-])exceptions?\s*:|(?<![\w/-])(?:apart|aside)\s+from|(?:^|[.!?;,]\s+)(?:still|that\s+said|even\s+so|on\s+the\s+other\s+hand|in\s+contrast|by\s+contrast)\b|(?<![\w/-])(?:and|because|where|when|which)\s+(?:(?:it|this|they)\s+|the\s+[A-Za-z0-9._/-]+\s+)(?!(?:is|are|was|were|looks?|appears?|remains?|stays?|has|have)\b)\w+\b/giu;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
