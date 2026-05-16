@@ -205,6 +205,27 @@ describe('review-execution-telemetry', () => {
       expectedCount: 1
     },
     {
+      name: 'keeps multiple split actionable defect bullets as findings',
+      output: 'Actionable defects:\n- cache corrupts output\n- parser drops errors\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 2
+    },
+    {
+      name: 'keeps split actionable defect bullets after blank section spacing as findings',
+      output: 'Actionable defects:\n\n- cache corrupts output\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'skips bare nested summary headings before split actionable defect bodies',
+      output: 'Actionable defects:\nSummary:\n[P1] The parser drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: 'P1',
+      expectedCount: 1
+    },
+    {
       name: 'keeps Markdown-wrapped actionable defect labels as findings',
       output: '**Actionable defects:** it drops errors.\n',
       expectedVerdict: 'findings',
@@ -277,6 +298,13 @@ describe('review-execution-telemetry', () => {
     {
       name: 'keeps dash-spliced defect clauses in no-op actionable defect summaries as findings',
       output: 'Actionable defects: No actionable defects were found in the parser - it drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'keeps coordinated defect clauses in no-op actionable defect summaries as findings',
+      output: 'Actionable defects: No actionable defects were found in the parser and it corrupts output.\n',
       expectedVerdict: 'findings',
       expectedPriority: null,
       expectedCount: 1

@@ -255,30 +255,32 @@ export function analyzeReviewSemanticVerdict(outputText: string): ReviewSemantic
   }
 
   const findings: ParsedReviewFinding[] = [];
-  let pendingActionableDefectHeading = false;
+  let inActionableDefectSection = false;
   for (const line of verdictText.split(/\r?\n/u)) {
     const trimmedLine = line.trim();
     if (!trimmedLine) {
-      pendingActionableDefectHeading = false;
       continue;
     }
     if (isTopLevelReviewRuntimeLine(trimmedLine)) {
       continue;
     }
-    if (pendingActionableDefectHeading) {
-      pendingActionableDefectHeading = false;
+    if (isActionableDefectSplitHeadingLine(trimmedLine)) {
+      inActionableDefectSection = true;
+      continue;
+    }
+    if (inActionableDefectSection) {
+      if (isBareActionableDefectNestedHeadingLine(trimmedLine)) {
+        continue;
+      }
       const carriedFinding = parseActionableDefectSummaryFinding(trimmedLine);
       if (carriedFinding) {
         findings.push(carriedFinding);
         continue;
       }
       if (isReviewSectionBreakLine(trimmedLine)) {
+        inActionableDefectSection = false;
         continue;
       }
-    }
-    if (isActionableDefectSplitHeadingLine(trimmedLine)) {
-      pendingActionableDefectHeading = true;
-      continue;
     }
     const finding = parseReviewFindingLine(line) ?? parseActionableDefectFindingLine(line);
     if (finding) {
@@ -676,6 +678,11 @@ function isActionableDefectSplitHeadingLine(line: string): boolean {
     .replace(/[:\s]+$/u, '')
     .trim();
   return /^actionable\s+defects?$/iu.test(candidate);
+}
+
+function isBareActionableDefectNestedHeadingLine(line: string): boolean {
+  const normalized = normalizeReviewVerdictClause(line);
+  return /^(?:review\s+)?summary:$/u.test(normalized);
 }
 
 function isReviewSectionBreakLine(line: string): boolean {
@@ -1192,7 +1199,7 @@ function getDisqualifyingCleanReviewVerdictClauses(candidate: string): string[] 
 }
 
 function getDisqualifyingCleanReviewVerdictPattern(): RegExp {
-  return /(?<![\w/-])(?:although|but|however|though|yet|except|unless|nevertheless|nonetheless|conversely|caveats?)(?![\w/-])|(?<![\w/-])(?:with\s+)?one\s+exception\s*[:;,.]|(?<![\w/-])exceptions?\s*:|(?<![\w/-])(?:apart|aside)\s+from|(?:^|[.!?;,]\s+)(?:still|that\s+said|even\s+so|on\s+the\s+other\s+hand|in\s+contrast|by\s+contrast)\b|(?<![\w/-])(?:and|because)\s+(?:(?:it|this|they)\s+|(?:the\s+)?[A-Za-z0-9._/-]+\s+)(?:drops?|leaks?|breaks?|fails?|crashes?|errors?|loses?|hides?|masks?|skips?|misses?)\b/giu;
+  return /(?<![\w/-])(?:although|but|however|though|yet|except|unless|nevertheless|nonetheless|conversely|caveats?)(?![\w/-])|(?<![\w/-])(?:with\s+)?one\s+exception\s*[:;,.]|(?<![\w/-])exceptions?\s*:|(?<![\w/-])(?:apart|aside)\s+from|(?:^|[.!?;,]\s+)(?:still|that\s+said|even\s+so|on\s+the\s+other\s+hand|in\s+contrast|by\s+contrast)\b|(?<![\w/-])(?:and|because)\s+(?:(?:it|this|they)\s+|the\s+[A-Za-z0-9._/-]+\s+)(?!(?:is|are|was|were|looks?|appears?|remains?|stays?|has|have)\b)\w+\b/giu;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
