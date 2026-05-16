@@ -198,6 +198,13 @@ describe('review-execution-telemetry', () => {
       expectedCount: 1
     },
     {
+      name: 'preserves priorities in split actionable defect summary bodies',
+      output: 'Actionable defects:\nSummary: [P1] The parser drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: 'P1',
+      expectedCount: 1
+    },
+    {
       name: 'keeps Markdown-wrapped actionable defect labels as findings',
       output: '**Actionable defects:** it drops errors.\n',
       expectedVerdict: 'findings',
@@ -539,6 +546,20 @@ describe('review-execution-telemetry', () => {
     {
       name: 'leaves dash-spliced defect clause unknown instead of clean',
       output: 'No actionable defects were found in the parser - it drops errors.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves coordinating defect clause unknown instead of clean',
+      output: 'No actionable defects were found in the parser and it drops errors.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves explanatory defect clause unknown instead of clean',
+      output: 'No actionable defects were found in the parser because it drops errors.\n',
       expectedVerdict: 'unknown',
       expectedPriority: null,
       expectedCount: 0

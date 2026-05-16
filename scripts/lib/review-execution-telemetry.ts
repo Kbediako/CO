@@ -267,12 +267,13 @@ export function analyzeReviewSemanticVerdict(outputText: string): ReviewSemantic
     }
     if (pendingActionableDefectHeading) {
       pendingActionableDefectHeading = false;
-      if (!isReviewSectionBreakLine(trimmedLine)) {
-        const carriedFinding = parseActionableDefectSummaryFinding(trimmedLine);
-        if (carriedFinding) {
-          findings.push(carriedFinding);
-          continue;
-        }
+      const carriedFinding = parseActionableDefectSummaryFinding(trimmedLine);
+      if (carriedFinding) {
+        findings.push(carriedFinding);
+        continue;
+      }
+      if (isReviewSectionBreakLine(trimmedLine)) {
+        continue;
       }
     }
     if (isActionableDefectSplitHeadingLine(trimmedLine)) {
@@ -612,14 +613,15 @@ function parseActionableDefectFindingLine(line: string): ParsedReviewFinding | n
 }
 
 function parseActionableDefectSummaryFinding(text: string): ParsedReviewFinding | null {
-  if (!text || isNoOpActionableDefectSummary(text)) {
+  const summaryText = normalizeActionableDefectSummaryBody(text);
+  if (!summaryText || isNoOpActionableDefectSummary(summaryText)) {
     return null;
   }
-  const normalized = normalizeReviewVerdictClause(text);
+  const normalized = normalizeReviewVerdictClause(summaryText);
   if (isValidationNotRunClause(normalized) || isBenignCleanReviewFollowupClause(normalized)) {
     return null;
   }
-  const prioritizedFinding = parseReviewFindingLine(text);
+  const prioritizedFinding = parseReviewFindingLine(summaryText);
   if (prioritizedFinding) {
     const normalizedPrioritizedText = normalizeReviewVerdictClause(prioritizedFinding.text);
     if (
@@ -632,8 +634,14 @@ function parseActionableDefectSummaryFinding(text: string): ParsedReviewFinding 
   }
   return {
     priority: prioritizedFinding?.priority ?? null,
-    text: `actionable defect: ${prioritizedFinding?.text ?? text}`
+    text: `actionable defect: ${prioritizedFinding?.text ?? summaryText}`
   };
+}
+
+function normalizeActionableDefectSummaryBody(text: string): string {
+  const candidate = normalizeReviewLabelCandidate(text);
+  const summaryMatch = candidate.match(/^(?:review\s+)?summary\s*:\s*(?<body>.+?)$/iu);
+  return summaryMatch?.groups?.body?.trim() ?? candidate;
 }
 
 function parseActionableDefectSummaryText(line: string): string | null {
@@ -1184,7 +1192,7 @@ function getDisqualifyingCleanReviewVerdictClauses(candidate: string): string[] 
 }
 
 function getDisqualifyingCleanReviewVerdictPattern(): RegExp {
-  return /(?<![\w/-])(?:although|but|however|though|yet|except|unless|nevertheless|nonetheless|conversely|caveats?)(?![\w/-])|(?<![\w/-])(?:with\s+)?one\s+exception\s*[:;,.]|(?<![\w/-])exceptions?\s*:|(?<![\w/-])(?:apart|aside)\s+from|(?:^|[.!?;,]\s+)(?:still|that\s+said|even\s+so|on\s+the\s+other\s+hand|in\s+contrast|by\s+contrast)\b/giu;
+  return /(?<![\w/-])(?:although|but|however|though|yet|except|unless|nevertheless|nonetheless|conversely|caveats?)(?![\w/-])|(?<![\w/-])(?:with\s+)?one\s+exception\s*[:;,.]|(?<![\w/-])exceptions?\s*:|(?<![\w/-])(?:apart|aside)\s+from|(?:^|[.!?;,]\s+)(?:still|that\s+said|even\s+so|on\s+the\s+other\s+hand|in\s+contrast|by\s+contrast)\b|(?<![\w/-])(?:and|because)\s+(?:(?:it|this|they)\s+|(?:the\s+)?[A-Za-z0-9._/-]+\s+)(?:drops?|leaks?|breaks?|fails?|crashes?|errors?|loses?|hides?|masks?|skips?|misses?)\b/giu;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
