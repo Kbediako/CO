@@ -503,6 +503,7 @@ describe('ControlRuntime', () => {
   it('includes the selected run task id in docs freshness repo-gate discovery', async () => {
     const selectedTaskId = 'selected-docs-gate';
     const completedTaskId = 'completed-docs-gate';
+    const generatedAt = new Date().toISOString();
     const providerIntakeState = createProviderIntakeState([
       {
         provider: 'linear',
@@ -540,7 +541,6 @@ describe('ControlRuntime', () => {
     });
     const selectedReport = join(fixture.root, 'out', selectedTaskId, 'docs-freshness-maintenance.json');
     const completedReport = join(fixture.root, 'out', completedTaskId, 'docs-freshness-maintenance.json');
-    const generatedAt = new Date().toISOString();
     await writeDocsFreshnessMaintenanceReport(selectedReport, {
       generatedAt,
       severity: 'blocking',
