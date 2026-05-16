@@ -81,13 +81,15 @@ task_checklists:
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Rehydrated accepted pending revalidation | Cached accepted row with stale runnable metadata can occupy active WIP before live revalidation releases it. | `remove fallback` | CO-544 | Live Linear state is non-runnable for a rehydrated accepted pending-revalidation claim. | 2026-05-16 | 2026-05-16 | This issue | Live non-runnable state releases/downgrades the claim and excludes it from active WIP. | Focused CO-510/CO-512-shaped regression. |
-| Missing live issue evidence | Pending revalidation fails closed instead of assuming stale cache is clean. | `justify retaining fallback` | Provider-intake control-host | Linear issue evidence is unavailable, incomplete, or degraded. | Existing provider-intake rehydration behavior | 2026-05-16 | Durable safety contract | Separate issue-quality review proves fail-closed pending revalidation is no longer needed. | Regression coverage for unavailable evidence preserving pending/degraded classification. |
+| Missing live issue evidence | Revalidation cache state stays fail-closed instead of assuming stale cache is clean. | `justify retaining fallback` | Provider-intake control-host | Linear issue evidence is unavailable, incomplete, or degraded. | Existing provider-intake rehydration behavior | 2026-05-16 | Durable safety contract | Separate issue-quality review proves fail-closed pending revalidation is no longer needed. | Regression coverage for unavailable evidence preserving pending/degraded classification. |
 
 - Contract name: Fail-closed pending revalidation.
 - Owning surface: Provider-intake control-host claim refresh.
-- Steady-state proof: unavailable live issue evidence remains visible as pending/degraded cache truth rather than clean active-worker truth.
+- Steady-state proof: absent live issue evidence remains visible as degraded cache truth and never becomes clean active-worker truth.
 - Tests/docs: focused control-host/provider-intake regression and this CO-544 packet.
+- Non-expiring rationale: this is a durable source-truth-loss safety contract, not temporary compatibility debt; remove only after a reviewed replacement proves equivalent fail-closed behavior.
 - Large-refactor check: a narrow fix is acceptable because the lane removes one stale active-WIP cache failure while preserving the existing provider-intake authority boundary.
+- Minor-seam decision: acceptable because the retained cache state is only a fail-closed source-truth-loss contract, not a new launch path or WIP-capacity bypass.
 
 ## Architecture & Data
 - Architecture / design adjustments:

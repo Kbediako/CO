@@ -109,11 +109,18 @@
 - `remove fallback`: cached accepted pending-revalidation rows must not remain active WIP after live Linear proves non-runnable state.
 - `justify retaining fallback`: pending revalidation remains a supported fail-closed cache state while live issue evidence is unavailable.
 - Large-refactor check: a large provider-intake authority refactor is not required for this lane because the existing refresh path already owns claim release/downgrade and status classification. The narrow change is acceptable only if live evidence remains final authority and missing evidence remains fail-closed.
+- Minor-seam decision: acceptable because the change removes stale active-WIP occupancy and keeps the existing fail-closed cache state only for missing live source truth.
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Rehydrated accepted pending revalidation | Cached accepted row with stale runnable metadata can occupy active WIP before live revalidation releases it. | `remove fallback` | CO-544 | Live Linear state is non-runnable for a rehydrated accepted pending-revalidation claim. | 2026-05-16 | 2026-05-16 | This issue | Live non-runnable state releases/downgrades the claim and excludes it from active WIP. | Focused CO-510/CO-512-shaped regression. |
-| Missing live issue evidence | Pending revalidation fails closed instead of assuming stale cache is clean. | `justify retaining fallback` | Provider-intake control-host | Linear issue evidence is unavailable, incomplete, or degraded. | Existing provider-intake rehydration behavior | 2026-05-16 | Durable safety contract | Separate issue-quality review proves fail-closed pending revalidation is no longer needed. | Regression coverage for unavailable evidence preserving pending/degraded classification. |
+| Missing live issue evidence | Revalidation cache state stays fail-closed instead of assuming stale cache is clean. | `justify retaining fallback` | Provider-intake control-host | Linear issue evidence is unavailable, incomplete, or degraded. | Existing provider-intake rehydration behavior | 2026-05-16 | Durable safety contract | Separate issue-quality review proves fail-closed pending revalidation is no longer needed. | Regression coverage for unavailable evidence preserving pending/degraded classification. |
+
+- Contract name: provider-intake revalidation fail-closed cache state.
+- Owning surface: provider-intake control-host claim refresh.
+- Steady-state proof: absent live issue evidence remains visible as degraded cache truth and never becomes clean active-worker truth.
+- Tests/docs: focused `ProviderIssueHandoff` and freshness-gauge regressions plus this CO-544 packet.
+- Non-expiring rationale: this is a durable source-truth-loss safety contract, not temporary compatibility debt; remove only after a reviewed replacement proves equivalent fail-closed behavior.
 
 ## Open Questions
 - Whether the smallest code seam is claim refresh, active-WIP classification, or a shared helper used by both status and freshness-gauge will be decided from source inspection before implementation.
