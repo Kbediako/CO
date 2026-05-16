@@ -21,8 +21,8 @@
 - [x] Every affected UUID-backed `linear-*` stale row is reviewed against live Linear Done/completed state and reclassified inactive `done`.
 - [x] No affected spec is deleted and `node scripts/spec-guard.mjs` is unchanged.
 - [x] `node scripts/spec-guard.mjs` passes non-dry on the branch. Evidence: post-repair command returned `Spec guard: OK`.
-- [ ] Workpad and PR notes preserve strict `spec-guard` versus `docs:freshness:maintain` distinction.
-- [ ] Draft PR is linked to CO-545 with current validation evidence.
+- [x] Workpad and PR notes preserve strict `spec-guard` versus `docs:freshness:maintain` distinction. Evidence: PR #819 body and the CO-545 workpad identify CO-522-owned docs freshness debt separately from this strict `spec-guard` repair.
+- [x] Draft PR is linked to CO-545 with current validation evidence. Evidence: https://github.com/Kbediako/CO/pull/819 and Linear attachment `ca0d14ff-3ebf-43cc-8398-6a24bb15ac30`.
 
 ## Validation
 - [x] Pre-repair strict spec-guard reproduction. Evidence: `MCP_RUNNER_TASK_ID=linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90 node scripts/spec-guard.mjs` reported the 51 Apr 14/15 rows.
@@ -41,3 +41,4 @@
 - 2026-05-16: Created single CO-545 workpad and recorded `stay_serial` / `single_bounded_change` because packet, stale row decisions, registry mirrors, validation, and PR handoff share one evidence chain.
 - 2026-05-16: Reproduced strict `spec-guard` failure before repo edits, reviewed all affected stale rows, and reclassified completed rows inactive `done` without deleting specs or changing guard code.
 - 2026-05-16: Validation completed for strict `spec-guard`, docs check, whitespace, diff budget with explicit scope override, docs freshness classification, standalone review, and elegance/minimality.
+- 2026-05-16: Draft PR #819 opened and attached to CO-545; handoff evidence keeps broader CO-522 `docs:freshness:maintain` debt separate from the cleared strict `spec-guard` cohort.
