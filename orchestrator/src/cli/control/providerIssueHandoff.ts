@@ -3170,6 +3170,7 @@ export function createProviderIssueHandoffService(
     allowPollFailClosed?: boolean;
     allowReleasedPollFailClosed?: boolean;
     allowDirectIssueById?: boolean;
+    releaseOnlyCachedPendingRevalidation?: boolean;
     onDirectIssueById?: () => void;
   }): Promise<ProviderTrackedIssueRefreshDisposition> => {
     if (shouldAbortRefreshCycle()) {
@@ -3188,6 +3189,8 @@ export function createProviderIssueHandoffService(
           allowPollFailClosed: input.allowPollFailClosed === true,
           allowReleasedPollFailClosed: input.allowReleasedPollFailClosed === true,
           allowDirectIssueById: input.allowDirectIssueById !== false,
+          releaseOnlyCachedPendingRevalidation:
+            input.releaseOnlyCachedPendingRevalidation === true,
           onDirectIssueById: input.onDirectIssueById
         }
       );
@@ -5113,6 +5116,7 @@ export function createProviderIssueHandoffService(
               !canFreshDiscoverReleasedLiveWorker &&
               !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot,
             allowDirectIssueById,
+            releaseOnlyCachedPendingRevalidation: pollInput?.deferFreshDiscovery === true,
             onDirectIssueById: () => {
               refreshCounts.issue_by_id_reads += 1;
               if (boundPreDiscoveryIssueByIdReads && activeRun === null) {
@@ -9898,6 +9902,7 @@ async function resolveTrackedIssuePollResolutionWithFallback(
     allowPollFailClosed?: boolean;
     allowReleasedPollFailClosed?: boolean;
     allowDirectIssueById?: boolean;
+    releaseOnlyCachedPendingRevalidation?: boolean;
     onDirectIssueById?: () => void;
   }
 ):
@@ -9944,6 +9949,16 @@ async function resolveTrackedIssuePollResolutionWithFallback(
     const eligibility = assessProviderTrackedIssueEligibility(directResolution.trackedIssue, {
       hasExistingClaim: true
     });
+    if (
+      shouldRevalidateCachedPendingClaim &&
+      options?.releaseOnlyCachedPendingRevalidation === true &&
+      eligibility.eligible
+    ) {
+      return {
+        kind: 'skip',
+        reason: 'provider_issue_poll_cached_revalidation_pending'
+      };
+    }
     if (eligibility.eligible) {
       if (eligibility.claimReason === 'provider_issue_handoff_owned') {
         return {

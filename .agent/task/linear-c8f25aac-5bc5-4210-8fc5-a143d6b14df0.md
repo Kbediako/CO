@@ -24,6 +24,7 @@
 - [x] Elegance/minimality review.
 - [x] Parent build and gpt-5.5/xhigh standalone review passed.
 - [x] Final closeout guards recorded; `docs:freshness` remains blocked by repo-wide stale-doc baseline debt outside CO-544.
+- [x] CI rework for PR #818 Core Lane test failures passed locally.
 - [x] Final workpad refresh.
 
 ## Not Done If

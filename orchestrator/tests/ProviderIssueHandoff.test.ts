@@ -5550,8 +5550,11 @@ describe('createProviderIssueHandoffService', () => {
       deferFreshDiscovery: true
     });
 
-    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-issue-1' }]
+    ]);
     expect(refetchTrackedIssues).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
     expect(state.claims[0]).toMatchObject({
       state: 'accepted',
       reason: 'provider_issue_rehydration_pending_revalidation',
@@ -5576,6 +5579,7 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-issue-1' }],
       [{ provider: 'linear', issueId: 'lin-issue-1' }]
     ]);
     expect(launcher.start).toHaveBeenCalledTimes(1);

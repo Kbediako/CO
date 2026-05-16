@@ -540,14 +540,15 @@ describe('ControlRuntime', () => {
     });
     const selectedReport = join(fixture.root, 'out', selectedTaskId, 'docs-freshness-maintenance.json');
     const completedReport = join(fixture.root, 'out', completedTaskId, 'docs-freshness-maintenance.json');
+    const generatedAt = new Date().toISOString();
     await writeDocsFreshnessMaintenanceReport(selectedReport, {
-      generatedAt: '2026-05-14T00:30:00.000Z',
+      generatedAt,
       severity: 'blocking',
       freshnessDecision: 'block_policy_over_budget',
       actionRequiredCount: 7
     });
     await writeDocsFreshnessMaintenanceReport(completedReport, {
-      generatedAt: '2026-05-14T00:59:00.000Z',
+      generatedAt,
       severity: 'blocking',
       freshnessDecision: 'block_policy_over_budget',
       actionRequiredCount: 99
