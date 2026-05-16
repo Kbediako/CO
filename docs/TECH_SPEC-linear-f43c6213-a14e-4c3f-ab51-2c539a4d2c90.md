@@ -1,0 +1,144 @@
+---
+id: 20260516-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90
+title: CO-545 clear May 16 strict spec-guard stale last_review baseline
+status: in_progress
+relates_to: docs/PRD-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md
+risk: high
+owners:
+  - Codex
+last_review: 2026-05-16
+related_action_plan: docs/ACTION_PLAN-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md
+task_checklists:
+  - tasks/tasks-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md
+review_notes:
+  - 2026-05-16: Created from live CO-545 issue-context after shared root was verified clean current main at 4caee1d9f1b467f8e8ec63e2b54dec4e321310fd and isolated worktree `.workspaces/linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90` was created on branch `linear/co-545-clear-strict-spec-guard-baseline`.
+  - 2026-05-16: Pre-repair non-dry `MCP_RUNNER_TASK_ID=linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90 node scripts/spec-guard.mjs` reproduced exactly 51 Apr 14/15 stale `tasks/specs/**` rows: 1182..1213, 1219, and 18 UUID-backed `linear-*` specs.
+  - 2026-05-16: Evidence review found every affected numbered row has a fully checked same-file task checklist, and every affected UUID-backed row live-resolves to Linear Done/completed; rows are reclassified inactive `done` without deleting specs, weakening `spec-guard`, or fabricating completion timestamps.
+  - 2026-05-16: Post-repair `node scripts/spec-guard.mjs`, `npm run docs:check`, `git diff --check`, and diff-budget with explicit scope override passed; `npm run docs:freshness` was run and classified only broader pre-existing CO-522-owned `docs:freshness:maintain` debt.
+---
+
+## Canonical Reference
+- PRD: `docs/PRD-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md`
+- TECH_SPEC mirror: `docs/TECH_SPEC-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md`
+- Task checklist: `tasks/tasks-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md`
+- .agent mirror: `.agent/task/linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md`
+- Linear issue: `CO-545` / `f43c6213-a14e-4c3f-ab51-2c539a4d2c90`
+- Linear URL: https://linear.app/asabeko/issue/CO-545/co-clear-may-16-strict-spec-guard-stale-last-review-baseline
+
+## Summary
+- Objective: clear the May 16 Apr 14/15 strict `spec-guard` stale `last_review` baseline with evidence-backed reclassification.
+- Scope: CO-545 packet/mirrors, the affected stale task specs, task index evidence metadata, `docs/TASKS.md`, and docs-freshness registry rows needed for traceability.
+- Constraints: no CO-544 implementation edits, no PR #818 mutation, no blind date bumps, no spec deletion, no `spec-guard` weakening, and no `docs:freshness:maintain` scope substitution.
+
+## Issue-Shaping Contract
+- User-request translation carried forward: `node scripts/spec-guard.mjs`, strict `spec-guard`, `last_review=2026-04-14`, `last_review=2026-04-15`, tasks/specs/1182..1213, tasks/specs/1219, `tasks/specs/linear-*`, PR #818, CO-544, CO-522, CO-523, no blind bumps, no deletion, no weakening must stay visible so this lane clears only the exact Apr 14/15 strict `spec-guard` cohort.
+- Protected terms / exact artifact and surface names: `node scripts/spec-guard.mjs`, strict `spec-guard`, `last_review=2026-04-14`, `last_review=2026-04-15`, tasks/specs/1182..1213, tasks/specs/1219, `tasks/specs/linear-*`, PR #818, CO-544, CO-522, CO-523, no blind bumps, no deletion, no weakening.
+- Nearby wrong interpretations to reject:
+  - this is CO-544 provider-intake implementation work
+  - this is CO-522 `docs:freshness:maintain` owner work
+  - this is CO-523 Apr 8-11 strict spec cleanup
+  - a blind `last_review` bump is acceptable
+  - historical specs can be deleted to pass the gate
+  - `node scripts/spec-guard.mjs` can be weakened or bypassed
+- Explicit non-goals carried forward:
+  - no CO-544 implementation or PR #818 code changes
+  - no guard behavior changes
+  - no docs catalog/freshness mass cleanup beyond registry rows touched by this packet/reclassification
+  - no invented `completed_at` metadata
+
+## Readiness Gate
+- Not done if: `node scripts/spec-guard.mjs` still fails on any affected Apr 14/15 row; any date change lacks evidence in this packet or row note; a spec is deleted to pass the gate; `spec-guard` is weakened; or CO-522/CO-523 ownership is used to hide this cohort.
+- Pre-implementation issue-quality review evidence: 2026-05-16 worker review after live CO-545 issue-context confirms the issue is a strict stale-spec cohort repair and not adjacent CO-544, CO-522, or CO-523 work.
+- Safeguard ownership split: parent worker owns all edits serially; no child lane launched because packet, stale row decisions, task index evidence, registry, validation, and PR handoff share the same evidence chain.
+
+## Stale Cohort Evidence
+
+### Numbered task specs
+
+| Spec path | Decision | Evidence | Evidence path |
+| --- | --- | --- | --- |
+| `tasks/specs/1182-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction.md` | inactive `done` | Same-file checklist has 19 checked items and 0 unchecked items. | `tasks/tasks-1182-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction.md` |
+| `tasks/specs/1183-coordinator-symphony-aligned-orchestrator-cloud-route-fallback-contract-extraction.md` | inactive `done` | Same-file checklist has 19 checked items and 0 unchecked items. | `tasks/tasks-1183-coordinator-symphony-aligned-orchestrator-cloud-route-fallback-contract-extraction.md` |
+| `tasks/specs/1184-coordinator-symphony-aligned-orchestrator-execution-routing-decision-shell-extraction.md` | inactive `done` | Same-file checklist has 19 checked items and 0 unchecked items. | `tasks/tasks-1184-coordinator-symphony-aligned-orchestrator-execution-routing-decision-shell-extraction.md` |
+| `tasks/specs/1185-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md` | inactive `done` | Same-file checklist has 19 checked items and 0 unchecked items. | `tasks/tasks-1185-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md` |
+| `tasks/specs/1186-coordinator-symphony-aligned-orchestrator-execution-route-adapter-shell-extraction.md` | inactive `done` | Same-file checklist has 19 checked items and 0 unchecked items. | `tasks/tasks-1186-coordinator-symphony-aligned-orchestrator-execution-route-adapter-shell-extraction.md` |
+| `tasks/specs/1187-coordinator-symphony-aligned-orchestrator-plan-target-tracker-shell-extraction.md` | inactive `done` | Same-file checklist has 19 checked items and 0 unchecked items. | `tasks/tasks-1187-coordinator-symphony-aligned-orchestrator-plan-target-tracker-shell-extraction.md` |
+| `tasks/specs/1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation.md` | inactive `done` | Same-file checklist has 19 checked items and 0 unchecked items. | `tasks/tasks-1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation.md` |
+| `tasks/specs/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction.md` | inactive `done` | Same-file checklist has 19 checked items and 0 unchecked items. | `tasks/tasks-1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction.md` |
+| `tasks/specs/1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction.md` | inactive `done` | Same-file checklist has 19 checked items and 0 unchecked items. | `tasks/tasks-1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction.md` |
+| `tasks/specs/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction.md` | inactive `done` | Same-file checklist has 19 checked items and 0 unchecked items. | `tasks/tasks-1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction.md` |
+| `tasks/specs/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction.md` | inactive `done` | Same-file checklist has 19 checked items and 0 unchecked items. | `tasks/tasks-1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction.md` |
+| `tasks/specs/1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md` | inactive `done` | Same-file checklist has 19 checked items and 0 unchecked items. | `tasks/tasks-1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md` |
+| `tasks/specs/1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md` | inactive `done` | Same-file checklist has 24 checked items and 0 unchecked items. | `tasks/tasks-1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md` |
+| `tasks/specs/1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md` | inactive `done` | Same-file checklist has 24 checked items and 0 unchecked items. | `tasks/tasks-1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md` |
+| `tasks/specs/1196-coordinator-symphony-aligned-orchestrator-status-shell-extraction.md` | inactive `done` | Same-file checklist has 24 checked items and 0 unchecked items. | `tasks/tasks-1196-coordinator-symphony-aligned-orchestrator-status-shell-extraction.md` |
+| `tasks/specs/1197-coordinator-symphony-aligned-orchestrator-plan-shell-extraction.md` | inactive `done` | Same-file checklist has 24 checked items and 0 unchecked items. | `tasks/tasks-1197-coordinator-symphony-aligned-orchestrator-plan-shell-extraction.md` |
+| `tasks/specs/1198-coordinator-symphony-aligned-orchestrator-runtime-selection-manifest-mutation-extraction.md` | inactive `done` | Same-file checklist has 24 checked items and 0 unchecked items. | `tasks/tasks-1198-coordinator-symphony-aligned-orchestrator-runtime-selection-manifest-mutation-extraction.md` |
+| `tasks/specs/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction.md` | inactive `done` | Same-file checklist has 24 checked items and 0 unchecked items. | `tasks/tasks-1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction.md` |
+| `tasks/specs/1200-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-persistence-callback-extraction.md` | inactive `done` | Same-file checklist has 24 checked items and 0 unchecked items. | `tasks/tasks-1200-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-persistence-callback-extraction.md` |
+| `tasks/specs/1201-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md` | inactive `done` | Same-file checklist has 17 checked items and 0 unchecked items. | `tasks/tasks-1201-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md` |
+| `tasks/specs/1202-coordinator-symphony-aligned-orchestrator-cloud-prompt-builder-extraction.md` | inactive `done` | Same-file checklist has 25 checked items and 0 unchecked items. | `tasks/tasks-1202-coordinator-symphony-aligned-orchestrator-cloud-prompt-builder-extraction.md` |
+| `tasks/specs/1203-coordinator-symphony-aligned-orchestrator-cloud-environment-resolution-boundary-extraction.md` | inactive `done` | Same-file checklist has 25 checked items and 0 unchecked items. | `tasks/tasks-1203-coordinator-symphony-aligned-orchestrator-cloud-environment-resolution-boundary-extraction.md` |
+| `tasks/specs/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction.md` | inactive `done` | Same-file checklist has 27 checked items and 0 unchecked items. | `tasks/tasks-1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction.md` |
+| `tasks/specs/1205-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment.md` | inactive `done` | Same-file checklist has 17 checked items and 0 unchecked items. | `tasks/tasks-1205-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment.md` |
+| `tasks/specs/1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract.md` | inactive `done` | Same-file checklist has 21 checked items and 0 unchecked items. | `tasks/tasks-1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract.md` |
+| `tasks/specs/1207-coordinator-symphony-aligned-standalone-review-prompt-context-builder-extraction.md` | inactive `done` | Same-file checklist has 22 checked items and 0 unchecked items. | `tasks/tasks-1207-coordinator-symphony-aligned-standalone-review-prompt-context-builder-extraction.md` |
+| `tasks/specs/1208-coordinator-symphony-aligned-standalone-review-prompt-context-review-support-classification.md` | inactive `done` | Same-file checklist has 21 checked items and 0 unchecked items. | `tasks/tasks-1208-coordinator-symphony-aligned-standalone-review-prompt-context-review-support-classification.md` |
+| `tasks/specs/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction.md` | inactive `done` | Same-file checklist has 25 checked items and 0 unchecked items. | `tasks/tasks-1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction.md` |
+| `tasks/specs/1210-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-review-support-classification.md` | inactive `done` | Same-file checklist has 25 checked items and 0 unchecked items. | `tasks/tasks-1210-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-review-support-classification.md` |
+| `tasks/specs/1211-coordinator-symphony-aligned-standalone-review-shell-command-parser-primitives-extraction.md` | inactive `done` | Same-file checklist has 25 checked items and 0 unchecked items. | `tasks/tasks-1211-coordinator-symphony-aligned-standalone-review-shell-command-parser-primitives-extraction.md` |
+| `tasks/specs/1212-coordinator-symphony-aligned-standalone-review-operand-path-normalization-boundary-extraction.md` | inactive `done` | Same-file checklist has 25 checked items and 0 unchecked items. | `tasks/tasks-1212-coordinator-symphony-aligned-standalone-review-operand-path-normalization-boundary-extraction.md` |
+| `tasks/specs/1213-coordinator-symphony-aligned-standalone-review-inspection-target-parsing-pipeline-extraction.md` | inactive `done` | Same-file checklist has 25 checked items and 0 unchecked items. | `tasks/tasks-1213-coordinator-symphony-aligned-standalone-review-inspection-target-parsing-pipeline-extraction.md` |
+| `tasks/specs/1219-coordinator-symphony-aligned-standalone-review-remaining-helper-family-freeze-reassessment.md` | inactive `done` | Same-file checklist has 17 checked items and 0 unchecked items. | `tasks/tasks-1219-coordinator-symphony-aligned-standalone-review-remaining-helper-family-freeze-reassessment.md` |
+
+### UUID-backed task specs
+
+| Spec path | Decision | Evidence | Evidence command |
+| --- | --- | --- | --- |
+| `tasks/specs/linear-0022f975-905a-4974-aa8e-d689df90167c.md` | inactive `done` | Live Linear issue-context verified CO-178 is Done/completed; https://github.com/Kbediako/CO/pull/476. | `node bin/codex-orchestrator.js linear issue-context --issue-id 0022f975-905a-4974-aa8e-d689df90167c --format json` |
+| `tasks/specs/linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c.md` | inactive `done` | Live Linear issue-context verified CO-173 is Done/completed; https://github.com/Kbediako/CO/pull/471. | `node bin/codex-orchestrator.js linear issue-context --issue-id 0f7f6994-db41-4b0a-91f3-9b8f32ea427c --format json` |
+| `tasks/specs/linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25.md` | inactive `done` | Live Linear issue-context verified CO-177 is Done/completed. | `node bin/codex-orchestrator.js linear issue-context --issue-id 1d94880c-44bb-46cd-8fcd-ec8df8245d25 --format json` |
+| `tasks/specs/linear-237c874c-c05f-4947-949a-573043fc575f.md` | inactive `done` | Live Linear issue-context verified CO-184 is Done/completed. | `node bin/codex-orchestrator.js linear issue-context --issue-id 237c874c-c05f-4947-949a-573043fc575f --format json` |
+| `tasks/specs/linear-34b60caa-258b-4f18-8d67-cdad3f6352cf.md` | inactive `done` | Live Linear issue-context verified CO-192 is Done/completed; https://github.com/Kbediako/CO/pull/487. | `node bin/codex-orchestrator.js linear issue-context --issue-id 34b60caa-258b-4f18-8d67-cdad3f6352cf --format json` |
+| `tasks/specs/linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2.md` | inactive `done` | Live Linear issue-context verified CO-174 is Done/completed; https://github.com/Kbediako/CO/pull/470. | `node bin/codex-orchestrator.js linear issue-context --issue-id 3cdd7af3-787e-4e73-bb00-731feb5d0db2 --format json` |
+| `tasks/specs/linear-4ffb542b-28b2-4530-8630-b79357e306e2.md` | inactive `done` | Live Linear issue-context verified CO-188 is Done/completed; https://github.com/Kbediako/CO/pull/483. | `node bin/codex-orchestrator.js linear issue-context --issue-id 4ffb542b-28b2-4530-8630-b79357e306e2 --format json` |
+| `tasks/specs/linear-8720424f-56b0-4539-bebe-041c759fcb74.md` | inactive `done` | Live Linear issue-context verified CO-181 is Done/completed; https://github.com/Kbediako/CO/pull/479. | `node bin/codex-orchestrator.js linear issue-context --issue-id 8720424f-56b0-4539-bebe-041c759fcb74 --format json` |
+| `tasks/specs/linear-9a54c7d8-518f-4452-95aa-c5852008b38d.md` | inactive `done` | Live Linear issue-context verified CO-185 is Done/completed; https://github.com/Kbediako/CO/pull/485. | `node bin/codex-orchestrator.js linear issue-context --issue-id 9a54c7d8-518f-4452-95aa-c5852008b38d --format json` |
+| `tasks/specs/linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d.md` | inactive `done` | Live Linear issue-context verified CO-193 is Done/completed; https://github.com/Kbediako/CO/pull/488. | `node bin/codex-orchestrator.js linear issue-context --issue-id 9b1440f0-a3af-4863-8bb5-2f8ea78bd02d --format json` |
+| `tasks/specs/linear-a560f416-c80a-473b-96fb-9f1ec090c968.md` | inactive `done` | Live Linear issue-context verified CO-172 is Done/completed; https://github.com/Kbediako/CO/pull/469. | `node bin/codex-orchestrator.js linear issue-context --issue-id a560f416-c80a-473b-96fb-9f1ec090c968 --format json` |
+| `tasks/specs/linear-aaa8be94-c82b-40a8-bb19-48343183790e.md` | inactive `done` | Live Linear issue-context verified CO-191 is Done/completed; https://github.com/Kbediako/CO/pull/486. | `node bin/codex-orchestrator.js linear issue-context --issue-id aaa8be94-c82b-40a8-bb19-48343183790e --format json` |
+| `tasks/specs/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d.md` | inactive `done` | Live Linear issue-context verified CO-180 is Done/completed. | `node bin/codex-orchestrator.js linear issue-context --issue-id acdc2c4c-b8b1-46e8-8e21-c9a9c014213d --format json` |
+| `tasks/specs/linear-afb6ebc9-1341-4dbd-a522-6531a15aab90.md` | inactive `done` | Live Linear issue-context verified CO-176 is Done/completed; https://github.com/Kbediako/CO/pull/473. | `node bin/codex-orchestrator.js linear issue-context --issue-id afb6ebc9-1341-4dbd-a522-6531a15aab90 --format json` |
+| `tasks/specs/linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964-co-status-prune-terminal-released-issues.md` | inactive `done` | Live Linear issue-context verified CO-182 is Done/completed; https://github.com/Kbediako/CO/pull/480. | `node bin/codex-orchestrator.js linear issue-context --issue-id ba9a1c35-c8d1-4b76-aa33-4937502d1964 --format json` |
+| `tasks/specs/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d.md` | inactive `done` | Live Linear issue-context verified CO-183 is Done/completed. | `node bin/codex-orchestrator.js linear issue-context --issue-id df69fabe-63c2-4b98-a226-9c37892b4f9d --format json` |
+| `tasks/specs/linear-e3bc507e-c33d-48c7-9474-196a6ef9a28c.md` | inactive `done` | Live Linear issue-context verified CO-171 is Done/completed; https://github.com/Kbediako/CO/pull/466. | `node bin/codex-orchestrator.js linear issue-context --issue-id e3bc507e-c33d-48c7-9474-196a6ef9a28c --format json` |
+| `tasks/specs/linear-ea7ddb9e-78a7-4e85-aaa2-f890046d4809.md` | inactive `done` | Live Linear issue-context verified CO-179 is Done/completed; https://github.com/Kbediako/CO/pull/475. | `node bin/codex-orchestrator.js linear issue-context --issue-id ea7ddb9e-78a7-4e85-aaa2-f890046d4809 --format json` |
+
+## Fallback Expiry / Refactor Decision
+- Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `Yes`, stale baseline handling is the subject.
+- Required decision table:
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Strict `spec-guard` Apr 14/15 stale baseline | Tolerating active stale spec rows or clearing them by blind bump/deletion. | remove fallback | CO-545 | PR #818 / CO-544 Core Lane is blocked by this exact stale cohort. | 2026-04-14 | 2026-05-16 | 30 days for stale docs/spec control surfaces. | Exact rows are reviewed and terminal rows are inactive `done` with evidence; `spec-guard` remains strict. | `node scripts/spec-guard.mjs`, `npm run docs:check`, `node scripts/diff-budget.mjs`, `git diff --check`. |
+
+- Large-refactor check: no larger refactor is warranted. `spec-guard` already has the correct inactive/terminal skip semantics; the drift was stale metadata in completed task packets.
+
+## Architecture & Data
+- Architecture / design adjustments: none.
+- Data model changes / migrations: reclassify completed task packet metadata to inactive `done`; preserve files and history.
+- External dependencies / integrations: live Linear issue-context for UUID-backed rows and local task checklists for numbered rows.
+
+## Validation Plan
+- Reproduce baseline: `MCP_RUNNER_TASK_ID=linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90 node scripts/spec-guard.mjs` before edits.
+- Required post-repair checks: `node scripts/spec-guard.mjs`, `npm run docs:check`, `node scripts/diff-budget.mjs`, `git diff --check`.
+- Because docs-freshness registry rows are touched for the packet/reclassification, run `npm run docs:freshness` and classify any unrelated debt separately.
+- Handoff checks: gpt-5.5/xhigh standalone review, explicit elegance/minimality pass, draft PR, Linear PR attachment, and workpad refresh.
+
+## Open Questions
+- None for the current cohort. Separately appearing stale rows after this branch should be proven separately.
+
+## Approvals
+- Reviewer: `codex review -c model="gpt-5.5" -c model_reasoning_effort="xhigh" --uncommitted --title "CO-545 strict spec-guard stale baseline"` reported no actionable correctness issues. Manual elegance/minimality pass found no smaller safe change than the declared row-level reclassification plus required docs-first mirrors.
+- Date: 2026-05-16

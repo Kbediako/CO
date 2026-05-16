@@ -1,6 +1,206 @@
 {
   "items": [
     {
+      "id": "20260516-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d",
+      "title": "CO-546 attach live Linear state to rehydrated pending-claim revalidation",
+      "relates_to": "tasks/tasks-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-16",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-16",
+          "status": "confirmed_in_progress",
+          "summary": "Live post-CO-544 validation confirmed CO-546 owns the remaining root cause: rehydrated pending-revalidation claims retain cached In Progress metadata while live Linear shows Blocked. Post-PR #820 rework narrowed the remaining failure to direct issue-by-id source binding being gated by dispatch_pilot.enabled=false."
+        },
+        "parallelization": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-16",
+          "status": "stay_serial_single_bounded_change",
+          "summary": "Docs, ProviderIssueHandoff implementation, focused tests, and review all share the same claim-refresh seam; prior worker produced no artifacts and was closed."
+        },
+        "docs_packet": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-16",
+          "status": "created_before_implementation",
+          "summary": "Created and refreshed the CO-546 docs-first packet to attach live Linear metadata during accepted/running/resumable pending-revalidation rehydrate while preserving fail-closed missing-evidence behavior and keeping broad dispatch-pilot admission disabled."
+        }
+      },
+      "validation": {
+        "status": "implemented_review_pending_live_restart_proof",
+        "passed": [
+          "live post-merge validation evidence",
+          "workpad creation",
+          "parallelization decision recorded",
+          "docs-first packet created",
+          "focused pending-revalidation regressions",
+          "full ProviderIssueHandoff test file",
+          "npm run build",
+          "npm run lint",
+          "npm run test",
+          "npm run docs:check",
+          "npm run repo:stewardship",
+          "node scripts/diff-budget.mjs",
+          "npm run pack:smoke",
+          "node scripts/spec-guard.mjs --dry-run",
+          "git diff --check",
+          "post-PR #820 root-cause evidence: direct live issue-by-id lookup works with configured Linear source binding while control-host recover skips with dispatch_source_disabled",
+          "source-binding rework implementation",
+          "TrackerDispatchPilot source-binding tests: 21 passed",
+          "focused ProviderIssueHandoff pending-revalidation slice: 16 passed",
+          "full core test suite: 360 files / 5658 tests",
+          "node scripts/delegation-guard.mjs with desktop subagent override",
+          "npm run repo:stewardship",
+          "JSON parse for tasks/index.json and docs/docs-freshness-registry.json",
+          "gpt-5.5/xhigh codex-orchestrator review clean: .runs/linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d/cli/2026-05-16T12-10-28-410Z-ed2414f2/review/telemetry.json"
+        ],
+        "blocked": [
+          "npm run docs:freshness fails on existing repo-wide stale-doc baseline debt outside CO-546: 286 stale docs and 10 strict docs approaching expiry"
+        ],
+        "waivers": [
+          "delegation guard passed with desktop spawn_agent override because the read-only CO-542 researcher is not represented by repo-local child manifests and the prior CO-546 worker produced no artifacts before closure"
+        ],
+        "pending": [
+          "post-rework control-host restart proof that CO-510/CO-512 stale pending-revalidation claims release",
+          "PR handoff"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
+        "prd": "docs/PRD-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
+        "docs": "docs/TECH_SPEC-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
+        "action_plan": "docs/ACTION_PLAN-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
+        "spec": "tasks/specs/linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
+        "task": "tasks/tasks-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md"
+      },
+      "source_issue": {
+        "id": "29b67d32-a612-489f-a1ac-8fd9cc4a9b5d",
+        "identifier": "CO-546",
+        "url": "https://linear.app/asabeko/issue/CO-546/co-attach-live-linear-state-to-rehydrated-pending-claim-revalidation"
+      },
+      "related_issues": [
+        {
+          "identifier": "CO-544",
+          "relation": "source_follow_up"
+        },
+        {
+          "identifier": "CO-510",
+          "relation": "affected_issue"
+        },
+        {
+          "identifier": "CO-512",
+          "relation": "affected_issue"
+        }
+      ]
+    },
+    {
+      "id": "20260516-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0",
+      "title": "CO-544 release rehydrated blocked provider claims from active WIP",
+      "relates_to": "tasks/tasks-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-16",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-16",
+          "status": "confirmed_in_progress",
+          "summary": "Live issue-context verified CO-544 is In Progress with no attached PR; provider worker created the workpad and recorded the required serial parallelization decision before implementation."
+        },
+        "docs_packet": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-16",
+          "status": "created_before_implementation",
+          "summary": "Created the CO-544 docs-first packet for stale rehydrated accepted provider-intake claims with cached In Progress metadata and live Blocked Linear state, preserving fail-closed unavailable-evidence behavior and status/freshness-gauge distinction requirements."
+        }
+      },
+      "validation": {
+        "status": "implemented_review_clean_docs_freshness_baseline_blocked",
+        "passed": [
+          "live issue-context",
+          "workpad creation",
+          "parallelization decision recorded",
+          "docs-first packet created",
+          "focused provider-intake pending-revalidation tests",
+          "status/freshness-gauge classification tests",
+          "git diff --check",
+          "npm run build",
+          "npm run lint",
+          "npm run docs:check",
+          "npm run repo:stewardship",
+          "node scripts/diff-budget.mjs",
+          "gpt-5.5/xhigh standalone review"
+        ],
+        "blocked": [
+          "npm run docs:freshness fails on existing repo-wide stale-doc baseline debt outside CO-544"
+        ],
+        "waivers": [
+          "delegation guard passed with desktop spawn_agent override because worker_complex 019e2f89-e720-7e40-a32d-087c9c15976f is not represented by repo-local child manifests"
+        ],
+        "pending": [
+          "PR handoff if opened"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md",
+        "prd": "docs/PRD-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md",
+        "docs": "docs/TECH_SPEC-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md",
+        "action_plan": "docs/ACTION_PLAN-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md",
+        "spec": "tasks/specs/linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md",
+        "task": "tasks/tasks-linear-c8f25aac-5bc5-4210-8fc5-a143d6b14df0.md"
+      },
+      "source_issue": {
+        "id": "c8f25aac-5bc5-4210-8fc5-a143d6b14df0",
+        "identifier": "CO-544",
+        "url": "https://linear.app/asabeko/issue/CO-544/co-release-rehydrated-blocked-provider-claims-from-active-wip"
+      }
+    },
+    {
+      "id": "20260516-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90",
+      "title": "CO-545 clear May 16 strict spec-guard stale last_review baseline",
+      "status": "in_progress",
+      "relates_to": "tasks/tasks-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-16",
+      "approvals": {
+        "pre_implementation_issue_quality_review": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "approved",
+          "summary": "Live issue-context and protected terms confirm this lane owns only the May 16 Apr 14/15 strict spec-guard stale last_review baseline, not CO-544 implementation, CO-522 docs:freshness:maintain, or CO-523 Apr 8-11 strict spec cleanup."
+        },
+        "stale_baseline_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated-pending-final-gates",
+          "summary": "Pre-repair spec-guard reproduced 51 Apr 14/15 stale task specs; all numbered rows had complete same-file checklists and all UUID-backed rows live-resolved Done/completed, so rows were reclassified inactive done without deletion or spec-guard changes."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md",
+        "task": "tasks/tasks-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md",
+        "agent_task": ".agent/task/linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md",
+        "prd": "docs/PRD-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md",
+        "docs": "docs/TECH_SPEC-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md",
+        "action_plan": "docs/ACTION_PLAN-linear-f43c6213-a14e-4c3f-ab51-2c539a4d2c90.md"
+      },
+      "source_issue": {
+        "id": "f43c6213-a14e-4c3f-ab51-2c539a4d2c90",
+        "identifier": "CO-545",
+        "url": "https://linear.app/asabeko/issue/CO-545/co-clear-may-16-strict-spec-guard-stale-last-review-baseline"
+      }
+    },
+    {
       "id": "20260515-linear-54f80820-2f4b-40c0-a998-ba767b02843e",
       "title": "CO-513 suppress same-attempt retries for create-follow-up label-resolution failures",
       "relates_to": "tasks/tasks-linear-54f80820-2f4b-40c0-a998-ba767b02843e.md",
@@ -8527,13 +8727,19 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "approvals": {
         "docs_review": {
           "reviewer": "manual recovery waiver after stale worker",
           "date": "2026-04-15",
           "status": "waived",
           "fallback_note": "CO-191 recovery started from a stale released-pending-reopen claim with no live worker and no surviving docs-review manifest. Parent preserved the docs-first packet, reran docs:check, docs:freshness, spec-guard, and delegation-guard, and recorded this waiver before PR review handoff."
+        },
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
         }
       },
       "paths": {
@@ -8551,8 +8757,15 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
-      "approvals": {},
+      "last_review": "2026-05-16",
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-4ffb542b-28b2-4530-8630-b79357e306e2.md",
         "task": "tasks/tasks-linear-4ffb542b-28b2-4530-8630-b79357e306e2.md",
@@ -8568,8 +8781,15 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
-      "approvals": {},
+      "last_review": "2026-05-16",
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-237c874c-c05f-4947-949a-573043fc575f.md",
         "task": "tasks/tasks-linear-237c874c-c05f-4947-949a-573043fc575f.md",
@@ -8585,8 +8805,15 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-14",
-      "approvals": {},
+      "last_review": "2026-05-16",
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-df69fabe-63c2-4b98-a226-9c37892b4f9d.md",
         "task": "tasks/tasks-linear-df69fabe-63c2-4b98-a226-9c37892b4f9d.md",
@@ -8619,8 +8846,15 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
-      "approvals": {},
+      "last_review": "2026-05-16",
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-9a54c7d8-518f-4452-95aa-c5852008b38d.md",
         "task": "tasks/tasks-linear-9a54c7d8-518f-4452-95aa-c5852008b38d.md",
@@ -8636,8 +8870,15 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-14",
-      "approvals": {},
+      "last_review": "2026-05-16",
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964-co-status-prune-terminal-released-issues.md",
         "task": "tasks/tasks-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964.md",
@@ -8652,8 +8893,15 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-14",
-      "approvals": {},
+      "last_review": "2026-05-16",
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-8720424f-56b0-4539-bebe-041c759fcb74.md",
         "task": "tasks/tasks-linear-8720424f-56b0-4539-bebe-041c759fcb74.md",
@@ -8669,7 +8917,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-14",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d.md",
         "task": "tasks/tasks-linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d.md",
@@ -8689,6 +8937,12 @@
           "date": "2026-04-14",
           "summary": "0.120.0 command surfaces and runtime canary passed; required cloud canary blocked by missing CODEX_CLOUD_ENV_ID.",
           "decision_summary": "out/linear-acdc2c4c-b8b1-46e8-8e21-c9a9c014213d/manual/codex-version-canary/compare/decision-go-no-go.md"
+        },
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
         }
       }
     },
@@ -8700,12 +8954,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-14",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/linear-0022f975-905a-4974-aa8e-d689df90167c.md",
         "task": "tasks/tasks-linear-0022f975-905a-4974-aa8e-d689df90167c.md",
         "agent_task": ".agent/task/linear-0022f975-905a-4974-aa8e-d689df90167c.md",
         "docs": "docs/TECH_SPEC-linear-0022f975-905a-4974-aa8e-d689df90167c.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -8716,8 +8978,15 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-14",
-      "approvals": {},
+      "last_review": "2026-05-16",
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-ea7ddb9e-78a7-4e85-aaa2-f890046d4809.md",
         "task": "tasks/tasks-linear-ea7ddb9e-78a7-4e85-aaa2-f890046d4809.md",
@@ -8733,7 +9002,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-14",
+      "last_review": "2026-05-16",
       "approvals": {
         "docs_review": {
           "status": "succeeded",
@@ -8742,6 +9011,12 @@
           "manifest": ".runs/linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25-co-177-docs-review-r2/cli/2026-04-14T05-20-05-166Z-23f9d876/manifest.json",
           "review_telemetry": ".runs/linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25-co-177-docs-review-r2/cli/2026-04-14T05-20-05-166Z-23f9d876/review/telemetry.json",
           "review_outcome": "clean-success"
+        },
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
         }
       },
       "paths": {
@@ -8759,12 +9034,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-14",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/linear-afb6ebc9-1341-4dbd-a522-6531a15aab90.md",
         "task": "tasks/tasks-linear-afb6ebc9-1341-4dbd-a522-6531a15aab90.md",
         "agent_task": ".agent/task/linear-afb6ebc9-1341-4dbd-a522-6531a15aab90.md",
         "docs": "docs/TECH_SPEC-linear-afb6ebc9-1341-4dbd-a522-6531a15aab90.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -8791,13 +9074,19 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-14",
+      "last_review": "2026-05-16",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (clean-success)",
           "date": "2026-04-14",
           "manifest": ".runs/linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2-co-174-docs-review/cli/2026-04-13T23-05-04-374Z-17c6fed0/manifest.json",
           "telemetry": ".runs/linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2-co-174-docs-review/cli/2026-04-13T23-05-04-374Z-17c6fed0/review/telemetry.json"
+        },
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
         }
       },
       "paths": {
@@ -8815,7 +9104,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-14",
+      "last_review": "2026-05-16",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (succeeded)",
@@ -8823,6 +9112,12 @@
           "status": "succeeded",
           "manifest": ".runs/linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c-co-173-docs-review/cli/2026-04-13T22-43-47-842Z-4ced90a2/manifest.json",
           "telemetry": ".runs/linear-0f7f6994-db41-4b0a-91f3-9b8f32ea427c-co-173-docs-review/cli/2026-04-13T22-43-47-842Z-4ced90a2/review/telemetry.json"
+        },
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
         }
       },
       "paths": {
@@ -8840,12 +9135,18 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-14",
+      "last_review": "2026-05-16",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (clean-success)",
           "date": "2026-04-14",
           "manifest": ".runs/linear-a560f416-c80a-473b-96fb-9f1ec090c968-docs-review-r3/cli/2026-04-13T22-30-05-481Z-fb8b4b92/manifest.json"
+        },
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
         }
       },
       "paths": {
@@ -8897,7 +9198,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-14",
+      "last_review": "2026-05-16",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (clean-success after TASKS archive threshold repair)",
@@ -8906,6 +9207,12 @@
           "manifest": ".runs/linear-e3bc507e-c33d-48c7-9474-196a6ef9a28c-docs-review-r2/cli/2026-04-13T19-14-21-280Z-150e2d52/manifest.json",
           "prior_failed_manifest": ".runs/linear-e3bc507e-c33d-48c7-9474-196a6ef9a28c-docs-review/cli/2026-04-13T19-12-44-668Z-d484f408/manifest.json",
           "repair_note": "docs/TASKS.md crossed max_lines after adding the CO-171 snapshot; npm run docs:archive-tasks archived one completed snapshot and local docs:check passed before the successful docs-review rerun."
+        },
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
         }
       },
       "paths": {
@@ -14894,12 +15201,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1219-coordinator-symphony-aligned-standalone-review-remaining-helper-family-freeze-reassessment.md",
         "task": "tasks/tasks-1219-coordinator-symphony-aligned-standalone-review-remaining-helper-family-freeze-reassessment.md",
         "agent_task": ".agent/task/1219-coordinator-symphony-aligned-standalone-review-remaining-helper-family-freeze-reassessment.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-remaining-helper-family-freeze-reassessment.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -14990,12 +15305,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1213-coordinator-symphony-aligned-standalone-review-inspection-target-parsing-pipeline-extraction.md",
         "task": "tasks/tasks-1213-coordinator-symphony-aligned-standalone-review-inspection-target-parsing-pipeline-extraction.md",
         "agent_task": ".agent/task/1213-coordinator-symphony-aligned-standalone-review-inspection-target-parsing-pipeline-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-inspection-target-parsing-pipeline-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15006,12 +15329,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1212-coordinator-symphony-aligned-standalone-review-operand-path-normalization-boundary-extraction.md",
         "task": "tasks/tasks-1212-coordinator-symphony-aligned-standalone-review-operand-path-normalization-boundary-extraction.md",
         "agent_task": ".agent/task/1212-coordinator-symphony-aligned-standalone-review-operand-path-normalization-boundary-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-operand-path-normalization-boundary-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15022,12 +15353,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1211-coordinator-symphony-aligned-standalone-review-shell-command-parser-primitives-extraction.md",
         "task": "tasks/tasks-1211-coordinator-symphony-aligned-standalone-review-shell-command-parser-primitives-extraction.md",
         "agent_task": ".agent/task/1211-coordinator-symphony-aligned-standalone-review-shell-command-parser-primitives-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-shell-command-parser-primitives-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15038,12 +15377,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1210-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-review-support-classification.md",
         "task": "tasks/tasks-1210-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-review-support-classification.md",
         "agent_task": ".agent/task/1210-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-review-support-classification.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-review-support-classification.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15054,12 +15401,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction.md",
         "task": "tasks/tasks-1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction.md",
         "agent_task": ".agent/task/1209-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-shell-env-interpreter-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15070,12 +15425,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1208-coordinator-symphony-aligned-standalone-review-prompt-context-review-support-classification.md",
         "task": "tasks/tasks-1208-coordinator-symphony-aligned-standalone-review-prompt-context-review-support-classification.md",
         "agent_task": ".agent/task/1208-coordinator-symphony-aligned-standalone-review-prompt-context-review-support-classification.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-prompt-context-review-support-classification.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15086,12 +15449,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1207-coordinator-symphony-aligned-standalone-review-prompt-context-builder-extraction.md",
         "task": "tasks/tasks-1207-coordinator-symphony-aligned-standalone-review-prompt-context-builder-extraction.md",
         "agent_task": ".agent/task/1207-coordinator-symphony-aligned-standalone-review-prompt-context-builder-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-prompt-context-builder-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15102,12 +15473,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract.md",
         "task": "tasks/tasks-1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract.md",
         "agent_task": ".agent/task/1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15118,12 +15497,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1205-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment.md",
         "task": "tasks/tasks-1205-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment.md",
         "agent_task": ".agent/task/1205-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15134,12 +15521,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction.md",
         "task": "tasks/tasks-1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction.md",
         "agent_task": ".agent/task/1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15150,12 +15545,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1203-coordinator-symphony-aligned-orchestrator-cloud-environment-resolution-boundary-extraction.md",
         "task": "tasks/tasks-1203-coordinator-symphony-aligned-orchestrator-cloud-environment-resolution-boundary-extraction.md",
         "agent_task": ".agent/task/1203-coordinator-symphony-aligned-orchestrator-cloud-environment-resolution-boundary-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-environment-resolution-boundary-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15166,12 +15569,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1202-coordinator-symphony-aligned-orchestrator-cloud-prompt-builder-extraction.md",
         "task": "tasks/tasks-1202-coordinator-symphony-aligned-orchestrator-cloud-prompt-builder-extraction.md",
         "agent_task": ".agent/task/1202-coordinator-symphony-aligned-orchestrator-cloud-prompt-builder-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-prompt-builder-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15182,12 +15593,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1201-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md",
         "task": "tasks/tasks-1201-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md",
         "agent_task": ".agent/task/1201-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-remaining-private-wrapper-reassessment.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15198,12 +15617,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1200-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-persistence-callback-extraction.md",
         "task": "tasks/tasks-1200-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-persistence-callback-extraction.md",
         "agent_task": ".agent/task/1200-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-persistence-callback-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-persistence-callback-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15214,12 +15641,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction.md",
         "task": "tasks/tasks-1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction.md",
         "agent_task": ".agent/task/1199-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-resume-token-validation-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15230,12 +15665,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1198-coordinator-symphony-aligned-orchestrator-runtime-selection-manifest-mutation-extraction.md",
         "task": "tasks/tasks-1198-coordinator-symphony-aligned-orchestrator-runtime-selection-manifest-mutation-extraction.md",
         "agent_task": ".agent/task/1198-coordinator-symphony-aligned-orchestrator-runtime-selection-manifest-mutation-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-runtime-selection-manifest-mutation-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15246,12 +15689,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1197-coordinator-symphony-aligned-orchestrator-plan-shell-extraction.md",
         "task": "tasks/tasks-1197-coordinator-symphony-aligned-orchestrator-plan-shell-extraction.md",
         "agent_task": ".agent/task/1197-coordinator-symphony-aligned-orchestrator-plan-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-plan-shell-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15262,12 +15713,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1196-coordinator-symphony-aligned-orchestrator-status-shell-extraction.md",
         "task": "tasks/tasks-1196-coordinator-symphony-aligned-orchestrator-status-shell-extraction.md",
         "agent_task": ".agent/task/1196-coordinator-symphony-aligned-orchestrator-status-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-status-shell-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15278,12 +15737,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md",
         "task": "tasks/tasks-1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md",
         "agent_task": ".agent/task/1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15294,12 +15761,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
         "task": "tasks/tasks-1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
         "agent_task": ".agent/task/1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15310,12 +15785,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
         "task": "tasks/tasks-1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
         "agent_task": ".agent/task/1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-with-control-plane-lifecycle-shell-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15326,12 +15809,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction.md",
         "task": "tasks/tasks-1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction.md",
         "agent_task": ".agent/task/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15342,12 +15833,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction.md",
         "task": "tasks/tasks-1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction.md",
         "agent_task": ".agent/task/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15358,12 +15857,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction.md",
         "task": "tasks/tasks-1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction.md",
         "agent_task": ".agent/task/1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15374,12 +15881,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction.md",
         "task": "tasks/tasks-1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction.md",
         "agent_task": ".agent/task/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15390,12 +15905,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation.md",
         "task": "tasks/tasks-1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation.md",
         "agent_task": ".agent/task/1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15406,12 +15929,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1187-coordinator-symphony-aligned-orchestrator-plan-target-tracker-shell-extraction.md",
         "task": "tasks/tasks-1187-coordinator-symphony-aligned-orchestrator-plan-target-tracker-shell-extraction.md",
         "agent_task": ".agent/task/1187-coordinator-symphony-aligned-orchestrator-plan-target-tracker-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-plan-target-tracker-shell-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15422,12 +15953,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1186-coordinator-symphony-aligned-orchestrator-execution-route-adapter-shell-extraction.md",
         "task": "tasks/tasks-1186-coordinator-symphony-aligned-orchestrator-execution-route-adapter-shell-extraction.md",
         "agent_task": ".agent/task/1186-coordinator-symphony-aligned-orchestrator-execution-route-adapter-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-execution-route-adapter-shell-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15438,12 +15977,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1185-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md",
         "task": "tasks/tasks-1185-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md",
         "agent_task": ".agent/task/1185-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15454,12 +16001,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1184-coordinator-symphony-aligned-orchestrator-execution-routing-decision-shell-extraction.md",
         "task": "tasks/tasks-1184-coordinator-symphony-aligned-orchestrator-execution-routing-decision-shell-extraction.md",
         "agent_task": ".agent/task/1184-coordinator-symphony-aligned-orchestrator-execution-routing-decision-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-execution-routing-decision-shell-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15470,12 +16025,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1183-coordinator-symphony-aligned-orchestrator-cloud-route-fallback-contract-extraction.md",
         "task": "tasks/tasks-1183-coordinator-symphony-aligned-orchestrator-cloud-route-fallback-contract-extraction.md",
         "agent_task": ".agent/task/1183-coordinator-symphony-aligned-orchestrator-cloud-route-fallback-contract-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-route-fallback-contract-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -15486,12 +16049,20 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-16",
       "paths": {
         "spec": "tasks/specs/1182-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction.md",
         "task": "tasks/tasks-1182-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction.md",
         "agent_task": ".agent/task/1182-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction.md"
+      },
+      "approvals": {
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        }
       }
     },
     {
@@ -21035,7 +21606,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "approvals": {
         "docs_review": {
           "reviewer": "parent standalone review after docs-packet child lane",
@@ -21045,6 +21616,12 @@
           "telemetry": ".runs/linear-34b60caa-258b-4f18-8d67-cdad3f6352cf/cli/2026-04-15T15-13-39-658Z-5e7c3046/review/telemetry.json",
           "review_outcome": "bounded-success",
           "fallback_note": "No separate docs-review child stream was retained for this packet. Same-issue docs child lane `.runs/linear-34b60caa-258b-4f18-8d67-cdad3f6352cf-docs-packet/cli/2026-04-15T15-17-13-513Z-1f05f920/manifest.json` produced the docs packet, parent accepted it before implementation, and the parent manifest-backed standalone review completed bounded-success."
+        },
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
         }
       },
       "paths": {
@@ -21062,7 +21639,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-15",
+      "last_review": "2026-05-16",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
@@ -21082,6 +21659,12 @@
           "status": "succeeded",
           "telemetry": ".runs/linear-9b1440f0-a3af-4863-8bb5-2f8ea78bd02d/cli/2026-04-15T15-14-04-331Z-0bebe30c/review/telemetry.json",
           "review_outcome": "bounded-success"
+        },
+        "co545_stale_spec_reclassification": {
+          "reviewer": "CO-545 worker",
+          "date": "2026-05-16",
+          "status": "validated",
+          "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
         }
       },
       "paths": {

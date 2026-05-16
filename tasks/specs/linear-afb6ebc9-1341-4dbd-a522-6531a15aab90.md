@@ -1,10 +1,10 @@
 ---
 id: 20260414-linear-afb6ebc9-1341-4dbd-a522-6531a15aab90
 title: CO workflow: add provider adoption eval for source-0, child lanes, and follow-up traceability
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-14
-last_review: 2026-04-14
+last_review: 2026-05-16
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-afb6ebc9-1341-4dbd-a522-6531a15aab90.md
@@ -15,6 +15,7 @@ review_notes:
   - 2026-04-14: Bounded child lane created the docs-first packet only. Parent lane owns Linear state, workpad, PR lifecycle, source-payload verification, implementation, and acceptance.
   - 2026-04-14: Issue-quality review approved the scope as an eval contract, not an implementation slice; packet preserves source anchor, protected terms, non-goals, Not Done If, acceptance criteria, and sanitized-fixture constraints.
   - 2026-04-14: Parent implementation added `scripts/provider-linear-adoption-eval.mjs`, sanitized fixtures under `evaluation/fixtures/provider-linear-adoption/`, and focused regressions under `evaluation/tests/provider-linear-adoption.test.ts`.
+  - 2026-05-16: CO-545 strict spec-guard audit reclassified this stale Apr 14/15 row as inactive done; live `node bin/codex-orchestrator.js linear issue-context --issue-id afb6ebc9-1341-4dbd-a522-6531a15aab90 --format json` verified CO-176 is Linear Done/completed and attached/related PR evidence https://github.com/Kbediako/CO/pull/473. No completed_at was inferred or fabricated.
 ---
 
 # Technical Specification

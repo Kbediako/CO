@@ -58,9 +58,13 @@ import {
   resolveLiveLinearTrackedIssueById,
   resolveLiveLinearTrackedIssues
 } from './control/linearDispatchSource.js';
-import { resolveLinearWebhookSourceSetup } from './control/linearWebhookController.js';
+import {
+  resolveLinearConfiguredSourceSetup,
+  resolveLinearWebhookSourceSetup
+} from './control/linearWebhookController.js';
 import {
   createProviderIssueHandoffService,
+  type CreateProviderIssueHandoffServiceOptions,
   type ProviderIssueHandoffService
 } from './control/providerIssueHandoff.js';
 import {
@@ -88,6 +92,10 @@ import {
 
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
+type ControlHostTrackedIssueResolvers = Pick<
+  CreateProviderIssueHandoffServiceOptions,
+  'resolveTrackedIssue' | 'resolveRevalidationTrackedIssue' | 'resolveTrackedIssues'
+>;
 
 const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
 const LOCAL_SPAWN_MANIFEST_WAIT_TIMEOUT_MS = 5_000;
@@ -244,48 +252,7 @@ export async function runControlHostCliShell(
         providerWorkflowConfigStore,
         runReviewHandoffPromotion: runProviderReviewHandoffPromotion,
         runMergeCloseout: runProviderDeterministicMergeCloseout,
-        resolveTrackedIssue: async ({ issueId }) => {
-          const runtimeEnv = process.env;
-          const sourceSetup = resolveLinearWebhookSourceSetup(readFeatureToggles(), runtimeEnv);
-          if ('error' in sourceSetup) {
-            return { kind: 'skip', reason: sourceSetup.error } as const;
-          }
-          const resolution = await resolveLiveLinearTrackedIssueById({
-            issueId,
-            sourceSetup: sourceSetup.sourceSetup,
-            env: runtimeEnv
-          });
-          if (resolution.kind === 'ready') {
-            return { kind: 'ready', trackedIssue: resolution.tracked_issue } as const;
-          }
-          if (shouldReleaseTrackedIssueClaim(resolution.reason)) {
-            return { kind: 'release', reason: resolution.reason } as const;
-          }
-          return {
-            kind: 'skip',
-            reason: resolution.reason,
-            ...(resolution.details ? { details: resolution.details } : {})
-          } as const;
-        },
-        resolveTrackedIssues: async (input) => {
-          const runtimeEnv = process.env;
-          const sourceSetup = resolveLinearWebhookSourceSetup(readFeatureToggles(), runtimeEnv);
-          if ('error' in sourceSetup) {
-            return { kind: 'skip', reason: sourceSetup.error } as const;
-          }
-          const resolution = await resolveLiveLinearTrackedIssues({
-            sourceSetup: sourceSetup.sourceSetup,
-            env: runtimeEnv,
-            queryMode: input?.mode,
-            eligibleIssueTargetCount: input?.eligibleTargetCount,
-            eligibleStateSlotCounts: input?.eligibleStateSlotCounts,
-            excludedIssueIds: input?.excludedIssueIds
-          });
-          if (resolution.kind === 'ready') {
-            return { kind: 'ready', trackedIssues: resolution.tracked_issues } as const;
-          }
-          return { kind: 'skip', reason: resolution.reason } as const;
-        },
+        ...createControlHostTrackedIssueResolvers({ readFeatureToggles }),
         launcher: {
           start: async (input) => {
             const launchSpec = await resolveProviderStartLaunchSpec(
@@ -917,6 +884,75 @@ function shouldReleaseTrackedIssueClaim(reason: string): boolean {
   );
 }
 
+function createControlHostTrackedIssueResolvers(input: {
+  readFeatureToggles: () => Record<string, unknown> | null | undefined;
+  resolveEnv?: () => NodeJS.ProcessEnv;
+  resolveIssueById?: typeof resolveLiveLinearTrackedIssueById;
+  resolveIssues?: typeof resolveLiveLinearTrackedIssues;
+}): ControlHostTrackedIssueResolvers {
+  const resolveEnv = input.resolveEnv ?? (() => process.env);
+  const resolveIssueById = input.resolveIssueById ?? resolveLiveLinearTrackedIssueById;
+  const resolveIssues = input.resolveIssues ?? resolveLiveLinearTrackedIssues;
+
+  const resolveIssueByIdWithSource = async (
+    sourceSetupResolver: (
+      featureToggles: Record<string, unknown> | null | undefined,
+      env: NodeJS.ProcessEnv
+    ) =>
+      | { sourceSetup: { provider: 'linear'; workspace_id: string | null; team_id: string | null; project_id: string | null } }
+      | { status: number; error: string },
+    issueId: string
+  ) => {
+    const runtimeEnv = resolveEnv();
+    const sourceSetup = sourceSetupResolver(input.readFeatureToggles(), runtimeEnv);
+    if ('error' in sourceSetup) {
+      return { kind: 'skip', reason: sourceSetup.error } as const;
+    }
+    const resolution = await resolveIssueById({
+      issueId,
+      sourceSetup: sourceSetup.sourceSetup,
+      env: runtimeEnv
+    });
+    if (resolution.kind === 'ready') {
+      return { kind: 'ready', trackedIssue: resolution.tracked_issue } as const;
+    }
+    if (shouldReleaseTrackedIssueClaim(resolution.reason)) {
+      return { kind: 'release', reason: resolution.reason } as const;
+    }
+    return {
+      kind: 'skip',
+      reason: resolution.reason,
+      ...(resolution.details ? { details: resolution.details } : {})
+    } as const;
+  };
+
+  return {
+    resolveTrackedIssue: async ({ issueId }) =>
+      await resolveIssueByIdWithSource(resolveLinearWebhookSourceSetup, issueId),
+    resolveRevalidationTrackedIssue: async ({ issueId }) =>
+      await resolveIssueByIdWithSource(resolveLinearConfiguredSourceSetup, issueId),
+    resolveTrackedIssues: async (resolverInput) => {
+      const runtimeEnv = resolveEnv();
+      const sourceSetup = resolveLinearWebhookSourceSetup(input.readFeatureToggles(), runtimeEnv);
+      if ('error' in sourceSetup) {
+        return { kind: 'skip', reason: sourceSetup.error } as const;
+      }
+      const resolution = await resolveIssues({
+        sourceSetup: sourceSetup.sourceSetup,
+        env: runtimeEnv,
+        queryMode: resolverInput?.mode,
+        eligibleIssueTargetCount: resolverInput?.eligibleTargetCount,
+        eligibleStateSlotCounts: resolverInput?.eligibleStateSlotCounts,
+        excludedIssueIds: resolverInput?.excludedIssueIds
+      });
+      if (resolution.kind === 'ready') {
+        return { kind: 'ready', trackedIssues: resolution.tracked_issues } as const;
+      }
+      return { kind: 'skip', reason: resolution.reason } as const;
+    }
+  };
+}
+
 async function readProviderLinearLaunchContextFromProof(runDir: string): Promise<{
   sourceScope: ProviderLinearSourceScope | null;
   attemptStartedAt: string | null;
@@ -1035,6 +1071,7 @@ export const __test__ = {
   assertResumeLaunchSpecMatchesAdmittedWorkerHost,
   resolveProviderResumeTaskId,
   resolveProviderOverridePackageRoot,
+  createControlHostTrackedIssueResolvers,
   snapshotRunManifests,
   writeRemoteProviderScriptToSshChild
 };

@@ -1,16 +1,18 @@
 ---
 id: 20260314-1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction
 title: Coordinator Symphony-Aligned Orchestrator Control Plane Lifecycle Shell Extraction
-status: draft
+status: done
 owners:
   - Codex
 created: 2026-03-14
-last_review: 2026-04-14
+last_review: 2026-05-16
 review_cadence_days: 30
 related_prd: docs/PRD-coordinator-symphony-aligned-orchestrator-with-control-plane-lifecycle-shell-extraction.md
 related_action_plan: docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-with-control-plane-lifecycle-shell-extraction.md
 related_tasks:
   - tasks/tasks-1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md
+review_notes:
+  - 2026-05-16: CO-545 strict spec-guard audit reclassified this stale Apr 14/15 row as inactive done; same-file checklist `tasks/tasks-1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md` has 19 checked items and 0 unchecked items, so the old draft status was stale metadata rather than active implementation work.
 ---
 
 # Task Spec - Coordinator Symphony-Aligned Orchestrator Control Plane Lifecycle Shell Extraction

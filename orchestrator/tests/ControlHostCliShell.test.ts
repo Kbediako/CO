@@ -38,6 +38,7 @@ const {
   resolveProviderResumeLaunchSpec,
   assertResumeLaunchSpecMatchesAdmittedWorkerHost,
   resolveProviderOverridePackageRoot,
+  createControlHostTrackedIssueResolvers,
   snapshotRunManifests,
   writeRemoteProviderScriptToSshChild
 } = controlHostCliShellTest;
@@ -180,6 +181,79 @@ describe('controlHostCliShell manifest discovery', () => {
     ).toEqual({
       mode: 'repo-authoritative',
       reason: `${CONFIG_AUTHORITY_MODE_ENV_KEY}=repo-authoritative`
+    });
+  });
+
+  it('uses configured source binding only for existing-claim revalidation while dispatch pilot is disabled', async () => {
+    const runtimeEnv = {
+      CO_LINEAR_WORKSPACE_ID: 'workspace-env',
+      CO_LINEAR_TEAM_ID: 'team-env',
+      CO_LINEAR_PROJECT_ID: 'project-env'
+    } as NodeJS.ProcessEnv;
+    const resolveIssueById = vi.fn(async (request: {
+      issueId: string;
+      sourceSetup?: {
+        provider: 'linear';
+        workspace_id: string | null;
+        team_id: string | null;
+        project_id: string | null;
+      } | null;
+      env?: NodeJS.ProcessEnv;
+    }) => ({
+      kind: 'unavailable' as const,
+      status: 404,
+      code: 'dispatch_source_unavailable' as const,
+      reason: 'dispatch_source_issue_not_found',
+      details: {
+        sourceSetup: request.sourceSetup
+      }
+    }));
+    const resolvers = createControlHostTrackedIssueResolvers({
+      readFeatureToggles: () => ({
+        dispatch_pilot: {
+          enabled: false,
+          source: {
+            provider: 'linear',
+            live: true
+          }
+        }
+      }),
+      resolveEnv: () => runtimeEnv,
+      resolveIssueById
+    });
+
+    expect(resolvers.resolveTrackedIssue).toBeDefined();
+    expect(resolvers.resolveTrackedIssues).toBeDefined();
+    expect(resolvers.resolveRevalidationTrackedIssue).toBeDefined();
+    await expect(
+      resolvers.resolveTrackedIssue!({ provider: 'linear', issueId: 'lin-issue-510' })
+    ).resolves.toEqual({
+      kind: 'skip',
+      reason: 'dispatch_source_disabled'
+    });
+    await expect(
+      resolvers.resolveTrackedIssues!({ mode: 'recovery_sweep' })
+    ).resolves.toEqual({
+      kind: 'skip',
+      reason: 'dispatch_source_disabled'
+    });
+    expect(resolveIssueById).not.toHaveBeenCalled();
+
+    await expect(
+      resolvers.resolveRevalidationTrackedIssue!({ provider: 'linear', issueId: 'lin-issue-510' })
+    ).resolves.toEqual({
+      kind: 'release',
+      reason: 'dispatch_source_issue_not_found'
+    });
+    expect(resolveIssueById).toHaveBeenCalledWith({
+      issueId: 'lin-issue-510',
+      sourceSetup: {
+        provider: 'linear',
+        workspace_id: 'workspace-env',
+        team_id: 'team-env',
+        project_id: 'project-env'
+      },
+      env: runtimeEnv
     });
   });
 
