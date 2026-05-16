@@ -296,6 +296,82 @@
       }
     },
     {
+      "id": "20260516-linear-089348e9-a67f-4cf0-a9f5-a55bd885f0aa",
+      "title": "CO-516 reconcile provider-intake terminal merge closeout truth",
+      "relates_to": "tasks/tasks-linear-089348e9-a67f-4cf0-a9f5-a55bd885f0aa.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-16",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO manual replacement worker",
+          "date": "2026-05-16",
+          "status": "parent_contract_confirmed",
+          "summary": "Parent-provided CO-516 contract scopes this lane to provider-intake terminal merge closeout truth; worker must not mutate Linear/GitHub or push."
+        },
+        "parallelization": {
+          "reviewer": "CO manual replacement worker",
+          "date": "2026-05-16",
+          "status": "stay_serial_single_bounded_change",
+          "summary": "Docs, ProviderIssueHandoff/provider-intake implementation, focused tests, and validation share the same terminal closeout truth seam; same-issue child lanes would overlap source ownership, and Linear mutation is forbidden for this replacement worker."
+        },
+        "docs_packet": {
+          "reviewer": "CO manual replacement worker",
+          "date": "2026-05-16",
+          "status": "created_before_implementation",
+          "summary": "Created the CO-516 docs-first packet for retained completed/released provider-intake claims with stale review/merge fields after merged PR plus Linear Done, preserving audit history and excluding terminal evidence from active non-release alarms."
+        }
+      },
+      "validation": {
+        "status": "docs_packet_created_implementation_pending",
+        "passed": [
+          "worktree created from origin/main",
+          "docs-first packet created",
+          "parallelization decision recorded locally"
+        ],
+        "blocked": [],
+        "waivers": [
+          "Linear workpad and `linear parallelization` command were not mutated because this manual replacement worker is explicitly forbidden from Linear/GitHub lifecycle changes"
+        ],
+        "pending": [
+          "docs-review or unrelated baseline fallback",
+          "focused regression",
+          "implementation",
+          "validation"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-089348e9-a67f-4cf0-a9f5-a55bd885f0aa.md",
+        "prd": "docs/PRD-linear-089348e9-a67f-4cf0-a9f5-a55bd885f0aa.md",
+        "docs": "docs/TECH_SPEC-linear-089348e9-a67f-4cf0-a9f5-a55bd885f0aa.md",
+        "action_plan": "docs/ACTION_PLAN-linear-089348e9-a67f-4cf0-a9f5-a55bd885f0aa.md",
+        "spec": "tasks/specs/linear-089348e9-a67f-4cf0-a9f5-a55bd885f0aa.md",
+        "task": "tasks/tasks-linear-089348e9-a67f-4cf0-a9f5-a55bd885f0aa.md"
+      },
+      "source_issue": {
+        "id": "089348e9-a67f-4cf0-a9f5-a55bd885f0aa",
+        "identifier": "CO-516",
+        "url": "https://linear.app/asabeko/issue/CO-516/co-reconcile-provider-intake-terminal-claims-after-merge-closeout"
+      },
+      "related_issues": [
+        {
+          "identifier": "CO-513",
+          "relation": "affected_issue"
+        },
+        {
+          "identifier": "CO-510",
+          "relation": "affected_issue"
+        },
+        {
+          "identifier": "CO-492",
+          "relation": "regression_lineage"
+        }
+      ]
+    },
+    {
       "id": "20260516-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d",
       "title": "CO-546 attach live Linear state to rehydrated pending-claim revalidation",
       "relates_to": "tasks/tasks-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",

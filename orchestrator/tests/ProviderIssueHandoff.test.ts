@@ -31004,6 +31004,165 @@ describe('createProviderIssueHandoffService', () => {
     expect(publishRuntime).toHaveBeenCalledWith('provider-intake.refresh');
   });
 
+  it('refreshes terminal retained released merge closeout residue through the release path', async () => {
+    const { paths } = await createHostPaths();
+    const co510BlockerSnapshot = {
+      id: 'lin-co-510',
+      identifier: 'CO-510',
+      state: 'Done',
+      state_type: 'completed'
+    };
+    const dependentBlocker = {
+      id: 'lin-dependent-blocker',
+      identifier: 'CO-BLOCK',
+      state: 'In Progress',
+      state_type: 'started'
+    };
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-510',
+      issue_identifier: 'CO-510',
+      issue_title: 'Cached stale released merge closeout residue',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T14:00:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-510-retained',
+      run_id: null,
+      run_manifest_path: null,
+      merge_closeout: {
+        recorded_at: '2026-05-16T15:01:00.000Z',
+        issue_id: 'lin-co-510',
+        issue_identifier: 'CO-510',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-16T14:53:00.000Z',
+        status: 'merged',
+        reason: 'merged_and_shared_root_reconciled_transition_deferred',
+        summary:
+          'Attached PR #817 was already merged and the shared root is reconciled; Linear Done transition was deferred by shared-budget cooldown.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/817'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/817',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 817
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-05-16T15:00:10.000Z',
+          merged_at: '2026-05-16T15:00:10.000Z',
+          head_oid: 'head817'
+        },
+        branch_recovery: null,
+        merge_attempt: null,
+        shared_root: {
+          status: 'reconciled',
+          attempted_at: '2026-05-16T15:00:30.000Z',
+          before_status: '## main...origin/main [behind 1]',
+          after_status: '## main...origin/main',
+          reason: 'shared_root_reconciled'
+        },
+        linear_transition: {
+          status: 'failed',
+          attempted_at: '2026-05-16T15:00:45.000Z',
+          previous_state: 'Merging',
+          target_state: 'Done',
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-05-16T14:53:00.000Z',
+          error: 'linear_rate_limited: Linear shared budget cooldown is active.'
+        }
+      }
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = createCo202Launcher(
+      'run-co-510-should-not-start',
+      '/tmp/provider-run/co-510-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-co-510',
+        identifier: 'CO-510',
+        title: 'Live terminal title should refresh stale released closeout residue',
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-05-16T15:04:00.000Z',
+        blocked_by: []
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    await service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-co-511',
+          identifier: 'CO-511',
+          title: 'Dependent issue seeing terminal blocker truth',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-05-16T15:04:30.000Z',
+          blocked_by: [co510BlockerSnapshot, dependentBlocker]
+        })
+      ],
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-co-510'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_title: 'Live terminal title should refresh stale released closeout residue',
+      issue_state: co510BlockerSnapshot.state,
+      issue_state_type: co510BlockerSnapshot.state_type,
+      issue_updated_at: '2026-05-16T15:04:00.000Z',
+      task_id: 'linear-lin-co-510-retained',
+      run_id: null,
+      run_manifest_path: null
+    });
+    expect(state.claims[0]?.merge_closeout).toMatchObject({
+      status: 'merged',
+      reason: 'merged_and_shared_root_reconciled_transition_deferred',
+      issue_state: 'Merging',
+      linear_transition: {
+        status: 'failed',
+        target_state: 'Done'
+      }
+    });
+    expect(getPersistedState().claims[0]?.merge_closeout).toMatchObject({
+      status: 'merged',
+      reason: 'merged_and_shared_root_reconciled_transition_deferred'
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
   it('refreshes terminal retained metadata after a cached active blocker refresh', async () => {
     const { paths } = await createHostPaths();
     const co276TerminalBlockerSnapshot = {
@@ -41640,6 +41799,332 @@ describe('createProviderIssueHandoffService', () => {
     expect(getPersistedState().claims[0]?.merge_closeout).toMatchObject({
       status: 'merged',
       reason: 'merged_and_shared_root_reconciled_transition_deferred'
+    });
+  });
+
+  it('refreshes completed CO-492 PR 793-style merged closeout residue to live Done during rehydrate without dropping audit history', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-co-516-terminal-completed-closeout'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-co-516-terminal-completed-closeout');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-516-terminal-completed-closeout',
+        task_id: 'task-co-516-terminal-completed-closeout',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-co-492',
+        issue_identifier: 'CO-492',
+        issue_updated_at: '2026-05-14T16:05:00.000Z',
+        updated_at: '2026-05-14T16:10:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-co-492',
+      issue_id: 'lin-co-492',
+      issue_identifier: 'CO-492',
+      issue_title: 'Completed closeout residue',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T16:05:00.000Z',
+      issue_assignee_id: null,
+      issue_assignee_name: null,
+      task_id: 'task-co-516-terminal-completed-closeout',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_merge_closeout_merged',
+      accepted_at: '2026-05-14T16:00:05.000Z',
+      updated_at: '2026-05-14T16:10:10.000Z',
+      last_delivery_id: 'delivery-co-516-completed-closeout',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_747_237_200_000,
+      run_id: 'run-co-516-terminal-completed-closeout',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      merge_closeout: {
+        recorded_at: '2026-05-14T16:10:00.000Z',
+        issue_id: 'lin-co-492',
+        issue_identifier: 'CO-492',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-14T16:05:00.000Z',
+        status: 'merged',
+        reason: 'merged_and_shared_root_reconciled_transition_deferred',
+        summary:
+          'Attached PR #793 was merged after In Review to Merging; local closeout retained audit truth while Linear Done arrived later.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/793'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/793',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 793
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-05-14T16:09:30.000Z',
+          merged_at: '2026-05-14T16:09:00.000Z',
+          head_oid: 'abc492'
+        },
+        merge_attempt: null,
+        shared_root: {
+          status: 'reconciled',
+          attempted_at: '2026-05-14T16:09:45.000Z',
+          before_status: '## main...origin/main',
+          after_status: '## main...origin/main',
+          reason: 'shared_root_reconciled'
+        },
+        linear_transition: {
+          status: 'failed',
+          attempted_at: '2026-05-14T16:09:50.000Z',
+          previous_state: 'Merging',
+          target_state: 'Done',
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-05-14T16:05:00.000Z',
+          error: 'linear_rate_limited: Linear shared budget cooldown is active.'
+        }
+      }
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const runMergeCloseout = vi.fn(async () => {
+      throw new Error('runMergeCloseout should not rerun after live Done terminal truth.');
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      runMergeCloseout,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          id: 'lin-co-492',
+          identifier: 'CO-492',
+          title: 'Completed closeout residue',
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: '2026-05-14T16:13:30.000Z',
+          assignee_id: null,
+          assignee_name: null
+        })
+      })
+    });
+
+    await service.rehydrate();
+
+    expect(runMergeCloseout).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_merge_closeout_merged',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-05-14T16:13:30.000Z',
+      task_id: 'task-co-516-terminal-completed-closeout',
+      run_id: 'run-co-516-terminal-completed-closeout',
+      run_manifest_path: childPaths.manifestPath
+    });
+    expect(state.claims[0]?.merge_closeout).toMatchObject({
+      status: 'merged',
+      reason: 'merged_and_shared_root_reconciled_transition_deferred',
+      pr: {
+        number: 793
+      }
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_merge_closeout_merged',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-05-14T16:13:30.000Z'
+    });
+    expect(getPersistedState().claims[0]?.merge_closeout).toMatchObject({
+      status: 'merged',
+      reason: 'merged_and_shared_root_reconciled_transition_deferred'
+    });
+  });
+
+  it('does not classify a merged closeout with a failed non-Done transition as terminal Done truth', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-co-516-non-done-transition'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-co-516-non-done-transition');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-516-non-done-transition',
+        task_id: 'task-co-516-non-done-transition',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-co-516-non-done',
+        issue_identifier: 'CO-516',
+        issue_updated_at: '2026-05-14T16:05:00.000Z',
+        updated_at: '2026-05-14T16:10:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-co-516-non-done',
+      issue_identifier: 'CO-516',
+      issue_title: 'Non-Done transition closeout residue',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T16:05:00.000Z',
+      task_id: 'task-co-516-non-done-transition',
+      state: 'completed',
+      reason: 'provider_issue_merge_closeout_merged',
+      run_id: 'run-co-516-non-done-transition',
+      run_manifest_path: childPaths.manifestPath,
+      merge_closeout: {
+        recorded_at: '2026-05-14T16:10:00.000Z',
+        issue_id: 'lin-co-516-non-done',
+        issue_identifier: 'CO-516',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-14T16:05:00.000Z',
+        status: 'merged',
+        reason: 'legacy_failed_transition',
+        summary:
+          'Attached PR was merged and shared root was reconciled, but the failed transition target was not terminal Done.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/793'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/793',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 793
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-05-14T16:09:30.000Z',
+          merged_at: '2026-05-14T16:09:00.000Z',
+          head_oid: 'abc516'
+        },
+        merge_attempt: null,
+        shared_root: {
+          status: 'reconciled',
+          attempted_at: '2026-05-14T16:09:45.000Z',
+          before_status: '## main...origin/main',
+          after_status: '## main...origin/main',
+          reason: 'shared_root_reconciled'
+        },
+        linear_transition: {
+          status: 'failed',
+          attempted_at: '2026-05-14T16:09:50.000Z',
+          previous_state: 'Merging',
+          target_state: 'In Review',
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-05-14T16:05:00.000Z',
+          error: 'linear_rate_limited: Linear shared budget cooldown is active.'
+        }
+      }
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const runMergeCloseout = vi.fn(async () => {
+      throw new Error('runMergeCloseout should not rerun for live terminal metadata refresh.');
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      runMergeCloseout,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          id: 'lin-co-516-non-done',
+          identifier: 'CO-516',
+          title: 'Live Done issue after non-Done transition residue',
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: '2026-05-14T16:13:30.000Z',
+          assignee_id: null,
+          assignee_name: null
+        })
+      })
+    });
+
+    await service.rehydrate();
+
+    expect(runMergeCloseout).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T16:05:00.000Z'
+    });
+    expect(state.claims[0]?.merge_closeout).toMatchObject({
+      status: 'merged',
+      reason: 'legacy_failed_transition',
+      linear_transition: {
+        status: 'failed',
+        target_state: 'In Review'
+      }
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      issue_state: 'Merging',
+      issue_state_type: 'started'
     });
   });
 

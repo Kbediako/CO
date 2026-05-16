@@ -7313,20 +7313,31 @@ function isSupersededTerminalMergeCloseoutClaim(input: {
   trackedIssue?: Pick<LiveLinearTrackedIssue, 'state' | 'state_type' | 'updated_at'> | null;
 }): boolean {
   const mergeCloseout = input.claim.merge_closeout ?? null;
-  if (
-    !mergeCloseout ||
-    mergeCloseout.status !== 'action_required' ||
-    normalizeOptionalString(mergeCloseout.reason) !== 'pending_shared_root_reconciliation'
-  ) {
+  if (!mergeCloseout) {
     return false;
   }
   if (!mergeCloseoutSnapshotShowsMerged(mergeCloseout)) {
     return false;
   }
-  if (normalizeOptionalString(mergeCloseout.shared_root?.status) !== 'skipped') {
+  if (normalizeProviderLinearWorkflowState(mergeCloseout.issue_state) !== 'merging') {
     return false;
   }
-  if (normalizeProviderLinearWorkflowState(mergeCloseout.issue_state) !== 'merging') {
+  const isPendingSharedRootReconciliation =
+    mergeCloseout.status === 'action_required' &&
+    normalizeOptionalString(mergeCloseout.reason) === 'pending_shared_root_reconciliation' &&
+    normalizeOptionalString(mergeCloseout.shared_root?.status) === 'skipped';
+  const hasFailedDoneTransition =
+    mergeCloseout.linear_transition?.status === 'failed' &&
+    normalizeProviderLinearWorkflowState(mergeCloseout.linear_transition.target_state) === 'done';
+  const isMergedTransitionDeferred =
+    mergeCloseout.status === 'merged' &&
+    normalizeOptionalString(mergeCloseout.shared_root?.status) === 'reconciled' &&
+    (
+      normalizeOptionalString(mergeCloseout.reason) ===
+        'merged_and_shared_root_reconciled_transition_deferred' ||
+      hasFailedDoneTransition
+    );
+  if (!isPendingSharedRootReconciliation && !isMergedTransitionDeferred) {
     return false;
   }
   const liveWorkflowState = classifyProviderLinearWorkflowState(
@@ -9465,6 +9476,20 @@ function buildProviderCompletedRunRehydrateState(input: {
     return {
       task_id: input.run.taskId,
       state: 'handoff_failed',
+      reason: resolveProviderMergeCloseoutClaimReason(input.claim.merge_closeout),
+      run_id: input.run.runId,
+      run_manifest_path: input.run.manifestPath,
+      ...clearProviderRetryFields()
+    };
+  }
+  if (
+    input.claim.merge_closeout &&
+    resolveProviderMergeCloseoutClaimState(input.claim.merge_closeout) === 'completed' &&
+    isSupersededTerminalMergeCloseoutClaim({ claim: input.claim })
+  ) {
+    return {
+      task_id: input.run.taskId,
+      state: 'completed',
       reason: resolveProviderMergeCloseoutClaimReason(input.claim.merge_closeout),
       run_id: input.run.runId,
       run_manifest_path: input.run.manifestPath,
