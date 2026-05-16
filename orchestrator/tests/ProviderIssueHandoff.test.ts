@@ -5550,8 +5550,11 @@ describe('createProviderIssueHandoffService', () => {
       deferFreshDiscovery: true
     });
 
-    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-issue-1' }]
+    ]);
     expect(refetchTrackedIssues).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
     expect(state.claims[0]).toMatchObject({
       state: 'accepted',
       reason: 'provider_issue_rehydration_pending_revalidation',
@@ -5576,6 +5579,7 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-issue-1' }],
       [{ provider: 'linear', issueId: 'lin-issue-1' }]
     ]);
     expect(launcher.start).toHaveBeenCalledTimes(1);
@@ -5664,6 +5668,469 @@ describe('createProviderIssueHandoffService', () => {
       issue_updated_at: '2026-04-12T07:20:00.000Z',
       run_id: 'run-startup-accepted-revalidation',
       run_manifest_path: '/tmp/provider-run/startup-accepted-revalidation-manifest.json'
+    });
+  });
+
+  it('releases stale pending-revalidation accepted claims when direct live issue state is Blocked', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-510',
+      issue_identifier: 'CO-510',
+      issue_title: 'Recognize clean review wording',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:00:00.000Z',
+      task_id: 'linear-lin-issue-510',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      accepted_at: '2026-05-16T05:59:00.000Z',
+      updated_at: '2026-05-16T05:59:30.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => {
+        throw new Error('blocked pending-revalidation claim must not launch');
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-510',
+        identifier: 'CO-510',
+        title: 'Recognize clean review wording',
+        state: 'Blocked',
+        state_type: 'started',
+        updated_at: '2026-05-16T06:45:00.000Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-issue-510' }]
+    ]);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-510',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T06:45:00.000Z',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
+  it('keeps pending-revalidation accepted claims fail-closed when direct issue evidence is unavailable', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-512',
+      issue_identifier: 'CO-512',
+      issue_title: 'Handle provider rehydration cache residue',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:30:00.000Z',
+      task_id: 'linear-lin-issue-512',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      accepted_at: '2026-05-16T05:59:00.000Z',
+      updated_at: '2026-05-16T05:59:30.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => {
+        throw new Error('unavailable pending-revalidation evidence must not launch');
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'skip' as const,
+      reason: 'linear_unavailable'
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-issue-512' }]
+    ]);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-512',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:30:00.000Z',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
+  it('does not launch runnable pending-revalidation claims supplied by deferred poll maps', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-runnable-pending',
+      issue_identifier: 'CO-520',
+      issue_title: 'Runnable pending revalidation',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:00:00.000Z',
+      task_id: 'linear-lin-issue-runnable-pending',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      accepted_at: '2026-05-16T05:59:00.000Z',
+      updated_at: '2026-05-16T05:59:30.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => {
+        throw new Error('deferred pending-revalidation poll-map runnable must not launch');
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => {
+      throw new Error('poll-map runnable pending revalidation should not need issue-by-id');
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue
+    });
+
+    await service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-issue-runnable-pending',
+          identifier: 'CO-520',
+          title: 'Runnable pending revalidation',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-05-16T06:45:00.000Z'
+        })
+      ],
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      issue_identifier: 'CO-520',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:00:00.000Z',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
+  it('releases handoff-state pending-revalidation claims supplied by deferred poll maps', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-handoff-pending',
+      issue_identifier: 'CO-521',
+      issue_title: 'Handoff pending revalidation',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:00:00.000Z',
+      task_id: 'linear-lin-issue-handoff-pending',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      accepted_at: '2026-05-16T05:59:00.000Z',
+      updated_at: '2026-05-16T05:59:30.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => {
+        throw new Error('handoff pending-revalidation claim must release, not launch');
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher
+    });
+
+    await service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-issue-handoff-pending',
+          identifier: 'CO-521',
+          title: 'Handoff pending revalidation',
+          state: 'In Review',
+          state_type: 'started',
+          updated_at: '2026-05-16T06:45:00.000Z'
+        })
+      ],
+      deferFreshDiscovery: true
+    });
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-521',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T06:45:00.000Z',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
+  it('keeps release probes available after runnable pending-revalidation confirmations', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-issue-runnable-first',
+        issue_identifier: 'CO-522',
+        issue_title: 'Runnable pending revalidation first',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-14T12:00:00.000Z',
+        task_id: 'linear-lin-issue-runnable-first',
+        state: 'accepted',
+        reason: 'provider_issue_rehydration_pending_revalidation',
+        accepted_at: '2026-05-16T05:59:00.000Z',
+        updated_at: '2026-05-16T05:59:30.000Z',
+        run_id: null,
+        run_manifest_path: null,
+        launch_source: null,
+        launch_token: null
+      }),
+      createProviderClaim({
+        issue_id: 'lin-issue-blocked-second',
+        issue_identifier: 'CO-523',
+        issue_title: 'Blocked pending revalidation second',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-14T12:30:00.000Z',
+        task_id: 'linear-lin-issue-blocked-second',
+        state: 'accepted',
+        reason: 'provider_issue_rehydration_pending_revalidation',
+        accepted_at: '2026-05-16T05:59:00.000Z',
+        updated_at: '2026-05-16T05:59:30.000Z',
+        run_id: null,
+        run_manifest_path: null,
+        launch_source: null,
+        launch_token: null
+      })
+    );
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => {
+        throw new Error('release-only pending revalidation must not launch');
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async (input: { issueId: string }) => {
+      if (input.issueId === 'lin-issue-runnable-first') {
+        return {
+          kind: 'ready' as const,
+          trackedIssue: createTrackedIssue({
+            id: 'lin-issue-runnable-first',
+            identifier: 'CO-522',
+            title: 'Runnable pending revalidation first',
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-05-16T06:45:00.000Z'
+          })
+        };
+      }
+      return {
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-blocked-second',
+          identifier: 'CO-523',
+          title: 'Blocked pending revalidation second',
+          state: 'Blocked',
+          state_type: 'started',
+          updated_at: '2026-05-16T06:46:00.000Z'
+        })
+      };
+    });
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-issue-fresh-discovery',
+          identifier: 'CO-524',
+          state: 'In Progress',
+          state_type: 'started'
+        })
+      ]
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-issue-runnable-first' }],
+      [{ provider: 'linear', issueId: 'lin-issue-blocked-second' }]
+    ]);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(getPersistedState().claims.find((claim) => claim.issue_id === 'lin-issue-runnable-first')).toMatchObject({
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:00:00.000Z'
+    });
+    expect(getPersistedState().claims.find((claim) => claim.issue_id === 'lin-issue-blocked-second')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T06:46:00.000Z'
+    });
+  });
+
+  it('releases direct handoff-state pending-revalidation claims during non-deferred polls', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-direct-handoff',
+      issue_identifier: 'CO-525',
+      issue_title: 'Direct handoff pending revalidation',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:00:00.000Z',
+      task_id: 'linear-lin-issue-direct-handoff',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      accepted_at: '2026-05-16T05:59:00.000Z',
+      updated_at: '2026-05-16T05:59:30.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => {
+        throw new Error('direct handoff pending-revalidation claim must release, not launch');
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-direct-handoff',
+        identifier: 'CO-525',
+        title: 'Direct handoff pending revalidation',
+        state: 'In Review',
+        state_type: 'started',
+        updated_at: '2026-05-16T06:45:00.000Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      deferFreshDiscovery: false
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-direct-handoff'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-525',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T06:45:00.000Z',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: null,
+      run_manifest_path: null
     });
   });
 
