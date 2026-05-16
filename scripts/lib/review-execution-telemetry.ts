@@ -258,15 +258,21 @@ export function analyzeReviewSemanticVerdict(outputText: string): ReviewSemantic
   let pendingActionableDefectHeading = false;
   for (const line of verdictText.split(/\r?\n/u)) {
     const trimmedLine = line.trim();
-    if (!trimmedLine || isTopLevelReviewRuntimeLine(trimmedLine)) {
+    if (!trimmedLine) {
+      pendingActionableDefectHeading = false;
+      continue;
+    }
+    if (isTopLevelReviewRuntimeLine(trimmedLine)) {
       continue;
     }
     if (pendingActionableDefectHeading) {
       pendingActionableDefectHeading = false;
-      const carriedFinding = parseActionableDefectSummaryFinding(trimmedLine);
-      if (carriedFinding) {
-        findings.push(carriedFinding);
-        continue;
+      if (!isReviewSectionBreakLine(trimmedLine)) {
+        const carriedFinding = parseActionableDefectSummaryFinding(trimmedLine);
+        if (carriedFinding) {
+          findings.push(carriedFinding);
+          continue;
+        }
       }
     }
     if (isActionableDefectSplitHeadingLine(trimmedLine)) {
@@ -664,6 +670,18 @@ function isActionableDefectSplitHeadingLine(line: string): boolean {
   return /^actionable\s+defects?$/iu.test(candidate);
 }
 
+function isReviewSectionBreakLine(line: string): boolean {
+  const normalized = normalizeReviewVerdictClause(line);
+  return (
+    /^(?:findings?|defects?):?\s*(?:none|none\s+(?:(?:was|were)\s+)?(?:found|identified|detected|seen)|no\s+findings?|n\/a|not\s+applicable)?$/u.test(
+      normalized
+    ) ||
+    /^(?:validation|verification|checks?|tests?|test\s+suite|summary|review\s+summary|notes?|recommendations?)\s*:/u.test(
+      normalized
+    )
+  );
+}
+
 function isNoOpActionableDefectSummary(value: string): boolean {
   const trimmed = value.replace(/\s+/gu, ' ').trim();
   if (isBlockingCleanReviewVerdictCaveat(trimmed)) {
@@ -689,7 +707,7 @@ function isNoOpActionableDefectSummaryCandidate(candidate: string): boolean {
   }
   return (
     /^(?:i\s+)?did\s+not\s+(?:find|identify|detect|see)\s+(?:any\s+|a\s+)?actionable\s+defects?(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?$/u.test(normalizedCandidate) ||
-    /^(?:none|none (?:(?:was|were) )?(?:found|identified|detected|seen)(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?|no actionable defects?(?: (?:(?:was|were) )?(?:found|identified|detected|seen))?(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?|n\/a|not applicable)$/u.test(normalizedCandidate) ||
+    /^(?:none|none (?:(?:was|were) )?(?:found|identified|detected|seen)(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?|(?:there\s+(?:are|were|is|was)\s+)?no actionable defects?(?: (?:(?:was|were) )?(?:found|identified|detected|seen))?(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?|n\/a|not applicable)$/u.test(normalizedCandidate) ||
     hasCleanReviewVerdict(candidate)
   );
 }
@@ -1070,6 +1088,12 @@ function normalizeReviewVerdictClause(candidate: string): string {
 }
 
 function isValidationNotRunClause(normalized: string): boolean {
+  const labeledValidationMatch = normalized.match(
+    /^(?:validation|verification|checks?|tests?|test\s+suite)\s*:\s*(?<body>.+?)$/u
+  );
+  if (labeledValidationMatch?.groups?.body) {
+    return isValidationNotRunClause(labeledValidationMatch.groups.body);
+  }
   return /^(?:(?:although|but|however|though|yet|except|unless|nevertheless|nonetheless|conversely|still|that\s+said|even\s+so|on\s+the\s+other\s+hand|in\s+contrast|by\s+contrast)\b|(?:apart|aside)\s+from)\s*,?\s+(?:(?:i\s+)?(?:did|do|have|had)\s+not\s+run\s+(?:the\s+)?(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)|(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)\s+(?:(?:was|were)\s+)?not\s+run|no\s+(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)\s+(?:(?:was|were)\s+)?run)$|^(?:(?:i\s+)?(?:did|do|have|had)\s+not\s+run\s+(?:the\s+)?(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)|(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)\s+(?:(?:was|were)\s+)?not\s+run|no\s+(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)\s+(?:(?:was|were)\s+)?run)$/u.test(normalized);
 }
 

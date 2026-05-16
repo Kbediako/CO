@@ -303,6 +303,13 @@ describe('review-execution-telemetry', () => {
       expectedCount: 0
     },
     {
+      name: 'recognizes there-are-no no-op actionable defect labels',
+      output: 'Actionable defects: There are no actionable defects.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
       name: 'recognizes numbered no-op actionable defect labels with dotted paths and validation notes',
       output: '2) Actionable defects: none found in scripts/lib/foo.ts. Tests not run.\n',
       expectedVerdict: 'clean',
@@ -639,6 +646,27 @@ describe('review-execution-telemetry', () => {
       name: 'keeps clean verdict when validation-only shorthand omits auxiliary verb',
       output: 'No actionable defects were found; tests not run.\n',
       expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when labeled validation shorthand follows',
+      output: 'No actionable defects were found.\nValidation: tests not run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when split empty actionable section precedes labeled validation',
+      output: 'No actionable defects were found.\nActionable defects:\n\nValidation: tests not run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves empty split actionable section before labeled validation unknown without a clean verdict',
+      output: 'Actionable defects:\n\nValidation: tests not run.\n',
+      expectedVerdict: 'unknown',
       expectedPriority: null,
       expectedCount: 0
     },
