@@ -86,6 +86,328 @@ describe('review-execution-telemetry', () => {
     }
   });
 
+  it.each(
+    [
+      'No actionable defects were found in the changed telemetry parser.',
+      'No actionable defect was found in the changed telemetry parser.',
+      'No concrete correctness regressions were found in the changed telemetry parser.',
+      'No concrete correctness regression was found in the changed telemetry parser.',
+      'No actionable defects were found in scripts/lib/review-execution-telemetry.ts.',
+      'No concrete correctness regressions were found in tests/review-execution-telemetry.spec.ts:91.',
+      'No actionable defects were found in .agent/task/linear-1e25073c-5587-4732-89ec-e27e5d167747.md.',
+      'No concrete correctness regressions were found in ./scripts/lib/review-execution-telemetry.ts.'
+    ]
+  )('recognizes CO-492 clean semantic review wording: %s', async (cleanOutput) => {
+    const sandbox = await makeSandbox();
+    const payload = await writeTelemetryForOutput(sandbox, `${cleanOutput}\n`);
+
+    expect(payload?.review_outcome).toBe('clean-success');
+    expect(payload?.review_verdict).toBe('clean');
+    expect(payload?.highest_finding_priority).toBeNull();
+    expect(payload?.finding_count).toBe(0);
+  });
+
+  it.each([
+    {
+      name: 'keeps P-prioritized findings ahead of clean wording',
+      output: [
+        'No actionable defects were found in the broad review summary.',
+        '- [P1] Clean-looking wording must not hide an actionable parser finding'
+      ].join('\n'),
+      expectedVerdict: 'findings',
+      expectedPriority: 'P1',
+      expectedCount: 1
+    },
+    {
+      name: 'keeps structured findings ahead of clean wording',
+      output: `${JSON.stringify({
+        review_verdict: 'clean',
+        summary: 'No concrete correctness regressions were found in the broad review summary.',
+        findings: [
+          {
+            title: '[P2] Structured findings still take precedence',
+            priority: 2
+          }
+        ]
+      })}\n`,
+      expectedVerdict: 'findings',
+      expectedPriority: 'P2',
+      expectedCount: 1
+    },
+    {
+      name: 'keeps explicit actionable defect prose ahead of clean wording',
+      output: [
+        'No actionable defects were found in the broad review summary.',
+        'Actionable defect: clean wording must not hide natural-language defect prose'
+      ].join('\n'),
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'keeps same-line actionable defect prose ahead of clean wording',
+      output: 'No actionable defects were found in the parser. Actionable defect: it drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'keeps same-line actionable defects prose ahead of clean wording',
+      output: 'No concrete correctness regressions were found in the parser. Actionable defects: it drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'keeps semicolon-separated actionable defect prose ahead of clean wording',
+      output: 'No actionable defects were found in the parser; actionable defect: it drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'ignores no-op actionable defect summaries',
+      output: [
+        'No actionable defects were found in the broad review summary.',
+        'Actionable defects: none found'
+      ].join('\n'),
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'ignores was/were no-op actionable defect summaries',
+      output: [
+        'No actionable defects were found in the broad review summary.',
+        'Actionable defects: none were found'
+      ].join('\n'),
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'ignores scoped no-op actionable defect summaries',
+      output: [
+        'No actionable defects were found in the broad review summary.',
+        'Actionable defects: none found in the diff'
+      ].join('\n'),
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'ignores dotted-path scoped no-op actionable defect summaries',
+      output: [
+        'No actionable defects were found in the broad review summary.',
+        'Actionable defects: none found in scripts/lib/review-execution-telemetry.ts.'
+      ].join('\n'),
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'ignores no-op actionable defect summaries with validation-only notes',
+      output: [
+        'No actionable defects were found in the broad review summary.',
+        'Actionable defects: none found; validation was not run'
+      ].join('\n'),
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes standalone no-op actionable defect summaries with validation-only notes',
+      output: 'Actionable defects: none found; validation was not run\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes labeled no-op actionable defect clean wording',
+      output: 'Actionable defects: No actionable defects were found in the changed telemetry parser.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes labeled no-op actionable defect clean wording scoped to a dot-prefixed file path',
+      output: 'Actionable defects: No actionable defects were found in .github/workflows/review.yml.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'recognizes active-voice labeled no-op actionable defect wording',
+      output: 'Actionable defects: I did not find any actionable defects in the diff.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves contrasting defect clause unknown instead of clean',
+      output: 'No actionable defects were found in the parser, but it drops [P1] findings.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves exception-style defect clause unknown instead of clean',
+      output: 'No actionable defects were found in the parser except it drops errors.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves contrasting correctness regression clause unknown instead of clean',
+      output: 'No concrete correctness regressions were found in the parser, but it drops [P1] findings.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves novel contrastive defect caveats unknown instead of clean',
+      output: 'No actionable defects were found, but it leaks credentials.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves explicit defect caveat clauses unknown instead of clean',
+      output: 'No actionable defects were found with one caveat: it drops review findings.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves same-line split clean plus contrasting warning unknown',
+      output:
+        'No actionable defects were found. No concrete correctness regressions were found, but it drops [P1] findings.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves multi-line contrasting warning unknown',
+      output: 'No actionable defects were found.\nHowever, it drops [P1] findings.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves nevertheless contrastive defect caveats unknown instead of clean',
+      output: 'No actionable defects were found.\nNevertheless, it leaks credentials.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves that-said contrastive defect caveats unknown instead of clean',
+      output: 'No actionable defects were found.\nThat said, it leaks credentials.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves on-the-other-hand contrastive defect caveats unknown instead of clean',
+      output: 'No actionable defects were found.\nOn the other hand, it leaks credentials.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves in-contrast defect caveats unknown instead of clean',
+      output: 'No actionable defects were found. In contrast, it leaks credentials.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when unrelated caveat mentions validation only',
+      output: 'No actionable defects were found.\nHowever, I did not run validation.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when same-line caveat mentions validation only',
+      output: 'No actionable defects were found, but I did not run validation.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when same-line validation-only note is semicolon-separated',
+      output: 'No actionable defects were found; validation was not run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when same-line caveat mentions validation suite only',
+      output: 'No actionable defects were found, but I did not run the validation suite.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdict when separate caveat says validation suite was not run',
+      output: 'No actionable defects were found.\nHowever, validation suite was not run.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps labeled contrasting actionable defect prose as a finding',
+      output: 'Actionable defects: No actionable defects were found in the parser, but it drops [P1] findings.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'keeps active-voice labeled contrasting actionable defect prose as a finding',
+      output: 'Actionable defects: I did not find any actionable defects in the parser, but it drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'leaves generic non-finding text unknown',
+      output: 'The review completed with general notes about scope and formatting only.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves unqualified defect wording unknown',
+      output: 'No defects were found in the changed telemetry parser.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves unqualified active-voice defect wording unknown',
+      output: 'I did not find any defects in the changed telemetry parser.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves unqualified regression wording unknown',
+      output: 'No regressions were found in the changed telemetry parser.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    }
+  ])('$name', async ({ output, expectedVerdict, expectedPriority, expectedCount }) => {
+    const sandbox = await makeSandbox();
+    const payload = await writeTelemetryForOutput(sandbox, output);
+
+    expect(payload?.review_outcome).toBe('clean-success');
+    expect(payload?.review_verdict).toBe(expectedVerdict);
+    expect(payload?.highest_finding_priority).toBe(expectedPriority);
+    expect(payload?.finding_count).toBe(expectedCount);
+  });
+
   it('requires explicit structured clean evidence when findings are empty', async () => {
     const sandbox = await makeSandbox();
     const payload = await writeTelemetryForOutput(sandbox, `${JSON.stringify({ findings: [] })}\n`);

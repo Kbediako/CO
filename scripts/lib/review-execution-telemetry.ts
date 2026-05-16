@@ -256,7 +256,7 @@ export function analyzeReviewSemanticVerdict(outputText: string): ReviewSemantic
 
   const findings: ParsedReviewFinding[] = [];
   for (const line of verdictText.split(/\r?\n/u)) {
-    const finding = parseReviewFindingLine(line);
+    const finding = parseReviewFindingLine(line) ?? parseActionableDefectFindingLine(line);
     if (finding) {
       findings.push(finding);
     }
@@ -582,6 +582,42 @@ function parseReviewFindingLine(
   return { priority, text };
 }
 
+function parseActionableDefectFindingLine(line: string): ParsedReviewFinding | null {
+  const text = parseActionableDefectSummaryText(line);
+  return text && !isNoOpActionableDefectSummary(text) ? { priority: null, text: `actionable defect: ${text}` } : null;
+}
+
+function parseActionableDefectSummaryText(line: string): string | null {
+  const match =
+    line.match(/^\s*(?:[-*]\s*)?(?:>\s*)?actionable\s+defects?:\s+(.+?)\s*$/iu) ??
+    line.match(/[.!?;]\s+actionable\s+defects?:\s+(.+?)\s*$/iu);
+  return match?.[1]?.trim() ?? null;
+}
+
+function isNoOpActionableDefectSummary(value: string): boolean {
+  const trimmed = value.replace(/\s+/gu, ' ').trim();
+  if (isBlockingCleanReviewVerdictCaveat(trimmed)) {
+    return false;
+  }
+  const candidate =
+    getCleanReviewVerdictPrefixBeforeNonBlockingCaveat(trimmed) ??
+    getCleanReviewVerdictPrefixBeforeValidationOnlyNote(trimmed) ??
+    trimmed;
+  const normalizedCandidate = candidate
+    .replace(/[.!]+$/u, '')
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .toLowerCase();
+  if (isDisqualifiedCleanReviewVerdictCandidate(candidate)) {
+    return false;
+  }
+  return (
+    /^(?:i\s+)?did\s+not\s+(?:find|identify|detect|see)\s+(?:any\s+|a\s+)?actionable\s+defects?(?:\s+(?:in|for|from|against|with)\b(?:(?![!?;\n]|[.]\s).)*)?$/u.test(normalizedCandidate) ||
+    /^(?:none|none (?:(?:was|were) )?(?:found|identified|detected|seen)(?:\s+(?:in|for|from|against|with)\b(?:(?![!?;\n]|[.]\s).)*)?|no actionable defects?(?: (?:(?:was|were) )?(?:found|identified|detected|seen))?(?:\s+(?:in|for|from|against|with)\b(?:(?![!?;\n]|[.]\s).)*)?|n\/a|not applicable)$/u.test(normalizedCandidate) ||
+    hasCleanReviewVerdict(candidate)
+  );
+}
+
 function parseStructuredReviewFinding(value: unknown): ParsedReviewFinding | null {
   if (!isRecord(value)) {
     return null;
@@ -662,8 +698,10 @@ function compareReviewFindingPriority(
 const reviewFindingPriorityRanks: Record<ReviewFindingPriority, number> = { P0: 0, P1: 1, P2: 2, P3: 3 };
 
 const CLEAN_REVIEW_VERDICT_PATTERNS = [
-  /^\s*(?:[-*]\s*)?(?:(?:(?:I|[A-Z][^.\n]*?)\s+)?(?:found|find)\s+no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions)(?:\s+(?:in|for|from|against|with)\b.*)?[.!]?|no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions)(?:\s+(?:found|identified|were found))?(?:\s+(?:in|for|from|against|with)\b.*)?[.!]?|no\s+findings\.?)\s*$/iu,
-  /^\s*(?:[-*]\s*)?(?:I\s+)?did\s+not\s+(?:find|identify|detect|see)\s+(?:any\s+|a\s+)?(?:(?:concrete|discrete|actionable|correctness)\s+)*(?:issues?|findings?|regressions?)(?:\s+(?:in|for|from|against|with)\b.*)?[.!]?\s*$/iu
+  /^\s*(?:[-*]\s*)?(?:(?:(?:I|[A-Z][^.\n]*?)\s+)?(?:found|find)\s+no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions|defects?)(?:\s+(?:in|for|from|against|with)\b[^.!?;\n]*)?(?:[.!]|\.\.\.|…)?|no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions|defects?)(?:\s+(?:found|identified|(?:was|were)\s+(?:found|identified|detected|seen)))?(?:\s+(?:in|for|from|against|with)\b[^.!?;\n]*)?(?:[.!]|\.\.\.|…)?|no\s+findings\.?)\s*$/iu,
+  /^\s*(?:[-*]\s*)?no\s+(?:concrete|discrete)\s+correctness\s+regressions?\s+(?:(?:was|were)\s+)?(?:found|identified|detected|seen)(?:\s+(?:in|for|from|against|with)\b[^.!?;\n]*)?(?:[.!]|\.\.\.|…)?\s*$/iu,
+  /^\s*(?:[-*]\s*)?(?:I\s+)?did\s+not\s+(?:find|identify|detect|see)\s+(?:any\s+|a\s+)?(?:(?:concrete|discrete|actionable|correctness)\s+)*(?:issues?|findings?|regressions?)(?:\s+(?:in|for|from|against|with)\b[^.!?;\n]*)?(?:[.!]|\.\.\.|…)?\s*$/iu,
+  /^\s*(?:[-*]\s*)?(?:I\s+)?did\s+not\s+(?:find|identify|detect|see)\s+(?:any\s+|a\s+)?actionable\s+defects?(?:\s+(?:in|for|from|against|with)\b[^.!?;\n]*)?(?:[.!]|\.\.\.|…)?\s*$/iu
 ] as const;
 
 const CLEAN_REVIEW_VERDICT_SENTENCE_BOUNDARY =
@@ -674,17 +712,124 @@ function getCleanReviewVerdictCandidates(line: string): string[] {
   if (!trimmed) {
     return [];
   }
-  return [trimmed, ...trimmed.split(CLEAN_REVIEW_VERDICT_SENTENCE_BOUNDARY).map((candidate) => candidate.trim())];
+  const candidates = [trimmed, ...trimmed.split(CLEAN_REVIEW_VERDICT_SENTENCE_BOUNDARY).map((candidate) => candidate.trim())];
+  return candidates.flatMap((candidate) => {
+    const prefix =
+      getCleanReviewVerdictPrefixBeforeNonBlockingCaveat(candidate) ??
+      getCleanReviewVerdictPrefixBeforeValidationOnlyNote(candidate);
+    const expandedCandidates = prefix ? [candidate, prefix] : [candidate];
+    return expandedCandidates.flatMap((expandedCandidate) => {
+      const actionableDefectSummary = parseActionableDefectSummaryText(expandedCandidate);
+      return actionableDefectSummary ? [expandedCandidate, actionableDefectSummary] : [expandedCandidate];
+    });
+  });
 }
 
 function hasCleanReviewVerdict(outputText: string): boolean {
-  return outputText
+  const lines = outputText
     .split(/\r?\n/u)
-    .some((line) =>
-      getCleanReviewVerdictCandidates(line).some((candidate) =>
-        CLEAN_REVIEW_VERDICT_PATTERNS.some((pattern) => pattern.test(candidate))
-      )
-    );
+    .map((line) => line.trim())
+    .filter((line) => Boolean(line));
+  if (lines.some((line) => isBlockingCleanReviewVerdictCaveat(line))) {
+    return false;
+  }
+  return lines.some((line) =>
+    getCleanReviewVerdictCandidates(line).some((candidate) => {
+      const actionableDefectSummary = parseActionableDefectSummaryText(candidate);
+      if (actionableDefectSummary && isNoOpActionableDefectSummary(actionableDefectSummary)) {
+        return true;
+      }
+      const normalizedCandidate = normalizeCleanReviewVerdictCandidate(candidate);
+      return (
+        !isDisqualifiedCleanReviewVerdictCandidate(candidate) &&
+        CLEAN_REVIEW_VERDICT_PATTERNS.some((pattern) => pattern.test(normalizedCandidate))
+      );
+    })
+  );
+}
+
+function normalizeCleanReviewVerdictCandidate(candidate: string): string {
+  return candidate
+    .replace(/(^|[\s("'`])\.(?=(?:\/|[A-Za-z0-9_-]+\/))/gu, '$1_')
+    .replace(/(?<=[A-Za-z0-9_-])\.(?=[A-Za-z0-9_-])/gu, '_');
+}
+
+function isDisqualifiedCleanReviewVerdictCandidate(candidate: string): boolean {
+  return (
+    /\[P[0-3]\]/u.test(candidate) ||
+    /\b(?:although|but|however|though|yet|except|unless|nevertheless|nonetheless|conversely|caveats?)\b|(?:apart|aside)\s+from|(?:^|[.!?;,]\s+)(?:still|that\s+said|even\s+so|on\s+the\s+other\s+hand|in\s+contrast|by\s+contrast)\b/iu.test(candidate)
+  );
+}
+
+function isBlockingCleanReviewVerdictCaveat(candidate: string): boolean {
+  if (!isDisqualifiedCleanReviewVerdictCandidate(candidate)) {
+    return false;
+  }
+  const caveats = getDisqualifyingCleanReviewVerdictClauses(candidate);
+  if (caveats.length === 0) {
+    return /\[P[0-3]\]/u.test(candidate);
+  }
+  return caveats.some((caveat) => !isNonBlockingCleanReviewVerdictCaveat(caveat));
+}
+
+function isNonBlockingCleanReviewVerdictCaveat(candidate: string): boolean {
+  return isValidationNotRunClause(normalizeReviewVerdictClause(candidate));
+}
+
+function normalizeReviewVerdictClause(candidate: string): string {
+  return candidate
+    .replace(/^[.!?;,]\s*/u, '')
+    .replace(/[.!]+$/u, '')
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function isValidationNotRunClause(normalized: string): boolean {
+  return /^(?:(?:although|but|however|though|yet|except|unless|nevertheless|nonetheless|conversely|still|that\s+said|even\s+so|on\s+the\s+other\s+hand|in\s+contrast|by\s+contrast)\b|(?:apart|aside)\s+from)\s*,?\s+(?:(?:i\s+)?(?:did|do|have|had)\s+not\s+run\s+(?:the\s+)?(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)|(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)\s+(?:was|were)\s+not\s+run)$|^(?:(?:i\s+)?(?:did|do|have|had)\s+not\s+run\s+(?:the\s+)?(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)|(?:validation|validation\s+(?:commands?|suite)|checks?|test\s+suite|tests?)\s+(?:was|were)\s+not\s+run)$/u.test(normalized);
+}
+
+function getCleanReviewVerdictPrefixBeforeValidationOnlyNote(candidate: string): string | null {
+  const match = /^(?<prefix>.+?)[,;]\s+(?<note>.+)$/u.exec(candidate);
+  if (!match?.groups) {
+    return null;
+  }
+  const note = normalizeReviewVerdictClause(match.groups.note);
+  if (!isValidationNotRunClause(note)) {
+    return null;
+  }
+  const prefix = match.groups.prefix.replace(/[,\s]+$/u, '').trim();
+  return prefix.length > 0 ? prefix : null;
+}
+
+function getCleanReviewVerdictPrefixBeforeNonBlockingCaveat(candidate: string): string | null {
+  const firstCaveat = getFirstDisqualifyingCleanReviewVerdictClause(candidate);
+  if (!firstCaveat || isBlockingCleanReviewVerdictCaveat(firstCaveat.clause)) {
+    return null;
+  }
+  const prefix = candidate.slice(0, firstCaveat.index).replace(/[,\s]+$/u, '').trim();
+  return prefix.length > 0 ? prefix : null;
+}
+
+function getFirstDisqualifyingCleanReviewVerdictClause(candidate: string): { index: number; clause: string } | null {
+  const match = getDisqualifyingCleanReviewVerdictPattern().exec(candidate);
+  if (!match) {
+    return null;
+  }
+  return { index: match.index, clause: candidate.slice(match.index).trim() };
+}
+
+function getDisqualifyingCleanReviewVerdictClauses(candidate: string): string[] {
+  const pattern = getDisqualifyingCleanReviewVerdictPattern();
+  const clauses: string[] = [];
+  for (let match = pattern.exec(candidate); match !== null; match = pattern.exec(candidate)) {
+    clauses.push(candidate.slice(match.index).trim());
+  }
+  return clauses;
+}
+
+function getDisqualifyingCleanReviewVerdictPattern(): RegExp {
+  return /\b(?:although|but|however|though|yet|except|unless|nevertheless|nonetheless|conversely|caveats?)\b|(?:apart|aside)\s+from|(?:^|[.!?;,]\s+)(?:still|that\s+said|even\s+so|on\s+the\s+other\s+hand|in\s+contrast|by\s+contrast)\b/giu;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
