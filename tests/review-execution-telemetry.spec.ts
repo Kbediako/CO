@@ -205,6 +205,20 @@ describe('review-execution-telemetry', () => {
       expectedCount: 1
     },
     {
+      name: 'keeps colon-spliced defect clauses in no-op actionable defect summaries as findings',
+      output: 'Actionable defects: No actionable defects were found in the parser: it drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
+      name: 'keeps dash-spliced defect clauses in no-op actionable defect summaries as findings',
+      output: 'Actionable defects: No actionable defects were found in the parser - it drops errors.\n',
+      expectedVerdict: 'findings',
+      expectedPriority: null,
+      expectedCount: 1
+    },
+    {
       name: 'recognizes clean-prefixed comma-separated no-op actionable defect labels',
       output: 'I found no actionable issues in the parser, actionable defects: none found.\n',
       expectedVerdict: 'clean',
@@ -339,6 +353,13 @@ describe('review-execution-telemetry', () => {
       expectedCount: 0
     },
     {
+      name: 'recognizes no-op actionable defect summaries with parenthesized validation-only notes',
+      output: 'Actionable defects: none found (tests not run).\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
       name: 'recognizes no-op actionable defect summaries with dotted paths before validation-only notes',
       output: 'Actionable defects: none found in scripts/lib/foo.ts. Tests not run.\n',
       expectedVerdict: 'clean',
@@ -427,6 +448,20 @@ describe('review-execution-telemetry', () => {
     {
       name: 'leaves exception-style defect clause unknown instead of clean',
       output: 'No actionable defects were found in the parser except it drops errors.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves colon-spliced defect clause unknown instead of clean',
+      output: 'No actionable defects were found in the parser: it drops errors.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves dash-spliced defect clause unknown instead of clean',
+      output: 'No actionable defects were found in the parser - it drops errors.\n',
       expectedVerdict: 'unknown',
       expectedPriority: null,
       expectedCount: 0
@@ -742,6 +777,20 @@ describe('review-execution-telemetry', () => {
       expectedCount: 0
     },
     {
+      name: 'keeps inline summary clean verdicts clean',
+      output: 'Summary: no actionable defects found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps inline final verdict clean labels clean',
+      output: 'Final verdict: Actionable defects: none found.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
       name: 'keeps multi-line benign and validation clean follow-ups clean',
       output: 'No actionable defects were found.\nThe implementation is sound.\nTests not run.\n',
       expectedVerdict: 'clean',
@@ -913,6 +962,34 @@ describe('review-execution-telemetry', () => {
       expectedVerdict: 'findings',
       expectedPriority: null,
       expectedCount: 1
+    },
+    {
+      name: 'leaves pure validation actionable defect summaries unknown without findings',
+      output: 'Actionable defects: tests not run.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'leaves pure benign actionable defect summaries unknown without findings',
+      output: 'Actionable defects: the patch looks sound.\n',
+      expectedVerdict: 'unknown',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps clean verdicts scoped to caveat-word path segments clean',
+      output: 'No actionable defects were found in packages/except/foo.ts.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
+    },
+    {
+      name: 'keeps labeled clean verdicts scoped to caveat-word path segments clean',
+      output: 'Actionable defects: none found in packages/but/foo.ts.\n',
+      expectedVerdict: 'clean',
+      expectedPriority: null,
+      expectedCount: 0
     },
     {
       name: 'keeps clean verdict when same-line caveat mentions validation suite only',

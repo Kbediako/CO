@@ -587,7 +587,14 @@ function parseActionableDefectFindingLine(line: string): ParsedReviewFinding | n
   if (!text || isNoOpActionableDefectSummary(text)) {
     return null;
   }
+  const normalized = normalizeReviewVerdictClause(text);
+  if (isValidationNotRunClause(normalized) || isBenignCleanReviewFollowupClause(normalized)) {
+    return null;
+  }
   const prioritizedFinding = parseReviewFindingLine(text);
+  if (prioritizedFinding && isNoOpActionableDefectSummary(prioritizedFinding.text)) {
+    return null;
+  }
   return {
     priority: prioritizedFinding?.priority ?? null,
     text: `actionable defect: ${prioritizedFinding?.text ?? text}`
@@ -629,7 +636,7 @@ function isNoOpActionableDefectSummary(value: string): boolean {
 }
 
 function isNoOpActionableDefectSummaryCandidate(candidate: string): boolean {
-  const verdictCandidate = stripReviewListMarker(candidate);
+  const verdictCandidate = normalizeCleanReviewVerdictCandidate(stripReviewListMarker(candidate));
   const normalizedCandidate = verdictCandidate
     .replace(/[.!]+$/u, '')
     .replace(/\s+/gu, ' ')
@@ -639,8 +646,8 @@ function isNoOpActionableDefectSummaryCandidate(candidate: string): boolean {
     return false;
   }
   return (
-    /^(?:i\s+)?did\s+not\s+(?:find|identify|detect|see)\s+(?:any\s+|a\s+)?actionable\s+defects?(?:\s+(?:in|for|from|against|with)\b(?:(?![!?,;\n]|[.]\s).)*)?$/u.test(normalizedCandidate) ||
-    /^(?:none|none (?:(?:was|were) )?(?:found|identified|detected|seen)(?:\s+(?:in|for|from|against|with)\b(?:(?![!?,;\n]|[.]\s).)*)?|no actionable defects?(?: (?:(?:was|were) )?(?:found|identified|detected|seen))?(?:\s+(?:in|for|from|against|with)\b(?:(?![!?,;\n]|[.]\s).)*)?|n\/a|not applicable)$/u.test(normalizedCandidate) ||
+    /^(?:i\s+)?did\s+not\s+(?:find|identify|detect|see)\s+(?:any\s+|a\s+)?actionable\s+defects?(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?$/u.test(normalizedCandidate) ||
+    /^(?:none|none (?:(?:was|were) )?(?:found|identified|detected|seen)(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?|no actionable defects?(?: (?:(?:was|were) )?(?:found|identified|detected|seen))?(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?|n\/a|not applicable)$/u.test(normalizedCandidate) ||
     hasCleanReviewVerdict(candidate)
   );
 }
@@ -762,15 +769,15 @@ function compareReviewFindingPriority(
 const reviewFindingPriorityRanks: Record<ReviewFindingPriority, number> = { P0: 0, P1: 1, P2: 2, P3: 3 };
 
 const CLEAN_REVIEW_VERDICT_PATTERNS = [
-  /^\s*(?:[-*]\s*)?(?:(?:(?:I|read-only\s+(?:diff\s+)?inspection(?:\s+(?:in|for|from|against|with|of)\b[^,.!?;\n]*)?)\s+)?(?:found|find)\s+no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions|defects?)(?:\s+(?:in|for|from|against|with)\b[^,.!?;\n]*)?(?:[.!]|\.\.\.|…)?|no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions|defects?)(?:\s+(?:found|identified|detected|seen|(?:was|were)\s+(?:found|identified|detected|seen)))?(?:\s+(?:in|for|from|against|with)\b[^,.!?;\n]*)?(?:[.!]|\.\.\.|…)?|no\s+findings\.?)\s*$/iu,
-  /^\s*(?:[-*]\s*)?no\s+(?:concrete|discrete)\s+correctness\s+regressions?\s+(?:(?:was|were)\s+)?(?:found|identified|detected|seen)(?:\s+(?:in|for|from|against|with)\b[^,.!?;\n]*)?(?:[.!]|\.\.\.|…)?\s*$/iu,
-  /^\s*(?:[-*]\s*)?(?:(?:I|read-only\s+(?:diff\s+)?inspection(?:\s+(?:in|for|from|against|with|of)\b[^,.!?;\n]*)?)\s+)?did\s+not\s+(?:find|identify|detect|see)\s+(?:any\s+|a\s+)?(?:(?:concrete|discrete|actionable|correctness)\s+)*(?:issues?|findings?|regressions?)(?:\s+(?:in|for|from|against|with)\b[^,.!?;\n]*)?(?:[.!]|\.\.\.|…)?\s*$/iu,
-  /^\s*(?:[-*]\s*)?(?:(?:I|read-only\s+(?:diff\s+)?inspection(?:\s+(?:in|for|from|against|with|of)\b[^,.!?;\n]*)?)\s+)?did\s+not\s+(?:find|identify|detect|see)\s+(?:any\s+|a\s+)?actionable\s+defects?(?:\s+(?:in|for|from|against|with)\b[^,.!?;\n]*)?(?:[.!]|\.\.\.|…)?\s*$/iu
+  /^\s*(?:[-*]\s*)?(?:(?:(?:I|read-only\s+(?:diff\s+)?inspection(?:\s+(?:in|for|from|against|with|of)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?)\s+)?(?:found|find)\s+no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions|defects?)(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?(?:[.!]|\.\.\.|…)?|no\s+actionable\s+(?:(?:correctness|regression)\s+)?(?:issues|findings|regressions|defects?)(?:\s+(?:found|identified|detected|seen|(?:was|were)\s+(?:found|identified|detected|seen)))?(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?(?:[.!]|\.\.\.|…)?|no\s+findings\.?)\s*$/iu,
+  /^\s*(?:[-*]\s*)?no\s+(?:concrete|discrete)\s+correctness\s+regressions?\s+(?:(?:was|were)\s+)?(?:found|identified|detected|seen)(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?(?:[.!]|\.\.\.|…)?\s*$/iu,
+  /^\s*(?:[-*]\s*)?(?:(?:I|read-only\s+(?:diff\s+)?inspection(?:\s+(?:in|for|from|against|with|of)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?)\s+)?did\s+not\s+(?:find|identify|detect|see)\s+(?:any\s+|a\s+)?(?:(?:concrete|discrete|actionable|correctness)\s+)*(?:issues?|findings?|regressions?)(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?(?:[.!]|\.\.\.|…)?\s*$/iu,
+  /^\s*(?:[-*]\s*)?(?:(?:I|read-only\s+(?:diff\s+)?inspection(?:\s+(?:in|for|from|against|with|of)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?)\s+)?did\s+not\s+(?:find|identify|detect|see)\s+(?:any\s+|a\s+)?actionable\s+defects?(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?(?:[.!]|\.\.\.|…)?\s*$/iu
 ] as const;
 
 const REVIEW_SUBJECT_CLEAN_VERDICT_PATTERNS = [
-  /^\s*(?:[-*]\s*)?(?:(?:review|(?:the\s+)?reviewer|codex|(?:the\s+)?(?:(?:standalone|bounded|read-only)\s+)?review|(?:the\s+)?(?:bounded|read-only)\s+retry)\s+)(?:found|find)\s+no\s+actionable\s+(?:(?:correctness|regression|diff-local|diff-scoped|code|docs?\/task|docs?|task|packet|registry|metadata|review|semantic|telemetry|parser|handoff|provider-worker|or)\s+)*(?:issues|findings|regressions|defects?)(?:\s+(?:in|for|from|against|with)\b[^,.!?;\n]*)?(?:[.!]|\.\.\.|…)?\s*$/iu,
-  /^\s*(?:[-*]\s*)?(?:(?:review|(?:the\s+)?reviewer|codex|(?:the\s+)?(?:(?:standalone|bounded|read-only)\s+)?review|(?:the\s+)?(?:bounded|read-only)\s+retry)\s+)did\s+not\s+(?:find|identify|detect|see)\s+(?:any\s+|a\s+)?(?:(?:concrete|discrete|actionable|correctness|diff-local|diff-scoped)\s+)*(?:issues?|findings?|regressions?|defects?)(?:\s+(?:in|for|from|against|with)\b[^,.!?;\n]*)?(?:[.!]|\.\.\.|…)?\s*$/iu
+  /^\s*(?:[-*]\s*)?(?:(?:review|(?:the\s+)?reviewer|codex|(?:the\s+)?(?:(?:standalone|bounded|read-only)\s+)?review|(?:the\s+)?(?:bounded|read-only)\s+retry)\s+)(?:found|find)\s+no\s+actionable\s+(?:(?:correctness|regression|diff-local|diff-scoped|code|docs?\/task|docs?|task|packet|registry|metadata|review|semantic|telemetry|parser|handoff|provider-worker|or)\s+)*(?:issues|findings|regressions|defects?)(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?(?:[.!]|\.\.\.|…)?\s*$/iu,
+  /^\s*(?:[-*]\s*)?(?:(?:review|(?:the\s+)?reviewer|codex|(?:the\s+)?(?:(?:standalone|bounded|read-only)\s+)?review|(?:the\s+)?(?:bounded|read-only)\s+retry)\s+)did\s+not\s+(?:find|identify|detect|see)\s+(?:any\s+|a\s+)?(?:(?:concrete|discrete|actionable|correctness|diff-local|diff-scoped)\s+)*(?:issues?|findings?|regressions?|defects?)(?:\s+(?:in|for|from|against|with)\b(?:(?![.,!?:;()\n]|\s[-–—]\s).)*)?(?:[.!]|\.\.\.|…)?\s*$/iu
 ] as const;
 
 const CLEAN_REVIEW_VERDICT_SENTENCE_BOUNDARY =
@@ -781,6 +788,7 @@ function getCleanReviewVerdictCandidates(line: string): string[] {
   if (!trimmed) {
     return [];
   }
+  const inlineNeutralPrefaceBody = extractInlineNeutralCleanReviewPrefaceBody(trimmed);
   const splitCandidates = trimmed
     .split(CLEAN_REVIEW_VERDICT_SENTENCE_BOUNDARY)
     .map((candidate) => candidate.trim())
@@ -794,6 +802,14 @@ function getCleanReviewVerdictCandidates(line: string): string[] {
       : null;
   const candidates = [
     { text: trimmed, allowPrefixExtraction: true },
+    ...(inlineNeutralPrefaceBody
+      ? [
+          {
+            text: inlineNeutralPrefaceBody,
+            allowPrefixExtraction: true
+          }
+        ]
+      : []),
     ...(terminalSplitCandidate
       ? [
           {
@@ -820,6 +836,7 @@ function getCleanReviewVerdictAllowedPrefixCandidates(candidate: string): string
   while (true) {
     const prefix =
       getCleanReviewVerdictPrefixBeforeNonBlockingCaveat(current) ??
+      getCleanReviewVerdictPrefixBeforeParenthesizedValidationOnlyNote(current) ??
       getCleanReviewVerdictPrefixBeforeValidationOnlyNote(current) ??
       getCleanReviewVerdictPrefixBeforeBenignFollowup(current);
     if (!prefix || prefix === current || seen.has(prefix)) {
@@ -842,6 +859,7 @@ function isAllowedCleanReviewVerdictPrefaceCandidate(candidate: string): boolean
     return true;
   }
   const prefix =
+    getCleanReviewVerdictPrefixBeforeParenthesizedValidationOnlyNote(trimmed) ??
     getCleanReviewVerdictPrefixBeforeValidationOnlyNote(trimmed) ??
     getCleanReviewVerdictPrefixBeforeBenignFollowup(trimmed);
   if (!prefix || prefix === trimmed) {
@@ -900,8 +918,19 @@ function isNeutralCleanReviewPrefaceClause(normalized: string): boolean {
   );
 }
 
+function extractInlineNeutralCleanReviewPrefaceBody(candidate: string): string | null {
+  const match = candidate.match(
+    /^\s*(?:(?:review\s+)?(?:summary|verdict|result)s?|(?:overall|final)\s+(?:summary|verdict|result)):\s+(.+?)\s*$/iu
+  );
+  return match?.[1]?.trim() || null;
+}
+
 function isCleanReviewVerdictCandidate(candidate: string): boolean {
   const verdictCandidate = stripReviewListMarker(candidate);
+  const inlineNeutralPrefaceBody = extractInlineNeutralCleanReviewPrefaceBody(verdictCandidate);
+  if (inlineNeutralPrefaceBody && isCleanReviewVerdictCandidate(inlineNeutralPrefaceBody)) {
+    return true;
+  }
   const actionableDefectSummary = parseActionableDefectSummaryText(verdictCandidate);
   if (actionableDefectSummary && isNoOpActionableDefectSummary(actionableDefectSummary)) {
     return true;
@@ -921,7 +950,8 @@ function stripReviewListMarker(candidate: string): string {
 function normalizeCleanReviewVerdictCandidate(candidate: string): string {
   return candidate
     .replace(/(^|[\s("'`])\.(?=(?:\/|[A-Za-z0-9_-]+\/))/gu, '$1_')
-    .replace(/(?<=[A-Za-z0-9_-])\.(?=[A-Za-z0-9_-])/gu, '_');
+    .replace(/(?<=[A-Za-z0-9_-])\.(?=[A-Za-z0-9_-])/gu, '_')
+    .replace(/(?<=[A-Za-z0-9_-]):(?=\d+\b)/gu, '_line_');
 }
 
 function isDisqualifiedCleanReviewVerdictCandidate(candidate: string): boolean {
@@ -958,6 +988,16 @@ function isValidationNotRunClause(normalized: string): boolean {
 
 function getCleanReviewVerdictPrefixBeforeValidationOnlyNote(candidate: string): string | null {
   return getCleanReviewVerdictPrefixBeforeTrailingClause(candidate, /[.!,;]/u, isValidationNotRunClause);
+}
+
+function getCleanReviewVerdictPrefixBeforeParenthesizedValidationOnlyNote(candidate: string): string | null {
+  const match = candidate.match(/^(?<prefix>.+?)\s+\((?<note>[^()]+)\)\s*[.!]?$/u);
+  const prefix = match?.groups?.prefix?.trim();
+  const note = match?.groups?.note ? normalizeReviewVerdictClause(match.groups.note) : '';
+  if (!prefix || !isValidationNotRunClause(note)) {
+    return null;
+  }
+  return prefix;
 }
 
 function getCleanReviewVerdictPrefixBeforeBenignFollowup(candidate: string): string | null {
@@ -1023,7 +1063,7 @@ function getDisqualifyingCleanReviewVerdictClauses(candidate: string): string[] 
 }
 
 function getDisqualifyingCleanReviewVerdictPattern(): RegExp {
-  return /\b(?:although|but|however|though|yet|except|unless|nevertheless|nonetheless|conversely|caveats?)\b|\b(?:with\s+)?one\s+exception\s*[:;,.]|\bexceptions?\s*:|(?:apart|aside)\s+from|(?:^|[.!?;,]\s+)(?:still|that\s+said|even\s+so|on\s+the\s+other\s+hand|in\s+contrast|by\s+contrast)\b/giu;
+  return /(?<![\w/-])(?:although|but|however|though|yet|except|unless|nevertheless|nonetheless|conversely|caveats?)(?![\w/-])|(?<![\w/-])(?:with\s+)?one\s+exception\s*[:;,.]|(?<![\w/-])exceptions?\s*:|(?<![\w/-])(?:apart|aside)\s+from|(?:^|[.!?;,]\s+)(?:still|that\s+said|even\s+so|on\s+the\s+other\s+hand|in\s+contrast|by\s+contrast)\b/giu;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
