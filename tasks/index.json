@@ -39,13 +39,7 @@
           "reviewer": "codex review",
           "date": "2026-05-17",
           "status": "clean",
-          "summary": "gpt-5.5/xhigh read-only reviewer and codex-orchestrator review found no actionable regressions."
-        },
-        "github_codex_review": {
-          "reviewer": "chatgpt-codex-connector",
-          "date": "2026-05-17",
-          "status": "clean",
-          "summary": "Manual @codex review was required for the PR #824 implementation head; Codex returned a thumbs-up and clean summary."
+          "summary": "Raw gpt-5.5/xhigh standalone codex review --uncommitted completed cleanly and reported full core passing; only existing spec/docs freshness baseline debt was noted."
         }
       },
       "validation": {
@@ -53,7 +47,7 @@
         "passed": [
           "live control-host recover failure evidence",
           "workpad creation",
-          "parallelization decision recorded",
+          "parallelization decision",
           "gpt-5.5/xhigh read-only explorer path map",
           "docs-first packet created",
           "focused ControlHostCliShell resolver regression",
@@ -61,7 +55,6 @@
           "touched ControlHostCliShell and ProviderIssueHandoff test files",
           "build",
           "lint",
-          "npm run test",
           "docs:check",
           "repo:stewardship",
           "diff-budget",
@@ -69,18 +62,15 @@
           "JSON parse",
           "git diff --check",
           "delegation guard with desktop subagent override",
-          "gpt-5.5/xhigh local review clean",
-          "implementation-head GitHub Codex PR review clean",
+          "raw gpt-5.5/xhigh codex review clean",
           "Linear workpad evidence update"
         ],
         "blocked": [
           "docs:freshness existing repo-wide stale-doc baseline debt outside CO-548",
-          "spec-guard dry-run existing stale-spec metadata outside CO-548"
+          "spec-guard dry-run existing stale-spec metadata outside CO-548",
+          "ProviderIssueHandoff queued-retry wait flake reproduced on clean main in full-file/full-suite runs"
         ],
-        "waivers": [
-          "delegation guard used desktop gpt-5.5/xhigh read-only subagent evidence because desktop spawn_agent evidence is not emitted as an MCP runner manifest",
-          "diagnostics manifest hit a transient async timing failure in an existing ProviderIssueHandoff test; the single test rerun and direct full npm run test passed"
-        ],
+        "waivers": [],
         "pending": [
           "PR handoff",
           "post-merge live CO-543 recovery proof"
