@@ -94,7 +94,10 @@ type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
 type ControlHostTrackedIssueResolvers = Pick<
   CreateProviderIssueHandoffServiceOptions,
-  'resolveTrackedIssue' | 'resolveRevalidationTrackedIssue' | 'resolveTrackedIssues'
+  | 'resolveTrackedIssue'
+  | 'resolveRevalidationTrackedIssue'
+  | 'resolveRecoveryTrackedIssue'
+  | 'resolveTrackedIssues'
 >;
 
 const CONFIG_OVERRIDE_ENV_KEYS = ['CODEX_CONFIG_OVERRIDES', 'CODEX_MCP_CONFIG_OVERRIDES'];
@@ -930,6 +933,8 @@ function createControlHostTrackedIssueResolvers(input: {
     resolveTrackedIssue: async ({ issueId }) =>
       await resolveIssueByIdWithSource(resolveLinearWebhookSourceSetup, issueId),
     resolveRevalidationTrackedIssue: async ({ issueId }) =>
+      await resolveIssueByIdWithSource(resolveLinearConfiguredSourceSetup, issueId),
+    resolveRecoveryTrackedIssue: async ({ issueId }) =>
       await resolveIssueByIdWithSource(resolveLinearConfiguredSourceSetup, issueId),
     resolveTrackedIssues: async (resolverInput) => {
       const runtimeEnv = resolveEnv();

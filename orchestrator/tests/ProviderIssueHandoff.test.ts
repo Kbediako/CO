@@ -1057,6 +1057,101 @@ describe('createProviderIssueHandoffService', () => {
     }
   );
 
+  it.each(['recover', 'relaunch', 'nudge'] as const)(
+    'uses the recovery resolver for explicit %s while broad dispatch resolution is disabled',
+    async (action) => {
+      const { paths } = await createHostPaths();
+      const state = createProviderIntakeState();
+      state.claims.push(createProviderClaim({
+        issue_id: 'lin-issue-543',
+        issue_identifier: 'CO-543',
+        issue_title: 'Resolve rolling active spec-guard stale cohorts',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        issue_updated_at: '2026-05-17T03:45:00.000Z',
+        issue_blocked_by: [],
+        task_id: 'linear-lin-issue-543',
+        state: 'accepted',
+        reason: 'provider_issue_rehydration_pending_revalidation',
+        accepted_at: '2026-05-17T03:46:00.000Z',
+        updated_at: '2026-05-17T03:46:00.000Z',
+        run_id: null,
+        run_manifest_path: null,
+        launch_started_at: null,
+        launch_source: null,
+        launch_token: null,
+        retry_error: null
+      }));
+      const persist = vi.fn(async () => undefined);
+      const startedRun = {
+        runId: 'run-co-543-recovered',
+        manifestPath: join(paths.runDir, 'provider-run-co-543-recovered.json')
+      };
+      const launcher = { start: vi.fn(async () => startedRun), resume: vi.fn(async () => undefined) };
+      const resolveTrackedIssue = vi.fn(async () => ({
+        kind: 'skip' as const,
+        reason: 'dispatch_source_disabled'
+      }));
+      const resolveRecoveryTrackedIssue = vi.fn(async ({ issueId }: { provider: 'linear'; issueId: string }) => ({
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: issueId,
+          identifier: 'CO-543',
+          title: 'Resolve rolling active spec-guard stale cohorts',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-05-17T03:47:00.000Z',
+          blocked_by: []
+        })
+      }));
+      const service = createProviderIssueHandoffService({
+        paths,
+        state,
+        persist,
+        launcher,
+        startPipelineId: 'provider-linear-worker',
+        resolveTrackedIssue,
+        resolveRecoveryTrackedIssue
+      });
+
+      const result = await service.recoverIssue({ provider: 'linear', issueId: 'lin-issue-543', action });
+
+      expect(result).toMatchObject({
+        kind: 'start',
+        reason: 'provider_issue_start_launched',
+        claim: {
+          issue_id: 'lin-issue-543',
+          issue_identifier: 'CO-543',
+          issue_state: 'Ready',
+          issue_state_type: 'unstarted',
+          state: 'starting',
+          reason: 'provider_issue_start_launched',
+          task_id: 'linear-lin-issue-543',
+          run_id: startedRun.runId,
+          run_manifest_path: startedRun.manifestPath,
+          launch_source: 'control-host',
+          launch_token_present: true
+        }
+      });
+      expect(resolveTrackedIssue).not.toHaveBeenCalled();
+      expect(resolveRecoveryTrackedIssue).toHaveBeenCalledTimes(1);
+      expect(resolveRecoveryTrackedIssue).toHaveBeenCalledWith({
+        provider: 'linear',
+        issueId: 'lin-issue-543'
+      });
+      expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+        taskId: 'linear-lin-issue-543',
+        pipelineId: 'provider-linear-worker',
+        provider: 'linear',
+        issueId: 'lin-issue-543',
+        issueIdentifier: 'CO-543',
+        issueUpdatedAt: '2026-05-17T03:47:00.000Z',
+        launchToken: expect.any(String)
+      }));
+      expect(persist).toHaveBeenCalled();
+    }
+  );
+
   it('keeps a fresh manifestless explicit-recovery claim inflight before relaunching once stale', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
@@ -22113,7 +22208,9 @@ describe('createProviderIssueHandoffService', () => {
     const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
     expect(scheduledTimeoutCount).toBeGreaterThanOrEqual(1);
     const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
-    expect(delayMs).toBeGreaterThanOrEqual(999);
+    // The retry queue uses monotonic performance time, so allow a small
+    // amount of real elapsed time while the fake system clock stays pinned.
+    expect(delayMs).toBeGreaterThanOrEqual(990);
     expect(delayMs).toBeLessThanOrEqual(1_000);
     const startCallsBeforeRetry = launcher.start.mock.calls.length;
     getLatestScheduledTimeoutCallback(setTimeoutSpy)();
@@ -39335,7 +39432,9 @@ describe('createProviderIssueHandoffService', () => {
     const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
     expect(scheduledTimeoutCount).toBeGreaterThanOrEqual(1);
     const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
-    expect(delayMs).toBeGreaterThanOrEqual(999);
+    // The retry queue uses monotonic performance time, so allow a small
+    // amount of real elapsed time while the fake system clock stays pinned.
+    expect(delayMs).toBeGreaterThanOrEqual(990);
     expect(delayMs).toBeLessThanOrEqual(1_000);
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
     const startCallsBeforeRetry = launcher.start.mock.calls.length;
