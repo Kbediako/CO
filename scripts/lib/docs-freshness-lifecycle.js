@@ -103,13 +103,14 @@ export function collectTaskIndexItems(taskIndex) {
   if (!taskIndex || typeof taskIndex !== 'object') {
     return [];
   }
+  const items = [];
   if (Array.isArray(taskIndex.items)) {
-    return taskIndex.items;
+    items.push(...taskIndex.items);
   }
   if (Array.isArray(taskIndex.tasks)) {
-    return taskIndex.tasks;
+    items.push(...taskIndex.tasks);
   }
-  return [];
+  return items;
 }
 
 function normalizeOptionalString(value) {

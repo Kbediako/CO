@@ -712,6 +712,16 @@ describe('docs freshness reporting', () => {
       join(repoRoot, 'tasks', 'index.json'),
       JSON.stringify(
         {
+          items: [
+            {
+              id: '20260517-active-canonical-item',
+              title: 'Active canonical item',
+              status: 'in_progress',
+              paths: {
+                spec: 'tasks/specs/active-canonical-item.md'
+              }
+            }
+          ],
           tasks: [
             {
               id: '20260517-linear-legacy-terminal-spec',

@@ -15,7 +15,7 @@ review_notes:
   - 2026-05-17: Pre-repair `node scripts/spec-guard.mjs --dry-run` reproduced exactly thirteen stale rows with `last_review=2026-04-16`; live Linear GraphQL verified CO-189, CO-192, CO-195, CO-197, CO-198, CO-199, CO-200, CO-201, CO-202, CO-203, CO-204, and CO-205 are Done/completed.
   - 2026-05-17: gpt-5.5/xhigh review found undeclared nonstandard terminal packet paths; CO-543 added explicit PRD/ACTION/findings path mappings, including the omitted 1220 findings path, and archived six additional registry rows before rerunning validation.
   - 2026-05-17: gpt-5.5/xhigh review found legacy specs with top-level `last_review:` would be skipped by pre-expiry collection; CO-543 now parses the legacy shape and excludes valid docs-archive stubs.
-  - 2026-05-17: gpt-5.5/xhigh review found legacy top-level `tasks[]` task-index rows would diverge between `spec-guard` and freshness maintainers; CO-543 now centralizes task-index item selection so `items[]` and legacy `tasks[]` lifecycle evidence are honored consistently.
+  - 2026-05-17: gpt-5.5/xhigh review found legacy top-level `tasks[]` task-index rows would diverge between `spec-guard` and freshness maintainers; CO-543 now centralizes task-index item selection so canonical `items[]` and legacy `tasks[]` lifecycle evidence are honored consistently, including transitional indexes that contain both arrays.
   - 2026-05-17: gpt-5.5/xhigh review found frontmatter parsing still diverged from `spec-guard` for leading blank lines and CRLF; CO-543 now mirrors the guard's line-based inactive-status parsing.
   - 2026-05-17: gpt-5.5/xhigh review found spec pre-expiry file selection diverged from `spec-guard`; CO-543 now limits pre-expiry warnings to immediate spec markdown files and skips `README.md`.
 ---
@@ -38,7 +38,7 @@ review_notes:
 
 ## Summary
 - Objective: clear the Apr 16 strict `spec-guard` stale cohort by evidence-backed terminal reclassification, not by date refresh.
-- Scope: CO-543 packet/mirrors, thirteen affected stale task specs, task-index evidence metadata, related terminal packet registry rows, `docs/TASKS.md`, active spec pre-expiry surfacing in `docs:freshness:maintain` for frontmatter and legacy `last_review:` specs, legacy `tasks[]` lifecycle parity with `spec-guard`, and focused owner-action routing regression assertions.
+- Scope: CO-543 packet/mirrors, thirteen affected stale task specs, task-index evidence metadata, related terminal packet registry rows, `docs/TASKS.md`, active spec pre-expiry surfacing in `docs:freshness:maintain` for frontmatter and legacy `last_review:` specs, legacy `tasks[]` and mixed `items[]` + `tasks[]` lifecycle parity with `spec-guard`, and focused owner-action routing regression assertions.
 - Constraints: no `scripts/spec-guard.mjs` weakening, no spec deletion, no rolling cap expansion, no CO-548 source edits, and no invented completion timestamps.
 
 ## Issue-Shaping Contract
@@ -75,7 +75,7 @@ review_notes:
 - `docs:freshness:maintain` now emits warning-level action evidence for active specs in the 7-day window before strict `spec-guard` expiry, so upcoming hard failures are visible before they block unrelated PRs.
 - Active spec pre-expiry collection now matches `spec-guard` on frontmatter and legacy top-level `last_review:` parsing, while preserving docs-archive stub exclusion so archived specs do not reopen as active debt.
 - Inactive frontmatter parsing now matches `spec-guard` for leading blank lines and CRLF, preventing terminal specs from surfacing as false pre-expiry warnings under supported formatting.
-- `spec-guard`, `docs:freshness`, and `docs:freshness:maintain` now share task-index `items[]` / legacy `tasks[]` selection, so completed legacy task-index packets are not misreported as active spec pre-expiry work.
+- `spec-guard`, `docs:freshness`, and `docs:freshness:maintain` now share merged task-index `items[]` / legacy `tasks[]` selection, so completed legacy task-index packets are not misreported as active spec pre-expiry work even when a transitional `tasks/index.json` contains both arrays.
 - The `docs:freshness:maintain` over-budget regression now also asserts owner-action evidence is emitted, proving future over-cap recurrence is routed toward the canonical owner rather than policy cap expansion.
 
 ## Validation Plan
