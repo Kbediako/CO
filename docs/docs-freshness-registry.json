@@ -3764,6 +3764,22 @@
       "cadence_days": 365
     },
     {
+      "path": ".agent/task/linear-089348e9-a67f-4cf0-a9f5-a55bd885f0aa.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "089348e9-a67f-4cf0-a9f5-a55bd885f0aa",
+        "identifier": "CO-516",
+        "url": "https://linear.app/asabeko/issue/CO-516/co-reconcile-provider-intake-terminal-claims-after-merge-closeout"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-16",
+      "next_review": "2026-06-15"
+    },
+    {
       "path": ".agent/task/linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -9899,6 +9915,22 @@
       "status": "archived",
       "last_review": "2026-05-13",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-089348e9-a67f-4cf0-a9f5-a55bd885f0aa.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "089348e9-a67f-4cf0-a9f5-a55bd885f0aa",
+        "identifier": "CO-516",
+        "url": "https://linear.app/asabeko/issue/CO-516/co-reconcile-provider-intake-terminal-claims-after-merge-closeout"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-16",
+      "next_review": "2026-06-15"
     },
     {
       "path": "docs/ACTION_PLAN-linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
@@ -19336,6 +19368,22 @@
       "cadence_days": 365
     },
     {
+      "path": "docs/PRD-linear-089348e9-a67f-4cf0-a9f5-a55bd885f0aa.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "089348e9-a67f-4cf0-a9f5-a55bd885f0aa",
+        "identifier": "CO-516",
+        "url": "https://linear.app/asabeko/issue/CO-516/co-reconcile-provider-intake-terminal-claims-after-merge-closeout"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-16",
+      "next_review": "2026-06-15"
+    },
+    {
       "path": "docs/PRD-linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -25916,6 +25964,22 @@
       "status": "archived",
       "last_review": "2026-05-13",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-089348e9-a67f-4cf0-a9f5-a55bd885f0aa.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "089348e9-a67f-4cf0-a9f5-a55bd885f0aa",
+        "identifier": "CO-516",
+        "url": "https://linear.app/asabeko/issue/CO-516/co-reconcile-provider-intake-terminal-claims-after-merge-closeout"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-16",
+      "next_review": "2026-06-15"
     },
     {
       "path": "docs/TECH_SPEC-linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
@@ -32777,6 +32841,22 @@
       "cadence_days": 365
     },
     {
+      "path": "tasks/specs/linear-089348e9-a67f-4cf0-a9f5-a55bd885f0aa.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "089348e9-a67f-4cf0-a9f5-a55bd885f0aa",
+        "identifier": "CO-516",
+        "url": "https://linear.app/asabeko/issue/CO-516/co-reconcile-provider-intake-terminal-claims-after-merge-closeout"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-16",
+      "next_review": "2026-06-15"
+    },
+    {
       "path": "tasks/specs/linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -39282,6 +39362,22 @@
       "status": "archived",
       "last_review": "2026-05-13",
       "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-linear-089348e9-a67f-4cf0-a9f5-a55bd885f0aa.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-16",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "089348e9-a67f-4cf0-a9f5-a55bd885f0aa",
+        "identifier": "CO-516",
+        "url": "https://linear.app/asabeko/issue/CO-516/co-reconcile-provider-intake-terminal-claims-after-merge-closeout"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-16",
+      "next_review": "2026-06-15"
     },
     {
       "path": "tasks/tasks-linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
