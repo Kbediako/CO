@@ -32,8 +32,8 @@
 ## Validation Results
 - Focused resolver and recovery tests passed.
 - Full affected `ControlHostCliShell` and `ProviderIssueHandoff` test files passed.
-- Build, lint, docs:check, repo:stewardship, diff-budget, delegation guard with desktop-subagent override, pack:smoke, JSON parse, and `git diff --check` passed.
-- Raw gpt-5.5/xhigh standalone `codex review --uncommitted` found no actionable regressions and reported full core passing.
+- Build, lint, default test, docs:check, repo:stewardship, diff-budget, delegation guard with desktop-subagent override, pack:smoke, JSON parse, and `git diff --check` passed.
+- Desktop gpt-5.5/xhigh read-only reviewer, `codex-orchestrator review --uncommitted`, and GitHub Codex PR review found no actionable regressions.
 - `docs:freshness` remains blocked by existing repo-wide stale-doc debt outside CO-548.
 - `spec-guard --dry-run` exits 0 but still reports existing stale spec metadata outside CO-548.
 
