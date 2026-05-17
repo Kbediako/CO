@@ -99,6 +99,19 @@ export function isTerminalTaskItem(item) {
   return Boolean(item && typeof item === 'object' && isTerminalTaskStatus(item.status));
 }
 
+export function collectTaskIndexItems(taskIndex) {
+  if (!taskIndex || typeof taskIndex !== 'object') {
+    return [];
+  }
+  if (Array.isArray(taskIndex.items)) {
+    return taskIndex.items;
+  }
+  if (Array.isArray(taskIndex.tasks)) {
+    return taskIndex.tasks;
+  }
+  return [];
+}
+
 function normalizeOptionalString(value) {
   if (typeof value !== 'string') {
     return null;

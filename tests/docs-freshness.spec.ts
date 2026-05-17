@@ -701,6 +701,69 @@ describe('docs freshness reporting', () => {
     expect(renderDocsFreshnessMarkdown(report)).toContain('- Terminal lifecycle entries: 7');
   });
 
+  it('routes legacy tasks[] terminal task packet rows to lifecycle action', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-legacy-tasks-terminal-lifecycle-'));
+    createdDirs.push(repoRoot);
+    const specPath = 'tasks/specs/linear-legacy-terminal-spec.md';
+
+    await mkdir(join(repoRoot, 'tasks', 'specs'), { recursive: true });
+    await writeFile(join(repoRoot, specPath), '# Legacy Terminal Spec\n', 'utf8');
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          tasks: [
+            {
+              id: '20260517-linear-legacy-terminal-spec',
+              title: 'Legacy terminal spec',
+              status: 'done',
+              completed_at: `${reviewDateDaysAgo(1)}T06:59:43.056Z`,
+              paths: {
+                spec: specPath,
+                task: 'tasks/tasks-linear-legacy-terminal-spec.md'
+              },
+              source_issue: {
+                identifier: 'CO-998'
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: specPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: reviewDateDaysAgo(45),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [{ glob: 'tasks/**/*.md', doc_class: 'task_packet' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.stale_entries).toBe(0);
+    expect(report.totals.terminal_lifecycle_entries).toBe(1);
+    expect(report.terminal_lifecycle_entries).toEqual([
+      expect.objectContaining({
+        path: specPath,
+        lifecycle_state: 'terminal_pending_archive',
+        task_key: 'linear-legacy-terminal-spec',
+        source_issue: expect.objectContaining({ identifier: 'CO-998' })
+      })
+    ]);
+  });
+
   it('keeps archived legacy task-packet rows out of active stale and lifecycle debt', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-archived-legacy-packets-'));
     createdDirs.push(repoRoot);

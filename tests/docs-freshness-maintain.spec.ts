@@ -474,6 +474,279 @@ describe('docs freshness maintenance decisions', () => {
     expect(decision.recommended_action).toContain('Review or assign direct action for 1 public/current doc');
   });
 
+  it('surfaces active specs approaching spec-guard expiry before the hard boundary', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-spec-pre-expiry-'));
+    createdDirs.push(repoRoot);
+    const specPath = 'tasks/specs/linear-open-spec.md';
+    const lastReview = reviewDateDaysAgo(27);
+    await writeFixture(repoRoot, {
+      entries: [{ path: specPath, lastReview }],
+      catalogPatterns: [
+        {
+          glob: 'tasks/specs/*.md',
+          doc_class: 'task_packet'
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, specPath),
+      `---
+id: 20260517-linear-open-spec
+title: Open spec approaching expiry
+status: in_progress
+last_review: ${lastReview}
+---
+
+# Spec
+`,
+      'utf8'
+    );
+
+    const { decision, shouldBlock } = await runMaintain(repoRoot);
+
+    expect(shouldBlock).toBe(false);
+    expect(decision.freshness_decision).toBe('clean');
+    expect(decision.totals.spec_guard_pre_expiry_entries).toBe(1);
+    expect(decision.spec_guard_pre_expiry_entries).toEqual([
+      expect.objectContaining({
+        path: specPath,
+        days_until_expiry: 3,
+        failure_kind: 'active_spec_pre_expiry'
+      })
+    ]);
+    expect(decision.public_current_actions).toEqual([
+      expect.objectContaining({
+        type: 'spec_guard_pre_expiry_review',
+        path: specPath,
+        rolling_deferral_eligible: false
+      })
+    ]);
+    expect(decision.repo_gate).toMatchObject({
+      severity: 'warning',
+      action_required_count: 1,
+      blocks_handoff: false,
+      blocks_unrelated_lanes: false,
+      sample_paths: expect.objectContaining({
+        spec_guard_pre_expiry_paths: [specPath]
+      })
+    });
+    expect(decision.recommended_action).toContain('active spec approaching spec-guard expiry');
+  });
+
+  it('surfaces legacy active specs approaching spec-guard expiry without reopening archived stubs', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-legacy-spec-pre-expiry-'));
+    createdDirs.push(repoRoot);
+    const legacySpecPath = 'tasks/specs/linear-legacy-open-spec.md';
+    const archivedSpecPath = 'tasks/specs/linear-archived-stub.md';
+    const lastReview = reviewDateDaysAgo(27);
+    await writeFixture(repoRoot, {
+      entries: [
+        { path: legacySpecPath, lastReview },
+        { path: archivedSpecPath, lastReview }
+      ],
+      catalogPatterns: [
+        {
+          glob: 'tasks/specs/*.md',
+          doc_class: 'task_packet'
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, legacySpecPath),
+      `# Legacy Open Spec
+
+last_review: ${lastReview}
+
+## Scope
+Legacy specs without YAML front matter still follow spec-guard freshness.
+`,
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, archivedSpecPath),
+      `# Archived Stub
+
+last_review: ${lastReview}
+
+<!-- docs-archive:stub -->
+> Archived on 2026-05-17.
+
+- Archive branch: doc-archives
+- Archive path: ${archivedSpecPath}
+`,
+      'utf8'
+    );
+
+    const { decision, shouldBlock } = await runMaintain(repoRoot);
+
+    expect(shouldBlock).toBe(false);
+    expect(decision.totals.spec_guard_pre_expiry_entries).toBe(1);
+    expect(decision.spec_guard_pre_expiry_entries).toEqual([
+      expect.objectContaining({
+        path: legacySpecPath,
+        days_until_expiry: 3,
+        failure_kind: 'active_spec_pre_expiry'
+      })
+    ]);
+    expect(decision.sample_paths.spec_guard_pre_expiry_paths).toEqual([legacySpecPath]);
+  });
+
+  it('matches spec-guard file selection for spec pre-expiry warnings', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-spec-selection-parity-'));
+    createdDirs.push(repoRoot);
+    const activeSpecPath = 'docs/design/specs/active-design-spec.md';
+    const taskReadmePath = 'tasks/specs/README.md';
+    const nestedTaskSpecPath = 'tasks/specs/nested/linear-nested-spec.md';
+    const designReadmePath = 'docs/design/specs/README.md';
+    const nestedDesignSpecPath = 'docs/design/specs/nested/design-nested-spec.md';
+    const lastReview = reviewDateDaysAgo(27);
+    await writeFixture(repoRoot, {
+      entries: [
+        { path: activeSpecPath, lastReview },
+        { path: taskReadmePath, lastReview },
+        { path: nestedTaskSpecPath, lastReview },
+        { path: designReadmePath, lastReview },
+        { path: nestedDesignSpecPath, lastReview }
+      ],
+      catalogPatterns: [
+        {
+          glob: 'tasks/specs/**/*.md',
+          doc_class: 'task_packet'
+        },
+        {
+          glob: 'docs/design/specs/**/*.md',
+          doc_class: 'task_packet'
+        }
+      ]
+    });
+    for (const specPath of [
+      activeSpecPath,
+      taskReadmePath,
+      nestedTaskSpecPath,
+      designReadmePath,
+      nestedDesignSpecPath
+    ]) {
+      await writeFile(
+        join(repoRoot, specPath),
+        `---
+id: 20260517-selection-parity
+title: Selection parity
+status: in_progress
+last_review: ${lastReview}
+---
+
+# Spec
+`,
+        'utf8'
+      );
+    }
+
+    const { decision } = await runMaintain(repoRoot);
+
+    expect(decision.totals.spec_guard_pre_expiry_entries).toBe(1);
+    expect(decision.spec_guard_pre_expiry_entries).toEqual([
+      expect.objectContaining({
+        path: activeSpecPath,
+        days_until_expiry: 3
+      })
+    ]);
+    expect(decision.sample_paths.spec_guard_pre_expiry_paths).toEqual([activeSpecPath]);
+  });
+
+  it('does not warn for legacy tasks[] terminal specs that spec-guard skips', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-legacy-tasks-terminal-spec-'));
+    createdDirs.push(repoRoot);
+    const specPath = 'tasks/specs/linear-legacy-terminal-spec.md';
+    const lastReview = reviewDateDaysAgo(27);
+    await writeFixture(repoRoot, {
+      entries: [{ path: specPath, lastReview }],
+      catalogPatterns: [
+        {
+          glob: 'tasks/specs/*.md',
+          doc_class: 'task_packet'
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, specPath),
+      `---
+id: 20260517-linear-legacy-terminal-spec
+title: Legacy terminal spec
+status: in_progress
+last_review: ${lastReview}
+---
+
+# Spec
+`,
+      'utf8'
+    );
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'tasks/index.json'),
+      JSON.stringify(
+        {
+          tasks: [
+            {
+              id: '20260517-linear-legacy-terminal-spec',
+              title: 'Legacy terminal spec',
+              status: 'done',
+              paths: {
+                spec: specPath,
+                task: 'tasks/tasks-linear-legacy-terminal-spec.md'
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const { decision } = await runMaintain(repoRoot);
+
+    expect(decision.totals.spec_guard_pre_expiry_entries).toBe(0);
+    expect(decision.spec_guard_pre_expiry_entries).toEqual([]);
+    expect(decision.sample_paths.spec_guard_pre_expiry_paths).toEqual([]);
+    expect(decision.totals.terminal_lifecycle_entries).toBe(1);
+  });
+
+  it('does not warn for inactive specs with spec-guard frontmatter formatting', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-frontmatter-parity-'));
+    createdDirs.push(repoRoot);
+    const specPath = 'tasks/specs/linear-inactive-crlf-spec.md';
+    const lastReview = reviewDateDaysAgo(27);
+    await writeFixture(repoRoot, {
+      entries: [{ path: specPath, lastReview }],
+      catalogPatterns: [
+        {
+          glob: 'tasks/specs/*.md',
+          doc_class: 'task_packet'
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, specPath),
+      [
+        '',
+        '---',
+        'status: done',
+        `last_review: ${lastReview}`,
+        '---',
+        '',
+        '# Done Spec',
+        ''
+      ].join('\r\n'),
+      'utf8'
+    );
+
+    const { decision } = await runMaintain(repoRoot);
+
+    expect(decision.totals.spec_guard_pre_expiry_entries).toBe(0);
+    expect(decision.spec_guard_pre_expiry_entries).toEqual([]);
+    expect(decision.sample_paths.spec_guard_pre_expiry_paths).toEqual([]);
+  });
+
   it('surfaces hard-stale current docs as direct action outside legacy cohort cleanup', () => {
     const taskLastReview = reviewDateDaysAgo(31);
     const publicLastReview = reviewDateDaysAgo(19);
@@ -3161,6 +3434,24 @@ describe('docs freshness maintenance decisions', () => {
       })
     );
     expect(decision.recommended_action).toContain('do not expand rolling caps');
+
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(decision, {
+      env: {} as NodeJS.ProcessEnv
+    });
+    expect(ownerActionEvidence.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          route_id: 'docs-freshness-maintain-owner-workpad',
+          mode: 'update_existing',
+          owner_issue: 'CO-175',
+          cohort_count: 2,
+          body: expect.objectContaining({
+            description: expect.stringContaining('Freshness decision: `block_policy_over_budget`')
+          })
+        })
+      ])
+    );
+    expect(ownerActionEvidence.actions[0].body.description).toContain('rolling-cap widening');
   });
 
   it('counts distinct declared baseline cohorts even when their review dates match', async () => {

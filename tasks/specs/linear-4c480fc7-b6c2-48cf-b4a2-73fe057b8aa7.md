@@ -1,11 +1,14 @@
 ---
 id: 20260416-linear-4c480fc7-b6c2-48cf-b4a2-73fe057b8aa7-codex-0121-diagnostics-auth-provenance
 title: CO-200 Codex 0.121 diagnostics auth provenance and failure distinctions
+status: done
 relates_to: docs/PRD-codex-0121-diagnostics-auth-provenance.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-16
+last_review: 2026-05-17
+review_notes:
+  - 2026-05-17: CO-543 strict spec-guard audit reclassified this stale Apr 16 row inactive done; live Linear evidence verified CO-200 is Done/completed. No completed_at was inferred or fabricated.
 ---
 
 ## Canonical Reference
