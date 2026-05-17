@@ -39,6 +39,12 @@ This lane removes the operational fallback of enabling broad dispatch to recover
 | Targeted recovery source binding | Explicit recover/relaunch/nudge is blocked by broad `dispatch_pilot.enabled=false`. | `remove fallback` | CO-548 | Operator invokes targeted recovery for one Linear issue id. | Existing shared resolver wiring | 2026-05-17 | This issue | Recovery uses configured source binding while broad dispatch stays disabled. | ControlHostCliShell and ProviderIssueHandoff regression tests. |
 | Broad dispatch disabled posture | Queue sweeps are disabled unless pilot is enabled. | `justify retaining fallback` | Control-host dispatch pilot | `dispatch_pilot.enabled=false`. | Existing dispatch-pilot safety contract | 2026-05-17 | Durable safety contract | Separate reviewed dispatch rollout enables broad admission. | Regression proves broad paths still skip. |
 
+- Contract name: dispatch-pilot broad admission disabled posture.
+- Owning surface: control-host dispatch pilot.
+- Steady-state proof: broad issue discovery remains disabled unless the pilot is explicitly enabled.
+- Tests/docs: focused resolver and recovery tests plus this docs packet.
+- Non-expiring rationale: durable operator safety contract, not a temporary fallback.
+
 ## Validation Plan
 - Focused resolver and recovery regressions.
 - `git diff --check`, JSON parse, spec guard, build, docs checks, and review handoff as scope requires.
