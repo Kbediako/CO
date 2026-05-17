@@ -12,7 +12,8 @@ import { collectDocFiles, computeAgeInDays, parseIsoDate, toPosixPath } from './
 import {
   buildTaskPacketLifecycleIndex,
   collectTaskIndexItems,
-  isTaskPacketLifecyclePath
+  isTaskPacketLifecyclePath,
+  isTerminalTaskStatus
 } from './lib/docs-freshness-lifecycle.js';
 import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 import { runDocsFreshness } from './docs-freshness.mjs';
@@ -985,21 +986,10 @@ const NON_LIVE_POLICY_CAPACITY_LIFECYCLE_STATES = new Set([
   'preserved_historical_stub',
   'terminal_pending_archive'
 ]);
-const TERMINAL_TASK_STATUSES = new Set([
-  'done',
-  'completed',
-  'canceled',
-  'cancelled',
-  'closed',
-  'duplicate',
-  'merged',
-  'succeeded'
-]);
-
 function isLivePolicyCapacityEntry(entry) {
   const explicitTaskStatus = explicitPolicyCapacityTaskStatus(entry);
   if (explicitTaskStatus) {
-    if (!TERMINAL_TASK_STATUSES.has(explicitTaskStatus)) {
+    if (!isTerminalTaskStatus(explicitTaskStatus)) {
       return true;
     }
   }
@@ -1048,11 +1038,11 @@ function hasNonLivePolicyCapacityClassification(entry) {
 
 function terminalTaskStatus(entry) {
   const explicitTaskStatus = explicitPolicyCapacityTaskStatus(entry);
-  if (explicitTaskStatus && TERMINAL_TASK_STATUSES.has(explicitTaskStatus)) {
+  if (explicitTaskStatus && isTerminalTaskStatus(explicitTaskStatus)) {
     return explicitTaskStatus;
   }
   const statusAlias = normalizeOptionalString(entry?.status)?.toLowerCase() ?? null;
-  return statusAlias && TERMINAL_TASK_STATUSES.has(statusAlias) ? statusAlias : null;
+  return statusAlias && isTerminalTaskStatus(statusAlias) ? statusAlias : null;
 }
 
 function needsTerminalTaskStatusLifecycleAction(entry) {

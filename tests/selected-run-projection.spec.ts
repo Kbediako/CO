@@ -517,6 +517,7 @@ describe('createSelectedRunProjectionReader', () => {
       canonical_owner_key: 'docs:freshness:maintain',
       active_remediation_issue: 'CO-522',
       blocks_handoff: true,
+      handoff_blocking: true,
       provider_wip_impact: 'excluded_repo_gate'
     });
   });

@@ -900,25 +900,34 @@ function formatDocsFreshnessCapacity(capacity) {
   if (!capacity?.status) {
     return null;
   }
+  const toFiniteNumber = (value) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
+  };
+  const currentEntries = toFiniteNumber(capacity.current_entries);
+  const maxEntries = toFiniteNumber(capacity.max_entries);
+  const entryExcess = toFiniteNumber(capacity.entry_excess) ?? 0;
+  const currentCohorts = toFiniteNumber(capacity.current_cohorts);
+  const maxCohorts = toFiniteNumber(capacity.max_cohorts);
+  const cohortExcess = toFiniteNumber(capacity.cohort_excess) ?? 0;
+  const expiredEntries = toFiniteNumber(capacity.expired_entries);
   const parts = [`capacity ${capacity.status}`];
-  if (Number.isFinite(Number(capacity.current_entries)) || Number.isFinite(Number(capacity.max_entries))) {
-    const entryExcess = Number(capacity.entry_excess ?? 0);
+  if (currentEntries !== null || maxEntries !== null) {
     parts.push(
-      `entries ${formatNullableNumber(capacity.current_entries)}/${formatNullableNumber(capacity.max_entries)}${
+      `entries ${formatNullableNumber(currentEntries)}/${formatNullableNumber(maxEntries)}${
         entryExcess > 0 ? ` (+${entryExcess})` : ''
       }`
     );
   }
-  if (Number.isFinite(Number(capacity.current_cohorts)) || Number.isFinite(Number(capacity.max_cohorts))) {
-    const cohortExcess = Number(capacity.cohort_excess ?? 0);
+  if (currentCohorts !== null || maxCohorts !== null) {
     parts.push(
-      `cohorts ${formatNullableNumber(capacity.current_cohorts)}/${formatNullableNumber(capacity.max_cohorts)}${
+      `cohorts ${formatNullableNumber(currentCohorts)}/${formatNullableNumber(maxCohorts)}${
         cohortExcess > 0 ? ` (+${cohortExcess})` : ''
       }`
     );
   }
-  if (Number.isFinite(Number(capacity.expired_entries))) {
-    parts.push(`expired ${formatNullableNumber(capacity.expired_entries)}`);
+  if (expiredEntries !== null) {
+    parts.push(`expired ${formatNullableNumber(expiredEntries)}`);
   }
   return parts.join(' ');
 }
