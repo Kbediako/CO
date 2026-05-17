@@ -15343,6 +15343,14 @@
       ],
       "status": "done",
       "last_review": "2026-05-17",
+      "approvals": {
+        "co543_stale_spec_reclassification": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "validated",
+          "summary": "CO-543 reclassified stale Apr 16 spec inactive done; explicit nonstandard packet paths were declared so lifecycle archival covers all related terminal registry rows."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/1220-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
         "task": "tasks/tasks-1220-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
@@ -15351,14 +15359,6 @@
         "prd": "docs/PRD-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
         "action_plan": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
         "findings": "docs/findings/1220-standalone-review-run-review-orchestration-boundary-reassessment-deliberation.md"
-      },
-      "approvals": {
-        "co543_stale_spec_reclassification": {
-          "reviewer": "parent orchestrator",
-          "date": "2026-05-17",
-          "status": "validated",
-          "summary": "CO-543 reclassified stale Apr 16 spec inactive done; explicit nonstandard packet paths were declared so lifecycle archival covers all related terminal registry rows."
-        }
       }
     },
     {
