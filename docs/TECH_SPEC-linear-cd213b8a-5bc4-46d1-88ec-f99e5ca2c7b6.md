@@ -42,3 +42,10 @@ This lane removes the operational fallback of enabling broad dispatch to recover
 ## Validation Plan
 - Focused resolver and recovery regressions.
 - `git diff --check`, JSON parse, spec guard, build, docs checks, and review handoff as scope requires.
+
+## Validation Results - 2026-05-17
+- Focused resolver and recovery tests passed, including explicit `recover`, `relaunch`, and `nudge` actions.
+- Touched `ControlHostCliShell` and `ProviderIssueHandoff` coverage passed together.
+- Build, lint, docs:check, repo:stewardship, diff-budget, pack:smoke, JSON parse, and `git diff --check` passed.
+- Raw gpt-5.5/xhigh standalone review completed cleanly and reported full core passing.
+- `spec-guard` stale-spec output and `docs:freshness` stale-doc output are existing repo-wide baseline debt outside CO-548; this mirror is current.

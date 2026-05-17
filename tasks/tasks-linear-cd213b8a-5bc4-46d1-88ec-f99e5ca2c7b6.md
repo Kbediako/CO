@@ -20,8 +20,8 @@
 - [x] Focused regression added.
 - [x] Implementation complete.
 - [x] Focused validation passing.
-- [x] Broader validation passing.
-- [ ] Workpad updated with evidence.
+- [x] Broader validation passing with ambient baseline debt recorded.
+- [x] Workpad updated with evidence.
 - [ ] PR/review handoff complete.
 
 ## Validation Evidence
@@ -33,18 +33,18 @@
 - `npm run docs:check` passed.
 - `npm run docs:freshness` failed on existing repo-wide freshness debt outside CO-548 (`5417` docs / `5420` registry entries, `556` stale docs).
 - `git diff --check` passed.
-- `npm run test` passed.
+- Raw gpt-5.5/xhigh standalone review ran the full core suite and reported it passed; earlier local full-file/full-suite attempts exposed an ambient queued-retry wait flake that also reproduced on clean `main`.
 - `npm run repo:stewardship` passed.
 - `node scripts/diff-budget.mjs` passed.
 - `DELEGATION_GUARD_OVERRIDE_REASON='Desktop gpt-5.5/xhigh read-only review subagent completed in the parent Codex session; MCP runner manifest is unavailable for desktop spawn_agent evidence in this lane.' node scripts/delegation-guard.mjs` passed.
 - `npm run pack:smoke` passed.
-- Desktop gpt-5.5/xhigh read-only reviewer reported no actionable findings.
-- `codex-orchestrator review --uncommitted` with gpt-5.5/xhigh completed as bounded success with no actionable regressions.
-- A follow-on standalone `codex review --uncommitted -c model="gpt-5.5" -c model_reasoning_effort="xhigh"` completed; the subsequent process sweep found no leftover review, delegate, or Vitest processes.
+- Desktop gpt-5.5/xhigh read-only explorer reported no actionable implementation blocker.
+- Raw standalone `codex review --uncommitted -c 'model="gpt-5.5"' -c 'model_reasoning_effort="xhigh"'` completed cleanly with no actionable regressions.
 
 ## Known Baseline Blockers
 - `npm run docs:freshness` remains blocked by existing repo-wide stale-doc debt, not by the new CO-548 registry rows.
 - `node scripts/spec-guard.mjs --dry-run` still surfaces existing stale spec metadata; CO-548 did not refresh unrelated specs.
+- `ProviderIssueHandoff` queued-retry wait tests are intermittently failing in full-file/full-suite runs on clean `main`; CO-548 focused and touched-file coverage passed, and the raw review's full-core rerun passed.
 
 ## Fallback Decision Table
 - Large-refactor decision: not required; use existing configured-source helper for targeted recovery.

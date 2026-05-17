@@ -14,15 +14,15 @@
 - Disabled broad dispatch posture preservation.
 
 ## Current Notes
-- Targeted recovery currently reaches the same enabled-pilot source setup as broad dispatch and skips with `dispatch_source_disabled`.
-- CO-548 must use configured source binding for explicit recovery only.
+- Targeted recovery previously reached the same enabled-pilot source setup as broad dispatch and skipped with `dispatch_source_disabled`.
+- CO-548 now uses configured source binding for explicit recovery only.
 - CO-546 already owns existing-claim revalidation and must remain separate.
 
 ## Validation
 - Focused resolver and recovery tests passed.
 - Full affected `ControlHostCliShell` and `ProviderIssueHandoff` test files passed.
-- Build, lint, default test, docs:check, repo:stewardship, diff-budget, delegation guard with desktop-subagent override, pack:smoke, JSON parse, and `git diff --check` passed.
-- gpt-5.5/xhigh read-only reviewer and `codex-orchestrator review --uncommitted` found no actionable regressions.
+- Build, lint, docs:check, repo:stewardship, diff-budget, delegation guard with desktop-subagent override, pack:smoke, JSON parse, and `git diff --check` passed.
+- Raw gpt-5.5/xhigh standalone `codex review --uncommitted` found no actionable regressions and reported full core passing.
 - `docs:freshness` remains blocked by existing repo-wide stale-doc debt outside CO-548.
 
 ## Fallback Decision Table

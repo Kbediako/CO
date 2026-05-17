@@ -8,7 +8,7 @@
       "owners": [
         "Codex"
       ],
-      "status": "in_progress",
+      "status": "implementation_complete_pr_pending",
       "last_review": "2026-05-17",
       "approvals": {
         "issue_context": {
@@ -28,10 +28,22 @@
           "date": "2026-05-17",
           "status": "created_before_implementation",
           "summary": "Created the CO-548 docs-first packet to split explicit targeted recovery source binding from broad dispatch-pilot admission without enabling broad dispatch."
+        },
+        "implementation": {
+          "reviewer": "CO orchestrator",
+          "date": "2026-05-17",
+          "status": "complete",
+          "summary": "Added a recovery-specific ProviderIssueHandoff resolver and wired control-host explicit recovery to configured Linear source binding while broad dispatch/webhook paths remain gated by dispatch_pilot.enabled."
+        },
+        "standalone_review": {
+          "reviewer": "codex review",
+          "date": "2026-05-17",
+          "status": "clean",
+          "summary": "Raw gpt-5.5/xhigh standalone codex review --uncommitted completed cleanly and reported full core passing; only existing spec/docs freshness baseline debt was noted."
         }
       },
       "validation": {
-        "status": "implementation_complete_pr_pending_with_baseline_docs_freshness_blocker",
+        "status": "passed_with_baseline_debt_pr_pending",
         "passed": [
           "live control-host recover failure evidence",
           "workpad creation",
@@ -39,33 +51,29 @@
           "gpt-5.5/xhigh read-only explorer path map",
           "docs-first packet created",
           "focused ControlHostCliShell resolver regression",
-          "focused ProviderIssueHandoff recovery regression",
-          "full affected ControlHostCliShell and ProviderIssueHandoff test files",
-          "npm run build",
-          "npm run lint",
-          "npm run test",
-          "npm run docs:check",
-          "npm run repo:stewardship",
-          "node scripts/diff-budget.mjs",
-          "node scripts/delegation-guard.mjs with desktop subagent evidence override",
-          "npm run pack:smoke",
+          "focused ProviderIssueHandoff recovery resolver regression",
+          "touched ControlHostCliShell and ProviderIssueHandoff test files",
+          "build",
+          "lint",
+          "docs:check",
+          "repo:stewardship",
+          "diff-budget",
+          "pack:smoke",
+          "JSON parse",
           "git diff --check",
-          "JSON parse for tasks/index.json and docs/docs-freshness-registry.json",
-          "gpt-5.5/xhigh read-only reviewer clean",
-          "gpt-5.5/xhigh codex-orchestrator review bounded success with no actionable regressions"
+          "delegation guard with desktop subagent override",
+          "raw gpt-5.5/xhigh codex review clean",
+          "Linear workpad evidence update"
         ],
         "blocked": [
-          "npm run docs:freshness remains blocked by existing repo-wide stale-doc debt outside CO-548",
-          "node scripts/spec-guard.mjs --dry-run exits 0 but still reports existing stale spec metadata outside CO-548"
+          "docs:freshness existing repo-wide stale-doc baseline debt outside CO-548",
+          "spec-guard dry-run existing stale-spec metadata outside CO-548",
+          "ProviderIssueHandoff queued-retry wait flake reproduced on clean main in full-file/full-suite runs"
         ],
-        "waivers": [
-          "delegation guard used desktop gpt-5.5/xhigh read-only subagent evidence because desktop spawn_agent evidence is not emitted as an MCP runner manifest",
-          "diagnostics manifest hit a transient async timing failure in an existing ProviderIssueHandoff test; the single test rerun and direct full npm run test passed"
-        ],
+        "waivers": [],
         "pending": [
-          "workpad evidence update",
           "PR handoff",
-          "post-merge control-host restart proof before retrying CO-543 targeted recovery from shared main"
+          "post-merge live CO-543 recovery proof"
         ]
       },
       "paths": {
