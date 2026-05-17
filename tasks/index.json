@@ -101,6 +101,79 @@
       ]
     },
     {
+      "id": "20260517-linear-a08ba13b-1c9a-43ed-beec-f63a0547b721",
+      "title": "CO: resolve rolling active spec-guard stale cohorts and prevent expiry repeats",
+      "relates_to": "tasks/tasks-linear-a08ba13b-1c9a-43ed-beec-f63a0547b721.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-17",
+      "source_issue": {
+        "id": "a08ba13b-1c9a-43ed-beec-f63a0547b721",
+        "identifier": "CO-543",
+        "url": "https://linear.app/asabeko/issue/CO-543/co-resolve-rolling-active-spec-guard-stale-cohorts-and-prevent"
+      },
+      "approvals": {
+        "issue_quality_review": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "approved",
+          "summary": "Live evidence confirms CO-543 owns the Apr 16 strict spec-guard cohort and rejects blind bumps, deletion, cap expansion, and CO-548 implementation scope."
+        },
+        "prevention_regression": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "succeeded",
+          "summary": "Focused docs-freshness-maintain regressions assert active spec pre-expiry surfacing and over-budget owner workpad action evidence instead of cap expansion.",
+          "evidence": "npx vitest run --config vitest.config.core.ts tests/docs-freshness-maintain.spec.ts"
+        },
+        "strict_spec_guard": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "succeeded",
+          "evidence": "node scripts/spec-guard.mjs",
+          "summary": "Strict spec-guard passed after CO-543 terminal reclassification and the guard-adjacent task-index lifecycle selector was centralized across spec and freshness maintainers."
+        },
+        "docs_check": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "succeeded",
+          "evidence": "npm run docs:check",
+          "summary": "docs:check returned OK after packet and registry updates."
+        },
+        "docs_freshness_classification": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "known_repo_debt",
+          "evidence": "npm run docs:freshness; node scripts/docs-freshness-maintain.mjs --check --format json",
+          "summary": "docs:freshness still fails on broader CO-522-owned stale-doc baseline debt with no missing registry rows; owner verification for CO-522 succeeded."
+        },
+        "standalone_review": {
+          "reviewer": "codex review",
+          "date": "2026-05-17",
+          "status": "clean",
+          "model": "gpt-5.5",
+          "reasoning_effort": "xhigh",
+          "session": "019e3511-e67a-7310-adab-510fbb0a010b",
+          "summary": "Final uncommitted review found no discrete correctness issues after the earlier gpt-5.5/xhigh review findings and lifecycle-path correction were fixed."
+        },
+        "elegance_review": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "approved",
+          "summary": "Kept the shared task-index selector and active-spec pre-expiry scanner as the smallest durable fix; no simplification patch was needed."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-a08ba13b-1c9a-43ed-beec-f63a0547b721.md",
+        "task": "tasks/tasks-linear-a08ba13b-1c9a-43ed-beec-f63a0547b721.md",
+        "agent_task": ".agent/task/linear-a08ba13b-1c9a-43ed-beec-f63a0547b721.md",
+        "docs": "docs/TECH_SPEC-linear-a08ba13b-1c9a-43ed-beec-f63a0547b721.md"
+      }
+    },
+    {
       "id": "20260516-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d",
       "title": "CO-546 attach live Linear state to rehydrated pending-claim revalidation",
       "relates_to": "tasks/tasks-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
@@ -8385,11 +8458,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-16",
-      "approvals": {},
+      "status": "done",
+      "last_review": "2026-05-17",
+      "approvals": {
+        "co543_stale_spec_reclassification": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "validated",
+          "summary": "CO-543 reclassified stale Apr 16 spec inactive done; explicit nonstandard packet paths were declared so lifecycle archival covers all related terminal registry rows."
+        }
+      },
       "paths": {
+        "spec": "tasks/specs/linear-4c480fc7-b6c2-48cf-b4a2-73fe057b8aa7.md",
         "task": "tasks/tasks-linear-4c480fc7-b6c2-48cf-b4a2-73fe057b8aa7.md",
-        "docs": "docs/TECH_SPEC-codex-0121-diagnostics-auth-provenance.md"
+        "docs": "docs/TECH_SPEC-codex-0121-diagnostics-auth-provenance.md",
+        "prd": "docs/PRD-codex-0121-diagnostics-auth-provenance.md",
+        "action_plan": "docs/ACTION_PLAN-codex-0121-diagnostics-auth-provenance.md"
       }
     },
     {
@@ -8400,7 +8484,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-16",
+      "status": "done",
+      "last_review": "2026-05-17",
       "approvals": {
         "docs_packet": {
           "reviewer": "same-issue docs child lane",
@@ -8409,6 +8494,12 @@
           "manifest": ".runs/linear-ec62eea8-7fcf-44a6-8216-10254c56e64d-docs-packet/cli/2026-04-16T10-20-19-149Z-7914bf20/manifest.json",
           "source_anchor": "ctx:sha256:3b4ea97b5bcc16b71fdd2942cb023f0d4031067c77a83fb0c0c36ff65ba5d8c4#chunk:c000001",
           "summary": "Docs-first packet preserves the run-review mock cleanup contract and leaves implementation/review integration to the parent lane."
+        },
+        "co543_stale_spec_reclassification": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "validated",
+          "summary": "CO-543 reclassified stale Apr 16 spec inactive done; live Linear Done/completed evidence verified CO-205; packet/spec history remains on disk."
         }
       },
       "paths": {
@@ -8426,7 +8517,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-16",
+      "status": "done",
+      "last_review": "2026-05-17",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
@@ -8455,6 +8547,12 @@
           "status": "passed",
           "artifact": "out/linear-c9163fc7-832a-45ac-8961-2d6c213e52af/manual/elegance-review.md",
           "summary": "Explicit minimality pass kept the scoped proof helper and fresh-discovery call-site threading; no simplification patch was needed."
+        },
+        "co543_stale_spec_reclassification": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "validated",
+          "summary": "CO-543 reclassified stale Apr 16 spec inactive done; live Linear Done/completed evidence verified CO-203; packet/spec history remains on disk."
         }
       },
       "paths": {
@@ -8472,7 +8570,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-16",
+      "status": "done",
+      "last_review": "2026-05-17",
       "approvals": {
         "child_lane": {
           "reviewer": "parent provider worker",
@@ -8502,6 +8601,12 @@
           "status": "approved",
           "artifact": "out/linear-9917183b-824a-48f7-95ee-bcee205d7a02/manual/elegance-review.md",
           "summary": "No simplification patch applied; helper split is intentionally kept to make the disposed-decision filter and child-output timestamp boundary explicit."
+        },
+        "co543_stale_spec_reclassification": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "validated",
+          "summary": "CO-543 reclassified stale Apr 16 spec inactive done; live Linear Done/completed evidence verified CO-204; packet/spec history remains on disk."
         }
       },
       "paths": {
@@ -8519,7 +8624,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-16",
+      "status": "done",
+      "last_review": "2026-05-17",
       "approvals": {
         "child_lane": {
           "reviewer": "parent provider worker",
@@ -8541,6 +8647,12 @@
           "status": "passed",
           "artifact": "out/linear-f8281682-ceed-4409-949c-efca2358568a/manual/elegance-review.md",
           "summary": "Explicit minimality pass kept the scoped helper and call-site threading; no simplification patch was needed."
+        },
+        "co543_stale_spec_reclassification": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "validated",
+          "summary": "CO-543 reclassified stale Apr 16 spec inactive done; live Linear Done/completed evidence verified CO-202; packet/spec history remains on disk."
         }
       },
       "paths": {
@@ -8558,7 +8670,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-16",
+      "status": "done",
+      "last_review": "2026-05-17",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded child lane",
@@ -8601,6 +8714,12 @@
           "status": "succeeded",
           "evidence": "out/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1/manual/elegance-review.md",
           "summary": "No simplification patch applied; advisory-only doctor diagnostics keep cloud blockers separate from local sandbox/security posture."
+        },
+        "co543_stale_spec_reclassification": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "validated",
+          "summary": "CO-543 reclassified stale Apr 16 spec inactive done; live Linear Done/completed evidence verified CO-199; packet/spec history remains on disk."
         }
       },
       "paths": {
@@ -8618,7 +8737,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-16",
+      "status": "done",
+      "last_review": "2026-05-17",
       "approvals": {
         "docs_child_lane": {
           "reviewer": "parent provider worker",
@@ -8641,6 +8761,12 @@
           "status": "succeeded",
           "evidence": "out/linear-2886b57d-b844-4803-9e55-6fe3657d516d/manual/elegance-review.md",
           "summary": "No simplification patch applied; explicit metadata table retained as the smallest auditable shape."
+        },
+        "co543_stale_spec_reclassification": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "validated",
+          "summary": "CO-543 reclassified stale Apr 16 spec inactive done; live Linear Done/completed evidence verified CO-197; packet/spec history remains on disk."
         }
       },
       "paths": {
@@ -8658,7 +8784,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-16",
+      "status": "done",
+      "last_review": "2026-05-17",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review (clean-success)",
@@ -8688,6 +8815,12 @@
           "date": "2026-04-16",
           "status": "succeeded",
           "evidence": "out/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1/manual/elegance-review/elegance-review.md"
+        },
+        "co543_stale_spec_reclassification": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "validated",
+          "summary": "CO-543 reclassified stale Apr 16 spec inactive done; live Linear Done/completed evidence verified CO-195; packet/spec history remains on disk."
         }
       },
       "paths": {
@@ -8767,7 +8900,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-16",
+      "status": "done",
+      "last_review": "2026-05-17",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
@@ -8784,13 +8918,20 @@
           "telemetry": ".runs/linear-c101cb88-3097-4502-bcd7-723d80da7955/cli/2026-04-16T00-32-45-449Z-66cc6490/review/telemetry.json",
           "review_outcome": "clean-success",
           "elegance_note": "out/linear-c101cb88-3097-4502-bcd7-723d80da7955/manual/elegance-review.md"
+        },
+        "co543_stale_spec_reclassification": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "validated",
+          "summary": "CO-543 reclassified stale Apr 16 spec inactive done; explicit nonstandard packet paths were declared so lifecycle archival covers all related terminal registry rows."
         }
       },
       "paths": {
         "spec": "tasks/specs/linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
         "task": "tasks/tasks-linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
         "agent_task": ".agent/task/linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
-        "docs": "docs/TECH_SPEC-linear-c101cb88-3097-4502-bcd7-723d80da7955.md"
+        "docs": "docs/TECH_SPEC-linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
+        "findings": "docs/findings/linear-c101cb88-3097-4502-bcd7-723d80da7955-docs-freshness-classification.md"
       }
     },
     {
@@ -8801,7 +8942,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-16",
+      "status": "done",
+      "last_review": "2026-05-17",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
@@ -8810,6 +8952,12 @@
           "manifest": ".runs/linear-72286a49-e68b-435a-be72-74d5c28feb09-docs-review/cli/2026-04-15T18-17-13-914Z-ba0ae44c/manifest.json",
           "telemetry": ".runs/linear-72286a49-e68b-435a-be72-74d5c28feb09-docs-review/cli/2026-04-15T18-17-13-914Z-ba0ae44c/review/telemetry.json",
           "review_outcome": "clean-success"
+        },
+        "co543_stale_spec_reclassification": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "validated",
+          "summary": "CO-543 reclassified stale Apr 16 spec inactive done; live Linear Done/completed evidence verified CO-192; packet/spec history remains on disk."
         }
       },
       "paths": {
@@ -8929,8 +9077,16 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-16",
-      "approvals": {},
+      "status": "done",
+      "last_review": "2026-05-17",
+      "approvals": {
+        "co543_stale_spec_reclassification": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "validated",
+          "summary": "CO-543 reclassified stale Apr 16 spec inactive done; live Linear Done/completed evidence verified CO-189; packet/spec history remains on disk."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-6c2a6f36-7852-4535-9914-e0042b082c95.md",
         "task": "tasks/tasks-linear-6c2a6f36-7852-4535-9914-e0042b082c95.md",
@@ -15285,12 +15441,24 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-16",
+      "status": "done",
+      "last_review": "2026-05-17",
+      "approvals": {
+        "co543_stale_spec_reclassification": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "validated",
+          "summary": "CO-543 reclassified stale Apr 16 spec inactive done; explicit nonstandard packet paths were declared so lifecycle archival covers all related terminal registry rows."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/1220-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
         "task": "tasks/tasks-1220-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
         "agent_task": ".agent/task/1220-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
-        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md"
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
+        "prd": "docs/PRD-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
+        "action_plan": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
+        "findings": "docs/findings/1220-standalone-review-run-review-orchestration-boundary-reassessment-deliberation.md"
       }
     },
     {
@@ -21782,7 +21950,8 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-16",
+      "status": "done",
+      "last_review": "2026-05-17",
       "approvals": {
         "docs_review": {
           "reviewer": "codex-orchestrator docs-review",
@@ -21807,13 +21976,20 @@
           "status": "passed",
           "artifact": "out/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7/manual/elegance-review-rework.md",
           "summary": "Explicit minimality pass kept the docs/artifact-only HOLD packet; no simplification patch was needed."
+        },
+        "co543_stale_spec_reclassification": {
+          "reviewer": "parent orchestrator",
+          "date": "2026-05-17",
+          "status": "validated",
+          "summary": "CO-543 reclassified stale Apr 16 spec inactive done; explicit nonstandard packet paths were declared so lifecycle archival covers all related terminal registry rows."
         }
       },
       "paths": {
         "spec": "tasks/specs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
         "task": "tasks/tasks-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
         "agent_task": ".agent/task/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
-        "docs": "docs/TECH_SPEC-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md"
+        "docs": "docs/TECH_SPEC-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
+        "findings": "docs/findings/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-codex-0121-appserver-canary.md"
       }
     },
     {

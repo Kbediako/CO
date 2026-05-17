@@ -1,10 +1,10 @@
 ---
 id: 20260416-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1
 title: CO Codex CLI 0.121.0 Sandbox/Security Preflight Policy Classification
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-16
-last_review: 2026-04-16
+last_review: 2026-05-17
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md
@@ -13,7 +13,16 @@ related_tasks:
   - tasks/tasks-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md
 review_notes:
   - 2026-04-16: Issue-quality review approves CO-199 as a docs-first classification lane. The lane must preserve protected terms, classify 0.121 sandbox/security deltas into local-only/cloud-only/both/not-applicable, and reject credential/profile rotation fixes, sandbox default weakening, and broad cloud runtime redesign.
+  - 2026-05-17: CO-543 strict spec-guard audit reclassified this stale Apr 16 row inactive done; live Linear evidence verified CO-199 is Done/completed. No completed_at was inferred or fabricated.
 ---
+
+## CO-382 Fallback Decision Table
+- Large-refactor check: no new fallback mechanism or guard split is warranted; CO-543 removes lifecycle metadata drift while keeping the existing strict spec-guard and docs-freshness ownership surfaces authoritative.
+- Minor-seam decision: the bounded seam is acceptable because completed packet rows are reclassified inactive or archived with evidence, and future active specs surface through the existing docs-freshness-maintain owner-action route before hard expiry.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Active spec lifecycle freshness | Completed task/spec packet rows remained active and recurred as stale spec-guard debt | remove fallback | CO-543 | Apr 16 terminal packet rows reached the 30-day strict spec-guard boundary | 2026-04-16 | 2026-05-17 | N/A after removal | Completed rows are inactive done; related terminal packet registry rows are archived; future active specs surface pre-expiry owner action | node scripts/spec-guard.mjs; npm run docs:check; focused docs-freshness/spec-guard tests; diff-budget override |
 
 # Technical Specification
 

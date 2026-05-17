@@ -20,6 +20,7 @@ import {
 import {
   buildTaskPacketLifecycleIndex,
   classifyTaskPacketPathFamily,
+  collectTaskIndexItems,
   normalizeDocPath,
   PRESERVED_HISTORICAL_STUB_STATUS,
   TERMINAL_PENDING_ARCHIVE_STATUS
@@ -95,7 +96,7 @@ async function loadTaskLifecycleIndex(repoRoot) {
   }
   const raw = await readFile(tasksIndexPath, 'utf8');
   const parsed = JSON.parse(raw);
-  return buildTaskPacketLifecycleIndex(Array.isArray(parsed?.items) ? parsed.items : []);
+  return buildTaskPacketLifecycleIndex(collectTaskIndexItems(parsed));
 }
 
 function classifyPath(docPath, catalog) {

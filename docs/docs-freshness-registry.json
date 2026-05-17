@@ -2720,10 +2720,11 @@
     },
     {
       "path": ".agent/task/1220-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": ".agent/task/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction.md",
@@ -3908,10 +3909,11 @@
     },
     {
       "path": ".agent/task/linear-2886b57d-b844-4803-9e55-6fe3657d516d.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": ".agent/task/linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
@@ -3947,10 +3949,11 @@
     },
     {
       "path": ".agent/task/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": ".agent/task/linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
@@ -4098,10 +4101,11 @@
     },
     {
       "path": ".agent/task/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": ".agent/task/linear-41f54a87-705b-467d-9e88-f49c6315f0dc.md",
@@ -4604,10 +4608,11 @@
     },
     {
       "path": ".agent/task/linear-6c2a6f36-7852-4535-9914-e0042b082c95.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": ".agent/task/linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
@@ -4705,10 +4710,11 @@
     },
     {
       "path": ".agent/task/linear-72286a49-e68b-435a-be72-74d5c28feb09.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": ".agent/task/linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
@@ -5205,10 +5211,11 @@
     },
     {
       "path": ".agent/task/linear-9917183b-824a-48f7-95ee-bcee205d7a02.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": ".agent/task/linear-994efebc-e1e4-4e00-8046-c60143813251.md",
@@ -5335,6 +5342,14 @@
       "status": "archived",
       "last_review": "2026-04-30",
       "cadence_days": 365
+    },
+    {
+      "path": ".agent/task/linear-a08ba13b-1c9a-43ed-beec-f63a0547b721.md",
+      "owner": "Codex",
+      "status": "active",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 owner packet for Apr 16 strict spec-guard stale cohort root-cause repair."
     },
     {
       "path": ".agent/task/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
@@ -5708,10 +5723,11 @@
     },
     {
       "path": ".agent/task/linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": ".agent/task/linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md",
@@ -5769,10 +5785,11 @@
     },
     {
       "path": ".agent/task/linear-c9163fc7-832a-45ac-8961-2d6c213e52af.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": ".agent/task/linear-c9e99e2c-bc48-48f1-a8ca-4bd2a9289be2.md",
@@ -6211,10 +6228,11 @@
     },
     {
       "path": ".agent/task/linear-ec62eea8-7fcf-44a6-8216-10254c56e64d.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": ".agent/task/linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
@@ -6246,10 +6264,11 @@
     },
     {
       "path": ".agent/task/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": ".agent/task/linear-f29c2953-192f-455c-aa67-5418d2607a3a.md",
@@ -6353,10 +6372,11 @@
     },
     {
       "path": ".agent/task/linear-f8281682-ceed-4409-949c-efca2358568a.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": ".agent/task/linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
@@ -6626,10 +6646,11 @@
     },
     {
       "path": "docs/ACTION_PLAN-codex-0121-diagnostics-auth-provenance.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed nonstandard packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-codex-0125-model-catalog-posture.md",
@@ -8687,10 +8708,11 @@
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed nonstandard packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-coordinator-symphony-aligned-standalone-review-run-review-scope-advisory-preflight-shell-extraction.md",
@@ -9806,10 +9828,11 @@
     },
     {
       "path": "docs/ACTION_PLAN-linear-2886b57d-b844-4803-9e55-6fe3657d516d.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
@@ -9845,10 +9868,11 @@
     },
     {
       "path": "docs/ACTION_PLAN-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
@@ -10003,10 +10027,11 @@
     },
     {
       "path": "docs/ACTION_PLAN-linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-linear-41f54a87-705b-467d-9e88-f49c6315f0dc.md",
@@ -10516,10 +10541,11 @@
     },
     {
       "path": "docs/ACTION_PLAN-linear-6c2a6f36-7852-4535-9914-e0042b082c95.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
@@ -10617,10 +10643,11 @@
     },
     {
       "path": "docs/ACTION_PLAN-linear-72286a49-e68b-435a-be72-74d5c28feb09.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
@@ -11131,10 +11158,11 @@
     },
     {
       "path": "docs/ACTION_PLAN-linear-9917183b-824a-48f7-95ee-bcee205d7a02.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-linear-994efebc-e1e4-4e00-8046-c60143813251.md",
@@ -11261,6 +11289,14 @@
       "status": "archived",
       "last_review": "2026-04-30",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-a08ba13b-1c9a-43ed-beec-f63a0547b721.md",
+      "owner": "Codex",
+      "status": "active",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 owner packet for Apr 16 strict spec-guard stale cohort root-cause repair."
     },
     {
       "path": "docs/ACTION_PLAN-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
@@ -11641,10 +11677,11 @@
     },
     {
       "path": "docs/ACTION_PLAN-linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md",
@@ -11702,10 +11739,11 @@
     },
     {
       "path": "docs/ACTION_PLAN-linear-c9163fc7-832a-45ac-8961-2d6c213e52af.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8.md",
@@ -12144,10 +12182,11 @@
     },
     {
       "path": "docs/ACTION_PLAN-linear-ec62eea8-7fcf-44a6-8216-10254c56e64d.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
@@ -12179,10 +12218,11 @@
     },
     {
       "path": "docs/ACTION_PLAN-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-linear-f29c2953-192f-455c-aa67-5418d2607a3a.md",
@@ -12279,10 +12319,11 @@
     },
     {
       "path": "docs/ACTION_PLAN-linear-f8281682-ceed-4409-949c-efca2358568a.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/ACTION_PLAN-linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
@@ -14625,10 +14666,11 @@
     },
     {
       "path": "docs/findings/1220-standalone-review-run-review-orchestration-boundary-reassessment-deliberation.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/findings/1221-standalone-review-execution-runtime-shell-extraction-deliberation.md",
@@ -15346,17 +15388,19 @@
     },
     {
       "path": "docs/findings/linear-c101cb88-3097-4502-bcd7-723d80da7955-docs-freshness-classification.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed nonstandard packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/findings/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7-codex-0121-appserver-canary.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed nonstandard packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/findings/linear-f4469614-cfdf-49a6-a7ff-366f58229816-codex-0125-model-catalog-posture.md",
@@ -15627,10 +15671,11 @@
     },
     {
       "path": "docs/PRD-codex-0121-diagnostics-auth-provenance.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed nonstandard packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/PRD-codex-0125-model-catalog-posture.md",
@@ -17695,10 +17740,11 @@
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed nonstandard packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/PRD-coordinator-symphony-aligned-standalone-review-run-review-scope-advisory-preflight-shell-extraction.md",
@@ -18821,10 +18867,11 @@
     },
     {
       "path": "docs/PRD-linear-2886b57d-b844-4803-9e55-6fe3657d516d.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/PRD-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
@@ -18860,10 +18907,11 @@
     },
     {
       "path": "docs/PRD-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/PRD-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
@@ -19018,10 +19066,11 @@
     },
     {
       "path": "docs/PRD-linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/PRD-linear-41f54a87-705b-467d-9e88-f49c6315f0dc.md",
@@ -19531,10 +19580,11 @@
     },
     {
       "path": "docs/PRD-linear-6c2a6f36-7852-4535-9914-e0042b082c95.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/PRD-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
@@ -19632,10 +19682,11 @@
     },
     {
       "path": "docs/PRD-linear-72286a49-e68b-435a-be72-74d5c28feb09.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/PRD-linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
@@ -20146,10 +20197,11 @@
     },
     {
       "path": "docs/PRD-linear-9917183b-824a-48f7-95ee-bcee205d7a02.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/PRD-linear-994efebc-e1e4-4e00-8046-c60143813251.md",
@@ -20276,6 +20328,14 @@
       "status": "archived",
       "last_review": "2026-04-30",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/PRD-linear-a08ba13b-1c9a-43ed-beec-f63a0547b721.md",
+      "owner": "Codex",
+      "status": "active",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 owner packet for Apr 16 strict spec-guard stale cohort root-cause repair."
     },
     {
       "path": "docs/PRD-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
@@ -20656,10 +20716,11 @@
     },
     {
       "path": "docs/PRD-linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/PRD-linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md",
@@ -20717,10 +20778,11 @@
     },
     {
       "path": "docs/PRD-linear-c9163fc7-832a-45ac-8961-2d6c213e52af.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/PRD-linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8.md",
@@ -21159,10 +21221,11 @@
     },
     {
       "path": "docs/PRD-linear-ec62eea8-7fcf-44a6-8216-10254c56e64d.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/PRD-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
@@ -21194,10 +21257,11 @@
     },
     {
       "path": "docs/PRD-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/PRD-linear-f29c2953-192f-455c-aa67-5418d2607a3a.md",
@@ -21294,10 +21358,11 @@
     },
     {
       "path": "docs/PRD-linear-f8281682-ceed-4409-949c-efca2358568a.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/PRD-linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
@@ -21955,10 +22020,11 @@
     },
     {
       "path": "docs/TECH_SPEC-codex-0121-diagnostics-auth-provenance.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-codex-cli-alignment-refresh-e2e.md",
@@ -24016,10 +24082,11 @@
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-standalone-review-run-review-scope-advisory-preflight-shell-extraction.md",
@@ -25135,10 +25202,11 @@
     },
     {
       "path": "docs/TECH_SPEC-linear-2886b57d-b844-4803-9e55-6fe3657d516d.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
@@ -25174,10 +25242,11 @@
     },
     {
       "path": "docs/TECH_SPEC-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
@@ -25332,10 +25401,11 @@
     },
     {
       "path": "docs/TECH_SPEC-linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-linear-41f54a87-705b-467d-9e88-f49c6315f0dc.md",
@@ -25817,10 +25887,11 @@
     },
     {
       "path": "docs/TECH_SPEC-linear-6c2a6f36-7852-4535-9914-e0042b082c95.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
@@ -25918,10 +25989,11 @@
     },
     {
       "path": "docs/TECH_SPEC-linear-72286a49-e68b-435a-be72-74d5c28feb09.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
@@ -26425,10 +26497,11 @@
     },
     {
       "path": "docs/TECH_SPEC-linear-9917183b-824a-48f7-95ee-bcee205d7a02.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-linear-994efebc-e1e4-4e00-8046-c60143813251.md",
@@ -26555,6 +26628,14 @@
       "status": "archived",
       "last_review": "2026-04-30",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-a08ba13b-1c9a-43ed-beec-f63a0547b721.md",
+      "owner": "Codex",
+      "status": "active",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 owner packet for Apr 16 strict spec-guard stale cohort root-cause repair."
     },
     {
       "path": "docs/TECH_SPEC-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
@@ -26935,10 +27016,11 @@
     },
     {
       "path": "docs/TECH_SPEC-linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md",
@@ -26982,10 +27064,11 @@
     },
     {
       "path": "docs/TECH_SPEC-linear-c9163fc7-832a-45ac-8961-2d6c213e52af.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8.md",
@@ -27410,10 +27493,11 @@
     },
     {
       "path": "docs/TECH_SPEC-linear-ec62eea8-7fcf-44a6-8216-10254c56e64d.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
@@ -27445,10 +27529,11 @@
     },
     {
       "path": "docs/TECH_SPEC-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-linear-f29c2953-192f-455c-aa67-5418d2607a3a.md",
@@ -27545,10 +27630,11 @@
     },
     {
       "path": "docs/TECH_SPEC-linear-f8281682-ceed-4409-949c-efca2358568a.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "docs/TECH_SPEC-linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
@@ -30606,10 +30692,11 @@
     },
     {
       "path": "tasks/specs/1220-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction.md",
@@ -31798,10 +31885,11 @@
     },
     {
       "path": "tasks/specs/linear-2886b57d-b844-4803-9e55-6fe3657d516d.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
@@ -31837,10 +31925,11 @@
     },
     {
       "path": "tasks/specs/linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
@@ -31997,10 +32086,11 @@
     },
     {
       "path": "tasks/specs/linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-41f54a87-705b-467d-9e88-f49c6315f0dc.md",
@@ -32123,10 +32213,11 @@
     },
     {
       "path": "tasks/specs/linear-4c480fc7-b6c2-48cf-b4a2-73fe057b8aa7.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
@@ -32518,10 +32609,11 @@
     },
     {
       "path": "tasks/specs/linear-6c2a6f36-7852-4535-9914-e0042b082c95.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
@@ -32619,10 +32711,11 @@
     },
     {
       "path": "tasks/specs/linear-72286a49-e68b-435a-be72-74d5c28feb09.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
@@ -33134,10 +33227,11 @@
     },
     {
       "path": "tasks/specs/linear-9917183b-824a-48f7-95ee-bcee205d7a02.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-994efebc-e1e4-4e00-8046-c60143813251.md",
@@ -33266,6 +33360,14 @@
       "status": "archived",
       "last_review": "2026-04-30",
       "cadence_days": 365
+    },
+    {
+      "path": "tasks/specs/linear-a08ba13b-1c9a-43ed-beec-f63a0547b721.md",
+      "owner": "Codex",
+      "status": "active",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 owner packet for Apr 16 strict spec-guard stale cohort root-cause repair."
     },
     {
       "path": "tasks/specs/linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
@@ -33651,10 +33753,11 @@
     },
     {
       "path": "tasks/specs/linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md",
@@ -33712,10 +33815,11 @@
     },
     {
       "path": "tasks/specs/linear-c9163fc7-832a-45ac-8961-2d6c213e52af.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8.md",
@@ -34157,10 +34261,11 @@
     },
     {
       "path": "tasks/specs/linear-ec62eea8-7fcf-44a6-8216-10254c56e64d.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
@@ -34192,10 +34297,11 @@
     },
     {
       "path": "tasks/specs/linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-f29c2953-192f-455c-aa67-5418d2607a3a.md",
@@ -34292,10 +34398,11 @@
     },
     {
       "path": "tasks/specs/linear-f8281682-ceed-4409-949c-efca2358568a.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed stale spec-guard row inactive done; packet/spec history remains on disk."
     },
     {
       "path": "tasks/specs/linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
@@ -36917,10 +37024,11 @@
     },
     {
       "path": "tasks/tasks-1220-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "tasks/tasks-1221-coordinator-symphony-aligned-standalone-review-execution-runtime-shell-extraction.md",
@@ -38098,10 +38206,11 @@
     },
     {
       "path": "tasks/tasks-linear-2886b57d-b844-4803-9e55-6fe3657d516d.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "tasks/tasks-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",
@@ -38137,10 +38246,11 @@
     },
     {
       "path": "tasks/tasks-linear-2a8f00cf-a39a-4b15-aeca-23bacd618af1.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "tasks/tasks-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
@@ -38295,10 +38405,11 @@
     },
     {
       "path": "tasks/tasks-linear-4122489e-1a3b-43cf-a181-e98ada0a55e1.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "tasks/tasks-linear-41f54a87-705b-467d-9e88-f49c6315f0dc.md",
@@ -38421,10 +38532,11 @@
     },
     {
       "path": "tasks/tasks-linear-4c480fc7-b6c2-48cf-b4a2-73fe057b8aa7.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "tasks/tasks-linear-4cbc2024-e85b-469d-adbc-7ee6f4ff2d43.md",
@@ -38815,10 +38927,11 @@
     },
     {
       "path": "tasks/tasks-linear-6c2a6f36-7852-4535-9914-e0042b082c95.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "tasks/tasks-linear-6d7e842c-b10a-42f5-a7e0-8a30a8dd9442.md",
@@ -38916,10 +39029,11 @@
     },
     {
       "path": "tasks/tasks-linear-72286a49-e68b-435a-be72-74d5c28feb09.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "tasks/tasks-linear-723139d4-2d01-4022-aa09-e88bda7dfd89.md",
@@ -39430,10 +39544,11 @@
     },
     {
       "path": "tasks/tasks-linear-9917183b-824a-48f7-95ee-bcee205d7a02.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "tasks/tasks-linear-994efebc-e1e4-4e00-8046-c60143813251.md",
@@ -39560,6 +39675,14 @@
       "status": "archived",
       "last_review": "2026-04-30",
       "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-linear-a08ba13b-1c9a-43ed-beec-f63a0547b721.md",
+      "owner": "Codex",
+      "status": "active",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 owner packet for Apr 16 strict spec-guard stale cohort root-cause repair."
     },
     {
       "path": "tasks/tasks-linear-a0a08e51-f0e9-479a-b45f-6d7be2c0d7a8.md",
@@ -39940,10 +40063,11 @@
     },
     {
       "path": "tasks/tasks-linear-c101cb88-3097-4502-bcd7-723d80da7955.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "tasks/tasks-linear-c21c8833-ce10-4c5d-a12f-e309bf6ffe3f.md",
@@ -40001,10 +40125,11 @@
     },
     {
       "path": "tasks/tasks-linear-c9163fc7-832a-45ac-8961-2d6c213e52af.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "tasks/tasks-linear-c9e99e2c-bc48-48f1-a8ca-4bd2a9289be2.md",
@@ -40450,10 +40575,11 @@
     },
     {
       "path": "tasks/tasks-linear-ec62eea8-7fcf-44a6-8216-10254c56e64d.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "tasks/tasks-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
@@ -40485,10 +40611,11 @@
     },
     {
       "path": "tasks/tasks-linear-f1d8b29c-b048-4816-96dd-a38f272dabb7.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "tasks/tasks-linear-f29c2953-192f-455c-aa67-5418d2607a3a.md",
@@ -40592,10 +40719,11 @@
     },
     {
       "path": "tasks/tasks-linear-f8281682-ceed-4409-949c-efca2358568a.md",
-      "owner": "Codex (top-level agent), Review agent",
-      "status": "active",
-      "last_review": "2026-04-16",
-      "cadence_days": 30
+      "owner": "Codex",
+      "status": "archived",
+      "last_review": "2026-05-17",
+      "cadence_days": 30,
+      "notes": "CO-543 reclassified completed packet surface inactive after terminal task-index evidence; history remains on disk and is no longer active freshness debt."
     },
     {
       "path": "tasks/tasks-linear-f838cbde-8bb6-46de-bde2-b749f2e64422.md",
