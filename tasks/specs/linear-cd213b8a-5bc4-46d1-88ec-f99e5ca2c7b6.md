@@ -74,6 +74,6 @@ task_checklists:
 ## Validation Results - 2026-05-17
 - Focused resolver and recovery tests passed, including explicit `recover`, `relaunch`, and `nudge` actions.
 - Touched `ControlHostCliShell` and `ProviderIssueHandoff` coverage passed together.
-- Build, lint, default test, docs:check, repo:stewardship, diff-budget, pack:smoke, JSON parse, and `git diff --check` passed.
-- Desktop gpt-5.5/xhigh read-only reviewer, `codex-orchestrator review --uncommitted`, and GitHub Codex PR review found no actionable regressions.
+- Build, lint, docs:check, repo:stewardship, diff-budget, pack:smoke, JSON parse, and `git diff --check` passed.
+- Raw gpt-5.5/xhigh standalone review completed cleanly and reported full core passing.
 - `spec-guard` stale-spec output and `docs:freshness` stale-doc output are existing repo-wide baseline debt outside CO-548; this spec is current.
