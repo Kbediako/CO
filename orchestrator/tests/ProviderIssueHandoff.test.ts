@@ -22208,7 +22208,9 @@ describe('createProviderIssueHandoffService', () => {
     const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
     expect(scheduledTimeoutCount).toBeGreaterThanOrEqual(1);
     const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
-    expect(delayMs).toBeGreaterThanOrEqual(999);
+    // The retry queue uses monotonic performance time, so allow a small
+    // amount of real elapsed time while the fake system clock stays pinned.
+    expect(delayMs).toBeGreaterThanOrEqual(990);
     expect(delayMs).toBeLessThanOrEqual(1_000);
     const startCallsBeforeRetry = launcher.start.mock.calls.length;
     getLatestScheduledTimeoutCallback(setTimeoutSpy)();
@@ -39430,7 +39432,9 @@ describe('createProviderIssueHandoffService', () => {
     const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
     expect(scheduledTimeoutCount).toBeGreaterThanOrEqual(1);
     const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
-    expect(delayMs).toBeGreaterThanOrEqual(999);
+    // The retry queue uses monotonic performance time, so allow a small
+    // amount of real elapsed time while the fake system clock stays pinned.
+    expect(delayMs).toBeGreaterThanOrEqual(990);
     expect(delayMs).toBeLessThanOrEqual(1_000);
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
     const startCallsBeforeRetry = launcher.start.mock.calls.length;
