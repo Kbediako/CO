@@ -184,7 +184,7 @@ describe('controlHostCliShell manifest discovery', () => {
     });
   });
 
-  it('uses configured source binding only for existing-claim revalidation while dispatch pilot is disabled', async () => {
+  it('uses configured source binding for revalidation and explicit recovery while dispatch pilot is disabled', async () => {
     const runtimeEnv = {
       CO_LINEAR_WORKSPACE_ID: 'workspace-env',
       CO_LINEAR_TEAM_ID: 'team-env',
@@ -225,6 +225,7 @@ describe('controlHostCliShell manifest discovery', () => {
     expect(resolvers.resolveTrackedIssue).toBeDefined();
     expect(resolvers.resolveTrackedIssues).toBeDefined();
     expect(resolvers.resolveRevalidationTrackedIssue).toBeDefined();
+    expect(resolvers.resolveRecoveryTrackedIssue).toBeDefined();
     await expect(
       resolvers.resolveTrackedIssue!({ provider: 'linear', issueId: 'lin-issue-510' })
     ).resolves.toEqual({
@@ -247,6 +248,23 @@ describe('controlHostCliShell manifest discovery', () => {
     });
     expect(resolveIssueById).toHaveBeenCalledWith({
       issueId: 'lin-issue-510',
+      sourceSetup: {
+        provider: 'linear',
+        workspace_id: 'workspace-env',
+        team_id: 'team-env',
+        project_id: 'project-env'
+      },
+      env: runtimeEnv
+    });
+
+    await expect(
+      resolvers.resolveRecoveryTrackedIssue!({ provider: 'linear', issueId: 'lin-issue-543' })
+    ).resolves.toEqual({
+      kind: 'release',
+      reason: 'dispatch_source_issue_not_found'
+    });
+    expect(resolveIssueById).toHaveBeenLastCalledWith({
+      issueId: 'lin-issue-543',
       sourceSetup: {
         provider: 'linear',
         workspace_id: 'workspace-env',

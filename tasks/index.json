@@ -1,6 +1,98 @@
 {
   "items": [
     {
+      "id": "20260517-linear-cd213b8a-5bc4-46d1-88ec-f99e5ca2c7b6",
+      "title": "CO-548 decouple targeted provider-worker nudge from broad dispatch pilot",
+      "relates_to": "tasks/tasks-linear-cd213b8a-5bc4-46d1-88ec-f99e5ca2c7b6.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-17",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO orchestrator",
+          "date": "2026-05-17",
+          "status": "confirmed_in_progress",
+          "summary": "Live control-host recovery for CO-543 skipped with dispatch_source_disabled because explicit targeted issue recovery is using the broad webhook dispatch gate while dispatch_pilot.enabled=false."
+        },
+        "parallelization": {
+          "reviewer": "CO orchestrator",
+          "date": "2026-05-17",
+          "status": "stay_serial_after_read_only_explorer",
+          "summary": "The implementation touches one resolver boundary shared by recovery wiring and focused tests; a gpt-5.5/xhigh read-only explorer mapped the path first."
+        },
+        "docs_packet": {
+          "reviewer": "CO orchestrator",
+          "date": "2026-05-17",
+          "status": "created_before_implementation",
+          "summary": "Created the CO-548 docs-first packet to split explicit targeted recovery source binding from broad dispatch-pilot admission without enabling broad dispatch."
+        }
+      },
+      "validation": {
+        "status": "implementation_complete_pr_pending_with_baseline_docs_freshness_blocker",
+        "passed": [
+          "live control-host recover failure evidence",
+          "workpad creation",
+          "parallelization decision recorded",
+          "gpt-5.5/xhigh read-only explorer path map",
+          "docs-first packet created",
+          "focused ControlHostCliShell resolver regression",
+          "focused ProviderIssueHandoff recovery regression",
+          "full affected ControlHostCliShell and ProviderIssueHandoff test files",
+          "npm run build",
+          "npm run lint",
+          "npm run test",
+          "npm run docs:check",
+          "npm run repo:stewardship",
+          "node scripts/diff-budget.mjs",
+          "node scripts/delegation-guard.mjs with desktop subagent evidence override",
+          "npm run pack:smoke",
+          "git diff --check",
+          "JSON parse for tasks/index.json and docs/docs-freshness-registry.json",
+          "gpt-5.5/xhigh read-only reviewer clean",
+          "gpt-5.5/xhigh codex-orchestrator review bounded success with no actionable regressions"
+        ],
+        "blocked": [
+          "npm run docs:freshness remains blocked by existing repo-wide stale-doc debt outside CO-548",
+          "node scripts/spec-guard.mjs --dry-run exits 0 but still reports existing stale spec metadata outside CO-548"
+        ],
+        "waivers": [
+          "delegation guard used desktop gpt-5.5/xhigh read-only subagent evidence because desktop spawn_agent evidence is not emitted as an MCP runner manifest",
+          "diagnostics manifest hit a transient async timing failure in an existing ProviderIssueHandoff test; the single test rerun and direct full npm run test passed"
+        ],
+        "pending": [
+          "workpad evidence update",
+          "PR handoff",
+          "post-merge control-host restart proof before retrying CO-543 targeted recovery from shared main"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-cd213b8a-5bc4-46d1-88ec-f99e5ca2c7b6.md",
+        "prd": "docs/PRD-linear-cd213b8a-5bc4-46d1-88ec-f99e5ca2c7b6.md",
+        "docs": "docs/TECH_SPEC-linear-cd213b8a-5bc4-46d1-88ec-f99e5ca2c7b6.md",
+        "action_plan": "docs/ACTION_PLAN-linear-cd213b8a-5bc4-46d1-88ec-f99e5ca2c7b6.md",
+        "spec": "tasks/specs/linear-cd213b8a-5bc4-46d1-88ec-f99e5ca2c7b6.md",
+        "task": "tasks/tasks-linear-cd213b8a-5bc4-46d1-88ec-f99e5ca2c7b6.md"
+      },
+      "source_issue": {
+        "id": "cd213b8a-5bc4-46d1-88ec-f99e5ca2c7b6",
+        "identifier": "CO-548",
+        "url": "https://linear.app/asabeko/issue/CO-548/co-decouple-targeted-provider-worker-nudge-from-broad-dispatch-pilot"
+      },
+      "related_issues": [
+        {
+          "identifier": "CO-543",
+          "relation": "blocked_target_issue"
+        },
+        {
+          "identifier": "CO-546",
+          "relation": "adjacent_revalidation_owner"
+        }
+      ]
+    },
+    {
       "id": "20260516-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d",
       "title": "CO-546 attach live Linear state to rehydrated pending-claim revalidation",
       "relates_to": "tasks/tasks-linear-29b67d32-a612-489f-a1ac-8fd9cc4a9b5d.md",

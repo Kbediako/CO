@@ -417,6 +417,12 @@ export interface CreateProviderIssueHandoffServiceOptions {
       issueId: string;
     }
   ) => Promise<ProviderTrackedIssueRefreshResolution>) | null;
+  resolveRecoveryTrackedIssue?: ((
+    input: {
+      provider: 'linear';
+      issueId: string;
+    }
+  ) => Promise<ProviderTrackedIssueRefreshResolution>) | null;
   resolveTrackedIssues?: ProviderTrackedIssueRefetch | null;
   providerWorkflowConfigStore?: ProviderWorkflowConfigStore | null;
   runTerminalCleanup?: typeof runProviderTerminalCleanup;
@@ -611,6 +617,7 @@ export function createProviderIssueHandoffService(
   });
   const resolveTrackedIssue = options.resolveTrackedIssue;
   const resolveRevalidationTrackedIssue = options.resolveRevalidationTrackedIssue ?? resolveTrackedIssue;
+  const resolveRecoveryTrackedIssue = options.resolveRecoveryTrackedIssue ?? resolveTrackedIssue;
   const resolveTrackedIssueWhenNotStuck =
     !resolveTrackedIssue
       ? null
@@ -621,6 +628,19 @@ export function createProviderIssueHandoffService(
             return buildRefreshCycleStuckSkipResolution();
           }
           const resolution = await resolveTrackedIssue(input);
+          assertRefreshLifecycleCurrent();
+          return resolution;
+        };
+  const resolveRecoveryTrackedIssueWhenNotStuck =
+    !resolveRecoveryTrackedIssue
+      ? null
+      : async (
+          input: Parameters<NonNullable<CreateProviderIssueHandoffServiceOptions['resolveTrackedIssue']>>[0]
+        ): Promise<ProviderTrackedIssueRefreshResolution> => {
+          if (shouldAbortRefreshCycle()) {
+            return buildRefreshCycleStuckSkipResolution();
+          }
+          const resolution = await resolveRecoveryTrackedIssue(input);
           assertRefreshLifecycleCurrent();
           return resolution;
         };
@@ -6553,7 +6573,7 @@ export function createProviderIssueHandoffService(
         await runWithConfiguredWorkerHostsCache(async () =>
           await runWithProviderIssueRunDiscoveryCache(async () =>
             await runWithRefreshLifecycleLock(async () => {
-              if (!resolveTrackedIssueWhenNotStuck) {
+              if (!resolveRecoveryTrackedIssueWhenNotStuck) {
                 return buildProviderIssueRecoveryResult({
                   provider: input.provider,
                   issueId: input.issueId,
@@ -6564,7 +6584,7 @@ export function createProviderIssueHandoffService(
                 });
               }
 
-              const resolution = await resolveTrackedIssueWhenNotStuck({
+              const resolution = await resolveRecoveryTrackedIssueWhenNotStuck({
                 provider: input.provider,
                 issueId: input.issueId
               });
