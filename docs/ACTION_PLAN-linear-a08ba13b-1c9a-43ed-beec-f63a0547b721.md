@@ -10,6 +10,15 @@
 - Not done if: the guard still fails on any declared Apr 16 row, a row is date-only bumped, a spec is deleted, the guard or policy caps are weakened, or CO-548 implementation is changed from this lane.
 - Fallback/refactor decision: remove the stale-active-row fallback. Completed packets must be inactive `done`; future over-cap cohorts must route owner action rather than cap expansion.
 - Large-refactor check: no guard refactor is warranted because `spec-guard` already skips inactive specs correctly. The defect is lifecycle metadata drift.
+- Minor-seam decision: bounded lifecycle metadata repair is acceptable because it removes active-row drift without adding another compatibility path.
+
+## CO-382 Fallback Decision Table
+- Large-refactor check: no new fallback mechanism or guard split is warranted; CO-543 removes lifecycle metadata drift while keeping the existing strict spec-guard and docs-freshness ownership surfaces authoritative.
+- Minor-seam decision: the bounded seam is acceptable because completed packet rows are reclassified inactive or archived with evidence, and future active specs surface through the existing docs-freshness-maintain owner-action route before hard expiry.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Active spec lifecycle freshness | Completed task/spec packet rows remained active and recurred as stale spec-guard debt | remove fallback | CO-543 | Apr 16 terminal packet rows reached the 30-day strict spec-guard boundary | 2026-04-16 | 2026-05-17 | N/A after removal | Completed rows are inactive done; related terminal packet registry rows are archived; future active specs surface pre-expiry owner action | node scripts/spec-guard.mjs; npm run docs:check; focused docs-freshness/spec-guard tests; diff-budget override |
 
 ## Milestones
 1. Confirm shared root clean latest main and create isolated worktree.

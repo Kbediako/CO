@@ -24,6 +24,14 @@
 - [x] `node scripts/spec-guard.mjs` passes non-dry on the branch. Evidence: returned `Spec guard: OK`.
 - [ ] Draft PR is linked to CO-543 with current validation evidence.
 
+## CO-382 Fallback Decision Table
+- Large-refactor check: no new fallback mechanism or guard split is warranted; CO-543 removes lifecycle metadata drift while keeping the existing strict spec-guard and docs-freshness ownership surfaces authoritative.
+- Minor-seam decision: the bounded seam is acceptable because completed packet rows are reclassified inactive or archived with evidence, and future active specs surface through the existing docs-freshness-maintain owner-action route before hard expiry.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Active spec lifecycle freshness | Completed task/spec packet rows remained active and recurred as stale spec-guard debt | remove fallback | CO-543 | Apr 16 terminal packet rows reached the 30-day strict spec-guard boundary | 2026-04-16 | 2026-05-17 | N/A after removal | Completed rows are inactive done; related terminal packet registry rows are archived; future active specs surface pre-expiry owner action | node scripts/spec-guard.mjs; npm run docs:check; focused docs-freshness/spec-guard tests; diff-budget override |
+
 ## Validation
 - [x] Pre-repair strict spec-guard reproduction. Evidence: `node scripts/spec-guard.mjs --dry-run` reported exactly thirteen Apr 16 stale rows.
 - [x] Numbered-row evidence review. Evidence: `tasks/tasks-1220-coordinator-symphony-aligned-standalone-review-run-review-orchestration-boundary-reassessment.md` has 17 checked and 0 unchecked items.
@@ -39,7 +47,7 @@
 - [x] `node scripts/delegation-guard.mjs`. Evidence: passed with explicit desktop-subagent override because the Codex desktop gpt-5.5/xhigh subagent evidence does not produce a repo-local delegation manifest.
 - [x] `npm run repo:stewardship`. Evidence: 6547 tracked files, 0 action-required.
 - [x] `npm run pack:smoke`. Evidence: completed with `pack smoke passed`.
-- [x] `node scripts/diff-budget.mjs`. Evidence: exceeded 1979/1200 lines and passed with `DIFF_BUDGET_OVERRIDE_REASON=CO-543 must atomically reclassify 13 terminal stale specs plus explicit nonstandard packet registry rows and spec pre-expiry regression coverage so completed packets stop recurring as active freshness debt.`
+- [x] `BASE_SHA=origin/main DIFF_BUDGET_OVERRIDE_REASON=... node scripts/diff-budget.mjs`. Evidence: exceeded 2108/1200 lines and passed with `DIFF_BUDGET_OVERRIDE_REASON=CO-543 must atomically reclassify 13 terminal stale specs plus explicit nonstandard packet registry rows and spec pre-expiry regression coverage so completed packets stop recurring as active freshness debt.`
 - [x] `git diff --check`. Evidence: returned no output.
 - [x] gpt-5.5/xhigh standalone review. Evidence: final direct `codex review -c model='gpt-5.5' -c model_reasoning_effort='xhigh' --uncommitted --title 'CO-543 final post-lifecycle-path rereview'` session `019e3511-e67a-7310-adab-510fbb0a010b` found no discrete correctness issues after prior findings were fixed.
 - [x] Explicit elegance/minimality pass. Evidence: kept the shared `collectTaskIndexItems` helper and active-spec pre-expiry scanner because they remove repeat root causes across `spec-guard`, `docs:freshness`, and `docs:freshness:maintain`; no simplification patch was needed.
