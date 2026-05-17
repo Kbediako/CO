@@ -2,13 +2,14 @@
 
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { access, mkdir, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
-import { parseIsoDate, toPosixPath } from './lib/docs-helpers.js';
+import { collectDocFiles, computeAgeInDays, parseIsoDate, toPosixPath } from './lib/docs-helpers.js';
+import { buildTaskPacketLifecycleIndex, collectTaskIndexItems } from './lib/docs-freshness-lifecycle.js';
 import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 import { runDocsFreshness } from './docs-freshness.mjs';
 
@@ -21,8 +22,21 @@ const PASSING_DECISIONS = new Set(['clean', 'pass_with_owned_rolling_debt']);
 const REPO_GATE_ID = 'docs_freshness_maintain';
 const CANONICAL_OWNER_MARKER_PREFIX = 'codex-orchestrator:canonical-owner-key=';
 const CANONICAL_OWNER_KEY_MAX_LENGTH = 512;
+const SPEC_GUARD_FRESHNESS_CADENCE_DAYS = 30;
+const SPEC_GUARD_PRE_EXPIRY_WINDOW_DAYS = 7;
+const SPEC_GUARD_ARCHIVE_STUB_MARKER = '<!-- docs-archive:stub -->';
 const TERMINAL_WORKFLOW_STATE_TYPES = new Set(['completed', 'canceled', 'cancelled', 'duplicate']);
 const TERMINAL_WORKFLOW_STATES = new Set(['done', 'completed', 'canceled', 'cancelled', 'duplicate']);
+const INACTIVE_SPEC_STATUSES = new Set([
+  'archived',
+  'canceled',
+  'cancelled',
+  'closed',
+  'completed',
+  'deprecated',
+  'done',
+  'succeeded'
+]);
 const CURRENT_DIRECT_ACTION_DOC_CLASSES = new Set([
   'front_door',
   'public_guide',
@@ -313,6 +327,197 @@ function normalizeSpecGuardPayload(specGuard) {
     payload.parsed_failures = parsedFailures;
   }
   return payload;
+}
+
+function extractFrontmatterBlock(content) {
+  if (typeof content !== 'string') {
+    return null;
+  }
+  const lines = content.split(/\r?\n/);
+  let index = 0;
+  while (index < lines.length && lines[index].trim() === '') {
+    index += 1;
+  }
+  if (lines[index]?.trim() !== '---') {
+    return null;
+  }
+  const frontmatter = [];
+  for (index += 1; index < lines.length; index += 1) {
+    if (lines[index].trim() === '---') {
+      return frontmatter.join('\n');
+    }
+    frontmatter.push(lines[index]);
+  }
+  return null;
+}
+
+function extractFrontmatterScalar(content, key) {
+  const frontmatter = extractFrontmatterBlock(content);
+  if (!frontmatter) {
+    return null;
+  }
+  const line = frontmatter
+    .split(/\r?\n/)
+    .find((candidate) => candidate.trim().startsWith(`${key}:`));
+  if (!line) {
+    return null;
+  }
+  return line.split(':', 2)[1]?.trim() || null;
+}
+
+function isInactiveSpecContent(content) {
+  const status = extractFrontmatterScalar(content, 'status');
+  return status ? INACTIVE_SPEC_STATUSES.has(status.toLowerCase()) : false;
+}
+
+function extractSpecGuardLastReview(content) {
+  const frontmatterLastReview = extractFrontmatterScalar(content, 'last_review');
+  if (frontmatterLastReview) {
+    return frontmatterLastReview;
+  }
+  const reviewLine = content
+    .split(/\r?\n/)
+    .find((line) => line.trim().startsWith('last_review:'));
+  return reviewLine ? reviewLine.split(':', 2)[1]?.trim() || null : null;
+}
+
+function isArchivedSpecStubContent(file, content) {
+  const lines = content.split(/\r?\n/);
+  let index = 0;
+  while (index < lines.length && lines[index].trim() === '') {
+    index += 1;
+  }
+
+  if (!lines[index]?.trim().startsWith('#')) {
+    return false;
+  }
+
+  index += 1;
+  while (index < lines.length && lines[index].trim() === '') {
+    index += 1;
+  }
+
+  if (lines[index]?.trim().startsWith('last_review:')) {
+    index += 1;
+    while (index < lines.length && lines[index].trim() === '') {
+      index += 1;
+    }
+  }
+
+  if (lines[index]?.trim() !== SPEC_GUARD_ARCHIVE_STUB_MARKER) {
+    return false;
+  }
+
+  const trailingLines = lines.slice(index + 1).map((line) => line.trim());
+  const archivePath =
+    trailingLines
+      .find((line) => line.startsWith('- Archive path:'))
+      ?.slice('- Archive path:'.length)
+      .trim() ?? '';
+
+  return (
+    trailingLines.some((line) => line.startsWith('> Archived on ')) &&
+    trailingLines.some((line) => line.startsWith('- Archive branch:')) &&
+    normalizeDocPath(archivePath) === normalizeDocPath(file)
+  );
+}
+
+function isSpecGuardFreshnessPath(file) {
+  const normalizedPath = normalizeDocPath(file);
+  const dir = path.posix.dirname(normalizedPath);
+  const basename = path.posix.basename(normalizedPath);
+  return (
+    basename.endsWith('.md') &&
+    basename !== 'README.md' &&
+    (dir === 'tasks/specs' || dir === 'docs/design/specs')
+  );
+}
+
+async function loadTerminalTaskLifecycleIndex(repoRoot) {
+  try {
+    const raw = await readFile(path.join(repoRoot, 'tasks/index.json'), 'utf8');
+    const parsed = JSON.parse(raw);
+    return buildTaskPacketLifecycleIndex(collectTaskIndexItems(parsed));
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      return buildTaskPacketLifecycleIndex([]);
+    }
+    throw error;
+  }
+}
+
+function normalizeSpecGuardPreExpiryEntry(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  const entryPath = normalizeDocPath(entry.path);
+  const lastReview = normalizeOptionalString(entry.last_review);
+  const cadenceDays = Number.parseInt(String(entry.cadence_days ?? ''), 10);
+  const ageDays = Number.parseInt(String(entry.age_days ?? ''), 10);
+  const daysUntilExpiry = Number.parseInt(String(entry.days_until_expiry ?? ''), 10);
+  if (!entryPath || !lastReview || !Number.isFinite(cadenceDays) || !Number.isFinite(ageDays)) {
+    return null;
+  }
+  return {
+    path: entryPath,
+    path_family: normalizeOptionalString(entry.path_family) ?? specGuardPathFamily(entryPath),
+    last_review: lastReview,
+    cadence_days: cadenceDays,
+    age_days: ageDays,
+    days_until_expiry: Number.isFinite(daysUntilExpiry) ? daysUntilExpiry : cadenceDays - ageDays,
+    next_review: normalizeOptionalString(entry.next_review) ?? addDaysToIsoDate(lastReview, cadenceDays),
+    failure_kind: 'active_spec_pre_expiry'
+  };
+}
+
+async function collectSpecGuardPreExpiryEntries(repoRoot, { windowDays = SPEC_GUARD_PRE_EXPIRY_WINDOW_DAYS } = {}) {
+  const allDocs = await collectDocFiles(repoRoot);
+  const specFiles = allDocs.filter(isSpecGuardFreshnessPath);
+  const lifecycleIndex = await loadTerminalTaskLifecycleIndex(repoRoot);
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const entries = [];
+
+  for (const file of specFiles) {
+    const normalizedPath = normalizeDocPath(file);
+    let content;
+    try {
+      content = await readFile(path.join(repoRoot, normalizedPath), 'utf8');
+    } catch (error) {
+      if (error?.code === 'ENOENT') {
+        continue;
+      }
+      throw error;
+    }
+    if (
+      isArchivedSpecStubContent(normalizedPath, content) ||
+      isInactiveSpecContent(content) ||
+      lifecycleIndex.byPath.has(normalizedPath)
+    ) {
+      continue;
+    }
+    const lastReview = extractSpecGuardLastReview(content);
+    const reviewDate = lastReview ? parseIsoDate(lastReview) : null;
+    if (!reviewDate) {
+      continue;
+    }
+    const ageDays = computeAgeInDays(reviewDate, today);
+    const daysUntilExpiry = SPEC_GUARD_FRESHNESS_CADENCE_DAYS - ageDays;
+    if (daysUntilExpiry >= 0 && daysUntilExpiry <= windowDays) {
+      entries.push({
+        path: normalizedPath,
+        path_family: specGuardPathFamily(normalizedPath),
+        last_review: lastReview,
+        cadence_days: SPEC_GUARD_FRESHNESS_CADENCE_DAYS,
+        age_days: ageDays,
+        days_until_expiry: daysUntilExpiry,
+        next_review: addDaysToIsoDate(lastReview, SPEC_GUARD_FRESHNESS_CADENCE_DAYS),
+        failure_kind: 'active_spec_pre_expiry'
+      });
+    }
+  }
+
+  return entries;
 }
 
 function normalizeOwnerIssueScope(config, env = process.env) {
@@ -1442,9 +1647,15 @@ function isCurrentDirectActionDoc(entry) {
 
 function buildRecommendedAction(
   decision,
-  { policy, expiresAfter, diffStatus, ownerIssueAction, preExpiryCount = 0 }
+  { policy, expiresAfter, diffStatus, ownerIssueAction, preExpiryCount = 0, specGuardPreExpiryCount = 0 }
 ) {
   if (decision === 'clean') {
+    if (specGuardPreExpiryCount > 0 && preExpiryCount > 0) {
+      return `Review or assign direct action for ${preExpiryCount} public/current doc${preExpiryCount === 1 ? '' : 's'} and ${specGuardPreExpiryCount} active spec${specGuardPreExpiryCount === 1 ? '' : 's'} approaching expiry; do not route strict docs/specs into rolling deferral.`;
+    }
+    if (specGuardPreExpiryCount > 0) {
+      return `Review or assign direct action for ${specGuardPreExpiryCount} active spec${specGuardPreExpiryCount === 1 ? '' : 's'} approaching spec-guard expiry; do not wait for the hard 30-day failure.`;
+    }
     if (preExpiryCount > 0) {
       return `Review or assign direct action for ${preExpiryCount} public/current doc${preExpiryCount === 1 ? '' : 's'} approaching expiry; do not route strict docs into rolling deferral.`;
     }
@@ -1491,6 +1702,10 @@ function buildRecommendedAction(
 
 function countSpecGuardActions(specGuard) {
   return Array.isArray(specGuard?.parsed_failures) ? specGuard.parsed_failures.length : 0;
+}
+
+function countSpecGuardPreExpiryActions(decision) {
+  return Array.isArray(decision?.spec_guard_pre_expiry_entries) ? decision.spec_guard_pre_expiry_entries.length : 0;
 }
 
 function collectSpecGuardFailurePaths(specGuard) {
@@ -1688,6 +1903,7 @@ export function buildDocsFreshnessRepoGate(decision) {
     Number(decision?.totals?.unowned_candidate_cohorts ?? 0) +
     Number(decision?.totals?.terminal_lifecycle_entries ?? 0) +
     Number(decision?.totals?.pre_expiry_entries ?? 0) +
+    countSpecGuardPreExpiryActions(decision) +
     countSpecGuardActions(decision?.spec_guard) +
     ownerActionRequiredCount;
   const blocksHandoff = !passing || ownerActionEvidence?.should_block === true;
@@ -1738,6 +1954,7 @@ export function buildDocsFreshnessRepoGate(decision) {
       blocking_changed_paths: decision?.sample_paths?.blocking_changed_paths ?? [],
       terminal_lifecycle_paths: decision?.sample_paths?.terminal_lifecycle_paths ?? [],
       pre_expiry_paths: decision?.sample_paths?.pre_expiry_paths ?? [],
+      spec_guard_pre_expiry_paths: decision?.sample_paths?.spec_guard_pre_expiry_paths ?? [],
       spec_guard_paths: decision?.sample_paths?.spec_guard_paths ?? [],
       hard_stale_paths: decision?.sample_paths?.hard_stale_paths ?? [],
       missing_or_invalid_paths: decision?.sample_paths?.missing_or_invalid_paths ?? []
@@ -2053,7 +2270,8 @@ export function buildDocsFreshnessMaintenanceDecision(
     diffBaseRef = null,
     generatedAt = new Date().toISOString(),
     ownerIssueVerification = null,
-    canonicalOwnerIssueVerifications = []
+    canonicalOwnerIssueVerifications = [],
+    specGuardPreExpiryEntries = []
   } = {}
 ) {
   const policy = report.rolling_freshness_policy ?? {};
@@ -2078,6 +2296,12 @@ export function buildDocsFreshnessMaintenanceDecision(
         rolling_deferral_eligible: entry?.rolling_deferral_eligible === true
       }))
     : [];
+  const normalizedSpecGuardPreExpiryEntries = (Array.isArray(specGuardPreExpiryEntries)
+    ? specGuardPreExpiryEntries
+    : []
+  )
+    .map(normalizeSpecGuardPreExpiryEntry)
+    .filter(Boolean);
   const hasOwnerRelevantDebtForAction =
     staleEntries.length > 0 || rollingEntries.length > 0 || normalizedSpecGuard.status === 'failed';
   const resolvedOwnerIssueVerification = hasOwnerRelevantDebtForAction
@@ -2194,6 +2418,18 @@ export function buildDocsFreshnessMaintenanceDecision(
         direct_action_required: entry.direct_action_required,
         rolling_deferral_eligible: false
       })),
+      ...normalizedSpecGuardPreExpiryEntries.map((entry) => ({
+        type: 'spec_guard_pre_expiry_review',
+        path: entry.path,
+        path_family: entry.path_family,
+        next_review: entry.next_review,
+        days_until_expiry: entry.days_until_expiry,
+        last_review: entry.last_review,
+        cadence_days: entry.cadence_days,
+        age_days: entry.age_days,
+        direct_action_required: true,
+        rolling_deferral_eligible: false
+      })),
       ...hardStaleCurrentEntries.map((entry) => ({
         type: 'strict_hard_stale_review',
         path: entry.path,
@@ -2242,7 +2478,8 @@ export function buildDocsFreshnessMaintenanceDecision(
       expiresAfter,
       diffStatus,
       ownerIssueAction: selectRecommendedOwnerIssueAction(ownerIssueAction, candidateCohorts),
-      preExpiryCount: preExpiryEntries.length
+      preExpiryCount: preExpiryEntries.length,
+      specGuardPreExpiryCount: normalizedSpecGuardPreExpiryEntries.length
     }),
     sample_paths: {
       changed_paths: normalizedChangedPaths.slice(0, 10),
@@ -2250,6 +2487,7 @@ export function buildDocsFreshnessMaintenanceDecision(
       candidate_paths: candidateEntries.slice(0, 10).map((entry) => entry.path),
       terminal_lifecycle_paths: terminalLifecycleEntries.slice(0, 10).map((entry) => entry.path),
       pre_expiry_paths: preExpiryEntries.slice(0, 10).map((entry) => entry.path),
+      spec_guard_pre_expiry_paths: normalizedSpecGuardPreExpiryEntries.slice(0, 10).map((entry) => entry.path),
       spec_guard_paths: collectSpecGuardFailurePaths(normalizedSpecGuard).slice(0, 10),
       hard_stale_paths: nonCandidateStaleEntries.slice(0, 10).map((entry) => entry.path),
       missing_or_invalid_paths: registryFailurePaths.slice(0, 10)
@@ -2261,6 +2499,7 @@ export function buildDocsFreshnessMaintenanceDecision(
       rolling_cohort_entries: report.totals?.rolling_cohort_entries ?? 0,
       terminal_lifecycle_entries: terminalLifecycleEntries.length,
       pre_expiry_entries: preExpiryEntries.length,
+      spec_guard_pre_expiry_entries: normalizedSpecGuardPreExpiryEntries.length,
       candidate_entries: candidateEntries.length,
       blocking_candidate_entries: blockingCandidateEntries.length,
       owned_rolling_entries: ownedRollingEntries.length,
@@ -2276,6 +2515,7 @@ export function buildDocsFreshnessMaintenanceDecision(
       invalid_entries: report.totals?.invalid_entries ?? 0,
       uncatalogued_docs: report.totals?.uncatalogued_docs ?? 0
     },
+    spec_guard_pre_expiry_entries: normalizedSpecGuardPreExpiryEntries,
     changed_paths: normalizedChangedPaths,
     spec_guard: normalizedSpecGuard,
     freshness_report: {
@@ -2423,11 +2663,12 @@ export async function runDocsFreshnessMaintain(
     outRoot,
     taskId
   });
-  const [diffResult, specGuard] = await Promise.all([
+  const [diffResult, specGuard, specGuardPreExpiryEntries] = await Promise.all([
     Array.isArray(changedPaths)
       ? Promise.resolve({ base_ref: baseRef, status: 'provided', paths: changedPaths })
       : collectChangedPaths(repoRoot, { baseRef }),
-    runSpecGuard(repoRoot, { skip: skipSpecGuard })
+    runSpecGuard(repoRoot, { skip: skipSpecGuard }),
+    collectSpecGuardPreExpiryEntries(repoRoot)
   ]);
   const hasOwnerRelevantDebt =
     (Array.isArray(freshnessResult.report?.stale_entries) && freshnessResult.report.stale_entries.length > 0) ||
@@ -2456,7 +2697,8 @@ export async function runDocsFreshnessMaintain(
     diffStatus: diffResult.status,
     diffBaseRef: diffResult.base_ref,
     ownerIssueVerification,
-    canonicalOwnerIssueVerifications
+    canonicalOwnerIssueVerifications,
+    specGuardPreExpiryEntries
   });
   decision.diff = diffResult;
   if (!skipOwnerActionEvidence) {
