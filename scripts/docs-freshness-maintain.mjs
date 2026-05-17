@@ -9,7 +9,12 @@ import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
 import { collectDocFiles, computeAgeInDays, parseIsoDate, toPosixPath } from './lib/docs-helpers.js';
-import { buildTaskPacketLifecycleIndex, collectTaskIndexItems } from './lib/docs-freshness-lifecycle.js';
+import {
+  buildTaskPacketLifecycleIndex,
+  collectTaskIndexItems,
+  isTaskPacketLifecyclePath,
+  isTerminalTaskStatus
+} from './lib/docs-freshness-lifecycle.js';
 import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 import { runDocsFreshness } from './docs-freshness.mjs';
 
@@ -971,6 +976,79 @@ function isEligibleHistoricalEntry(entry, policy) {
   );
 }
 
+const NON_LIVE_POLICY_CAPACITY_REGISTRY_STATUSES = new Set([
+  'archived',
+  'preserved_historical_stub',
+  'terminal_pending_archive'
+]);
+const NON_LIVE_POLICY_CAPACITY_LIFECYCLE_STATES = new Set([
+  'archived',
+  'preserved_historical_stub',
+  'terminal_pending_archive'
+]);
+function isLivePolicyCapacityEntry(entry) {
+  const explicitTaskStatus = explicitPolicyCapacityTaskStatus(entry);
+  if (explicitTaskStatus) {
+    if (!isTerminalTaskStatus(explicitTaskStatus)) {
+      return true;
+    }
+  }
+
+  if (hasNonLivePolicyCapacityClassification(entry)) {
+    return false;
+  }
+
+  if (terminalTaskStatus(entry)) {
+    return false;
+  }
+
+  return true;
+}
+
+function explicitPolicyCapacityTaskStatus(entry) {
+  if (!isTaskPacketLifecyclePath(entry?.path)) {
+    return null;
+  }
+  return (
+    normalizeOptionalString(entry?.task_status)?.toLowerCase() ??
+    normalizeOptionalString(entry?.task_lifecycle_status)?.toLowerCase() ??
+    normalizeOptionalString(entry?.lifecycle_status)?.toLowerCase() ??
+    null
+  );
+}
+
+function hasNonLivePolicyCapacityClassification(entry) {
+  const registryStatus = normalizeOptionalString(entry?.registry_status)?.toLowerCase() ?? null;
+  const statusAlias = normalizeOptionalString(entry?.status)?.toLowerCase() ?? null;
+  const effectiveRegistryStatus =
+    registryStatus ?? (statusAlias && NON_LIVE_POLICY_CAPACITY_REGISTRY_STATUSES.has(statusAlias) ? statusAlias : null);
+  if (effectiveRegistryStatus && NON_LIVE_POLICY_CAPACITY_REGISTRY_STATUSES.has(effectiveRegistryStatus)) {
+    return true;
+  }
+
+  const lifecycleState = normalizeOptionalString(entry?.lifecycle_state)?.toLowerCase() ?? null;
+  const effectiveLifecycleState =
+    lifecycleState ?? (statusAlias && NON_LIVE_POLICY_CAPACITY_LIFECYCLE_STATES.has(statusAlias) ? statusAlias : null);
+  if (effectiveLifecycleState && NON_LIVE_POLICY_CAPACITY_LIFECYCLE_STATES.has(effectiveLifecycleState)) {
+    return true;
+  }
+
+  return false;
+}
+
+function terminalTaskStatus(entry) {
+  const explicitTaskStatus = explicitPolicyCapacityTaskStatus(entry);
+  if (explicitTaskStatus && isTerminalTaskStatus(explicitTaskStatus)) {
+    return explicitTaskStatus;
+  }
+  const statusAlias = normalizeOptionalString(entry?.status)?.toLowerCase() ?? null;
+  return statusAlias && isTerminalTaskStatus(statusAlias) ? statusAlias : null;
+}
+
+function needsTerminalTaskStatusLifecycleAction(entry) {
+  return Boolean(terminalTaskStatus(entry) && !hasNonLivePolicyCapacityClassification(entry));
+}
+
 function shouldVerifyCanonicalOwnerIssues(report) {
   const policy = report?.rolling_freshness_policy ?? {};
   if (policy?.is_valid !== true) {
@@ -981,7 +1059,9 @@ function shouldVerifyCanonicalOwnerIssues(report) {
     ...(Array.isArray(report?.stale_entries) ? report.stale_entries : []),
     ...(Array.isArray(report?.rolling_cohort_entries) ? report.rolling_cohort_entries : [])
   ];
-  return ownerCandidateEntries.some((entry) => isEligibleHistoricalEntry(entry, policy));
+  return ownerCandidateEntries.some(
+    (entry) => isLivePolicyCapacityEntry(entry) && isEligibleHistoricalEntry(entry, policy)
+  );
 }
 
 function normalizeTerminalLifecycleEntry(entry) {
@@ -999,10 +1079,22 @@ function normalizeTerminalLifecycleEntry(entry) {
     recommended_action: entry?.recommended_action || 'archive_or_reclassify_terminal_packet',
     task_id: entry?.task_id || null,
     task_key: entry?.task_key || null,
-    task_status: entry?.status || null,
+    task_status: terminalTaskStatus(entry),
     completed_at: entry?.completed_at || null,
     source_issue: entry?.source_issue ?? null
   };
+}
+
+function uniqueTerminalLifecycleEntries(entries) {
+  const seen = new Set();
+  return entries.filter((entry) => {
+    const path = normalizeDocPath(entry?.path);
+    if (!path || seen.has(path)) {
+      return false;
+    }
+    seen.add(path);
+    return true;
+  });
 }
 
 function normalizeCandidateEntry(entry, policy, source) {
@@ -1587,12 +1679,19 @@ function isCohortOwnerResolved(cohort) {
 
 function summarizePolicyCapacity(candidateEntries, policy, { hasUsableOwnerPath = false, hasPolicyOwnerUsable = false } = {}) {
   if (!policy?.enabled) {
+    const maxEntries = policy?.max_entries ?? 0;
+    const maxCohorts = policy?.max_cohorts ?? 0;
     return {
       status: 'policy_missing',
       current_entries: candidateEntries.length,
-      max_entries: policy?.max_entries ?? 0,
+      max_entries: maxEntries,
       current_cohorts: 0,
-      max_cohorts: policy?.max_cohorts ?? 0
+      max_cohorts: maxCohorts,
+      expired_entries: 0,
+      entry_excess: Math.max(0, candidateEntries.length - maxEntries),
+      cohort_excess: 0,
+      over_entry_budget: candidateEntries.length > maxEntries,
+      over_cohort_budget: false
     };
   }
   if (
@@ -1600,12 +1699,19 @@ function summarizePolicyCapacity(candidateEntries, policy, { hasUsableOwnerPath 
     !policy.owner_issue ||
     (candidateEntries.length > 0 && !hasUsableOwnerPath && !hasPolicyOwnerUsable)
   ) {
+    const maxEntries = policy.max_entries ?? 0;
+    const maxCohorts = policy.max_cohorts ?? 0;
     return {
       status: 'invalid_policy',
       current_entries: candidateEntries.length,
-      max_entries: policy.max_entries ?? 0,
+      max_entries: maxEntries,
       current_cohorts: 0,
-      max_cohorts: policy.max_cohorts ?? 0
+      max_cohorts: maxCohorts,
+      expired_entries: 0,
+      entry_excess: Math.max(0, candidateEntries.length - maxEntries),
+      cohort_excess: 0,
+      over_entry_budget: candidateEntries.length > maxEntries,
+      over_cohort_budget: false
     };
   }
 
@@ -1631,6 +1737,8 @@ function summarizePolicyCapacity(candidateEntries, policy, { hasUsableOwnerPath 
     current_cohorts: cohortKeys.size,
     max_cohorts: policy.max_cohorts,
     expired_entries: expiredEntries.length,
+    entry_excess: Math.max(0, inWindowEntries.length - policy.max_entries),
+    cohort_excess: Math.max(0, cohortKeys.size - policy.max_cohorts),
     over_entry_budget: overEntryBudget,
     over_cohort_budget: overCohortBudget
   };
@@ -1835,13 +1943,16 @@ function resolveRepoGateOwner(decision, ownerActionEvidence) {
     const issue = actionIssues[0];
     const action = actions.find((candidate) => normalizeOptionalString(candidate?.owner_issue) === issue) ?? null;
     const actionMode = action?.mode ?? action?.owner_issue_action?.mode ?? decision?.owner_issue_action?.mode ?? null;
+    const canonicalOwnerKey = repoGateOwnerCanonicalKey(action, decision);
     const verification = resolveRepoGateOwnerVerification(decision, issue, {
-      canonicalOwnerKey: repoGateOwnerCanonicalKey(action, decision),
+      canonicalOwnerKey,
       ownerSource: action
     });
     return {
       issue,
+      canonical_owner_key: canonicalOwnerKey,
       action: actionMode,
+      owner_issue_action: action?.owner_issue_action ?? null,
       verification,
       verified: isRepoGateOwnerVerified({
         verification,
@@ -1861,13 +1972,16 @@ function resolveRepoGateOwner(decision, ownerActionEvidence) {
     const issue = resolvedIssues[0];
     const cohort = resolvedCohorts.find((candidate) => normalizeOptionalString(candidate?.owner_issue) === issue) ?? null;
     const actionMode = cohort?.owner_issue_action?.mode ?? decision?.owner_issue_action?.mode ?? null;
+    const canonicalOwnerKey = repoGateOwnerCanonicalKey(cohort, decision);
     const verification = resolveRepoGateOwnerVerification(decision, issue, {
-      canonicalOwnerKey: repoGateOwnerCanonicalKey(cohort, decision),
+      canonicalOwnerKey,
       ownerSource: cohort
     });
     return {
       issue,
+      canonical_owner_key: canonicalOwnerKey,
       action: actionMode,
+      owner_issue_action: cohort?.owner_issue_action ?? null,
       verification,
       verified: isRepoGateOwnerVerified({
         verification,
@@ -1882,7 +1996,9 @@ function resolveRepoGateOwner(decision, ownerActionEvidence) {
   const actionMode = decision?.owner_issue_action?.mode ?? null;
   return {
     issue,
+    canonical_owner_key: repoGateOwnerCanonicalKey(decision?.owner_issue_action, decision),
     action: actionMode,
+    owner_issue_action: decision?.owner_issue_action ?? null,
     verification,
     verified: isRepoGateOwnerVerified({
       verification,
@@ -1900,6 +2016,7 @@ export function buildDocsFreshnessRepoGate(decision) {
   const actionRequiredCount =
     Number(decision?.totals?.registry_blockers ?? 0) +
     Number(decision?.totals?.hard_stale_entries ?? 0) +
+    Number(decision?.totals?.rolling_non_candidate_entries ?? 0) +
     Number(decision?.totals?.unowned_candidate_cohorts ?? 0) +
     Number(decision?.totals?.terminal_lifecycle_entries ?? 0) +
     Number(decision?.totals?.pre_expiry_entries ?? 0) +
@@ -1910,13 +2027,17 @@ export function buildDocsFreshnessRepoGate(decision) {
   const hasLocalBlocker =
     Array.isArray(decision?.blocking_changed_paths) && decision.blocking_changed_paths.length > 0;
   const specGuardFailed = decision?.spec_guard?.status === 'failed';
+  const capacityStatus = decision?.policy_capacity_status?.status;
+  const hasLiveCapacityEntries = Number(decision?.totals?.candidate_entries ?? 0) > 0;
+  const hasCapacityRepoWideBlocker =
+    ['expired', 'over_budget'].includes(capacityStatus) ||
+    (['invalid_policy', 'policy_missing'].includes(capacityStatus) && hasLiveCapacityEntries);
   const hasRepoWideBlocker =
     Number(decision?.totals?.registry_blockers ?? 0) > 0 ||
     Number(decision?.totals?.hard_stale_entries ?? 0) > 0 ||
+    Number(decision?.totals?.rolling_non_candidate_entries ?? 0) > 0 ||
     Number(decision?.totals?.unowned_candidate_cohorts ?? 0) > 0 ||
-    ['expired', 'over_budget', 'invalid_policy', 'policy_missing'].includes(
-      decision?.policy_capacity_status?.status
-    );
+    hasCapacityRepoWideBlocker;
   const hasDiffProofOnlyBlocker =
     freshnessDecision === 'block_diff_local' && !hasLocalBlocker && !specGuardFailed && !hasRepoWideBlocker;
   const blocksUnrelatedLanes =
@@ -1925,6 +2046,12 @@ export function buildDocsFreshnessRepoGate(decision) {
     !hasDiffProofOnlyBlocker &&
     (hasRepoWideBlocker || (!specGuardFailed && freshnessDecision !== 'block_terminal_lifecycle'));
   const owner = resolveRepoGateOwner(decision, ownerActionEvidence);
+  const canonicalOwnerKey =
+    normalizeOptionalString(owner?.canonical_owner_key) ??
+    normalizeOptionalString(decision?.owner_issue_action?.canonical_owner_key) ??
+    normalizeOptionalString(decision?.policy_canonical_owner_key) ??
+    normalizeOptionalString(decision?.fallback_expiry?.canonical_owner_key) ??
+    'docs:freshness:maintain';
 
   return {
     id: REPO_GATE_ID,
@@ -1932,7 +2059,19 @@ export function buildDocsFreshnessRepoGate(decision) {
     freshness_decision: freshnessDecision,
     owner: {
       issue: owner.issue ?? null,
+      active_remediation_issue: owner.issue ?? null,
+      canonical_owner_key: canonicalOwnerKey,
       action: owner.action ?? null,
+      reason:
+        normalizeOptionalString(owner?.owner_issue_action?.reason) ??
+        normalizeOptionalString(decision?.owner_issue_action?.reason) ??
+        normalizeOptionalString(ownerActionEvidence?.reason) ??
+        null,
+      policy_doc:
+        normalizeOptionalString(owner?.owner_issue_action?.policy_doc) ??
+        normalizeOptionalString(decision?.owner_issue_action?.policy_doc) ??
+        null,
+      configured_issue: normalizeOptionalString(owner?.owner_issue_action?.existing_issue) ?? null,
       state: owner.verification?.state?.name ?? owner.verification?.state ?? null,
       state_type:
         owner.verification?.state?.type ??
@@ -1945,18 +2084,31 @@ export function buildDocsFreshnessRepoGate(decision) {
       action_required_count: countSpecGuardActions(decision?.spec_guard)
     },
     capacity: decision?.policy_capacity_status ?? null,
+    capacity_excess: decision?.policy_capacity_status
+      ? {
+          entries: Number(decision.policy_capacity_status.entry_excess ?? 0),
+          cohorts: Number(decision.policy_capacity_status.cohort_excess ?? 0),
+          expired_entries: Number(decision.policy_capacity_status.expired_entries ?? 0)
+        }
+      : null,
+    canonical_owner_key: canonicalOwnerKey,
+    active_remediation_issue: owner.issue ?? null,
     next_expiry: decision?.expires_after ?? null,
     action_required_count: actionRequiredCount,
     blocks_unrelated_lanes: blocksUnrelatedLanes,
     blocks_handoff: blocksHandoff,
+    handoff_blocking: blocksHandoff,
     provider_wip_impact: 'excluded_repo_gate',
     sample_paths: {
       blocking_changed_paths: decision?.sample_paths?.blocking_changed_paths ?? [],
+      candidate_paths: decision?.sample_paths?.candidate_paths ?? [],
       terminal_lifecycle_paths: decision?.sample_paths?.terminal_lifecycle_paths ?? [],
       pre_expiry_paths: decision?.sample_paths?.pre_expiry_paths ?? [],
       spec_guard_pre_expiry_paths: decision?.sample_paths?.spec_guard_pre_expiry_paths ?? [],
       spec_guard_paths: decision?.sample_paths?.spec_guard_paths ?? [],
       hard_stale_paths: decision?.sample_paths?.hard_stale_paths ?? [],
+      rolling_current_action_paths: decision?.sample_paths?.rolling_current_action_paths ?? [],
+      rolling_non_candidate_paths: decision?.sample_paths?.rolling_non_candidate_paths ?? [],
       missing_or_invalid_paths: decision?.sample_paths?.missing_or_invalid_paths ?? []
     }
   };
@@ -2278,9 +2430,22 @@ export function buildDocsFreshnessMaintenanceDecision(
   const normalizedSpecGuard = normalizeSpecGuardPayload(specGuard);
   const staleEntries = Array.isArray(report.stale_entries) ? report.stale_entries : [];
   const rollingEntries = Array.isArray(report.rolling_cohort_entries) ? report.rolling_cohort_entries : [];
-  const terminalLifecycleEntries = Array.isArray(report.terminal_lifecycle_entries)
+  const reportedTerminalLifecycleEntries = Array.isArray(report.terminal_lifecycle_entries)
     ? report.terminal_lifecycle_entries.map(normalizeTerminalLifecycleEntry)
     : [];
+  const terminalTaskStatusLifecycleEntries = [...staleEntries, ...rollingEntries]
+    .filter(needsTerminalTaskStatusLifecycleAction)
+    .map((entry) =>
+      normalizeTerminalLifecycleEntry({
+        ...entry,
+        lifecycle_state: 'terminal_pending_archive',
+        recommended_action: 'archive_or_reclassify_terminal_packet'
+      })
+    );
+  const terminalLifecycleEntries = uniqueTerminalLifecycleEntries([
+    ...reportedTerminalLifecycleEntries,
+    ...terminalTaskStatusLifecycleEntries
+  ]);
   const preExpiryEntries = Array.isArray(report.pre_expiry_entries)
     ? report.pre_expiry_entries.map((entry) => ({
         path: normalizeDocPath(entry?.path),
@@ -2302,8 +2467,12 @@ export function buildDocsFreshnessMaintenanceDecision(
   )
     .map(normalizeSpecGuardPreExpiryEntry)
     .filter(Boolean);
+  const livePolicyStaleEntries = staleEntries.filter(isLivePolicyCapacityEntry);
+  const livePolicyRollingEntries = rollingEntries.filter(isLivePolicyCapacityEntry);
   const hasOwnerRelevantDebtForAction =
-    staleEntries.length > 0 || rollingEntries.length > 0 || normalizedSpecGuard.status === 'failed';
+    livePolicyStaleEntries.length > 0 ||
+    livePolicyRollingEntries.length > 0 ||
+    normalizedSpecGuard.status === 'failed';
   const resolvedOwnerIssueVerification = hasOwnerRelevantDebtForAction
     ? deriveOwnerIssueVerification(policy, ownerIssueVerification)
     : null;
@@ -2311,19 +2480,23 @@ export function buildDocsFreshnessMaintenanceDecision(
     hasOwnerRelevantDebtForAction ? policy : { ...policy, require_live_owner_verification: false },
     resolvedOwnerIssueVerification
   );
-  const blockingCandidateEntries = staleEntries
+  const blockingCandidateEntries = livePolicyStaleEntries
     .filter((entry) => isEligibleHistoricalEntry(entry, policy))
     .map((entry) => normalizeCandidateEntry(entry, policy, 'blocking_candidate'));
-  const ownedRollingEntries = rollingEntries
+  const ownedRollingEntries = livePolicyRollingEntries
     .filter((entry) => isEligibleHistoricalEntry(entry, policy))
     .map((entry) => normalizeCandidateEntry(entry, policy, 'rolling_window'));
   const candidateEntries = [...blockingCandidateEntries, ...ownedRollingEntries];
   const blockingCandidatePaths = new Set(blockingCandidateEntries.map((entry) => entry.path));
   const candidatePaths = new Set(candidateEntries.map((entry) => entry.path));
-  const nonCandidateStaleEntries = staleEntries
+  const nonCandidateStaleEntries = livePolicyStaleEntries
     .filter((entry) => !blockingCandidatePaths.has(normalizeDocPath(entry.path)))
     .map((entry) => normalizeCandidateEntry(entry, policy, 'hard_stale'));
   const hardStaleCurrentEntries = nonCandidateStaleEntries.filter(isCurrentDirectActionDoc);
+  const nonCandidateRollingEntries = livePolicyRollingEntries
+    .filter((entry) => !candidatePaths.has(normalizeDocPath(entry.path)))
+    .map((entry) => normalizeCandidateEntry(entry, policy, 'rolling_non_candidate'));
+  const rollingCurrentActionEntries = nonCandidateRollingEntries.filter(isCurrentDirectActionDoc);
   const candidateCohorts = [
     ...summarizeCandidateCohorts(
       candidateEntries,
@@ -2361,7 +2534,7 @@ export function buildDocsFreshnessMaintenanceDecision(
     Number(report.totals?.missing_on_disk ?? 0) +
     Number(report.totals?.invalid_entries ?? 0) +
     Number(report.totals?.uncatalogued_docs ?? 0);
-  const hasOwnerRelevantDebt = candidateEntries.length > 0 || staleEntries.length > 0;
+  const hasOwnerRelevantDebt = livePolicyStaleEntries.length > 0 || livePolicyRollingEntries.length > 0;
   const hasTerminalLifecycleDebt = terminalLifecycleEntries.length > 0;
 
   let freshnessDecision = 'clean';
@@ -2380,7 +2553,11 @@ export function buildDocsFreshnessMaintenanceDecision(
     freshnessDecision = 'block_policy_expired';
   } else if (policyCapacityStatus.status === 'over_budget') {
     freshnessDecision = 'block_policy_over_budget';
-  } else if (unownedCandidateCohorts.length > 0 || nonCandidateStaleEntries.length > 0) {
+  } else if (
+    unownedCandidateCohorts.length > 0 ||
+    nonCandidateStaleEntries.length > 0 ||
+    nonCandidateRollingEntries.length > 0
+  ) {
     freshnessDecision = 'block_unowned_repo_debt';
   } else if (candidateEntries.length > 0 && ownedCandidateEntries > 0) {
     freshnessDecision = 'pass_with_owned_rolling_debt';
@@ -2441,6 +2618,18 @@ export function buildDocsFreshnessMaintenanceDecision(
         overdue_days: entry.overdue_days,
         direct_action_required: true,
         rolling_deferral_eligible: false
+      })),
+      ...rollingCurrentActionEntries.map((entry) => ({
+        type: 'rolling_current_action_review',
+        path: entry.path,
+        doc_class: entry.doc_class,
+        doc_class_label: entry.doc_class_label,
+        last_review: entry.last_review,
+        cadence_days: entry.cadence_days,
+        age_days: entry.age_days,
+        overdue_days: entry.overdue_days,
+        direct_action_required: true,
+        rolling_deferral_eligible: false
       }))
     ],
     blocking_changed_paths: blockingChangedPaths,
@@ -2490,6 +2679,8 @@ export function buildDocsFreshnessMaintenanceDecision(
       spec_guard_pre_expiry_paths: normalizedSpecGuardPreExpiryEntries.slice(0, 10).map((entry) => entry.path),
       spec_guard_paths: collectSpecGuardFailurePaths(normalizedSpecGuard).slice(0, 10),
       hard_stale_paths: nonCandidateStaleEntries.slice(0, 10).map((entry) => entry.path),
+      rolling_current_action_paths: rollingCurrentActionEntries.slice(0, 10).map((entry) => entry.path),
+      rolling_non_candidate_paths: nonCandidateRollingEntries.slice(0, 10).map((entry) => entry.path),
       missing_or_invalid_paths: registryFailurePaths.slice(0, 10)
     },
     totals: {
@@ -2509,6 +2700,8 @@ export function buildDocsFreshnessMaintenanceDecision(
         (cohort) => Number(cohort?.source_breakdown?.spec_guard ?? 0) > 0
       ).length,
       hard_stale_entries: nonCandidateStaleEntries.length,
+      rolling_non_candidate_entries: nonCandidateRollingEntries.length,
+      rolling_current_action_entries: rollingCurrentActionEntries.length,
       registry_blockers: registryBlockerCount,
       missing_in_registry: report.totals?.missing_in_registry ?? 0,
       missing_on_disk: report.totals?.missing_on_disk ?? 0,

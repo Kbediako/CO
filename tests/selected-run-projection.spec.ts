@@ -442,7 +442,10 @@ describe('createSelectedRunProjectionReader', () => {
           freshness_decision: 'block_policy_over_budget',
           owner: {
             issue: 'CO-522',
+            active_remediation_issue: 'CO-522',
+            canonical_owner_key: 'docs:freshness:maintain',
             action: 'update_existing',
+            reason: 'canonical_owner_key_match',
             state: 'Blocked',
             state_type: 'started',
             verified: true
@@ -454,12 +457,27 @@ describe('createSelectedRunProjectionReader', () => {
           capacity: {
             status: 'over_budget',
             current_entries: 741,
-            max_entries: 300
+            max_entries: 300,
+            current_cohorts: 11,
+            max_cohorts: 2,
+            expired_entries: 0,
+            entry_excess: 441,
+            cohort_excess: 9,
+            over_entry_budget: true,
+            over_cohort_budget: true
           },
+          capacity_excess: {
+            entries: 441,
+            cohorts: 9,
+            expired_entries: 0
+          },
+          canonical_owner_key: 'docs:freshness:maintain',
+          active_remediation_issue: 'CO-522',
           next_expiry: '2026-05-20',
           action_required_count: 33,
           blocks_unrelated_lanes: true,
           blocks_handoff: true,
+          handoff_blocking: true,
           provider_wip_impact: 'excluded_repo_gate'
         }
       },
@@ -475,8 +493,31 @@ describe('createSelectedRunProjectionReader', () => {
     expect(uiDataset.counts.running).toBe(0);
     expect(uiDataset.repo_gates?.docs_freshness_maintain).toMatchObject({
       severity: 'blocking',
-      owner: { issue: 'CO-522' },
+      owner: {
+        issue: 'CO-522',
+        active_remediation_issue: 'CO-522',
+        canonical_owner_key: 'docs:freshness:maintain'
+      },
       action_required_count: 33,
+      capacity: {
+        status: 'over_budget',
+        current_entries: 741,
+        max_entries: 300,
+        entry_excess: 441,
+        current_cohorts: 11,
+        max_cohorts: 2,
+        cohort_excess: 9,
+        expired_entries: 0
+      },
+      capacity_excess: {
+        entries: 441,
+        cohorts: 9,
+        expired_entries: 0
+      },
+      canonical_owner_key: 'docs:freshness:maintain',
+      active_remediation_issue: 'CO-522',
+      blocks_handoff: true,
+      handoff_blocking: true,
       provider_wip_impact: 'excluded_repo_gate'
     });
   });

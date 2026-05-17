@@ -936,6 +936,176 @@ describe('docs freshness reporting', () => {
     expect(report.totals.terminal_lifecycle_entries).toBe(0);
   });
 
+  it('keeps archived rows with closed task status out of active docs freshness debt', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-archived-closed-task-status-'));
+    createdDirs.push(repoRoot);
+    const packetPath = 'tasks/tasks-1234-closed.md';
+
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(join(repoRoot, packetPath), '# Closed Packet\n', 'utf8');
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: packetPath,
+          owner: 'Codex',
+          status: 'archived',
+          lifecycle_state: 'archived',
+          task_status: 'closed',
+          last_review: reviewDateDaysAgo(31),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [{ glob: 'tasks/**/*.md', doc_class: 'task_packet' }],
+      catalogPolicies: {
+        rolling_freshness_cohorts: rollingFreshnessPolicy({ max_entries: 300 })
+      }
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(false);
+    expect(report.totals.stale_entries).toBe(0);
+    expect(report.totals.rolling_cohort_entries).toBe(0);
+    expect(report.totals.terminal_lifecycle_entries).toBe(0);
+  });
+
+  it('routes fresh active registry-only terminal task status rows to terminal lifecycle action', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-active-terminal-task-status-fresh-'));
+    createdDirs.push(repoRoot);
+    const packetPath = 'tasks/tasks-1234-closed.md';
+
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(join(repoRoot, packetPath), '# Closed Packet\n', 'utf8');
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: packetPath,
+          owner: 'Codex',
+          status: 'active',
+          task_status: 'closed',
+          last_review: reviewDateDaysAgo(1),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [{ glob: 'tasks/**/*.md', doc_class: 'task_packet' }],
+      catalogPolicies: {
+        rolling_freshness_cohorts: rollingFreshnessPolicy({ max_entries: 300 })
+      }
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.stale_entries).toBe(0);
+    expect(report.totals.rolling_cohort_entries).toBe(0);
+    expect(report.totals.terminal_lifecycle_entries).toBe(1);
+    expect(report.terminal_lifecycle_entries).toEqual([
+      expect.objectContaining({
+        path: packetPath,
+        registry_status: 'active',
+        task_status: 'closed',
+        status: 'closed',
+        lifecycle_state: 'terminal_pending_archive',
+        overdue_days: 0,
+        recommended_action: 'archive_or_reclassify_terminal_packet'
+      })
+    ]);
+  });
+
+  it('keeps overdue active registry-only terminal task status rows out of rolling capacity', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-active-terminal-task-status-overdue-'));
+    createdDirs.push(repoRoot);
+    const packetPath = 'tasks/tasks-1234-completed.md';
+
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(join(repoRoot, packetPath), '# Completed Packet\n', 'utf8');
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: packetPath,
+          owner: 'Codex',
+          status: 'active',
+          task_status: 'completed',
+          last_review: reviewDateDaysAgo(31),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [{ glob: 'tasks/**/*.md', doc_class: 'task_packet' }],
+      catalogPolicies: {
+        rolling_freshness_cohorts: rollingFreshnessPolicy({ max_entries: 300 })
+      }
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.stale_entries).toBe(0);
+    expect(report.totals.rolling_cohort_entries).toBe(0);
+    expect(report.totals.terminal_lifecycle_entries).toBe(1);
+    expect(report.terminal_lifecycle_entries).toEqual([
+      expect.objectContaining({
+        path: packetPath,
+        registry_status: 'active',
+        task_status: 'completed',
+        status: 'completed',
+        lifecycle_state: 'terminal_pending_archive',
+        overdue_days: 1,
+        recommended_action: 'archive_or_reclassify_terminal_packet'
+      })
+    ]);
+  });
+
+  it('keeps archived rows with explicit nonterminal task status in live rolling freshness input', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-archived-nonterminal-'));
+    createdDirs.push(repoRoot);
+    const packetPath = 'tasks/tasks-1234-nonterminal.md';
+
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(join(repoRoot, packetPath), '# Nonterminal Packet\n', 'utf8');
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: packetPath,
+          owner: 'Codex',
+          status: 'archived',
+          task_status: 'in-progress',
+          last_review: reviewDateDaysAgo(31),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [{ glob: 'tasks/**/*.md', doc_class: 'task_packet' }],
+      catalogPolicies: {
+        rolling_freshness_cohorts: rollingFreshnessPolicy({ max_entries: 300 })
+      }
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(false);
+    expect(report.totals.stale_entries).toBe(0);
+    expect(report.totals.rolling_cohort_entries).toBe(1);
+    expect(report.rolling_cohort_entries).toEqual([
+      expect.objectContaining({
+        path: packetPath,
+        registry_status: 'archived',
+        task_status: 'in-progress',
+        baseline_cohort_id: 'fixture-rolling-baseline'
+      })
+    ]);
+  });
+
   it('routes slug-only docs packet rows when terminal task keys carry numeric prefixes', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-slug-only-terminal-lifecycle-'));
     createdDirs.push(repoRoot);

@@ -896,6 +896,42 @@ function formatRepoGateSeverity(severity) {
     .join(' ');
 }
 
+function formatDocsFreshnessCapacity(capacity) {
+  if (!capacity?.status) {
+    return null;
+  }
+  const toFiniteNumber = (value) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
+  };
+  const currentEntries = toFiniteNumber(capacity.current_entries);
+  const maxEntries = toFiniteNumber(capacity.max_entries);
+  const entryExcess = toFiniteNumber(capacity.entry_excess) ?? 0;
+  const currentCohorts = toFiniteNumber(capacity.current_cohorts);
+  const maxCohorts = toFiniteNumber(capacity.max_cohorts);
+  const cohortExcess = toFiniteNumber(capacity.cohort_excess) ?? 0;
+  const expiredEntries = toFiniteNumber(capacity.expired_entries);
+  const parts = [`capacity ${capacity.status}`];
+  if (currentEntries !== null || maxEntries !== null) {
+    parts.push(
+      `entries ${formatNullableNumber(currentEntries)}/${formatNullableNumber(maxEntries)}${
+        entryExcess > 0 ? ` (+${entryExcess})` : ''
+      }`
+    );
+  }
+  if (currentCohorts !== null || maxCohorts !== null) {
+    parts.push(
+      `cohorts ${formatNullableNumber(currentCohorts)}/${formatNullableNumber(maxCohorts)}${
+        cohortExcess > 0 ? ` (+${cohortExcess})` : ''
+      }`
+    );
+  }
+  if (expiredEntries !== null) {
+    parts.push(`expired ${formatNullableNumber(expiredEntries)}`);
+  }
+  return parts.join(' ');
+}
+
 function summarizeDocsFreshnessGate(gate) {
   const parts = [];
   if (gate.evidence_status && gate.evidence_status !== 'fresh') {
@@ -908,11 +944,15 @@ function summarizeDocsFreshnessGate(gate) {
   if (gate.owner?.issue) {
     parts.push(`owner ${gate.owner.issue}`);
   }
+  if (gate.owner?.canonical_owner_key || gate.canonical_owner_key) {
+    parts.push(`canonical ${gate.owner?.canonical_owner_key ?? gate.canonical_owner_key}`);
+  }
   if (gate.spec_guard?.status) {
     parts.push(`spec ${gate.spec_guard.status}`);
   }
-  if (gate.capacity?.status) {
-    parts.push(`capacity ${gate.capacity.status}`);
+  const capacitySummary = formatDocsFreshnessCapacity(gate.capacity);
+  if (capacitySummary) {
+    parts.push(capacitySummary);
   }
   if (gate.next_expiry) {
     parts.push(`next ${gate.next_expiry}`);
