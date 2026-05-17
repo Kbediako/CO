@@ -15,6 +15,14 @@ CO-553 clears `docs:freshness:maintain` capacity debt by reducing or correctly c
 - `policy_capacity_status` exposes entry/cohort counts, excess counts, expired entries, and boolean over-budget flags.
 - `co-status` keeps the repo-wide docs freshness gate visible and distinguishes owner, handoff blocking, terminal lifecycle paths, and blocking changed paths.
 
+## CO-382 Fallback Decision Table
+Large-refactor check: CO-553 stays scoped to docs freshness capacity/actionability while CO-552 owns the broader owner/reconciler architecture.
+Minor-seam decision: the bounded seam change is acceptable because it removes hidden/non-actionable freshness debt rather than adding a retained fallback.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `docs:freshness:maintain` capacity/actionability | Historical capacity and rolling-current actionability seam that let rows look clean or non-actionable under owner/capacity routing | remove fallback | CO-553 | Current direct-action docs and non-candidate rolling rows can hide or block without path/action evidence. | 2026-05-17 | 2026-05-17 | N/A after removal | Live capacity classification surfaces stale current docs and rolling non-candidate current docs as blocking action evidence. | `npx vitest run --config vitest.config.core.ts tests/docs-freshness-maintain.spec.ts`; parent stale/rolling probe; `node scripts/spec-guard.mjs --dry-run`; `npm run build`. |
+
 ## Non-Goals
 - No CO-522 terminal transition.
 - No policy cap increase.

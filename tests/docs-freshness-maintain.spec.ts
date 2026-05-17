@@ -3728,6 +3728,80 @@ last_review: ${lastReview}
     );
   });
 
+  it('surfaces non-candidate rolling current docs as direct-action debt', () => {
+    const currentDocPath = 'docs/book/operations.md';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          stale_entries: 0,
+          rolling_cohort_entries: 1,
+          terminal_lifecycle_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [],
+        rolling_cohort_entries: [
+          staleTaskPacketEntry({
+            path: currentDocPath,
+            doc_class: 'public_guide',
+            doc_class_label: 'Public Guide',
+            path_family: 'docs/book',
+            task_number: null,
+            task_status: 'completed'
+          })
+        ],
+        terminal_lifecycle_entries: [],
+        rolling_freshness_policy: rollingFreshnessPolicy()
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'provided',
+        specGuard: { status: 'succeeded' }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_unowned_repo_debt');
+    expect(decision.totals).toEqual(
+      expect.objectContaining({
+        candidate_entries: 0,
+        hard_stale_entries: 0,
+        rolling_non_candidate_entries: 1,
+        rolling_current_action_entries: 1,
+        terminal_lifecycle_entries: 0
+      })
+    );
+    expect(decision.public_current_actions).toEqual([
+      expect.objectContaining({
+        type: 'rolling_current_action_review',
+        path: currentDocPath,
+        doc_class: 'public_guide',
+        direct_action_required: true,
+        rolling_deferral_eligible: false
+      })
+    ]);
+    expect(decision.sample_paths).toEqual(
+      expect.objectContaining({
+        hard_stale_paths: [],
+        rolling_current_action_paths: [currentDocPath],
+        rolling_non_candidate_paths: [currentDocPath],
+        terminal_lifecycle_paths: []
+      })
+    );
+    expect(decision.repo_gate).toMatchObject({
+      action_required_count: 1,
+      blocks_handoff: true,
+      sample_paths: {
+        rolling_current_action_paths: [currentDocPath],
+        rolling_non_candidate_paths: [currentDocPath]
+      }
+    });
+  });
+
   it('does not route excluded historical-only stale rows through invalid live-owner policy checks', () => {
     const archivedPath = 'tasks/tasks-1165-archived.md';
     const historicalPath = 'tasks/tasks-1166-historical-stub.md';

@@ -12,6 +12,12 @@
 - Fallback / refactor decision: this task removes stale historical rows from live capacity classification and removes the status anatomy opacity seam; no retained fallback is introduced.
 - Durable retention evidence: archived packet rows keep history on disk and record archive metadata in the freshness registry.
 - Large-refactor check: long-term owner identity split is deferred because CO-553 can clear the concrete policy capacity blocker without widening into owner architecture.
+- Minor-seam decision: the bounded seam change is acceptable because it removes hidden/non-actionable freshness debt rather than adding a retained fallback.
+
+## CO-382 Fallback Decision Table
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `docs:freshness:maintain` capacity/actionability | Historical capacity and rolling-current actionability seam that let rows look clean or non-actionable under owner/capacity routing | remove fallback | CO-553 | Current direct-action docs and non-candidate rolling rows can hide or block without path/action evidence. | 2026-05-17 | 2026-05-17 | N/A after removal | Live capacity classification surfaces stale current docs and rolling non-candidate current docs as blocking action evidence. | `npx vitest run --config vitest.config.core.ts tests/docs-freshness-maintain.spec.ts`; parent stale/rolling probe; `node scripts/spec-guard.mjs --dry-run`; `npm run build`. |
 
 ## Milestones & Sequencing
 1. Reproduce baseline `block_policy_over_budget` and capture counts.

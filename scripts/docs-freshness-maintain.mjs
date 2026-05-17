@@ -2026,6 +2026,7 @@ export function buildDocsFreshnessRepoGate(decision) {
   const actionRequiredCount =
     Number(decision?.totals?.registry_blockers ?? 0) +
     Number(decision?.totals?.hard_stale_entries ?? 0) +
+    Number(decision?.totals?.rolling_non_candidate_entries ?? 0) +
     Number(decision?.totals?.unowned_candidate_cohorts ?? 0) +
     Number(decision?.totals?.terminal_lifecycle_entries ?? 0) +
     Number(decision?.totals?.pre_expiry_entries ?? 0) +
@@ -2044,6 +2045,7 @@ export function buildDocsFreshnessRepoGate(decision) {
   const hasRepoWideBlocker =
     Number(decision?.totals?.registry_blockers ?? 0) > 0 ||
     Number(decision?.totals?.hard_stale_entries ?? 0) > 0 ||
+    Number(decision?.totals?.rolling_non_candidate_entries ?? 0) > 0 ||
     Number(decision?.totals?.unowned_candidate_cohorts ?? 0) > 0 ||
     hasCapacityRepoWideBlocker;
   const hasDiffProofOnlyBlocker =
@@ -2115,6 +2117,8 @@ export function buildDocsFreshnessRepoGate(decision) {
       spec_guard_pre_expiry_paths: decision?.sample_paths?.spec_guard_pre_expiry_paths ?? [],
       spec_guard_paths: decision?.sample_paths?.spec_guard_paths ?? [],
       hard_stale_paths: decision?.sample_paths?.hard_stale_paths ?? [],
+      rolling_current_action_paths: decision?.sample_paths?.rolling_current_action_paths ?? [],
+      rolling_non_candidate_paths: decision?.sample_paths?.rolling_non_candidate_paths ?? [],
       missing_or_invalid_paths: decision?.sample_paths?.missing_or_invalid_paths ?? []
     }
   };
@@ -2499,6 +2503,10 @@ export function buildDocsFreshnessMaintenanceDecision(
     .filter((entry) => !blockingCandidatePaths.has(normalizeDocPath(entry.path)))
     .map((entry) => normalizeCandidateEntry(entry, policy, 'hard_stale'));
   const hardStaleCurrentEntries = nonCandidateStaleEntries.filter(isCurrentDirectActionDoc);
+  const nonCandidateRollingEntries = livePolicyRollingEntries
+    .filter((entry) => !candidatePaths.has(normalizeDocPath(entry.path)))
+    .map((entry) => normalizeCandidateEntry(entry, policy, 'rolling_non_candidate'));
+  const rollingCurrentActionEntries = nonCandidateRollingEntries.filter(isCurrentDirectActionDoc);
   const candidateCohorts = [
     ...summarizeCandidateCohorts(
       candidateEntries,
@@ -2555,7 +2563,11 @@ export function buildDocsFreshnessMaintenanceDecision(
     freshnessDecision = 'block_policy_expired';
   } else if (policyCapacityStatus.status === 'over_budget') {
     freshnessDecision = 'block_policy_over_budget';
-  } else if (unownedCandidateCohorts.length > 0 || nonCandidateStaleEntries.length > 0) {
+  } else if (
+    unownedCandidateCohorts.length > 0 ||
+    nonCandidateStaleEntries.length > 0 ||
+    nonCandidateRollingEntries.length > 0
+  ) {
     freshnessDecision = 'block_unowned_repo_debt';
   } else if (candidateEntries.length > 0 && ownedCandidateEntries > 0) {
     freshnessDecision = 'pass_with_owned_rolling_debt';
@@ -2616,6 +2628,18 @@ export function buildDocsFreshnessMaintenanceDecision(
         overdue_days: entry.overdue_days,
         direct_action_required: true,
         rolling_deferral_eligible: false
+      })),
+      ...rollingCurrentActionEntries.map((entry) => ({
+        type: 'rolling_current_action_review',
+        path: entry.path,
+        doc_class: entry.doc_class,
+        doc_class_label: entry.doc_class_label,
+        last_review: entry.last_review,
+        cadence_days: entry.cadence_days,
+        age_days: entry.age_days,
+        overdue_days: entry.overdue_days,
+        direct_action_required: true,
+        rolling_deferral_eligible: false
       }))
     ],
     blocking_changed_paths: blockingChangedPaths,
@@ -2665,6 +2689,8 @@ export function buildDocsFreshnessMaintenanceDecision(
       spec_guard_pre_expiry_paths: normalizedSpecGuardPreExpiryEntries.slice(0, 10).map((entry) => entry.path),
       spec_guard_paths: collectSpecGuardFailurePaths(normalizedSpecGuard).slice(0, 10),
       hard_stale_paths: nonCandidateStaleEntries.slice(0, 10).map((entry) => entry.path),
+      rolling_current_action_paths: rollingCurrentActionEntries.slice(0, 10).map((entry) => entry.path),
+      rolling_non_candidate_paths: nonCandidateRollingEntries.slice(0, 10).map((entry) => entry.path),
       missing_or_invalid_paths: registryFailurePaths.slice(0, 10)
     },
     totals: {
@@ -2684,6 +2710,8 @@ export function buildDocsFreshnessMaintenanceDecision(
         (cohort) => Number(cohort?.source_breakdown?.spec_guard ?? 0) > 0
       ).length,
       hard_stale_entries: nonCandidateStaleEntries.length,
+      rolling_non_candidate_entries: nonCandidateRollingEntries.length,
+      rolling_current_action_entries: rollingCurrentActionEntries.length,
       registry_blockers: registryBlockerCount,
       missing_in_registry: report.totals?.missing_in_registry ?? 0,
       missing_on_disk: report.totals?.missing_on_disk ?? 0,
