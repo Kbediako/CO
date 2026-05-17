@@ -29,7 +29,12 @@ export interface DocsFreshnessMaintainRepoGatePayload {
   freshness_decision: string;
   owner: {
     issue: string | null;
+    active_remediation_issue?: string | null;
+    canonical_owner_key?: string | null;
     action: string | null;
+    reason?: string | null;
+    policy_doc?: string | null;
+    configured_issue?: string | null;
     state: string | null;
     state_type: string | null;
     verified: boolean;
@@ -39,10 +44,14 @@ export interface DocsFreshnessMaintainRepoGatePayload {
     action_required_count: number;
   };
   capacity: Record<string, unknown> | null;
+  capacity_excess?: Record<string, unknown> | null;
+  canonical_owner_key?: string | null;
+  active_remediation_issue?: string | null;
   next_expiry: string | null;
   action_required_count: number;
   blocks_unrelated_lanes: boolean;
   blocks_handoff: boolean;
+  handoff_blocking?: boolean;
   provider_wip_impact: 'excluded_repo_gate';
   sample_paths?: Record<string, unknown>;
   source_path?: string;
@@ -122,7 +131,12 @@ export function normalizeDocsFreshnessMaintainRepoGate(
     freshness_decision: readString(record.freshness_decision),
     owner: {
       issue: readNullableString(owner.issue),
+      active_remediation_issue: readNullableString(owner.active_remediation_issue),
+      canonical_owner_key: readNullableString(owner.canonical_owner_key),
       action: readNullableString(owner.action),
+      reason: readNullableString(owner.reason),
+      policy_doc: readNullableString(owner.policy_doc),
+      configured_issue: readNullableString(owner.configured_issue),
       state: readNullableString(owner.state),
       state_type: readNullableString(owner.state_type),
       verified: readBoolean(owner.verified)
@@ -132,10 +146,17 @@ export function normalizeDocsFreshnessMaintainRepoGate(
       action_required_count: readNonNegativeInteger(specGuard.action_required_count)
     },
     capacity: readRecord(record.capacity),
+    capacity_excess: readRecord(record.capacity_excess),
+    canonical_owner_key: readNullableString(record.canonical_owner_key),
+    active_remediation_issue: readNullableString(record.active_remediation_issue),
     next_expiry: readNullableString(record.next_expiry),
     action_required_count: readNonNegativeInteger(record.action_required_count),
     blocks_unrelated_lanes: readBoolean(record.blocks_unrelated_lanes),
     blocks_handoff: readBoolean(record.blocks_handoff),
+    handoff_blocking:
+      typeof record.handoff_blocking === 'boolean'
+        ? record.handoff_blocking
+        : readBoolean(record.blocks_handoff),
     provider_wip_impact: 'excluded_repo_gate',
     ...(samplePaths ? { sample_paths: samplePaths } : {}),
     ...(sourcePath ? { source_path: sourcePath } : {})

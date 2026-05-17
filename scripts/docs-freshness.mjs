@@ -21,6 +21,8 @@ import {
   buildTaskPacketLifecycleIndex,
   classifyTaskPacketPathFamily,
   collectTaskIndexItems,
+  isTaskPacketLifecyclePath,
+  isTerminalTaskStatus,
   normalizeDocPath,
   PRESERVED_HISTORICAL_STUB_STATUS,
   TERMINAL_PENDING_ARCHIVE_STATUS
@@ -71,6 +73,25 @@ function normalizeOwner(value) {
     return '';
   }
   return value.trim();
+}
+
+function normalizeRegistryTaskStatus(entry) {
+  for (const key of ['task_status', 'task_lifecycle_status', 'lifecycle_status']) {
+    const value = entry?.[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim().toLowerCase();
+    }
+  }
+  return null;
+}
+
+function hasExplicitNonTerminalTaskStatus(entry) {
+  const taskStatus = normalizeRegistryTaskStatus(entry);
+  return Boolean(taskStatus && !isTerminalTaskStatus(taskStatus));
+}
+
+function isStaleEligibleRegistryEntry(status, entry) {
+  return STALE_ELIGIBLE_STATUSES.has(status) || hasExplicitNonTerminalTaskStatus(entry);
 }
 
 function isApprovedPreservedHistoricalStubPath(docPath) {
@@ -174,6 +195,24 @@ function explicitTerminalPendingLifecycle(status, entryPath) {
     task_key: null,
     title: null,
     status: null,
+    completed_at: null,
+    source_issue: null
+  };
+}
+
+function explicitTerminalTaskStatusLifecycle(taskStatus, entryPath) {
+  if (!entryPath || !isTerminalTaskStatus(taskStatus) || !isTaskPacketLifecyclePath(entryPath)) {
+    return null;
+  }
+  return {
+    path: entryPath,
+    path_family: classifyTaskPacketPathFamily(entryPath),
+    lifecycle_state: TERMINAL_PENDING_ARCHIVE_STATUS,
+    recommended_action: 'archive_or_reclassify_terminal_packet',
+    task_id: null,
+    task_key: null,
+    title: null,
+    status: taskStatus,
     completed_at: null,
     source_issue: null
   };
@@ -684,6 +723,8 @@ export async function runDocsFreshness(
     const entryPath = normalizeDocPath(entry?.path);
     const owner = normalizeOwner(entry?.owner);
     const status = typeof entry?.status === 'string' ? entry.status : '';
+    const taskStatus = normalizeRegistryTaskStatus(entry);
+    const explicitNonTerminalTaskStatus = hasExplicitNonTerminalTaskStatus(entry);
     const cadenceDays = Number.isFinite(entry?.cadence_days) ? Number(entry.cadence_days) : NaN;
     const reviewDate = parseIsoDate(entry?.last_review);
     const docClass = classifyPath(entryPath, docsCatalog);
@@ -711,7 +752,7 @@ export async function runDocsFreshness(
       issues.push('invalid last_review');
     }
 
-    if (OWNER_REQUIRED_STATUSES.has(status)) {
+    if (OWNER_REQUIRED_STATUSES.has(status) || explicitNonTerminalTaskStatus) {
       if (!owner || OWNER_PLACEHOLDERS.has(owner.toLowerCase())) {
         issues.push('missing owner');
       }
@@ -741,11 +782,20 @@ export async function runDocsFreshness(
     }
 
     if (reviewDate && Number.isInteger(cadenceDays) && cadenceDays > 0) {
-      if (STALE_ELIGIBLE_STATUSES.has(status)) {
+      if (isStaleEligibleRegistryEntry(status, entry)) {
         const ageDays = computeAgeInDays(reviewDate, today);
         const daysUntilExpiry = cadenceDays - ageDays;
         const terminalLifecycle =
-          lifecycleIndex.byPath.get(entryPath) ?? explicitTerminalPendingLifecycle(status, entryPath);
+          lifecycleIndex.byPath.get(entryPath) ??
+          explicitTerminalPendingLifecycle(status, entryPath) ??
+          explicitTerminalTaskStatusLifecycle(taskStatus, entryPath);
+        const registryLifecycleMetadata = {
+          ...(STALE_ELIGIBLE_STATUSES.has(status) ? {} : { registry_status: status }),
+          ...(taskStatus ? { task_status: taskStatus } : {}),
+          ...(typeof entry?.lifecycle_state === 'string' && entry.lifecycle_state.trim()
+            ? { lifecycle_state: entry.lifecycle_state.trim() }
+            : {})
+        };
         if (
           STRICT_PRE_EXPIRY_DOC_CLASSES.has(docClass || '') &&
           daysUntilExpiry >= 0 &&
@@ -762,7 +812,8 @@ export async function runDocsFreshness(
             doc_class_label: docClassLabel,
             path_family: classifyPathFamily(entryPath),
             direct_action_required: true,
-            rolling_deferral_eligible: false
+            rolling_deferral_eligible: false,
+            ...registryLifecycleMetadata
           });
         }
         if (terminalLifecycle) {
@@ -776,6 +827,7 @@ export async function runDocsFreshness(
             doc_class_label: docClassLabel,
             path_family: classifyPathFamily(entryPath),
             task_number: extractTaskNumber(entryPath),
+            ...registryLifecycleMetadata,
             ...terminalLifecycle,
             registry_status: status,
             lifecycle_state: TERMINAL_PENDING_ARCHIVE_STATUS,
@@ -792,7 +844,8 @@ export async function runDocsFreshness(
             doc_class: docClass || 'uncatalogued',
             doc_class_label: docClassLabel,
             path_family: classifyPathFamily(entryPath),
-            task_number: extractTaskNumber(entryPath)
+            task_number: extractTaskNumber(entryPath),
+            ...registryLifecycleMetadata
           });
         }
       }

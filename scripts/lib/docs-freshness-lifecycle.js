@@ -9,7 +9,10 @@ export const TERMINAL_TASK_STATUSES = new Set([
   'completed',
   'done',
   'canceled',
-  'cancelled'
+  'cancelled',
+  'closed',
+  'duplicate',
+  'merged'
 ]);
 
 export const TASK_PACKET_PATH_FAMILIES = new Set([

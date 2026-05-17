@@ -1,6 +1,128 @@
 {
   "items": [
     {
+      "id": "20260517-linear-8826c2fa-3160-4fa3-bfcb-eaa0c0b9d6f1",
+      "title": "CO-553 eliminate docs freshness policy capacity over-budget debt",
+      "relates_to": "tasks/tasks-linear-8826c2fa-3160-4fa3-bfcb-eaa0c0b9d6f1.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "implementation_complete_pr_pending",
+      "last_review": "2026-05-17",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO orchestrator",
+          "date": "2026-05-17",
+          "status": "confirmed_in_progress",
+          "summary": "Live issue-context showed CO-553 Ready with no attached PR and no workpad; moved to In Progress before active coding."
+        },
+        "parallelization": {
+          "reviewer": "CO orchestrator",
+          "date": "2026-05-17",
+          "status": "parallelize_now",
+          "summary": "Same-issue capacity-tests child lane owned tests/docs-freshness-maintain.spec.ts and completed successfully; parent imported the validated patch after a stale accept guard caused by the parent workpad update."
+        },
+        "baseline": {
+          "reviewer": "CO orchestrator",
+          "date": "2026-05-17",
+          "status": "reproduced",
+          "summary": "docs:freshness:maintain reported block_policy_over_budget with current_entries=470, max_entries=300, current_cohorts=37, max_cohorts=2, expired_entries=0, and owner CO-522."
+        },
+        "docs_packet": {
+          "reviewer": "CO orchestrator",
+          "date": "2026-05-17",
+          "status": "created_before_parent_implementation",
+          "summary": "Created the CO-553 docs-first packet before parent-owned classifier/status/registry edits."
+        },
+        "local_validation": {
+          "reviewer": "CO orchestrator",
+          "date": "2026-05-17",
+          "status": "clean",
+          "summary": "Focused freshness/status tests, full core test suite, docs:freshness:maintain --check, docs:freshness, spec-guard, docs:check, repo:stewardship, diff-budget override, pack:smoke, and current local-code co-status proof passed after the stale and rolling terminal task-status lifecycle fixes; the full gate set reran clean after review-waiver metadata update with npm run test passing 360 files / 5875 tests."
+        },
+        "elegance_review": {
+          "reviewer": "CO orchestrator",
+          "date": "2026-05-17",
+          "status": "complete",
+          "summary": "Post-implementation minimality review kept the targeted classifier/status/registry approach; no cap increase, gate weakening, historical deletion, or broad owner-model refactor was added."
+        },
+        "standalone_review": {
+          "reviewer": "CO orchestrator",
+          "date": "2026-05-17",
+          "status": "break_glass_manual_clean",
+          "summary": "Three final wrapper-led review passes reported no actionable/concrete correctness regressions and finding_count=0, but semantic telemetry stayed review_verdict=unknown; waiver expires 2026-05-24 and is removable once a PR-head review reports review_verdict=clean or the parser is fixed and rerun."
+        }
+      },
+      "validation": {
+        "status": "implementation_complete_pr_pending",
+        "passed": [
+          "live issue-context read",
+          "workpad creation",
+          "parallelization decision",
+          "capacity-tests child-lane patch imported",
+          "baseline docs freshness maintenance reproduction",
+          "docs-first packet registered",
+          "standalone review P1 terminal task-status lifecycle fixes addressed for stale and rolling rows",
+          "focused docs freshness maintain/status tests",
+          "docs:freshness:maintain --check --format json clean",
+          "npm run docs:freshness",
+          "node scripts/spec-guard.mjs --dry-run",
+          "npm run docs:check",
+          "npm run build",
+          "npm run lint",
+          "npm run test",
+          "npm run repo:stewardship",
+          "node scripts/diff-budget.mjs with CO-553 override",
+          "npm run pack:smoke",
+          "current local-code co-status proof",
+          "elegance review",
+          "standalone review waiver plus manual correctness/regression/missing-tests review"
+        ],
+        "pending": [
+          "PR handoff"
+        ],
+        "blocked": [],
+        "waivers": [
+          {
+            "type": "standalone_review_semantic_verdict_unknown",
+            "owner": "CO-553 provider worker / Codex",
+            "trigger": "codex-orchestrator review produced clean-in-substance outputs with finding_count=0 but review_verdict=unknown",
+            "introduced_date": "2026-05-17",
+            "review_date": "2026-05-17",
+            "maximum_lifetime_days": 7,
+            "expires_at": "2026-05-24",
+            "removal_condition": "Rerun manifest-backed standalone review on the PR head and remove this waiver once telemetry reports review_verdict=clean, or land a reviewed parser fix and rerun cleanly.",
+            "reason": "Review-wrapper semantic verdict classification failed despite no actionable findings; using the lane-approved break-glass path is narrower than expanding CO-553 into review-wrapper parser changes.",
+            "evidence": "out/linear-8826c2fa-3160-4fa3-bfcb-eaa0c0b9d6f1/manual/standalone-review-waiver.md"
+          }
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-8826c2fa-3160-4fa3-bfcb-eaa0c0b9d6f1.md",
+        "prd": "docs/PRD-linear-8826c2fa-3160-4fa3-bfcb-eaa0c0b9d6f1.md",
+        "docs": "docs/TECH_SPEC-linear-8826c2fa-3160-4fa3-bfcb-eaa0c0b9d6f1.md",
+        "action_plan": "docs/ACTION_PLAN-linear-8826c2fa-3160-4fa3-bfcb-eaa0c0b9d6f1.md",
+        "spec": "tasks/specs/linear-8826c2fa-3160-4fa3-bfcb-eaa0c0b9d6f1.md",
+        "task": "tasks/tasks-linear-8826c2fa-3160-4fa3-bfcb-eaa0c0b9d6f1.md"
+      },
+      "source_issue": {
+        "id": "8826c2fa-3160-4fa3-bfcb-eaa0c0b9d6f1",
+        "identifier": "CO-553",
+        "url": "https://linear.app/asabeko/issue/CO-553/co-eliminate-docs-freshness-policy-capacity-over-budget-debt"
+      },
+      "related_issues": [
+        {
+          "identifier": "CO-522",
+          "relation": "canonical_owner_anchor"
+        },
+        {
+          "identifier": "CO-552",
+          "relation": "future_owner_model_split_reference"
+        }
+      ]
+    },
+    {
       "id": "20260517-linear-cd213b8a-5bc4-46d1-88ec-f99e5ca2c7b6",
       "title": "CO-548 decouple targeted provider-worker nudge from broad dispatch pilot",
       "relates_to": "tasks/tasks-linear-cd213b8a-5bc4-46d1-88ec-f99e5ca2c7b6.md",
@@ -20576,7 +20698,7 @@
       "title": "Codex Cloud Execution Wiring",
       "path": "tasks/tasks-0957-codex-cloud-execution-wiring.md",
       "kind": "prd",
-      "status": "in-progress",
+      "status": "completed",
       "gate": {
         "phase": "codex-cloud-execution-wiring-planning",
         "status": "succeeded",
@@ -20584,7 +20706,7 @@
         "run_id": "2026-02-13T09-47-41-178Z-453a5990"
       },
       "created_at": "2026-02-13",
-      "completed_at": null
+      "completed_at": "2026-02-13"
     },
     {
       "id": "0958",
@@ -20592,7 +20714,7 @@
       "title": "Cloud Execution Canary CI Coverage",
       "path": "tasks/tasks-0958-cloud-canary-ci.md",
       "kind": "prd",
-      "status": "in-progress",
+      "status": "completed",
       "gate": {
         "phase": "cloud-canary-ci-implementation",
         "status": "succeeded",
@@ -20600,7 +20722,7 @@
         "run_id": "2026-02-13T13-09-22-859Z-a9289881"
       },
       "created_at": "2026-02-13",
-      "completed_at": null
+      "completed_at": "2026-02-13"
     },
     {
       "id": "0959",
@@ -20640,7 +20762,7 @@
       "title": "Recursive RLM Enhancements",
       "path": "tasks/tasks-0961-recursive-rlm-enhancements.md",
       "kind": "plan",
-      "status": "in-progress",
+      "status": "completed",
       "gate": {
         "phase": "recursive-rlm-enhancements-implementation",
         "status": "succeeded",
@@ -20648,7 +20770,7 @@
         "run_id": "2026-02-14T10-05-13-113Z-975d57f0"
       },
       "created_at": "2026-02-14",
-      "completed_at": null
+      "completed_at": "2026-02-14"
     },
     {
       "id": "0962",
@@ -20656,15 +20778,15 @@
       "title": "Release + Cloud + RLM Hardening",
       "path": "tasks/tasks-0962-release-cloud-rlm-hardening.md",
       "kind": "plan",
-      "status": "in-progress",
+      "status": "completed",
       "gate": {
         "phase": "release-cloud-rlm-hardening-implementation",
-        "status": "in-progress",
+        "status": "succeeded",
         "log": ".runs/0962-release-cloud-rlm-hardening/cli/2026-02-14T12-47-55-237Z-d45ad3bb/manifest.json",
         "run_id": "2026-02-14T12-47-55-237Z-d45ad3bb"
       },
       "created_at": "2026-02-14",
-      "completed_at": null
+      "completed_at": "2026-02-14"
     },
     {
       "id": "0963",
@@ -20672,7 +20794,7 @@
       "title": "Codex CLI Alignment + Refresh E2E",
       "path": "tasks/tasks-0963-codex-cli-alignment-refresh-e2e.md",
       "kind": "plan",
-      "status": "in-progress",
+      "status": "completed",
       "gate": {
         "phase": "codex-cli-alignment-refresh-e2e-implementation",
         "status": "succeeded",
@@ -20680,7 +20802,7 @@
         "run_id": "2026-02-14T22-06-33-925Z-1460cf12"
       },
       "created_at": "2026-02-14",
-      "completed_at": null
+      "completed_at": "2026-02-14"
     },
     {
       "id": "0964",
@@ -20704,7 +20826,7 @@
       "title": "RLM Help + Cloud Fallback Stdout",
       "path": "tasks/tasks-0965-rlm-help-cloud-stdout.md",
       "kind": "plan",
-      "status": "in-progress",
+      "status": "completed",
       "gate": {
         "phase": "rlm-help-cloud-stdout-implementation",
         "status": "succeeded",
@@ -20712,7 +20834,7 @@
         "run_id": "2026-02-16T00-29-52-337Z-458760fe"
       },
       "created_at": "2026-02-15",
-      "completed_at": null
+      "completed_at": "2026-02-16"
     },
     {
       "id": "0966",

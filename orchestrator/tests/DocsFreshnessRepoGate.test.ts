@@ -27,7 +27,17 @@ describe('readDocsFreshnessMaintainRepoGate', () => {
       generated_at: '2026-05-14T00:00:00.000Z',
       severity: 'blocking',
       freshness_decision: 'block_policy_over_budget',
-      action_required_count: 320
+      action_required_count: 320,
+      capacity: {
+        status: 'over_budget',
+        current_entries: 470,
+        max_entries: 300,
+        current_cohorts: 37,
+        max_cohorts: 2,
+        expired_entries: 0,
+        entry_excess: 170,
+        cohort_excess: 35
+      }
     });
     process.env.CODEX_ORCHESTRATOR_ROOT = repoRoot;
     process.env.CODEX_ORCHESTRATOR_OUT_DIR = outRoot;
@@ -39,9 +49,29 @@ describe('readDocsFreshnessMaintainRepoGate', () => {
       freshness_decision: 'block_policy_over_budget',
       owner: {
         issue: 'CO-522',
+        active_remediation_issue: 'CO-522',
+        canonical_owner_key: 'docs:freshness:maintain',
         action: 'update_existing',
         verified: true
       },
+      capacity: {
+        status: 'over_budget',
+        current_entries: 470,
+        max_entries: 300,
+        current_cohorts: 37,
+        max_cohorts: 2,
+        expired_entries: 0,
+        entry_excess: 170,
+        cohort_excess: 35
+      },
+      capacity_excess: {
+        entries: 170,
+        cohorts: 35,
+        expired_entries: 0
+      },
+      canonical_owner_key: 'docs:freshness:maintain',
+      active_remediation_issue: 'CO-522',
+      handoff_blocking: true,
       generated_at: '2026-05-14T00:00:00.000Z',
       evidence_status: 'fresh',
       source_path: reportPath
@@ -79,6 +109,30 @@ describe('readDocsFreshnessMaintainRepoGate', () => {
         action: 'create_required'
       },
       source_path: reportPath
+    });
+  });
+
+  it('defaults missing legacy handoff_blocking alias from blocks_handoff', async () => {
+    const repoRoot = await mkTempRoot();
+    const outRoot = join(repoRoot, 'out');
+    const reportPath = join(outRoot, 'docs-truthfulness-maintenance', 'docs-freshness-maintenance.json');
+    await writeReport(reportPath, {
+      generated_at: '2026-05-14T00:00:00.000Z',
+      severity: 'blocking',
+      freshness_decision: 'block_policy_over_budget',
+      action_required_count: 320,
+      include_handoff_alias: false
+    });
+
+    const gate = readDocsFreshnessMaintainRepoGate({
+      repoRoot,
+      env: { CODEX_ORCHESTRATOR_ROOT: repoRoot } as NodeJS.ProcessEnv,
+      now: '2026-05-14T01:00:00.000Z'
+    });
+
+    expect(gate).toMatchObject({
+      blocks_handoff: true,
+      handoff_blocking: true
     });
   });
 
@@ -525,8 +579,11 @@ async function writeReport(
     action_required_count: number;
     owner_issue?: string | null;
     owner_action?: string;
+    capacity?: Record<string, unknown>;
+    include_handoff_alias?: boolean;
   }
 ): Promise<void> {
+  const blocksHandoff = options.severity === 'blocking' || options.severity === 'action_required';
   await mkdir(dirname(reportPath), { recursive: true });
   await writeFile(
     reportPath,
@@ -538,7 +595,10 @@ async function writeReport(
           freshness_decision: options.freshness_decision,
           owner: {
             issue: options.owner_issue === undefined ? 'CO-522' : options.owner_issue,
+            active_remediation_issue: options.owner_issue === undefined ? 'CO-522' : options.owner_issue,
+            canonical_owner_key: 'docs:freshness:maintain',
             action: options.owner_action ?? 'update_existing',
+            reason: 'canonical_owner_key_match',
             state: 'Blocked',
             state_type: 'started',
             verified: true
@@ -547,13 +607,21 @@ async function writeReport(
             status: 'succeeded',
             action_required_count: 0
           },
-          capacity: {
+          capacity: options.capacity ?? {
             status: options.freshness_decision === 'clean' ? 'no_candidates' : 'over_budget'
           },
+          capacity_excess: {
+            entries: Number(options.capacity?.entry_excess ?? 0),
+            cohorts: Number(options.capacity?.cohort_excess ?? 0),
+            expired_entries: Number(options.capacity?.expired_entries ?? 0)
+          },
+          canonical_owner_key: 'docs:freshness:maintain',
+          active_remediation_issue: options.owner_issue === undefined ? 'CO-522' : options.owner_issue,
           next_expiry: null,
           action_required_count: options.action_required_count,
           blocks_unrelated_lanes: false,
-          blocks_handoff: options.severity === 'blocking' || options.severity === 'action_required',
+          blocks_handoff: blocksHandoff,
+          ...(options.include_handoff_alias === false ? {} : { handoff_blocking: blocksHandoff }),
           provider_wip_impact: 'excluded_repo_gate'
         }
       },
