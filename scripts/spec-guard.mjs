@@ -9,9 +9,9 @@ import { parseArgs, hasFlag } from './lib/cli-args.js';
 import { computeAgeInDays, parseIsoDate } from './lib/docs-helpers.js';
 import { maybeLoadDocsCatalog, resolveDocsCatalogEntry } from './lib/docs-catalog.js';
 import { buildTaskPacketLifecycleIndex, collectTaskIndexItems } from './lib/docs-freshness-lifecycle.js';
+import { hasArchiveStubMarker, isValidArchiveStubForPath } from './lib/archive-stub.js';
 
 const execFileAsync = promisify(execFile);
-const ARCHIVE_STUB_MARKER = '<!-- docs-archive:stub -->';
 const ALLOWED_FALLBACK_DECISIONS = new Set([
   'remove fallback',
   'expire fallback',
@@ -1046,6 +1046,12 @@ function parsePolicyDecisionEvidence(content) {
   return result;
 }
 
+function hasFallbackDecisionEvidenceMarker(content) {
+  return /(?:CO-382|fallback\s*\/\s*refactor decision|fallback[-_\s]+expiry|large[-_\s]refactor|minor[-_\s]seam)/i.test(
+    String(content)
+  );
+}
+
 async function checkFallbackDecisionEvidence(baseRef, changedFiles) {
   const touchedFiles = await detectFallbackTouchingChanges(baseRef, changedFiles);
   if (touchedFiles.length === 0) {
@@ -1053,7 +1059,13 @@ async function checkFallbackDecisionEvidence(baseRef, changedFiles) {
   }
 
   const sourceEntries = await readChangedFallbackDecisionSources(changedFiles);
-  const sourceTypes = new Set(sourceEntries.map((entry) => entry.type));
+  const decisionSourceEntries = sourceEntries.filter((entry) => !isArchivedSpecStub(entry.file, entry.content));
+  const rowsBySource = decisionSourceEntries.map((entry) => ({
+    ...entry,
+    rows: parseFallbackDecisionRows(entry.content)
+  }));
+  const evidenceRowsBySource = rowsBySource.filter((entry) => entry.rows.length > 0);
+  const sourceTypes = new Set(evidenceRowsBySource.map((entry) => entry.type));
   const failures = [];
   for (const requiredType of FALLBACK_DECISION_SOURCE_TYPES) {
     if (!sourceTypes.has(requiredType)) {
@@ -1063,10 +1075,11 @@ async function checkFallbackDecisionEvidence(baseRef, changedFiles) {
     }
   }
 
-  const combinedEvidence = sourceEntries.map((entry) => entry.content).join('\n');
-  if (hasNotApplicableFallbackDecisionLabel(combinedEvidence)) {
+  const combinedSourceContent = decisionSourceEntries.map((entry) => entry.content).join('\n');
+  if (hasNotApplicableFallbackDecisionLabel(combinedSourceContent)) {
     failures.push('Not applicable is only valid when no fallback/seam behavior changed');
   }
+  const combinedEvidence = evidenceRowsBySource.map((entry) => entry.content).join('\n');
   const policyDecisions = parsePolicyDecisionEvidence(combinedEvidence);
   if (
     policyDecisions.placeholderLabels.length > 0 ||
@@ -1076,17 +1089,15 @@ async function checkFallbackDecisionEvidence(baseRef, changedFiles) {
     failures.push('fallback/seam-touching changes require large refactor and minor seam decision evidence');
   }
 
-  const rowsBySource = sourceEntries.map((entry) => ({
-    ...entry,
-    rows: parseFallbackDecisionRows(entry.content)
-  }));
   for (const entry of rowsBySource) {
-    if (entry.rows.length === 0) {
+    const rowlessFallbackSource =
+      hasFallbackDecisionEvidenceMarker(entry.content) || hasArchiveStubMarker(entry.content);
+    if (entry.rows.length === 0 && rowlessFallbackSource) {
       failures.push(`${entry.file}: fallback/seam-touching changes require a parseable CO-382 fallback decision table`);
     }
   }
 
-  const rows = rowsBySource.flatMap((entry) =>
+  const rows = evidenceRowsBySource.flatMap((entry) =>
     entry.rows.map((row) => ({
       file: entry.file,
       sourceContent: entry.content,
@@ -1529,50 +1540,7 @@ function isInactiveSpec(content) {
 }
 
 function isArchivedSpecStub(file, content) {
-  const lines = content.split(/\r?\n/);
-  let index = 0;
-  while (index < lines.length && lines[index].trim() === '') {
-    index += 1;
-  }
-
-  if (!lines[index]?.trim().startsWith('#')) {
-    return false;
-  }
-
-  index += 1;
-  while (index < lines.length && lines[index].trim() === '') {
-    index += 1;
-  }
-
-  if (lines[index]?.trim().startsWith('last_review:')) {
-    index += 1;
-    while (index < lines.length && lines[index].trim() === '') {
-      index += 1;
-    }
-  }
-
-  if (lines[index]?.trim() !== ARCHIVE_STUB_MARKER) {
-    return false;
-  }
-
-  const trailingLines = lines.slice(index + 1).map((line) => line.trim());
-  const archivePath =
-    trailingLines
-      .find((line) => line.startsWith('- Archive path:'))
-      ?.slice('- Archive path:'.length)
-      .trim() ?? '';
-  const normalizedArchivePath = normalizeSpecPathForComparison(archivePath);
-  const normalizedFile = normalizeSpecPathForComparison(file);
-
-  return (
-    trailingLines.some((line) => line.startsWith('> Archived on ')) &&
-    trailingLines.some((line) => line.startsWith('- Archive branch:')) &&
-    normalizedArchivePath === normalizedFile
-  );
-}
-
-function normalizeSpecPathForComparison(value) {
-  return posix.normalize(value.replace(/\\/g, '/'));
+  return isValidArchiveStubForPath(file, content);
 }
 
 async function main() {

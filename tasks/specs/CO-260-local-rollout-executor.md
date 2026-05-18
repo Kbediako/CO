@@ -1,11 +1,14 @@
 ---
 id: linear-c9e99e2c-bc48-48f1-a8ca-4bd2a9289be2
 title: CO-260 bounded unattended local_rollout executor
+status: in_progress
 relates_to: docs/PRD-CO-260-local-rollout-executor.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-19
+last_review: 2026-05-18
+review_notes:
+  - 2026-05-18: CO-522 active-spec audit found 1 unchecked task checklist item, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 ## Canonical Reference

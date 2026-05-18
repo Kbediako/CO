@@ -1,5 +1,7 @@
 # ACTION_PLAN: Coordinator Symphony-Aligned Doctor CLI Request Shell Extraction
 
-1. Isolate the remaining doctor request-shaping logic still owned by `handleDoctor(...)`.
-2. Extract that bounded shell into `orchestrator/src/cli/` while keeping binary-facing parse/dispatch ownership local.
-3. Add focused parity coverage, run the validation lane, and record the closeout evidence.
+<!-- docs-archive:stub -->
+> Archived on 2026-05-18. Full content: https://github.com/Kbediako/CO/blob/doc-archives/docs/ACTION_PLAN-coordinator-symphony-aligned-doctor-cli-request-shell-extraction.md
+
+- Archive branch: doc-archives
+- Archive path: docs/ACTION_PLAN-coordinator-symphony-aligned-doctor-cli-request-shell-extraction.md

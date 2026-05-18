@@ -1,54 +1,9 @@
----
-id: 20260422-linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8
-title: CO-304 co-status degraded-read fallback when `/ui/data.json` times out but supervisor truth stays fresh after `CO-296`
-relates_to: docs/PRD-linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8.md
-risk: high
-owners:
-  - Codex
-last_review: 2026-04-22
----
+# Archived Document
 
-## Summary
-- `co-status --format json` can time out on `/ui/data.json` even while `provider-intake-state.json` continues advancing after `CO-296`.
-- The repair is a bounded `degraded-read fallback` backed by fresh `supervisor truth`.
-- `fail-closed freshness` remains mandatory when supervisor data is stale or absent.
+last_review: 2026-05-18
 
-## Requirements
-1. Preserve the direct-read seam: timed-out `/ui/data.json` versus still-fresh `provider-intake-state.json`.
-2. Add degraded JSON output only when freshness proves the supervisor truth is still current.
-3. Ensure stale or missing supervisor truth stays on the hard-failure path.
-4. Preserve an explicit degraded marker instead of presenting the result as a normal UI-backed read.
-5. Leave UI layout work, dashboard redesign, and unrelated control-host features out of scope.
+<!-- docs-archive:stub -->
+> Archived on 2026-05-18. Full content: https://github.com/Kbediako/CO/blob/doc-archives/tasks/specs/linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8.md
 
-## Protected Terms
-- `co-status --format json`
-- `/ui/data.json`
-- `provider-intake-state.json`
-- `CO-296`
-- `supervisor truth`
-- `degraded-read fallback`
-- `fail-closed freshness`
-
-## Wrong Interpretations To Reject
-- Reopen `CO-296` instead of closing the adjacent gap.
-- Treat every `/ui/data.json` timeout as proof the host is dead.
-- Return stale supervisor truth as healthy output.
-- Expand the fix into UI layout or dashboard work.
-
-## Parity Matrix
-
-| Surface | Current | Target |
-| --- | --- | --- |
-| Direct JSON read | `co-status --format json` times out on `/ui/data.json` | direct JSON can emit bounded degraded output |
-| Provider intake | `provider-intake-state.json` can still advance | advancing intake truth is used only as fallback input |
-| Freshness | stale handling is too coarse for this path | `fail-closed freshness` decides whether degraded output is legal |
-| Scope | easy to drift into dashboard work | lane stays bounded to read-contract behavior after `CO-296` |
-
-## Validation
-- Focused reproduction of the timeout path.
-- Focused fresh degraded-read regression.
-- Focused stale fail-closed regression.
-- Required docs/spec/review gates before handoff.
-
-## Notes
-- 2026-04-22 pre-implementation issue-quality review: this issue is narrower than generic control-host recovery and broader than a message-only tweak; the right seam is the direct JSON fallback plus freshness gating.
+- Archive branch: doc-archives
+- Archive path: tasks/specs/linear-cb221338-8cdc-41ad-880b-3bcfae49d4a8.md

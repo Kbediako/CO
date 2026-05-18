@@ -4,7 +4,7 @@ title: CO-343 Apr 24 Spec Freshness and Dry-Run Accounting
 status: in_progress
 owner: Codex
 created: 2026-04-24
-last_review: 2026-04-24
+last_review: 2026-05-18
 review_cadence_days: 30
 risk_level: medium
 related_prd: docs/PRD-co-343-apr-24-spec-freshness-dry-run-accounting.md
@@ -15,6 +15,7 @@ review_notes:
   - 2026-04-24: Opened from CO-341 validation after `spec-guard --dry-run` printed five stale active-spec failures while exiting zero.
   - 2026-04-24: Same-turn read-only validator reproduced non-dry-run `spec-guard` exit 1 on the same five specs and recommended a separate owner issue rather than widening CO-341.
   - 2026-04-24: Parent created CO-343 as the live owner for Apr 24 spec/docs freshness debt and keeps CO-324 as terminal historical evidence only.
+  - 2026-05-18: CO-522 active-spec audit found 1 unchecked task checklist item, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 # Technical Specification

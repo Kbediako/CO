@@ -1,11 +1,14 @@
 ---
 id: 20260421-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6
 title: Control host refresh retained released/not_active claim metadata
+status: in_progress
 relates_to: docs/PRD-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-21
+last_review: 2026-05-18
+review_notes:
+  - 2026-05-18: CO-522 active-spec audit found 1 unchecked task checklist item, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 ## Canonical Reference
