@@ -999,6 +999,72 @@ describe('ControlRuntime', () => {
     });
   });
 
+  it('clears selected provider retry state when the matching authoritative claim is terminal', async () => {
+    const providerIntakeState = createProviderIntakeState([
+      {
+        provider: 'linear',
+        provider_key: 'linear:issue-co-554',
+        issue_id: 'issue-co-554',
+        issue_identifier: 'CO-554',
+        issue_title: 'Terminal completed retry claim',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-05-18T19:20:00.000Z',
+        task_id: 'task-co-554-completed-retry',
+        mapping_source: 'provider_id_fallback',
+        state: 'completed',
+        reason: 'provider_issue_rehydrated_completed_run',
+        accepted_at: '2026-05-18T19:05:00.000Z',
+        updated_at: '2026-05-18T20:35:00.000Z',
+        last_delivery_id: 'delivery-co-554-terminal-retry',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_779_112_800_000,
+        run_id: 'run-co-554-completed',
+        run_manifest_path: null,
+        launch_source: null,
+        launch_token: null,
+        retry_queued: true,
+        retry_attempt: 1,
+        retry_due_at: '2026-05-18T20:36:00.000Z',
+        retry_error: 'stale completed-run continuation'
+      }
+    ]);
+    const fixture = await createFixture({
+      taskId: 'task-co-554-completed-retry',
+      providerIntakeState
+    });
+
+    await seedManifest(fixture.paths, {
+      task_id: 'task-co-554-completed-retry',
+      run_id: 'run-co-554-completed',
+      issue_provider: 'linear',
+      issue_id: 'issue-co-554',
+      issue_identifier: 'CO-554',
+      summary: 'selected run has stale retry fields after terminal issue refresh',
+      updated_at: '2026-05-18T20:35:00.000Z'
+    });
+
+    const selectedSnapshot = await fixture.runtime.snapshot().readSelectedRunSnapshot();
+
+    expect(selectedSnapshot.selected?.issueIdentifier).toBe('CO-554');
+    expect(selectedSnapshot.selected?.providerRetryState).toBeNull();
+    expect(selectedSnapshot.providerIntake).toMatchObject({
+      active_claim_count: 0,
+      running_claim_count: 0,
+      active_issue_identifiers: [],
+      selected_claim: {
+        issue_identifier: 'CO-554',
+        retry: {
+          active: false,
+          attempt: 1,
+          due_at: '2026-05-18T20:36:00.000Z',
+          error: 'stale completed-run continuation'
+        }
+      }
+    });
+  });
+
   it('keeps authoritative retry due_at metadata when the queued retry has no recorded attempt yet', async () => {
     const providerIntakeState = createProviderIntakeState([]);
     const fixture = await createFixture({

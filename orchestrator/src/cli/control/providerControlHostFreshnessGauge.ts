@@ -6,6 +6,7 @@ import {
   summarizeProviderLinearAuditPath,
   type ProviderLinearAuditSummary
 } from './providerLinearWorkflowAudit.js';
+import { isTerminalProviderIntakeIssueState } from './providerIntakeState.js';
 
 export type ProviderControlHostFreshnessVerdict =
   | 'healthy'
@@ -448,7 +449,7 @@ async function discoverClaimLinkedRunArtifactSources(
     }
     for (const rawClaim of claims) {
       const claim = asRecord(rawClaim);
-      if (!claim || !ACTIVE_CLAIM_STATES.has(readState(claim))) {
+      if (!claim || !isActiveClaim(claim)) {
         continue;
       }
       const manifestPath = normalizeOptionalString(claim?.run_manifest_path);
@@ -599,7 +600,7 @@ function evaluateClaimQueueAge(
   findings: ProviderControlHostFreshnessGaugeFinding[]
 ): ProviderControlHostFreshnessGaugeMetric<number> {
   const claims = collectClaims(intakeState);
-  const queuedClaims = claims.filter((claim) => QUEUED_CLAIM_STATES.has(readState(claim)));
+  const queuedClaims = claims.filter(isQueuedClaim);
   const candidates = queuedClaims.flatMap((claim) => {
     const acceptedAt = timestampMs(claim.accepted_at ?? claim.updated_at);
     return acceptedAt === null ? [] : [{ claim, acceptedAt, ageMs: Math.max(0, nowMs - acceptedAt) }];
@@ -822,6 +823,7 @@ function evaluateActiveHeartbeatAge(
   const activeProofs = proofs.filter(isActiveProof);
   const missingProofClaims = collectClaims(intakeState)
     .filter((claim) => readState(claim) === 'running')
+    .filter((claim) => !isTerminalProviderIntakeGaugeClaim(claim))
     .filter((claim) => {
       const runId = normalizeOptionalString(claim.run_id);
       return !runId || !activeProofs.some((proof) => resolveProofRunId(proof) === runId);
@@ -889,7 +891,7 @@ function evaluateTerminalReconciliationLag(
   findings: ProviderControlHostFreshnessGaugeFinding[]
 ): ProviderControlHostFreshnessGaugeMetric<number> {
   const claims = collectClaims(intakeState);
-  const activeClaims = claims.filter((claim) => ACTIVE_CLAIM_STATES.has(readState(claim)));
+  const activeClaims = claims.filter(isActiveClaim);
   const unreconcilableTerminalProofs: ProofArtifact[] = [];
   const candidates = proofs.flatMap((proof) => {
     if (!isTerminalProof(proof)) {
@@ -968,6 +970,7 @@ function evaluateRetryBackoffAge(
 ): ProviderControlHostFreshnessGaugeMetric<number> {
   const retryCandidates = [
     ...collectClaims(input.intakeState)
+      .filter((claim) => !isTerminalProviderIntakeGaugeClaim(claim))
       .filter((claim) => claim.retry_queued === true || timestampMs(claim.retry_due_at) !== null)
       .flatMap((claim) => {
         const dueAt = timestampMs(claim.retry_due_at);
@@ -1236,7 +1239,20 @@ function collectClaims(intakeState: JsonArtifact | null): Record<string, unknown
 }
 
 function isActiveClaim(claim: Record<string, unknown>): boolean {
-  return ACTIVE_CLAIM_STATES.has(readState(claim));
+  return ACTIVE_CLAIM_STATES.has(readState(claim)) && !isTerminalProviderIntakeGaugeClaim(claim);
+}
+
+function isQueuedClaim(claim: Record<string, unknown>): boolean {
+  return QUEUED_CLAIM_STATES.has(readState(claim)) && !isTerminalProviderIntakeGaugeClaim(claim);
+}
+
+function isTerminalProviderIntakeGaugeClaim(claim: Record<string, unknown>): boolean {
+  return isTerminalProviderIntakeIssueState({
+    issue_state: normalizeOptionalString(claim.issue_state),
+    issue_state_type: normalizeOptionalString(claim.issue_state_type),
+    issue_archived_at: normalizeOptionalString(claim.issue_archived_at),
+    issue_trashed: claim.issue_trashed === true
+  });
 }
 
 function collectStatusRetrying(statusDataset: JsonArtifact | null): Record<string, unknown>[] {

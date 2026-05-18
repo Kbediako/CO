@@ -43,6 +43,7 @@ import {
   buildProviderFallbackTaskId,
   buildProviderIssueKey,
   hasQueuedProviderIntakeRetry,
+  isTerminalProviderIntakeIssueState,
   markProviderIntakeRehydrated,
   readProviderIntakeClaim,
   type ProviderLaunchSource,
@@ -2681,6 +2682,103 @@ export function createProviderIssueHandoffService(
       };
     };
 
+    const buildReleasedRehydratedTerminalClaim = (input: {
+      claim: ProviderIntakeClaimRecord;
+      run: ProviderIssueRunRecord | null;
+      releaseReason?: string | null;
+      releaseClaimFields?: ActiveClaimFreshTrackedIssueFields;
+      trackedIssue?: ActiveClaimFreshTrackedIssueResolution['trackedIssue'];
+    }): Parameters<typeof upsertProviderIntakeClaim>[1] => {
+      const releaseClaimFields = input.releaseClaimFields ?? {};
+      const retainedRunIdentity = resolveReleasedClaimRetainedRunIdentity({
+        claim: input.claim,
+        run: input.run,
+        trackedIssue: input.trackedIssue ?? null,
+        issueState: releaseClaimFields.issue_state ?? input.claim.issue_state,
+        issueStateType: releaseClaimFields.issue_state_type ?? input.claim.issue_state_type
+      });
+      return {
+        ...input.claim,
+        ...releaseClaimFields,
+        launch_source: undefined,
+        launch_token: undefined,
+        ...retainedRunIdentity,
+        state: 'released' as const,
+        reason: input.releaseReason ?? 'provider_issue_released:not_active',
+        ...clearProviderRetryFields(),
+        updated_at: now
+      };
+    };
+
+    const resolveRehydratedTerminalIssueRelease = (input: {
+      claim: ProviderIntakeClaimRecord;
+      run: ProviderIssueRunRecord | null;
+      freshTrackedIssue: ActiveClaimFreshTrackedIssueResolution;
+    }): Parameters<typeof upsertProviderIntakeClaim>[1] | null => {
+      if (input.freshTrackedIssue.releaseReason) {
+        return buildReleasedRehydratedTerminalClaim({
+          claim: input.claim,
+          run: input.run,
+          releaseReason: input.freshTrackedIssue.releaseReason,
+          releaseClaimFields: input.freshTrackedIssue.releaseClaimFields,
+          trackedIssue: input.freshTrackedIssue.trackedIssue
+        });
+      }
+      if (input.freshTrackedIssue.useCachedClaimIssueState) {
+        return null;
+      }
+      const refreshedClaim = {
+        ...input.claim,
+        ...input.freshTrackedIssue.claimFields
+      };
+      if (!isTerminalProviderIntakeIssueState(refreshedClaim)) {
+        return null;
+      }
+      return buildReleasedRehydratedTerminalClaim({
+        claim: input.claim,
+        run: input.run,
+        releaseClaimFields: input.freshTrackedIssue.claimFields,
+        trackedIssue: input.freshTrackedIssue.trackedIssue
+      });
+    };
+
+    const runRehydratedTerminalReleaseSideEffects = async (input: {
+      claim: ProviderIntakeClaimRecord;
+      releaseClaim: Parameters<typeof upsertProviderIntakeClaim>[1];
+      run: ProviderIssueRunRecord | null;
+    }): Promise<boolean> => {
+      let hasPendingReleaseCancel = false;
+      if (shouldAttemptReleaseCancel(input.run)) {
+        await retryReleaseCancel({
+          releaseRun: input.run,
+          reason: input.releaseClaim.reason ?? 'provider_issue_released:not_active',
+          assertCurrent: assertRehydrateLifecycleCurrent
+        });
+        hasPendingReleaseCancel = true;
+      }
+      if (canCleanupReleasedProviderWorkspace(input.run)) {
+        await cleanupReleasedProviderWorkspaceWhenCurrent({
+          repoRoot,
+          taskId: input.run?.taskId ?? input.claim.task_id,
+          manifestPath: input.run?.manifestPath ?? input.claim.run_manifest_path,
+          issueId: input.claim.issue_id,
+          issueIdentifier: input.claim.issue_identifier,
+          providerWorkflowConfigStore: options.providerWorkflowConfigStore ?? null,
+          runTerminalCleanup
+        });
+      }
+      return hasPendingReleaseCancel;
+    };
+
+    const shouldReleasePlainCompletedRetryClaim = (
+      candidate: ProviderIntakeClaimRecord
+    ): boolean =>
+      candidate.state === 'completed' &&
+      candidate.reason === 'provider_issue_rehydrated_completed_run' &&
+      candidate.retry_queued === true &&
+      !candidate.review_promotion &&
+      !candidate.merge_closeout;
+
     const runRehydrate = async (): Promise<{ hasPendingClaims: boolean }> => {
       for (const claim of [...options.state.claims]) {
         assertRehydrateLifecycleCurrent();
@@ -2832,6 +2930,22 @@ export function createProviderIssueHandoffService(
           const freshTrackedIssue = input?.refreshTrackedIssueMetadata
             ? await resolveFreshTrackedIssueForActiveClaim(claim)
             : buildActiveClaimFreshTrackedIssueFallback(true);
+          const terminalReleaseClaim = resolveRehydratedTerminalIssueRelease({
+            claim,
+            run: activeRun,
+            freshTrackedIssue
+          });
+          if (terminalReleaseClaim) {
+            publishRuntime ||= hasProviderClaimTransitioned(claim, terminalReleaseClaim);
+            upsertRehydratedProviderIntakeClaim(terminalReleaseClaim);
+            const hasPendingReleaseCancel = await runRehydratedTerminalReleaseSideEffects({
+              claim,
+              releaseClaim: terminalReleaseClaim,
+              run: activeRun
+            });
+            hasPendingClaims ||= hasPendingReleaseCancel;
+            continue;
+          }
           const mergeTrackedIssue = freshTrackedIssue.trackedIssue;
           if (preserveMergeCloseoutClaim && !mergeTrackedIssue) {
             hasPendingClaims = true;
@@ -2887,6 +3001,25 @@ export function createProviderIssueHandoffService(
           (run) => run.status !== null && RESUME_ELIGIBLE_STATUSES.has(run.status)
         );
         if (resumableRun) {
+          const freshTrackedIssue = input?.refreshTrackedIssueMetadata
+            ? await resolveFreshTrackedIssueForActiveClaim(claim)
+            : buildActiveClaimFreshTrackedIssueFallback(true);
+          const terminalReleaseClaim = resolveRehydratedTerminalIssueRelease({
+            claim,
+            run: resumableRun,
+            freshTrackedIssue
+          });
+          if (terminalReleaseClaim) {
+            publishRuntime ||= hasProviderClaimTransitioned(claim, terminalReleaseClaim);
+            upsertRehydratedProviderIntakeClaim(terminalReleaseClaim);
+            const hasPendingReleaseCancel = await runRehydratedTerminalReleaseSideEffects({
+              claim,
+              releaseClaim: terminalReleaseClaim,
+              run: resumableRun
+            });
+            hasPendingClaims ||= hasPendingReleaseCancel;
+            continue;
+          }
           const queuedRetryFields = buildQueuedProviderRetryFields({
             claim,
             previousRun: resumableRun,
@@ -2896,7 +3029,9 @@ export function createProviderIssueHandoffService(
             delayType: 'failure'
           });
           const workerHost = resolveRehydratedActiveRunWorkerHost(resumableRun, claim);
+          const trackedIssueFields = freshTrackedIssue.claimFields;
           publishRuntime ||= hasProviderClaimTransitioned(claim, {
+            ...trackedIssueFields,
             state: 'resumable',
             reason: 'provider_issue_rehydrated_resumable_run',
             task_id: resumableRun.taskId,
@@ -2907,6 +3042,7 @@ export function createProviderIssueHandoffService(
           });
           upsertRehydratedProviderIntakeClaim({
             ...claim,
+            ...trackedIssueFields,
             launch_source: undefined,
             launch_token: undefined,
             task_id: resumableRun.taskId,
@@ -2973,6 +3109,24 @@ export function createProviderIssueHandoffService(
                 }
               }
             } else {
+              if (shouldReleasePlainCompletedRetryClaim(completedClaim)) {
+                const terminalReleaseClaim = resolveRehydratedTerminalIssueRelease({
+                  claim: completedClaim,
+                  run: completedRun,
+                  freshTrackedIssue
+                });
+                if (terminalReleaseClaim) {
+                  publishRuntime ||= hasProviderClaimTransitioned(claim, terminalReleaseClaim);
+                  upsertRehydratedProviderIntakeClaim(terminalReleaseClaim);
+                  const hasPendingReleaseCancel = await runRehydratedTerminalReleaseSideEffects({
+                    claim,
+                    releaseClaim: terminalReleaseClaim,
+                    run: completedRun
+                  });
+                  hasPendingClaims ||= hasPendingReleaseCancel;
+                  continue;
+                }
+              }
               const hasFreshReleaseIssueMetadata =
                 freshTrackedIssue.releaseClaimFields.issue_state !== undefined ||
                 freshTrackedIssue.releaseClaimFields.issue_state_type !== undefined ||
@@ -3027,6 +3181,24 @@ export function createProviderIssueHandoffService(
             ...nextCompletedClaim
           });
           continue;
+        }
+
+        if (
+          shouldReleasePlainCompletedRetryClaim(claim) &&
+          hasConcreteRetainedRunIdentity(claim) &&
+          input?.refreshTrackedIssueMetadata === true
+        ) {
+          const freshTrackedIssue = await resolveFreshTrackedIssueForActiveClaim(claim);
+          const terminalReleaseClaim = resolveRehydratedTerminalIssueRelease({
+            claim,
+            run: null,
+            freshTrackedIssue
+          });
+          if (terminalReleaseClaim) {
+            publishRuntime ||= hasProviderClaimTransitioned(claim, terminalReleaseClaim);
+            upsertRehydratedProviderIntakeClaim(terminalReleaseClaim);
+            continue;
+          }
         }
 
         if (claim.state === 'starting' || claim.state === 'resuming') {
@@ -7789,15 +7961,28 @@ function createProviderPollDispatchBudget(
 }
 
 function shouldProviderClaimOccupyPollDispatchSlot(
-  claim: Pick<ProviderIntakeClaimRecord, 'state'>
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'issue_state' | 'issue_state_type' | 'issue_archived_at' | 'issue_trashed'
+  >
 ): boolean {
+  if (isTerminalProviderIntakeIssueState(claim)) {
+    return false;
+  }
   return claim.state === 'starting' || claim.state === 'resuming' || claim.state === 'running';
 }
 
 function shouldCountQueuedAdmissionOccupancyForClaim(
   claim: Pick<
     ProviderIntakeClaimRecord,
-    'state' | 'retry_queued' | 'issue_state' | 'issue_state_type' | 'run_id' | 'run_manifest_path'
+    | 'state'
+    | 'retry_queued'
+    | 'issue_state'
+    | 'issue_state_type'
+    | 'issue_archived_at'
+    | 'issue_trashed'
+    | 'run_id'
+    | 'run_manifest_path'
   > | null,
   run: Pick<ProviderIssueRunRecord, 'runId' | 'manifestPath'>
 ): boolean {
@@ -7806,6 +7991,9 @@ function shouldCountQueuedAdmissionOccupancyForClaim(
   }
   if (!hasProviderClaimRunIdentityMatch(claim, run)) {
     return true;
+  }
+  if (isTerminalProviderIntakeIssueState(claim)) {
+    return false;
   }
   if (claim.state !== 'completed') {
     return true;
@@ -7817,8 +8005,14 @@ function shouldCountQueuedAdmissionOccupancyForClaim(
 }
 
 function shouldProviderClaimOccupyAdmissionSlot(
-  claim: Pick<ProviderIntakeClaimRecord, 'state' | 'retry_queued'>
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'retry_queued' | 'issue_state' | 'issue_state_type' | 'issue_archived_at' | 'issue_trashed'
+  >
 ): boolean {
+  if (isTerminalProviderIntakeIssueState(claim)) {
+    return false;
+  }
   return (
     claim.retry_queued === true ||
     claim.state === 'starting' ||
@@ -7831,10 +8025,20 @@ function shouldProviderClaimOccupyAdmissionSlot(
 function shouldRetainedProviderClaimOccupyPollDispatchSlot(
   claim: Pick<
     ProviderIntakeClaimRecord,
-    'state' | 'retry_queued' | 'issue_state' | 'issue_state_type' | 'run_id' | 'run_manifest_path'
+    | 'state'
+    | 'retry_queued'
+    | 'issue_state'
+    | 'issue_state_type'
+    | 'issue_archived_at'
+    | 'issue_trashed'
+    | 'run_id'
+    | 'run_manifest_path'
   >,
   run: Pick<ProviderIssueRunRecord, 'status' | 'runId' | 'manifestPath'> | null
 ): boolean {
+  if (isTerminalProviderIntakeIssueState(claim)) {
+    return false;
+  }
   if (run?.status === 'in_progress') {
     return true;
   }
@@ -9882,9 +10086,12 @@ function resolveLatestKnownProviderRun(
 function shouldQueuePostWorkerRetryClaim(
   claim: Pick<
     ProviderIntakeClaimRecord,
-    'retry_queued' | 'issue_state' | 'issue_state_type'
+    'retry_queued' | 'issue_state' | 'issue_state_type' | 'issue_archived_at' | 'issue_trashed'
   >
 ): boolean {
+  if (isTerminalProviderIntakeIssueState(claim)) {
+    return false;
+  }
   if (claim.retry_queued === true) {
     return true;
   }

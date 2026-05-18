@@ -18,8 +18,10 @@ import {
 } from './controlHostOwnership.js';
 import {
   buildProviderIntakeSummary,
+  hasQueuedProviderIntakeRetry,
   isActiveProviderIntakeClaim,
   isRecordLike,
+  isTerminalProviderIntakeIssueState,
   type ProviderIntakeClaimRecord,
   type ProviderIntakeState
 } from './providerIntakeState.js';
@@ -925,13 +927,14 @@ function enrichProjectionSourceWithProviderRetryState<
           rehydrated_at: providerIntakeState.rehydrated_at ?? null
         }) ?? source.providerDebugSnapshot ?? null
       : source.providerDebugSnapshot ?? null;
-  if (!retryState && providerDebugSnapshot === source.providerDebugSnapshot) {
+  const shouldClearRetryState = retryState === null && source.providerRetryState != null;
+  if (!retryState && !shouldClearRetryState && providerDebugSnapshot === source.providerDebugSnapshot) {
     return source;
   }
   return {
     ...source,
     ...(providerDebugSnapshot ? { providerDebugSnapshot } : {}),
-    ...(retryState ? { providerRetryState: retryState } : {})
+    ...(retryState || shouldClearRetryState ? { providerRetryState: retryState } : {})
   };
 }
 
@@ -941,7 +944,10 @@ function buildProviderRetryState(
   if (!claim) {
     return null;
   }
-  const active = claim.retry_queued === true;
+  if (isTerminalProviderIntakeIssueState(claim)) {
+    return null;
+  }
+  const active = hasQueuedProviderIntakeRetry(claim);
   const attempt = claim.retry_attempt ?? null;
   const dueAt = claim.retry_due_at ?? null;
   const error = claim.retry_error ?? null;

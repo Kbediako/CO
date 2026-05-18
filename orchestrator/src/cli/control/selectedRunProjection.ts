@@ -35,6 +35,7 @@ import {
   buildProviderIssueKey,
   hasQueuedProviderIntakeRetry,
   isActiveProviderIntakeClaim,
+  isTerminalProviderIntakeIssueState,
   readProviderIntakeClaim,
   selectProviderIntakeClaim
 } from './providerIntakeState.js';
@@ -3108,13 +3109,23 @@ function hasAuthoritativeProjectionIssueIdentity(
 function buildProviderRetryState(
   claim: Pick<
     ProviderIntakeClaimRecord,
-    'retry_queued' | 'retry_attempt' | 'retry_due_at' | 'retry_error'
+    | 'retry_queued'
+    | 'retry_attempt'
+    | 'retry_due_at'
+    | 'retry_error'
+    | 'issue_state'
+    | 'issue_state_type'
+    | 'issue_archived_at'
+    | 'issue_trashed'
   > | null
 ): ControlCompatibilitySourceContext['providerRetryState'] {
   if (!claim) {
     return null;
   }
-  const active = claim.retry_queued === true;
+  if (isTerminalProviderIntakeIssueState(claim)) {
+    return null;
+  }
+  const active = hasQueuedProviderIntakeRetry(claim);
   const attempt = claim.retry_attempt ?? null;
   const dueAt = claim.retry_due_at ?? null;
   const error = claim.retry_error ?? null;
