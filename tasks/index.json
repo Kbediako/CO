@@ -25,7 +25,7 @@
         }
       },
       "validation": {
-        "status": "implemented_review_clean_post_merge_validation_pending",
+        "status": "implemented_review_clean_ready_review_pending",
         "passed": [
           "live issue-context",
           "Ready -> In Progress transition",
@@ -37,10 +37,11 @@
           "pre-merge full provider-worker validation floor",
           "manifest-backed standalone review clean with valid contract",
           "explicit elegance/minimality pass",
-          "PR #834 opened and attached"
+          "PR #834 opened and attached",
+          "post-origin/main-merge validation rerun"
         ],
         "pending": [
-          "post-origin/main-merge validation rerun",
+          "CodeRabbit re-review acknowledgement",
           "PR ready-review drain",
           "Linear In Review handoff"
         ]

@@ -25,6 +25,7 @@
 - [x] Rehydration paths that find resume-eligible runs for terminal issues preserve audit evidence but downgrade/release/ignore the active claim instead of queuing retry WIP. Evidence: provider issue handoff rehydration releases terminal retry/resumable claims and clears retry WIP fields.
 - [x] `co-status`, freshness-gauge, and quota-hygiene surfaces no longer count terminal retryable/resumable claims as active or retrying, while still surfacing retained terminal audit evidence. Evidence: runtime and selected-run retry projections use terminal-aware helpers and retained retry metadata reports inactive.
 - [x] Regression coverage includes a CO-512-shaped fixture: live issue Done/completed plus stale failed/resume-eligible run plus `retry_queued=true` must not produce an active claim or selected active issue. Evidence: `ProviderIntakeState.test.ts` and `ProviderIssueHandoff.test.ts` CO-512-shaped tests.
+- [x] Regression coverage includes the CO-554-shaped completed-retry fixture: cached `state=completed`, `reason=provider_issue_rehydrated_completed_run`, `retry_queued=true`, cached `issue_state=In Progress`/`started`, fresh live `Done`/`completed`, expected retry cleared/inactive and no start/resume/requeue. Evidence: `ProviderIssueHandoff.test.ts` exact CO-554-shaped rehydrate test plus `ControlRuntime.test.ts` terminal selected-retry clearing projection test.
 - [x] Existing non-terminal retry/resumable workers remain active and retry-visible. Evidence: non-terminal retry-resumable provider-intake regression.
 - [x] No manual `provider-intake-state.json` edits are required. Evidence: no state files changed; supported control-host logic converges the stale claim.
 
@@ -60,14 +61,14 @@
 - [x] Implement terminal-aware active/retry predicates. Evidence: `providerIntakeState.ts` exports terminal issue-state predicate and `hasQueuedProviderIntakeRetry` ignores terminal issues.
 - [x] Implement terminal-aware rehydration release and capacity helpers. Evidence: `providerIssueHandoff.ts` releases terminal retry/resumable claims and excludes terminal queued claims from poll/admission occupancy.
 - [x] Update runtime and selected-run retry projections. Evidence: `controlRuntime.ts` and `selectedRunProjection.ts` suppress terminal retry state.
-- [x] Add focused regression coverage. Evidence: `ProviderIntakeState.test.ts` and `ProviderIssueHandoff.test.ts`.
+- [x] Add focused regression coverage. Evidence: `ProviderIntakeState.test.ts`, `ProviderIssueHandoff.test.ts`, and `ControlRuntime.test.ts`.
 
 ## Validation
 - [x] Same-issue child lane. Evidence: `terminal-retry-tests` run `2026-05-18T19-23-32-870Z-f45dcca5` completed successfully; parent invalidated stale patch metadata and reimplemented final tests directly.
-- [x] Focused provider-intake/handoff regression. Evidence: `npm run test:core -- orchestrator/tests/ProviderIssueHandoff.test.ts` passed after review feedback.
-- [x] Full provider-worker validation floor before PR. Evidence: delegation guard, spec guard dry-run, build, lint, test, docs:check, docs:freshness, repo:stewardship, diff-budget, and pack:smoke passed before `origin/main` merge; post-merge revalidation is in progress.
-- [x] Manifest-backed standalone review. Evidence: first review found P1 `CO555-POLL-TERMINAL-OCCUPANCY`; fix landed and rerun completed with `review_verdict=clean`, `contract_validation.status=valid`, and `contract_overall_verdict=clean`.
-- [x] Explicit elegance/minimality pass. Evidence: manual post-review checklist found no avoidable abstraction; retained one shared terminal predicate plus local rehydration release helpers.
+- [x] Focused provider-intake/handoff regression. Evidence: full `ProviderIssueHandoff.test.ts` passed after review feedback, including terminal release side effects after an earlier pending claim and the exact CO-554 completed-retry rehydrate fixture.
+- [x] Full provider-worker validation floor. Evidence: delegation guard, spec guard dry-run, git diff check, build, lint, full test, docs:check, docs:freshness, repo:stewardship, diff-budget, and pack:smoke passed after current-main merge and review-feedback fixes.
+- [x] Manifest-backed standalone review. Evidence: latest enforced review completed with `review_verdict=clean`, `contract_validation.status=valid`, `contract_overall_verdict=clean`, and zero findings after the side-effect short-circuit fix.
+- [x] Explicit elegance/minimality pass. Evidence: manual post-review checklist found no avoidable abstraction; retained one shared terminal predicate plus local rehydration release side-effect helper and narrow projection clearing.
 - [ ] PR ready-review drain. Evidence: pending after post-merge validation and branch push.
 
 ## Progress Log
