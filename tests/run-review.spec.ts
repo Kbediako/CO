@@ -2514,23 +2514,65 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).toContain('enforce contract gate failed: review contract telemetry is missing');
   });
 
-  it('fails enforce-mode explicit scoped review before artifact-only prompt transport can hide contract instructions', async () => {
+  it('runs enforce-mode explicit scoped review through structured stdin transport', async () => {
     const sandbox = await makeSandbox();
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    await writeFile(join(sandbox, 'file-1.txt'), 'updated\n', 'utf8');
+    await runGit(['add', 'file-1.txt'], sandbox);
+    await runGit(['commit', '-m', 'update file'], sandbox);
     const manifestPath = await makeManifest(sandbox);
     const codexBin = await makeFakeCodex(sandbox);
+    const argsLogPath = join(sandbox, 'review-args.log');
+    const stdinLogPath = join(sandbox, 'review-stdin.log');
     const result = await runReviewCommand(
       manifestPath,
       {
         ...baseEnv(sandbox, codexBin),
-        NOTES: 'Goal: enforce scoped contract test | Summary: explicit scoped launches cannot carry contract prompt inline | Risks: missing contract must fail closed',
+        RUN_REVIEW_MODE: 'contract-clean-output',
+        RUN_REVIEW_ARGS_LOG: argsLogPath,
+        RUN_REVIEW_STDIN_LOG: stdinLogPath,
+        NOTES: 'Goal: enforce scoped contract test | Summary: explicit scoped launches must carry the contract prompt through structured stdin transport | Risks: missing scoped change-bundle must fail closed',
         CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
         CODEX_REVIEW_CONTRACT_MODE: 'enforce'
       },
       ['--base', 'HEAD~1']
     );
 
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain('governed enforce review contract requires inline prompt delivery');
+    expect(result.exitCode).toBe(0);
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    expect(argsLog).toContain('argv=exec -s read-only --output-schema');
+    expect(argsLog).toContain(' -');
+    expect(argsLog).not.toContain('--base HEAD~1');
+    const stdinLog = await readFile(stdinLogPath, 'utf8');
+    expect(stdinLog).toContain('Goal: enforce scoped contract test');
+    const changeBundle = JSON.parse(
+      await readFile(join(dirname(manifestPath), 'review', 'inputs', 'change-bundle.json'), 'utf8')
+    ) as {
+      scope_mode?: string;
+      scope_base?: string;
+      git_diff_name_status?: string;
+      git_diff_patch?: string;
+    };
+    expect(changeBundle.scope_mode).toBe('base');
+    expect(changeBundle.scope_base).toBe('HEAD~1');
+    expect(changeBundle.git_diff_name_status).toContain('file-1.txt');
+    expect(changeBundle.git_diff_patch).toContain('updated');
+    const telemetry = JSON.parse(
+      await readFile(join(dirname(manifestPath), 'review', 'telemetry.json'), 'utf8')
+    ) as {
+      status?: string;
+      review_verdict?: string;
+      launch_context?: {
+        scope_flag_mode?: string | null;
+        prompt_delivery?: string | null;
+        reviewer_visible_context_transport?: string | null;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.review_verdict).toBe('clean');
+    expect(telemetry.launch_context?.scope_flag_mode).toBe('base');
+    expect(telemetry.launch_context?.prompt_delivery).toBe('stdin');
+    expect(telemetry.launch_context?.reviewer_visible_context_transport).toBe('stdin-prompt');
   });
 
   it('ignores ambient fake-codex harness env in baseEnv', async () => {

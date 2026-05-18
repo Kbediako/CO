@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 import { promisify } from 'node:util';
 
+import Ajv from 'ajv';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
@@ -507,6 +508,48 @@ describe('review contract v1', () => {
     expect(result.valid).toBe(false);
     expect(result.errors.join('\n')).toContain('must match a schema in anyOf');
     expect(result.errors.join('\n')).toContain('must be equal to constant');
+  });
+
+  it('keeps the structured-output schema in parity with canonical optional proposal fields', async () => {
+    const sandbox = await makeSandbox();
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const contract = buildCleanContract(evidenceRef);
+    markCodeChangesFinding(contract, evidenceRef);
+    markAgentLoopFinding(contract, evidenceRef);
+    contract.code_change_proposals.push({
+      id: 'code-target-only',
+      title: 'Patch target without inline diff',
+      rationale: 'Reviewers may describe a patchable target without emitting a full unified diff.',
+      target: {
+        path: 'scripts/lib/review-contract.ts'
+      },
+      tests: ['npm run test:core -- tests/review-contract.spec.ts'],
+      risk: 'low',
+      evidence_refs: [evidenceRef]
+    });
+    contract.agent_loop_proposals.push({
+      id: 'loop-no-owner',
+      title: 'Capture loop feedback without canonical owner',
+      rationale: 'A valid agent-loop follow-up may not have a known canonical owner key yet.',
+      routing: {
+        default_route: 'linear_follow_up',
+        follow_up_kind: 'agent_loop',
+        intent_checksum: 'loop-no-owner-checksum',
+        non_goals: ['Do not force artificial owner metadata.'],
+        not_done_if: ['The proposal requires a bogus canonical owner key.'],
+        acceptance_criteria: ['The proposal routes with canonical_owner_key null.']
+      },
+      evidence_refs: [evidenceRef]
+    });
+
+    await expect(validateReviewContract(contract, { repoRoot: sandbox })).resolves.toEqual({
+      valid: true,
+      errors: []
+    });
+    await expect(validateStructuredOutputSchema(contract)).resolves.toEqual({
+      valid: true,
+      errors: []
+    });
   });
 
   it('maps blocked and findings axes to fail-closed semantic findings', async () => {
@@ -1050,6 +1093,41 @@ function markCodeChangesFinding(
         evidence_refs: [evidenceRef]
       }
     ]
+  };
+}
+
+function markAgentLoopFinding(
+  contract: ReturnType<typeof buildCleanContract>,
+  evidenceRef: ReviewContractEvidenceRef
+): void {
+  (contract as Record<string, unknown>).overall_verdict = 'findings';
+  (contract.axes as Record<string, unknown>).agent_loop = {
+    verdict: 'findings',
+    summary: 'Agent-loop proposal requires parent action.',
+    evidence_refs: [evidenceRef],
+    findings: [
+      {
+        id: 'agent-loop-proposal-1',
+        priority: 'P2',
+        title: 'Agent-loop follow-up proposed.',
+        evidence_refs: [evidenceRef]
+      }
+    ]
+  };
+}
+
+async function validateStructuredOutputSchema(
+  candidate: unknown
+): Promise<{ valid: boolean; errors: string[] }> {
+  const schema = JSON.parse(
+    await readFile(join(process.cwd(), 'schemas', 'review-contract.v1.output.schema.json'), 'utf8')
+  ) as Record<string, unknown>;
+  const ajv = new Ajv({ allErrors: true });
+  const validate = ajv.compile(schema);
+  const valid = validate(candidate);
+  return {
+    valid,
+    errors: valid ? [] : (validate.errors ?? []).map((error) => `${error.instancePath}: ${error.message}`)
   };
 }
 

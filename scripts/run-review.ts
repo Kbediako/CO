@@ -800,11 +800,6 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
       promptLines.push('', `Diff budget override: ${diffBudgetOverride}`);
     }
 
-    if (contractMode === 'enforce' && explicitScopedReview) {
-      throw new Error(
-        'governed enforce review contract requires inline prompt delivery; explicit --base/--commit/--uncommitted review launches currently use artifact-only prompt transport, so rerun without explicit scope flags or use shadow/off contract mode for scoped diagnostics.'
-      );
-    }
     const reviewContractInputs = await prepareReviewContractInputBundles({
       repoRoot,
       reviewDir: resolveReviewArtifactsDir(manifestPath, repoRoot),
