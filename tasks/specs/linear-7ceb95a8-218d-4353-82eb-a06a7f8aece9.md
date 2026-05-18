@@ -1,11 +1,14 @@
 ---
 id: 20260422-linear-7ceb95a8-218d-4353-82eb-a06a7f8aece9
 title: Child lane launcher fail closed on appserver scope drift and stuck launching ledgers
+status: in_progress
 relates_to: docs/PRD-linear-7ceb95a8-218d-4353-82eb-a06a7f8aece9.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-22
+last_review: 2026-05-18
+review_notes:
+  - 2026-05-18: CO-522 active-spec audit found 8 unchecked task checklist items, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 ## Canonical Reference

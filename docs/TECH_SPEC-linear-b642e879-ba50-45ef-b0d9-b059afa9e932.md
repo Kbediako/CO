@@ -1,4 +1,4 @@
-# TECH_SPEC Mirror - CO-522 docs:freshness:maintain owner rehome
+# TECH_SPEC Mirror - CO-522 docs:freshness:maintain owner recovery
 
 This mirror follows `tasks/specs/linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md`.
 
@@ -7,18 +7,32 @@ This mirror follows `tasks/specs/linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md`
 - Preserve `canonical_owner_key=docs:freshness:maintain` and marker `codex-orchestrator:canonical-owner-key=docs:freshness:maintain`.
 - Preserve baseline evidence: `configured_owner_terminal`, `issue_state=Done`, `blocking_changed_paths=[]`, `freshness_decision=block_diff_local`, stale docs, and registry rows.
 - Keep CO-514 provider-worker manifest serialization out of scope.
+- 2026-05-18 recovery scope: keep CO-522 as the live owner and burn down the current `block_spec_guard_pre_expiry` gate reported by `docs:freshness:maintain`.
+- Preserve handoff blocking while `repo_gate.blocks_handoff=true`; CO-512/PR #829 must remain draft or explicitly waived until this gate clears.
+- Use the disposition manifest to route each stale/pre-expiry entry to review refresh, archive, reclassification, or same-project owner deferral.
 
 ## Acceptance Criteria
 - [x] CO-522 is the usable live same-project owner.
 - [x] `docs:freshness:maintain -- --format json` no longer reports `configured_owner_terminal` for the canonical owner key.
 - [x] Stale cohort evidence remains visible and owner-routed.
 - [x] `docs:freshness` and spec-guard are not weakened.
+- [x] The current `block_spec_guard_pre_expiry` gate is removed locally without a metadata-only date bump, cap/window expansion, or duplicate owner issue. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/docs-freshness-maintenance-after-spec-lifecycle.json`.
+- [x] No action is resolved by a metadata-only `last_review` bump, cap/window expansion, or duplicate owner issue. Evidence: the recovery uses archive stubs, terminal lifecycle status, active-spec review metadata, and missing-index repair while leaving guard thresholds intact.
+- [ ] `co-status` and `docs:freshness:maintain` agree that `blocks_handoff=false` before CO-512 advances.
 
 ## Validation
 - Before and after `docs:freshness:maintain -- --format json`.
 - `node scripts/spec-guard.mjs --dry-run`.
 - `npm run docs:freshness`.
 - `npm run docs:check`.
+- `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/disposition-manifest.json` accounts for the stale and pre-expiry groups.
+- `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json` and `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-disposition-summary.json` classify remaining pre-expiry specs as terminal, active, standalone, or index-repair-needed.
+- `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/docs-freshness-maintenance-after-spec-lifecycle.json` records `repo_gate.blocks_handoff=false` for the local recovery branch.
+- `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/docs-freshness-final.json` and `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/docs-freshness-maintenance-final.json` record the final local clean docs freshness and maintain gates after packet evidence updates.
+- `.runs/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-guard/cli/2026-05-18T08-17-21-680Z-82986f0f/manifest.json` records repo-local delegation/build/lint/test/spec-guard evidence.
+- ChatGPT Pro advisory evidence from Browser session `CO-522 Freshness Blocker Strategy` supported the same classification path and explicitly rejected blind date bumps, guard weakening, duplicate owner issues, and declaring terminal before `blocks_handoff=false`.
+- Focused freshness/archive tests if the recovery changes lifecycle classification or archive automation.
+- `co-status --format json` after recovery must not report CO-522 as a handoff-blocking repo gate.
 
 ## CO-382 Fallback Decision Table
 

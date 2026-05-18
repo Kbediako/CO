@@ -1,8 +1,7 @@
 # ACTION_PLAN: Coordinator Symphony-Aligned Codex Setup And Defaults CLI Shell Extraction
 
-## Steps
+<!-- docs-archive:stub -->
+> Archived on 2026-05-18. Full content: https://github.com/Kbediako/CO/blob/doc-archives/docs/ACTION_PLAN-coordinator-symphony-aligned-codex-setup-and-defaults-cli-shell-extraction.md
 
-1. Capture the current `codex setup` / `codex defaults` contract and isolate the truthful shell boundary.
-2. Move the shell family into a dedicated orchestrator CLI module while keeping the setup/defaults engines unchanged.
-3. Add focused helper and/or CLI parity coverage for the extracted contract.
-4. Run the validation lane and close the task with explicit carry-forwards if any non-local drift remains.
+- Archive branch: doc-archives
+- Archive path: docs/ACTION_PLAN-coordinator-symphony-aligned-codex-setup-and-defaults-cli-shell-extraction.md

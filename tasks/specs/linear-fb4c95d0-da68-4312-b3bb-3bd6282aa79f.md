@@ -4,7 +4,7 @@ title: Control host / CO STATUS: prevent top-level tracked.linear from leaking s
 status: in_progress
 owner: Codex
 created: 2026-04-18
-last_review: 2026-04-19
+last_review: 2026-05-18
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md
@@ -16,6 +16,7 @@ review_notes:
   - 2026-04-18: The expected shared source payload path is absent in this child checkout, so the packet preserves the verbatim CO-223 issue prompt recovered via read-only Linear fetch plus direct repo inspection of `controlRuntime.ts`, `selectedRunProjection.ts`, and `observabilityReadModel.ts`.
   - 2026-04-18: The docs child lane left `docs/TASKS.md` untouched because that checkout reported a `450`-line cap constraint.
   - 2026-04-19: Parent lane added the CO-223 active-task snapshot row to `docs/TASKS.md` after current `origin/main` had line-count headroom, so no archive movement was required.
+  - 2026-05-18: CO-522 active-spec audit found 3 unchecked task checklist items, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 # Technical Specification

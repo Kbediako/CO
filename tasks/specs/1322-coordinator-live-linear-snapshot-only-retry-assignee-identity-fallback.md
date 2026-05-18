@@ -4,7 +4,7 @@ title: Coordinator Live Linear Snapshot-Only Retry Assignee-Identity Fallback
 status: in_progress
 owner: Codex
 created: 2026-03-24
-last_review: 2026-04-24
+last_review: 2026-05-18
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-live-linear-snapshot-only-retry-assignee-identity-fallback.md
@@ -17,6 +17,7 @@ review_notes:
   - 2026-03-24: Current CO truth is that snapshot-only retry fallback reconstructs `assignee_id` from persisted claim state but drops `viewer_id`, which makes self-assigned retries look foreign when live resolution is unavailable.
   - 2026-03-24: The bounded corrective seam is additive persisted viewer identity plus an auth-context fingerprint so fallback reconstruction only replays viewer identity when the current Linear token still matches; the ownership predicate itself should stay unchanged.
   - 2026-04-24: Re-reviewed for CO-343 Apr 24 freshness restoration; the packet remains active historical/operator evidence, so only freshness metadata changed.
+  - 2026-05-18: CO-522 active-spec audit found 4 unchecked task checklist items, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 # Technical Specification

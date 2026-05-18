@@ -1,4 +1,4 @@
-# PRD - CO-522 docs:freshness:maintain owner rehome after CO-511 terminal
+# PRD - CO-522 docs:freshness:maintain owner recovery and pre-expiry burn-down
 
 ## Traceability
 - Linear issue: `CO-522` / `b642e879-ba50-45ef-b0d9-b059afa9e932`
@@ -9,11 +9,15 @@
 - Before owner-truth report: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932/before-docs-freshness-maintenance-report.json`
 - After owner-truth report: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932/after-docs-freshness-maintenance-report.json`
 - Accepted child slice: `.runs/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-co522-task-checklist/cli/2026-05-12T17-20-16-231Z-292db3b2/manifest.json`
+- 2026-05-18 recovery report: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/docs-freshness-maintenance.json`
+- 2026-05-18 disposition manifest: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/disposition-manifest.json`
 
 ## Summary
 CO-514 validation surfaced repo-wide docs freshness debt outside CO-514's provider-worker manifest serialization scope. `docs:freshness:maintain -- --format json` identified the canonical owner key `docs:freshness:maintain`, but the configured owner `CO-511` is terminal `Done`, so future provider-worker lanes see `configured_owner_terminal` and cannot route baseline debt to a live owner.
 
 CO-522 restores the live same-project owner by re-homing `rolling_freshness_cohorts.owner_issue` from terminal `CO-511` to live `CO-522`, while preserving stale-doc evidence, canonical owner reuse semantics, and strict `docs:freshness` / `spec-guard` behavior.
+
+2026-05-18 recovery update: the owner-rehome PR is merged, but the live maintenance gate has advanced from terminal-owner routing to an active `block_spec_guard_pre_expiry` blocker under the same canonical owner. Current evidence reports `owner_issue=CO-522`, `owner_issue_verification.state=Blocked`, `spec_guard_status=succeeded`, `policy_capacity_status.current_entries=275`, `policy_capacity_status.current_cohorts=13`, `action_required_count=180`, and `blocks_handoff=true`. CO-522 now owns the burn-down plan for those current actions, not just the historical owner pointer.
 
 ## User Request Translation
 - Create or reuse the canonical docs freshness maintenance owner for `canonical_owner_key=docs:freshness:maintain`.
@@ -21,6 +25,8 @@ CO-522 restores the live same-project owner by re-homing `rolling_freshness_coho
 - Preserve the exact blocker evidence: `owner_issue=CO-511`, `configured_owner_terminal`, `issue_state=Done`, `issue_state_type=completed`, `blocking_changed_paths=[]`, and `freshness_decision=block_diff_local`.
 - Do not weaken `docs:freshness`, `docs:freshness:maintain`, spec-guard, docs catalog, or registry validation.
 - Do not blindly bump `last_review` or delete stale docs to clear gates.
+- Recover CO-522 as the active implementation lane for the live `block_spec_guard_pre_expiry` gate while keeping Linear state `Blocked` until the gate is actually cleared.
+- Keep CO-512 / PR #829 draft while `docs:freshness:maintain` reports `blocks_handoff=true`.
 
 ## Intent Checksum
 - Protected terms:
@@ -44,6 +50,7 @@ CO-522 restores the live same-project owner by re-homing `rolling_freshness_coho
 | Maintenance output | `docs:freshness:maintain` reports `configured_owner_terminal` for `CO-511`. | Provider-worker lanes need a non-terminal owner or clear replacement action. | Output no longer reports `configured_owner_terminal` for `docs:freshness:maintain`. | Making all stale docs green by broad repair. |
 | Stale cohort evidence | Baseline includes 617 stale entries, 611 blocking candidate entries, 33 candidate cohorts, 6 hard-stale entries, and no missing registry rows. | Baseline debt remains visible and machine-routable. | Packet and guide preserve the stale cohort evidence under CO-522. | Blind `last_review` bumps or stale-doc deletion. |
 | CO-514 scope | CO-514 owns provider-worker manifest serialization. | Unrelated implementation lanes should not absorb repo-wide docs freshness debt. | CO-522 owns owner routing only. | Lifecycle authority changes for CO-514. |
+| 2026-05-18 live gate | `docs:freshness:maintain` reports `block_spec_guard_pre_expiry`, `action_required_count=180`, `blocks_handoff=true`, and one hard-stale current doc. | Owner re-home is not remediation unless current actions are cleared or explicitly owner-deferred. | Every current action has an evidence-backed disposition and the gate reports `blocks_handoff=false` before handoff. | Duplicate owner issues, cap/window increases, or metadata-only freshness bumps. |
 
 ## Not Done If
 - `docs:freshness:maintain` still reports `configured_owner_terminal` for `canonical_owner_key=docs:freshness:maintain`.
@@ -51,19 +58,23 @@ CO-522 restores the live same-project owner by re-homing `rolling_freshness_coho
 - The diff weakens `docs:freshness`, `docs:freshness:maintain`, spec-guard, docs catalog, or registry validation.
 - The repair deletes stale docs, hides stale rows, or blindly bumps `last_review`.
 - CO-514 provider-worker manifest serialization scope is changed.
+- CO-522 remains only a nominal owner while `action_required_count > 0` or `blocks_handoff=true`.
+- CO-512 / PR #829 leaves draft or review-blocked posture while the CO-522 gate still blocks handoff.
 
 ## Goals
-- Re-home the live `docs:freshness:maintain` owner from terminal `CO-511` to live `CO-522`.
+- Keep the live `docs:freshness:maintain` owner on same-project non-terminal `CO-522`.
 - Preserve stale cohort evidence and canonical owner marker traceability.
-- Register the CO-522 packet and registry mirrors.
-- Validate before/after owner truth without weakening freshness gates.
+- Register and refresh the CO-522 packet and registry mirrors.
+- Burn down the live pre-expiry/current-action gate through real review, archive, reclassification, or explicit same-project owner deferral.
+- Validate owner truth and handoff readiness without weakening freshness gates.
 
 ## Non-Goals
 - No CO-514 provider-worker manifest serialization changes.
-- No broad stale-doc repair.
+- No unrelated product or provider-worker implementation changes.
 - No changes to owner-verification code.
-- No stale packet deletion or blind `last_review` churn.
+- No blind `last_review` churn, cohort cap/window widening, or stale packet deletion to silence validation.
 - No lifecycle authority changes for CO-514.
+- No duplicate canonical owner for `docs:freshness:maintain` while CO-522 verifies live.
 
 ## Metrics & Guardrails
 - Before report captures terminal `CO-511` evidence.
@@ -71,6 +82,8 @@ CO-522 restores the live same-project owner by re-homing `rolling_freshness_coho
 - `blocking_changed_paths=[]` remains visible as evidence that the blocker is owner-routed baseline debt.
 - Packet and registry JSON parse cleanly.
 - Validation commands are recorded without bypass flags.
+- 2026-05-18 disposition manifest records four groups: strict hard-stale current docs, strict pre-expiry current docs, spec-guard pre-expiry active specs, and historical task/report stale cohorts.
+- Handoff is blocked while `repo_gate.blocks_handoff=true`.
 
 ## Open Questions
 - None.

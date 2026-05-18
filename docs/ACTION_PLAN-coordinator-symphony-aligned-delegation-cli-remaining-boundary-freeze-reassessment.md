@@ -1,8 +1,7 @@
 # ACTION_PLAN: Coordinator Symphony-Aligned Delegation CLI Remaining Boundary Freeze Reassessment
 
-## Steps
+<!-- docs-archive:stub -->
+> Archived on 2026-05-18. Full content: https://github.com/Kbediako/CO/blob/doc-archives/docs/ACTION_PLAN-coordinator-symphony-aligned-delegation-cli-remaining-boundary-freeze-reassessment.md
 
-1. Reinspect the remaining local delegation CLI surface in `bin/codex-orchestrator.ts` after `1261`.
-2. Confirm whether any meaningful ownership split remains beyond shared parse/help glue and the thin wrapper into `orchestrator/src/cli/delegationCliShell.ts`.
-3. Record the freeze-or-go result in the task/spec/checklist mirrors.
-4. Only register another implementation slice if reassessment finds a real bounded seam.
+- Archive branch: doc-archives
+- Archive path: docs/ACTION_PLAN-coordinator-symphony-aligned-delegation-cli-remaining-boundary-freeze-reassessment.md

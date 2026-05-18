@@ -1,11 +1,14 @@
 ---
 id: 20260417-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c
 title: Control host prevent repeated refresh-stuck restart churn while active provider workers remain healthy
+status: in_progress
 relates_to: docs/PRD-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-21
+last_review: 2026-05-18
+review_notes:
+  - 2026-05-18: CO-522 active-spec audit found 1 unchecked task checklist item, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 ## Canonical Reference

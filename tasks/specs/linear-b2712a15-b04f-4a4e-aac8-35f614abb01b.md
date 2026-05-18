@@ -1,11 +1,14 @@
 ---
 id: 20260423-linear-b2712a15-b04f-4a4e-aac8-35f614abb01b-release-runbook-parity-docs-check-truth-coverage
 title: CO-315 release-runbook parity and docs:check truth coverage
+status: in_progress
 relates_to: docs/PRD-linear-b2712a15-b04f-4a4e-aac8-35f614abb01b.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-23
+last_review: 2026-05-18
+review_notes:
+  - 2026-05-18: CO-522 active-spec audit found 12 unchecked task checklist items, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 ## Canonical Reference

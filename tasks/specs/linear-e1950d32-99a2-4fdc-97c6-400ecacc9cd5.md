@@ -4,7 +4,7 @@ title: CO Reconcile Terminal Provider-Worker Failures and Stale Intake Workpad S
 status: in_progress
 owner: Codex
 created: 2026-03-25
-last_review: 2026-04-25
+last_review: 2026-05-18
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-e1950d32-99a2-4fdc-97c6-400ecacc9cd5.md
@@ -18,6 +18,7 @@ review_notes:
   - 2026-03-25: The failed `CO-16` artifact pair proves a terminal worker failure (`manifest.status = failed`, `proof.owner_status = failed`, `proof.end_reason = codex_exit_1`) after successful Linear writes had already occurred.
   - 2026-03-25: Current local control-host intake state has since been manually recovered, so this lane targets the missing automatic reconciliation path rather than replaying the already-fixed live stale snapshot.
   - 2026-03-25: Delegation override is required for this worker run because `spawn_agent` is unavailable without explicit user authorization in-session.
+  - 2026-05-18: CO-522 active-spec audit found 3 unchecked task checklist items, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 # Technical Specification

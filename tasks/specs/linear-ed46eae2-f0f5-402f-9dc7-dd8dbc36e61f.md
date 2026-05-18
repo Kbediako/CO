@@ -1,11 +1,14 @@
 ---
 id: 20260423-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f
 title: CO Codex CLI 0.123.0 Posture and Next-Release Target Audit
+status: in_progress
 relates_to: docs/PRD-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-23
+last_review: 2026-05-18
+review_notes:
+  - 2026-05-18: CO-522 active-spec audit found 1 unchecked task checklist item, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 ## Summary

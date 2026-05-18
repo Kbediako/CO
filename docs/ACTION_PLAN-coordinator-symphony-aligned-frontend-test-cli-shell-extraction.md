@@ -1,8 +1,7 @@
 # ACTION_PLAN: Coordinator Symphony-Aligned Frontend-Test CLI Shell Extraction
 
-## Steps
+<!-- docs-archive:stub -->
+> Archived on 2026-05-18. Full content: https://github.com/Kbediako/CO/blob/doc-archives/docs/ACTION_PLAN-coordinator-symphony-aligned-frontend-test-cli-shell-extraction.md
 
-1. Reinspect `handleFrontendTest(...)` and the handoff into `orchestrator.start(...)` to confirm the exact shell boundary.
-2. Extract the bounded binary-facing `frontend-test` shell behind a dedicated helper without widening into neighboring command families.
-3. Add focused parity coverage for the extracted shell and any touched CLI surface.
-4. Validate the shipped tree honestly, including review and pack-smoke, then record the next truthful nearby seam or freeze.
+- Archive branch: doc-archives
+- Archive path: docs/ACTION_PLAN-coordinator-symphony-aligned-frontend-test-cli-shell-extraction.md
