@@ -1367,6 +1367,52 @@ function buildConsolidatedOwnerAction(decision, actions) {
   };
 }
 
+function buildSpecGuardPreExpiryOwnerAction(decision) {
+  const preExpiryEntries = Array.isArray(decision?.spec_guard_pre_expiry_entries)
+    ? decision.spec_guard_pre_expiry_entries
+    : [];
+  if (preExpiryEntries.length === 0) {
+    return null;
+  }
+
+  const action = decision?.owner_issue_action ?? {};
+  const routeId = 'co-554-spec-guard-pre-expiry';
+  let mode = normalizeOptionalString(action.mode) ?? 'create_or_update_required';
+  if (action.reason === 'configured_owner_terminal') {
+    mode = 'replace_terminal_owner';
+  } else if (!['create_required', 'update_existing', 'update_existing_multiple'].includes(mode)) {
+    mode = 'create_or_update_required';
+  }
+
+  const cohort = {
+    id: 'spec-guard-pre-expiry',
+    canonical_owner_key: docsFreshnessOwnerKeyForDecision(decision),
+    configured_owner_issue: action.existing_issue ?? decision?.owner_issue ?? null,
+    owner_issue_action: action,
+    sample_paths: Array.isArray(decision?.sample_paths?.spec_guard_pre_expiry_paths)
+      ? decision.sample_paths.spec_guard_pre_expiry_paths.slice(0, 10)
+      : preExpiryEntries.slice(0, 10).map((entry) => entry.path).filter(Boolean),
+    source_breakdown: {
+      spec_guard_pre_expiry: preExpiryEntries.length
+    }
+  };
+  const body = buildCanonicalOwnerBody({ decision, cohort, mode, routeId });
+  return {
+    route_id: routeId,
+    mode,
+    canonical_owner_key: body.canonical_owner_key,
+    canonical_owner_marker: body.canonical_owner_marker,
+    cohort_id: null,
+    cohort_count: preExpiryEntries.length,
+    cohort_canonical_owner_key: null,
+    owner_issue: ownerActionIssueForCohort(cohort, decision),
+    owner_issue_action: action,
+    body,
+    copyable_command: buildCopyableOwnerCommand(body, decision?.owner_issue ?? '<source-linear-issue-id>', mode),
+    should_block: false
+  };
+}
+
 function hasLinearWriteCredentials(env = process.env) {
   return Boolean(
     normalizeOptionalString(env.CO_LINEAR_API_TOKEN) ??
@@ -1382,49 +1428,13 @@ function shouldOwnerActionBlock(decision, action) {
   return ['create_required', 'create_or_update_required', 'replace_terminal_owner'].includes(action.mode);
 }
 
-export function buildDocsFreshnessOwnerActionEvidence(
-  decision,
-  {
-    env = process.env,
-    dryRunLinearActions = false
-  } = {}
-) {
-  const cohorts = Array.isArray(decision?.candidate_cohorts) ? decision.candidate_cohorts : [];
-  if (cohorts.length === 0) {
-    return {
-      status: 'not_applicable',
-      write_status: 'not_required',
-      should_block: false,
-      actions: []
-    };
-  }
-
-  const credentialsAvailable = hasLinearWriteCredentials(env);
-  const rawActions = cohorts.map((cohort) => {
-    const routeId = routeIdForCohort(cohort);
-    const mode = ownerActionModeForCohort(cohort, decision);
-    const body = buildCanonicalOwnerBody({ decision, cohort, mode, routeId });
-    return {
-      route_id: routeId,
-      mode,
-      canonical_owner_key: body.canonical_owner_key,
-      canonical_owner_marker: body.canonical_owner_marker,
-      cohort_id: cohort.id ?? null,
-      cohort_canonical_owner_key: cohort.canonical_owner_key ?? null,
-      owner_issue: ownerActionIssueForCohort(cohort, decision),
-      owner_issue_action: cohort.owner_issue_action ?? decision.owner_issue_action ?? null,
-      body,
-      copyable_command: buildCopyableOwnerCommand(body, decision?.owner_issue ?? '<source-linear-issue-id>', mode),
-      should_block: false
-    };
-  });
-  const consolidatedAction = buildConsolidatedOwnerAction(decision, rawActions);
-  const actions = consolidatedAction ? [consolidatedAction] : rawActions;
+function buildOwnerActionEvidenceResult(decision, actions, { env = process.env, dryRunLinearActions = false } = {}) {
   for (const action of actions) {
     action.should_block = shouldOwnerActionBlock(decision, action);
   }
 
   const requiredActions = actions.filter((action) => action.should_block);
+  const credentialsAvailable = hasLinearWriteCredentials(env);
   let status = 'resolved';
   let writeStatus = credentialsAvailable ? 'credentials_available' : 'credentials_missing';
   if (dryRunLinearActions) {
@@ -1443,6 +1453,54 @@ export function buildDocsFreshnessOwnerActionEvidence(
     required_actions: requiredActions.length,
     actions
   };
+}
+
+export function buildDocsFreshnessOwnerActionEvidence(
+  decision,
+  {
+    env = process.env,
+    dryRunLinearActions = false
+  } = {}
+) {
+  const cohorts = Array.isArray(decision?.candidate_cohorts) ? decision.candidate_cohorts : [];
+  if (cohorts.length === 0) {
+    const preExpiryOwnerAction = buildSpecGuardPreExpiryOwnerAction(decision);
+    if (preExpiryOwnerAction) {
+      return buildOwnerActionEvidenceResult(decision, [preExpiryOwnerAction], { env, dryRunLinearActions });
+    }
+    return {
+      status: 'not_applicable',
+      write_status: 'not_required',
+      should_block: false,
+      actions: []
+    };
+  }
+
+  const preExpiryOwnerAction = buildSpecGuardPreExpiryOwnerAction(decision);
+  const rawActions = cohorts.map((cohort) => {
+    const routeId = routeIdForCohort(cohort);
+    const mode = ownerActionModeForCohort(cohort, decision);
+    const body = buildCanonicalOwnerBody({ decision, cohort, mode, routeId });
+    return {
+      route_id: routeId,
+      mode,
+      canonical_owner_key: body.canonical_owner_key,
+      canonical_owner_marker: body.canonical_owner_marker,
+      cohort_id: cohort.id ?? null,
+      cohort_canonical_owner_key: cohort.canonical_owner_key ?? null,
+      owner_issue: ownerActionIssueForCohort(cohort, decision),
+      owner_issue_action: cohort.owner_issue_action ?? decision.owner_issue_action ?? null,
+      body,
+      copyable_command: buildCopyableOwnerCommand(body, decision?.owner_issue ?? '<source-linear-issue-id>', mode),
+      should_block: false
+    };
+  });
+  if (preExpiryOwnerAction) {
+    rawActions.push(preExpiryOwnerAction);
+  }
+  const consolidatedAction = buildConsolidatedOwnerAction(decision, rawActions);
+  const actions = consolidatedAction ? [consolidatedAction] : rawActions;
+  return buildOwnerActionEvidenceResult(decision, actions, { env, dryRunLinearActions });
 }
 
 function isoDateFromTimestamp(value) {
@@ -1783,6 +1841,9 @@ function buildRecommendedAction(
   }
   if (decision === 'block_terminal_lifecycle') {
     return 'Run the implementation-docs archive/reclassification path for terminal task packets, or intentionally preserve reviewed active docs before they become ordinary stale debt.';
+  }
+  if (decision === 'block_spec_guard_pre_expiry') {
+    return `Review, archive, reclassify, or assign direct owner action for ${specGuardPreExpiryCount} active spec${specGuardPreExpiryCount === 1 ? '' : 's'} approaching spec-guard expiry; do not wait for the hard 30-day failure.`;
   }
   if (decision === 'block_policy_expired') {
     return `Refresh, archive, or reclassify the expired historical cohort through ${describeOwnerIssuePath(ownerIssueAction)}; do not defer it further.`;
@@ -2467,12 +2528,14 @@ export function buildDocsFreshnessMaintenanceDecision(
   )
     .map(normalizeSpecGuardPreExpiryEntry)
     .filter(Boolean);
+  const hasSpecGuardPreExpiryDebt = normalizedSpecGuardPreExpiryEntries.length > 0;
   const livePolicyStaleEntries = staleEntries.filter(isLivePolicyCapacityEntry);
   const livePolicyRollingEntries = rollingEntries.filter(isLivePolicyCapacityEntry);
   const hasOwnerRelevantDebtForAction =
     livePolicyStaleEntries.length > 0 ||
     livePolicyRollingEntries.length > 0 ||
-    normalizedSpecGuard.status === 'failed';
+    normalizedSpecGuard.status === 'failed' ||
+    hasSpecGuardPreExpiryDebt;
   const resolvedOwnerIssueVerification = hasOwnerRelevantDebtForAction
     ? deriveOwnerIssueVerification(policy, ownerIssueVerification)
     : null;
@@ -2540,7 +2603,11 @@ export function buildDocsFreshnessMaintenanceDecision(
   let freshnessDecision = 'clean';
   if (registryBlockerCount > 0) {
     freshnessDecision = 'block_missing_or_invalid_registry';
-  } else if (!hasProvenDiffStatus(diffStatus) || blockingChangedPaths.length > 0 || normalizedSpecGuard.status === 'failed') {
+  } else if (blockingChangedPaths.length > 0 || normalizedSpecGuard.status === 'failed') {
+    freshnessDecision = 'block_diff_local';
+  } else if (hasSpecGuardPreExpiryDebt) {
+    freshnessDecision = 'block_spec_guard_pre_expiry';
+  } else if (!hasProvenDiffStatus(diffStatus)) {
     freshnessDecision = 'block_diff_local';
   } else if (hasTerminalLifecycleDebt) {
     freshnessDecision = 'block_terminal_lifecycle';
@@ -2863,13 +2930,17 @@ export async function runDocsFreshnessMaintain(
     runSpecGuard(repoRoot, { skip: skipSpecGuard }),
     collectSpecGuardPreExpiryEntries(repoRoot)
   ]);
+  const hasSpecGuardPreExpiryDebt = specGuardPreExpiryEntries.length > 0;
   const hasOwnerRelevantDebt =
     (Array.isArray(freshnessResult.report?.stale_entries) && freshnessResult.report.stale_entries.length > 0) ||
     (Array.isArray(freshnessResult.report?.rolling_cohort_entries) &&
       freshnessResult.report.rolling_cohort_entries.length > 0) ||
-    specGuard.status === 'failed';
+    specGuard.status === 'failed' ||
+    hasSpecGuardPreExpiryDebt;
   const shouldVerifyCanonicalOwners =
-    shouldVerifyCanonicalOwnerIssues(freshnessResult.report) || specGuard.status === 'failed';
+    shouldVerifyCanonicalOwnerIssues(freshnessResult.report) ||
+    specGuard.status === 'failed' ||
+    hasSpecGuardPreExpiryDebt;
   const [ownerIssueVerification, canonicalOwnerIssueVerifications] = await Promise.all([
     hasOwnerRelevantDebt
       ? verifyOwnerIssueContext(
