@@ -1,6 +1,75 @@
 {
   "items": [
     {
+      "id": "20260518-linear-2f522b6e-8208-484a-a7ad-08172d0280d9",
+      "title": "CO-554 prevent rolling active-spec expiry repeats",
+      "relates_to": "tasks/tasks-linear-2f522b6e-8208-484a-a7ad-08172d0280d9.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "implementation_update_validation_pending",
+      "last_review": "2026-05-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet-2026-05-18T03-52-23-001Z-30ada228",
+          "date": "2026-05-18",
+          "status": "produced_for_parent_import",
+          "manifest": ".runs/linear-2f522b6e-8208-484a-a7ad-08172d0280d9-docs-packet/cli/2026-05-18T03-52-23-001Z-30ada228/manifest.json",
+          "source_anchor": "ctx:sha256:1dbe6fff6c3d671a2a4d6df11f5d5b78f816b725f0c7ac8deb101241d8631d6f#chunk:c000001",
+          "summary": "Docs-only child lane created the CO-554 packet and registry mirrors; parent later refreshed the packet with current reproduction, row evidence, and prevention validation."
+        },
+        "parent_implementation_update": {
+          "reviewer": "CO-554 provider worker",
+          "date": "2026-05-18",
+          "status": "validation_pending",
+          "summary": "Parent reproduced the Apr 17 strict spec-guard cohort, verified all 13 source issues are Done/completed through live Linear issue-context, reclassified those specs inactive done with history retained, and changed docs:freshness:maintain to block on active spec pre-expiry before hard strict expiry."
+        }
+      },
+      "validation": {
+        "status": "implementation_update_validation_pending",
+        "passed": [
+          "docs-first packet created",
+          "registry mirrors created",
+          "child-lane JSON parse checks",
+          "child-lane protected-term checks",
+          "child-lane git diff --check for tracked files",
+          "child-lane trailing-whitespace scan for all owned files",
+          "parent strict non-dry node scripts/spec-guard.mjs reproduction",
+          "parent Apr 17 row evidence table from live Linear issue-context",
+          "parent CO-543 prevention mismatch repair",
+          "focused docs-freshness-maintain active spec pre-expiry regression",
+          "parent strict dry-run and non-dry node scripts/spec-guard.mjs clean proof",
+          "docs:freshness:maintain emits block_spec_guard_pre_expiry with no Apr 17 cohort mentions"
+        ],
+        "pending": [
+          "npm run docs:check",
+          "npm run docs:freshness and broader validation classification",
+          "standalone review and elegance pass before review handoff",
+          "PR attachment and ready-review drain before review-state transition"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-2f522b6e-8208-484a-a7ad-08172d0280d9.md",
+        "prd": "docs/PRD-linear-2f522b6e-8208-484a-a7ad-08172d0280d9.md",
+        "docs": "docs/TECH_SPEC-linear-2f522b6e-8208-484a-a7ad-08172d0280d9.md",
+        "action_plan": "docs/ACTION_PLAN-linear-2f522b6e-8208-484a-a7ad-08172d0280d9.md",
+        "spec": "tasks/specs/linear-2f522b6e-8208-484a-a7ad-08172d0280d9.md",
+        "task": "tasks/tasks-linear-2f522b6e-8208-484a-a7ad-08172d0280d9.md"
+      },
+      "source_issue": {
+        "id": "2f522b6e-8208-484a-a7ad-08172d0280d9",
+        "identifier": "CO-554",
+        "url": "https://linear.app/asabeko/issue/CO-554"
+      },
+      "related_issues": [
+        {
+          "identifier": "CO-543",
+          "relation": "repeat_prevention_reference"
+        }
+      ]
+    },
+    {
       "id": "20260517-linear-8826c2fa-3160-4fa3-bfcb-eaa0c0b9d6f1",
       "title": "CO-553 eliminate docs freshness policy capacity over-budget debt",
       "relates_to": "tasks/tasks-linear-8826c2fa-3160-4fa3-bfcb-eaa0c0b9d6f1.md",
@@ -7429,7 +7498,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-17",
+      "last_review": "2026-05-18",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -7445,6 +7514,10 @@
         "task": "tasks/tasks-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md",
         "agent_task": ".agent/task/linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md",
         "docs": "docs/TECH_SPEC-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md"
+      },
+      "status": "done",
+      "validation": {
+        "status": "done"
       }
     },
     {
@@ -8281,13 +8354,17 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-18",
+      "last_review": "2026-05-18",
       "approvals": {},
       "paths": {
         "spec": "tasks/specs/linear-5f3bf177-0fa7-4378-9438-5dcaf7919394.md",
         "task": "tasks/tasks-linear-5f3bf177-0fa7-4378-9438-5dcaf7919394.md",
         "agent_task": ".agent/task/linear-5f3bf177-0fa7-4378-9438-5dcaf7919394.md",
         "docs": "docs/TECH_SPEC-linear-5f3bf177-0fa7-4378-9438-5dcaf7919394.md"
+      },
+      "status": "done",
+      "validation": {
+        "status": "done"
       }
     },
     {
@@ -8298,13 +8375,17 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-17",
+      "last_review": "2026-05-18",
       "approvals": {},
       "paths": {
         "spec": "tasks/specs/linear-5b31889f-233c-4f23-9750-5ff21d737661.md",
         "task": "tasks/tasks-linear-5b31889f-233c-4f23-9750-5ff21d737661.md",
         "agent_task": ".agent/task/linear-5b31889f-233c-4f23-9750-5ff21d737661.md",
         "docs": "docs/TECH_SPEC-linear-5b31889f-233c-4f23-9750-5ff21d737661.md"
+      },
+      "status": "done",
+      "validation": {
+        "status": "done"
       }
     },
     {
@@ -8315,7 +8396,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-17",
+      "last_review": "2026-05-18",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -8331,6 +8412,10 @@
         "task": "tasks/tasks-linear-5de4b04b-ec1e-4ab5-b75a-270989af4599.md",
         "agent_task": ".agent/task/linear-5de4b04b-ec1e-4ab5-b75a-270989af4599.md",
         "docs": "docs/TECH_SPEC-linear-5de4b04b-ec1e-4ab5-b75a-270989af4599.md"
+      },
+      "status": "done",
+      "validation": {
+        "status": "done"
       }
     },
     {
@@ -8341,7 +8426,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-17",
+      "last_review": "2026-05-18",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -8357,6 +8442,10 @@
         "task": "tasks/tasks-linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926.md",
         "agent_task": ".agent/task/linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926.md",
         "docs": "docs/TECH_SPEC-linear-975669a4-3804-4b5b-9a7b-e1b7c77d3926.md"
+      },
+      "status": "done",
+      "validation": {
+        "status": "done"
       }
     },
     {
@@ -8367,7 +8456,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-17",
+      "last_review": "2026-05-18",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -8383,6 +8472,10 @@
         "task": "tasks/tasks-linear-50e8a891-2b2f-4a67-b4d0-a2706870ddec.md",
         "agent_task": ".agent/task/linear-50e8a891-2b2f-4a67-b4d0-a2706870ddec.md",
         "docs": "docs/TECH_SPEC-linear-50e8a891-2b2f-4a67-b4d0-a2706870ddec.md"
+      },
+      "status": "done",
+      "validation": {
+        "status": "done"
       }
     },
     {
@@ -8393,7 +8486,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-17",
+      "last_review": "2026-05-18",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -8423,6 +8516,10 @@
         "task": "tasks/tasks-linear-34c13c4f-5839-4c64-b6c3-c2b30b7d7fe3.md",
         "agent_task": ".agent/task/linear-34c13c4f-5839-4c64-b6c3-c2b30b7d7fe3.md",
         "docs": "docs/TECH_SPEC-linear-34c13c4f-5839-4c64-b6c3-c2b30b7d7fe3.md"
+      },
+      "status": "done",
+      "validation": {
+        "status": "done"
       }
     },
     {
@@ -8535,7 +8632,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-17",
+      "last_review": "2026-05-18",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -8580,6 +8677,10 @@
         "task": "tasks/tasks-linear-901cd944-fc0c-4372-92ce-65bb8bb411c0.md",
         "agent_task": ".agent/task/linear-901cd944-fc0c-4372-92ce-65bb8bb411c0.md",
         "docs": "docs/TECH_SPEC-linear-901cd944-fc0c-4372-92ce-65bb8bb411c0.md"
+      },
+      "status": "done",
+      "validation": {
+        "status": "done"
       }
     },
     {
@@ -8590,13 +8691,17 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-17",
+      "last_review": "2026-05-18",
       "approvals": {},
       "paths": {
         "spec": "tasks/specs/linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md",
         "task": "tasks/tasks-linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md",
         "agent_task": ".agent/task/linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md",
         "docs": "docs/TECH_SPEC-linear-6b0183b4-9ebc-4423-a356-4105ce8aa32b.md"
+      },
+      "status": "done",
+      "validation": {
+        "status": "done"
       }
     },
     {
@@ -8607,7 +8712,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-17",
+      "last_review": "2026-05-18",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -8623,6 +8728,10 @@
         "task": "tasks/tasks-linear-004edeb8-9641-4a91-8f9b-2d024766c2ac.md",
         "agent_task": ".agent/task/linear-004edeb8-9641-4a91-8f9b-2d024766c2ac.md",
         "docs": "docs/TECH_SPEC-linear-004edeb8-9641-4a91-8f9b-2d024766c2ac.md"
+      },
+      "status": "done",
+      "validation": {
+        "status": "done"
       }
     },
     {
@@ -8633,7 +8742,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-17",
+      "last_review": "2026-05-18",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -8646,6 +8755,10 @@
       },
       "paths": {
         "docs": "tasks/specs/linear-642e622a-b02e-4766-85c2-6f2fc47b1f44.md"
+      },
+      "status": "done",
+      "validation": {
+        "status": "done"
       }
     },
     {
@@ -22280,7 +22393,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-18",
+      "last_review": "2026-05-18",
       "approvals": {
         "docs_review_fallback": {
           "reviewer": "provider worker manual docs review",
@@ -22325,6 +22438,10 @@
         "task": "tasks/tasks-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
         "agent_task": ".agent/task/linear-5561a9a9-39dd-4ed4-99a0-896553327669.md",
         "docs": "docs/TECH_SPEC-linear-5561a9a9-39dd-4ed4-99a0-896553327669.md"
+      },
+      "status": "done",
+      "validation": {
+        "status": "done"
       }
     },
     {
@@ -22395,7 +22512,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-18",
+      "last_review": "2026-05-18",
       "approvals": {
         "docs_packet_parent_reset": {
           "reviewer": "parent provider worker",
@@ -22417,6 +22534,10 @@
         "task": "tasks/tasks-linear-9f101328-ca10-47b3-9dc9-b0984d339794.md",
         "agent_task": ".agent/task/linear-9f101328-ca10-47b3-9dc9-b0984d339794.md",
         "docs": "docs/TECH_SPEC-linear-9f101328-ca10-47b3-9dc9-b0984d339794.md"
+      },
+      "status": "done",
+      "validation": {
+        "status": "done"
       }
     },
     {
