@@ -56,6 +56,7 @@ export class CodexReviewError extends Error {
 export interface RunCodexReviewOptions {
   command: string;
   args: string[];
+  stdinInput?: string | null;
   env: Record<string, string | undefined>;
   stdio: StdioOptions;
   activeCloseoutBundleRoots?: string[];
@@ -151,6 +152,20 @@ export async function runCodexReview(
     cwd: options.repoRoot,
     detached
   });
+
+  if (options.stdinInput !== undefined && options.stdinInput !== null) {
+    child.stdin?.on('error', () => {
+      // The child process outcome and missing/invalid contract checks remain authoritative.
+    });
+    try {
+      child.stdin?.end(options.stdinInput, 'utf8');
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException | undefined)?.code;
+      if (typeof code !== 'string' || !BENIGN_STDIO_ERROR_CODES.has(code)) {
+        throw error;
+      }
+    }
+  }
 
   const outputStream = createWriteStream(options.outputLogPath, { flags: 'w' });
   const outputClosed = new Promise<void>((resolve) => {
@@ -332,7 +347,7 @@ function envFlagEnabled(value: string | undefined): boolean {
     return false;
   }
   const normalized = value.trim().toLowerCase();
-  return normalized === '1' || normalized === 'true' || normalized === 'yes';
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
 function formatBoundedHeavyCommandFailure(blockedCommand: string): string {

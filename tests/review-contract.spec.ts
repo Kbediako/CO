@@ -1,0 +1,1058 @@
+import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, relative, sep } from 'node:path';
+import { promisify } from 'node:util';
+
+import { afterEach, describe, expect, it } from 'vitest';
+
+import {
+  buildReviewContractProposalRouting,
+  buildReviewContractTelemetry,
+  prepareReviewContractInputBundles,
+  validateReviewContract,
+  type ReviewContractEvidenceRef
+} from '../scripts/lib/review-contract.js';
+
+const sandboxes: string[] = [];
+const execFileAsync = promisify(execFile);
+const THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE =
+  'codex_core::session: failed to record rollout items: thread 019de1d2-3b27-7193-8330-0ed726e28044 not found';
+const WARN_THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE = `warn ${THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}`;
+
+async function makeSandbox(): Promise<string> {
+  const sandbox = await mkdtemp(join(tmpdir(), 'review-contract-'));
+  sandboxes.push(sandbox);
+  return sandbox;
+}
+
+afterEach(async () => {
+  await Promise.all(sandboxes.splice(0).map((sandbox) => rm(sandbox, { recursive: true, force: true })));
+});
+
+describe('review contract v1', () => {
+  it('validates a fully clean contract with explicit clean signals and evidence hashes', async () => {
+    const sandbox = await makeSandbox();
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const contract = buildCleanContract(evidenceRef);
+
+    await expect(validateReviewContract(contract, { repoRoot: sandbox })).resolves.toEqual({
+      valid: true,
+      errors: []
+    });
+
+    const telemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: `codex\n${JSON.stringify(contract)}\n`,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract.json')
+    });
+
+    expect(telemetry.contract_validation.status).toBe('valid');
+    expect(telemetry.review_verdict).toBe('clean');
+    expect(telemetry.axis_verdicts.spec_conformance).toBe('clean');
+    await expect(readFile(join(sandbox, 'review', 'contract.json'), 'utf8')).resolves.toContain(
+      '"schema_version": "co.review.contract.v1"'
+    );
+
+    const lastMessageContractPath = join(sandbox, 'review', 'contract-last-message.json');
+    await writeFile(lastMessageContractPath, `${JSON.stringify(contract)}\n`, 'utf8');
+    const lastMessageTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: `codex\n${JSON.stringify(contract)}\nhook: Stop\nhook: Stop Completed\n`,
+      repoRoot: sandbox,
+      contractPath: lastMessageContractPath,
+      source: 'last-message-file'
+    });
+
+    expect(lastMessageTelemetry.contract_validation.status).toBe('valid');
+    expect(lastMessageTelemetry.review_verdict).toBe('clean');
+  });
+
+  it('ignores contract-shaped JSON outside the final reviewer response', async () => {
+    const sandbox = await makeSandbox();
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const contract = buildCleanContract(evidenceRef);
+    const inspectedTranscript = [
+      'exec',
+      "/bin/zsh -lc 'cat review/contract.json' in /repo",
+      JSON.stringify(contract)
+    ].join('\n');
+
+    const transcriptOnlyTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: inspectedTranscript,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-transcript-only.json')
+    });
+
+    expect(transcriptOnlyTelemetry.contract_validation.status).toBe('missing');
+    expect(transcriptOnlyTelemetry.review_verdict).toBe('unknown');
+
+    const finalProseTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: `${inspectedTranscript}\ncodex\nI found no actionable issues.\n`,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-final-prose.json')
+    });
+
+    expect(finalProseTelemetry.contract_validation.status).toBe('missing');
+    expect(finalProseTelemetry.review_verdict).toBe('unknown');
+
+    const inspectedReviewOutput = [
+      'exec',
+      "/bin/zsh -lc 'cat review/output.log' in /repo",
+      ' succeeded in 0ms:',
+      'codex',
+      JSON.stringify(contract)
+    ].join('\n');
+    const inspectedReviewOutputTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: inspectedReviewOutput,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-inspected-review-output.json')
+    });
+
+    expect(inspectedReviewOutputTelemetry.contract_validation.status).toBe('missing');
+    expect(inspectedReviewOutputTelemetry.review_verdict).toBe('unknown');
+
+    const finalContractAfterInspectedOutputTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: `${inspectedReviewOutput}\ncodex\n${JSON.stringify(contract)}\n`,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-final-after-inspection.json')
+    });
+
+    expect(finalContractAfterInspectedOutputTelemetry.contract_validation.status).toBe('missing');
+    expect(finalContractAfterInspectedOutputTelemetry.review_verdict).toBe('unknown');
+
+    const finalContractAfterTopLevelProgressTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: `${inspectedReviewOutput}\nthinking\ncodex\n${JSON.stringify(contract)}\n`,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-final-after-progress.json')
+    });
+
+    expect(finalContractAfterTopLevelProgressTelemetry.contract_validation.status).toBe('missing');
+    expect(finalContractAfterTopLevelProgressTelemetry.review_verdict).toBe('unknown');
+
+    const inspectedProgressTailedOutputTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: [
+        'exec',
+        "/bin/zsh -lc 'tail -80 review/output.log' in /repo",
+        ' succeeded in 0ms:',
+        'thinking',
+        'codex',
+        JSON.stringify(contract)
+      ].join('\n'),
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-inspected-progress-tailed-output.json')
+    });
+
+    expect(inspectedProgressTailedOutputTelemetry.contract_validation.status).toBe('missing');
+    expect(inspectedProgressTailedOutputTelemetry.review_verdict).toBe('unknown');
+
+    const inspectedMultiCodexTailedOutputTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: [
+        'exec',
+        "/bin/zsh -lc 'tail -80 review/output.log' in /repo",
+        ' succeeded in 0ms:',
+        'codex',
+        'Earlier assistant prose.',
+        'thinking',
+        'codex',
+        JSON.stringify(contract)
+      ].join('\n'),
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-inspected-multi-codex-tailed-output.json')
+    });
+
+    expect(inspectedMultiCodexTailedOutputTelemetry.contract_validation.status).toBe('missing');
+    expect(inspectedMultiCodexTailedOutputTelemetry.review_verdict).toBe('unknown');
+
+    const finalContractAfterPlainJsonInspectionTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: [
+        'exec',
+        "/bin/zsh -lc 'cat review/contract.json' in /repo",
+        ' succeeded in 0ms:',
+        JSON.stringify(contract),
+        'codex',
+        JSON.stringify(contract)
+      ].join('\n'),
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-final-after-plain-json-inspection.json')
+    });
+
+    expect(finalContractAfterPlainJsonInspectionTelemetry.contract_validation.status).toBe('valid');
+    expect(finalContractAfterPlainJsonInspectionTelemetry.review_verdict).toBe('clean');
+
+    const inspectedNestedTranscript = [
+      'exec',
+      "/bin/zsh -lc 'cat review/output.log' in /repo",
+      ' succeeded in 0ms:',
+      'OpenAI Codex v0.130.0',
+      '--------',
+      'workdir: /repo',
+      'model: gpt-5.5',
+      'user',
+      'Review this diff.',
+      'codex',
+      JSON.stringify(contract)
+    ].join('\n');
+    const inspectedNestedTranscriptTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: inspectedNestedTranscript,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-inspected-nested-transcript.json')
+    });
+
+    expect(inspectedNestedTranscriptTelemetry.contract_validation.status).toBe('missing');
+    expect(inspectedNestedTranscriptTelemetry.review_verdict).toBe('unknown');
+
+    const inspectedMultiTurnNestedTranscript = [
+      'exec',
+      "/bin/zsh -lc 'cat review/output.log' in /repo",
+      ' succeeded in 0ms:',
+      'OpenAI Codex v0.130.0',
+      '--------',
+      'workdir: /repo',
+      'model: gpt-5.5',
+      'user',
+      'Review this diff.',
+      'codex',
+      'Earlier assistant prose.',
+      'user',
+      'Return the final contract.',
+      'codex',
+      JSON.stringify(contract)
+    ].join('\n');
+    const inspectedMultiTurnNestedTranscriptTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: inspectedMultiTurnNestedTranscript,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-inspected-multi-turn-nested-transcript.json')
+    });
+
+    expect(inspectedMultiTurnNestedTranscriptTelemetry.contract_validation.status).toBe('missing');
+    expect(inspectedMultiTurnNestedTranscriptTelemetry.review_verdict).toBe('unknown');
+
+    const inlineHeaderInspectedTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: [
+        "exec /bin/zsh -lc 'tail -80 review/output.log' in /repo succeeded in 0ms:",
+        'codex',
+        JSON.stringify(contract)
+      ].join('\n'),
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-inspected-inline-header.json')
+    });
+
+    expect(inlineHeaderInspectedTelemetry.contract_validation.status).toBe('missing');
+    expect(inlineHeaderInspectedTelemetry.review_verdict).toBe('unknown');
+
+    const stalePriorContractThenInspectedOutputTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: [
+        'codex',
+        JSON.stringify(contract),
+        'exec',
+        "/bin/zsh -lc 'cat review/output.log' in /repo",
+        ' succeeded in 0ms:',
+        'codex',
+        JSON.stringify(contract)
+      ].join('\n'),
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-stale-prior-then-inspected-output.json')
+    });
+
+    expect(stalePriorContractThenInspectedOutputTelemetry.contract_validation.status).toBe('missing');
+    expect(stalePriorContractThenInspectedOutputTelemetry.review_verdict).toBe('unknown');
+
+    const bareJsonTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: `${JSON.stringify(contract)}\n`,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-bare-json.json')
+    });
+
+    expect(bareJsonTelemetry.contract_validation.status).toBe('valid');
+    expect(bareJsonTelemetry.review_verdict).toBe('clean');
+  });
+
+  it('rejects trailing content after the final contract JSON object', async () => {
+    const sandbox = await makeSandbox();
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const contract = buildCleanContract(evidenceRef);
+
+    const trailingProseTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: `codex\n${JSON.stringify(contract)}\nReview comment: hidden contradictory finding.\n`,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-trailing-prose.json')
+    });
+
+    expect(trailingProseTelemetry.contract_validation.status).toBe('invalid');
+    expect(trailingProseTelemetry.review_verdict).toBe('unknown');
+    expect(trailingProseTelemetry.contract_validation.errors.join('\n')).toContain('no trailing content');
+
+    const secondObjectTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: `codex\n${JSON.stringify(contract)}\n${JSON.stringify({
+        findings: [{ priority: 'P1', title: 'must not be ignored' }]
+      })}\n`,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-trailing-second-object.json')
+    });
+
+    expect(secondObjectTelemetry.contract_validation.status).toBe('invalid');
+    expect(secondObjectTelemetry.contract_validation.errors.join('\n')).toContain('no trailing content');
+
+    const fencedTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: `codex\n\`\`\`json\n${JSON.stringify(contract)}\n\`\`\`\n`,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-fenced-json.json')
+    });
+
+    expect(fencedTelemetry.contract_validation.status).toBe('valid');
+    expect(fencedTelemetry.review_verdict).toBe('clean');
+
+    const trailingRuntimeNoiseTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: `codex\n${JSON.stringify(contract)}\n${WARN_THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}\n`,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-trailing-runtime-noise.json')
+    });
+
+    expect(trailingRuntimeNoiseTelemetry.contract_validation.status).toBe('valid');
+    expect(trailingRuntimeNoiseTelemetry.review_verdict).toBe('clean');
+
+    const fencedTrailingRuntimeNoiseTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: `codex\n\`\`\`json\n${JSON.stringify(contract)}\n\`\`\`\n${THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE}\n`,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-fenced-trailing-runtime-noise.json')
+    });
+
+    expect(fencedTrailingRuntimeNoiseTelemetry.contract_validation.status).toBe('valid');
+    expect(fencedTrailingRuntimeNoiseTelemetry.review_verdict).toBe('clean');
+
+    const fencedTrailingTelemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: `codex\n\`\`\`json\n${JSON.stringify(contract)}\n\`\`\`\nextra prose\n`,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-fenced-trailing.json')
+    });
+
+    expect(fencedTrailingTelemetry.contract_validation.status).toBe('invalid');
+    expect(fencedTrailingTelemetry.contract_validation.errors.join('\n')).toContain('no trailing content');
+  });
+
+  it('rejects missing axes and clean verdicts without explicit clean signals', async () => {
+    const sandbox = await makeSandbox();
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const missingAxis = buildCleanContract(evidenceRef);
+    delete (missingAxis.axes as Record<string, unknown>).agent_loop;
+
+    const missingAxisResult = await validateReviewContract(missingAxis, { repoRoot: sandbox });
+    expect(missingAxisResult.valid).toBe(false);
+    expect(missingAxisResult.errors.join('\n')).toContain("must have required property 'agent_loop'");
+
+    const ambiguousClean = buildCleanContract(evidenceRef);
+    delete ambiguousClean.axes.spec_conformance.clean_signal;
+    const ambiguousResult = await validateReviewContract(ambiguousClean, { repoRoot: sandbox });
+    expect(ambiguousResult.valid).toBe(false);
+    expect(ambiguousResult.errors.join('\n')).toContain('clean_signal');
+  });
+
+  it('rejects stale or missing evidence refs', async () => {
+    const sandbox = await makeSandbox();
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const staleRef = { ...evidenceRef, sha256: '0'.repeat(64) };
+    const contract = buildCleanContract(staleRef);
+
+    const result = await validateReviewContract(contract, { repoRoot: sandbox });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join('\n')).toContain('stale or mismatched');
+  });
+
+  it('rejects whitespace-only required strings before evidence refs are trusted', async () => {
+    const sandbox = await makeSandbox();
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const blankPathRef = { ...evidenceRef, path: ' ' };
+    const contract = buildCleanContract(blankPathRef);
+
+    const result = await validateReviewContract(contract, { repoRoot: sandbox });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join('\n')).toContain('/path: must NOT have fewer than 1 characters');
+  });
+
+  it('reports non-file evidence refs as invalid contracts instead of telemetry failures', async () => {
+    const sandbox = await makeSandbox();
+    await mkdir(join(sandbox, 'docs'), { recursive: true });
+    const directoryRef = {
+      path: 'docs',
+      sha256: 'a'.repeat(64)
+    };
+    const contract = buildCleanContract(directoryRef);
+
+    const result = await validateReviewContract(contract, { repoRoot: sandbox });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join('\n')).toContain('evidence path must be a readable file');
+
+    const telemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: `codex\n${JSON.stringify(contract)}\n`,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract.json')
+    });
+    expect(telemetry.contract_validation.status).toBe('invalid');
+    expect(telemetry.contract_validation.errors.join('\n')).toContain('evidence path must be a readable file');
+    expect(telemetry.review_verdict).toBe('unknown');
+  });
+
+  it('allows trusted shared run artifact evidence refs but rejects unrelated parent paths', async () => {
+    const sandbox = await makeSandbox();
+    const repoRoot = join(sandbox, '.workspaces', 'linear-abc');
+    const runRoot = join(sandbox, '.runs', 'linear-abc', 'cli', 'run-1', 'review', 'inputs');
+    await mkdir(repoRoot, { recursive: true });
+    await mkdir(runRoot, { recursive: true });
+    const artifactPath = join(runRoot, 'spec-bundle.json');
+    const artifactContent = '{"bundle":"spec"}\n';
+    await writeFile(artifactPath, artifactContent, 'utf8');
+    const artifactRef = {
+      path: relative(repoRoot, artifactPath),
+      sha256: createHash('sha256').update(artifactContent).digest('hex')
+    };
+
+    await expect(validateReviewContract(buildCleanContract(artifactRef), { repoRoot })).resolves.toEqual({
+      valid: true,
+      errors: []
+    });
+
+    const secretPath = join(sandbox, 'secret.txt');
+    const secretContent = 'not an allowed artifact root\n';
+    await writeFile(secretPath, secretContent, 'utf8');
+    const secretRef = {
+      path: relative(repoRoot, secretPath),
+      sha256: createHash('sha256').update(secretContent).digest('hex')
+    };
+    const secretResult = await validateReviewContract(buildCleanContract(secretRef), { repoRoot });
+    expect(secretResult.valid).toBe(false);
+    expect(secretResult.errors.join('\n')).toContain('trusted run artifact roots');
+  });
+
+  it('trusts generated review-dir evidence refs for external explicit run manifests', async () => {
+    const sandbox = await makeSandbox();
+    const repoRoot = join(sandbox, 'repo');
+    const externalReviewDir = join(sandbox, 'external-runs', 'linear-abc', 'cli', 'run-1', 'review');
+    await mkdir(repoRoot, { recursive: true });
+    await mkdir(join(externalReviewDir, 'inputs'), { recursive: true });
+    const artifactPath = join(externalReviewDir, 'inputs', 'spec-bundle.json');
+    const artifactContent = '{"bundle":"spec"}\n';
+    await writeFile(artifactPath, artifactContent, 'utf8');
+    const externalArtifactRef = {
+      path: relative(repoRoot, artifactPath).split(sep).join('/'),
+      sha256: createHash('sha256').update(artifactContent).digest('hex')
+    };
+    const contract = buildCleanContract(externalArtifactRef);
+
+    const directValidation = await validateReviewContract(contract, { repoRoot });
+    expect(directValidation.valid).toBe(false);
+    expect(directValidation.errors.join('\n')).toContain('trusted run artifact roots');
+
+    const telemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: `codex\n${JSON.stringify(contract)}\n`,
+      repoRoot,
+      contractPath: join(externalReviewDir, 'contract.json')
+    });
+
+    expect(telemetry.contract_validation.status).toBe('valid');
+    expect(telemetry.review_verdict).toBe('clean');
+  });
+
+  it('rejects malformed code and agent-loop proposals', async () => {
+    const sandbox = await makeSandbox();
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const contract = buildCleanContract(evidenceRef);
+    contract.code_change_proposals.push({
+      id: 'code-1',
+      title: 'Patch parser',
+      rationale: 'Needs exact patch proposal.',
+      tests: ['npm run test -- review-contract'],
+      risk: 'low',
+      evidence_refs: [evidenceRef]
+    });
+    contract.agent_loop_proposals.push({
+      id: 'loop-1',
+      title: 'Improve handoff',
+      rationale: 'Loop evidence should route separately.',
+      routing: {
+        default_route: 'comment',
+        follow_up_kind: 'agent_loop',
+        intent_checksum: 'loop-1',
+        non_goals: ['Do not change code behavior.'],
+        not_done_if: ['No typed follow-up route.'],
+        acceptance_criteria: ['Route is typed.']
+      },
+      evidence_refs: [evidenceRef]
+    });
+
+    const result = await validateReviewContract(contract, { repoRoot: sandbox });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join('\n')).toContain('must match a schema in anyOf');
+    expect(result.errors.join('\n')).toContain('must be equal to constant');
+  });
+
+  it('maps blocked and findings axes to fail-closed semantic findings', async () => {
+    const sandbox = await makeSandbox();
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const contract = buildCleanContract(evidenceRef);
+    contract.overall_verdict = 'blocked';
+    contract.axes.agent_loop = {
+      verdict: 'blocked',
+      summary: 'Required review loop evidence is absent.',
+      evidence_refs: [evidenceRef],
+      findings: [
+        {
+          id: 'loop-blocked',
+          priority: 'P1',
+          title: 'Agent-loop evidence missing',
+          evidence_refs: [evidenceRef]
+        }
+      ]
+    };
+
+    const telemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: `codex\n${JSON.stringify(contract)}\n`,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract.json')
+    });
+
+    expect(telemetry.contract_validation.status).toBe('valid');
+    expect(telemetry.contract_overall_verdict).toBe('blocked');
+    expect(telemetry.review_verdict).toBe('findings');
+    expect(telemetry.finding_count).toBe(1);
+    expect(telemetry.highest_finding_priority).toBe('P1');
+  });
+
+  it('rejects blocking agent-loop proposals when the agent-loop axis is clean', async () => {
+    const sandbox = await makeSandbox();
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const contract = buildCleanContract(evidenceRef);
+    contract.agent_loop_proposals.push({
+      id: 'loop-blocking',
+      title: 'Missing handoff proof',
+      rationale: 'A blocking loop proposal must be represented by the agent-loop axis verdict.',
+      blocking: true,
+      routing: {
+        default_route: 'linear_follow_up',
+        follow_up_kind: 'agent_loop',
+        intent_checksum: 'loop-blocking-checksum',
+        non_goals: ['Do not block unrelated code findings.'],
+        not_done_if: ['The clean agent-loop axis hides blocking feedback.'],
+        acceptance_criteria: ['The blocking proposal is paired with a non-clean agent-loop axis.']
+      },
+      evidence_refs: [evidenceRef]
+    });
+
+    const result = await validateReviewContract(contract, { repoRoot: sandbox });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join('\n')).toContain(
+      'blocking agent-loop proposals require the agent_loop axis to be findings or blocked'
+    );
+  });
+
+  it('rejects code-change proposals when the code-changes axis is clean', async () => {
+    const sandbox = await makeSandbox();
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const contract = buildCleanContract(evidenceRef);
+    contract.code_change_proposals.push(buildCodeChangeProposal(evidenceRef));
+
+    const result = await validateReviewContract(contract, { repoRoot: sandbox });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join('\n')).toContain(
+      'code-change proposals require the code_changes axis to be findings or blocked'
+    );
+
+    const telemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: `${JSON.stringify(contract)}\n`,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-code-proposal-clean.json')
+    });
+    expect(telemetry.contract_validation.status).toBe('invalid');
+    expect(telemetry.review_verdict).toBe('unknown');
+  });
+
+  it('routes code-change and agent-loop proposals separately for Linear follow-up handling', async () => {
+    const sandbox = await makeSandbox();
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const contract = buildCleanContract(evidenceRef);
+    markCodeChangesFinding(contract, evidenceRef);
+    contract.code_change_proposals.push(buildCodeChangeProposal(evidenceRef));
+    contract.agent_loop_proposals.push({
+      id: 'loop-1',
+      title: 'Add missing review handoff checklist item',
+      rationale: 'The producing loop skipped a review-handoff checklist update.',
+      routing: {
+        default_route: 'linear_follow_up',
+        follow_up_kind: 'agent_loop',
+        intent_checksum: 'loop-1-checksum',
+        canonical_owner_key: 'review-agent-loop:handoff-checklist',
+        non_goals: ['Do not change the reviewed product diff.'],
+        not_done_if: ['The feedback is mixed into code findings.'],
+        acceptance_criteria: ['A typed Linear follow-up is created or reused.']
+      },
+      evidence_refs: [evidenceRef]
+    });
+
+    const routing = await buildReviewContractProposalRouting({
+      contract,
+      repoRoot: sandbox,
+      issueId: '991643b6-0043-49b8-9411-33b6de78e421'
+    });
+
+    expect(routing.ok).toBe(true);
+    if (!routing.ok) {
+      return;
+    }
+    expect(routing.code_change_proposals).toEqual([
+      expect.objectContaining({
+        proposal_id: 'code-1',
+        unified_diff: expect.stringContaining('diff --git')
+      })
+    ]);
+    expect(routing.agent_loop_follow_ups).toEqual([
+      expect.objectContaining({
+        proposal_id: 'loop-1',
+        intent_checksum: 'loop-1-checksum',
+        canonical_owner_key: 'review-agent-loop:handoff-checklist',
+        non_goals: '- Do not change the reviewed product diff.',
+        not_done_if: '- The feedback is mixed into code findings.',
+        acceptance_criteria: '- A typed Linear follow-up is created or reused.',
+        create_follow_up_args: expect.arrayContaining([
+          'create-follow-up',
+          '--issue-id',
+          '991643b6-0043-49b8-9411-33b6de78e421',
+          '--canonical-owner-key',
+          'review-agent-loop:handoff-checklist'
+        ])
+      })
+    ]);
+    expect(routing.agent_loop_follow_ups[0]?.description).toContain('follow_up_kind: `agent_loop`');
+    expect(routing.agent_loop_memory_entries).toEqual([]);
+  });
+
+  it('exports memory entries only for accepted validated agent-loop proposals', async () => {
+    const sandbox = await makeSandbox();
+    const evidenceRef = await writeEvidence(sandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const contract = buildCleanContract(evidenceRef);
+    contract.agent_loop_proposals.push({
+      id: 'loop-1',
+      title: 'Capture accepted loop learning',
+      rationale: 'Only accepted loop feedback should reach memory.',
+      routing: {
+        default_route: 'linear_follow_up',
+        follow_up_kind: 'agent_loop',
+        intent_checksum: 'loop-1-checksum',
+        non_goals: ['Do not ingest raw review suggestions.'],
+        not_done_if: ['Unaccepted feedback appears in prompt memory.'],
+        acceptance_criteria: ['Accepted feedback becomes a validated memory entry.']
+      },
+      evidence_refs: [evidenceRef]
+    });
+
+    const acceptedRouting = await buildReviewContractProposalRouting({
+      contract,
+      repoRoot: sandbox,
+      issueId: '991643b6-0043-49b8-9411-33b6de78e421',
+      acceptedAgentLoopProposalIds: ['loop-1']
+    });
+
+    expect(acceptedRouting.ok).toBe(true);
+    if (!acceptedRouting.ok) {
+      return;
+    }
+    expect(acceptedRouting.agent_loop_memory_entries).toEqual([
+      {
+        schema_version: 'co.review.agent_loop_memory_entry.v1',
+        proposal_id: 'loop-1',
+        title: 'Capture accepted loop learning',
+        rationale: 'Only accepted loop feedback should reach memory.',
+        source_contract_schema: 'co.review.contract.v1',
+        evidence_refs: [evidenceRef]
+      }
+    ]);
+
+    const rawSuggestionRouting = await buildReviewContractProposalRouting({
+      contract,
+      repoRoot: sandbox,
+      issueId: '991643b6-0043-49b8-9411-33b6de78e421',
+      acceptedAgentLoopProposalIds: ['raw-review-suggestion']
+    });
+
+    expect(rawSuggestionRouting).toEqual({
+      ok: false,
+      errors: ['accepted agent-loop proposal raw-review-suggestion is not present in the validated contract.']
+    });
+  });
+
+  it('writes the four governed input bundles and prompt evidence refs', async () => {
+    const sandbox = await makeSandbox();
+    await mkdir(join(sandbox, 'tasks'), { recursive: true });
+    await mkdir(join(sandbox, 'docs'), { recursive: true });
+    await writeFile(
+      join(sandbox, 'tasks', 'index.json'),
+      JSON.stringify({
+        items: [
+          {
+            id: 'linear-abc',
+            relates_to: 'tasks/tasks-linear-abc.md',
+            paths: {
+              task: 'tasks/tasks-linear-abc.md',
+              docs: 'docs/TECH_SPEC-linear-abc.md',
+              prd: 'docs/PRD-linear-abc.md',
+              action_plan: 'docs/ACTION_PLAN-linear-abc.md'
+            }
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(join(sandbox, 'tasks', 'tasks-linear-abc.md'), '# Task\n', 'utf8');
+    await writeFile(join(sandbox, 'docs', 'TECH_SPEC-linear-abc.md'), '# Spec\n', 'utf8');
+    await writeFile(join(sandbox, 'docs', 'PRD-linear-abc.md'), '# PRD\n', 'utf8');
+    await writeFile(join(sandbox, 'docs', 'ACTION_PLAN-linear-abc.md'), '# Plan\n', 'utf8');
+    const manifestPath = join(sandbox, '.runs', 'linear-abc', 'cli', 'run-1', 'manifest.json');
+    await mkdir(join(manifestPath, '..'), { recursive: true });
+    await writeFile(manifestPath, '{"status":"in_progress"}\n', 'utf8');
+
+    const result = await prepareReviewContractInputBundles({
+      repoRoot: sandbox,
+      reviewDir: join(sandbox, '.runs', 'linear-abc', 'cli', 'run-1', 'review'),
+      manifestPath,
+      taskKey: 'linear-abc',
+      taskLabel: 'linear-abc',
+      reviewSurface: 'diff',
+      scopePaths: ['docs/TECH_SPEC-linear-abc.md'],
+      notes: 'Goal: test',
+      mode: 'shadow'
+    });
+
+    expect(result).not.toBeNull();
+    expect(result?.bundleRefs.map((ref) => ref.path)).toEqual([
+      '.runs/linear-abc/cli/run-1/review/inputs/spec-bundle.json',
+      '.runs/linear-abc/cli/run-1/review/inputs/standards-bundle.json',
+      '.runs/linear-abc/cli/run-1/review/inputs/change-bundle.json',
+      '.runs/linear-abc/cli/run-1/review/inputs/agent-loop-bundle.json'
+    ]);
+    expect(result?.promptLines.join('\n')).toContain('Required axes: `spec_conformance`');
+    expect(result?.promptLines.join('\n')).toContain(
+      'shadow mode: telemetry records the contract for audit while legacy semantic parsing remains authoritative'
+    );
+    await expect(
+      readFile(join(sandbox, '.runs', 'linear-abc', 'cli', 'run-1', 'review', 'inputs', 'spec-bundle.json'), 'utf8')
+    ).resolves.toContain('docs/TECH_SPEC-linear-abc.md');
+  });
+
+  it('skips task bundle document paths that escape the repository root', async () => {
+    const sandbox = await makeSandbox();
+    const repoRoot = join(sandbox, 'repo');
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(join(sandbox, 'secret.txt'), 'super secret content\n', 'utf8');
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify({
+        items: [
+          {
+            id: 'linear-abc',
+            relates_to: 'tasks/tasks-linear-abc.md',
+            paths: {
+              docs: '../secret.txt'
+            }
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(join(repoRoot, 'tasks', 'tasks-linear-abc.md'), '# Task\n', 'utf8');
+    const manifestPath = join(repoRoot, '.runs', 'linear-abc', 'cli', 'run-1', 'manifest.json');
+    await mkdir(join(manifestPath, '..'), { recursive: true });
+    await writeFile(manifestPath, '{"status":"in_progress"}\n', 'utf8');
+
+    await prepareReviewContractInputBundles({
+      repoRoot,
+      reviewDir: join(repoRoot, '.runs', 'linear-abc', 'cli', 'run-1', 'review'),
+      manifestPath,
+      taskKey: 'linear-abc',
+      taskLabel: 'linear-abc',
+      reviewSurface: 'diff',
+      scopePaths: [],
+      notes: 'Goal: test',
+      mode: 'shadow'
+    });
+
+    const specBundle = JSON.parse(
+      await readFile(join(repoRoot, '.runs', 'linear-abc', 'cli', 'run-1', 'review', 'inputs', 'spec-bundle.json'), 'utf8')
+    ) as { skipped_task_document_paths?: string[]; task_documents?: Array<{ content?: string }> };
+    expect(specBundle.skipped_task_document_paths).toEqual(['../secret.txt']);
+    expect(JSON.stringify(specBundle.task_documents)).not.toContain('super secret content');
+  });
+
+  it('includes staged and untracked files in the governed change bundle', async () => {
+    const sandbox = await makeSandbox();
+    await git(sandbox, ['init']);
+    await mkdir(join(sandbox, 'tasks'), { recursive: true });
+    await writeFile(join(sandbox, 'tasks', 'index.json'), JSON.stringify({ items: [] }), 'utf8');
+    await writeFile(join(sandbox, 'staged.txt'), 'staged\ncontent\n', 'utf8');
+    await git(sandbox, ['add', 'staged.txt']);
+    await writeFile(join(sandbox, 'untracked.txt'), 'untracked\ncontent\n', 'utf8');
+    const manifestPath = join(sandbox, '.runs', 'linear-abc', 'cli', 'run-1', 'manifest.json');
+    await mkdir(join(manifestPath, '..'), { recursive: true });
+    await writeFile(manifestPath, '{"status":"in_progress"}\n', 'utf8');
+
+    await prepareReviewContractInputBundles({
+      repoRoot: sandbox,
+      reviewDir: join(sandbox, '.runs', 'linear-abc', 'cli', 'run-1', 'review'),
+      manifestPath,
+      taskKey: 'linear-abc',
+      taskLabel: 'linear-abc',
+      reviewSurface: 'diff',
+      scopePaths: ['staged.txt', 'untracked.txt'],
+      notes: 'Goal: staged and untracked scope',
+      mode: 'shadow'
+    });
+
+    const changeBundle = JSON.parse(
+      await readFile(join(sandbox, '.runs', 'linear-abc', 'cli', 'run-1', 'review', 'inputs', 'change-bundle.json'), 'utf8')
+    ) as { git_diff_name_status?: string; git_diff_stat?: string; git_diff_patch?: string };
+    expect(changeBundle.git_diff_name_status).toContain('A\tstaged.txt');
+    expect(changeBundle.git_diff_name_status).toContain('??\tuntracked.txt');
+    expect(changeBundle.git_diff_stat).toContain('staged.txt');
+    expect(changeBundle.git_diff_stat).toContain('untracked.txt');
+    expect(changeBundle.git_diff_patch).toContain('diff --git a/untracked.txt b/untracked.txt');
+    expect(changeBundle.git_diff_patch).toContain('+untracked');
+  });
+
+  it('keeps large governed diff evidence in the change bundle', async () => {
+    const sandbox = await makeSandbox();
+    await git(sandbox, ['init']);
+    await mkdir(join(sandbox, 'tasks'), { recursive: true });
+    await writeFile(join(sandbox, 'tasks', 'index.json'), JSON.stringify({ items: [] }), 'utf8');
+    const largeContent = Array.from(
+      { length: 7_000 },
+      (_, index) => `line-${index.toString().padStart(4, '0')} ${'x'.repeat(48)}`
+    ).join('\n');
+    await writeFile(join(sandbox, 'large.txt'), `${largeContent}\n`, 'utf8');
+    await git(sandbox, ['add', 'large.txt']);
+    const manifestPath = join(sandbox, '.runs', 'linear-abc', 'cli', 'run-1', 'manifest.json');
+    await mkdir(join(manifestPath, '..'), { recursive: true });
+    await writeFile(manifestPath, '{"status":"in_progress"}\n', 'utf8');
+
+    await prepareReviewContractInputBundles({
+      repoRoot: sandbox,
+      reviewDir: join(sandbox, '.runs', 'linear-abc', 'cli', 'run-1', 'review-large'),
+      manifestPath,
+      taskKey: 'linear-abc',
+      taskLabel: 'linear-abc',
+      reviewSurface: 'diff',
+      scopePaths: ['large.txt'],
+      notes: 'Goal: large diff scope',
+      mode: 'shadow'
+    });
+
+    const changeBundle = JSON.parse(
+      await readFile(join(sandbox, '.runs', 'linear-abc', 'cli', 'run-1', 'review-large', 'inputs', 'change-bundle.json'), 'utf8')
+    ) as { git_diff_patch?: string };
+    expect(changeBundle.git_diff_patch).not.toContain('[git command failed:');
+    expect(changeBundle.git_diff_patch).toContain('diff --git a/large.txt b/large.txt');
+    expect(changeBundle.git_diff_patch).toContain('+line-6999');
+  });
+
+  it('builds governed change bundles from explicit base and commit scopes', async () => {
+    const sandbox = await makeSandbox();
+    await git(sandbox, ['init']);
+    await git(sandbox, ['config', 'user.email', 'review-contract-tests@example.com']);
+    await git(sandbox, ['config', 'user.name', 'review-contract-tests']);
+    await mkdir(join(sandbox, 'tasks'), { recursive: true });
+    await writeFile(join(sandbox, 'tasks', 'index.json'), JSON.stringify({ items: [] }), 'utf8');
+    await writeFile(join(sandbox, 'tracked.txt'), 'baseline\n', 'utf8');
+    await git(sandbox, ['add', '.']);
+    await git(sandbox, ['commit', '-m', 'baseline']);
+    await writeFile(join(sandbox, 'tracked.txt'), 'updated\n', 'utf8');
+    await git(sandbox, ['add', 'tracked.txt']);
+    await git(sandbox, ['commit', '-m', 'update tracked']);
+    const manifestPath = join(sandbox, '.runs', 'linear-abc', 'cli', 'run-1', 'manifest.json');
+    await mkdir(join(manifestPath, '..'), { recursive: true });
+    await writeFile(manifestPath, '{"status":"in_progress"}\n', 'utf8');
+
+    await prepareReviewContractInputBundles({
+      repoRoot: sandbox,
+      reviewDir: join(sandbox, '.runs', 'linear-abc', 'cli', 'run-1', 'review-base'),
+      manifestPath,
+      taskKey: 'linear-abc',
+      taskLabel: 'linear-abc',
+      reviewSurface: 'diff',
+      scopePaths: ['tracked.txt'],
+      scopeMode: 'base',
+      scopeBase: 'HEAD~1',
+      notes: 'Goal: base scope',
+      mode: 'shadow'
+    });
+
+    const baseBundle = JSON.parse(
+      await readFile(join(sandbox, '.runs', 'linear-abc', 'cli', 'run-1', 'review-base', 'inputs', 'change-bundle.json'), 'utf8')
+    ) as { scope_mode?: string; git_diff_name_status?: string; git_diff_patch?: string };
+    expect(baseBundle.scope_mode).toBe('base');
+    expect(baseBundle.git_diff_name_status).toContain('M\ttracked.txt');
+    expect(baseBundle.git_diff_patch).toContain('+updated');
+
+    await prepareReviewContractInputBundles({
+      repoRoot: sandbox,
+      reviewDir: join(sandbox, '.runs', 'linear-abc', 'cli', 'run-1', 'review-commit'),
+      manifestPath,
+      taskKey: 'linear-abc',
+      taskLabel: 'linear-abc',
+      reviewSurface: 'diff',
+      scopePaths: ['tracked.txt'],
+      scopeMode: 'commit',
+      scopeCommit: 'HEAD',
+      notes: 'Goal: commit scope',
+      mode: 'shadow'
+    });
+
+    const commitBundle = JSON.parse(
+      await readFile(join(sandbox, '.runs', 'linear-abc', 'cli', 'run-1', 'review-commit', 'inputs', 'change-bundle.json'), 'utf8')
+    ) as { scope_mode?: string; git_diff_name_status?: string; git_diff_patch?: string };
+    expect(commitBundle.scope_mode).toBe('commit');
+    expect(commitBundle.git_diff_name_status).toContain('M\ttracked.txt');
+    expect(commitBundle.git_diff_patch).toContain('+updated');
+  });
+
+  it('keeps sanitized eval fixtures for the required governed-review scenarios', async () => {
+    const raw = await readFile(join(process.cwd(), 'evaluation', 'fixtures', 'review-contract', 'fixtures.json'), 'utf8');
+    const parsed = JSON.parse(raw) as {
+      fixtures?: Array<{
+        id?: string;
+        expected_contract?: {
+          overall_verdict?: string;
+          proposal_counts?: {
+            code_change?: number;
+            agent_loop?: number;
+          };
+        };
+      }>;
+    };
+    const fixtures = parsed.fixtures ?? [];
+
+    expect(fixtures.map((fixture) => fixture.id)).toEqual([
+      'spec-violation-green-tests',
+      'coding-standard-fallback-violation',
+      'real-code-bug-with-patch-proposal',
+      'skipped-agent-loop-step',
+      'legacy-prose-clean-output'
+    ]);
+    expect(fixtures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'real-code-bug-with-patch-proposal',
+          expected_contract: expect.objectContaining({
+            proposal_counts: { code_change: 1, agent_loop: 0 }
+          })
+        }),
+        expect.objectContaining({
+          id: 'skipped-agent-loop-step',
+          expected_contract: expect.objectContaining({
+            proposal_counts: { code_change: 0, agent_loop: 1 }
+          })
+        }),
+        expect.objectContaining({
+          id: 'legacy-prose-clean-output',
+          expected_contract: expect.objectContaining({
+            overall_verdict: 'unknown'
+          })
+        })
+      ])
+    );
+  });
+});
+
+async function writeEvidence(
+  sandbox: string,
+  repoPath: string,
+  content: string
+): Promise<ReviewContractEvidenceRef> {
+  const absolutePath = join(sandbox, repoPath);
+  await mkdir(join(absolutePath, '..'), { recursive: true });
+  await writeFile(absolutePath, content, 'utf8');
+  return {
+    path: repoPath,
+    sha256: createHash('sha256').update(content).digest('hex')
+  };
+}
+
+function buildCleanContract(evidenceRef: ReviewContractEvidenceRef) {
+  const cleanAxis = (summary: string) => ({
+    verdict: 'clean' as const,
+    summary,
+    clean_signal: summary,
+    evidence_refs: [evidenceRef],
+    findings: []
+  });
+  return {
+    schema_version: 'co.review.contract.v1',
+    generated_at: '2026-05-14T00:00:00.000Z',
+    overall_verdict: 'clean' as const,
+    axes: {
+      spec_conformance: cleanAxis('Spec conformance checked.'),
+      coding_standards: cleanAxis('Coding standards checked.'),
+      code_changes: cleanAxis('Code changes checked.'),
+      agent_loop: cleanAxis('Agent loop checked.')
+    },
+    code_change_proposals: [] as Array<Record<string, unknown>>,
+    agent_loop_proposals: [] as Array<Record<string, unknown>>
+  };
+}
+
+function buildCodeChangeProposal(evidenceRef: ReviewContractEvidenceRef): Record<string, unknown> {
+  return {
+    id: 'code-1',
+    title: 'Patch contract parser',
+    rationale: 'Parser should reject malformed proposal diffs.',
+    unified_diff: 'diff --git a/scripts/lib/review-contract.ts b/scripts/lib/review-contract.ts\n',
+    tests: ['npm run test:core -- tests/review-contract.spec.ts'],
+    risk: 'low',
+    evidence_refs: [evidenceRef]
+  };
+}
+
+function markCodeChangesFinding(
+  contract: ReturnType<typeof buildCleanContract>,
+  evidenceRef: ReviewContractEvidenceRef
+): void {
+  (contract as Record<string, unknown>).overall_verdict = 'findings';
+  (contract.axes as Record<string, unknown>).code_changes = {
+    verdict: 'findings',
+    summary: 'Code-change proposal requires parent action.',
+    evidence_refs: [evidenceRef],
+    findings: [
+      {
+        id: 'code-change-proposal-1',
+        priority: 'P2',
+        title: 'Patchable code change proposed.',
+        evidence_refs: [evidenceRef]
+      }
+    ]
+  };
+}
+
+async function git(cwd: string, args: string[]): Promise<void> {
+  await execFileAsync('git', args, { cwd });
+}

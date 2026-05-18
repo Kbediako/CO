@@ -1034,6 +1034,265 @@ describe('runCommandStage review evidence consistency', () => {
     }
   });
 
+  it('fails provider-linear-worker review handoff when the authoritative gate implies missing contract evidence is required', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(input, {
+        status: 'succeeded',
+        review_outcome: 'clean-success',
+        review_verdict: 'clean',
+        finding_count: 0,
+        outputLogContent: 'codex\nI found no actionable issues.\n',
+        termination_boundary: null
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with missing governed contract',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed because standalone review did not produce a concrete verdict.');
+    expect(result.summary).toContain('review contract: required but missing');
+
+    const errorPayload = JSON.parse(await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_unknown');
+    expect(errorPayload.details?.review_outcome_summary).toContain('review contract: required but missing');
+  });
+
+  it('fails provider-linear-worker review handoff on non-clean governed contract verdicts', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(input, {
+        status: 'succeeded',
+        review_outcome: 'clean-success',
+        review_verdict: 'clean',
+        finding_count: 0,
+        outputLogContent: 'codex\n{"schema_version":"co.review.contract.v1"}\n',
+        termination_boundary: null,
+        contract_path: 'review/contract.json',
+        contract_mode: 'enforce',
+        contract_validation: {
+          status: 'valid',
+          errors: []
+        },
+        contract_overall_verdict: 'blocked',
+        axis_verdicts: {
+          spec_conformance: 'clean',
+          coding_standards: 'clean',
+          code_changes: 'clean',
+          agent_loop: 'blocked'
+        },
+        axis_finding_counts: {
+          spec_conformance: 0,
+          coding_standards: 0,
+          code_changes: 0,
+          agent_loop: 1
+        },
+        proposal_counts: {
+          code_change: 0,
+          agent_loop: 1
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with blocked governed contract',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed because standalone review reported findings.');
+    expect(result.summary).toContain('review contract: mode=enforce, validation=valid, overall=blocked');
+    expect(result.summary).toContain('review contract proposals: code_change=0, agent_loop=1');
+
+    const errorPayload = JSON.parse(await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_findings');
+    expect(errorPayload.details?.review_outcome_summary).toContain('overall=blocked');
+  });
+
+  it('fails governed provider-linear-worker review handoff on bounded-success telemetry', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(input, {
+        status: 'succeeded',
+        review_outcome: 'bounded-success',
+        review_verdict: 'clean',
+        finding_count: 0,
+        outputLogContent: 'codex\n{"schema_version":"co.review.contract.v1"}\n',
+        termination_boundary: {
+          kind: 'relevant-reinspection-dwell',
+          provenance: 'post-startup-anchor',
+          reason: 'bounded review relevant-reinspection dwell boundary violated after 1s.',
+          sample: null
+        },
+        contract_path: 'review/contract.json',
+        contract_mode: 'enforce',
+        contract_validation: {
+          status: 'valid',
+          errors: []
+        },
+        contract_overall_verdict: 'clean',
+        axis_verdicts: {
+          spec_conformance: 'clean',
+          coding_standards: 'clean',
+          code_changes: 'clean',
+          agent_loop: 'clean'
+        },
+        axis_finding_counts: {
+          spec_conformance: 0,
+          coding_standards: 0,
+          code_changes: 0,
+          agent_loop: 0
+        },
+        proposal_counts: {
+          code_change: 0,
+          agent_loop: 0
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with bounded governed review telemetry',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed (governed_review_handoff_not_clean).');
+    expect(result.summary).toContain('review outcome: bounded success via relevant-reinspection-dwell');
+    expect(result.summary).toContain('review contract: mode=enforce, validation=valid, overall=clean');
+    expect(result.summary).toContain('governed review handoff failed: review outcome is bounded-success');
+
+    const errorPayload = JSON.parse(await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_not_clean');
+    expect(errorPayload.details?.review_outcome_summary).toContain('review outcome is bounded-success');
+  });
+
+  it('fails governed provider-linear-worker review handoff after a legacy fallback launch', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(input, {
+        status: 'succeeded',
+        review_outcome: 'clean-success',
+        review_verdict: 'clean',
+        finding_count: 0,
+        outputLogContent: 'codex\n{"schema_version":"co.review.contract.v1"}\n',
+        termination_boundary: null,
+        launch_context: {
+          legacy_fallback_attempt: 'review-wrapper-read-only-sandbox-compatibility'
+        },
+        contract_path: 'review/contract.json',
+        contract_mode: 'enforce',
+        contract_validation: {
+          status: 'valid',
+          errors: []
+        },
+        contract_overall_verdict: 'clean',
+        axis_verdicts: {
+          spec_conformance: 'clean',
+          coding_standards: 'clean',
+          code_changes: 'clean',
+          agent_loop: 'clean'
+        },
+        axis_finding_counts: {
+          spec_conformance: 0,
+          coding_standards: 0,
+          code_changes: 0,
+          agent_loop: 0
+        },
+        proposal_counts: {
+          code_change: 0,
+          agent_loop: 0
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with fallback governed review launch',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('review outcome: clean success');
+    expect(result.summary).toContain('review contract: mode=enforce, validation=valid, overall=clean');
+    expect(result.summary).toContain(
+      'governed review handoff failed: review launch used legacy fallback review-wrapper-read-only-sandbox-compatibility'
+    );
+
+    const errorPayload = JSON.parse(await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_not_clean');
+    expect(errorPayload.details?.review_outcome_summary).toContain(
+      'review launch used legacy fallback review-wrapper-read-only-sandbox-compatibility'
+    );
+  });
+
   it('preserves rollout-item thread-not-found review log noise notes in provider-worker terminal summaries', async () => {
     mockState.runImpl = async (input) => {
       await writeProviderLinearWorkerProofArtifacts(input, {
@@ -2177,6 +2436,8 @@ async function bootstrapCommandStage(
     command: stageSeed.command,
     ...(stageSeed.summaryHint ? { summaryHint: stageSeed.summaryHint } : {}),
     env: {
+      CODEX_REVIEW_AUTHORITATIVE_GATE: '0',
+      CODEX_REVIEW_CONTRACT_MODE: '',
       ...stageEnv
     }
   };
@@ -2234,11 +2495,19 @@ async function writeReviewArtifacts(
     review_verdict: 'findings' | 'clean' | 'unknown';
     highest_finding_priority: 'P0' | 'P1' | 'P2' | 'P3' | null;
     finding_count: number;
+    contract_path: string | null;
+    contract_mode: 'off' | 'shadow' | 'enforce' | null;
+    contract_validation: Record<string, unknown> | null;
+    contract_overall_verdict: 'clean' | 'findings' | 'blocked' | 'unknown' | null;
+    axis_verdicts: Record<string, unknown> | null;
+    axis_finding_counts: Record<string, unknown> | null;
+    proposal_counts: Record<string, unknown> | null;
     error: string | null;
     output_log_path: string;
     outputLogContent: string;
     omitReviewOutcome: boolean;
     termination_boundary: Record<string, unknown> | null;
+    launch_context: Record<string, unknown> | null;
   }>
 ): Promise<void> {
   const execEnv = (input.env ?? {}) as NodeJS.ProcessEnv;

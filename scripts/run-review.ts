@@ -32,8 +32,15 @@ import {
   REVIEW_ENFORCE_BOUNDED_MODE_ENV_KEY
 } from './lib/review-execution-boundary-preflight.js';
 import {
+  resolveReviewArtifactsDir,
   runReviewLaunchAttemptShell
 } from './lib/review-launch-attempt.js';
+import {
+  prepareReviewContractInputBundles,
+  REVIEW_CONTRACT_MODE_ENV_KEY,
+  resolveReviewContractMode,
+  type ReviewContractMode
+} from './lib/review-contract.js';
 import {
   prepareReviewNonInteractiveHandoffShell,
   shouldForceNonInteractive,
@@ -54,6 +61,7 @@ import {
   runCodexReview
 } from './lib/review-execution-runtime.js';
 import {
+  getEnforceContractReviewFailureReason,
   logReviewTelemetrySummary as logReviewExecutionTelemetrySummary,
   type ReviewLaunchContext,
   type ReviewTelemetryPayload,
@@ -147,13 +155,26 @@ function resolveMissingReviewNotesWaiverFromEnv(env: NodeJS.ProcessEnv): Missing
 }
 
 function buildAuthoritativeNonInteractiveGateError(params: {
+  contractMode: ReviewContractMode;
   env: NodeJS.ProcessEnv;
   nonInteractive: boolean;
 }): string | null {
+  const authoritativeGate = envFlagEnabled(params.env[REVIEW_AUTHORITATIVE_GATE_ENV_KEY]);
+  const forceReview = params.env.FORCE_CODEX_REVIEW;
+  const forceReviewExplicitlyDisabled = envFlagExplicitlyDisabled(forceReview);
+  if (!params.nonInteractive || envFlagEnabled(forceReview)) {
+    return null;
+  }
   if (
-    !envFlagEnabled(params.env[REVIEW_AUTHORITATIVE_GATE_ENV_KEY]) ||
-    !params.nonInteractive ||
-    envFlagEnabled(params.env.FORCE_CODEX_REVIEW)
+    forceReviewExplicitlyDisabled &&
+    params.contractMode === 'enforce' &&
+    !authoritativeGate
+  ) {
+    return `${REVIEW_CONTRACT_MODE_ENV_KEY}=enforce disallows prompt-only non-interactive review handoff; set FORCE_CODEX_REVIEW=1 so the authoritative review gate executes and writes terminal telemetry.`;
+  }
+  if (
+    !authoritativeGate ||
+    (params.contractMode === 'enforce' && !forceReviewExplicitlyDisabled)
   ) {
     return null;
   }
@@ -659,10 +680,12 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
     const diffBudgetOverride = process.env.DIFF_BUDGET_OVERRIDE_REASON?.trim();
     const scopeMode = resolveEffectiveScopeMode(options);
     const allowHeavyCommands = allowHeavyReviewCommands();
+    const contractMode = resolveReviewContractMode(process.env);
     const {
       promptLines,
       reviewTaskContext,
       activeCloseoutBundleRoots,
+      resolvedNotes,
       scopedReviewerVisibleTitle
     } = await buildReviewPromptContext({
       repoRoot,
@@ -673,7 +696,8 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
       runnerLogExists,
       relativeRunnerLog,
       notes: process.env.NOTES,
-      authoritativeGate: envFlagEnabled(process.env[REVIEW_AUTHORITATIVE_GATE_ENV_KEY]),
+      authoritativeGate:
+        contractMode === 'enforce' || envFlagEnabled(process.env[REVIEW_AUTHORITATIVE_GATE_ENV_KEY]),
       missingNotesWaiver: resolveMissingReviewNotesWaiverFromEnv(process.env),
       scopeMode,
       includeBoundedReviewConstraints: !allowHeavyCommands
@@ -728,6 +752,7 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
     const requestedNonInteractive =
       options.nonInteractive ?? shouldForceNonInteractive(process.env, stdinIsTTY);
     const authoritativeNonInteractiveGateError = buildAuthoritativeNonInteractiveGateError({
+      contractMode,
       env: process.env,
       nonInteractive: requestedNonInteractive
     });
@@ -773,6 +798,31 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
 
     if (reviewSurface === 'audit' && diffBudgetOverride) {
       promptLines.push('', `Diff budget override: ${diffBudgetOverride}`);
+    }
+
+    if (contractMode === 'enforce' && explicitScopedReview) {
+      throw new Error(
+        'governed enforce review contract requires inline prompt delivery; explicit --base/--commit/--uncommitted review launches currently use artifact-only prompt transport, so rerun without explicit scope flags or use shadow/off contract mode for scoped diagnostics.'
+      );
+    }
+    const reviewContractInputs = await prepareReviewContractInputBundles({
+      repoRoot,
+      reviewDir: resolveReviewArtifactsDir(manifestPath, repoRoot),
+      manifestPath,
+      runnerLogPath,
+      runnerLogExists,
+      taskKey,
+      taskLabel,
+      reviewSurface,
+      scopePaths: scopePathCollection.paths,
+      scopeMode,
+      scopeBase: options.base ?? null,
+      scopeCommit: options.commit ?? null,
+      notes: resolvedNotes,
+      mode: contractMode
+    });
+    if (reviewContractInputs) {
+      promptLines.push(...reviewContractInputs.promptLines);
     }
 
     const prompt = promptLines.join('\n');
@@ -827,12 +877,17 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
       allowedMetaSurfaceEnvVarPaths
     } = boundaryPreflight;
     const autoIssueLogEnabled = options.autoIssueLog ?? false;
-    const runReview = async (resolved: { command: string; args: string[] }) =>
+    const runReview = async (resolved: { command: string; args: string[]; stdinInput?: string | null }) =>
       runCodexReview({
         command: resolved.command,
         args: resolved.args,
+        stdinInput: resolved.stdinInput ?? null,
         env: runtimeContext.env,
-        stdio: nonInteractive ? ['ignore', 'pipe', 'pipe'] : ['inherit', 'pipe', 'pipe'],
+        stdio: resolved.stdinInput
+          ? ['pipe', 'pipe', 'pipe']
+          : nonInteractive
+            ? ['ignore', 'pipe', 'pipe']
+            : ['inherit', 'pipe', 'pipe'],
         activeCloseoutBundleRoots,
         blockHeavyCommands: enforceBoundedMode,
         allowValidationCommandIntents: allowHeavyCommands,
@@ -864,8 +919,8 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
       errorMessage?: string | null,
       terminationBoundary?: ReviewTerminationBoundaryRecord | null,
       launchContext?: ReviewLaunchContext | null
-    ): Promise<ReviewTelemetryPayload | null> =>
-      writeReviewExecutionTelemetry({
+    ): Promise<ReviewTelemetryPayload | null> => {
+      const payload = await writeReviewExecutionTelemetry({
         state,
         status,
         error: errorMessage ?? null,
@@ -875,8 +930,38 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
         repoRoot,
         telemetryPath: artifactPaths.telemetryPath,
         includeRawTelemetry: envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]),
-        telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY
+        telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY,
+        contractMode,
+        contractPath: reviewContractInputs?.contractPath ?? null,
+        contractTelemetrySource: reviewContractInputs?.telemetrySource
       });
+      const enforceContractFailure = getEnforceContractReviewFailureReason(payload, contractMode);
+      if (enforceContractFailure) {
+        const errorMessage = `enforce contract gate failed: ${enforceContractFailure}`;
+        const failedPayload =
+          payload?.status === 'succeeded'
+            ? await writeReviewExecutionTelemetry({
+                state,
+                status: 'failed',
+                error: errorMessage,
+                terminationBoundary,
+                launchContext: launchContext ?? null,
+                outputLogPath: artifactPaths.outputLogPath,
+                repoRoot,
+                telemetryPath: artifactPaths.telemetryPath,
+                includeRawTelemetry: envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]),
+                telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY,
+                contractMode,
+                contractPath: reviewContractInputs?.contractPath ?? null,
+                contractTelemetrySource: reviewContractInputs?.telemetrySource
+              })
+            : payload;
+        console.error(`[run-review] enforce contract gate failed: ${enforceContractFailure}.`);
+        process.exitCode = 1;
+        return failedPayload ?? payload;
+      }
+      return payload;
+    };
 
     await runReviewLaunchAttemptShell({
       cliOptions: {
@@ -887,10 +972,14 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
       prompt,
       retryWithoutScopeFlagsGateError,
       runtimeContext,
-      repoRoot,
-      manifestPath,
-      artifactPaths,
-      autoIssueLogEnabled,
+        repoRoot,
+        manifestPath,
+        artifactPaths,
+        contractOutputSchemaPath:
+          contractMode === 'enforce' ? reviewContractInputs?.outputSchemaPath ?? null : null,
+        contractOutputLastMessagePath:
+          contractMode === 'enforce' ? reviewContractInputs?.contractPath ?? null : null,
+        autoIssueLogEnabled,
       telemetryDebugEnabled: envFlagEnabled(process.env[REVIEW_TELEMETRY_DEBUG_ENV_KEY]),
       telemetryDebugEnvKey: REVIEW_TELEMETRY_DEBUG_ENV_KEY,
       runReview,
@@ -1002,7 +1091,15 @@ function envFlagEnabled(value: string | undefined): boolean {
     return false;
   }
   const normalized = value.trim().toLowerCase();
-  return normalized === '1' || normalized === 'true' || normalized === 'yes';
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
+
+function envFlagExplicitlyDisabled(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off';
 }
 
 function printReviewWrapperHelp(): void {

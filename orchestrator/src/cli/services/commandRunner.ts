@@ -33,6 +33,7 @@ import {
   coerceReviewFindingPriority,
   coerceReviewSemanticVerdict,
   deriveReviewOutcomeDisposition,
+  formatReviewContractTelemetrySummary,
   formatReviewSemanticVerdictSummary,
   type ReviewOutcomeDisposition
 } from '../../../../scripts/lib/review-execution-telemetry.js';
@@ -115,8 +116,16 @@ interface ReviewTelemetryEvidencePayload {
   review_verdict?: unknown;
   highest_finding_priority?: unknown;
   finding_count?: unknown;
+  contract_path?: unknown;
+  contract_mode?: unknown;
+  contract_validation?: unknown;
+  contract_overall_verdict?: unknown;
+  axis_verdicts?: unknown;
+  axis_finding_counts?: unknown;
+  proposal_counts?: unknown;
   error?: unknown;
   termination_boundary?: unknown;
+  launch_context?: unknown;
 }
 
 interface ReviewEvidenceMismatch {
@@ -544,11 +553,22 @@ export async function runCommandStage(
         }
       }
       const reviewTelemetryStatus = coerceTelemetryStatusValue(providerReviewTelemetry?.status);
-      const reviewOutcomeSummary = formatReviewTelemetryOutcomeSummary(providerReviewTelemetry);
+      const requiresGovernedContract = requiresGovernedReviewContract(execEnv);
+      const reviewOutcomeSummary = appendReviewContractRequirementSummary(
+        formatReviewTelemetryOutcomeSummary(providerReviewTelemetry),
+        providerReviewTelemetry,
+        requiresGovernedContract
+      );
       const reviewSemanticVerdict = providerReviewTelemetry
-        ? resolveReviewSemanticVerdict(providerReviewTelemetry)
+        ? resolveReviewSemanticVerdict(providerReviewTelemetry, {
+            requireContract: requiresGovernedContract
+          })
         : requiresProviderReviewSemanticVerdict
           ? 'unknown'
+          : null;
+      const governedReviewHandoffFailureReason =
+        requiresProviderReviewSemanticVerdict && requiresGovernedContract
+          ? resolveGovernedReviewHandoffFailureReason(providerReviewTelemetry)
           : null;
       providerLinearWorkerReviewOutcomeSummary = reviewOutcomeSummary;
       const mutationSuppressions = deriveDeterministicProviderMutationSuppressions(
@@ -576,6 +596,21 @@ export async function runCommandStage(
           status: 'failed',
           endReason: null,
           reviewOutcomeSummary: reviewOutcomeSummary ?? 'review telemetry reported terminal failure',
+          reviewOutputLogNoiseSummary,
+          degradationSummary
+        });
+        forceProviderLinearWorkerFailure = true;
+      } else if (providerLinearWorkerFailureReason === null && governedReviewHandoffFailureReason) {
+        const governedReviewOutcomeSummary = appendReviewOutcomeSummaryDetail(
+          reviewOutcomeSummary,
+          `governed review handoff failed: ${governedReviewHandoffFailureReason}`
+        );
+        providerLinearWorkerReviewOutcomeSummary = governedReviewOutcomeSummary;
+        providerLinearWorkerFailureReason = 'provider_linear_worker_review_not_clean';
+        effectiveSummary = buildProviderLinearWorkerTerminalSummary({
+          status: 'failed',
+          endReason: 'governed_review_handoff_not_clean',
+          reviewOutcomeSummary: governedReviewOutcomeSummary,
           reviewOutputLogNoiseSummary,
           degradationSummary
         });
@@ -1209,6 +1244,13 @@ function coerceTelemetryString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function coerceTelemetryRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
 function coerceTelemetryStatusValue(value: unknown): 'succeeded' | 'failed' | null {
   if (value === 'succeeded' || value === 'failed') {
     return value;
@@ -1300,16 +1342,139 @@ function formatReviewTelemetryOutcomeSummary(
     highest_finding_priority: coerceReviewFindingPriority(telemetry?.highest_finding_priority),
     finding_count: coerceTelemetryFindingCount(telemetry?.finding_count)
   });
-  return semanticSummary ? `${outcomeSummary}; ${semanticSummary}` : outcomeSummary;
+  const contractSummary = formatReviewContractTelemetrySummary({
+    contract_mode: coerceReviewContractMode(telemetry?.contract_mode),
+    contract_validation: coerceReviewContractValidation(telemetry?.contract_validation),
+    contract_overall_verdict: coerceReviewContractAxisVerdict(telemetry?.contract_overall_verdict)
+  });
+  const proposalSummary = formatReviewContractProposalSummary(telemetry);
+  return [outcomeSummary, semanticSummary, contractSummary, proposalSummary].filter(Boolean).join('; ');
 }
 
 function resolveReviewSemanticVerdict(
-  telemetry: ReviewTelemetryEvidencePayload | null
+  telemetry: ReviewTelemetryEvidencePayload | null,
+  options: { requireContract?: boolean } = {}
 ): ReturnType<typeof coerceReviewSemanticVerdict> {
   if (!telemetry) {
     return null;
   }
+  if (options.requireContract || coerceTelemetryString(telemetry.contract_mode) === 'enforce') {
+    const validation = coerceReviewContractValidation(telemetry.contract_validation);
+    const overall = coerceReviewContractAxisVerdict(telemetry.contract_overall_verdict);
+    if (validation?.status !== 'valid') {
+      return 'unknown';
+    }
+    if (overall === 'clean') {
+      return 'clean';
+    }
+    if (overall === 'findings' || overall === 'blocked') {
+      return 'findings';
+    }
+    return 'unknown';
+  }
   return coerceReviewSemanticVerdict(telemetry.review_verdict) ?? 'unknown';
+}
+
+function requiresGovernedReviewContract(env: NodeJS.ProcessEnv): boolean {
+  const configured = coerceTelemetryString(env.CODEX_REVIEW_CONTRACT_MODE)?.toLowerCase();
+  if (configured) {
+    return configured === 'enforce';
+  }
+  return envFlagEnabled(env.CODEX_REVIEW_AUTHORITATIVE_GATE);
+}
+
+function envFlagEnabled(value: string | undefined): boolean {
+  if (value === undefined) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
+
+function coerceReviewContractMode(value: unknown): 'off' | 'shadow' | 'enforce' | null {
+  return value === 'off' || value === 'shadow' || value === 'enforce' ? value : null;
+}
+
+function coerceReviewContractAxisVerdict(
+  value: unknown
+): 'clean' | 'findings' | 'blocked' | 'unknown' | null {
+  return value === 'clean' || value === 'findings' || value === 'blocked' || value === 'unknown'
+    ? value
+    : null;
+}
+
+function coerceReviewContractValidation(value: unknown): {
+  status: 'off' | 'missing' | 'invalid' | 'valid';
+  errors: string[];
+} | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const status = record.status;
+  if (!(status === 'off' || status === 'missing' || status === 'invalid' || status === 'valid')) {
+    return null;
+  }
+  const errors = Array.isArray(record.errors)
+    ? record.errors.filter((entry): entry is string => typeof entry === 'string')
+    : [];
+  return { status, errors };
+}
+
+function formatReviewContractProposalSummary(
+  telemetry: ReviewTelemetryEvidencePayload | null
+): string | null {
+  const counts = telemetry?.proposal_counts;
+  if (!counts || typeof counts !== 'object' || Array.isArray(counts)) {
+    return null;
+  }
+  const record = counts as Record<string, unknown>;
+  const codeChange = coerceTelemetryFindingCount(record.code_change) ?? 0;
+  const agentLoop = coerceTelemetryFindingCount(record.agent_loop) ?? 0;
+  if (codeChange === 0 && agentLoop === 0) {
+    return null;
+  }
+  return `review contract proposals: code_change=${codeChange}, agent_loop=${agentLoop}`;
+}
+
+function appendReviewContractRequirementSummary(
+  summary: string | null,
+  telemetry: ReviewTelemetryEvidencePayload | null,
+  required: boolean
+): string | null {
+  if (!required) {
+    return summary;
+  }
+  if (!telemetry) {
+    return [summary, 'review contract: required but telemetry is missing'].filter(Boolean).join('; ');
+  }
+  const validation = coerceReviewContractValidation(telemetry.contract_validation);
+  if (validation) {
+    return summary;
+  }
+  return [summary, 'review contract: required but missing'].filter(Boolean).join('; ');
+}
+
+function appendReviewOutcomeSummaryDetail(summary: string | null, detail: string): string {
+  return [summary, detail].filter(Boolean).join('; ');
+}
+
+function resolveGovernedReviewHandoffFailureReason(
+  telemetry: ReviewTelemetryEvidencePayload | null
+): string | null {
+  if (!telemetry) {
+    return null;
+  }
+  const disposition = resolveReviewTelemetryOutcomeDisposition(telemetry);
+  if (disposition && disposition !== 'clean-success') {
+    return `review outcome is ${disposition}`;
+  }
+  const launchContext = coerceTelemetryRecord(telemetry.launch_context);
+  const legacyFallbackAttempt = coerceTelemetryString(launchContext?.legacy_fallback_attempt);
+  if (legacyFallbackAttempt) {
+    return `review launch used legacy fallback ${legacyFallbackAttempt}`;
+  }
+  return null;
 }
 
 function coerceTelemetryFindingCount(value: unknown): number | null {
