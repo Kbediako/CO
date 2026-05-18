@@ -13255,21 +13255,21 @@
       "path": "docs/book/public-posture.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-18",
+      "last_review": "2026-05-13",
       "cadence_days": 14
     },
     {
       "path": "docs/book/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-18",
+      "last_review": "2026-05-13",
       "cadence_days": 14
     },
     {
       "path": "docs/book/setup.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-18",
+      "last_review": "2026-05-13",
       "cadence_days": 14
     },
     {
@@ -16128,7 +16128,7 @@
       "path": "docs/guides/codex-version-policy.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-18",
+      "last_review": "2026-05-13",
       "cadence_days": 90
     },
     {
@@ -22713,7 +22713,7 @@
       "path": "docs/README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-18",
+      "last_review": "2026-04-04",
       "cadence_days": 90
     },
     {
@@ -29241,7 +29241,7 @@
       "path": "README.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-18",
+      "last_review": "2026-04-24",
       "cadence_days": 90
     },
     {

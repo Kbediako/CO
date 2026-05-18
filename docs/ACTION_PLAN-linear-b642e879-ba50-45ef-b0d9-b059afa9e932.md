@@ -21,7 +21,8 @@
 12. Resolve spec pre-expiry actions through real spec review, archive, reclassification, or same-project owner deferral.
 13. Resolve historical task/report stale cohorts structurally through archive/lifecycle truth rather than date-only edits.
 14. Record recurrence evidence on CO-552 while preserving CO-522 as the immediate owner.
-15. Keep CO-512 / PR #829 draft until `docs:freshness:maintain` and `co-status` report `blocks_handoff=false` or an explicit waiver exists.
+15. Keep CO-512 / PR #829 draft until shared-root `docs:freshness:maintain` and `co-status` report `blocks_handoff=false` or an explicit waiver exists.
+16. Verify archived-stub payloads are available on `doc-archives`, or record an explicit archive-payload waiver before merge.
 
 ## Protected Terms
 - `docs:freshness`
@@ -47,6 +48,8 @@
 - `blocks_handoff=true` remains after claiming recovery complete.
 - CO-512 advances while the CO-522 gate remains active.
 - CO-552 absorbs the immediate owner work and makes CO-522 ownership ambiguous.
+- Archived stubs point at `doc-archives` content that is unavailable and no explicit payload waiver exists.
+- Branch-local clean reports are treated as shared-root/control-host proof.
 
 ## Validation Checklist
 - [x] Before owner-truth JSON captured.
@@ -60,9 +63,10 @@
 - [x] Current docs and shipped skill entries reviewed or explicitly owner-deferred with evidence. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/docs-freshness-after-spec-lifecycle.json` has `stale_entries=0`, `missing_in_registry=0`, `invalid_entries=0`, and `uncatalogued_docs=0`.
 - [x] Active spec pre-expiry entries reviewed, archived, reclassified, or owner-deferred with evidence. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json` and `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-disposition-summary.json` classify `terminal=59`, `active=94`, `standalone=1`, and repair the remaining active missing-index path through `tasks/index.json`.
 - [x] Historical task/report stale cohorts archived or lifecycle-corrected without broad date-only refresh. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/archive-apply-after-spec-lifecycle/docs-archive-report.json` archives 355 terminal implementation docs and `docs:freshness` reports zero terminal lifecycle entries after the spec lifecycle pass.
-- [x] `docs:freshness:maintain --check --format json`, `npm run docs:freshness`, `node scripts/spec-guard.mjs --dry-run`, and `npm run docs:check` rerun after recovery. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/docs-freshness-maintenance-final.json` reports `freshness_decision=clean`, `repo_gate.action_required_count=0`, and `repo_gate.blocks_handoff=false`; `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/docs-freshness-final.json` reports zero stale, zero missing, zero invalid, and zero uncatalogued docs; terminal `npm run docs:freshness`, `node scripts/spec-guard.mjs --dry-run`, and `npm run docs:check` passed.
+- [x] `docs:freshness:maintain --check --format json`, `npm run docs:freshness`, `node scripts/spec-guard.mjs --dry-run`, and `npm run docs:check` rerun after recovery as branch-local validation. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/docs-freshness-maintenance-after-codex-rework.json` reports local `freshness_decision=clean`, `repo_gate.action_required_count=0`, and `repo_gate.blocks_handoff=false`; `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/docs-freshness-after-codex-rework.json` reports zero stale, zero missing, zero invalid, and zero uncatalogued docs; terminal `npm run docs:freshness`, `node scripts/spec-guard.mjs --dry-run`, and `npm run docs:check` passed. This does not replace shared-root/control-host proof.
 - [x] Minimality pass complete: changed paths are confined to docs/task metadata, `.agent` task mirrors, the release skill note, and freshness catalog/registry data; no runtime scripts or implementation code changed.
-- [ ] `co-status --format json` no longer reports the CO-522 repo gate as handoff-blocking.
+- [ ] Archive payload availability on `doc-archives` is verified, or an explicit payload waiver is recorded.
+- [ ] Shared-root/control-host `co-status --format json` or live `docs:freshness:maintain` no longer reports the CO-522 repo gate as handoff-blocking.
 
 ## CO-382 Fallback Decision Table
 
