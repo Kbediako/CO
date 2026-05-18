@@ -22,7 +22,7 @@
 - [x] Parent leaves product implementation lanes and unrelated provider-worker behavior out of the owner rehome.
 - [x] Parent clears or explicitly owner-defers every current action on the recovery branch without weakening gates, widening caps, creating duplicate owner issues, or using metadata-only freshness bumps. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/docs-freshness-maintenance-after-spec-lifecycle.json` reports branch-local `repo_gate.action_required_count=0`, `repo_gate.blocks_handoff=false`, `capacity.current_entries=0`, `capacity.current_cohorts=0`, and `spec_guard.action_required_count=0`; this remains recovery-branch evidence, not final shared-root/control-host proof.
 - [x] Parent verifies the archive payload for archived stubs is available on `doc-archives` or records an explicit merge waiver that names the missing payload, owner, expiry, and recovery command. Evidence: `origin/doc-archives` commit `cd4982cffaf30e7ef17d53871402ca1706586438` contains the CO-522 archive payload; representative archived stubs `.agent/task/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md` and `tasks/tasks-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md` are present.
-- [ ] Parent keeps CO-512 / PR #829 draft until shared-root `docs:freshness:maintain` and `co-status` report `blocks_handoff=false`, or an explicit waiver is recorded.
+- [x] Parent records an explicit pre-merge shared-root/control-host proof waiver for PR #833 and keeps CO-512 / PR #829 draft until post-merge shared-root `docs:freshness:maintain` and `co-status` report `blocks_handoff=false`. Evidence: shared root is clean latest `main` at `489463e41ea4a8b8f644810b56d07cfc7332e80c`; live shared-root `co-status` is expected to remain blocked until PR #833 lands, so pre-merge proof is circular under the clean-main constraint.
 
 ## Validation
 - [x] Child scoped file creation only. Evidence: this file is the only declared child-lane edit.
@@ -34,7 +34,8 @@
 - [x] 2026-05-18 recovery reports captured: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/docs-freshness-maintenance.json`, `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/docs-freshness.json`, and `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/disposition-manifest.json`.
 - [x] Parent reruns `node scripts/docs-freshness-maintain.mjs --check --format json`, `npm run docs:freshness`, `node scripts/spec-guard.mjs --dry-run`, and `npm run docs:check` after recovery changes. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/docs-freshness-maintenance-final.json`, `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/docs-freshness-final.json`, terminal `npm run docs:freshness`, terminal `node scripts/spec-guard.mjs --dry-run`, and terminal `npm run docs:check` all passed on 2026-05-18 as branch-local recovery evidence.
 - [x] Parent records archive payload availability on `doc-archives`, or an explicit payload waiver, before merge. Evidence: `git ls-remote origin refs/heads/doc-archives` returned `cd4982cffaf30e7ef17d53871402ca1706586438`, and `git ls-tree` verified representative archived stubs in that payload.
-- [ ] Parent records shared-root/control-host `co-status --format json` or live `docs:freshness:maintain` evidence that the CO-522 repo gate no longer blocks handoff.
+- [x] Parent records a pre-merge waiver for shared-root/control-host proof. Evidence: branch-local `docs:freshness:maintain` is clean at PR #833 head `5de8a9d0fd8f0b999bfaaa42849b60d1e7115881`, but shared-root `co-status` from clean latest `main` still reports `owner=CO-522` and `blocks_handoff=true` because the PR has not landed; the proof is therefore deferred to a post-merge/downstream-unblock gate rather than faked or collected by pointing the control host at the branch.
+- [ ] Post-merge/downstream-unblock gate: after PR #833 lands and shared root fast-forwards to merged `main`, rerun shared-root `co-status --format json` or live `docs:freshness:maintain` and record `blocks_handoff=false` before advancing CO-512 / PR #829.
 
 ## Non-Goals
 - Do not edit parent-owned owner metadata, registry mirrors, `tasks/index.json`, `docs/TASKS.md`, workpad comments, PR state, or Linear state from this child lane.
@@ -43,6 +44,7 @@
 - Keep CO-514 provider-worker manifest serialization out of scope.
 - Do not create another canonical `docs:freshness:maintain` owner while CO-522 verifies live.
 - Do not move CO-512 forward while the CO-522 gate reports `blocks_handoff=true`.
+- Do not fake shared-root/control-host proof, and do not point the control host at the PR branch to satisfy a pre-merge proof requirement while shared root is required to remain clean latest `main`.
 
 ## Evidence
 - Source anchor: `ctx:sha256:1abafed42f940096a3f36ad165f83269a6d61f805f22db09605ed97dac2ae384#chunk:c000001`.
@@ -59,6 +61,8 @@
 - 2026-05-18 active-doc review evidence: `docs/public/downstream-setup.md` was re-reviewed against `README.md`, `docs/README.md`, and `docs/guides/codex-version-policy.md`; its current `0.128.0` local posture, `gpt-5.5`/`xhigh` ChatGPT-auth posture, portable `gpt-5.4` fallback, marketplace command guidance, and first-run commands remain consistent with the current policy surfaces, so its registry `last_review=2026-05-18` is backed by explicit review evidence rather than a metadata-only bump.
 - 2026-05-18 GPT Pro review critique via the in-app Browser keypress path agreed with the rework direction: keep archive payload and live owner proof as explicit blocking gates, revert registry-only active-doc review-date changes unless backed by real review evidence, and prevent branch-local reports from being promoted to shared-root/control-host proof.
 - 2026-05-18 archive payload proof: pushed `doc-archives` commit `cd4982cffaf30e7ef17d53871402ca1706586438` to `origin/doc-archives`; `git ls-remote origin refs/heads/doc-archives` returned that commit, and `git ls-tree` verified representative archived stubs `.agent/task/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md` and `tasks/tasks-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md`.
+- 2026-05-18 GPT Pro decision check via the in-app Browser keypress path: the pre-merge shared-root/control-host proof requirement is circular while shared root must remain clean latest `main`; accepted decision is to mark PR #833 ready after branch evidence, current-head review, archive payload, and unresolved review threads are clean, while recording an explicit pre-merge proof waiver and converting shared-root/control-host proof into a post-merge/downstream-unblock gate.
+- 2026-05-18 PR review thread closeout: current archive-payload P1 and two outdated Codex inline threads were replied to with evidence and resolved; unresolved review thread count is zero.
 
 ## CO-382 Fallback Decision Table
 
