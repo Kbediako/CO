@@ -2724,6 +2724,9 @@ export function createProviderIssueHandoffService(
           trackedIssue: input.freshTrackedIssue.trackedIssue
         });
       }
+      if (input.freshTrackedIssue.useCachedClaimIssueState) {
+        return null;
+      }
       const refreshedClaim = {
         ...input.claim,
         ...input.freshTrackedIssue.claimFields
@@ -2738,6 +2741,43 @@ export function createProviderIssueHandoffService(
         trackedIssue: input.freshTrackedIssue.trackedIssue
       });
     };
+
+    const runRehydratedTerminalReleaseSideEffects = async (input: {
+      claim: ProviderIntakeClaimRecord;
+      releaseClaim: Parameters<typeof upsertProviderIntakeClaim>[1];
+      run: ProviderIssueRunRecord | null;
+    }): Promise<boolean> => {
+      let hasPendingReleaseCancel = false;
+      if (shouldAttemptReleaseCancel(input.run)) {
+        await retryReleaseCancel({
+          releaseRun: input.run,
+          reason: input.releaseClaim.reason ?? 'provider_issue_released:not_active',
+          assertCurrent: assertRehydrateLifecycleCurrent
+        });
+        hasPendingReleaseCancel = true;
+      }
+      if (canCleanupReleasedProviderWorkspace(input.run)) {
+        await cleanupReleasedProviderWorkspaceWhenCurrent({
+          repoRoot,
+          taskId: input.run?.taskId ?? input.claim.task_id,
+          manifestPath: input.run?.manifestPath ?? input.claim.run_manifest_path,
+          issueId: input.claim.issue_id,
+          issueIdentifier: input.claim.issue_identifier,
+          providerWorkflowConfigStore: options.providerWorkflowConfigStore ?? null,
+          runTerminalCleanup
+        });
+      }
+      return hasPendingReleaseCancel;
+    };
+
+    const shouldReleasePlainCompletedRetryClaim = (
+      candidate: ProviderIntakeClaimRecord
+    ): boolean =>
+      candidate.state === 'completed' &&
+      candidate.reason === 'provider_issue_rehydrated_completed_run' &&
+      candidate.retry_queued === true &&
+      !candidate.review_promotion &&
+      !candidate.merge_closeout;
 
     const runRehydrate = async (): Promise<{ hasPendingClaims: boolean }> => {
       for (const claim of [...options.state.claims]) {
@@ -2898,25 +2938,12 @@ export function createProviderIssueHandoffService(
           if (terminalReleaseClaim) {
             publishRuntime ||= hasProviderClaimTransitioned(claim, terminalReleaseClaim);
             upsertRehydratedProviderIntakeClaim(terminalReleaseClaim);
-            if (shouldAttemptReleaseCancel(activeRun)) {
-              await retryReleaseCancel({
-                releaseRun: activeRun,
-                reason: terminalReleaseClaim.reason ?? 'provider_issue_released:not_active',
-                assertCurrent: assertRehydrateLifecycleCurrent
-              });
-              hasPendingClaims = true;
-            }
-            if (canCleanupReleasedProviderWorkspace(activeRun)) {
-              await cleanupReleasedProviderWorkspaceWhenCurrent({
-                repoRoot,
-                taskId: activeRun.taskId,
-                manifestPath: activeRun.manifestPath,
-                issueId: claim.issue_id,
-                issueIdentifier: claim.issue_identifier,
-                providerWorkflowConfigStore: options.providerWorkflowConfigStore ?? null,
-                runTerminalCleanup
-              });
-            }
+            const hasPendingReleaseCancel = await runRehydratedTerminalReleaseSideEffects({
+              claim,
+              releaseClaim: terminalReleaseClaim,
+              run: activeRun
+            });
+            hasPendingClaims ||= hasPendingReleaseCancel;
             continue;
           }
           const mergeTrackedIssue = freshTrackedIssue.trackedIssue;
@@ -2985,6 +3012,12 @@ export function createProviderIssueHandoffService(
           if (terminalReleaseClaim) {
             publishRuntime ||= hasProviderClaimTransitioned(claim, terminalReleaseClaim);
             upsertRehydratedProviderIntakeClaim(terminalReleaseClaim);
+            const hasPendingReleaseCancel = await runRehydratedTerminalReleaseSideEffects({
+              claim,
+              releaseClaim: terminalReleaseClaim,
+              run: resumableRun
+            });
+            hasPendingClaims ||= hasPendingReleaseCancel;
             continue;
           }
           const queuedRetryFields = buildQueuedProviderRetryFields({
@@ -3076,6 +3109,24 @@ export function createProviderIssueHandoffService(
                 }
               }
             } else {
+              if (shouldReleasePlainCompletedRetryClaim(completedClaim)) {
+                const terminalReleaseClaim = resolveRehydratedTerminalIssueRelease({
+                  claim: completedClaim,
+                  run: completedRun,
+                  freshTrackedIssue
+                });
+                if (terminalReleaseClaim) {
+                  publishRuntime ||= hasProviderClaimTransitioned(claim, terminalReleaseClaim);
+                  upsertRehydratedProviderIntakeClaim(terminalReleaseClaim);
+                  const hasPendingReleaseCancel = await runRehydratedTerminalReleaseSideEffects({
+                    claim,
+                    releaseClaim: terminalReleaseClaim,
+                    run: completedRun
+                  });
+                  hasPendingClaims ||= hasPendingReleaseCancel;
+                  continue;
+                }
+              }
               const hasFreshReleaseIssueMetadata =
                 freshTrackedIssue.releaseClaimFields.issue_state !== undefined ||
                 freshTrackedIssue.releaseClaimFields.issue_state_type !== undefined ||
@@ -3130,6 +3181,24 @@ export function createProviderIssueHandoffService(
             ...nextCompletedClaim
           });
           continue;
+        }
+
+        if (
+          shouldReleasePlainCompletedRetryClaim(claim) &&
+          hasConcreteRetainedRunIdentity(claim) &&
+          input?.refreshTrackedIssueMetadata === true
+        ) {
+          const freshTrackedIssue = await resolveFreshTrackedIssueForActiveClaim(claim);
+          const terminalReleaseClaim = resolveRehydratedTerminalIssueRelease({
+            claim,
+            run: null,
+            freshTrackedIssue
+          });
+          if (terminalReleaseClaim) {
+            publishRuntime ||= hasProviderClaimTransitioned(claim, terminalReleaseClaim);
+            upsertRehydratedProviderIntakeClaim(terminalReleaseClaim);
+            continue;
+          }
         }
 
         if (claim.state === 'starting' || claim.state === 'resuming') {

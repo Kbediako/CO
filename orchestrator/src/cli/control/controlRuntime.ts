@@ -927,13 +927,14 @@ function enrichProjectionSourceWithProviderRetryState<
           rehydrated_at: providerIntakeState.rehydrated_at ?? null
         }) ?? source.providerDebugSnapshot ?? null
       : source.providerDebugSnapshot ?? null;
-  if (!retryState && providerDebugSnapshot === source.providerDebugSnapshot) {
+  const shouldClearRetryState = retryState === null && source.providerRetryState != null;
+  if (!retryState && !shouldClearRetryState && providerDebugSnapshot === source.providerDebugSnapshot) {
     return source;
   }
   return {
     ...source,
     ...(providerDebugSnapshot ? { providerDebugSnapshot } : {}),
-    ...(retryState ? { providerRetryState: retryState } : {})
+    ...(retryState || shouldClearRetryState ? { providerRetryState: retryState } : {})
   };
 }
 
