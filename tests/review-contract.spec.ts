@@ -546,10 +546,31 @@ describe('review contract v1', () => {
       valid: true,
       errors: []
     });
-    await expect(validateStructuredOutputSchema(contract)).resolves.toEqual({
+    const structuredContract = withStructuredOutputNulls(contract);
+    await expect(validateStructuredOutputSchema(structuredContract)).resolves.toEqual({
       valid: true,
       errors: []
     });
+    const telemetry = await buildReviewContractTelemetry({
+      mode: 'enforce',
+      outputText: `codex\n${JSON.stringify(structuredContract)}\n`,
+      repoRoot: sandbox,
+      contractPath: join(sandbox, 'review', 'contract-output-parity.json')
+    });
+    expect(telemetry.contract_validation.status).toBe('valid');
+    expect(telemetry.review_verdict).toBe('findings');
+    const persisted = JSON.parse(
+      await readFile(join(sandbox, 'review', 'contract-output-parity.json'), 'utf8')
+    ) as {
+      code_change_proposals?: Array<Record<string, unknown>>;
+      agent_loop_proposals?: Array<{ blocking?: unknown; routing?: { canonical_owner_key?: unknown } }>;
+    };
+    expect(persisted.code_change_proposals?.[0]?.unified_diff).toBeUndefined();
+    expect(persisted.code_change_proposals?.[0]?.target).toEqual({
+      path: 'scripts/lib/review-contract.ts'
+    });
+    expect(persisted.agent_loop_proposals?.[0]?.blocking).toBeUndefined();
+    expect(persisted.agent_loop_proposals?.[0]?.routing?.canonical_owner_key).toBeUndefined();
   });
 
   it('maps blocked and findings axes to fail-closed semantic findings', async () => {
@@ -1114,6 +1135,70 @@ function markAgentLoopFinding(
       }
     ]
   };
+}
+
+function withStructuredOutputNulls(contract: ReturnType<typeof buildCleanContract>): Record<string, unknown> {
+  const structured = JSON.parse(JSON.stringify(contract)) as Record<string, unknown>;
+  const axes = structured.axes as Record<string, Record<string, unknown>>;
+  for (const axis of Object.values(axes)) {
+    axis.clean_signal ??= null;
+    addEvidenceDescriptions(axis.evidence_refs);
+    if (Array.isArray(axis.findings)) {
+      for (const finding of axis.findings) {
+        if (!isTestRecord(finding)) {
+          continue;
+        }
+        finding.body ??= null;
+        addEvidenceDescriptions(finding.evidence_refs);
+      }
+    }
+  }
+
+  if (Array.isArray(structured.code_change_proposals)) {
+    for (const proposal of structured.code_change_proposals) {
+      if (!isTestRecord(proposal)) {
+        continue;
+      }
+      proposal.unified_diff ??= null;
+      if (proposal.target === undefined) {
+        proposal.target = null;
+      } else if (isTestRecord(proposal.target)) {
+        proposal.target.section ??= null;
+        proposal.target.function ??= null;
+      }
+      addEvidenceDescriptions(proposal.evidence_refs);
+    }
+  }
+
+  if (Array.isArray(structured.agent_loop_proposals)) {
+    for (const proposal of structured.agent_loop_proposals) {
+      if (!isTestRecord(proposal)) {
+        continue;
+      }
+      proposal.blocking ??= null;
+      if (isTestRecord(proposal.routing)) {
+        proposal.routing.canonical_owner_key ??= null;
+      }
+      addEvidenceDescriptions(proposal.evidence_refs);
+    }
+  }
+
+  return structured;
+}
+
+function addEvidenceDescriptions(value: unknown): void {
+  if (!Array.isArray(value)) {
+    return;
+  }
+  for (const evidenceRef of value) {
+    if (isTestRecord(evidenceRef)) {
+      evidenceRef.description ??= null;
+    }
+  }
+}
+
+function isTestRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 async function validateStructuredOutputSchema(

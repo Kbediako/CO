@@ -285,9 +285,10 @@ export async function buildReviewContractTelemetry(options: {
     );
   }
 
-  await writeJson(options.contractPath, extracted.contract);
+  const normalizedContract = normalizeStructuredOutputOptionalNulls(extracted.contract);
+  await writeJson(options.contractPath, normalizedContract);
   const contractEvidenceRoot = dirname(resolve(options.repoRoot, options.contractPath));
-  const validation = await validateReviewContract(extracted.contract, {
+  const validation = await validateReviewContract(normalizedContract, {
     repoRoot: options.repoRoot,
     trustedEvidenceRoots: [contractEvidenceRoot]
   });
@@ -302,7 +303,7 @@ export async function buildReviewContractTelemetry(options: {
   return buildTelemetryFromValidContract(
     options.mode,
     relative(options.repoRoot, options.contractPath),
-    extracted.contract
+    normalizedContract
   );
 }
 
@@ -1942,6 +1943,76 @@ function collectEvidenceRefs(value: unknown): unknown[] {
       .filter(([key]) => key !== 'evidence_refs')
       .flatMap(([, entry]) => collectEvidenceRefs(entry))
   ];
+}
+
+function normalizeStructuredOutputOptionalNulls(contract: ReviewContractRecord): ReviewContractRecord {
+  const normalized = JSON.parse(JSON.stringify(contract)) as ReviewContractRecord;
+  const axes = isRecord(normalized.axes) ? normalized.axes : {};
+  for (const axis of CONTRACT_AXES) {
+    const value = axes[axis];
+    if (!isRecord(value)) {
+      continue;
+    }
+    deleteNullProperty(value, 'clean_signal');
+    normalizeEvidenceRefs(value.evidence_refs);
+    if (Array.isArray(value.findings)) {
+      for (const finding of value.findings) {
+        if (!isRecord(finding)) {
+          continue;
+        }
+        deleteNullProperty(finding, 'body');
+        normalizeEvidenceRefs(finding.evidence_refs);
+      }
+    }
+  }
+
+  if (Array.isArray(normalized.code_change_proposals)) {
+    for (const proposal of normalized.code_change_proposals) {
+      if (!isRecord(proposal)) {
+        continue;
+      }
+      deleteNullProperty(proposal, 'unified_diff');
+      if (proposal.target === null) {
+        delete proposal.target;
+      } else if (isRecord(proposal.target)) {
+        deleteNullProperty(proposal.target, 'section');
+        deleteNullProperty(proposal.target, 'function');
+      }
+      normalizeEvidenceRefs(proposal.evidence_refs);
+    }
+  }
+
+  if (Array.isArray(normalized.agent_loop_proposals)) {
+    for (const proposal of normalized.agent_loop_proposals) {
+      if (!isRecord(proposal)) {
+        continue;
+      }
+      deleteNullProperty(proposal, 'blocking');
+      if (isRecord(proposal.routing)) {
+        deleteNullProperty(proposal.routing, 'canonical_owner_key');
+      }
+      normalizeEvidenceRefs(proposal.evidence_refs);
+    }
+  }
+
+  return normalized;
+}
+
+function normalizeEvidenceRefs(value: unknown): void {
+  if (!Array.isArray(value)) {
+    return;
+  }
+  for (const evidenceRef of value) {
+    if (isRecord(evidenceRef)) {
+      deleteNullProperty(evidenceRef, 'description');
+    }
+  }
+}
+
+function deleteNullProperty(record: ReviewContractRecord, key: string): void {
+  if (record[key] === null) {
+    delete record[key];
+  }
 }
 
 function deriveOverallVerdict(
