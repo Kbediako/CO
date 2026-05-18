@@ -1,15 +1,18 @@
 ---
 id: 20260320-1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up
 title: Coordinator Live Provider Child-Run Delegation-Guard Launch-Provenance Test Hermeticity Follow-Up
+status: in_progress
 relates_to: docs/PRD-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-20
+last_review: 2026-05-18
 dependencies:
   - docs/findings/1309-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up-deliberation.md
   - docs/ACTION_PLAN-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md
   - tasks/tasks-1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md
+review_notes:
+  - 2026-05-18: CO-522 active-spec audit found 2 unchecked task checklist items, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 # TECH_SPEC: Coordinator Live Provider Child-Run Delegation-Guard Launch-Provenance Test Hermeticity Follow-Up

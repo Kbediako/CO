@@ -4,7 +4,7 @@ title: CO: repair archive automation auto-merge token
 status: in_progress
 owner: Codex
 created: 2026-04-25
-last_review: 2026-04-25
+last_review: 2026-05-18
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-fd4bf705-11a9-4717-948c-addfb4fa3f83.md
@@ -15,6 +15,7 @@ review_notes:
   - 2026-04-25: Bounded docs child lane read `CO-362` live in Linear in read-only mode because the provided source payload contained lane metadata only. The issue narrows this lane to `ARCHIVE_AUTOMERGE_TOKEN` secret or permission repair after `CO-356`; repository workflow, script, test, branch-protection, archive eligibility, and archive payload changes are out of scope for this packet.
   - 2026-04-25: Pre-implementation issue-quality review confirms the issue is not a broader archive automation rewrite. The protected surfaces are `ARCHIVE_AUTOMERGE_TOKEN`, `tasks-archive-automation`, `implementation-docs-archive-automation`, archive auto-merge, and `401 Bad credentials`; `Core Lane` must remain the required check and `Cloud Canary` must not be treated as a replacement.
   - 2026-04-25: Parent confirmed pre-fix `tasks-archive-automation` run `24922804853` created archive PR `#637`; required `Core Lane` target run `24922814963` completed `success` before the optional auto-merge step returned `401 Unauthorized` / `Bad credentials`. Parent rotated repository Actions secret `ARCHIVE_AUTOMERGE_TOKEN` outside repo code at `2026-04-25T06:17:28Z` without exposing the token value.
+  - 2026-05-18: CO-522 active-spec audit found 3 unchecked task checklist items, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 # Technical Specification

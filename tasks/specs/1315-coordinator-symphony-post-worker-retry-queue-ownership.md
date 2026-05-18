@@ -4,7 +4,7 @@ title: Coordinator Symphony Post-Worker Retry Queue Ownership
 status: in_progress
 owner: Codex
 created: 2026-03-21
-last_review: 2026-04-21
+last_review: 2026-05-18
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-symphony-post-worker-retry-queue-ownership.md
@@ -21,6 +21,7 @@ review_notes:
   - 2026-03-21: docs-review for `1315` succeeded via `.runs/1315-coordinator-symphony-post-worker-retry-queue-ownership/cli/2026-03-21T13-04-33-775Z-038089ca/manifest.json`.
   - 2026-03-21: Current branch truth now includes the landed `1315` implementation through `providerIssueRetryQueue.ts`, `providerIssueHandoff.ts`, and the coupled runtime-truth updates. The branch has since advanced to the stacked `1312`-`1316` publication vehicle in PR `#283`, but publication still remains open.
   - 2026-04-21: CO-278 spec-guard freshness review re-read the retry-owner contract, current-truth section, and validation plan; no scope reclassification or archive action is warranted, so this refresh is limited to the stale review baseline blocking enforced `node scripts/spec-guard.mjs`.
+  - 2026-05-18: CO-522 active-spec audit found 11 unchecked task checklist items, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 # Technical Specification

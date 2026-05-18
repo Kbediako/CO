@@ -1,11 +1,14 @@
 ---
 id: 20260214-0959-experience-prompt-injection-delegation-skill-harmonization
 title: Experience Prompt Injection + Delegation Skill Harmonization
+status: in_progress
 relates_to: docs/PRD-experience-prompt-injection-and-delegation-skill-harmonization.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-04-19
+last_review: 2026-05-18
+review_notes:
+  - 2026-05-18: CO-522 active-spec audit found 2 unchecked task checklist items, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 ## Summary

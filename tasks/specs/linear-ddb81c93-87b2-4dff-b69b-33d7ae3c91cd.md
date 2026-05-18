@@ -1,11 +1,14 @@
 ---
 id: 20260418-linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd
 title: CO: reclaim / reclassify / re-admit plain released/not_active issues across Backlog -> Ready with a free slot
+status: in_progress
 relates_to: docs/PRD-linear-ddb81c93-87b2-4dff-b69b-33d7ae3c91cd.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-18
+last_review: 2026-05-18
+review_notes:
+  - 2026-05-18: CO-522 active-spec audit found 10 unchecked task checklist items, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 ## Canonical Reference

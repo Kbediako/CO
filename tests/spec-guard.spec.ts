@@ -436,10 +436,10 @@ describe('spec-guard script', () => {
       [
         '# Archived Document',
         '',
-        'last_review: 2000-01-01',
+        'last_review: 2026-04-08',
         '',
         '<!-- docs-archive:stub -->',
-        '> Archived on 2026-04-08. Full content: https://example.com/archive.md',
+        '> Archived on 2026-04-08. Full content: https://github.com/example/repo/blob/doc-archives/tasks/specs/0001-initial.md',
         '',
         '- Archive branch: doc-archives',
         '- Archive path: tasks/specs/0001-initial.md',
@@ -466,10 +466,97 @@ describe('spec-guard script', () => {
         'last_review: 2000-01-01',
         '',
         '<!-- docs-archive:stub -->',
-        '> Archived on 2026-04-08. Full content: https://example.com/archive.md',
+        '> Archived on 2026-04-08. Full content: https://github.com/example/repo/blob/doc-archives/tasks/specs/other-spec.md',
         '',
         '- Archive branch: doc-archives',
         '- Archive path: tasks/specs/other-spec.md',
+        ''
+      ].join('\n')
+    );
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain("tasks/specs/0001-initial.md: last_review 2000-01-01");
+  });
+
+  it('does not skip archive stubs whose archive branch is blank', async () => {
+    const repo = await initRepository();
+
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      [
+        '# Archived Document',
+        '',
+        'last_review: 2000-01-01',
+        '',
+        '<!-- docs-archive:stub -->',
+        '> Archived on 2026-04-08. Full content: https://github.com/example/repo/blob/doc-archives/tasks/specs/0001-initial.md',
+        '',
+        '- Archive branch:',
+        '- Archive path: tasks/specs/0001-initial.md',
+        ''
+      ].join('\n')
+    );
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain("tasks/specs/0001-initial.md: last_review 2000-01-01");
+  });
+
+  it('does not skip archive stubs whose archived-on line lacks a full content URL', async () => {
+    const repo = await initRepository();
+
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      [
+        '# Archived Document',
+        '',
+        'last_review: 2000-01-01',
+        '',
+        '<!-- docs-archive:stub -->',
+        '> Archived on 2026-04-08.',
+        '',
+        '- Archive branch: doc-archives',
+        '- Archive path: tasks/specs/0001-initial.md',
+        ''
+      ].join('\n')
+    );
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain("tasks/specs/0001-initial.md: last_review 2000-01-01");
+  });
+
+  it('does not skip archive stubs that retain active body content after metadata', async () => {
+    const repo = await initRepository();
+
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      [
+        '# Archived Document',
+        '',
+        'last_review: 2000-01-01',
+        '',
+        '<!-- docs-archive:stub -->',
+        '> Archived on 2026-04-08. Full content: https://github.com/example/repo/blob/doc-archives/tasks/specs/0001-initial.md',
+        '',
+        '- Archive branch: doc-archives',
+        '- Archive path: tasks/specs/0001-initial.md',
+        '',
+        '## Still Active',
+        'This body content must not coexist with an archive stub marker.',
         ''
       ].join('\n')
     );
@@ -491,10 +578,10 @@ describe('spec-guard script', () => {
       [
         '# Archived Document',
         '',
-        'last_review: 2000-01-01',
+        'last_review: 2026-04-08',
         '',
         '<!-- docs-archive:stub -->',
-        '> Archived on 2026-04-08. Full content: https://example.com/archive.md',
+        '> Archived on 2026-04-08. Full content: https://github.com/example/repo/blob/doc-archives/tasks/specs/0001-initial.md',
         '',
         '- Archive branch: doc-archives',
         '- Archive path: tasks\\specs\\0001-initial.md',
@@ -1386,7 +1473,7 @@ describe('spec-guard script', () => {
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
   });
 
-  it('requires parseable fallback decision rows in every changed packet source', async () => {
+  it('requires parseable fallback decision rows in every active changed packet source', async () => {
     const repo = await initRepository();
     const decisionBody = fallbackDecisionTable([completeExpireFallbackRow()]);
 
@@ -1411,6 +1498,144 @@ describe('spec-guard script', () => {
       'docs/ACTION_PLAN-linear-fallback-fixture.md: fallback/seam-touching changes require a parseable CO-382 fallback decision table'
     );
     expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('requires parseable rows for hyphenated fallback-expiry packet sources even when a sibling type has rows', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([completeExpireFallbackRow()]);
+
+    await commitFallbackGuardChange(repo, {
+      decisionBody,
+      sourceDecisionBodies: {
+        agentTask: 'The fallback-expiry metadata for this mirror will be captured later.'
+      }
+    });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain(
+      '.agent/task/linear-fallback-fixture.md: fallback/seam-touching changes require a parseable CO-382 fallback decision table'
+    );
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not require fallback decision rows in archive stubs when active packet evidence is complete', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([completeExpireFallbackRow()]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+    await writeFile(
+      join(repo, 'docs/ACTION_PLAN-linear-archived-history.md'),
+      [
+        '# ACTION_PLAN - Archived fallback history',
+        '',
+        '<!-- docs-archive:stub -->',
+        '> Archived on 2026-05-18. Full content: https://github.com/Kbediako/CO/blob/doc-archives/docs/ACTION_PLAN-linear-archived-history.md',
+        '',
+        '- Archive branch: doc-archives',
+        '- Archive path: docs/ACTION_PLAN-linear-archived-history.md',
+        ''
+      ].join('\n')
+    );
+    await execFileAsync('git', ['add', 'docs/ACTION_PLAN-linear-archived-history.md'], { cwd: repo });
+    await execFileAsync('git', ['commit', '--amend', '--no-edit'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
+  it('rejects malformed archive stubs without fallback decision rows', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([completeExpireFallbackRow()]);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+    await writeFile(
+      join(repo, 'docs/ACTION_PLAN-linear-malformed-archive.md'),
+      [
+        '# ACTION_PLAN - Malformed archived fallback history',
+        '',
+        '<!-- docs-archive:stub -->',
+        '> Archived on 2026-05-18. Full content: https://github.com/Kbediako/CO/blob/doc-archives/docs/ACTION_PLAN-linear-malformed-archive.md',
+        '',
+        '- Archive branch: doc-archives',
+        ''
+      ].join('\n')
+    );
+    await writeFile(
+      join(repo, 'docs/ACTION_PLAN-linear-blank-branch-archive.md'),
+      [
+        '# ACTION_PLAN - Blank archive branch fallback history',
+        '',
+        '<!-- docs-archive:stub -->',
+        '> Archived on 2026-05-18. Full content: https://github.com/Kbediako/CO/blob/doc-archives/docs/ACTION_PLAN-linear-blank-branch-archive.md',
+        '',
+        '- Archive branch:',
+        '- Archive path: docs/ACTION_PLAN-linear-blank-branch-archive.md',
+        ''
+      ].join('\n')
+    );
+    await execFileAsync(
+      'git',
+      ['add', 'docs/ACTION_PLAN-linear-malformed-archive.md', 'docs/ACTION_PLAN-linear-blank-branch-archive.md'],
+      { cwd: repo }
+    );
+    await execFileAsync('git', ['commit', '--amend', '--no-edit'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain(
+      'docs/ACTION_PLAN-linear-malformed-archive.md: fallback/seam-touching changes require a parseable CO-382 fallback decision table'
+    );
+    expect(stdout).toContain(
+      'docs/ACTION_PLAN-linear-blank-branch-archive.md: fallback/seam-touching changes require a parseable CO-382 fallback decision table'
+    );
+    expect(stdout).toContain('Dry run: exiting successfully despite failures.');
+  });
+
+  it('does not require fallback decision rows in unrelated active packet updates when active evidence is complete', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([completeExpireFallbackRow()]);
+    const today = new Date().toISOString().slice(0, 10);
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+    await writeFile(
+      join(repo, 'tasks/specs/linear-unrelated-active-review.md'),
+      [
+        '---',
+        'id: unrelated-active-review',
+        'title: "Unrelated active review"',
+        'status: in_progress',
+        `last_review: ${today}`,
+        '---',
+        '',
+        '# Unrelated active review',
+        '',
+        '- This spec mentions stable fallback behavior as historical context, but it does not claim to carry source-local decision evidence.',
+        '- The actual fallback-sensitive implementation packet in this commit carries the required PRD, TECH_SPEC, ACTION_PLAN, and task checklist rows.',
+        ''
+      ].join('\n')
+    );
+    await execFileAsync('git', ['add', 'tasks/specs/linear-unrelated-active-review.md'], { cwd: repo });
+    await execFileAsync('git', ['commit', '--amend', '--no-edit'], { cwd: repo });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
   });
 
   it('ignores fenced fallback decision example tables', async () => {

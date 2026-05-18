@@ -2,6 +2,8 @@
 
 `codex-orchestrator review` is the downstream-safe, agent-first wrapper around `codex review` (`npm run review` is the repo alias). It saves the review prompt and Codex CLI artifacts beside the manifest that supplied the evidence. The artifact layout mirrors `.runs/<task>/cli/<run-id>`, so reviewers can grab everything they need without guessing.
 
+2026-05-18 review note: local smoke on `codex-cli 0.130.0` still exposes `codex review [PROMPT]` plus `--uncommitted`, `--base`, `--commit`, and `--title`; the wrapper artifact contract below remains current. This smoke note is not a posture promotion; canonical version posture remains governed by `docs/guides/codex-version-policy.md`.
+
 ## Artifact layout
 
 - The prompt is written to `review/prompt.txt` inside the run directory that contains the manifest.

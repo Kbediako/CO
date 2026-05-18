@@ -812,6 +812,21 @@
       ]
     },
     {
+      "glob": "docs/REVIEW-*.md",
+      "status": "archived",
+      "doc_class": "report_only",
+      "audience": "maintainers and reviewers",
+      "source_of_truth": [
+        "task packets",
+        "standalone review artifacts"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 365,
+      "update_triggers": [
+        "review evidence correction"
+      ]
+    },
+    {
       "glob": "docs/public/**/*.md",
       "status": "active",
       "doc_class": "public_guide",

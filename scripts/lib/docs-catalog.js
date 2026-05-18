@@ -117,13 +117,10 @@ function normalizeClassMap(raw) {
   return result;
 }
 
-export async function loadDocsCatalog(repoRoot, relativePath = DEFAULT_DOCS_CATALOG_PATH) {
-  const absolutePath = path.resolve(repoRoot, relativePath);
-  const raw = JSON.parse(await readFile(absolutePath, 'utf8'));
-
+export function normalizeDocsCatalog(raw, relativePath = DEFAULT_DOCS_CATALOG_PATH, absolutePath = '') {
   return {
     version: Number.isFinite(raw?.version) ? Number(raw.version) : 1,
-    relative_path: toPosixPath(path.relative(repoRoot, absolutePath)),
+    relative_path: toPosixPath(relativePath),
     absolute_path: absolutePath,
     classes: normalizeClassMap(raw?.classes),
     policies: isObject(raw?.policies) ? raw.policies : {},
@@ -134,6 +131,13 @@ export async function loadDocsCatalog(repoRoot, relativePath = DEFAULT_DOCS_CATA
       ? raw.patterns.map((entry) => normalizeCatalogRule(entry, 'pattern'))
       : []
   };
+}
+
+export async function loadDocsCatalog(repoRoot, relativePath = DEFAULT_DOCS_CATALOG_PATH) {
+  const absolutePath = path.resolve(repoRoot, relativePath);
+  const raw = JSON.parse(await readFile(absolutePath, 'utf8'));
+
+  return normalizeDocsCatalog(raw, path.relative(repoRoot, absolutePath), absolutePath);
 }
 
 export async function maybeLoadDocsCatalog(repoRoot, relativePath = DEFAULT_DOCS_CATALOG_PATH) {

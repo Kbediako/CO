@@ -1,15 +1,18 @@
 ---
 id: 20260320-1307-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up
 title: Coordinator Live Provider Child-Run Test-Stage Terminal Completion Follow-Up
+status: in_progress
 relates_to: docs/PRD-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-20
+last_review: 2026-05-18
 dependencies:
   - docs/findings/1307-live-provider-child-run-test-stage-terminal-completion-follow-up-deliberation.md
   - docs/ACTION_PLAN-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md
   - tasks/tasks-1307-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md
+review_notes:
+  - 2026-05-18: CO-522 active-spec audit found 16 unchecked task checklist items, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 # TECH_SPEC: Coordinator Live Provider Child-Run Test-Stage Terminal Completion Follow-Up
