@@ -42653,6 +42653,101 @@ describe('createProviderIssueHandoffService', () => {
     expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
   });
 
+  it('cancels an active child run when rehydrate releases terminal live Linear truth', async () => {
+    const { root, paths } = await createHostPaths();
+    const taskId = 'task-co-512-terminal-active';
+    const runId = 'run-co-512-active';
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(childEnv, runId);
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: runId,
+        task_id: taskId,
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-512',
+        issue_identifier: 'CO-512',
+        issue_updated_at: '2026-05-18T19:10:00.000Z',
+        updated_at: '2026-05-18T19:15:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const cancelSpy = vi
+      .spyOn(questionChildResolutionAdapter, 'callChildControlEndpoint')
+      .mockResolvedValue(undefined);
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      provider_key: 'linear:lin-issue-512',
+      issue_id: 'lin-issue-512',
+      issue_identifier: 'CO-512',
+      issue_title: 'Terminal active claim',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-18T19:10:00.000Z',
+      task_id: taskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: runId,
+      run_manifest_path: childPaths.manifestPath
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-512',
+          identifier: 'CO-512',
+          title: 'Terminal active claim',
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: '2026-05-18T19:20:00.000Z',
+          assignee_id: 'viewer-1',
+          assignee_name: 'Codex'
+        })
+      })
+    });
+
+    await service.rehydrate();
+
+    expect(cancelSpy).toHaveBeenCalledWith(expect.objectContaining({
+      manifestPath: childPaths.manifestPath,
+      payload: {
+        action: 'cancel',
+        requested_by: 'control-host',
+        reason: 'provider_issue_released:not_active'
+      }
+    }));
+    const expectedClaim = {
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: null,
+      run_manifest_path: null
+    };
+    expect(state.claims[0]).toMatchObject(expectedClaim);
+    expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
   it('retries queued-retry deadline repair after refresh persist failure instead of keeping only in-memory retry_due_at', async () => {
     const { paths } = await createHostPaths();
 

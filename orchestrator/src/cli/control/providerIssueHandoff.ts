@@ -2898,6 +2898,14 @@ export function createProviderIssueHandoffService(
           if (terminalReleaseClaim) {
             publishRuntime ||= hasProviderClaimTransitioned(claim, terminalReleaseClaim);
             upsertRehydratedProviderIntakeClaim(terminalReleaseClaim);
+            if (shouldAttemptReleaseCancel(activeRun)) {
+              await retryReleaseCancel({
+                releaseRun: activeRun,
+                reason: terminalReleaseClaim.reason ?? 'provider_issue_released:not_active',
+                assertCurrent: assertRehydrateLifecycleCurrent
+              });
+              hasPendingClaims = true;
+            }
             if (canCleanupReleasedProviderWorkspace(activeRun)) {
               await cleanupReleasedProviderWorkspaceWhenCurrent({
                 repoRoot,
