@@ -1,32 +1,62 @@
 {
   "items": [
     {
-      "id": "linear-a91cfc38-be9e-496f-90bd-5cb2625763a5",
+      "id": "20260518-linear-a91cfc38-be9e-496f-90bd-5cb2625763a5",
       "title": "CO-555 exclude terminal retryable provider claims from active WIP",
+      "relates_to": "tasks/tasks-linear-a91cfc38-be9e-496f-90bd-5cb2625763a5.md",
       "risk": "high",
       "owners": [
         "Codex"
       ],
-      "status": "implementation_validation_pending",
+      "status": "review_handoff_prep",
       "last_review": "2026-05-18",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-18",
+          "status": "confirmed_ready_started",
+          "summary": "Live issue-context verified CO-555 was Ready with no attached PR; provider worker moved it to In Progress, created the workpad, and recorded the required parallelization decision before implementation."
+        },
+        "docs_packet": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-18",
+          "status": "created_for_fallback_decision_evidence",
+          "summary": "Created the CO-555 docs-first packet for terminal retryable/resumable provider-intake claims, preserving inactive retained audit evidence while removing terminal active-WIP authority."
+        }
+      },
+      "validation": {
+        "status": "implemented_review_clean_post_merge_validation_pending",
+        "passed": [
+          "live issue-context",
+          "Ready -> In Progress transition",
+          "workpad creation and refreshes",
+          "parallelization decision recorded",
+          "same-issue child lane terminal-retry-tests completed successfully before parent invalidation",
+          "focused provider-intake and provider-handoff regressions",
+          "full ProviderIssueHandoff regression after review feedback",
+          "pre-merge full provider-worker validation floor",
+          "manifest-backed standalone review clean with valid contract",
+          "explicit elegance/minimality pass",
+          "PR #834 opened and attached"
+        ],
+        "pending": [
+          "post-origin/main-merge validation rerun",
+          "PR ready-review drain",
+          "Linear In Review handoff"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-a91cfc38-be9e-496f-90bd-5cb2625763a5.md",
+        "prd": "docs/PRD-linear-a91cfc38-be9e-496f-90bd-5cb2625763a5.md",
+        "docs": "docs/TECH_SPEC-linear-a91cfc38-be9e-496f-90bd-5cb2625763a5.md",
+        "action_plan": "docs/ACTION_PLAN-linear-a91cfc38-be9e-496f-90bd-5cb2625763a5.md",
+        "spec": "tasks/specs/linear-a91cfc38-be9e-496f-90bd-5cb2625763a5.md",
+        "task": "tasks/tasks-linear-a91cfc38-be9e-496f-90bd-5cb2625763a5.md"
+      },
       "source_issue": {
         "id": "a91cfc38-be9e-496f-90bd-5cb2625763a5",
         "identifier": "CO-555",
         "url": "https://linear.app/asabeko/issue/CO-555/co-exclude-terminal-retryable-provider-claims-from-active-wip"
-      },
-      "validation": {
-        "status": "focused_validation_passed",
-        "passed": [
-          "same-issue child lane terminal-retry-tests completed successfully before parent invalidation",
-          "npm run build",
-          "node scripts/spec-guard.mjs --dry-run",
-          "focused provider-intake, provider-handoff, selected-run, control-runtime, co-status, freshness-gauge, and observability tests"
-        ],
-        "pending": [
-          "delegation guard after task registration",
-          "full provider-worker validation floor",
-          "standalone review and elegance pass before review handoff"
-        ]
       }
     },
     {
