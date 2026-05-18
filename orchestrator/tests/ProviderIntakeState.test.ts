@@ -867,6 +867,104 @@ describe('buildProviderIntakeSummary', () => {
     });
   });
 
+  it('keeps non-terminal retry-resumable claims active and retry visible', () => {
+    const summary = buildProviderIntakeSummary({
+      schema_version: 1,
+      updated_at: '2026-05-18T19:23:32.870Z',
+      rehydrated_at: '2026-05-18T19:23:32.870Z',
+      latest_provider_key: 'linear:lin-issue-329',
+      latest_reason: 'provider_issue_rehydrated_resumable_run',
+      claims: [
+        createClaim({
+          issue_identifier: 'CO-329',
+          issue_title: 'Non-terminal retry-resumable claim',
+          issue_state: 'Ready',
+          issue_state_type: 'unstarted',
+          issue_updated_at: '2026-05-18T19:21:00.000Z',
+          task_id: 'linear-lin-issue-329',
+          state: 'resumable',
+          reason: 'provider_issue_rehydrated_resumable_run',
+          accepted_at: '2026-05-18T19:11:00.000Z',
+          updated_at: '2026-05-18T19:22:32.870Z',
+          run_id: 'run-co-329-resumable',
+          run_manifest_path: '/tmp/run-co-329-resumable/manifest.json',
+          retry_queued: true,
+          retry_attempt: 1,
+          retry_due_at: '2026-05-18T19:24:32.870Z',
+          retry_error: 'non-terminal retry should remain active'
+        })
+      ]
+    });
+
+    expect(summary).toMatchObject({
+      active_claim_count: 1,
+      running_claim_count: 0,
+      active_issue_identifiers: ['CO-329'],
+      running_issue_identifiers: [],
+      selected_claim: {
+        issue_identifier: 'CO-329',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        state: 'resumable',
+        retry: {
+          active: true,
+          attempt: 1,
+          due_at: '2026-05-18T19:24:32.870Z',
+          error: 'non-terminal retry should remain active'
+        }
+      }
+    });
+  });
+
+  it('suppresses terminal Linear retry-resumable claims from active WIP', () => {
+    const summary = buildProviderIntakeSummary({
+      schema_version: 1,
+      updated_at: '2026-05-18T19:23:32.870Z',
+      rehydrated_at: '2026-05-18T19:23:32.870Z',
+      latest_provider_key: 'linear:lin-issue-512',
+      latest_reason: 'provider_issue_rehydrated_resumable_run',
+      claims: [
+        createClaim({
+          issue_identifier: 'CO-512',
+          issue_title: 'Terminal retry-resumable claim',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          issue_updated_at: '2026-05-18T19:20:00.000Z',
+          task_id: 'linear-lin-issue-512',
+          state: 'resumable',
+          reason: 'provider_issue_rehydrated_resumable_run',
+          accepted_at: '2026-05-18T19:10:00.000Z',
+          updated_at: '2026-05-18T19:23:32.870Z',
+          run_id: 'run-co-512-resumable',
+          run_manifest_path: '/tmp/run-co-512-resumable/manifest.json',
+          retry_queued: true,
+          retry_attempt: 2,
+          retry_due_at: '2026-05-18T19:24:02.870Z',
+          retry_error: 'stale resumable run should not occupy active WIP'
+        })
+      ]
+    });
+
+    expect(summary).toMatchObject({
+      active_claim_count: 0,
+      running_claim_count: 0,
+      active_issue_identifiers: [],
+      running_issue_identifiers: [],
+      selected_claim: {
+        issue_identifier: 'CO-512',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        state: 'resumable',
+        retry: {
+          active: false,
+          attempt: 2,
+          due_at: '2026-05-18T19:24:02.870Z',
+          error: 'stale resumable run should not occupy active WIP'
+        }
+      }
+    });
+  });
+
   it('excludes terminal handoff failures and merge-closeout non-retry failures from active issue identifiers', () => {
     const summary = buildProviderIntakeSummary({
       schema_version: 1,
@@ -917,9 +1015,9 @@ describe('buildProviderIntakeSummary', () => {
     });
 
     expect(summary).toMatchObject({
-      active_claim_count: 2,
+      active_claim_count: 1,
       running_claim_count: 0,
-      active_issue_identifiers: ['CO-392', 'CO-393'],
+      active_issue_identifiers: ['CO-392'],
       running_issue_identifiers: [],
       selected_claim: {
         issue_identifier: 'CO-392',

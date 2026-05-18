@@ -1,6 +1,35 @@
 {
   "items": [
     {
+      "id": "linear-a91cfc38-be9e-496f-90bd-5cb2625763a5",
+      "title": "CO-555 exclude terminal retryable provider claims from active WIP",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "implementation_validation_pending",
+      "last_review": "2026-05-18",
+      "source_issue": {
+        "id": "a91cfc38-be9e-496f-90bd-5cb2625763a5",
+        "identifier": "CO-555",
+        "url": "https://linear.app/asabeko/issue/CO-555/co-exclude-terminal-retryable-provider-claims-from-active-wip"
+      },
+      "validation": {
+        "status": "focused_validation_passed",
+        "passed": [
+          "same-issue child lane terminal-retry-tests completed successfully before parent invalidation",
+          "npm run build",
+          "node scripts/spec-guard.mjs --dry-run",
+          "focused provider-intake, provider-handoff, selected-run, control-runtime, co-status, freshness-gauge, and observability tests"
+        ],
+        "pending": [
+          "delegation guard after task registration",
+          "full provider-worker validation floor",
+          "standalone review and elegance pass before review handoff"
+        ]
+      }
+    },
+    {
       "id": "20260518-linear-2f522b6e-8208-484a-a7ad-08172d0280d9",
       "title": "CO-554 prevent rolling active-spec expiry repeats",
       "relates_to": "tasks/tasks-linear-2f522b6e-8208-484a-a7ad-08172d0280d9.md",

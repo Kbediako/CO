@@ -11384,7 +11384,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
-  it('keeps ignored terminal same-run queued occupancy blocking global admission capacity', async () => {
+  it('excludes ignored terminal same-run queued occupancy from global admission capacity', async () => {
     const { root, paths } = await createHostPaths();
     const queuedEnv = {
       repoRoot: root,
@@ -11458,15 +11458,15 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     expect(result).toMatchObject({
-      kind: 'ignored',
-      reason: 'provider_issue_start_blocked:max_concurrency',
+      kind: 'start',
+      reason: 'provider_issue_start_launched',
       claim: {
         provider_key: 'linear:lin-issue-fresh',
-        state: 'accepted',
-        reason: 'provider_issue_start_blocked:max_concurrency'
+        state: 'starting',
+        reason: 'provider_issue_start_launched'
       }
     });
-    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledTimes(1);
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
@@ -11560,7 +11560,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
-  it('treats terminal claim state for an inflight foreign queued run as unknown when enforcing per-state admission caps', async () => {
+  it('excludes terminal claim state for an inflight foreign queued run from per-state admission caps', async () => {
     const { root, paths } = await createHostPaths();
     const foreignEnv = {
       repoRoot: root,
@@ -11636,19 +11636,19 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     expect(result).toMatchObject({
-      kind: 'ignored',
-      reason: 'provider_issue_start_blocked:max_concurrency',
+      kind: 'start',
+      reason: 'provider_issue_start_launched',
       claim: {
         provider_key: 'linear:lin-issue-fresh',
-        state: 'accepted',
-        reason: 'provider_issue_start_blocked:max_concurrency'
+        state: 'starting',
+        reason: 'provider_issue_start_launched'
       }
     });
-    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledTimes(1);
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
-  it('treats inflight terminal queued claim state as unknown when reporting fresh-discovery state slots', async () => {
+  it('excludes inflight terminal queued claim state when reporting fresh-discovery state slots', async () => {
     const { root, paths } = await createHostPaths();
     const foreignEnv = {
       repoRoot: root,
@@ -11727,8 +11727,11 @@ describe('createProviderIssueHandoffService', () => {
     expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
     expect(refetchTrackedIssues.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
       mode: 'fresh_discovery',
-      eligibleTargetCount: 1,
-      eligibleStateSlotCounts: {}
+      eligibleTargetCount: 2,
+      eligibleStateSlotCounts: {
+        'in progress': 1
+      },
+      excludedIssueIds: ['lin-issue-foreign-poll-queued-terminal']
     }));
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
@@ -42545,6 +42548,109 @@ describe('createProviderIssueHandoffService', () => {
       retry_due_at: '2026-03-19T04:30:20.000Z',
       retry_error: null
     });
+  });
+
+  it('releases CO-512-shaped retry-resumable WIP when live Linear truth is terminal Done', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T19:23:32.870Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-co-512-terminal-retry'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-co-512-resumable');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-512-resumable',
+        task_id: 'task-co-512-terminal-retry',
+        status: 'failed',
+        summary: 'Provider worker failed before retry cleanup.',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-512',
+        issue_identifier: 'CO-512',
+        issue_updated_at: '2026-05-18T19:10:00.000Z',
+        updated_at: '2026-05-18T19:15:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-512',
+      issue_id: 'lin-issue-512',
+      issue_identifier: 'CO-512',
+      issue_title: 'Terminal retry-resumable claim',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-05-18T19:20:00.000Z',
+      task_id: 'task-co-512-terminal-retry',
+      mapping_source: 'provider_id_fallback',
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      accepted_at: '2026-05-18T19:10:00.000Z',
+      updated_at: '2026-05-18T19:18:00.000Z',
+      last_delivery_id: 'delivery-co-512-terminal-retry',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_779_112_800_000,
+      run_id: 'run-co-512-resumable',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: 2,
+      retry_due_at: '2026-05-18T19:24:02.870Z',
+      retry_error: 'stale continuation queue'
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-512',
+          identifier: 'CO-512',
+          title: 'Terminal retry-resumable claim',
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: '2026-05-18T19:20:00.000Z',
+          assignee_id: 'viewer-1',
+          assignee_name: 'Codex'
+        })
+      })
+    });
+
+    await service.rehydrate();
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    const expectedClaim = {
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    };
+    expect(state.claims[0]).toMatchObject(expectedClaim);
+    expect(persist).toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
   });
 
   it('retries queued-retry deadline repair after refresh persist failure instead of keeping only in-memory retry_due_at', async () => {
