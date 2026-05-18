@@ -362,6 +362,225 @@ describe('docs freshness maintenance decisions', () => {
     });
   });
 
+  it('keeps active spec pre-expiry from being masked by terminal lifecycle debt', () => {
+    const terminalPath = 'tasks/tasks-linear-terminal.md';
+    const specPath = 'tasks/specs/linear-open-spec.md';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 2,
+          registry_entries: 2,
+          stale_entries: 0,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [
+          {
+            path: terminalPath,
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'tasks/tasks-*',
+            last_review: reviewDateDaysAgo(31),
+            cadence_days: 30,
+            age_days: 31,
+            overdue_days: 1,
+            registry_status: 'active',
+            lifecycle_state: 'terminal_pending_archive',
+            task_key: 'linear-terminal',
+            status: 'done'
+          }
+        ],
+        rolling_freshness_policy: rollingFreshnessPolicy()
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'provided',
+        specGuard: { status: 'succeeded' },
+        specGuardPreExpiryEntries: [
+          {
+            path: specPath,
+            path_family: 'tasks/specs',
+            last_review: reviewDateDaysAgo(27),
+            cadence_days: 30,
+            age_days: 27,
+            days_until_expiry: 3
+          }
+        ]
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_spec_guard_pre_expiry');
+    expect(decision.lifecycle_actions).toEqual([
+      expect.objectContaining({
+        path: terminalPath,
+        lifecycle_state: 'terminal_pending_archive'
+      })
+    ]);
+    expect(decision.spec_guard_pre_expiry_entries).toEqual([
+      expect.objectContaining({
+        path: specPath,
+        days_until_expiry: 3,
+        failure_kind: 'active_spec_pre_expiry'
+      })
+    ]);
+    expect(decision.repo_gate).toMatchObject({
+      severity: 'blocking',
+      action_required_count: 2,
+      blocks_handoff: true,
+      blocks_unrelated_lanes: true,
+      sample_paths: expect.objectContaining({
+        terminal_lifecycle_paths: [terminalPath],
+        spec_guard_pre_expiry_paths: [specPath]
+      })
+    });
+  });
+
+  it('requires live owner verification for active spec pre-expiry blockers', () => {
+    const specPath = 'tasks/specs/linear-open-spec.md';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          stale_entries: 0,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [],
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          require_live_owner_verification: true
+        })
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'provided',
+        specGuard: { status: 'succeeded' },
+        ownerIssueVerification: {
+          issue: 'CO-175',
+          state: 'Done',
+          state_type: 'completed',
+          is_terminal: true,
+          usable: false,
+          same_project: true,
+          verification_status: 'succeeded'
+        },
+        specGuardPreExpiryEntries: [
+          {
+            path: specPath,
+            path_family: 'tasks/specs',
+            last_review: reviewDateDaysAgo(27),
+            cadence_days: 30,
+            age_days: 27,
+            days_until_expiry: 3
+          }
+        ]
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_spec_guard_pre_expiry');
+    expect(decision.owner_issue_verification).toEqual(
+      expect.objectContaining({
+        issue: 'CO-175',
+        is_terminal: true,
+        verification_status: 'succeeded'
+      })
+    );
+    expect(decision.owner_issue_action).toMatchObject({
+      mode: 'create_required',
+      existing_issue: 'CO-175',
+      reason: 'configured_owner_terminal'
+    });
+    expect(decision.repo_gate.owner).toMatchObject({
+      issue: 'CO-175',
+      action: 'create_required',
+      configured_issue: 'CO-175',
+      verified: false
+    });
+
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(decision, {
+      env: {} as NodeJS.ProcessEnv,
+      dryRunLinearActions: true
+    });
+    expect(ownerActionEvidence).toMatchObject({
+      status: 'credentials_missing',
+      write_status: 'dry_run_credentials_missing',
+      should_block: true,
+      required_actions: 1,
+      actions: [
+        expect.objectContaining({
+          route_id: 'co-554-spec-guard-pre-expiry',
+          mode: 'replace_terminal_owner',
+          owner_issue: 'CO-175',
+          copyable_command: expect.stringContaining('--canonical-owner-key "docs:freshness:maintain"')
+        })
+      ]
+    });
+  });
+
+  it('keeps active spec pre-expiry repo-wide when diff proof is unavailable', () => {
+    const specPath = 'tasks/specs/linear-open-spec.md';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          stale_entries: 0,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [],
+        rolling_freshness_policy: rollingFreshnessPolicy()
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'missing_base',
+        specGuard: { status: 'succeeded' },
+        specGuardPreExpiryEntries: [
+          {
+            path: specPath,
+            path_family: 'tasks/specs',
+            last_review: reviewDateDaysAgo(27),
+            cadence_days: 30,
+            age_days: 27,
+            days_until_expiry: 3
+          }
+        ]
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_spec_guard_pre_expiry');
+    expect(decision.diff_status).toBe('missing_base');
+    expect(decision.repo_gate).toMatchObject({
+      severity: 'blocking',
+      blocks_handoff: true,
+      blocks_unrelated_lanes: true,
+      sample_paths: expect.objectContaining({
+        spec_guard_pre_expiry_paths: [specPath]
+      })
+    });
+  });
+
   it('keeps unrelated lanes blocked when spec-guard failure coexists with repo-wide debt', () => {
     const lastReview = reviewDateDaysAgo(31);
     const decision = buildDocsFreshnessMaintenanceDecision(
@@ -520,8 +739,8 @@ last_review: ${lastReview}
 
     const { decision, shouldBlock } = await runMaintain(repoRoot);
 
-    expect(shouldBlock).toBe(false);
-    expect(decision.freshness_decision).toBe('clean');
+    expect(shouldBlock).toBe(true);
+    expect(decision.freshness_decision).toBe('block_spec_guard_pre_expiry');
     expect(decision.totals.spec_guard_pre_expiry_entries).toBe(1);
     expect(decision.spec_guard_pre_expiry_entries).toEqual([
       expect.objectContaining({
@@ -538,15 +757,16 @@ last_review: ${lastReview}
       })
     ]);
     expect(decision.repo_gate).toMatchObject({
-      severity: 'warning',
-      action_required_count: 1,
-      blocks_handoff: false,
-      blocks_unrelated_lanes: false,
+      severity: 'blocking',
+      action_required_count: 2,
+      blocks_handoff: true,
+      blocks_unrelated_lanes: true,
       sample_paths: expect.objectContaining({
         spec_guard_pre_expiry_paths: [specPath]
       })
     });
     expect(decision.recommended_action).toContain('active spec approaching spec-guard expiry');
+    expect(decision.recommended_action).toContain('do not wait for the hard 30-day failure');
   });
 
   it('surfaces legacy active specs approaching spec-guard expiry without reopening archived stubs', async () => {
@@ -595,7 +815,8 @@ last_review: ${lastReview}
 
     const { decision, shouldBlock } = await runMaintain(repoRoot);
 
-    expect(shouldBlock).toBe(false);
+    expect(shouldBlock).toBe(true);
+    expect(decision.freshness_decision).toBe('block_spec_guard_pre_expiry');
     expect(decision.totals.spec_guard_pre_expiry_entries).toBe(1);
     expect(decision.spec_guard_pre_expiry_entries).toEqual([
       expect.objectContaining({
