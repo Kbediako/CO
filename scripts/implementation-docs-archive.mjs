@@ -25,6 +25,7 @@ const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
 const TASKS_INDEX_PATH = 'tasks/index.json';
 const ARCHIVE_MARKER = '<!-- docs-archive:stub -->';
 const DEFAULT_OWNER = 'Codex (top-level agent), Review agent';
+const OPEN_CHECKLIST_ITEM_PATTERN = /^\s*(?:[-*+]|\d+[.)])\s+\[ \]\s+.+$/gmu;
 const REPORT_ONLY_RETENTION_FINDINGS_PATTERN = /^docs\/findings\/(\d+)-.*-deliberation\.md$/;
 const REPORT_ONLY_TERMINAL_FINDINGS_PATTERN = /^docs\/findings\/(\d+)-.*\.md$/;
 const PRESERVED_HISTORICAL_STUB_STATUS = 'preserved_historical_stub';
@@ -144,6 +145,36 @@ function collectExplicitIndexedDocPaths(item) {
     }
   }
   return values.filter((entry) => typeof entry === 'string' && entry.trim().length > 0);
+}
+
+function isTaskChecklistPath(relativePath) {
+  return (
+    typeof relativePath === 'string' &&
+    (relativePath.startsWith('tasks/tasks-') || relativePath.startsWith('.agent/task/')) &&
+    relativePath.endsWith('.md')
+  );
+}
+
+function collectSiblingTaskChecklistPaths(item, taskKey) {
+  const paths = new Set();
+  for (const candidate of collectIndexedTaskPacketPaths(item)) {
+    if (isTaskChecklistPath(candidate)) {
+      paths.add(candidate);
+    }
+  }
+  if (item?.paths && typeof item.paths === 'object') {
+    for (const key of ['task', 'agent_task']) {
+      const value = item.paths[key];
+      if (typeof value === 'string' && isTaskChecklistPath(value)) {
+        paths.add(value);
+      }
+    }
+  }
+  if (typeof taskKey === 'string' && taskKey.length > 0) {
+    paths.add(`tasks/tasks-${taskKey}.md`);
+    paths.add(`.agent/task/${taskKey}.md`);
+  }
+  return [...paths];
 }
 
 function toContainedRepoRelativePath(repoRoot, absolutePath) {
@@ -349,6 +380,13 @@ function buildStubContent({ headerLine, archiveUrl, archivedAt, archiveBranch, r
   return lines.join('\n');
 }
 
+function extractOpenChecklistItems(content) {
+  if (typeof content !== 'string' || content.length === 0) {
+    return [];
+  }
+  return Array.from(content.matchAll(OPEN_CHECKLIST_ITEM_PATTERN), (match) => match[0].trim());
+}
+
 function ensureRegistryEntry(registryMap, relativePath, defaults) {
   if (registryMap.has(relativePath)) {
     return registryMap.get(relativePath);
@@ -425,6 +463,7 @@ async function main() {
   const taskCandidateKeys = new Set();
   const reportOnlyTerminalEligibility = new Map();
   const reportOnlyRetentionEligibility = new Map();
+  const linkedOpenChecklistByPath = new Map();
 
   function addTaskCandidate(candidate) {
     const key = `${candidate.taskKey ?? ''}\0${candidate.path}`;
@@ -503,6 +542,45 @@ async function main() {
     const agentPath = `.agent/task/${taskKey}.md`;
     docPaths.add(agentPath);
     indexedDocPaths.add(agentPath);
+
+    const linkedOpenChecklistSources = [];
+    for (const checklistPath of collectSiblingTaskChecklistPaths(item, taskKey)) {
+      const containedChecklistPath = await resolveContainedPath(repoRoot, checklistPath, {
+        allowMissing: true,
+        resolvedRepoRoot
+      });
+      if (
+        !containedChecklistPath ||
+        !containedChecklistPath.exists ||
+        !(await pathExists(containedChecklistPath.absolutePath))
+      ) {
+        continue;
+      }
+      const checklistContent = await readFile(containedChecklistPath.absolutePath, 'utf8');
+      if (checklistContent.includes(ARCHIVE_MARKER)) {
+        continue;
+      }
+      const openChecklistItems = extractOpenChecklistItems(checklistContent);
+      if (openChecklistItems.length > 0) {
+        linkedOpenChecklistSources.push({
+          path: containedChecklistPath.relativePath,
+          taskKey,
+          unchecked_checklist_items: openChecklistItems.length,
+          unchecked_checklist_samples: openChecklistItems.slice(0, 5)
+        });
+      }
+    }
+
+    if (linkedOpenChecklistSources.length > 0) {
+      for (const pathValue of docPaths) {
+        if (linkedOpenChecklistSources.some((source) => source.path === pathValue)) {
+          continue;
+        }
+        const existing = linkedOpenChecklistByPath.get(pathValue) ?? [];
+        existing.push(...linkedOpenChecklistSources);
+        linkedOpenChecklistByPath.set(pathValue, existing);
+      }
+    }
 
     for (const pathValue of docPaths) {
       if (excludeSet.has(pathValue)) {
@@ -734,6 +812,35 @@ async function main() {
         recordRepair: true
       });
       report.skipped.push({ path: relativePath, reason: 'already_stubbed', context, registry_repaired: registryRepaired });
+      report.totals.skipped += 1;
+      return;
+    }
+
+    const openChecklistItems = extractOpenChecklistItems(content);
+    if (openChecklistItems.length > 0) {
+      report.skipped.push({
+        path: relativePath,
+        reason: 'unchecked_checklist_items',
+        context: {
+          ...context,
+          unchecked_checklist_items: openChecklistItems.length,
+          unchecked_checklist_samples: openChecklistItems.slice(0, 5)
+        }
+      });
+      report.totals.skipped += 1;
+      return;
+    }
+
+    const linkedOpenChecklistItems = linkedOpenChecklistByPath.get(relativePath) ?? [];
+    if (linkedOpenChecklistItems.length > 0) {
+      report.skipped.push({
+        path: relativePath,
+        reason: 'linked_unchecked_checklist_items',
+        context: {
+          ...context,
+          linked_unchecked_checklists: linkedOpenChecklistItems
+        }
+      });
       report.totals.skipped += 1;
       return;
     }

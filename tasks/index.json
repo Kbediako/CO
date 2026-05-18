@@ -6599,7 +6599,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-18",
+      "last_review": "2026-04-23",
       "approvals": {
         "parent_docs_first": {
           "reviewer": "provider worker",
@@ -6608,15 +6608,6 @@
           "source_anchor": "ctx:sha256:baea476992e02ddae2d101831f55c08787b93c5aefb8b73b992a2ac1d788fabd#chunk:c000001",
           "manifest": ".runs/linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7/cli/2026-04-23T08-13-32-404Z-6a3dbcd8/manifest.json",
           "summary": "Docs-first packet preserves CO-331 as the queue truth lane for Backlog follow-up issue admission and max_allowed enforcement under resumable claims and queued retry claims. The packet rejects manual state moves, cap weakening, and conflation with CO-317, CO-329, or CO-330 runtime failures."
-        },
-        "spec_lifecycle_audit_20260518": {
-          "reviewer": "CO-522 spec lifecycle audit",
-          "date": "2026-05-18",
-          "status": "done",
-          "checked_items": 9,
-          "unchecked_items": 0,
-          "evidence": "out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json",
-          "summary": "Linked task checklist has zero unchecked items; mark terminal so spec-guard and implementation-docs archive no longer treat the packet as active work."
         }
       },
       "paths": {
@@ -6628,9 +6619,7 @@
           "TECH_SPEC": "docs/TECH_SPEC-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md",
           "ACTION_PLAN": "docs/ACTION_PLAN-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md"
         }
-      },
-      "status": "done",
-      "completed_at": null
+      }
     },
     {
       "id": "20260423-linear-8d010b73-9338-4f35-9494-a9a3d773d284",
@@ -16302,16 +16291,6 @@
         "task": "tasks/tasks-1275-coordinator-symphony-aligned-status-cli-remaining-boundary-freeze-reassessment.md",
         "agent_task": ".agent/task/1275-coordinator-symphony-aligned-status-cli-remaining-boundary-freeze-reassessment.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-status-cli-remaining-boundary-freeze-reassessment.md"
-      },
-      "status": "done",
-      "completed_at": "2026-03-17T00:00:00Z",
-      "approvals": {
-        "lifecycle_audit_20260518": {
-          "reviewer": "CO-522 lifecycle audit",
-          "date": "2026-05-18",
-          "status": "done",
-          "summary": "tasks/index.json was missing terminal lifecycle fields while the task spec frontmatter and task checklist already recorded terminal completion; CO-522 restored index lifecycle metadata so archival/freshness tooling no longer treats the packet as active debt."
-        }
       }
     },
     {
@@ -24528,24 +24507,13 @@
         "Codex"
       ],
       "last_review": "2026-05-18",
-      "approvals": {
-        "lifecycle_audit_20260518": {
-          "reviewer": "CO-522 lifecycle audit",
-          "date": "2026-05-18",
-          "status": "done",
-          "evidence": "https://github.com/Kbediako/CO/pull/560",
-          "merge_commit": "48a1ef671e3130758ba927347431a3a934be9770",
-          "summary": "PR #560 merged after Core Lane, Cloud Canary, and CodeRabbit approval; CO-522 corrected index lifecycle metadata to match the terminal merged packet and updated the stale checklist item."
-        }
-      },
+      "approvals": {},
       "paths": {
         "spec": "tasks/specs/linear-27a61a75-236f-40c6-8cb0-8e4921708d91.md",
         "task": "tasks/tasks-linear-27a61a75-236f-40c6-8cb0-8e4921708d91.md",
         "agent_task": ".agent/task/linear-27a61a75-236f-40c6-8cb0-8e4921708d91.md",
         "docs": "docs/TECH_SPEC-linear-27a61a75-236f-40c6-8cb0-8e4921708d91.md"
-      },
-      "status": "done",
-      "completed_at": "2026-04-19T19:53:26Z"
+      }
     },
     {
       "id": "20260420-linear-b1835ea5-3d28-493a-934e-1b38048270ce",
@@ -24729,7 +24697,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-18",
+      "last_review": "2026-04-23",
       "approvals": {
         "baseline_evidence_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -24763,15 +24731,6 @@
           "date": "2026-04-23",
           "status": "approved",
           "summary": "Kept the fix at the smallest correct scope: six target task-spec freshness updates plus required docs-first packet mirrors and no guard or policy changes."
-        },
-        "spec_lifecycle_audit_20260518": {
-          "reviewer": "CO-522 spec lifecycle audit",
-          "date": "2026-05-18",
-          "status": "done",
-          "checked_items": 9,
-          "unchecked_items": 0,
-          "evidence": "out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json",
-          "summary": "Linked task checklist has zero unchecked items; mark terminal so spec-guard and implementation-docs archive no longer treat the packet as active work."
         }
       },
       "paths": {
@@ -24779,9 +24738,7 @@
         "task": "tasks/tasks-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
         "agent_task": ".agent/task/linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
         "docs": "docs/TECH_SPEC-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md"
-      },
-      "status": "done",
-      "completed_at": null
+      }
     },
     {
       "id": "20260423-linear-80d4473e-e9c7-4d4d-9340-bc1193103a7d",

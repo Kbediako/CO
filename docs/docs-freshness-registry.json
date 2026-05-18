@@ -3273,9 +3273,9 @@
     {
       "path": ".agent/task/1275-coordinator-symphony-aligned-status-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-18",
-      "cadence_days": 365
+      "cadence_days": 30
     },
     {
       "path": ".agent/task/1276-coordinator-symphony-aligned-plan-cli-shell-extraction.md",
@@ -11160,9 +11160,9 @@
     {
       "path": "docs/ACTION_PLAN-linear-75a26ef8-4cb7-4b6e-9335-85edae0fd9be.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
-      "last_review": "2026-05-18",
-      "cadence_days": 365
+      "status": "active",
+      "last_review": "2026-04-23",
+      "cadence_days": 30
     },
     {
       "path": "docs/ACTION_PLAN-linear-763df058-1809-457d-823f-f56268fd9dcc.md",
@@ -11695,9 +11695,9 @@
     {
       "path": "docs/ACTION_PLAN-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
-      "last_review": "2026-05-18",
-      "cadence_days": 365
+      "status": "active",
+      "last_review": "2026-04-23",
+      "cadence_days": 30
     },
     {
       "path": "docs/ACTION_PLAN-linear-9d962236-4c38-4b28-b144-007c6f3a1395.md",
@@ -38922,9 +38922,9 @@
     {
       "path": "tasks/tasks-1275-coordinator-symphony-aligned-status-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-18",
-      "cadence_days": 365
+      "cadence_days": 30
     },
     {
       "path": "tasks/tasks-1276-coordinator-symphony-aligned-plan-cli-shell-extraction.md",
@@ -39739,9 +39739,9 @@
     {
       "path": "tasks/tasks-linear-27a61a75-236f-40c6-8cb0-8e4921708d91.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-18",
-      "cadence_days": 365
+      "cadence_days": 30
     },
     {
       "path": "tasks/tasks-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md",
