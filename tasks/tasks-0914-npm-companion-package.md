@@ -106,7 +106,7 @@
 
 #### Migrate MCP scripts to CLI
 - [x] Replace user-facing MCP scripts with CLI subcommands - Evidence: CLI + docs updates.
-  - Files: `scripts/run-local-mcp.sh`, `scripts/run-mcp-diagnostics.sh`, `scripts/mcp-runner-*.{sh,js}`, `mcp-client.json`, `README.md`
+  - Files: `bin/codex-orchestrator.ts`, `orchestrator/src/cli/mcp.ts`, `README.md`
   - Acceptance:
     - References to MCP scripts are replaced with `codex-orchestrator` subcommands.
     - `mcp-client.json` template (if shipped) points to CLI, not `scripts/**`.
@@ -168,7 +168,7 @@
 
 #### Optional peer deps + loader
 - [x] Move Playwright-class deps to optional peer deps and add dynamic loader - Evidence: package metadata + tests.
-  - Files: `package.json`, `scripts/design/pipeline/optionalDeps.ts`, `packages/shared/**`
+  - Files: `package.json`, `scripts/design/pipeline/optional-deps.js`, `packages/shared/**`
   - Acceptance:
     - Optional loader resolves from CWD first, then from the package.
     - Clear error message with install instructions when missing.

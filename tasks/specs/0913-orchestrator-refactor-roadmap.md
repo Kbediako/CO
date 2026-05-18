@@ -1,12 +1,15 @@
 ---
 id: 20251226-0913-orchestrator-refactor-roadmap
 title: Orchestrator Refactor Roadmap (Robustness + Performance)
+status: done
 relates_to: Task 0913 — docs/PRD-orchestrator-refactor-roadmap.md
 risk: medium
 owners:
   - Codex (top-level agent)
   - Review agent
-last_review: 2025-12-26
+last_review: 2026-05-18
+review_notes:
+  - 2026-05-18: CO-522 spec lifecycle audit found the linked task checklist has zero unchecked items (17 checked), so this spec is terminal and eligible for implementation-docs archive. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 ## Added by Bootstrap 2025-10-16

@@ -20,7 +20,7 @@
 - Package name is scoped to `@kbediako/codex-orchestrator`; the installed bin remains `codex-orchestrator`.
 - `npm run build` uses `tsconfig.build.json`; `clean:dist` + `prepack` exist, but ad-hoc builds can still leave stale `dist/` unless cleaned.
 - Pack audit restricts `dist/` to runtime subtrees; the `files` allowlist mirrors those subtrees so non-runtime `dist/**` output never ships.
-- `scripts/run-review.ts` enforces a non-interactive guard in CI or when stdin is not a TTY by printing the review handoff prompt (with manifest evidence + task context) and exiting successfully; set `FORCE_CODEX_REVIEW=1` to invoke `codex review` in that mode.
+- `scripts/run-review.ts` enforces a non-interactive guard in CI or when stdin is not a TTY by printing the review handoff prompt (with manifest evidence + task context) for direct/manual runs; set `FORCE_CODEX_REVIEW=1` to invoke `codex review` in that mode. Authoritative gate runs set `CODEX_REVIEW_AUTHORITATIVE_GATE=1`, require `NOTES`, and fail closed rather than treating prompt-only handoff as success.
 - Base logger uses `console.info` (stdout); MCP stdout-only guarantees are enforced by the `mcp serve` stdout guard.
 - Runtime schema resolution uses the `imports` alias with a fallback to `schemas/manifest.json`.
 - MCP usage still has legacy scripts in `scripts/`, but `mcp-client.json` now points at `codex-orchestrator mcp serve`.
@@ -98,8 +98,8 @@
 - Publish from immutable tarball attached to the GitHub Release asset.
 - Prefer npm trusted publishing (OIDC) and provenance if available.
 - Release workflow runs `npm run clean:dist` before `npm run build` to avoid stale `dist/**` artifacts in the tarball.
-- Publish job uses `NODE_AUTH_TOKEN` (set from `secrets.NPM_TOKEN`) when present (no provenance); if the token is absent, publish via OIDC with `id-token: write` + `--provenance`.
-- Decision: keep the NPM token fallback until trusted publishing is fully configured; OIDC remains the preferred path.
+- Publish job attempts OIDC trusted publishing first (`id-token: write` + `--provenance`), then falls back to `secrets.NPM_TOKEN` when OIDC is unavailable.
+- Decision: keep the NPM token fallback until trusted publishing is fully configured; `secrets.NPM_TOKEN` must be an npm automation token (not OTP-gated).
 
 #### Release portability (required in workflow docs)
 - Preferred download method (with retries):
