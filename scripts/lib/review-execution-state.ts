@@ -32,8 +32,9 @@ import {
   buildReviewTelemetryPayload,
   inferTerminationBoundaryKindsFromErrorMessage,
   type ReviewLaunchContext,
-  type ReviewTelemetryPayload,
+  type ReviewTelemetryPayload
 } from './review-execution-telemetry.js';
+import type { ReviewContractTelemetry } from './review-contract.js';
 
 const REVIEW_DELEGATION_STARTUP_LINE_RE = /\bmcp:\s*delegation\s+(starting|ready)\b/i;
 const REVIEW_PROGRESS_SIGNAL_LINE_RE = /^(thinking|exec|codex)\b/i;
@@ -297,6 +298,7 @@ interface ReviewExecutionTelemetryPayloadOptions {
   telemetryDebugEnvKey: string;
   launchContext?: ReviewLaunchContext | null;
   reviewOutputText?: string | null;
+  contractTelemetry?: ReviewContractTelemetry | null;
 }
 
 export interface ReviewTerminationBoundaryRecord {
@@ -780,6 +782,7 @@ export class ReviewExecutionState {
       telemetryDebugEnvKey: options.telemetryDebugEnvKey,
       launchContext: options.launchContext ?? null,
       reviewOutputText: options.reviewOutputText ?? this.getPreview(),
+      contractTelemetry: options.contractTelemetry ?? null,
       summary: this.buildOutputSummary()
     });
   }

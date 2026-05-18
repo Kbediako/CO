@@ -6,6 +6,15 @@ import type {
   ReviewTerminationBoundaryKind,
   ReviewTerminationBoundaryRecord
 } from './review-execution-state.js';
+import {
+  buildReviewContractTelemetry,
+  type ReviewContractAxisName,
+  type ReviewContractAxisVerdict,
+  type ReviewContractMode,
+  type ReviewContractProposalCounts,
+  type ReviewContractTelemetry,
+  type ReviewContractTelemetrySource
+} from './review-contract.js';
 
 export interface ReviewTelemetryPayload {
   version: number;
@@ -19,6 +28,13 @@ export interface ReviewTelemetryPayload {
   output_log_path: string;
   launch_context: ReviewLaunchContext | null;
   termination_boundary: ReviewTerminationBoundaryRecord | null;
+  contract_path?: string | null;
+  contract_mode?: ReviewContractMode | null;
+  contract_validation?: ReviewContractTelemetry['contract_validation'] | null;
+  contract_overall_verdict?: ReviewContractAxisVerdict | null;
+  axis_verdicts?: Record<ReviewContractAxisName, ReviewContractAxisVerdict | null> | null;
+  axis_finding_counts?: Record<ReviewContractAxisName, number> | null;
+  proposal_counts?: ReviewContractProposalCounts | null;
   summary: ReviewOutputSummary;
 }
 
@@ -39,9 +55,12 @@ export interface ReviewSemanticVerdictSummary {
 
 export interface ReviewLaunchContext {
   scope_flag_mode: 'commit' | 'base' | 'uncommitted' | null;
-  prompt_delivery: 'inline' | 'artifact-only';
-  reviewer_visible_context_transport: 'inline-prompt' | 'scoped-title' | 'artifact-only';
+  prompt_delivery: 'inline' | 'artifact-only' | 'stdin';
+  reviewer_visible_context_transport: 'inline-prompt' | 'stdin-prompt' | 'scoped-title' | 'artifact-only';
   reviewer_visible_title_source: 'user' | 'notes-surface' | null;
+  transport?: 'codex-review' | 'codex-exec-output-schema';
+  output_schema_path?: string;
+  output_last_message_path?: string;
   legacy_fallback_attempt?: 'review-wrapper-read-only-sandbox-compatibility';
   legacy_fallback_owner?: 'CO-485';
   legacy_fallback_trigger?: string;
@@ -62,6 +81,7 @@ export interface BuildReviewTelemetryPayloadOptions {
   launchContext?: ReviewLaunchContext | null;
   reviewOutputText?: string | null;
   summary: ReviewOutputSummary;
+  contractTelemetry?: ReviewContractTelemetry | null;
 }
 
 export interface PersistReviewTelemetryOptions {
@@ -80,6 +100,7 @@ export interface ReviewTelemetryPayloadBuilder {
     telemetryDebugEnvKey: string;
     launchContext?: ReviewLaunchContext | null;
     reviewOutputText?: string | null;
+    contractTelemetry?: ReviewContractTelemetry | null;
   }): ReviewTelemetryPayload;
 }
 
@@ -94,6 +115,9 @@ export interface WriteReviewExecutionTelemetryOptions {
   includeRawTelemetry: boolean;
   telemetryDebugEnvKey: string;
   launchContext?: ReviewLaunchContext | null;
+  contractMode?: ReviewContractMode;
+  contractPath?: string | null;
+  contractTelemetrySource?: ReviewContractTelemetrySource;
   logPersistFailure?: (message: string) => void;
 }
 
@@ -139,6 +163,25 @@ export function resolveReviewOutcomeDisposition(payload: {
   return explicitDisposition === derivedDisposition ? explicitDisposition : derivedDisposition;
 }
 
+function resolveStrictReviewOutcomeDisposition(payload: {
+  status?: 'succeeded' | 'failed' | null;
+  review_outcome?: ReviewOutcomeDisposition | null;
+  termination_boundary?: ReviewTerminationBoundaryRecord | null;
+}): ReviewOutcomeDisposition | null {
+  if (payload.status !== 'succeeded' && payload.status !== 'failed') {
+    return null;
+  }
+  const explicitDisposition = coerceReviewOutcomeDisposition(payload.review_outcome ?? null);
+  if (!explicitDisposition) {
+    return null;
+  }
+  const derivedDisposition = deriveReviewOutcomeDisposition({
+    status: payload.status,
+    terminationBoundary: payload.termination_boundary ?? null
+  });
+  return explicitDisposition === derivedDisposition ? explicitDisposition : null;
+}
+
 export function formatReviewOutcomeSummary(payload: {
   status: 'succeeded' | 'failed';
   review_outcome?: ReviewOutcomeDisposition | null;
@@ -146,6 +189,9 @@ export function formatReviewOutcomeSummary(payload: {
   review_verdict?: ReviewSemanticVerdict | null;
   highest_finding_priority?: ReviewFindingPriority | null;
   finding_count?: number | null;
+  contract_mode?: ReviewContractMode | null;
+  contract_validation?: ReviewContractTelemetry['contract_validation'] | null;
+  contract_overall_verdict?: ReviewContractAxisVerdict | null;
 }): string {
   const disposition = resolveReviewOutcomeDisposition(payload);
   const boundaryKind = payload.termination_boundary?.kind ?? null;
@@ -166,7 +212,86 @@ export function formatReviewOutcomeSummary(payload: {
     }
   })();
   const semanticSummary = formatReviewSemanticVerdictSummary(payload);
-  return semanticSummary ? `${wrapperSummary}; ${semanticSummary}` : wrapperSummary;
+  const contractSummary = formatReviewContractTelemetrySummary(payload);
+  return [wrapperSummary, semanticSummary, contractSummary].filter(Boolean).join('; ');
+}
+
+export function getEnforceContractReviewFailureReason(payload: {
+  status?: 'succeeded' | 'failed' | null;
+  review_outcome?: ReviewOutcomeDisposition | null;
+  termination_boundary?: ReviewTerminationBoundaryRecord | null;
+  launch_context?: Partial<ReviewLaunchContext> | null;
+  contract_mode?: ReviewContractMode | null;
+  contract_validation?: ReviewContractTelemetry['contract_validation'] | null;
+  contract_overall_verdict?: ReviewContractAxisVerdict | null;
+  review_verdict?: ReviewSemanticVerdict | null;
+  proposal_counts?: ReviewContractProposalCounts | null;
+} | null, expectedMode?: ReviewContractMode | null): string | null {
+  const mode = payload?.contract_mode ?? expectedMode ?? null;
+  if (mode !== 'enforce') {
+    return null;
+  }
+  if (!payload) {
+    return 'review contract telemetry is missing';
+  }
+  const reviewOutcome = resolveStrictReviewOutcomeDisposition({
+    status: payload.status,
+    review_outcome: payload.review_outcome ?? null,
+    termination_boundary: payload.termination_boundary ?? null
+  });
+  if (!reviewOutcome) {
+    return 'review outcome is missing or invalid';
+  }
+  if (reviewOutcome && reviewOutcome !== 'clean-success') {
+    return `review outcome is ${reviewOutcome}`;
+  }
+  const validationStatus = payload.contract_validation?.status ?? 'missing';
+  if (validationStatus !== 'valid') {
+    return `review contract validation is ${validationStatus}`;
+  }
+  const overall = payload.contract_overall_verdict ?? 'unknown';
+  if (overall !== 'clean') {
+    return `review contract overall verdict is ${overall}`;
+  }
+  const semanticVerdict = payload.review_verdict ?? 'unknown';
+  if (semanticVerdict !== 'clean') {
+    return `semantic review verdict is ${semanticVerdict}`;
+  }
+  const launchFailure = getEnforceContractLaunchContextFailureReason(payload.launch_context ?? null);
+  if (launchFailure) {
+    return launchFailure;
+  }
+  if ((payload.proposal_counts?.agent_loop ?? 0) > 0) {
+    return 'agent-loop proposals require routing before handoff';
+  }
+  return null;
+}
+
+function getEnforceContractLaunchContextFailureReason(
+  launchContext: Partial<ReviewLaunchContext> | null
+): string | null {
+  if (!launchContext) {
+    return 'review launch context is missing';
+  }
+  if (launchContext.legacy_fallback_attempt) {
+    return `review launch used legacy fallback ${launchContext.legacy_fallback_attempt}`;
+  }
+  if (launchContext.transport !== 'codex-exec-output-schema') {
+    return `review launch transport is ${launchContext.transport ?? 'missing'}`;
+  }
+  if (launchContext.prompt_delivery !== 'stdin') {
+    return `review prompt delivery is ${launchContext.prompt_delivery ?? 'missing'}`;
+  }
+  if (launchContext.reviewer_visible_context_transport !== 'stdin-prompt') {
+    return `reviewer-visible context transport is ${launchContext.reviewer_visible_context_transport ?? 'missing'}`;
+  }
+  if (!launchContext.output_schema_path) {
+    return 'review output schema path is missing';
+  }
+  if (!launchContext.output_last_message_path) {
+    return 'review output last-message path is missing';
+  }
+  return null;
 }
 
 export function buildReviewTelemetryPayload(
@@ -178,6 +303,16 @@ export function buildReviewTelemetryPayload(
     options.telemetryDebugEnvKey
   );
   const semanticVerdict = analyzeReviewSemanticVerdict(options.reviewOutputText ?? '');
+  const contractTelemetry = options.contractTelemetry ?? null;
+  const useContractSemanticVerdict = contractTelemetry?.contract_mode === 'enforce';
+  const effectiveSemanticVerdict =
+    useContractSemanticVerdict && contractTelemetry
+      ? {
+          review_verdict: contractTelemetry.review_verdict,
+          highest_finding_priority: contractTelemetry.highest_finding_priority,
+          finding_count: contractTelemetry.finding_count
+        }
+      : semanticVerdict;
   return {
     version: 1,
     generated_at: new Date().toISOString(),
@@ -186,9 +321,9 @@ export function buildReviewTelemetryPayload(
       status: options.status,
       terminationBoundary
     }),
-    review_verdict: semanticVerdict.review_verdict,
-    highest_finding_priority: semanticVerdict.highest_finding_priority,
-    finding_count: semanticVerdict.finding_count,
+    review_verdict: effectiveSemanticVerdict.review_verdict,
+    highest_finding_priority: effectiveSemanticVerdict.highest_finding_priority,
+    finding_count: effectiveSemanticVerdict.finding_count,
     error: sanitizeTelemetryErrorForPersistence(
       options.error ?? null,
       options.includeRawTelemetry,
@@ -197,6 +332,17 @@ export function buildReviewTelemetryPayload(
     output_log_path: path.relative(options.repoRoot, options.outputLogPath),
     launch_context: options.launchContext ?? null,
     termination_boundary: terminationBoundary,
+    ...(contractTelemetry
+      ? {
+          contract_path: contractTelemetry.contract_path,
+          contract_mode: contractTelemetry.contract_mode,
+          contract_validation: contractTelemetry.contract_validation,
+          contract_overall_verdict: contractTelemetry.contract_overall_verdict,
+          axis_verdicts: contractTelemetry.axis_verdicts,
+          axis_finding_counts: contractTelemetry.axis_finding_counts,
+          proposal_counts: contractTelemetry.proposal_counts
+        }
+      : {}),
     summary: sanitizeTelemetrySummaryForPersistence(
       options.summary,
       options.includeRawTelemetry,
@@ -216,6 +362,17 @@ export async function writeReviewExecutionTelemetry(
   options: WriteReviewExecutionTelemetryOptions
 ): Promise<ReviewTelemetryPayload | null> {
   try {
+    const reviewOutputText = await readReviewOutputLog(options.outputLogPath);
+    const contractTelemetry =
+      options.contractMode && options.contractPath
+        ? await buildReviewContractTelemetry({
+            mode: options.contractMode,
+        outputText: reviewOutputText,
+        repoRoot: options.repoRoot,
+        contractPath: options.contractPath,
+        source: options.contractTelemetrySource
+      })
+        : null;
     const payloadOptions: Parameters<ReviewTelemetryPayloadBuilder['buildTelemetryPayload']>[0] = {
       status: options.status,
       error: options.error ?? null,
@@ -224,7 +381,8 @@ export async function writeReviewExecutionTelemetry(
       includeRawTelemetry: options.includeRawTelemetry,
       telemetryDebugEnvKey: options.telemetryDebugEnvKey,
       launchContext: options.launchContext ?? null,
-      reviewOutputText: await readReviewOutputLog(options.outputLogPath)
+      reviewOutputText,
+      contractTelemetry
     };
     if (Object.prototype.hasOwnProperty.call(options, 'terminationBoundary')) {
       payloadOptions.terminationBoundary = options.terminationBoundary;
@@ -334,6 +492,24 @@ export function formatReviewSemanticVerdictSummary(payload: {
     return 'semantic review verdict: unknown';
   }
   return null;
+}
+
+export function formatReviewContractTelemetrySummary(payload: {
+  contract_mode?: ReviewContractMode | null;
+  contract_validation?: ReviewContractTelemetry['contract_validation'] | null;
+  contract_overall_verdict?: ReviewContractAxisVerdict | null;
+}): string | null {
+  if (!payload.contract_mode || payload.contract_mode === 'off') {
+    return null;
+  }
+  const validation = payload.contract_validation;
+  const status = validation?.status ?? 'missing';
+  const errorCount = validation?.errors?.length ?? 0;
+  const overall = payload.contract_overall_verdict ?? 'none';
+  if (payload.contract_mode === 'shadow' && status === 'missing') {
+    return null;
+  }
+  return `review contract: mode=${payload.contract_mode}, validation=${status}, overall=${overall}, errors=${errorCount}`;
 }
 
 export function coerceReviewSemanticVerdict(value: unknown): ReviewSemanticVerdict | null {

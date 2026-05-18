@@ -11616,6 +11616,13 @@
       "cadence_days": 365
     },
     {
+      "path": "docs/ACTION_PLAN-linear-991643b6-0043-49b8-9411-33b6de78e421.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-18",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/ACTION_PLAN-linear-9917183b-824a-48f7-95ee-bcee205d7a02.md",
       "owner": "Codex",
       "status": "archived",
@@ -21074,6 +21081,13 @@
       "cadence_days": 365
     },
     {
+      "path": "docs/PRD-linear-991643b6-0043-49b8-9411-33b6de78e421.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-18",
+      "cadence_days": 30
+    },
+    {
       "path": "docs/PRD-linear-9917183b-824a-48f7-95ee-bcee205d7a02.md",
       "owner": "Codex",
       "status": "archived",
@@ -27635,6 +27649,13 @@
       "status": "archived",
       "last_review": "2026-04-30",
       "cadence_days": 365
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-991643b6-0043-49b8-9411-33b6de78e421.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-18",
+      "cadence_days": 30
     },
     {
       "path": "docs/TECH_SPEC-linear-9917183b-824a-48f7-95ee-bcee205d7a02.md",
@@ -34555,6 +34576,13 @@
       "cadence_days": 365
     },
     {
+      "path": "tasks/specs/linear-991643b6-0043-49b8-9411-33b6de78e421.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-18",
+      "cadence_days": 30
+    },
+    {
       "path": "tasks/specs/linear-9917183b-824a-48f7-95ee-bcee205d7a02.md",
       "owner": "Codex",
       "status": "archived",
@@ -41097,6 +41125,13 @@
       "status": "archived",
       "last_review": "2026-04-30",
       "cadence_days": 365
+    },
+    {
+      "path": "tasks/tasks-linear-991643b6-0043-49b8-9411-33b6de78e421.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-18",
+      "cadence_days": 30
     },
     {
       "path": "tasks/tasks-linear-9917183b-824a-48f7-95ee-bcee205d7a02.md",

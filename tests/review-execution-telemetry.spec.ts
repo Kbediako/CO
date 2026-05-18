@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -7,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ReviewExecutionState } from '../scripts/lib/review-execution-state.js';
 import {
   formatReviewOutcomeSummary,
+  getEnforceContractReviewFailureReason,
   logReviewTelemetrySummary,
   writeReviewExecutionTelemetry
 } from '../scripts/lib/review-execution-telemetry.js';
@@ -18,7 +20,7 @@ const WARN_THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE = `warn ${THREAD_NOT_FOUND_ROLLOU
 const CO474_REVIEW_OUTPUT_FIXTURE = new URL('./fixtures/review-execution/co474-review-output-with-findings.log', import.meta.url);
 
 type WriteTelemetryOptions = Parameters<typeof writeReviewExecutionTelemetry>[0];
-type TelemetryFixtureOptions = Partial<Pick<WriteTelemetryOptions, 'status' | 'terminationBoundary' | 'error' | 'includeRawTelemetry' | 'logPersistFailure'>> & {
+type TelemetryFixtureOptions = Partial<Pick<WriteTelemetryOptions, 'status' | 'terminationBoundary' | 'error' | 'includeRawTelemetry' | 'logPersistFailure' | 'launchContext' | 'contractMode' | 'contractPath'>> & {
   outputName?: string; state?: ReviewExecutionState; telemetryName?: string;
 };
 
@@ -42,6 +44,9 @@ async function writeTelemetryForOutput(sandbox: string, outputText: string, opti
     telemetryPath: join(reviewDir, options.telemetryName ?? 'telemetry.json'),
     includeRawTelemetry: options.includeRawTelemetry ?? false,
     telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY',
+    launchContext: options.launchContext,
+    contractMode: options.contractMode,
+    contractPath: options.contractPath,
     logPersistFailure: options.logPersistFailure
   };
   if (Object.prototype.hasOwnProperty.call(options, 'terminationBoundary')) {
@@ -56,6 +61,55 @@ afterEach(async () => {
     createdSandboxes.splice(0).map((sandbox) => rm(sandbox, { recursive: true, force: true }))
   );
 });
+
+async function writeContractEvidence(
+  sandbox: string,
+  repoPath: string,
+  content: string
+): Promise<{ path: string; sha256: string }> {
+  const absolutePath = join(sandbox, repoPath);
+  await mkdir(join(absolutePath, '..'), { recursive: true });
+  await writeFile(absolutePath, content, 'utf8');
+  return {
+    path: repoPath,
+    sha256: createHash('sha256').update(content).digest('hex')
+  };
+}
+
+function buildTelemetryCleanContract(evidence: { path: string; sha256: string }) {
+  const axis = (summary: string) => ({
+    verdict: 'clean' as const,
+    summary,
+    clean_signal: summary,
+    evidence_refs: [evidence],
+    findings: []
+  });
+  return {
+    schema_version: 'co.review.contract.v1',
+    generated_at: '2026-05-14T00:00:00.000Z',
+    overall_verdict: 'clean' as const,
+    axes: {
+      spec_conformance: axis('Spec checked.'),
+      coding_standards: axis('Standards checked.'),
+      code_changes: axis('Code checked.'),
+      agent_loop: axis('Loop checked.')
+    },
+    code_change_proposals: [],
+    agent_loop_proposals: []
+  };
+}
+
+function structuredOutputLaunchContext(): NonNullable<WriteTelemetryOptions['launchContext']> {
+  return {
+    scope_flag_mode: null,
+    prompt_delivery: 'stdin',
+    reviewer_visible_context_transport: 'stdin-prompt',
+    reviewer_visible_title_source: null,
+    transport: 'codex-exec-output-schema',
+    output_schema_path: 'review/review-contract-output.schema.json',
+    output_last_message_path: 'review/last-message.json'
+  };
+}
 
 describe('review-execution-telemetry', () => {
   it('persists success telemetry built from the provided state helper', async () => {
@@ -1472,6 +1526,137 @@ describe('review-execution-telemetry', () => {
     expect(incorrectPayload?.review_verdict).toBe('unknown');
     expect(incorrectPayload?.highest_finding_priority).toBeNull();
     expect(incorrectPayload?.finding_count).toBe(0);
+  });
+
+  it('derives enforce-mode semantic telemetry from the governed contract only', async () => {
+    const sandbox = await makeSandbox();
+    const payload = await writeTelemetryForOutput(
+      sandbox,
+      'codex\nI found no actionable issues in the uncommitted diff.\n',
+      {
+        contractMode: 'enforce',
+        contractPath: join(sandbox, 'review', 'contract.json')
+      }
+    );
+
+    expect(payload?.review_outcome).toBe('clean-success');
+    expect(payload?.review_verdict).toBe('unknown');
+    expect(payload?.contract_mode).toBe('enforce');
+    expect(payload?.contract_validation?.status).toBe('missing');
+    expect(payload?.contract_path).toBe('review/contract.json');
+
+    const contractSandbox = await makeSandbox();
+    const evidence = await writeContractEvidence(contractSandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const contract = buildTelemetryCleanContract(evidence);
+    const contractPayload = await writeTelemetryForOutput(
+      contractSandbox,
+      `codex\n${JSON.stringify(contract)}\n`,
+      {
+        contractMode: 'enforce',
+        contractPath: join(contractSandbox, 'review', 'contract.json'),
+        launchContext: structuredOutputLaunchContext()
+      }
+    );
+
+    expect(contractPayload?.review_verdict).toBe('clean');
+    expect(contractPayload?.contract_validation?.status).toBe('valid');
+    expect(contractPayload?.contract_overall_verdict).toBe('clean');
+    expect(contractPayload?.axis_verdicts?.agent_loop).toBe('clean');
+    expect(contractPayload?.proposal_counts).toEqual({ code_change: 0, agent_loop: 0 });
+    expect(getEnforceContractReviewFailureReason(contractPayload)).toBeNull();
+    expect(getEnforceContractReviewFailureReason(payload)).toBe('review contract validation is missing');
+    expect(getEnforceContractReviewFailureReason(null, 'enforce')).toBe('review contract telemetry is missing');
+    expect(
+      getEnforceContractReviewFailureReason({
+        ...contractPayload,
+        contract_overall_verdict: 'blocked',
+        review_verdict: 'findings'
+      })
+    ).toBe('review contract overall verdict is blocked');
+    expect(
+      getEnforceContractReviewFailureReason({
+        ...contractPayload,
+        launch_context: null
+      })
+    ).toBe('review launch context is missing');
+    expect(
+      getEnforceContractReviewFailureReason({
+        ...contractPayload,
+        review_outcome: undefined
+      })
+    ).toBe('review outcome is missing or invalid');
+    expect(
+      getEnforceContractReviewFailureReason({
+        ...contractPayload,
+        review_outcome: 'fallback-clean' as never
+      })
+    ).toBe('review outcome is missing or invalid');
+    expect(
+      getEnforceContractReviewFailureReason({
+        ...contractPayload,
+        review_outcome: 'bounded-success'
+      })
+    ).toBe('review outcome is missing or invalid');
+    expect(
+      getEnforceContractReviewFailureReason({
+        ...contractPayload,
+        proposal_counts: {
+          code_change: 0,
+          agent_loop: 1
+        }
+      })
+    ).toBe('agent-loop proposals require routing before handoff');
+
+    const boundedContractSandbox = await makeSandbox();
+    const boundedEvidence = await writeContractEvidence(
+      boundedContractSandbox,
+      'review/inputs/spec-bundle.json',
+      '{"bundle":"spec"}\n'
+    );
+    const boundedContract = buildTelemetryCleanContract(boundedEvidence);
+    const boundedPayload = await writeTelemetryForOutput(
+      boundedContractSandbox,
+      `codex\n${JSON.stringify(boundedContract)}\n`,
+      {
+        contractMode: 'enforce',
+        contractPath: join(boundedContractSandbox, 'review', 'contract.json'),
+        terminationBoundary: {
+          kind: 'command-intent',
+          provenance: 'post-startup-anchor',
+          reason: 'bounded review command-intent boundary preserved for audit',
+          sample: 'npm run test'
+        }
+      }
+    );
+
+    expect(boundedPayload?.review_outcome).toBe('bounded-success');
+    expect(boundedPayload?.review_verdict).toBe('clean');
+    expect(boundedPayload?.contract_validation?.status).toBe('valid');
+    expect(getEnforceContractReviewFailureReason(boundedPayload)).toBe('review outcome is bounded-success');
+    expect(
+      getEnforceContractReviewFailureReason({
+        ...contractPayload,
+        launch_context: {
+          legacy_fallback_attempt: 'review-wrapper-read-only-sandbox-compatibility'
+        }
+      })
+    ).toBe('review launch used legacy fallback review-wrapper-read-only-sandbox-compatibility');
+
+    const shadowSandbox = await makeSandbox();
+    const shadowEvidence = await writeContractEvidence(shadowSandbox, 'review/inputs/spec-bundle.json', '{"bundle":"spec"}\n');
+    const shadowContract = buildTelemetryCleanContract(shadowEvidence);
+    const shadowPayload = await writeTelemetryForOutput(
+      shadowSandbox,
+      `codex\n${JSON.stringify(shadowContract)}\n`,
+      {
+        contractMode: 'shadow',
+        contractPath: join(shadowSandbox, 'review', 'contract.json')
+      }
+    );
+
+    expect(shadowPayload?.contract_mode).toBe('shadow');
+    expect(shadowPayload?.contract_validation?.status).toBe('valid');
+    expect(shadowPayload?.review_verdict).toBe('unknown');
   });
 
   it('derives semantic verdicts from final reviewer output, not inspected transcripts', async () => {

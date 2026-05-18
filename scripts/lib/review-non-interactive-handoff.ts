@@ -40,7 +40,10 @@ export function shouldPrintNonInteractiveHandoff(params: {
   nonInteractive: boolean;
   stdinIsTTY: boolean;
 }): boolean {
-  if (envFlagEnabled(params.env.CODEX_REVIEW_AUTHORITATIVE_GATE)) {
+  if (
+    envFlagEnabled(params.env.CODEX_REVIEW_AUTHORITATIVE_GATE) ||
+    reviewContractModeIsEnforce(params.env.CODEX_REVIEW_CONTRACT_MODE)
+  ) {
     return false;
   }
   return (
@@ -103,5 +106,9 @@ function envFlagEnabled(value: string | undefined): boolean {
     return false;
   }
   const normalized = value.trim().toLowerCase();
-  return normalized === '1' || normalized === 'true' || normalized === 'yes';
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
+
+function reviewContractModeIsEnforce(value: string | undefined): boolean {
+  return value?.trim().toLowerCase() === 'enforce';
 }

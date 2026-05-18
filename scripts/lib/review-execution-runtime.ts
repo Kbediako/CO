@@ -23,6 +23,24 @@ const REVIEW_VERDICT_STABILITY_TIMEOUT_ENV_KEY = 'CODEX_REVIEW_VERDICT_STABILITY
 const REVIEW_META_SURFACE_TIMEOUT_ENV_KEY = 'CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS';
 const REVIEW_TELEMETRY_DEBUG_ENV_KEY = 'CODEX_REVIEW_DEBUG_TELEMETRY';
 
+function isBenignStdioError(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code;
+  return typeof code === 'string' && BENIGN_STDIO_ERROR_CODES.has(code);
+}
+
+function formatStdinPromptDeliveryError(error: unknown): Error {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code;
+  const detail =
+    error instanceof Error && error.message.trim()
+      ? error.message.trim()
+      : typeof error === 'string' && error.trim()
+        ? error.trim()
+        : code
+          ? code
+          : String(error);
+  return new Error(`codex review stdin prompt delivery failed: ${detail}`);
+}
+
 export class CodexReviewError extends Error {
   exitCode: number | null;
   signal: NodeJS.Signals | null;
@@ -56,6 +74,7 @@ export class CodexReviewError extends Error {
 export interface RunCodexReviewOptions {
   command: string;
   args: string[];
+  stdinInput?: string | null;
   env: Record<string, string | undefined>;
   stdio: StdioOptions;
   activeCloseoutBundleRoots?: string[];
@@ -122,15 +141,13 @@ function writeToStreamSafely(target: NodeJS.WriteStream, chunk: Buffer): void {
       if (!error) {
         return;
       }
-      const code = (error as NodeJS.ErrnoException | undefined)?.code;
-      if (typeof code === 'string' && BENIGN_STDIO_ERROR_CODES.has(code)) {
+      if (isBenignStdioError(error)) {
         return;
       }
       // Best effort only; stdout/stderr mirroring should not fail the run.
     });
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException | undefined)?.code;
-    if (typeof code === 'string' && BENIGN_STDIO_ERROR_CODES.has(code)) {
+    if (isBenignStdioError(error)) {
       return;
     }
     throw error;
@@ -151,6 +168,28 @@ export async function runCodexReview(
     cwd: options.repoRoot,
     detached
   });
+
+  let stdinFailure: Error | null = null;
+  let stdinForCleanup: NodeJS.WritableStream | null = null;
+  let onStdinError: ((error: Error) => void) | null = null;
+  if (options.stdinInput !== undefined && options.stdinInput !== null) {
+    if (!child.stdin) {
+      signalChildProcess(child, 'SIGTERM', detached);
+      throw new Error('codex review stdin prompt requested but child stdin is not available');
+    }
+    stdinForCleanup = child.stdin;
+    onStdinError = (error: Error) => {
+      stdinFailure = formatStdinPromptDeliveryError(error);
+      signalChildProcess(child, 'SIGTERM', detached);
+    };
+    stdinForCleanup.on('error', onStdinError);
+    try {
+      child.stdin.end(options.stdinInput, 'utf8');
+    } catch (error) {
+      signalChildProcess(child, 'SIGTERM', detached);
+      throw formatStdinPromptDeliveryError(error);
+    }
+  }
 
   const outputStream = createWriteStream(options.outputLogPath, { flags: 'w' });
   const outputClosed = new Promise<void>((resolve) => {
@@ -205,6 +244,9 @@ export async function runCodexReview(
     uninstallSignalForwarders();
     child.stdout?.off('data', onStdout);
     child.stderr?.off('data', onStderr);
+    if (stdinForCleanup && onStdinError) {
+      stdinForCleanup.removeListener('error', onStdinError);
+    }
     try {
       outputStream.end();
     } catch {
@@ -246,6 +288,9 @@ export async function runCodexReview(
       detached,
       onCleanup: cleanup
     });
+    if (stdinFailure) {
+      throw stdinFailure;
+    }
     await outputClosed;
     return {
       preview: executionState.getPreview(),
@@ -332,7 +377,7 @@ function envFlagEnabled(value: string | undefined): boolean {
     return false;
   }
   const normalized = value.trim().toLowerCase();
-  return normalized === '1' || normalized === 'true' || normalized === 'yes';
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
 function formatBoundedHeavyCommandFailure(blockedCommand: string): string {

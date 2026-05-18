@@ -70,6 +70,78 @@ const THREAD_NOT_FOUND_ROLLOUT_NOISE_MESSAGE =
   'codex_core::session: failed to record rollout items: thread 019de1d2-3b27-7193-8330-0ed726e28044 not found';
 const THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE = `WARN ${THREAD_NOT_FOUND_ROLLOUT_NOISE_MESSAGE}`;
 
+type ReviewArtifactOverrides = Partial<{
+  generated_at: string;
+  status: 'succeeded' | 'failed';
+  review_outcome: 'clean-success' | 'bounded-success' | 'failed-boundary' | 'failed-other';
+  review_verdict: 'findings' | 'clean' | 'unknown';
+  highest_finding_priority: 'P0' | 'P1' | 'P2' | 'P3' | null;
+  finding_count: number;
+  contract_path: string | null;
+  contract_mode: 'off' | 'shadow' | 'enforce' | null;
+  contract_validation: Record<string, unknown> | null;
+  contract_overall_verdict: 'clean' | 'findings' | 'blocked' | 'unknown' | null;
+  axis_verdicts: Record<string, unknown> | null;
+  axis_finding_counts: Record<string, unknown> | null;
+  proposal_counts: Record<string, unknown> | null;
+  error: string | null;
+  output_log_path: string;
+  outputLogContent: string;
+  omitContractArtifact: boolean;
+  omitReviewOutcome: boolean;
+  omitStatus: boolean;
+  termination_boundary: Record<string, unknown> | null;
+  launch_context: Record<string, unknown> | null;
+}>;
+
+function governedStructuredLaunchContext(): Record<string, unknown> {
+  return {
+    scope_flag_mode: null,
+    prompt_delivery: 'stdin',
+    reviewer_visible_context_transport: 'stdin-prompt',
+    reviewer_visible_title_source: null,
+    transport: 'codex-exec-output-schema',
+    output_schema_path: 'schemas/review-contract.v1.output.schema.json',
+    output_last_message_path: 'review/last-message.json'
+  };
+}
+
+function cleanGovernedReviewArtifactOverrides(overrides: ReviewArtifactOverrides = {}): ReviewArtifactOverrides {
+  return {
+    status: 'succeeded',
+    review_outcome: 'clean-success',
+    review_verdict: 'clean',
+    finding_count: 0,
+    outputLogContent: 'codex\n{"schema_version":"co.review.contract.v1"}\n',
+    termination_boundary: null,
+    launch_context: governedStructuredLaunchContext(),
+    contract_path: 'review/contract.json',
+    contract_mode: 'enforce',
+    contract_validation: {
+      status: 'valid',
+      errors: []
+    },
+    contract_overall_verdict: 'clean',
+    axis_verdicts: {
+      spec_conformance: 'clean',
+      coding_standards: 'clean',
+      code_changes: 'clean',
+      agent_loop: 'clean'
+    },
+    axis_finding_counts: {
+      spec_conformance: 0,
+      coding_standards: 0,
+      code_changes: 0,
+      agent_loop: 0
+    },
+    proposal_counts: {
+      code_change: 0,
+      agent_loop: 0
+    },
+    ...overrides
+  };
+}
+
 let workspaceRoot: string;
 
 beforeEach(async () => {
@@ -1032,6 +1104,476 @@ describe('runCommandStage review evidence consistency', () => {
       expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_unknown');
       expect(errorPayload.details?.review_outcome_summary).toContain('semantic review verdict: unknown');
     }
+  });
+
+  it('fails provider-linear-worker review handoff when the authoritative gate implies missing contract evidence is required', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(input, {
+        status: 'succeeded',
+        review_outcome: 'clean-success',
+        review_verdict: 'clean',
+        finding_count: 0,
+        outputLogContent: 'codex\nI found no actionable issues.\n',
+        termination_boundary: null
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with missing governed contract',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed because standalone review did not produce a concrete verdict.');
+    expect(result.summary).toContain('review contract: required but missing');
+
+    const errorPayload = JSON.parse(await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_unknown');
+    expect(errorPayload.details?.review_outcome_summary).toContain('review contract: required but missing');
+  });
+
+  it('fails governed provider-linear-worker review handoff when the contract artifact is absent', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(input, {
+        ...cleanGovernedReviewArtifactOverrides(),
+        omitContractArtifact: true
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with missing governed contract artifact',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed (governed_review_handoff_not_clean).');
+    expect(result.summary).toContain('governed review handoff failed: review contract artifact is missing');
+
+    const errorPayload = JSON.parse(await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_not_clean');
+    expect(errorPayload.details?.review_outcome_summary).toContain('review contract artifact is missing');
+  });
+
+  it('fails provider-linear-worker review handoff on non-clean governed contract verdicts', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(input, {
+        status: 'succeeded',
+        review_outcome: 'clean-success',
+        review_verdict: 'clean',
+        finding_count: 0,
+        outputLogContent: 'codex\n{"schema_version":"co.review.contract.v1"}\n',
+        termination_boundary: null,
+        launch_context: governedStructuredLaunchContext(),
+        contract_path: 'review/contract.json',
+        contract_mode: 'enforce',
+        contract_validation: {
+          status: 'valid',
+          errors: []
+        },
+        contract_overall_verdict: 'blocked',
+        axis_verdicts: {
+          spec_conformance: 'clean',
+          coding_standards: 'clean',
+          code_changes: 'clean',
+          agent_loop: 'blocked'
+        },
+        axis_finding_counts: {
+          spec_conformance: 0,
+          coding_standards: 0,
+          code_changes: 0,
+          agent_loop: 1
+        },
+        proposal_counts: {
+          code_change: 0,
+          agent_loop: 1
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with blocked governed contract',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed because standalone review reported findings.');
+    expect(result.summary).toContain('review contract: mode=enforce, validation=valid, overall=blocked');
+    expect(result.summary).toContain('review contract proposals: code_change=0, agent_loop=1');
+
+    const errorPayload = JSON.parse(await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_findings');
+    expect(errorPayload.details?.review_outcome_summary).toContain('overall=blocked');
+  });
+
+  it('fails governed provider-linear-worker review handoff on bounded-success telemetry', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(input, {
+        status: 'succeeded',
+        review_outcome: 'bounded-success',
+        review_verdict: 'clean',
+        finding_count: 0,
+        outputLogContent: 'codex\n{"schema_version":"co.review.contract.v1"}\n',
+        termination_boundary: {
+          kind: 'relevant-reinspection-dwell',
+          provenance: 'post-startup-anchor',
+          reason: 'bounded review relevant-reinspection dwell boundary violated after 1s.',
+          sample: null
+        },
+        contract_path: 'review/contract.json',
+        contract_mode: 'enforce',
+        contract_validation: {
+          status: 'valid',
+          errors: []
+        },
+        contract_overall_verdict: 'clean',
+        axis_verdicts: {
+          spec_conformance: 'clean',
+          coding_standards: 'clean',
+          code_changes: 'clean',
+          agent_loop: 'clean'
+        },
+        axis_finding_counts: {
+          spec_conformance: 0,
+          coding_standards: 0,
+          code_changes: 0,
+          agent_loop: 0
+        },
+        proposal_counts: {
+          code_change: 0,
+          agent_loop: 0
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with bounded governed review telemetry',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed (governed_review_handoff_not_clean).');
+    expect(result.summary).toContain('review outcome: bounded success via relevant-reinspection-dwell');
+    expect(result.summary).toContain('review contract: mode=enforce, validation=valid, overall=clean');
+    expect(result.summary).toContain('governed review handoff failed: review outcome is bounded-success');
+
+    const errorPayload = JSON.parse(await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_not_clean');
+    expect(errorPayload.details?.review_outcome_summary).toContain('review outcome is bounded-success');
+  });
+
+  it('fails governed provider-linear-worker review handoff after a legacy fallback launch', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(input, {
+        status: 'succeeded',
+        review_outcome: 'clean-success',
+        review_verdict: 'clean',
+        finding_count: 0,
+        outputLogContent: 'codex\n{"schema_version":"co.review.contract.v1"}\n',
+        termination_boundary: null,
+        launch_context: {
+          legacy_fallback_attempt: 'review-wrapper-read-only-sandbox-compatibility'
+        },
+        contract_path: 'review/contract.json',
+        contract_mode: 'enforce',
+        contract_validation: {
+          status: 'valid',
+          errors: []
+        },
+        contract_overall_verdict: 'clean',
+        axis_verdicts: {
+          spec_conformance: 'clean',
+          coding_standards: 'clean',
+          code_changes: 'clean',
+          agent_loop: 'clean'
+        },
+        axis_finding_counts: {
+          spec_conformance: 0,
+          coding_standards: 0,
+          code_changes: 0,
+          agent_loop: 0
+        },
+        proposal_counts: {
+          code_change: 0,
+          agent_loop: 0
+        }
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with fallback governed review launch',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('review outcome: clean success');
+    expect(result.summary).toContain('review contract: mode=enforce, validation=valid, overall=clean');
+    expect(result.summary).toContain(
+      'governed review handoff failed: review launch used legacy fallback review-wrapper-read-only-sandbox-compatibility'
+    );
+
+    const errorPayload = JSON.parse(await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_not_clean');
+    expect(errorPayload.details?.review_outcome_summary).toContain(
+      'review launch used legacy fallback review-wrapper-read-only-sandbox-compatibility'
+    );
+  });
+
+  it('fails governed provider-linear-worker review handoff without structured review launch context', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(input, cleanGovernedReviewArtifactOverrides({ launch_context: null }));
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with missing governed launch context',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('review outcome: clean success');
+    expect(result.summary).toContain('review contract: mode=enforce, validation=valid, overall=clean');
+    expect(result.summary).toContain('governed review handoff failed: review launch context is missing');
+
+    const errorPayload = JSON.parse(await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_not_clean');
+    expect(errorPayload.details?.review_outcome_summary).toContain('review launch context is missing');
+  });
+
+  it('fails governed provider-linear-worker review handoff on missing terminal review outcome', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(
+        input,
+        cleanGovernedReviewArtifactOverrides({
+          omitReviewOutcome: true
+        })
+      );
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with missing governed review outcome',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed (governed_review_handoff_not_clean).');
+    expect(result.summary).toContain('governed review handoff failed: review outcome is missing or invalid');
+
+    const errorPayload = JSON.parse(await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_not_clean');
+    expect(errorPayload.details?.review_outcome_summary).toContain('review outcome is missing or invalid');
+  });
+
+  it('fails governed provider-linear-worker review handoff on unrecognized terminal review outcome', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(
+        input,
+        cleanGovernedReviewArtifactOverrides({
+          review_outcome: 'fallback-clean' as never
+        })
+      );
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with invalid governed review outcome',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed (governed_review_handoff_not_clean).');
+    expect(result.summary).toContain('governed review handoff failed: review outcome is missing or invalid');
+
+    const errorPayload = JSON.parse(await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_not_clean');
+    expect(errorPayload.details?.review_outcome_summary).toContain('review outcome is missing or invalid');
+  });
+
+  it('fails governed provider-linear-worker review handoff when agent-loop proposals remain unrouted', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(
+        input,
+        cleanGovernedReviewArtifactOverrides({
+          proposal_counts: {
+            code_change: 0,
+            agent_loop: 1
+          }
+        })
+      );
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with unrouted agent loop proposal',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('review contract: mode=enforce, validation=valid, overall=clean');
+    expect(result.summary).toContain('review contract proposals: code_change=0, agent_loop=1');
+    expect(result.summary).toContain('governed review handoff failed: agent-loop proposals require routing before handoff');
+
+    const errorPayload = JSON.parse(await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_not_clean');
+    expect(errorPayload.details?.review_outcome_summary).toContain(
+      'agent-loop proposals require routing before handoff'
+    );
   });
 
   it('preserves rollout-item thread-not-found review log noise notes in provider-worker terminal summaries', async () => {
@@ -2177,6 +2719,8 @@ async function bootstrapCommandStage(
     command: stageSeed.command,
     ...(stageSeed.summaryHint ? { summaryHint: stageSeed.summaryHint } : {}),
     env: {
+      CODEX_REVIEW_AUTHORITATIVE_GATE: '0',
+      CODEX_REVIEW_CONTRACT_MODE: '',
       ...stageEnv
     }
   };
@@ -2227,19 +2771,7 @@ async function writeProviderLinearWorkerProofArtifacts(
 
 async function writeReviewArtifacts(
   input: Record<string, unknown>,
-  overrides: Partial<{
-    generated_at: string;
-    status: 'succeeded' | 'failed';
-    review_outcome: 'clean-success' | 'bounded-success' | 'failed-boundary' | 'failed-other';
-    review_verdict: 'findings' | 'clean' | 'unknown';
-    highest_finding_priority: 'P0' | 'P1' | 'P2' | 'P3' | null;
-    finding_count: number;
-    error: string | null;
-    output_log_path: string;
-    outputLogContent: string;
-    omitReviewOutcome: boolean;
-    termination_boundary: Record<string, unknown> | null;
-  }>
+  overrides: ReviewArtifactOverrides
 ): Promise<void> {
   const execEnv = (input.env ?? {}) as NodeJS.ProcessEnv;
   const repoRoot = String(execEnv.CODEX_ORCHESTRATOR_ROOT);
@@ -2248,12 +2780,37 @@ async function writeReviewArtifacts(
   const outputLogPath = join(reviewDir, 'output.log');
   const {
     outputLogContent,
+    omitContractArtifact,
     omitReviewOutcome,
+    omitStatus,
     review_outcome: overriddenReviewOutcome,
     ...telemetryOverrides
   } = overrides;
+  delete telemetryOverrides.status;
   await mkdir(reviewDir, { recursive: true });
   await writeFile(outputLogPath, outputLogContent ?? 'review output\n', 'utf8');
+  if (omitContractArtifact !== true && typeof telemetryOverrides.contract_path === 'string') {
+    await writeFile(
+      join(runDir, telemetryOverrides.contract_path),
+      `${JSON.stringify(
+        {
+          schema_version: 'co.review.contract.v1',
+          overall_verdict: telemetryOverrides.contract_overall_verdict ?? 'clean',
+          axes: {
+            spec_conformance: { verdict: 'clean', clean_signal: 'test fixture', findings: [] },
+            coding_standards: { verdict: 'clean', clean_signal: 'test fixture', findings: [] },
+            code_changes: { verdict: 'clean', clean_signal: 'test fixture', findings: [] },
+            agent_loop: { verdict: 'clean', clean_signal: 'test fixture', findings: [] }
+          },
+          code_change_proposals: [],
+          agent_loop_proposals: []
+        },
+        null,
+        2
+      )}\n`,
+      'utf8'
+    );
+  }
   const status = overrides.status ?? 'succeeded';
   const terminationBoundary = overrides.termination_boundary ?? null;
   const reviewOutcome =
@@ -2268,7 +2825,7 @@ async function writeReviewArtifacts(
       {
         version: 1,
         generated_at: new Date().toISOString(),
-        status,
+        ...(omitStatus === true ? {} : { status }),
         ...(omitReviewOutcome === true ? {} : { review_outcome: reviewOutcome }),
         error: null,
         output_log_path: relative(repoRoot, outputLogPath),

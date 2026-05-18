@@ -649,7 +649,7 @@
         "Codex"
       ],
       "status": "in_progress",
-      "last_review": "2026-05-14",
+      "last_review": "2026-05-18",
       "approvals": {
         "issue_context": {
           "reviewer": "CO provider worker",
@@ -812,6 +812,60 @@
         "action_plan": "docs/ACTION_PLAN-linear-7988f236-b499-4790-895d-1ec8c94e46d6.md",
         "spec": "tasks/specs/linear-7988f236-b499-4790-895d-1ec8c94e46d6.md",
         "task": "tasks/tasks-linear-7988f236-b499-4790-895d-1ec8c94e46d6.md"
+      }
+    },
+    {
+      "id": "20260514-linear-991643b6-0043-49b8-9411-33b6de78e421",
+      "title": "CO-512 governed review contract no-fallback packet",
+      "relates_to": "tasks/tasks-linear-991643b6-0043-49b8-9411-33b6de78e421.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-18",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet-2026-05-14T14-45-59-322Z-a6960ee0",
+          "date": "2026-05-14",
+          "status": "produced_for_parent_import",
+          "manifest": ".runs/linear-991643b6-0043-49b8-9411-33b6de78e421-docs-packet/cli/2026-05-14T14-45-59-322Z-a6960ee0/manifest.json",
+          "source_anchor": "ctx:sha256:141ca5b9d78167ddcb18b23d5b89c747b145a3a2bee95da7f903b322ab037291#chunk:c000001",
+          "summary": "Docs-only child lane created the CO-512 packet and tasks/index registration for the governed review contract. Parent reconciled the source payload, implemented schema-backed contract telemetry, structured-output enforce transport, and provider-worker gating, and preserved protected no-fallback wording and acceptance criteria while leaving final PR/Linear lifecycle gates parent-owned."
+        }
+      },
+      "validation": {
+        "status": "validated_pending_lifecycle",
+        "passed": [
+          "docs-first packet created",
+          "tasks/index.json registration created",
+          "child-lane scoped file presence check",
+          "child-lane protected-term scan",
+          "child-lane tasks/index.json parse check",
+          "git diff --check",
+          "manual minimality pass",
+          "parent source payload reconciliation",
+          "parent implementation",
+          "focused governed review contract validation",
+          "structured-output enforce transport validation",
+          "parent no-fallback governed review evidence before handoff",
+          "parent-required validation and review gates"
+        ],
+        "pending": [
+          "PR, review, and Linear lifecycle"
+        ]
+      },
+      "paths": {
+        "prd": "docs/PRD-linear-991643b6-0043-49b8-9411-33b6de78e421.md",
+        "docs": "docs/TECH_SPEC-linear-991643b6-0043-49b8-9411-33b6de78e421.md",
+        "action_plan": "docs/ACTION_PLAN-linear-991643b6-0043-49b8-9411-33b6de78e421.md",
+        "spec": "tasks/specs/linear-991643b6-0043-49b8-9411-33b6de78e421.md",
+        "task": "tasks/tasks-linear-991643b6-0043-49b8-9411-33b6de78e421.md"
+      },
+      "source_issue": {
+        "id": "991643b6-0043-49b8-9411-33b6de78e421",
+        "identifier": "CO-512",
+        "url": "https://linear.app/asabeko/issue/CO-512"
       }
     },
     {
