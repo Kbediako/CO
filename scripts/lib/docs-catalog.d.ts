@@ -31,6 +31,7 @@ export interface DocsCatalog {
   patterns: DocsCatalogRule[];
 }
 
+export function normalizeDocsCatalog(raw: any, relativePath?: string, absolutePath?: string): DocsCatalog;
 export function loadDocsCatalog(repoRoot: string, relativePath?: string): Promise<DocsCatalog>;
 export function maybeLoadDocsCatalog(repoRoot: string, relativePath?: string): Promise<DocsCatalog | null>;
 export function getDocsCatalogClassMeta(catalog: DocsCatalog | null, docClass: string): DocsCatalogClassMeta;

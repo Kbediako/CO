@@ -16,6 +16,7 @@ import {
   isTerminalTaskStatus
 } from './lib/docs-freshness-lifecycle.js';
 import { resolveEnvironmentPaths } from './lib/run-manifests.js';
+import { isValidArchiveStubForPath } from './lib/archive-stub.js';
 import { runDocsFreshness } from './docs-freshness.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -29,7 +30,6 @@ const CANONICAL_OWNER_MARKER_PREFIX = 'codex-orchestrator:canonical-owner-key=';
 const CANONICAL_OWNER_KEY_MAX_LENGTH = 512;
 const SPEC_GUARD_FRESHNESS_CADENCE_DAYS = 30;
 const SPEC_GUARD_PRE_EXPIRY_WINDOW_DAYS = 7;
-const SPEC_GUARD_ARCHIVE_STUB_MARKER = '<!-- docs-archive:stub -->';
 const TERMINAL_WORKFLOW_STATE_TYPES = new Set(['completed', 'canceled', 'cancelled', 'duplicate']);
 const TERMINAL_WORKFLOW_STATES = new Set(['done', 'completed', 'canceled', 'cancelled', 'duplicate']);
 const INACTIVE_SPEC_STATUSES = new Set([
@@ -387,44 +387,7 @@ function extractSpecGuardLastReview(content) {
 }
 
 function isArchivedSpecStubContent(file, content) {
-  const lines = content.split(/\r?\n/);
-  let index = 0;
-  while (index < lines.length && lines[index].trim() === '') {
-    index += 1;
-  }
-
-  if (!lines[index]?.trim().startsWith('#')) {
-    return false;
-  }
-
-  index += 1;
-  while (index < lines.length && lines[index].trim() === '') {
-    index += 1;
-  }
-
-  if (lines[index]?.trim().startsWith('last_review:')) {
-    index += 1;
-    while (index < lines.length && lines[index].trim() === '') {
-      index += 1;
-    }
-  }
-
-  if (lines[index]?.trim() !== SPEC_GUARD_ARCHIVE_STUB_MARKER) {
-    return false;
-  }
-
-  const trailingLines = lines.slice(index + 1).map((line) => line.trim());
-  const archivePath =
-    trailingLines
-      .find((line) => line.startsWith('- Archive path:'))
-      ?.slice('- Archive path:'.length)
-      .trim() ?? '';
-
-  return (
-    trailingLines.some((line) => line.startsWith('> Archived on ')) &&
-    trailingLines.some((line) => line.startsWith('- Archive branch:')) &&
-    normalizeDocPath(archivePath) === normalizeDocPath(file)
-  );
+  return isValidArchiveStubForPath(file, content);
 }
 
 function isSpecGuardFreshnessPath(file) {

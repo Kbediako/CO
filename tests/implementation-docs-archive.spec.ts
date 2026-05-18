@@ -1442,6 +1442,9 @@ describe('implementation-docs-archive script', () => {
       '',
       '<!-- docs-archive:stub -->',
       '> Archived on 2026-05-01. Full content: https://github.com/example/repo/blob/doc-archives/tasks/tasks-9999-archive-test.md',
+      '',
+      '- Archive branch: doc-archives',
+      '- Archive path: tasks/tasks-9999-archive-test.md',
       ''
     ].join('\n');
     await writeFile(taskPath, alreadyStubbed);

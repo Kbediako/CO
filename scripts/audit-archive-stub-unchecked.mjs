@@ -4,13 +4,25 @@ import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import process from 'node:process';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
-import { collectIndexedTaskPacketPaths } from './lib/docs-freshness-lifecycle.js';
+import { normalizeDocsCatalog, resolveDocsCatalogEntry } from './lib/docs-catalog.js';
+import { collectIndexedTaskPacketPaths, isTerminalTaskStatus } from './lib/docs-freshness-lifecycle.js';
 import { resolveEnvironmentPaths } from './lib/run-manifests.js';
+import { hasArchiveStubMarker, parseArchiveStubMetadata } from './lib/archive-stub.js';
 
-const ARCHIVE_MARKER = '<!-- docs-archive:stub -->';
 const OPEN_CHECKLIST_ITEM_PATTERN = /^\s*(?:[-*+]|\d+[.)])\s+\[ \]\s+.+$/gmu;
 const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
+const DOCS_CATALOG_PATH = 'docs/docs-catalog.json';
 const TASKS_INDEX_PATH = 'tasks/index.json';
+const NONTERMINAL_PACKET_STATUSES = new Set([
+  'active',
+  'blocked',
+  'in-progress',
+  'in_progress',
+  'open',
+  'ready',
+  'rework',
+  'todo'
+]);
 
 function showUsage() {
   console.log(`Usage: node scripts/audit-archive-stub-unchecked.mjs [options]
@@ -69,21 +81,31 @@ function readGitPath(repoRoot, ref, relativePath) {
   }
 }
 
-async function readCurrentCandidateContents(repoRoot, relativePath) {
+async function readCurrentContentCandidates(repoRoot, relativePath) {
   const candidates = [];
   const stagedContent = readGitPath(repoRoot, ':', relativePath);
   if (stagedContent !== null) {
-    candidates.push(stagedContent);
+    candidates.push({ source: 'index', content: stagedContent });
   }
   try {
     const worktreeContent = await readFile(`${repoRoot}/${relativePath}`, 'utf8');
-    if (!candidates.includes(worktreeContent)) {
-      candidates.push(worktreeContent);
-    }
+    candidates.push({ source: 'worktree', content: worktreeContent });
   } catch {
     // Deleted paths are excluded from the diff filter; missing worktree paths can be ignored here.
   }
   return candidates;
+}
+
+async function readCurrentCandidateContents(repoRoot, relativePath) {
+  const seen = new Set();
+  const contents = [];
+  for (const candidate of await readCurrentContentCandidates(repoRoot, relativePath)) {
+    if (!seen.has(candidate.content)) {
+      contents.push(candidate.content);
+      seen.add(candidate.content);
+    }
+  }
+  return contents;
 }
 
 function extractOpenChecklistItems(content) {
@@ -137,6 +159,14 @@ function isTaskChecklistPath(relativePath) {
   );
 }
 
+function isMarkdownArchiveStubCandidate(relativePath) {
+  return typeof relativePath === 'string' && relativePath.endsWith('.md');
+}
+
+function normalizeRegistryPath(value) {
+  return typeof value === 'string' ? value.trim().replace(/\\/g, '/') : '';
+}
+
 async function readJsonIfPresent(pathValue, fallback) {
   try {
     return JSON.parse(await readFile(pathValue, 'utf8'));
@@ -157,10 +187,46 @@ function readJsonGitPath(repoRoot, ref, relativePath, fallback) {
   }
 }
 
-function summarizeRegistryEntry(registry, docPath) {
-  const entry = Array.isArray(registry?.entries)
-    ? registry.entries.find((candidate) => candidate?.path === docPath)
-    : null;
+async function readCurrentJsonCandidates(repoRoot, relativePath) {
+  const candidates = [];
+  const seen = new Set();
+  const addRaw = (source, raw) => {
+    const key = `${source}\0${raw ?? ''}`;
+    if (typeof raw !== 'string' || seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    try {
+      candidates.push({ source, value: JSON.parse(raw) });
+    } catch {
+      // Ignore malformed intermediate JSON; the dedicated JSON validators report those failures.
+    }
+  };
+  addRaw('index', readGitPath(repoRoot, ':', relativePath));
+  try {
+    addRaw('worktree', await readFile(`${repoRoot}/${relativePath}`, 'utf8'));
+  } catch {
+    // Missing worktree files can be represented by the index candidate above.
+  }
+  return candidates;
+}
+
+function candidatesBySource(candidates) {
+  return new Map(candidates.map((candidate) => [candidate.source, candidate.value]));
+}
+
+function sourceValue(sourceMap, source, fallback) {
+  return sourceMap.has(source) ? sourceMap.get(source) : fallback;
+}
+
+function normalizeDocsCatalogCandidates(repoRoot, candidates) {
+  return candidates.map((candidate) => ({
+    source: candidate.source,
+    value: normalizeDocsCatalog(candidate.value, DOCS_CATALOG_PATH, `${repoRoot}/${DOCS_CATALOG_PATH}`)
+  }));
+}
+
+function summarizeRegistryLikeEntry(entry) {
   if (!entry) {
     return null;
   }
@@ -169,6 +235,13 @@ function summarizeRegistryEntry(registry, docPath) {
     last_review: entry.last_review ?? null,
     cadence_days: entry.cadence_days ?? null
   };
+}
+
+function summarizeRegistryEntry(registry, docPath) {
+  const entry = Array.isArray(registry?.entries)
+    ? registry.entries.find((candidate) => candidate?.path === docPath)
+    : null;
+  return summarizeRegistryLikeEntry(entry);
 }
 
 function summarizeTaskIndexEntries(taskIndex, docPath) {
@@ -181,6 +254,101 @@ function summarizeTaskIndexEntries(taskIndex, docPath) {
       status: item.status ?? null,
       last_review: item.last_review ?? null
     }));
+}
+
+function registryEntriesByPath(registry) {
+  const entries = Array.isArray(registry?.entries) ? registry.entries : [];
+  const byPath = new Map();
+  for (const entry of entries) {
+    const entryPath = normalizeRegistryPath(entry?.path);
+    if (entryPath && !byPath.has(entryPath)) {
+      byPath.set(entryPath, entry);
+    }
+  }
+  return byPath;
+}
+
+function collectNewlyArchivedRegistryEntries(baseRegistry, currentRegistry) {
+  const baseByPath = registryEntriesByPath(baseRegistry);
+  const entries = [];
+  for (const entry of Array.isArray(currentRegistry?.entries) ? currentRegistry.entries : []) {
+    const entryPath = normalizeRegistryPath(entry?.path);
+    if (!isMarkdownArchiveStubCandidate(entryPath) || entry?.status !== 'archived') {
+      continue;
+    }
+    const baseEntry = baseByPath.get(entryPath);
+    if (baseEntry?.status !== 'archived') {
+      entries.push({
+        relativePath: entryPath,
+        previousStatus: baseEntry?.status ?? null,
+        registryEntry: entry
+      });
+    }
+  }
+  return Array.from(
+    new Map(entries.map((entry) => [entry.relativePath, entry])).values()
+  ).sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+}
+
+function isPreservedReportOnlyRegistryArchive(relativePath, docsCatalog) {
+  const catalogEntry = resolveDocsCatalogEntry(relativePath, docsCatalog);
+  return catalogEntry?.doc_class === 'report_only';
+}
+
+function registryArchiveReason(previousRegistryStatus) {
+  return `registry status ${previousRegistryStatus ?? 'missing'} -> archived without valid stub`;
+}
+
+function extractFrontmatterStatus(content) {
+  if (typeof content !== 'string') {
+    return null;
+  }
+  const lines = content.split(/\r?\n/);
+  let index = 0;
+  while (index < lines.length && lines[index].trim() === '') {
+    index += 1;
+  }
+  if (lines[index]?.trim() !== '---') {
+    return null;
+  }
+  for (index += 1; index < lines.length; index += 1) {
+    const line = lines[index].trim();
+    if (line === '---') {
+      return null;
+    }
+    const match = line.match(/^status:\s*(.+)$/i);
+    if (match) {
+      return match[1].replace(/^['"]|['"]$/g, '').trim().toLowerCase();
+    }
+  }
+  return null;
+}
+
+function nonTerminalSourceReasons(
+  taskIndex,
+  relativePath,
+  currentContents,
+  linkedOpenChecklistItems
+) {
+  const reasons = [];
+  const frontmatterStatuses = Array.from(
+    new Set(currentContents.map(extractFrontmatterStatus).filter(Boolean))
+  );
+  for (const status of frontmatterStatuses) {
+    if (NONTERMINAL_PACKET_STATUSES.has(status) || !isTerminalTaskStatus(status)) {
+      reasons.push(`frontmatter status ${status}`);
+    }
+  }
+  for (const item of summarizeTaskIndexEntries(taskIndex, relativePath)) {
+    const status = typeof item.status === 'string' ? item.status.trim().toLowerCase() : '';
+    if (status && !isTerminalTaskStatus(status)) {
+      reasons.push(`task index status ${status}`);
+    }
+  }
+  if (linkedOpenChecklistItems.length > 0) {
+    reasons.push('linked checklist has unchecked items');
+  }
+  return Array.from(new Set(reasons));
 }
 
 function mergeLinkedChecklistMaps(target, source) {
@@ -200,7 +368,7 @@ function mergeLinkedChecklistMaps(target, source) {
   }
 }
 
-async function buildLinkedOpenChecklistMap(repoRoot, taskIndex, targetPaths = [], baseRef = null) {
+async function buildLinkedOpenChecklistMap(repoRoot, taskIndex, targetPaths = [], baseRef = null, currentSource = null) {
   const map = new Map();
   const targetPathSet = new Set(targetPaths);
   const items = Array.isArray(taskIndex?.items) ? taskIndex.items : [];
@@ -211,7 +379,11 @@ async function buildLinkedOpenChecklistMap(repoRoot, taskIndex, targetPaths = []
     }
     const checklistSources = [];
     for (const checklistPath of collectTaskChecklistPaths(item)) {
-      const candidates = await readCurrentCandidateContents(repoRoot, checklistPath);
+      const candidates = currentSource
+        ? (await readCurrentContentCandidates(repoRoot, checklistPath))
+            .filter((candidate) => candidate.source === currentSource)
+            .map((candidate) => candidate.content)
+        : await readCurrentCandidateContents(repoRoot, checklistPath);
       if (candidates.length === 0 && baseRef) {
         const baseContent = readGitPath(repoRoot, baseRef, checklistPath);
         if (baseContent !== null) {
@@ -288,59 +460,182 @@ async function main() {
     process.exit(0);
   }
 
+  let registry = { entries: [] };
+  let baseRegistry = { entries: [] };
+  let currentRegistryCandidates = [];
+  const registryChanged = changedFiles.includes(DEFAULT_REGISTRY_PATH);
+  if (registryChanged) {
+    currentRegistryCandidates = await readCurrentJsonCandidates(repoRoot, DEFAULT_REGISTRY_PATH);
+    registry = currentRegistryCandidates.at(-1)?.value ?? { entries: [] };
+    baseRegistry = readJsonGitPath(repoRoot, comparisonBase, DEFAULT_REGISTRY_PATH, { entries: [] });
+  }
+
   const changedStubCandidates = [];
   for (const relativePath of changedFiles) {
+    if (!isMarkdownArchiveStubCandidate(relativePath)) {
+      continue;
+    }
     const currentContents = await readCurrentCandidateContents(repoRoot, relativePath);
-    if (!currentContents.some((content) => content.includes(ARCHIVE_MARKER))) {
+    if (!currentContents.some(hasArchiveStubMarker)) {
       continue;
     }
 
     const baseContent = readGitPath(repoRoot, comparisonBase, relativePath);
-    if (baseContent === null) {
-      continue;
-    }
-
-    changedStubCandidates.push({ relativePath, baseContent });
+    changedStubCandidates.push({ relativePath, baseContent, currentContents, source: 'archive_stub' });
   }
 
-  let registry = { entries: [] };
+  const registryArchiveCandidates = [];
+  if (registryChanged) {
+    const archiveEntries = [];
+    for (const currentRegistry of currentRegistryCandidates) {
+      for (const entry of collectNewlyArchivedRegistryEntries(baseRegistry, currentRegistry.value)) {
+        archiveEntries.push({
+          ...entry,
+          registrySource: currentRegistry.source
+        });
+      }
+    }
+    archiveEntries.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+    const reportedRegistryArchiveKeys = new Set();
+    for (const { relativePath, previousStatus, registryEntry, registrySource } of archiveEntries) {
+      const archiveKey = `${registrySource}\0${relativePath}`;
+      if (reportedRegistryArchiveKeys.has(archiveKey)) {
+        continue;
+      }
+      const contentCandidates = await readCurrentContentCandidates(repoRoot, relativePath);
+      const currentContents = Array.from(
+        new Set(
+          contentCandidates
+            .filter((candidate) => candidate.source === registrySource)
+            .map((candidate) => candidate.content)
+        )
+      );
+      if (currentContents.some((content) => parseArchiveStubMetadata(relativePath, content).isValid)) {
+        continue;
+      }
+      reportedRegistryArchiveKeys.add(archiveKey);
+      const baseContent = readGitPath(repoRoot, comparisonBase, relativePath);
+      registryArchiveCandidates.push({
+        relativePath,
+        baseContent,
+        currentContents,
+        previousRegistryStatus: previousStatus,
+        registryEntry,
+        registrySource,
+        source: 'registry_archive'
+      });
+    }
+  }
+
+  const auditCandidates = [...changedStubCandidates, ...registryArchiveCandidates];
   let taskIndex = { items: [] };
   let linkedOpenChecklistByPath = new Map();
-  if (changedStubCandidates.length > 0) {
-    registry = await readJsonIfPresent(`${repoRoot}/${DEFAULT_REGISTRY_PATH}`, { entries: [] });
+  let baseLinkedOpenChecklistByPath = new Map();
+  let taskIndexBySource = new Map();
+  let linkedOpenChecklistBySource = new Map();
+  let docsCatalog = null;
+  let docsCatalogBySource = new Map();
+  if (auditCandidates.length > 0) {
+    if (!registryChanged) {
+      registry = await readJsonIfPresent(`${repoRoot}/${DEFAULT_REGISTRY_PATH}`, { entries: [] });
+    }
+    docsCatalogBySource = candidatesBySource(
+      normalizeDocsCatalogCandidates(repoRoot, await readCurrentJsonCandidates(repoRoot, DOCS_CATALOG_PATH))
+    );
+    docsCatalog = sourceValue(docsCatalogBySource, 'worktree', null);
+    const candidatePaths = auditCandidates.map((candidate) => candidate.relativePath);
     const baseTaskIndex = readJsonGitPath(repoRoot, comparisonBase, TASKS_INDEX_PATH, { items: [] });
-    const baseLinkedOpenChecklistByPath = await buildLinkedOpenChecklistMap(
+    baseLinkedOpenChecklistByPath = await buildLinkedOpenChecklistMap(
       repoRoot,
       baseTaskIndex,
-      changedStubCandidates.map((candidate) => candidate.relativePath),
+      candidatePaths,
       comparisonBase
     );
     mergeLinkedChecklistMaps(linkedOpenChecklistByPath, baseLinkedOpenChecklistByPath);
 
-    taskIndex = await readJsonIfPresent(`${repoRoot}/${TASKS_INDEX_PATH}`, { items: [] });
+    taskIndexBySource = candidatesBySource(await readCurrentJsonCandidates(repoRoot, TASKS_INDEX_PATH));
+    taskIndex = sourceValue(taskIndexBySource, 'worktree', { items: [] });
     const currentLinkedOpenChecklistByPath = await buildLinkedOpenChecklistMap(
       repoRoot,
       taskIndex,
-      changedStubCandidates.map((candidate) => candidate.relativePath)
+      candidatePaths
     );
     mergeLinkedChecklistMaps(linkedOpenChecklistByPath, currentLinkedOpenChecklistByPath);
+    for (const [source, sourceTaskIndex] of taskIndexBySource.entries()) {
+      const linkedMap = new Map();
+      mergeLinkedChecklistMaps(linkedMap, baseLinkedOpenChecklistByPath);
+      mergeLinkedChecklistMaps(
+        linkedMap,
+        await buildLinkedOpenChecklistMap(repoRoot, sourceTaskIndex, candidatePaths, null, source)
+      );
+      linkedOpenChecklistBySource.set(source, linkedMap);
+    }
   }
   const findings = [];
+  const reportedFindingPaths = new Set();
 
-  for (const { relativePath, baseContent } of changedStubCandidates) {
-    const openChecklistItems = extractOpenChecklistItems(baseContent);
-    const linkedOpenChecklistItems = linkedOpenChecklistByPath.get(relativePath) ?? [];
-    if (openChecklistItems.length === 0 && linkedOpenChecklistItems.length === 0) {
+  for (const {
+    relativePath,
+    baseContent,
+    currentContents,
+    previousRegistryStatus,
+    registryEntry,
+    registrySource,
+    source
+  } of auditCandidates) {
+    const openChecklistItems = Array.from(
+      new Set([baseContent, ...currentContents].flatMap((content) => extractOpenChecklistItems(content)))
+    );
+    const sourceTaskIndex = registrySource ? sourceValue(taskIndexBySource, registrySource, { items: [] }) : taskIndex;
+    const sourceDocsCatalog = registrySource ? sourceValue(docsCatalogBySource, registrySource, null) : docsCatalog;
+    const sourceLinkedOpenChecklistByPath = registrySource
+      ? linkedOpenChecklistBySource.get(registrySource) ?? baseLinkedOpenChecklistByPath
+      : linkedOpenChecklistByPath;
+    const linkedOpenChecklistItems = sourceLinkedOpenChecklistByPath.get(relativePath) ?? [];
+    const invalidArchiveStubMetadata = currentContents
+      .map((content) => parseArchiveStubMetadata(relativePath, content))
+      .filter((parsed) => parsed.hasMarker && !parsed.isValid);
+    const registryArchiveWithoutStub = source === 'registry_archive';
+    const preservedReportOnlyArchive =
+      registryArchiveWithoutStub &&
+      currentContents.length > 0 &&
+      isPreservedReportOnlyRegistryArchive(relativePath, sourceDocsCatalog);
+    const registryArchiveRequiresStub = registryArchiveWithoutStub && !preservedReportOnlyArchive;
+    const statusSourceContents =
+      currentContents.length > 0 ? currentContents : [baseContent].filter((content) => typeof content === 'string');
+    const activeSourceReasons = registryArchiveWithoutStub
+      ? [
+          ...(registryArchiveRequiresStub ? [registryArchiveReason(previousRegistryStatus)] : []),
+          ...nonTerminalSourceReasons(sourceTaskIndex, relativePath, statusSourceContents, linkedOpenChecklistItems)
+        ]
+      : [];
+    if (
+      openChecklistItems.length === 0 &&
+      linkedOpenChecklistItems.length === 0 &&
+      invalidArchiveStubMetadata.length === 0 &&
+      !registryArchiveRequiresStub &&
+      activeSourceReasons.length === 0
+    ) {
       continue;
     }
+    if (reportedFindingPaths.has(relativePath)) {
+      continue;
+    }
+    reportedFindingPaths.add(relativePath);
 
     findings.push({
       path: relativePath,
+      registry_archive_without_stub: registryArchiveWithoutStub,
+      active_source_reasons: activeSourceReasons,
+      invalid_archive_stub_metadata: invalidArchiveStubMetadata.length > 0,
+      archive_stub_metadata_errors: [
+        ...new Set(invalidArchiveStubMetadata.flatMap((parsed) => parsed.errors))
+      ],
       unchecked_checklist_items: openChecklistItems.length,
       unchecked_checklist_samples: openChecklistItems.slice(0, 5),
       linked_unchecked_checklists: linkedOpenChecklistItems,
-      registry: summarizeRegistryEntry(registry, relativePath),
-      task_index: summarizeTaskIndexEntries(taskIndex, relativePath)
+      registry: summarizeRegistryLikeEntry(registryEntry) ?? summarizeRegistryEntry(registry, relativePath),
+      task_index: summarizeTaskIndexEntries(sourceTaskIndex, relativePath)
     });
   }
 
@@ -357,7 +652,7 @@ async function main() {
     console.log(JSON.stringify(report, null, 2));
   } else if (findings.length > 0) {
     console.error(
-      `Archive stub unchecked audit failed: ${findings.length} changed archive stub(s) replace base content with open checklist items.`
+      `Archive stub unchecked audit failed: ${findings.length} changed archive stub(s) have invalid metadata or hide open checklist items.`
     );
     for (const finding of findings) {
       const registrySummary = finding.registry
@@ -367,6 +662,14 @@ async function main() {
         .map((item) => `${item.id ?? 'unknown'}:${item.status ?? 'unset'}`)
         .join(', ');
       console.error(`- ${finding.path} (${finding.unchecked_checklist_items} open item(s); registry ${registrySummary}; task ${taskStatuses || 'none'})`);
+      if (finding.invalid_archive_stub_metadata) {
+        console.error(`  invalid metadata: ${finding.archive_stub_metadata_errors.join('; ')}`);
+      }
+      if (finding.registry_archive_without_stub) {
+        console.error(
+          `  registry archived without valid stub: ${finding.active_source_reasons.join('; ') || 'active source evidence present'}`
+        );
+      }
       for (const sample of finding.unchecked_checklist_samples.slice(0, 3)) {
         console.error(`  ${sample}`);
       }
@@ -381,7 +684,7 @@ async function main() {
     }
   } else {
     console.log(
-      `Archive stub unchecked audit: OK (${changedFiles.length} changed file(s), 0 changed stubs hide open checklist items).`
+      `Archive stub unchecked audit: OK (${changedFiles.length} changed file(s), 0 changed stubs have invalid metadata or hide open checklist items).`
     );
   }
 

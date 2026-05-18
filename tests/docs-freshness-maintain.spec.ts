@@ -802,10 +802,10 @@ Legacy specs without YAML front matter still follow spec-guard freshness.
       join(repoRoot, archivedSpecPath),
       `# Archived Stub
 
-last_review: ${lastReview}
+last_review: 2026-05-17
 
 <!-- docs-archive:stub -->
-> Archived on 2026-05-17.
+> Archived on 2026-05-17. Full content: https://github.com/example/repo/blob/doc-archives/${archivedSpecPath}
 
 - Archive branch: doc-archives
 - Archive path: ${archivedSpecPath}
@@ -826,6 +826,49 @@ last_review: ${lastReview}
       })
     ]);
     expect(decision.sample_paths.spec_guard_pre_expiry_paths).toEqual([legacySpecPath]);
+  });
+
+  it('surfaces archive stubs with blank archive branch as active spec pre-expiry', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-blank-archive-branch-'));
+    createdDirs.push(repoRoot);
+    const archivedSpecPath = 'tasks/specs/linear-blank-archive-branch.md';
+    const lastReview = reviewDateDaysAgo(27);
+    await writeFixture(repoRoot, {
+      entries: [{ path: archivedSpecPath, lastReview }],
+      catalogPatterns: [
+        {
+          glob: 'tasks/specs/*.md',
+          doc_class: 'task_packet'
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, archivedSpecPath),
+      `# Archived Stub
+
+last_review: ${lastReview}
+
+<!-- docs-archive:stub -->
+> Archived on 2026-05-17.
+
+- Archive branch:
+- Archive path: ${archivedSpecPath}
+`,
+      'utf8'
+    );
+
+    const { decision, shouldBlock } = await runMaintain(repoRoot);
+
+    expect(shouldBlock).toBe(true);
+    expect(decision.freshness_decision).toBe('block_spec_guard_pre_expiry');
+    expect(decision.totals.spec_guard_pre_expiry_entries).toBe(1);
+    expect(decision.spec_guard_pre_expiry_entries).toEqual([
+      expect.objectContaining({
+        path: archivedSpecPath,
+        days_until_expiry: 3,
+        failure_kind: 'active_spec_pre_expiry'
+      })
+    ]);
   });
 
   it('matches spec-guard file selection for spec pre-expiry warnings', async () => {

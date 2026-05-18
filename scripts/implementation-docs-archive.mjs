@@ -19,11 +19,15 @@ import {
   TERMINAL_PENDING_ARCHIVE_STATUS
 } from './lib/docs-freshness-lifecycle.js';
 import { resolveEnvironmentPaths } from './lib/run-manifests.js';
+import {
+  buildArchiveStubContent,
+  hasArchiveStubMarker,
+  parseArchiveStubMetadata
+} from './lib/archive-stub.js';
 
 const DEFAULT_POLICY_PATH = 'docs/implementation-docs-archive-policy.json';
 const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
 const TASKS_INDEX_PATH = 'tasks/index.json';
-const ARCHIVE_MARKER = '<!-- docs-archive:stub -->';
 const DEFAULT_OWNER = 'Codex (top-level agent), Review agent';
 const OPEN_CHECKLIST_ITEM_PATTERN = /^\s*(?:[-*+]|\d+[.)])\s+\[ \]\s+.+$/gmu;
 const REPORT_ONLY_RETENTION_FINDINGS_PATTERN = /^docs\/findings\/(\d+)-.*-deliberation\.md$/;
@@ -363,23 +367,6 @@ function extractDocReferences(content, docRegexes) {
   return [...matches];
 }
 
-function buildStubContent({ headerLine, archiveUrl, archivedAt, archiveBranch, relativePath }) {
-  const title = headerLine || `# Archived Document`;
-  const lines = [title, ''];
-  if (relativePath.startsWith('tasks/specs/')) {
-    lines.push(`last_review: ${archivedAt}`, '');
-  }
-  lines.push(
-    ARCHIVE_MARKER,
-    `> Archived on ${archivedAt}. Full content: ${archiveUrl}`,
-    '',
-    `- Archive branch: ${archiveBranch}`,
-    `- Archive path: ${relativePath}`,
-    ''
-  );
-  return lines.join('\n');
-}
-
 function extractOpenChecklistItems(content) {
   if (typeof content !== 'string' || content.length === 0) {
     return [];
@@ -557,7 +544,7 @@ async function main() {
         continue;
       }
       const checklistContent = await readFile(containedChecklistPath.absolutePath, 'utf8');
-      if (checklistContent.includes(ARCHIVE_MARKER)) {
+      if (hasArchiveStubMarker(checklistContent)) {
         continue;
       }
       const openChecklistItems = extractOpenChecklistItems(checklistContent);
@@ -804,7 +791,20 @@ async function main() {
     const { containedPath, content } = loaded;
     const archiveRelativePath = containedPath.relativePath;
     const archiveUrl = `${policy.repoUrl}/blob/${policy.archiveBranch}/${archiveRelativePath}`;
-    if (content.includes(ARCHIVE_MARKER)) {
+    if (hasArchiveStubMarker(content)) {
+      const parsedStub = parseArchiveStubMetadata(archiveRelativePath, content);
+      if (!parsedStub.isValid) {
+        report.skipped.push({
+          path: relativePath,
+          reason: 'invalid_archive_stub_metadata',
+          context: {
+            ...context,
+            archive_stub_errors: parsedStub.errors
+          }
+        });
+        report.totals.skipped += 1;
+        return;
+      }
       const registryRepaired = markArchivedRegistryEntry(relativePath, {
         reason: 'already_stubbed_active_registry',
         context,
@@ -847,7 +847,7 @@ async function main() {
 
     const lines = content.split('\n');
     const headerLine = lines.find((line) => line.trim().startsWith('# ')) || null;
-    const stub = buildStubContent({
+    const stub = buildArchiveStubContent({
       headerLine,
       archiveUrl,
       archivedAt: todayString,

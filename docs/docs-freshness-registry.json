@@ -4097,9 +4097,9 @@
     {
       "path": ".agent/task/linear-27a61a75-236f-40c6-8cb0-8e4921708d91.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-18",
-      "cadence_days": 365
+      "cadence_days": 30
     },
     {
       "path": ".agent/task/linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md",
@@ -10264,9 +10264,9 @@
     {
       "path": "docs/ACTION_PLAN-linear-27a61a75-236f-40c6-8cb0-8e4921708d91.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-18",
-      "cadence_days": 365
+      "cadence_days": 30
     },
     {
       "path": "docs/ACTION_PLAN-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md",
@@ -19722,9 +19722,9 @@
     {
       "path": "docs/PRD-linear-27a61a75-236f-40c6-8cb0-8e4921708d91.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-18",
-      "cadence_days": 365
+      "cadence_days": 30
     },
     {
       "path": "docs/PRD-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md",
@@ -25399,9 +25399,9 @@
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-status-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-18",
-      "cadence_days": 365
+      "cadence_days": 30
     },
     {
       "path": "docs/TECH_SPEC-coordinator-symphony-aligned-status-cli-shell-extraction.md",
@@ -26320,9 +26320,9 @@
     {
       "path": "docs/TECH_SPEC-linear-27a61a75-236f-40c6-8cb0-8e4921708d91.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-18",
-      "cadence_days": 365
+      "cadence_days": 30
     },
     {
       "path": "docs/TECH_SPEC-linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md",
@@ -32387,9 +32387,9 @@
     {
       "path": "tasks/specs/1275-coordinator-symphony-aligned-status-cli-remaining-boundary-freeze-reassessment.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-18",
-      "cadence_days": 365
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/1276-coordinator-symphony-aligned-plan-cli-shell-extraction.md",
@@ -33203,9 +33203,9 @@
     {
       "path": "tasks/specs/linear-27a61a75-236f-40c6-8cb0-8e4921708d91.md",
       "owner": "Codex (top-level agent), Review agent",
-      "status": "archived",
+      "status": "active",
       "last_review": "2026-05-18",
-      "cadence_days": 365
+      "cadence_days": 30
     },
     {
       "path": "tasks/specs/linear-27ac1e64-d88c-4add-b2f4-f4908cb63e80.md",
