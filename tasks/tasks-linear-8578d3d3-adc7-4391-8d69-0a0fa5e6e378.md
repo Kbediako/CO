@@ -1,0 +1,76 @@
+# Task Checklist - linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378
+
+- Linear Issue: `CO-216` / `8578d3d3-adc7-4391-8d69-0a0fa5e6e378`
+- MCP Task ID: `linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378`
+- Primary PRD: `docs/PRD-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`
+- TECH_SPEC: `docs/TECH_SPEC-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`
+- Task spec: `tasks/specs/linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`
+- Source anchor: `ctx:sha256:ce6083384b86554ab408103b1cb76c240fe7afc936fa45247ec8a65e67938015#chunk:c000001`
+
+## Docs-First
+- [x] PRD drafted for operator-autopilot backlog re-promotion churn after manual demotion. Evidence: `docs/PRD-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`.
+- [x] TECH_SPEC drafted with issue-shaping contract, protected terms, readiness gate, and parent-owned validation requirements. Evidence: `docs/TECH_SPEC-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`, `tasks/specs/linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`.
+- [x] ACTION_PLAN drafted for parent implementation and closeout. Evidence: `docs/ACTION_PLAN-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`.
+- [x] Task checklist and `.agent` mirror drafted within child-lane scope. Evidence: `tasks/tasks-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`, `.agent/task/linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`.
+- [x] Canonical registry mirrors updated within this docs lane. Evidence: `tasks/index.json`, `docs/TASKS.md`.
+- [x] Pre-implementation issue-quality review recorded in the TECH_SPEC readiness gate. Evidence: `docs/TECH_SPEC-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`, `tasks/specs/linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`.
+
+## Source / Assumptions
+- [x] Shared source anchor recorded. Evidence: `ctx:sha256:ce6083384b86554ab408103b1cb76c240fe7afc936fa45247ec8a65e67938015#chunk:c000001`.
+- [x] Child lane recorded that the provided `.runs` source payload and manifest paths are absent in this checkout. Evidence: `docs/PRD-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`, `docs/TECH_SPEC-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`.
+- [x] Child lane anchored the packet on protected issue wording plus current repo truth from `providerOperatorAutopilot.ts`, `providerLinearWorkflowFacade.ts`, `providerWorkflowConfigStore.ts`, and `observabilityReadModel.ts`. Evidence: this checklist, the PRD, and the TECH_SPEC readiness gate.
+- [x] Parent/child ownership split recorded. Evidence: this checklist, the PRD, and the TECH_SPEC readiness gate.
+
+## Parent Implementation Acceptance
+- [x] Focused regression proves promote -> manual demote -> hold for the same issue snapshot. Evidence: `npx vitest run --config vitest.config.core.ts orchestrator/tests/ProviderOperatorAutopilot.test.ts orchestrator/tests/ProviderWorkflowConfigStore.test.ts orchestrator/tests/ObservabilityReadModel.test.ts` exits `0` with `48/48`.
+- [x] Normal safe backlog-head promotion still succeeds when no manual-demotion signal exists. Evidence: `ProviderOperatorAutopilot.test.ts` focused run exits `0`.
+- [x] Backlog promotion preserves expected-state metadata. Evidence: `ProviderOperatorAutopilot.test.ts` asserts `expectedStateName`, `expectedStateType`, and `expectedUpdatedAt` at the transition helper seam.
+- [x] Stored autopilot result and observability expose `issue updated_at`, hold reason, and whether a force path was used. Evidence: `ProviderWorkflowConfigStore.test.ts` and `ObservabilityReadModel.test.ts` focused run exits `0`.
+- [x] The manual-demotion hold is bounded to the exact snapshot rather than permanently suppressing future promotion. Evidence: `ProviderOperatorAutopilot.test.ts` covers consecutive hold and later acknowledgement re-promotion.
+- [x] The parent fix stays out of broad scheduler, generic `CO-215`, and refresh-stall scope. Evidence: source diff stays within autopilot decision, persistence clone, read-model projection, and focused tests.
+
+## Validation
+- [x] Docs child lane scoped JSON syntax check. Evidence: `jq empty tasks/index.json` exits `0`.
+- [x] Docs child lane scoped whitespace check. Evidence: `git diff --check -- docs/PRD-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md docs/TECH_SPEC-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md docs/ACTION_PLAN-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md tasks/specs/linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md tasks/tasks-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md .agent/task/linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md tasks/index.json docs/TASKS.md` exits `0`.
+- [x] Docs child lane protected-term check. Evidence: `rg -n "operator-autopilot|Backlog to Ready|manual Ready to Backlog demotion|re-promotion churn|providerOperatorAutopilot.ts|previous_result|expectedStateName|expectedStateType|expectedUpdatedAt|transition_guard|issue updated_at|hold reason|force path" docs/PRD-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md docs/TECH_SPEC-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md docs/ACTION_PLAN-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md tasks/specs/linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md tasks/tasks-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md .agent/task/linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md` exits `0`.
+- [x] Parent focused `orchestrator/tests/ProviderOperatorAutopilot.test.ts`. Evidence: combined focused run exits `0` with `29/29` in that file.
+- [x] Parent focused `orchestrator/tests/ProviderWorkflowConfigStore.test.ts`. Evidence: combined focused run exits `0` with `18/18` in that file.
+- [x] Parent focused `orchestrator/tests/ObservabilityReadModel.test.ts`. Evidence: combined focused run exits `0` with `1/1`.
+- [x] Parent full-suite regression coverage includes nearby runtime and Linear workflow contracts. Evidence: `npm run test` exits `0` with `4084/4084` tests after the `SelectedRunProjection` `CODEX_HOME` fixture isolation fix.
+- [x] Required diagnostics manifest captured. Evidence: `codex-orchestrator start diagnostics --approval-policy never --format json --no-interactive` exits `0`, manifest `.runs/linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378/cli/2026-04-19T05-06-49-474Z-4a57775a/manifest.json`.
+- [ ] Review handoff blocked on repo-wide docs freshness/spec freshness debt. Evidence: `npm run docs:freshness` exits `1` with `117` stale docs, and `npm run docs:freshness:maintain` writes `out/linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378/docs-freshness-maintenance.json` with `freshness_decision=block_diff_local`, `blocking_changed_paths=[]`, and non-dry-run `spec_guard.status=failed` on unrelated stale specs.
+
+## Handoff Status
+- [x] Child lane leaves packet and registry/checklist changes in place for patch export. Evidence: dirty working tree in this child workspace.
+- [x] Parent updated Linear workpad with validation state and blocker evidence. Evidence: comment `01451229-9765-4938-a334-51ac791aedc8`.
+- [ ] Parent opens/attaches PR and runs review handoff after docs freshness/spec freshness blocker is cleared or explicitly reclassified by the owner lane. Evidence: blocked; no PR attached.
+
+## Progress Log
+- 2026-04-17: Created the scoped docs-first packet from the protected CO-216 wording plus direct inspection of current backlog-promotion, transition-guard, persistence, and observability seams because the provided `.runs` payload is absent in this child checkout.
+- 2026-04-17: Preserved the exact issue shape: prevent operator-autopilot `Backlog -> Ready` re-promotion churn after a manual `Ready -> Backlog` demotion, keep normal safe backlog-head promotion when no manual-demotion signal exists, preserve expected-state metadata, and surface `issue updated_at`, hold reason, and force-path usage.
+- 2026-04-17: Completed the requested scoped checks: `jq empty`, protected-term `rg`, and `git diff --check`.
+- 2026-04-19: Parent refreshed the existing implementation with a focused optional-field robustness fix, added persistence/read-model assertions, and passed the combined focused run for `ProviderOperatorAutopilot`, `ProviderWorkflowConfigStore`, and `ObservabilityReadModel`.
+- 2026-04-19: Parent completed validation through diagnostics and `pack:smoke`; issue is parked in `Blocked` because docs freshness maintenance is still fail-closed on unrelated repo-wide stale spec/docs debt with zero CO-216 changed-path blockers.
+
+## Relevant Files
+- `docs/PRD-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`
+- `docs/TECH_SPEC-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`
+- `docs/ACTION_PLAN-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`
+- `tasks/specs/linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`
+- `tasks/tasks-linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`
+- `.agent/task/linear-8578d3d3-adc7-4391-8d69-0a0fa5e6e378.md`
+- `tasks/index.json`
+- `docs/TASKS.md`
+- `orchestrator/src/cli/control/providerOperatorAutopilot.ts`
+- `orchestrator/src/cli/control/providerWorkflowConfigStore.ts`
+- `orchestrator/src/cli/control/observabilityReadModel.ts`
+- `orchestrator/tests/ProviderOperatorAutopilot.test.ts`
+- `orchestrator/tests/ProviderWorkflowConfigStore.test.ts`
+- `orchestrator/tests/ObservabilityReadModel.test.ts`
+
+## Notes
+- Do not widen this lane into a broad scheduler redesign.
+- Do not reopen generic `CO-215` transition-contract scope.
+- Do not route this into reclaim or refresh-stall work.
+- Do not drop expected-state metadata from backlog promotion.
