@@ -19,7 +19,7 @@ This mirror follows `tasks/specs/linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md`
 - [x] `docs:freshness` and spec-guard are not weakened.
 - [x] The current `block_spec_guard_pre_expiry` gate is removed locally without a metadata-only date bump, cap/window expansion, or duplicate owner issue. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/docs-freshness-maintenance-after-spec-lifecycle.json`. This is recovery-branch evidence, not final shared-root/control-host proof.
 - [x] No action is resolved by a metadata-only `last_review` bump, cap/window expansion, or duplicate owner issue. Evidence: the recovery uses archive stubs, terminal lifecycle status, active-spec review metadata, and missing-index repair while leaving guard thresholds intact.
-- [ ] Archive payload availability on `doc-archives` is verified, or an explicit payload waiver is recorded.
+- [x] Archive payload availability on `doc-archives` is verified, or an explicit payload waiver is recorded. Evidence: `origin/doc-archives` commit `cd4982cffaf30e7ef17d53871402ca1706586438` contains the CO-522 archive payload, including representative stubs `.agent/task/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md` and `tasks/tasks-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md`.
 - [ ] Shared-root/control-host `co-status` and live `docs:freshness:maintain` agree that `blocks_handoff=false` before merge and before CO-512 advances.
 
 ## Validation
@@ -34,7 +34,7 @@ This mirror follows `tasks/specs/linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md`
 - `.runs/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-guard/cli/2026-05-18T08-17-21-680Z-82986f0f/manifest.json` records repo-local delegation/build/lint/test/spec-guard evidence.
 - ChatGPT Pro advisory evidence from Browser session `CO-522 Freshness Blocker Strategy` supported the same classification path and explicitly rejected blind date bumps, guard weakening, duplicate owner issues, and declaring terminal before `blocks_handoff=false`.
 - Focused freshness/archive tests if the recovery changes lifecycle classification or archive automation.
-- Archive payload availability on `doc-archives`, or an explicit payload waiver, is required before merge.
+- Archive payload availability on `doc-archives` is captured: `git ls-remote origin refs/heads/doc-archives` returned `cd4982cffaf30e7ef17d53871402ca1706586438`, and `git ls-tree` verified representative archived stubs in that payload.
 - Shared-root/control-host `co-status --format json` or live `docs:freshness:maintain` after recovery must not report CO-522 as a handoff-blocking repo gate.
 
 ## CO-382 Fallback Decision Table
