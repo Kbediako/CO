@@ -28,6 +28,19 @@ function isBenignStdioError(error: unknown): boolean {
   return typeof code === 'string' && BENIGN_STDIO_ERROR_CODES.has(code);
 }
 
+function formatStdinPromptDeliveryError(error: unknown): Error {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code;
+  const detail =
+    error instanceof Error && error.message.trim()
+      ? error.message.trim()
+      : typeof error === 'string' && error.trim()
+        ? error.trim()
+        : code
+          ? code
+          : String(error);
+  return new Error(`codex review stdin prompt delivery failed: ${detail}`);
+}
+
 export class CodexReviewError extends Error {
   exitCode: number | null;
   signal: NodeJS.Signals | null;
@@ -166,20 +179,15 @@ export async function runCodexReview(
     }
     stdinForCleanup = child.stdin;
     onStdinError = (error: Error) => {
-      if (isBenignStdioError(error)) {
-        return;
-      }
-      stdinFailure = error instanceof Error ? error : new Error(String(error));
+      stdinFailure = formatStdinPromptDeliveryError(error);
       signalChildProcess(child, 'SIGTERM', detached);
     };
     stdinForCleanup.on('error', onStdinError);
     try {
       child.stdin.end(options.stdinInput, 'utf8');
     } catch (error) {
-      if (!isBenignStdioError(error)) {
-        signalChildProcess(child, 'SIGTERM', detached);
-        throw error;
-      }
+      signalChildProcess(child, 'SIGTERM', detached);
+      throw formatStdinPromptDeliveryError(error);
     }
   }
 

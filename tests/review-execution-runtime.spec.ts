@@ -64,4 +64,17 @@ describe('review-execution-runtime', () => {
       })
     ).rejects.toThrow('codex review stdin prompt requested but child stdin is not available');
   });
+
+  it('fails closed when the stdin prompt pipe closes before delivery completes', async () => {
+    const sandbox = await makeSandbox();
+
+    await expect(
+      runCodexReview({
+        ...baseRunOptions(sandbox),
+        args: ['-e', 'process.exit(0)'],
+        stdinInput: 'authoritative prompt\n'.repeat(262_144),
+        stdio: ['pipe', 'pipe', 'pipe']
+      })
+    ).rejects.toThrow(/codex review stdin prompt delivery failed/u);
+  });
 });

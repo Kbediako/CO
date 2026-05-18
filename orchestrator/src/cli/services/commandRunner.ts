@@ -1,4 +1,4 @@
-import { createWriteStream } from 'node:fs';
+import { createWriteStream, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -568,7 +568,7 @@ export async function runCommandStage(
           : null;
       const governedReviewHandoffFailureReason =
         requiresProviderReviewSemanticVerdict && requiresGovernedContract
-          ? resolveGovernedReviewHandoffFailureReason(providerReviewTelemetry)
+          ? resolveGovernedReviewHandoffFailureReason(providerReviewTelemetry, paths)
           : null;
       providerLinearWorkerReviewOutcomeSummary = reviewOutcomeSummary;
       const mutationSuppressions = deriveDeterministicProviderMutationSuppressions(
@@ -1480,7 +1480,8 @@ function appendReviewOutcomeSummaryDetail(summary: string | null, detail: string
 }
 
 function resolveGovernedReviewHandoffFailureReason(
-  telemetry: ReviewTelemetryEvidencePayload | null
+  telemetry: ReviewTelemetryEvidencePayload | null,
+  paths: RunPaths
 ): string | null {
   if (!telemetry) {
     return null;
@@ -1497,6 +1498,13 @@ function resolveGovernedReviewHandoffFailureReason(
   if (validation?.status !== 'valid' || overall !== 'clean') {
     return null;
   }
+  const contractArtifactFailure = resolveGovernedReviewContractArtifactFailureReason(
+    telemetry,
+    paths
+  );
+  if (contractArtifactFailure) {
+    return contractArtifactFailure;
+  }
   const launchContext = coerceTelemetryRecord(telemetry.launch_context);
   const launchFailure = resolveGovernedReviewLaunchContextFailureReason(launchContext);
   if (launchFailure) {
@@ -1505,6 +1513,28 @@ function resolveGovernedReviewHandoffFailureReason(
   const proposalCounts = coerceReviewContractProposalCounts(telemetry.proposal_counts);
   if ((proposalCounts?.agent_loop ?? 0) > 0) {
     return 'agent-loop proposals require routing before handoff';
+  }
+  return null;
+}
+
+function resolveGovernedReviewContractArtifactFailureReason(
+  telemetry: ReviewTelemetryEvidencePayload,
+  paths: RunPaths
+): string | null {
+  const contractPath = coerceTelemetryString(telemetry.contract_path);
+  if (!contractPath) {
+    return 'review contract path is missing';
+  }
+  if (contractPath !== 'review/contract.json') {
+    return `review contract path is ${contractPath}`;
+  }
+  try {
+    const artifact = statSync(join(paths.runDir, contractPath));
+    if (!artifact.isFile()) {
+      return 'review contract artifact is not a file';
+    }
+  } catch {
+    return 'review contract artifact is missing';
   }
   return null;
 }

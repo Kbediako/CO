@@ -87,6 +87,7 @@ type ReviewArtifactOverrides = Partial<{
   error: string | null;
   output_log_path: string;
   outputLogContent: string;
+  omitContractArtifact: boolean;
   omitReviewOutcome: boolean;
   omitStatus: boolean;
   termination_boundary: Record<string, unknown> | null;
@@ -1146,6 +1147,46 @@ describe('runCommandStage review evidence consistency', () => {
     expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
     expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_unknown');
     expect(errorPayload.details?.review_outcome_summary).toContain('review contract: required but missing');
+  });
+
+  it('fails governed provider-linear-worker review handoff when the contract artifact is absent', async () => {
+    mockState.runImpl = async (input) => {
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff'
+      });
+      await writeReviewArtifacts(input, {
+        ...cleanGovernedReviewArtifactOverrides(),
+        omitContractArtifact: true
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with missing governed contract artifact',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed (governed_review_handoff_not_clean).');
+    expect(result.summary).toContain('governed review handoff failed: review contract artifact is missing');
+
+    const errorPayload = JSON.parse(await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_not_clean');
+    expect(errorPayload.details?.review_outcome_summary).toContain('review contract artifact is missing');
   });
 
   it('fails provider-linear-worker review handoff on non-clean governed contract verdicts', async () => {
@@ -2739,6 +2780,7 @@ async function writeReviewArtifacts(
   const outputLogPath = join(reviewDir, 'output.log');
   const {
     outputLogContent,
+    omitContractArtifact,
     omitReviewOutcome,
     omitStatus,
     review_outcome: overriddenReviewOutcome,
@@ -2747,6 +2789,28 @@ async function writeReviewArtifacts(
   delete telemetryOverrides.status;
   await mkdir(reviewDir, { recursive: true });
   await writeFile(outputLogPath, outputLogContent ?? 'review output\n', 'utf8');
+  if (omitContractArtifact !== true && typeof telemetryOverrides.contract_path === 'string') {
+    await writeFile(
+      join(runDir, telemetryOverrides.contract_path),
+      `${JSON.stringify(
+        {
+          schema_version: 'co.review.contract.v1',
+          overall_verdict: telemetryOverrides.contract_overall_verdict ?? 'clean',
+          axes: {
+            spec_conformance: { verdict: 'clean', clean_signal: 'test fixture', findings: [] },
+            coding_standards: { verdict: 'clean', clean_signal: 'test fixture', findings: [] },
+            code_changes: { verdict: 'clean', clean_signal: 'test fixture', findings: [] },
+            agent_loop: { verdict: 'clean', clean_signal: 'test fixture', findings: [] }
+          },
+          code_change_proposals: [],
+          agent_loop_proposals: []
+        },
+        null,
+        2
+      )}\n`,
+      'utf8'
+    );
+  }
   const status = overrides.status ?? 'succeeded';
   const terminationBoundary = overrides.termination_boundary ?? null;
   const reviewOutcome =
