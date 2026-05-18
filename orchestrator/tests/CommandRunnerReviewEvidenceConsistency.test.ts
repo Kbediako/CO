@@ -100,7 +100,7 @@ function governedStructuredLaunchContext(): Record<string, unknown> {
     reviewer_visible_context_transport: 'stdin-prompt',
     reviewer_visible_title_source: null,
     transport: 'codex-exec-output-schema',
-    output_schema_path: 'schemas/review-contract-output.schema.json',
+    output_schema_path: 'schemas/review-contract.v1.output.schema.json',
     output_last_message_path: 'review/last-message.json'
   };
 }

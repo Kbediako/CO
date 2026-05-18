@@ -633,10 +633,10 @@ function buildReviewArgs(
     }
     args.push('review');
   } else {
-    args.push('exec');
     if (opts.disableDelegationMcp) {
       args.push('-c', REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE);
     }
+    args.push('exec');
     args.push('-s', 'read-only');
     args.push('--output-schema', contractOutputSchemaPath as string);
     args.push('--output-last-message', contractOutputLastMessagePath as string);
@@ -671,7 +671,7 @@ function buildReviewLaunchContext(
   const useStructuredContractExec = Boolean(contractOutputSchemaPath && contractOutputLastMessagePath);
   const promptDelivery = useStructuredContractExec ? 'stdin' : scopedFlag ? 'artifact-only' : 'inline';
   return {
-    scope_flag_mode: scopedFlag?.mode ?? null,
+    scope_flag_mode: useStructuredContractExec ? null : (scopedFlag?.mode ?? null),
     prompt_delivery: promptDelivery,
     reviewer_visible_context_transport: useStructuredContractExec
       ? 'stdin-prompt'

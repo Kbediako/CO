@@ -2399,6 +2399,27 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.launch_context?.reviewer_visible_context_transport).toBe('stdin-prompt');
   });
 
+  it('keeps delegation disable config as a global option for structured-output exec', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const argsLogPath = join(sandbox, 'review-args.log');
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'contract-clean-output',
+      RUN_REVIEW_ARGS_LOG: argsLogPath,
+      CODEX_REVIEW_DISABLE_DELEGATION_MCP: '1',
+      CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+      CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+    });
+
+    expect(result.exitCode).toBe(0);
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    expect(argsLog).toContain('config=mcp_servers.delegation.enabled=false');
+    expect(argsLog).toContain('argv=exec -s read-only --output-schema');
+    expect(argsLog).not.toContain('argv=exec -c');
+  });
+
   it('fails closed instead of printing a prompt-only handoff when enforce mode is set without the authoritative gate', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
@@ -2570,7 +2591,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     };
     expect(telemetry.status).toBe('succeeded');
     expect(telemetry.review_verdict).toBe('clean');
-    expect(telemetry.launch_context?.scope_flag_mode).toBe('base');
+    expect(telemetry.launch_context?.scope_flag_mode).toBeNull();
     expect(telemetry.launch_context?.prompt_delivery).toBe('stdin');
     expect(telemetry.launch_context?.reviewer_visible_context_transport).toBe('stdin-prompt');
   });

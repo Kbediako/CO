@@ -23,6 +23,11 @@ const REVIEW_VERDICT_STABILITY_TIMEOUT_ENV_KEY = 'CODEX_REVIEW_VERDICT_STABILITY
 const REVIEW_META_SURFACE_TIMEOUT_ENV_KEY = 'CODEX_REVIEW_META_SURFACE_TIMEOUT_SECONDS';
 const REVIEW_TELEMETRY_DEBUG_ENV_KEY = 'CODEX_REVIEW_DEBUG_TELEMETRY';
 
+function isBenignStdioError(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code;
+  return typeof code === 'string' && BENIGN_STDIO_ERROR_CODES.has(code);
+}
+
 export class CodexReviewError extends Error {
   exitCode: number | null;
   signal: NodeJS.Signals | null;
@@ -123,15 +128,13 @@ function writeToStreamSafely(target: NodeJS.WriteStream, chunk: Buffer): void {
       if (!error) {
         return;
       }
-      const code = (error as NodeJS.ErrnoException | undefined)?.code;
-      if (typeof code === 'string' && BENIGN_STDIO_ERROR_CODES.has(code)) {
+      if (isBenignStdioError(error)) {
         return;
       }
       // Best effort only; stdout/stderr mirroring should not fail the run.
     });
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException | undefined)?.code;
-    if (typeof code === 'string' && BENIGN_STDIO_ERROR_CODES.has(code)) {
+    if (isBenignStdioError(error)) {
       return;
     }
     throw error;
@@ -153,15 +156,28 @@ export async function runCodexReview(
     detached
   });
 
+  let stdinFailure: Error | null = null;
+  let stdinForCleanup: NodeJS.WritableStream | null = null;
+  let onStdinError: ((error: Error) => void) | null = null;
   if (options.stdinInput !== undefined && options.stdinInput !== null) {
-    child.stdin?.on('error', () => {
-      // The child process outcome and missing/invalid contract checks remain authoritative.
-    });
+    if (!child.stdin) {
+      signalChildProcess(child, 'SIGTERM', detached);
+      throw new Error('codex review stdin prompt requested but child stdin is not available');
+    }
+    stdinForCleanup = child.stdin;
+    onStdinError = (error: Error) => {
+      if (isBenignStdioError(error)) {
+        return;
+      }
+      stdinFailure = error instanceof Error ? error : new Error(String(error));
+      signalChildProcess(child, 'SIGTERM', detached);
+    };
+    stdinForCleanup.on('error', onStdinError);
     try {
-      child.stdin?.end(options.stdinInput, 'utf8');
+      child.stdin.end(options.stdinInput, 'utf8');
     } catch (error) {
-      const code = (error as NodeJS.ErrnoException | undefined)?.code;
-      if (typeof code !== 'string' || !BENIGN_STDIO_ERROR_CODES.has(code)) {
+      if (!isBenignStdioError(error)) {
+        signalChildProcess(child, 'SIGTERM', detached);
         throw error;
       }
     }
@@ -220,6 +236,9 @@ export async function runCodexReview(
     uninstallSignalForwarders();
     child.stdout?.off('data', onStdout);
     child.stderr?.off('data', onStderr);
+    if (stdinForCleanup && onStdinError) {
+      stdinForCleanup.removeListener('error', onStdinError);
+    }
     try {
       outputStream.end();
     } catch {
@@ -261,6 +280,9 @@ export async function runCodexReview(
       detached,
       onCleanup: cleanup
     });
+    if (stdinFailure) {
+      throw stdinFailure;
+    }
     await outputClosed;
     return {
       preview: executionState.getPreview(),
