@@ -1313,6 +1313,26 @@ function resolveReviewTelemetryOutcomeDisposition(
   return explicitDisposition === derivedDisposition ? explicitDisposition : derivedDisposition;
 }
 
+function resolveStrictReviewTelemetryOutcomeDisposition(
+  telemetry: ReviewTelemetryEvidencePayload | null
+): ReviewOutcomeDisposition | null {
+  if (!telemetry) {
+    return null;
+  }
+  const explicitDisposition = coerceReviewOutcomeDisposition(telemetry.review_outcome);
+  const telemetryStatus = coerceTelemetryStatusValue(telemetry.status);
+  if (!explicitDisposition || !telemetryStatus) {
+    return null;
+  }
+  const derivedDisposition = deriveReviewOutcomeDisposition({
+    status: telemetryStatus,
+    terminationBoundary: hasTelemetryTerminationBoundary(telemetry)
+      ? REVIEW_OUTCOME_BOUNDARY_PRESENCE_SENTINEL
+      : null
+  });
+  return explicitDisposition === derivedDisposition ? explicitDisposition : null;
+}
+
 function formatReviewTelemetryOutcomeSummary(
   telemetry: ReviewTelemetryEvidencePayload | null
 ): string | null {
@@ -1465,16 +1485,73 @@ function resolveGovernedReviewHandoffFailureReason(
   if (!telemetry) {
     return null;
   }
-  const disposition = resolveReviewTelemetryOutcomeDisposition(telemetry);
-  if (disposition && disposition !== 'clean-success') {
+  const disposition = resolveStrictReviewTelemetryOutcomeDisposition(telemetry);
+  if (!disposition) {
+    return 'review outcome is missing or invalid';
+  }
+  if (disposition !== 'clean-success') {
     return `review outcome is ${disposition}`;
   }
+  const validation = coerceReviewContractValidation(telemetry.contract_validation);
+  const overall = coerceReviewContractAxisVerdict(telemetry.contract_overall_verdict);
+  if (validation?.status !== 'valid' || overall !== 'clean') {
+    return null;
+  }
   const launchContext = coerceTelemetryRecord(telemetry.launch_context);
+  const launchFailure = resolveGovernedReviewLaunchContextFailureReason(launchContext);
+  if (launchFailure) {
+    return launchFailure;
+  }
+  const proposalCounts = coerceReviewContractProposalCounts(telemetry.proposal_counts);
+  if ((proposalCounts?.agent_loop ?? 0) > 0) {
+    return 'agent-loop proposals require routing before handoff';
+  }
+  return null;
+}
+
+function resolveGovernedReviewLaunchContextFailureReason(
+  launchContext: Record<string, unknown> | null
+): string | null {
+  if (!launchContext) {
+    return 'review launch context is missing';
+  }
   const legacyFallbackAttempt = coerceTelemetryString(launchContext?.legacy_fallback_attempt);
   if (legacyFallbackAttempt) {
     return `review launch used legacy fallback ${legacyFallbackAttempt}`;
   }
+  const transport = coerceTelemetryString(launchContext.transport);
+  if (transport !== 'codex-exec-output-schema') {
+    return `review launch transport is ${transport ?? 'missing'}`;
+  }
+  const promptDelivery = coerceTelemetryString(launchContext.prompt_delivery);
+  if (promptDelivery !== 'stdin') {
+    return `review prompt delivery is ${promptDelivery ?? 'missing'}`;
+  }
+  const contextTransport = coerceTelemetryString(launchContext.reviewer_visible_context_transport);
+  if (contextTransport !== 'stdin-prompt') {
+    return `reviewer-visible context transport is ${contextTransport ?? 'missing'}`;
+  }
+  if (!coerceTelemetryString(launchContext.output_schema_path)) {
+    return 'review output schema path is missing';
+  }
+  if (!coerceTelemetryString(launchContext.output_last_message_path)) {
+    return 'review output last-message path is missing';
+  }
   return null;
+}
+
+function coerceReviewContractProposalCounts(value: unknown): {
+  code_change: number;
+  agent_loop: number;
+} | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  return {
+    code_change: coerceTelemetryFindingCount(record.code_change) ?? 0,
+    agent_loop: coerceTelemetryFindingCount(record.agent_loop) ?? 0
+  };
 }
 
 function coerceTelemetryFindingCount(value: unknown): number | null {

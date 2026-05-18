@@ -163,6 +163,25 @@ export function resolveReviewOutcomeDisposition(payload: {
   return explicitDisposition === derivedDisposition ? explicitDisposition : derivedDisposition;
 }
 
+function resolveStrictReviewOutcomeDisposition(payload: {
+  status?: 'succeeded' | 'failed' | null;
+  review_outcome?: ReviewOutcomeDisposition | null;
+  termination_boundary?: ReviewTerminationBoundaryRecord | null;
+}): ReviewOutcomeDisposition | null {
+  if (payload.status !== 'succeeded' && payload.status !== 'failed') {
+    return null;
+  }
+  const explicitDisposition = coerceReviewOutcomeDisposition(payload.review_outcome ?? null);
+  if (!explicitDisposition) {
+    return null;
+  }
+  const derivedDisposition = deriveReviewOutcomeDisposition({
+    status: payload.status,
+    terminationBoundary: payload.termination_boundary ?? null
+  });
+  return explicitDisposition === derivedDisposition ? explicitDisposition : null;
+}
+
 export function formatReviewOutcomeSummary(payload: {
   status: 'succeeded' | 'failed';
   review_outcome?: ReviewOutcomeDisposition | null;
@@ -201,11 +220,12 @@ export function getEnforceContractReviewFailureReason(payload: {
   status?: 'succeeded' | 'failed' | null;
   review_outcome?: ReviewOutcomeDisposition | null;
   termination_boundary?: ReviewTerminationBoundaryRecord | null;
-  launch_context?: Pick<ReviewLaunchContext, 'legacy_fallback_attempt'> | null;
+  launch_context?: Partial<ReviewLaunchContext> | null;
   contract_mode?: ReviewContractMode | null;
   contract_validation?: ReviewContractTelemetry['contract_validation'] | null;
   contract_overall_verdict?: ReviewContractAxisVerdict | null;
   review_verdict?: ReviewSemanticVerdict | null;
+  proposal_counts?: ReviewContractProposalCounts | null;
 } | null, expectedMode?: ReviewContractMode | null): string | null {
   const mode = payload?.contract_mode ?? expectedMode ?? null;
   if (mode !== 'enforce') {
@@ -214,18 +234,16 @@ export function getEnforceContractReviewFailureReason(payload: {
   if (!payload) {
     return 'review contract telemetry is missing';
   }
-  const reviewOutcome = payload.status
-    ? resolveReviewOutcomeDisposition({
-        status: payload.status,
-        review_outcome: payload.review_outcome ?? null,
-        termination_boundary: payload.termination_boundary ?? null
-      })
-    : coerceReviewOutcomeDisposition(payload.review_outcome ?? null);
+  const reviewOutcome = resolveStrictReviewOutcomeDisposition({
+    status: payload.status,
+    review_outcome: payload.review_outcome ?? null,
+    termination_boundary: payload.termination_boundary ?? null
+  });
+  if (!reviewOutcome) {
+    return 'review outcome is missing or invalid';
+  }
   if (reviewOutcome && reviewOutcome !== 'clean-success') {
     return `review outcome is ${reviewOutcome}`;
-  }
-  if (payload.launch_context?.legacy_fallback_attempt) {
-    return `review launch used legacy fallback ${payload.launch_context.legacy_fallback_attempt}`;
   }
   const validationStatus = payload.contract_validation?.status ?? 'missing';
   if (validationStatus !== 'valid') {
@@ -238,6 +256,40 @@ export function getEnforceContractReviewFailureReason(payload: {
   const semanticVerdict = payload.review_verdict ?? 'unknown';
   if (semanticVerdict !== 'clean') {
     return `semantic review verdict is ${semanticVerdict}`;
+  }
+  const launchFailure = getEnforceContractLaunchContextFailureReason(payload.launch_context ?? null);
+  if (launchFailure) {
+    return launchFailure;
+  }
+  if ((payload.proposal_counts?.agent_loop ?? 0) > 0) {
+    return 'agent-loop proposals require routing before handoff';
+  }
+  return null;
+}
+
+function getEnforceContractLaunchContextFailureReason(
+  launchContext: Partial<ReviewLaunchContext> | null
+): string | null {
+  if (!launchContext) {
+    return 'review launch context is missing';
+  }
+  if (launchContext.legacy_fallback_attempt) {
+    return `review launch used legacy fallback ${launchContext.legacy_fallback_attempt}`;
+  }
+  if (launchContext.transport !== 'codex-exec-output-schema') {
+    return `review launch transport is ${launchContext.transport ?? 'missing'}`;
+  }
+  if (launchContext.prompt_delivery !== 'stdin') {
+    return `review prompt delivery is ${launchContext.prompt_delivery ?? 'missing'}`;
+  }
+  if (launchContext.reviewer_visible_context_transport !== 'stdin-prompt') {
+    return `reviewer-visible context transport is ${launchContext.reviewer_visible_context_transport ?? 'missing'}`;
+  }
+  if (!launchContext.output_schema_path) {
+    return 'review output schema path is missing';
+  }
+  if (!launchContext.output_last_message_path) {
+    return 'review output last-message path is missing';
   }
   return null;
 }

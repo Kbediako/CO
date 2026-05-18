@@ -20,7 +20,7 @@ const WARN_THREAD_NOT_FOUND_ROLLOUT_NOISE_LINE = `warn ${THREAD_NOT_FOUND_ROLLOU
 const CO474_REVIEW_OUTPUT_FIXTURE = new URL('./fixtures/review-execution/co474-review-output-with-findings.log', import.meta.url);
 
 type WriteTelemetryOptions = Parameters<typeof writeReviewExecutionTelemetry>[0];
-type TelemetryFixtureOptions = Partial<Pick<WriteTelemetryOptions, 'status' | 'terminationBoundary' | 'error' | 'includeRawTelemetry' | 'logPersistFailure' | 'contractMode' | 'contractPath'>> & {
+type TelemetryFixtureOptions = Partial<Pick<WriteTelemetryOptions, 'status' | 'terminationBoundary' | 'error' | 'includeRawTelemetry' | 'logPersistFailure' | 'launchContext' | 'contractMode' | 'contractPath'>> & {
   outputName?: string; state?: ReviewExecutionState; telemetryName?: string;
 };
 
@@ -44,6 +44,7 @@ async function writeTelemetryForOutput(sandbox: string, outputText: string, opti
     telemetryPath: join(reviewDir, options.telemetryName ?? 'telemetry.json'),
     includeRawTelemetry: options.includeRawTelemetry ?? false,
     telemetryDebugEnvKey: 'CODEX_REVIEW_DEBUG_TELEMETRY',
+    launchContext: options.launchContext,
     contractMode: options.contractMode,
     contractPath: options.contractPath,
     logPersistFailure: options.logPersistFailure
@@ -95,6 +96,18 @@ function buildTelemetryCleanContract(evidence: { path: string; sha256: string })
     },
     code_change_proposals: [],
     agent_loop_proposals: []
+  };
+}
+
+function structuredOutputLaunchContext(): NonNullable<WriteTelemetryOptions['launchContext']> {
+  return {
+    scope_flag_mode: null,
+    prompt_delivery: 'stdin',
+    reviewer_visible_context_transport: 'stdin-prompt',
+    reviewer_visible_title_source: null,
+    transport: 'codex-exec-output-schema',
+    output_schema_path: 'review/review-contract-output.schema.json',
+    output_last_message_path: 'review/last-message.json'
   };
 }
 
@@ -1540,7 +1553,8 @@ describe('review-execution-telemetry', () => {
       `codex\n${JSON.stringify(contract)}\n`,
       {
         contractMode: 'enforce',
-        contractPath: join(contractSandbox, 'review', 'contract.json')
+        contractPath: join(contractSandbox, 'review', 'contract.json'),
+        launchContext: structuredOutputLaunchContext()
       }
     );
 
@@ -1559,6 +1573,39 @@ describe('review-execution-telemetry', () => {
         review_verdict: 'findings'
       })
     ).toBe('review contract overall verdict is blocked');
+    expect(
+      getEnforceContractReviewFailureReason({
+        ...contractPayload,
+        launch_context: null
+      })
+    ).toBe('review launch context is missing');
+    expect(
+      getEnforceContractReviewFailureReason({
+        ...contractPayload,
+        review_outcome: undefined
+      })
+    ).toBe('review outcome is missing or invalid');
+    expect(
+      getEnforceContractReviewFailureReason({
+        ...contractPayload,
+        review_outcome: 'fallback-clean' as never
+      })
+    ).toBe('review outcome is missing or invalid');
+    expect(
+      getEnforceContractReviewFailureReason({
+        ...contractPayload,
+        review_outcome: 'bounded-success'
+      })
+    ).toBe('review outcome is missing or invalid');
+    expect(
+      getEnforceContractReviewFailureReason({
+        ...contractPayload,
+        proposal_counts: {
+          code_change: 0,
+          agent_loop: 1
+        }
+      })
+    ).toBe('agent-loop proposals require routing before handoff');
 
     const boundedContractSandbox = await makeSandbox();
     const boundedEvidence = await writeContractEvidence(
