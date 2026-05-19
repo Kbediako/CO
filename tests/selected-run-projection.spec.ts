@@ -605,6 +605,99 @@ describe('createSelectedRunProjectionReader', () => {
     expect(statusProjection.issues).toHaveLength(0);
   });
 
+  it('reconciles passive released Backlog owner failed runs in scoped large intake discovery', async () => {
+    const sandbox = await makeSandbox();
+    const taskId = 'linear-b9447b5a-224d-4731-bab9-95bb0597dbe0';
+    const runId = '2026-05-19T03-40-00-000Z-large-intake-stale-failed';
+    const controlRunId = 'control-host';
+    const manifestPath = await writeRunManifest(
+      sandbox,
+      taskId,
+      runId,
+      buildProviderWorkerManifest(taskId, runId, {
+        issue_id: 'b9447b5a-224d-4731-bab9-95bb0597dbe0',
+        issue_identifier: 'CO-558',
+        issue_title: 'CO: replace terminal docs freshness maintenance owner after May 19',
+        status: 'failed',
+        completed_at: '2026-05-19T03:52:14.000Z',
+        updated_at: '2026-05-19T03:52:14.000Z',
+        summary: 'Old failed run summary remained after PR #838 merged.'
+      })
+    );
+    const controlManifestPath = await writeRunManifest(sandbox, 'local-mcp', controlRunId, {
+      task_id: 'local-mcp',
+      run_id: controlRunId,
+      status: 'in_progress',
+      started_at: '2026-05-19T04:00:00.000Z',
+      updated_at: '2026-05-19T04:04:00.000Z'
+    });
+    const fillerClaims = Array.from({ length: 16 }, (_, index) =>
+      buildProviderIntakeClaim(
+        `linear-filler-${index.toString().padStart(2, '0')}`,
+        `2026-05-19T03-30-${index.toString().padStart(2, '0')}-000Z-filler`,
+        join(
+          sandbox,
+          '.runs',
+          `linear-filler-${index.toString().padStart(2, '0')}`,
+          'cli',
+          `2026-05-19T03-30-${index.toString().padStart(2, '0')}-000Z-filler`,
+          'manifest.json'
+        ),
+        {
+          issue_id: `filler-${index}`,
+          issue_identifier: `CO-FILLER-${index}`,
+          issue_title: `Filler claim ${index}`,
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          state: 'completed',
+          reason: 'provider_issue_done'
+        }
+      )
+    );
+    const providerIntakeState = buildProviderIntakeState(
+      [
+        ...fillerClaims,
+        buildProviderIntakeClaim(taskId, runId, manifestPath, {
+          provider_key: 'linear:b9447b5a-224d-4731-bab9-95bb0597dbe0',
+          issue_id: 'b9447b5a-224d-4731-bab9-95bb0597dbe0',
+          issue_identifier: 'CO-558',
+          issue_title: 'CO: replace terminal docs freshness maintenance owner after May 19',
+          issue_state: 'Backlog',
+          issue_state_type: 'backlog',
+          issue_updated_at: '2026-05-19T04:02:22.625Z',
+          state: 'released',
+          reason: 'provider_issue_released:not_active',
+          updated_at: '2026-05-19T04:04:34.521Z',
+          retry_queued: null,
+          retry_attempt: null,
+          retry_due_at: null,
+          retry_error: null
+        })
+      ],
+      { updated_at: '2026-05-19T04:04:34.521Z' }
+    );
+
+    const collection = await discoverCompatibilityCollectionContexts(
+      buildProjectionContext({
+        manifestPath: controlManifestPath,
+        runId: controlRunId,
+        providerIntakeState
+      })
+    );
+
+    expect(collection.running).toHaveLength(0);
+    expect(collection.retrying).toHaveLength(0);
+    expect(collection.all).toHaveLength(1);
+    expect(collection.all[0]).toMatchObject({
+      issueIdentifier: 'CO-558',
+      rawStatus: 'cancelled',
+      displayStatus: 'cancelled',
+      statusReason: 'provider_claim_released',
+      lastError: null,
+      providerRetryState: null
+    });
+  });
+
   it('keeps real failed provider-worker run summaries visible without passive release evidence', async () => {
     const sandbox = await makeSandbox();
     const taskId = 'linear-b9447b5a-224d-4731-bab9-95bb0597dbe0';

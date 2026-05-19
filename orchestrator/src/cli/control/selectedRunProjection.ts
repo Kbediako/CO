@@ -381,7 +381,8 @@ function selectCompatibilityDiscoveryClaims(
   return providerIntakeState.claims.filter((claim) =>
     isActiveProviderIntakeClaim(claim) ||
     hasQueuedProviderIntakeRetry(claim) ||
-    isLiveRehydrateProviderLinearWorkerReleasedClaim(claim)
+    isLiveRehydrateProviderLinearWorkerReleasedClaim(claim) ||
+    isPassiveReleasedProviderOwnerClaim(claim)
   );
 }
 
