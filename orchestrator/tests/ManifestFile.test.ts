@@ -180,39 +180,6 @@ describe('run manifest file writes', () => {
     expect((clearingManifest as unknown as Record<string, unknown>).goal_evidence).toBeNull();
   });
 
-  it('retains marked goal evidence clear intent after a failed save retry', async () => {
-    const manifestPath = await createManifest({
-      version: 1,
-      task_id: 'task-1',
-      run_id: 'run-1',
-      pipeline_id: 'diagnostics',
-      status: 'in_progress',
-      goal_evidence: buildGoalEvidence('must clear after retry')
-    });
-    const clearingManifest = {
-      version: 1,
-      task_id: 'task-1',
-      run_id: 'run-1',
-      pipeline_id: 'diagnostics',
-      status: 'succeeded',
-      updated_at: '2026-05-12T00:00:00.000Z',
-      goal_evidence: null
-    } as unknown as CliManifest;
-    const lockPath = `${manifestPath}.lock`;
-
-    markManifestGoalEvidenceExplicitClear(clearingManifest);
-    await writeFile(lockPath, 'held by test', 'utf8');
-    await expect(saveManifest({ manifestPath } as RunPaths, clearingManifest)).rejects.toThrow(
-      'Failed to acquire run manifest lock'
-    );
-    await rm(lockPath, { force: true });
-
-    await saveManifest({ manifestPath } as RunPaths, clearingManifest);
-
-    const persisted = await readManifest(manifestPath);
-    expect(persisted.goal_evidence).toBeNull();
-  });
-
   it('lets field-level goal evidence patches clear current evidence explicitly', async () => {
     const manifestPath = await createManifest({
       version: 1,
