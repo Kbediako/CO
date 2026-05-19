@@ -359,6 +359,132 @@ function buildExpectedFollowUpDescriptionForIssue(options: {
     .replaceAll('CO-1', sourceIdentifier);
 }
 
+function simulateLinearBulletMarkerNormalization(description: string): string {
+  return description.replaceAll('\n- ', '\n* ');
+}
+
+function simulateLinearHeadingListSpacing(description: string): string {
+  return description.replace(/^(## [^\n]+)\n(?=(?:[-*]|\d+[.)]) )/gmu, '$1\n\n');
+}
+
+function simulateLinearMarkdownNormalization(description: string): string {
+  return simulateLinearHeadingListSpacing(simulateLinearBulletMarkerNormalization(description));
+}
+
+async function exerciseFollowUpTraceabilityUpdateScenario(options: {
+  inputDescription?: string;
+  observedFinalDescription: string;
+  expectedOk: boolean;
+}): Promise<{
+  result: Awaited<ReturnType<typeof createProviderLinearFollowUpIssue>>;
+  calls: string[];
+  initialDescription: string;
+  finalDescription: string;
+}> {
+  const inputDescription = options.inputDescription ?? 'Investigate the remaining improvement.';
+  const initialDescription = buildExpectedFollowUpDescription().replace(
+    'Investigate the remaining improvement.',
+    inputDescription
+  );
+  const finalDescription = buildExpectedFollowUpDescription({
+    includeTraceability: true
+  }).replace('Investigate the remaining improvement.', inputDescription);
+  const calls: string[] = [];
+  const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+    const body = JSON.parse(String(init?.body ?? '{}')) as {
+      query?: string;
+      variables?: Record<string, unknown>;
+    };
+    if (body.query?.includes('ProviderLinearIssueSummary')) {
+      return jsonResponse(buildIssueContextBody());
+    }
+    if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+      calls.push('create');
+      return jsonResponse({
+        data: {
+          issueCreate: {
+            success: true,
+            issue: buildCanonicalOwnerIssue({
+              id: 'lin-issue-2',
+              identifier: 'CO-2',
+              title: 'Follow-up issue',
+              description: initialDescription,
+              labels: buildIssueLabelsConnection(FOLLOW_UP_LABEL_NODES)
+            })
+          }
+        }
+      });
+    }
+    if (body.query?.includes('ProviderLinearUpdateIssueDescription')) {
+      calls.push('update-description');
+      expect(body.variables).toEqual({
+        id: 'lin-issue-2',
+        description: finalDescription
+      });
+      return jsonResponse({
+        data: {
+          issueUpdate: {
+            success: true,
+            issue: buildCanonicalOwnerIssue({
+              id: 'lin-issue-2',
+              identifier: 'CO-2',
+              title: 'Follow-up issue',
+              description: options.observedFinalDescription,
+              labels: buildIssueLabelsConnection(FOLLOW_UP_LABEL_NODES)
+            })
+          }
+        }
+      });
+    }
+    if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+      calls.push('related-relation');
+      if (!options.expectedOk) {
+        throw new Error('relations must not run after description drift');
+      }
+      expect(body.variables).toEqual({
+        input: {
+          type: 'related',
+          issueId: 'lin-issue-1',
+          relatedIssueId: 'lin-issue-2'
+        }
+      });
+      return jsonResponse({
+        data: {
+          issueRelationCreate: {
+            success: true,
+            issueRelation: {
+              id: 'relation-related',
+              type: 'related'
+            }
+          }
+        }
+      });
+    }
+    throw new Error(`Unexpected query: ${body.query}`);
+  });
+
+  const result = await createProviderLinearFollowUpIssue({
+    issueId: 'lin-issue-1',
+    title: 'Follow-up issue',
+    description: inputDescription,
+    intentChecksum: '- Preserve exact `CO STATUS` wording.',
+    nonGoals: '- [ ] Do not reopen the browser surface.',
+    notDoneIf: '- [ ] The issue still allows browser-first parity.',
+    acceptanceCriteria: '- [ ] Captured',
+    env: {
+      CO_LINEAR_API_TOKEN: 'lin-api-token'
+    },
+    fetchImpl
+  });
+
+  return {
+    result,
+    calls,
+    initialDescription,
+    finalDescription
+  };
+}
+
 function buildCanonicalOwnerIssuesBody(
   nodes: unknown[],
   pageInfo: {
@@ -13028,6 +13154,179 @@ describe('providerLinearWorkflowFacade', () => {
     expect(calls).toEqual(['issue-summary', 'create', 'update-description', 'issue-summary', 'related-relation']);
   });
 
+  it.each([
+    ['bullet markers', undefined, simulateLinearBulletMarkerNormalization],
+    ['heading spacing', undefined, simulateLinearHeadingListSpacing],
+    [
+      'nested bullet markers',
+      ['Investigate the remaining improvement.', '', '- Parent item', '    * Child item'].join('\n'),
+      (description: string) => description.replace('    * Child item', '    - Child item')
+    ],
+    [
+      'nested bullet markers under an ordered parent',
+      ['Investigate the remaining improvement.', '', '1. Parent item', '    * Child item'].join('\n'),
+      (description: string) => description.replace('    * Child item', '    - Child item')
+    ],
+    ['nested plus bullet markers', ['Investigate the remaining improvement.', '', '- Parent item', '    + Child item'].join('\n'), (description: string) => description.replace('    + Child item', '    - Child item')],
+    ['nested bullet markers under a plus parent', ['Investigate the remaining improvement.', '', '+ Parent item', '    * Child item'].join('\n'), (description: string) => description.replace('+ Parent item', '- Parent item').replace('    * Child item', '    - Child item')],
+    ['nested plus bullet markers under an ordered parent', ['Investigate the remaining improvement.', '', '1. Parent item', '    + Child item'].join('\n'), (description: string) => description.replace('    + Child item', '    - Child item')],
+    ['nested bullet markers under a wide ordered parent', ['Investigate the remaining improvement.', '', '10. Parent item', '     * Child item'].join('\n'), (description: string) => description.replace('     * Child item', '     - Child item')],
+    ['nested sibling bullet markers', ['Investigate the remaining improvement.', '', '- Parent item', '    * First child', '    * Second child'].join('\n'), (description: string) => description.replaceAll('    * ', '    - ')],
+    ['multi-level nested plus bullet markers', ['Investigate the remaining improvement.', '', '- Parent item', '    - Child item', '        + Grandchild item'].join('\n'), (description: string) => description.replace('        + Grandchild item', '        - Grandchild item')],
+    ['plus bullet markers', ['Investigate the remaining improvement.', '', '+ Plus item'].join('\n'), (description: string) => description.replace('+ Plus item', '- Plus item')],
+    ['heading spacing before an ordered list', ['Investigate the remaining improvement.', '', '## Steps', '1. Do it'].join('\n'), simulateLinearHeadingListSpacing],
+    ['blockquoted bullet markers', ['Investigate the remaining improvement.', '', '> * Quoted item'].join('\n'), (description: string) => description.replace('> * Quoted item', '> - Quoted item')],
+    ['nested blockquoted bullet markers', ['Investigate the remaining improvement.', '', '> - Parent item', '>     * Child item'].join('\n'), (description: string) => description.replace('>     * Child item', '>     - Child item')],
+    ['nested blockquoted plus bullet markers', ['Investigate the remaining improvement.', '', '> - Parent item', '>     + Child item'].join('\n'), (description: string) => description.replace('>     + Child item', '>     - Child item')],
+    [
+      'blockquoted fenced code with a compact close before an outside bullet',
+      ['Investigate the remaining improvement.', '', '> ```md', '> * keep literal bullet.', '>```', '* Outside item'].join('\n'),
+      (description: string) => description.replace('* Outside item', '- Outside item')
+    ]
+  ])('accepts Linear-normalized %s after follow-up traceability update', async (_label, inputDescription, normalize) => {
+    const finalDescription = buildExpectedFollowUpDescription({
+      includeTraceability: true
+    }).replace('Investigate the remaining improvement.', inputDescription ?? 'Investigate the remaining improvement.');
+    const normalizedFinalDescription = normalize(finalDescription);
+    const { result, calls } = await exerciseFollowUpTraceabilityUpdateScenario({
+      inputDescription,
+      observedFinalDescription: normalizedFinalDescription,
+      expectedOk: true
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'create-follow-up',
+      action: 'created',
+      follow_up_issue: {
+        id: 'lin-issue-2',
+        identifier: 'CO-2',
+        description: normalizedFinalDescription
+      },
+      relations: {
+        related: true,
+        blocked_by_source: false
+      }
+    });
+    expect(calls).toEqual(['create', 'update-description', 'related-relation']);
+  });
+
+  it('fails closed when fenced heading spacing changes after follow-up traceability update', async () => {
+    const fencedDescription = [
+      'Investigate the remaining improvement.',
+      '```md',
+      '## Example',
+      '',
+      '- Keep this fenced blank line.',
+      '```'
+    ].join('\n');
+    const expectedFinalDescription = buildExpectedFollowUpDescription({
+      includeTraceability: true
+    }).replace('Investigate the remaining improvement.', fencedDescription);
+    const collapsedFencedDescription = expectedFinalDescription.replace(
+      '## Example\n\n- Keep this fenced blank line.',
+      '## Example\n- Keep this fenced blank line.'
+    );
+    const { result, calls, finalDescription } = await exerciseFollowUpTraceabilityUpdateScenario({
+      inputDescription: fencedDescription,
+      observedFinalDescription: collapsedFencedDescription,
+      expectedOk: false
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_description_update_incomplete',
+        status: 409,
+        details: {
+          failed_step: 'description_update',
+          expected_description: finalDescription,
+          observed_description: collapsedFencedDescription
+        }
+      }
+    });
+    expect(calls).toEqual(['create', 'update-description']);
+  });
+
+  it.each([
+    [
+      'a fence-like content line keeps the code fence open',
+      ['Investigate the remaining improvement.', '```md', '```not-a-close', '* keep literal bullet.', '```'].join('\n'),
+      (description: string) => description.replace('* keep literal bullet.', '- keep literal bullet.')
+    ],
+    [
+      'a blockquoted fence-looking content line inside an unquoted fence keeps the code fence open',
+      ['Investigate the remaining improvement.', '```md', '> ```', '* keep literal bullet.', '```'].join('\n'),
+      (description: string) => description.replace('* keep literal bullet.', '- keep literal bullet.')
+    ],
+    ['a blockquoted fenced code line is not bullet-normalized', ['Investigate the remaining improvement.', '', '> ```md', '> * keep literal bullet.', '> ```'].join('\n'), (description: string) => description.replace('> * keep literal bullet.', '> - keep literal bullet.')],
+    ['a raw HTML pre block line is not bullet-normalized', ['Investigate the remaining improvement.', '', '<pre>', '* keep literal bullet.', '</pre>'].join('\n'), (description: string) => description.replace('* keep literal bullet.', '- keep literal bullet.')],
+    ['a raw HTML script block line is not bullet-normalized', ['Investigate the remaining improvement.', '', '<script>', '* keep literal bullet.', '</script>'].join('\n'), (description: string) => description.replace('* keep literal bullet.', '- keep literal bullet.')],
+    ['a custom raw HTML block line is not bullet-normalized', ['Investigate the remaining improvement.', '', '<custom-element>', '* keep literal bullet.', '</custom-element>'].join('\n'), (description: string) => description.replace('* keep literal bullet.', '- keep literal bullet.')],
+    ['a custom raw HTML block line with a quoted angle bracket attribute is not bullet-normalized', ['Investigate the remaining improvement.', '', '<custom-element data="a>b">', '* keep literal bullet.', '</custom-element>'].join('\n'), (description: string) => description.replace('* keep literal bullet.', '- keep literal bullet.')],
+    ['a blockquoted raw HTML pre block line is not bullet-normalized', ['Investigate the remaining improvement.', '', '> <pre>', '> * keep literal bullet.', '> </pre>'].join('\n'), (description: string) => description.replace('> * keep literal bullet.', '> - keep literal bullet.')],
+    ['a blockquoted indented code line is not bullet-normalized', ['Investigate the remaining improvement.', '', '>     * keep literal bullet.'].join('\n'), (description: string) => description.replace('>     * keep literal bullet.', '>     - keep literal bullet.')],
+    [
+      'an indented code line is not bullet-normalized',
+      ['Investigate the remaining improvement.', '', '    1. prior literal code.', '        * keep literal bullet.'].join('\n'),
+      (description: string) => description.replace('        * keep literal bullet.', '        - keep literal bullet.')
+    ],
+    [
+      'a thematic break is not bullet-normalized',
+      ['Investigate the remaining improvement.', '', '* * *'].join('\n'),
+      (description: string) => description.replace('* * *', '- * *')
+    ],
+    [
+      'an indented code line after a thematic break is not bullet-normalized',
+      ['Investigate the remaining improvement.', '', '* * *', '    * keep literal bullet.'].join('\n'),
+      (description: string) => description.replace('    * keep literal bullet.', '    - keep literal bullet.')
+    ],
+    [
+      'a list-contained indented code line is not bullet-normalized',
+      ['Investigate the remaining improvement.', '', '- Parent item', '      * keep literal code.'].join('\n'),
+      (description: string) => description.replace('      * keep literal code.', '      - keep literal code.')
+    ],
+    [
+      'heading spacing before indented code is preserved',
+      ['Investigate the remaining improvement.', '', '## Example', '', '    - keep literal code.'].join('\n'),
+      (description: string) => description.replace('## Example\n\n    - keep literal code.', '## Example\n    - keep literal code.')
+    ],
+    ['extra heading/list blank lines are preserved', ['Investigate the remaining improvement.', '', '## Steps', '', '', '- Do it'].join('\n'), (description: string) => description.replace('## Steps\n\n\n- Do it', '## Steps\n\n- Do it')],
+    [
+      'an indented code line after a dash thematic break is not bullet-normalized',
+      ['Investigate the remaining improvement.', '', '- - -', '    * keep literal bullet.'].join('\n'),
+      (description: string) => description.replace('    * keep literal bullet.', '    - keep literal bullet.')
+    ],
+    ['a mixed space-tab indented code line is not bullet-normalized', ['Investigate the remaining improvement.', '', ' \t* keep literal bullet.'].join('\n'), (description: string) => description.replace(' \t* keep literal bullet.', ' \t- keep literal bullet.')],
+    ['a blockquoted thematic break is not bullet-normalized', ['Investigate the remaining improvement.', '', '> * * *'].join('\n'), (description: string) => description.replace('> * * *', '> - * *')]
+  ])('fails closed when %s after follow-up traceability update', async (_label, inputDescription, drift) => {
+    const finalDescription = buildExpectedFollowUpDescription({
+      includeTraceability: true
+    }).replace('Investigate the remaining improvement.', inputDescription);
+    const observedFinalDescription = drift(finalDescription);
+    const { result, calls } = await exerciseFollowUpTraceabilityUpdateScenario({
+      inputDescription,
+      observedFinalDescription,
+      expectedOk: false
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_description_update_incomplete',
+        status: 409,
+        details: {
+          failed_step: 'description_update',
+          expected_description: finalDescription,
+          observed_description: observedFinalDescription
+        }
+      }
+    });
+    expect(calls).toEqual(['create', 'update-description']);
+  });
+
   it('fails closed before creation when source labels cannot satisfy the follow-up label policy', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
@@ -15906,7 +16205,10 @@ describe('providerLinearWorkflowFacade', () => {
     expect(calls).toEqual(['owner-search', 'related-relation']);
   });
 
-  it('fails closed when a source-line-tolerated canonical owner has appended drift', async () => {
+  it.each([
+    ['raw Markdown', (description: string) => description],
+    ['Linear-normalized Markdown', simulateLinearMarkdownNormalization]
+  ])('fails closed when a source-line-tolerated canonical owner has appended drift in %s', async (_label, normalize) => {
     const canonicalOwnerKey =
       'docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-19|cadence_days:30';
     const canonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
@@ -15942,6 +16244,7 @@ describe('providerLinearWorkflowFacade', () => {
         '- Follow-up packet prefix: `linear-lin-issue-254`'
       ].join('\n')
     ].join('\n\n');
+    const observedDriftedDescription = normalize(driftedDescription);
     const calls: string[] = [];
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
@@ -15970,7 +16273,7 @@ describe('providerLinearWorkflowFacade', () => {
               id: 'lin-issue-254',
               identifier: 'CO-254',
               title: 'Apr 19 spec/docs freshness baseline owner',
-              description: driftedDescription,
+              description: observedDriftedDescription,
               state: {
                 id: 'state-backlog',
                 name: 'Backlog',
@@ -16017,11 +16320,11 @@ describe('providerLinearWorkflowFacade', () => {
         details: {
           failed_step: 'canonical_owner_traceability_update',
           expected_description: currentSourceDescription,
-          observed_description: driftedDescription,
+          observed_description: observedDriftedDescription,
           follow_up_issue: {
             id: 'lin-issue-254',
             identifier: 'CO-254',
-            description: driftedDescription
+            description: observedDriftedDescription
           }
         }
       }
@@ -16138,6 +16441,141 @@ describe('providerLinearWorkflowFacade', () => {
       }
     });
     expect(calls).toEqual(['owner-search', 'related-relation']);
+  });
+
+  it('reuses a canonical owner when traceability update returns Linear-normalized Markdown', async () => {
+    const canonicalOwnerKey = 'baseline_cohort_id:linear-normalized-markdown';
+    const canonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
+    const initialOwnerDescription = buildExpectedFollowUpDescription({
+      canonicalOwnerKey
+    });
+    const finalOwnerDescription = buildExpectedFollowUpDescriptionForIssue({
+      canonicalOwnerKey,
+      includeTraceability: true,
+      followUpId: 'lin-owner-issue',
+      followUpIdentifier: 'CO-254'
+    });
+    const normalizedFinalOwnerDescription = simulateLinearMarkdownNormalization(finalOwnerDescription);
+    const calls: string[] = [];
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, unknown>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCanonicalFollowUpOwners')) {
+        calls.push('owner-search');
+        expect(body.variables).toMatchObject({
+          teamId: 'lin-team-1',
+          projectId: 'lin-project-1',
+          marker: canonicalOwnerMarker
+        });
+        return jsonResponse(
+          buildCanonicalOwnerIssuesBody([
+            buildCanonicalOwnerIssue({
+              id: 'lin-owner-issue',
+              identifier: 'CO-254',
+              title: 'Existing canonical owner',
+              description: initialOwnerDescription,
+              labels: buildIssueLabelsConnection(FOLLOW_UP_LABEL_NODES),
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            })
+          ])
+        );
+      }
+      if (body.query?.includes('ProviderLinearUpdateIssueDescription')) {
+        calls.push('update-description');
+        expect(body.variables).toEqual({
+          id: 'lin-owner-issue',
+          description: finalOwnerDescription
+        });
+        return jsonResponse({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: buildCanonicalOwnerIssue({
+                id: 'lin-owner-issue',
+                identifier: 'CO-254',
+                title: 'Existing canonical owner',
+                description: normalizedFinalOwnerDescription,
+                labels: buildIssueLabelsConnection(FOLLOW_UP_LABEL_NODES),
+                state: {
+                  id: 'state-backlog',
+                  name: 'Backlog',
+                  type: 'unstarted'
+                }
+              })
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        throw new Error('canonical-owner-key reuse must not create a duplicate');
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        calls.push('related-relation');
+        expect(body.variables).toEqual({
+          input: {
+            type: 'related',
+            issueId: 'lin-issue-1',
+            relatedIssueId: 'lin-owner-issue'
+          }
+        });
+        return jsonResponse({
+          data: {
+            issueRelationCreate: {
+              success: true,
+              issueRelation: {
+                id: 'relation-related',
+                type: 'related'
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Existing canonical owner',
+      description: 'Investigate the remaining improvement.',
+      intentChecksum: '- Preserve exact `CO STATUS` wording.',
+      nonGoals: '- [ ] Do not reopen the browser surface.',
+      notDoneIf: '- [ ] The issue still allows browser-first parity.',
+      acceptanceCriteria: '- [ ] Captured',
+      canonicalOwnerKey,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'create-follow-up',
+      action: 'reused',
+      follow_up_issue: {
+        id: 'lin-owner-issue',
+        identifier: 'CO-254',
+        description: normalizedFinalOwnerDescription
+      },
+      canonical_owner: {
+        key: canonicalOwnerKey,
+        marker: canonicalOwnerMarker
+      },
+      relations: {
+        related: true,
+        blocked_by_source: false
+      }
+    });
+    expect(calls).toEqual(['owner-search', 'update-description', 'related-relation']);
   });
 
   it('reuses an asterisk-bulleted oversized canonical owner marker without creating a duplicate', async () => {
