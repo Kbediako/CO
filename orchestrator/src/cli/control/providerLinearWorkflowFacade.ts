@@ -3753,18 +3753,12 @@ function hasTrailingManagedFollowUpDescriptionDriftAfterLinearMarkdownNormalizat
 function normalizeLinearPersistedMarkdownForComparison(description: string): string {
   const lines = description.replace(/\r\n?/gu, '\n').split('\n');
   const normalizedLines: string[] = [];
-  let activeFence: { marker: '`' | '~'; length: number } | null = null;
+  let activeFence: LinearMarkdownFenceState | null = null;
 
   for (const line of lines) {
-    const fenceMatch = line.match(/^[ \t]{0,3}(`{3,}|~{3,})/u);
-    if (fenceMatch) {
-      const delimiter = fenceMatch[1];
-      const marker = delimiter[0] as '`' | '~';
-      if (activeFence === null) {
-        activeFence = { marker, length: delimiter.length };
-      } else if (activeFence.marker === marker && delimiter.length >= activeFence.length) {
-        activeFence = null;
-      }
+    const fence = parseLinearMarkdownFence(line);
+    if (fence !== null) {
+      activeFence = nextLinearMarkdownFenceState(activeFence, fence);
       normalizedLines.push(line);
       continue;
     }
@@ -3774,18 +3768,48 @@ function normalizeLinearPersistedMarkdownForComparison(description: string): str
       continue;
     }
 
-    normalizedLines.push(line.replace(/^([ \t]*)[*+]\s+/u, '$1- '));
+    normalizedLines.push(line.replace(/^([ \t]*)\*\s+/u, '$1- '));
   }
 
   return collapseLinearHeadingListSpacing(normalizedLines).join('\n');
 }
 
+type LinearMarkdownFenceState = { marker: '`' | '~'; length: number };
+
+function parseLinearMarkdownFence(line: string): LinearMarkdownFenceState | null {
+  const fenceMatch = line.match(/^[ \t]{0,3}(`{3,}|~{3,})/u);
+  if (!fenceMatch) {
+    return null;
+  }
+  const delimiter = fenceMatch[1];
+  return {
+    marker: delimiter[0] as '`' | '~',
+    length: delimiter.length
+  };
+}
+
+function nextLinearMarkdownFenceState(
+  activeFence: LinearMarkdownFenceState | null,
+  fence: LinearMarkdownFenceState
+): LinearMarkdownFenceState | null {
+  if (activeFence === null) {
+    return fence;
+  }
+  if (activeFence.marker === fence.marker && fence.length >= activeFence.length) {
+    return null;
+  }
+  return activeFence;
+}
+
 function collapseLinearHeadingListSpacing(lines: string[]): string[] {
   const collapsed: string[] = [];
+  let activeFence: LinearMarkdownFenceState | null = null;
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
+    const fence = parseLinearMarkdownFence(line);
     if (
       line.trim() === '' &&
+      activeFence === null &&
       collapsed.length > 0 &&
       isLinearMarkdownNormalizationHeadingLine(collapsed[collapsed.length - 1]) &&
       isLinearMarkdownNormalizationListItemLine(peekNextNonEmptyLine(lines, index + 1))
@@ -3793,6 +3817,9 @@ function collapseLinearHeadingListSpacing(lines: string[]): string[] {
       continue;
     }
     collapsed.push(line);
+    if (fence !== null) {
+      activeFence = nextLinearMarkdownFenceState(activeFence, fence);
+    }
   }
   return collapsed;
 }
