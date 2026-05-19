@@ -33,9 +33,12 @@ type AuditVerdict = 'healthy' | 'degraded' | 'critical';
 type FindingSeverity = 'degraded' | 'critical';
 type RiskLevel = 'green' | 'degraded' | 'critical' | 'unknown';
 
-const DEFAULT_CONTROL_HOST_ARTIFACT_ROOT = '.runs/local-mcp/cli/control-host';
+const CONTROL_HOST_RUN_ARTIFACT_SUBPATH = 'local-mcp/cli/control-host';
 const QUOTA_PROCESS_PATTERNS = [
   /\bcodex-orchestrator(?:\.js)?\s+review\b/u,
+  /\bcodex-orch(?:\.js)?\s+review\b/u
+];
+const OWNER_REQUIRED_QUOTA_PROCESS_PATTERNS = [
   /\bproviderLinearWorkerRunner\.(?:js|ts)\b/u
 ];
 const CODEX_QUOTA_SUBCOMMANDS = new Set(['exec', 'review']);
@@ -228,10 +231,12 @@ export interface QuotaHygieneAudit {
   verdict: AuditVerdict;
   findings: QuotaHygieneFinding[];
   process_inventory: {
+    status: 'available' | 'unavailable';
     total_relevant: number;
     quota_burning_count: number;
     unowned_quota_burning_count: number;
     processes: QuotaHygieneProcessSummary[];
+    error: string | null;
   };
   delegation: QuotaHygieneDelegateSummary;
   control_host: QuotaHygieneControlHostSummary;
@@ -318,7 +323,7 @@ export async function buildQuotaHygieneAudit(input: {
   const explicitArtifactRoot = readStringFlag(input.flags, 'artifact-root');
   const artifactRoot = explicitArtifactRoot
     ? resolve(repoRoot, explicitArtifactRoot)
-    : join(resolveProviderSharedRoot(repoRoot), DEFAULT_CONTROL_HOST_ARTIFACT_ROOT);
+    : resolveDefaultControlHostArtifactRoot(repoRoot, dependencies.env);
   const providerIntakePath = resolve(
     repoRoot,
     readStringFlag(input.flags, 'provider-intake-state') ?? join(artifactRoot, 'provider-intake-state.json')
@@ -334,7 +339,7 @@ export async function buildQuotaHygieneAudit(input: {
     undefined;
 
   const findings: QuotaHygieneFinding[] = [];
-  const processSummary = summarizeProcesses(await dependencies.readProcessInventory(), findings);
+  const processSummary = await summarizeProcessInventory(dependencies, findings);
   const delegation = summarizeDelegation(
     await dependencies.inspectDelegateServerProcesses({ repoRoot }),
     processSummary.processes,
@@ -390,6 +395,31 @@ export async function buildQuotaHygieneAudit(input: {
   };
 }
 
+async function summarizeProcessInventory(
+  dependencies: QuotaHygieneCliShellDependencies,
+  findings: QuotaHygieneFinding[]
+): Promise<QuotaHygieneAudit['process_inventory']> {
+  try {
+    return summarizeProcesses(await dependencies.readProcessInventory(), findings);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    findings.push({
+      code: 'process_inventory_unavailable',
+      severity: 'degraded',
+      summary: 'Process inventory could not be read.',
+      evidence: { error: message }
+    });
+    return {
+      status: 'unavailable',
+      total_relevant: 0,
+      quota_burning_count: 0,
+      unowned_quota_burning_count: 0,
+      processes: [],
+      error: message
+    };
+  }
+}
+
 function summarizeProcesses(
   records: QuotaHygieneProcessRecord[],
   findings: QuotaHygieneFinding[]
@@ -397,8 +427,8 @@ function summarizeProcesses(
   const processes = records
     .filter((record) => RELEVANT_PROCESS_PATTERN.test(record.command))
     .map((record) => {
-      const quotaBurning = isQuotaBurningCommand(record.command);
       const owner = extractProcessOwner(record.command);
+      const quotaBurning = isQuotaBurningCommand(record.command, owner);
       return {
         ...record,
         relevant: true,
@@ -421,10 +451,12 @@ function summarizeProcesses(
     });
   }
   return {
+    status: 'available',
     total_relevant: processes.length,
     quota_burning_count: processes.filter((record) => record.quota_burning).length,
     unowned_quota_burning_count: unownedQuotaProcesses.length,
-    processes
+    processes,
+    error: null
   };
 }
 
@@ -450,7 +482,9 @@ function summarizeDelegation(
       inspection
     };
   }
-  const hasCorroboratingQuotaProcess = processes.some((record) => record.quota_burning);
+  const hasCorroboratingQuotaProcess = inspection.details.some((detail) =>
+    delegateDetailHasCorroboratingQuotaProcess(detail, processes)
+  );
   const allActiveUnassociated =
     inspection.activeCount > 0 &&
     inspection.staleCount === 0 &&
@@ -960,7 +994,7 @@ function collectCoStatusLiveTokens(dataset: CoStatusJsonDataset): string[] {
   }
   for (const issue of Array.isArray(dataset.issues) ? dataset.issues : []) {
     const record = issue as unknown as Record<string, unknown>;
-    if (isRecord(record.provider_linear_worker_proof)) {
+    if (isRecord(record.provider_linear_worker_proof) && isLiveProviderWorkerProof(record.provider_linear_worker_proof)) {
       add(record.provider_linear_worker_proof.issue_id);
       add(record.provider_linear_worker_proof.issue_identifier);
       add(record.provider_linear_worker_proof.task_id);
@@ -1033,11 +1067,20 @@ function collectFreshnessFindingCodes(report: ProviderControlHostFreshnessGaugeR
     .sort();
 }
 
-function isQuotaBurningCommand(command: string): boolean {
+function isQuotaBurningCommand(
+  command: string,
+  owner: QuotaHygieneProcessSummary['owner'] = extractProcessOwner(command)
+): boolean {
   if (isCodexQuotaCommand(command)) {
     return true;
   }
-  return QUOTA_PROCESS_PATTERNS.some((pattern) => pattern.test(command));
+  if (QUOTA_PROCESS_PATTERNS.some((pattern) => pattern.test(command))) {
+    return true;
+  }
+  return (
+    owner.status === 'identified' &&
+    OWNER_REQUIRED_QUOTA_PROCESS_PATTERNS.some((pattern) => pattern.test(command))
+  );
 }
 
 function isCodexQuotaCommand(command: string): boolean {
@@ -1100,12 +1143,34 @@ function processOwnerMatchesClaimTokens(
   return ownerTokens.some((token) => claimTokens.includes(token));
 }
 
+function delegateDetailHasCorroboratingQuotaProcess(
+  detail: DelegateServerProcessInspection['details'][number],
+  processes: QuotaHygieneProcessSummary[]
+): boolean {
+  const parentPids = new Set(
+    [detail.parentPid, detail.rootCodexParentPid].filter((pid): pid is number => typeof pid === 'number')
+  );
+  if (parentPids.size === 0) {
+    return false;
+  }
+  return processes.some((record) => record.quota_burning && parentPids.has(record.pid));
+}
+
+function isLiveProviderWorkerProof(proof: Record<string, unknown>): boolean {
+  const ownerPhase = normalizeOptionalString(proof.owner_phase)?.toLowerCase() ?? null;
+  const ownerStatus = normalizeOptionalString(proof.owner_status)?.toLowerCase() ?? null;
+  if (ownerPhase === 'ended') {
+    return false;
+  }
+  if (ownerStatus !== null && ownerStatus !== 'in_progress') {
+    return false;
+  }
+  return true;
+}
+
 function extractProcessOwner(command: string): QuotaHygieneProcessSummary['owner'] {
   const issueIdentifier = command.match(/\bCO-\d+\b/u)?.[0] ?? null;
-  const issueId =
-    readFlagValue(command, 'issue-id') ??
-    command.match(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/u)?.[0] ??
-    null;
+  const issueId = readFlagValue(command, 'issue-id');
   const taskId = readFlagValue(command, 'task') ?? command.match(/\blinear-[0-9a-f-]{36}\b/u)?.[0] ?? null;
   const runId =
     readFlagValue(command, 'run') ??
@@ -1195,6 +1260,14 @@ function resolveOutputFormat(flags: ArgMap): OutputFormat {
 
 function resolveProviderSharedRoot(repoRoot: string): string {
   return basename(dirname(repoRoot)) === '.workspaces' ? dirname(dirname(repoRoot)) : repoRoot;
+}
+
+function resolveDefaultControlHostArtifactRoot(repoRoot: string, env: NodeJS.ProcessEnv): string {
+  const configuredRunsRoot = normalizeOptionalString(env.CODEX_ORCHESTRATOR_RUNS_DIR);
+  const runsRoot = configuredRunsRoot
+    ? resolve(repoRoot, configuredRunsRoot)
+    : join(resolveProviderSharedRoot(repoRoot), '.runs');
+  return join(runsRoot, CONTROL_HOST_RUN_ARTIFACT_SUBPATH);
 }
 
 function readStringFlag(flags: ArgMap, key: string): string | undefined {
