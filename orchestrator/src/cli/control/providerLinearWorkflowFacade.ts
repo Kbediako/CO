@@ -3768,6 +3768,11 @@ function normalizeLinearPersistedMarkdownForComparison(description: string): str
       continue;
     }
 
+    if (isLinearMarkdownIndentedCodeLine(line) || isLinearMarkdownThematicBreakLine(line)) {
+      normalizedLines.push(line);
+      continue;
+    }
+
     normalizedLines.push(line.replace(/^([ \t]*)\*\s+/u, '$1- '));
   }
 
@@ -3775,30 +3780,43 @@ function normalizeLinearPersistedMarkdownForComparison(description: string): str
 }
 
 type LinearMarkdownFenceState = { marker: '`' | '~'; length: number };
+type LinearMarkdownFenceToken = LinearMarkdownFenceState & { trailing: string };
 
-function parseLinearMarkdownFence(line: string): LinearMarkdownFenceState | null {
-  const fenceMatch = line.match(/^[ \t]{0,3}(`{3,}|~{3,})/u);
+function parseLinearMarkdownFence(line: string): LinearMarkdownFenceToken | null {
+  const fenceMatch = line.match(/^[ \t]{0,3}(`{3,}|~{3,})(.*)$/u);
   if (!fenceMatch) {
     return null;
   }
   const delimiter = fenceMatch[1];
   return {
     marker: delimiter[0] as '`' | '~',
-    length: delimiter.length
+    length: delimiter.length,
+    trailing: fenceMatch[2] ?? ''
   };
 }
 
 function nextLinearMarkdownFenceState(
   activeFence: LinearMarkdownFenceState | null,
-  fence: LinearMarkdownFenceState
+  fence: LinearMarkdownFenceToken
 ): LinearMarkdownFenceState | null {
   if (activeFence === null) {
-    return fence;
+    return {
+      marker: fence.marker,
+      length: fence.length
+    };
   }
-  if (activeFence.marker === fence.marker && fence.length >= activeFence.length) {
+  if (activeFence.marker === fence.marker && fence.length >= activeFence.length && fence.trailing.trim() === '') {
     return null;
   }
   return activeFence;
+}
+
+function isLinearMarkdownIndentedCodeLine(line: string): boolean {
+  return /^(?: {4,}|\t)/u.test(line);
+}
+
+function isLinearMarkdownThematicBreakLine(line: string): boolean {
+  return /^[ \t]{0,3}(?:\*[ \t]*){3,}$/u.test(line);
 }
 
 function collapseLinearHeadingListSpacing(lines: string[]): string[] {

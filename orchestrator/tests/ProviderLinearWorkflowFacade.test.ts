@@ -13222,6 +13222,49 @@ describe('providerLinearWorkflowFacade', () => {
     expect(calls).toEqual(['create', 'update-description']);
   });
 
+  it.each([
+    [
+      'a fence-like content line keeps the code fence open',
+      ['Investigate the remaining improvement.', '```md', '```not-a-close', '* keep literal bullet.', '```'].join('\n'),
+      (description: string) => description.replace('* keep literal bullet.', '- keep literal bullet.')
+    ],
+    [
+      'an indented code line is not bullet-normalized',
+      ['Investigate the remaining improvement.', '', '    * keep literal bullet.'].join('\n'),
+      (description: string) => description.replace('    * keep literal bullet.', '    - keep literal bullet.')
+    ],
+    [
+      'a thematic break is not bullet-normalized',
+      ['Investigate the remaining improvement.', '', '* * *'].join('\n'),
+      (description: string) => description.replace('* * *', '- * *')
+    ]
+  ])('fails closed when %s after follow-up traceability update', async (_label, inputDescription, drift) => {
+    const finalDescription = buildExpectedFollowUpDescription({
+      includeTraceability: true
+    }).replace('Investigate the remaining improvement.', inputDescription);
+    const observedFinalDescription = drift(finalDescription);
+    const { result, calls } = await exerciseFollowUpTraceabilityUpdateScenario({
+      inputDescription,
+      observedFinalDescription,
+      expectedOk: false
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      operation: 'create-follow-up',
+      error: {
+        code: 'linear_follow_up_description_update_incomplete',
+        status: 409,
+        details: {
+          failed_step: 'description_update',
+          expected_description: finalDescription,
+          observed_description: observedFinalDescription
+        }
+      }
+    });
+    expect(calls).toEqual(['create', 'update-description']);
+  });
+
   it('fails closed before creation when source labels cannot satisfy the follow-up label policy', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
