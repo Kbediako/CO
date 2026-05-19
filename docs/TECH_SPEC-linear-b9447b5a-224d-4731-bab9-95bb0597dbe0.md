@@ -26,6 +26,7 @@ canonical_owner_marker: codex-orchestrator:canonical-owner-key=docs:freshness:ma
 - Explicit non-goals carried forward: no provider-intake, WIP cap, control-host, Linear lifecycle authority, or CO-515 behavior changes.
 
 ## Parity / Alignment Matrix
+
 | Surface | Current Truth | Reference Truth | Target Truth | Explicitly Out Of Scope |
 | --- | --- | --- | --- | --- |
 | `rolling_freshness_cohorts.owner_issue` | `CO-522`, terminal `Done`. | Terminal owners fail closed. | `CO-558`, live same-project non-terminal. | Reopening `CO-522`. |
@@ -50,6 +51,7 @@ canonical_owner_marker: codex-orchestrator:canonical-owner-key=docs:freshness:ma
 - Interfaces / contracts: `docs:freshness`, `docs:freshness:maintain`, `spec-guard`, docs catalog policy, Linear owner verification.
 
 ## Fallback Expiry / Refactor Decision
+
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `docs:freshness:maintain` | Retained rolling ownership for May 19 historical docs freshness cohort | expire fallback | CO-558 | Terminal `CO-522` plus May 19 stale historical cohort | 2026-05-19 | 2026-05-19 | 7 days after cadence expiry, expires 2026-05-25 | Refresh, archive, or reclassify cohort before expiry; re-home again if CO-558 becomes terminal | Before/after `docs:freshness:maintain`, `docs:freshness`, `spec-guard --dry-run`, `docs:check` |

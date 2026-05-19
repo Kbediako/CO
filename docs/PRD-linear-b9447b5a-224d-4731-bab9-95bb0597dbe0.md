@@ -35,6 +35,7 @@
 - Reject interpretations that weaken `docs:freshness`, weaken `docs:freshness:maintain`, hide stale docs, delete historical docs solely to clear the gate, blindly bump `last_review` dates, or make CO-515 own unrelated docs freshness debt.
 
 ## Parity / Alignment Matrix
+
 | Surface | Current Truth | Reference Truth | Target Truth | Explicitly Out Of Scope |
 | --- | --- | --- | --- | --- |
 | Live owner metadata | `docs/docs-catalog.json` names terminal `CO-522`. | Terminal owners are evidence only. | `docs/docs-catalog.json` names non-terminal same-project `CO-558`. | Owner-verification code changes. |
@@ -42,6 +43,15 @@
 | Historical stale cohort | May 19 report has 131 stale Apr 18 task/report rows across `.agent/task`, task packet, and report-only surfaces. | Stale historical docs stay visible and owner-routable. | Cohort is re-homed to CO-558 with retained rolling evidence or refreshed from source-specific lifecycle evidence. | Deleting historical packets or broad cap/window weakening. |
 | Strict pre-expiry surfaces | Skill/template and active spec rows are inside the pre-expiry window. | Current guidance/specs require direct review before handoff. | Registry/spec `last_review` changes are backed by explicit CO-558 review evidence. | Metadata-only bumps without reviewing source content. |
 | CO-515 boundary | CO-515 produced the follow-up evidence but owns control-host source freshness. | Unrelated implementation lanes do not absorb repo-wide docs freshness debt. | CO-515 changed paths remain out of the CO-558 maintenance diff. | Provider-intake, WIP cap, or lifecycle authority changes. |
+
+## Fallback Expiry / Refactor Decision
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `docs:freshness:maintain` | May 19 owner-routed historical docs freshness cohort | `expire fallback` | `CO-558` | Terminal `CO-522` plus May 19 stale `.agent/task`, task packet, and report-only rows | 2026-05-19 | 2026-05-19 | 2026-05-25 | Refresh, archive, or reclassify the cohort before expiry; re-home again if `CO-558` becomes terminal | `npm run docs:freshness`; `npm run docs:freshness:maintain`; `node scripts/spec-guard.mjs --dry-run`; `npm run docs:check` |
+
+Large-refactor check: Existing owner verification already detects terminal owners and emits canonical owner action evidence, so this lane repairs live owner metadata plus cohort evidence instead of adding another owner-resolution path.
+Minor-seam decision: The retained cohort is bounded owner-routed debt under the existing `docs:freshness:maintain` contract, not a new compatibility seam.
 
 ## Not Done If
 - `docs:freshness:maintain` still points at terminal `CO-522`.

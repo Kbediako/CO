@@ -35,6 +35,15 @@
 - `blocking_changed_paths` must remain visible as routing evidence and must not be treated as a waiver for repo-wide owner maintenance.
 - The parent lane owns any changes to `docs/docs-freshness-registry.json` and must keep `task_mirror`, `task_packet`, `report_only`, and `pre_expiry_entries` classifications truthful.
 
+## Fallback Expiry / Refactor Decision
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `docs:freshness:maintain` | May 19 owner-routed historical docs freshness cohort | `expire fallback` | `CO-558` | Terminal `CO-522` plus May 19 stale `.agent/task`, task packet, and report-only rows | 2026-05-19 | 2026-05-19 | 2026-05-25 | Refresh, archive, or reclassify the cohort before expiry; re-home again if `CO-558` becomes terminal | `npm run docs:freshness`; `npm run docs:freshness:maintain`; `node scripts/spec-guard.mjs --dry-run`; `npm run docs:check` |
+
+Large-refactor check: Existing owner verification already detects terminal owners and emits canonical owner action evidence, so this lane repairs live owner metadata plus cohort evidence instead of adding another owner-resolution path.
+Minor-seam decision: The retained cohort is bounded owner-routed debt under the existing `docs:freshness:maintain` contract, not a new compatibility seam.
+
 ## Acceptance Criteria
 - [x] The parent lane verifies the live `docs freshness maintenance owner` state for `docs:freshness:maintain`.
 - [x] The parent lane records why the `CO-522 terminal owner` no longer satisfies the live owner requirement, preserving `configured_owner_terminal` evidence.

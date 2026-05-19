@@ -9,9 +9,15 @@
 - Intent checksum / protected terms carried forward: `docs:freshness`, `docs:freshness:maintain`, `docs freshness maintenance owner`, `CO-522 terminal owner`, `configured_owner_terminal`, `blocking_changed_paths`, `task_mirror`, `task_packet`, `report_only`, `pre_expiry_entries`, `docs/docs-freshness-registry.json`.
 - Not done if: `docs:freshness:maintain` still points at terminal `CO-522`, `docs:freshness` remains blocked by the same May 19 stale baseline, or review-date changes lack source-specific evidence.
 - Pre-implementation issue-quality review: CO-558 issue text carries acceptance criteria, non-goals, `Not Done If`, and immediate traceability; baseline report captured at `out/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/before/docs-freshness-maintenance.json`.
-- Fallback / refactor decision: This touches stale/rolling docs freshness ownership. Decision is `expire fallback` for the retained rolling historical cohort under CO-558, expiring by 2026-05-25 unless refreshed, archived, or reclassified.
+- Fallback / refactor decision: This touches stale/rolling docs freshness ownership and records the required CO-382 decision table below.
 - Durable retention evidence: Not applicable; this is expiring owner-routed debt, not a non-expiring retained fallback.
-- Large-refactor check: Existing owner verification and canonical owner action evidence are sufficient; this lane repairs live metadata and cohort evidence rather than adding another owner-resolution seam.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `docs:freshness:maintain` | May 19 owner-routed historical docs freshness cohort | `expire fallback` | `CO-558` | Terminal `CO-522` plus May 19 stale `.agent/task`, task packet, and report-only rows | 2026-05-19 | 2026-05-19 | 2026-05-25 | Refresh, archive, or reclassify the cohort before expiry; re-home again if `CO-558` becomes terminal | `npm run docs:freshness`; `npm run docs:freshness:maintain`; `node scripts/spec-guard.mjs --dry-run`; `npm run docs:check` |
+
+Large-refactor check: Existing owner verification and canonical owner action evidence are sufficient; this lane repairs live metadata and cohort evidence rather than adding another owner-resolution seam.
+Minor-seam decision: The retained cohort stays inside the existing owner-routed maintenance mechanism with a short expiry, so no additional seam is introduced.
 
 ## Milestones & Sequencing
 1. Baseline and packet
