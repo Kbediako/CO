@@ -26003,7 +26003,7 @@
         "Codex"
       ],
       "status": "in_progress",
-      "last_review": "2026-05-20",
+      "last_review": "2026-05-19",
       "evidence": [
         "docs/PRD-linear-c456a3cd-5df0-4112-9d52-c0201455abfb.md",
         "docs/TECH_SPEC-linear-c456a3cd-5df0-4112-9d52-c0201455abfb.md",
@@ -26022,7 +26022,7 @@
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue child lane packet-docs-2026-05-19T20-59-57-408Z-9dd4a988 plus parent provider worker",
-          "date": "2026-05-20",
+          "date": "2026-05-19",
           "status": "accepted_for_parent_integration",
           "manifest": ".runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb-packet-docs/cli/2026-05-19T20-59-57-408Z-9dd4a988/manifest.json",
           "source_anchor": "ctx:sha256:2bc9d835d25cc769df42134a55d81362f859e6e881c0ba271234658d26152a4b#chunk:c000001",
@@ -26031,7 +26031,7 @@
         },
         "release_intake_parent_closeout": {
           "reviewer": "CO-565 parent provider worker",
-          "date": "2026-05-20",
+          "date": "2026-05-19",
           "status": "classified_and_validated",
           "summary": "Parent release-intake evidence adopts 0.131.0 only for upstream/npm release-intake marker and package command-surface evidence, intentionally holds local 0.130.0 posture, release-facing 0.125.0 pins, cloud-canary 0.124.0 pin, and unchanged model posture; repo validation and standalone review completed clean before PR feedback drain."
         }

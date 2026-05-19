@@ -33,7 +33,7 @@
   - stale current-facing docs, workflow pins, prior release evidence pages, package/downstream holds, cloud-canary blockers, or model posture claims remain unclassified
   - this lane edits source files, package files, workflows, generated outputs, tests, templates, release publishing, local install state, model defaults, or unrelated Linear/GitHub lifecycle surfaces
 - Pre-implementation issue-quality review:
-  - 2026-05-20: approved for release-intake packet/classification. The lane is not suitable for the micro-task path because correctness depends on exact protected terms, evidence axes, and release-intake closeout classification.
+  - 2026-05-19: approved for release-intake packet/classification. The lane is not suitable for the micro-task path because correctness depends on exact protected terms, evidence axes, and release-intake closeout classification.
 - Fallback / refactor decision:
   - This lane adds no runtime fallback, compatibility path, legacy behavior, stale behavior, cached behavior, break-glass path, or minor seam. Existing release-facing package/downstream and cloud-canary holds are posture surfaces to classify, not new fallback behavior introduced by this lane.
 
@@ -95,4 +95,4 @@
 ## Approvals
 - Docs packet child lane: produced in this workspace for parent patch export.
 - Parent release-intake classification: completed; final validation/review/PR handoff pending.
-- Date: 2026-05-20
+- Date: 2026-05-19
