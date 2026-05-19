@@ -26016,8 +26016,8 @@
         "docs/docs-freshness-registry.json",
         "docs/guides/codex-version-policy.md",
         ".runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb-packet-docs/cli/2026-05-19T20-59-57-408Z-9dd4a988/manifest.json",
-        "../../.runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/manifest.json",
-        "../../.runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/memory/source-0/source.txt"
+        ".runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/manifest.json",
+        ".runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/memory/source-0/source.txt"
       ],
       "approvals": {
         "docs_packet_child_lane": {
@@ -26032,18 +26032,29 @@
         "release_intake_parent_closeout": {
           "reviewer": "CO-565 parent provider worker",
           "date": "2026-05-20",
-          "status": "classified_validation_pending",
-          "summary": "Parent release-intake evidence adopts 0.131.0 only for upstream/npm release-intake marker and package command-surface evidence, intentionally holds local 0.130.0 posture, release-facing 0.125.0 pins, cloud-canary 0.124.0 pin, and unchanged model posture pending clean gates."
+          "status": "classified_and_validated",
+          "summary": "Parent release-intake evidence adopts 0.131.0 only for upstream/npm release-intake marker and package command-surface evidence, intentionally holds local 0.130.0 posture, release-facing 0.125.0 pins, cloud-canary 0.124.0 pin, and unchanged model posture; repo validation and standalone review completed clean before PR feedback drain."
         }
       },
       "validation": {
-        "status": "validation_pending_after_classification",
+        "status": "pr_feedback_drain_pending_after_clean_review",
         "passed": [
           "packet-docs child lane accepted",
           "npm/GitHub release evidence captured",
           "local CLI posture evidence captured",
           "isolated package smoke for @openai/codex@0.131.0",
-          "npm run build"
+          "node scripts/delegation-guard.mjs",
+          "node scripts/spec-guard.mjs --dry-run",
+          "npm run build",
+          "npm run lint",
+          "npm run test",
+          "npm run docs:check",
+          "npm run docs:freshness",
+          "npm run repo:stewardship",
+          "node scripts/diff-budget.mjs",
+          "npm run pack:smoke",
+          "manifest-backed standalone review clean (review_verdict=clean, enforce contract valid)",
+          "elegance/minimality pass"
         ],
         "blockers_or_holds": [
           "required cloud canary failed environment_not_found for configured env id",
@@ -26051,17 +26062,9 @@
           "local installed CLI remains 0.130.0 so local 0.131.0 posture is held"
         ],
         "pending": [
-          "delegation guard",
-          "spec guard",
-          "lint",
-          "test",
-          "docs gates",
-          "repo stewardship",
-          "diff budget",
-          "standalone review",
-          "elegance review",
           "PR checks",
-          "ready-review drain"
+          "ready-review drain",
+          "Linear review-state handoff"
         ]
       },
       "paths": {

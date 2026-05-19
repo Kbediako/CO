@@ -64,6 +64,7 @@
   - "this lane should edit source files, package/workflow files, generated outputs, release publishing, local install state, or model defaults"
 
 ## Parity / Alignment Matrix
+
 | Surface | Current truth to verify | Reference truth | Target truth / intended delta | Explicitly out-of-scope differences |
 | --- | --- | --- | --- | --- |
 | local CLI | Local `/opt/homebrew/bin/codex --version` remains `codex-cli 0.130.0`. | Release-intake requires installed or candidate executable version, command-surface smoke, and local auth/provider constraints. | CO-565 intentionally holds local posture at installed `0.130.0` while adopting `0.131.0` only as upstream/package-audited evidence. | No local install or runtime-mode canary for `0.131.0`. |

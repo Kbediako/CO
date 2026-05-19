@@ -99,6 +99,7 @@ task_checklists:
 - [x] release notes evidence: official `rust-v0.131.0` release and npm publish timestamps are captured; `doctor`, plugin marketplace, remote-control/runtime API, remote env, default hook, Python SDK, and permission/state deltas are classified as package-audited, held, or no-op unless a separate governed lane needs them.
 
 ## Supersedes / Holds Matrix
+
 | Surface | Prior release evidence page or posture surface | Classification | Reason | Evidence | Follow-up |
 | --- | --- | --- | --- | --- | --- |
 | local CLI | `0.130.0` current local ChatGPT-auth/appserver command/runtime posture from CO-518. | Intentionally hold local posture; adopt `0.131.0` only as latest upstream/package-audited candidate. | Local installed CLI remains `0.130.0`; this lane did not install `0.131.0` locally or rerun runtime-mode canary against a local `0.131.0` posture. | `local-cli-version.log`, `local-features-0130.log`, `local-debug-models.log`, local help logs. | Future local promotion requires local install and runtime-mode/cloud gates. |
