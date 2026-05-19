@@ -3851,7 +3851,7 @@ function collapseLinearHeadingListSpacing(lines: string[]): string[] {
       activeFence === null &&
       collapsed.length > 0 &&
       isLinearMarkdownNormalizationHeadingLine(collapsed[collapsed.length - 1]) &&
-      isLinearMarkdownNormalizationListItemLine(peekNextNonEmptyLine(lines, index + 1))
+      isLinearMarkdownNormalizationListItemLine(lines[index + 1] ?? '')
     ) {
       continue;
     }
@@ -3861,15 +3861,6 @@ function collapseLinearHeadingListSpacing(lines: string[]): string[] {
     }
   }
   return collapsed;
-}
-
-function peekNextNonEmptyLine(lines: readonly string[], startIndex: number): string {
-  for (let index = startIndex; index < lines.length; index += 1) {
-    if (lines[index].trim() !== '') {
-      return lines[index];
-    }
-  }
-  return '';
 }
 
 function isLinearMarkdownNormalizationHeadingLine(line: string): boolean {

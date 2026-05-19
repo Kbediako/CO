@@ -13267,6 +13267,7 @@ describe('providerLinearWorkflowFacade', () => {
       ['Investigate the remaining improvement.', '', '## Example', '', '    - keep literal code.'].join('\n'),
       (description: string) => description.replace('## Example\n\n    - keep literal code.', '## Example\n    - keep literal code.')
     ],
+    ['extra heading/list blank lines are preserved', ['Investigate the remaining improvement.', '', '## Steps', '', '', '- Do it'].join('\n'), (description: string) => description.replace('## Steps\n\n\n- Do it', '## Steps\n\n- Do it')],
     [
       'an indented code line after a dash thematic break is not bullet-normalized',
       ['Investigate the remaining improvement.', '', '- - -', '    * keep literal bullet.'].join('\n'),
