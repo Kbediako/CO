@@ -4,7 +4,7 @@ title: CO-361 First Post-v0.2.0 Release Prep
 status: in_progress
 owner: Codex
 created: 2026-04-26
-last_review: 2026-04-26
+last_review: 2026-05-19
 review_cadence_days: 30
 risk_level: medium
 related_prd: docs/PRD-co-361-first-post-v0-2-0-release-prep.md
