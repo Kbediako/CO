@@ -381,7 +381,8 @@ function selectCompatibilityDiscoveryClaims(
   return providerIntakeState.claims.filter((claim) =>
     isActiveProviderIntakeClaim(claim) ||
     hasQueuedProviderIntakeRetry(claim) ||
-    isLiveRehydrateProviderLinearWorkerReleasedClaim(claim)
+    isLiveRehydrateProviderLinearWorkerReleasedClaim(claim) ||
+    isPassiveReleasedProviderOwnerClaim(claim)
   );
 }
 
@@ -783,9 +784,13 @@ async function reconcileSelectedProviderLinearWorkerContext<T extends ControlCom
   if (!selected || !context.providerIntakeState) {
     return selected;
   }
+  const claim = findProviderLinearWorkerClaimForContext(context.providerIntakeState, selected);
+  const passiveReleasedOwnerFailedRun =
+    claim !== null && isPassiveReleasedProviderLinearWorkerOwnerFailedRun(selected, claim);
   if (
     !isProviderLinearWorkerReconciliationSource(selected) ||
-    !isActiveLookingProviderLinearWorkerManifestStatus(selected.rawStatus)
+    (!isActiveLookingProviderLinearWorkerManifestStatus(selected.rawStatus) &&
+      !passiveReleasedOwnerFailedRun)
   ) {
     return selected;
   }
@@ -1931,13 +1936,16 @@ function resolveProviderLinearWorkerRunArtifactReconciliation(
   allContexts: ControlCompatibilitySourceContext[],
   providerIntakeState: ProviderIntakeState
 ): ProviderLinearWorkerRunArtifactReconciliationRecord | null {
+  const claim = findProviderLinearWorkerClaimForContext(providerIntakeState, context);
+  const passiveReleasedOwnerFailedRun =
+    claim !== null && isPassiveReleasedProviderLinearWorkerOwnerFailedRun(context, claim);
   if (
     !isProviderLinearWorkerReconciliationSource(context) ||
-    !isActiveLookingProviderLinearWorkerManifestStatus(context.rawStatus)
+    (!isActiveLookingProviderLinearWorkerManifestStatus(context.rawStatus) &&
+      !passiveReleasedOwnerFailedRun)
   ) {
     return null;
   }
-  const claim = findProviderLinearWorkerClaimForContext(providerIntakeState, context);
   if (claim && isActiveProviderLinearWorkerReconciliationClaim(claim)) {
     return null;
   }
@@ -2068,7 +2076,7 @@ function applyProviderLinearWorkerRunArtifactReconciliation(
     lastError:
       reconciliation.reconciled_status === 'failed'
         ? context.lastError ?? reconciliation.summary
-        : context.lastError,
+        : null,
     latestEvent: {
       ...(context.latestEvent ?? {
         requestedBy: null,
@@ -2099,6 +2107,66 @@ async function writeProviderLinearWorkerRunArtifactReconciliation(
 
 function isActiveLookingProviderLinearWorkerManifestStatus(status: string): boolean {
   return status === 'in_progress' || status === 'launching';
+}
+
+function isPassiveReleasedProviderLinearWorkerOwnerFailedRun(
+  context: Pick<ControlCompatibilitySourceContext, 'rawStatus' | 'runId' | 'manifestPath'>,
+  claim: ProviderIntakeClaimRecord
+): boolean {
+  return (
+    context.rawStatus === 'failed' &&
+    providerLinearWorkerClaimRunIdentityMatchesContext(claim, context) &&
+    isPassiveReleasedProviderOwnerClaim(claim)
+  );
+}
+
+function isPassiveReleasedProviderOwnerClaim(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    | 'state'
+    | 'reason'
+    | 'issue_state'
+    | 'issue_state_type'
+    | 'retry_queued'
+    | 'retry_attempt'
+    | 'retry_due_at'
+    | 'retry_error'
+  >
+): boolean {
+  if (
+    claim.state !== 'released' ||
+    claim.reason !== 'provider_issue_released:not_active' ||
+    !hasPassiveReleasedProviderRetryState(claim)
+  ) {
+    return false;
+  }
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: claim.issue_state,
+    state_type: claim.issue_state_type
+  });
+  return (
+    workflowState.normalizedState === 'backlog' ||
+    workflowState.normalizedStateType === 'backlog'
+  );
+}
+
+function hasPassiveReleasedProviderRetryState(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'retry_queued' | 'retry_attempt' | 'retry_due_at' | 'retry_error'
+  >
+): boolean {
+  if (
+    (claim.retry_queued !== null && claim.retry_queued !== false) ||
+    claim.retry_due_at !== null ||
+    claim.retry_error !== null
+  ) {
+    return false;
+  }
+  return (
+    claim.retry_attempt === null ||
+    (typeof claim.retry_attempt === 'number' && Number.isFinite(claim.retry_attempt))
+  );
 }
 
 function isProviderLinearWorkerReconciliationSource(
@@ -2474,7 +2542,7 @@ function providerLinearWorkerClaimHasRunIdentity(claim: ProviderIntakeClaimRecor
 
 function providerLinearWorkerClaimRunIdentityMatchesContext(
   claim: ProviderIntakeClaimRecord,
-  context: ControlCompatibilitySourceContext
+  context: Pick<ControlCompatibilitySourceContext, 'runId' | 'manifestPath'>
 ): boolean {
   const manifestPath = context.manifestPath ?? null;
   return Boolean(
@@ -3117,12 +3185,17 @@ function buildProviderRetryState(
     | 'issue_state_type'
     | 'issue_archived_at'
     | 'issue_trashed'
+    | 'state'
+    | 'reason'
   > | null
 ): ControlCompatibilitySourceContext['providerRetryState'] {
   if (!claim) {
     return null;
   }
   if (isTerminalProviderIntakeIssueState(claim)) {
+    return null;
+  }
+  if (isPassiveReleasedProviderOwnerClaim(claim)) {
     return null;
   }
   const active = hasQueuedProviderIntakeRetry(claim);
