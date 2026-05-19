@@ -3754,13 +3754,13 @@ function normalizeLinearPersistedMarkdownForComparison(description: string): str
   const lines = description.replace(/\r\n?/gu, '\n').split('\n');
   const normalizedLines: string[] = [];
   let activeFence: LinearMarkdownFenceState | null = null;
-  let activeHtmlPreBlock = false;
+  let activeHtmlBlock: LinearMarkdownHtmlBlockState | null = null;
 
   for (const line of lines) {
-    if (activeHtmlPreBlock) {
+    if (activeHtmlBlock !== null) {
       normalizedLines.push(line);
-      if (isLinearMarkdownHtmlPreBlockEndLine(line)) {
-        activeHtmlPreBlock = false;
+      if (isLinearMarkdownHtmlBlockEndLine(line, activeHtmlBlock)) {
+        activeHtmlBlock = null;
       }
       continue;
     }
@@ -3777,9 +3777,10 @@ function normalizeLinearPersistedMarkdownForComparison(description: string): str
       continue;
     }
 
-    if (isLinearMarkdownHtmlPreBlockStartLine(line)) {
+    const htmlBlock = parseLinearMarkdownHtmlBlockStartLine(line);
+    if (htmlBlock !== null) {
       normalizedLines.push(line);
-      activeHtmlPreBlock = !isLinearMarkdownHtmlPreBlockEndLine(line);
+      activeHtmlBlock = isLinearMarkdownHtmlBlockEndLine(line, htmlBlock) ? null : htmlBlock;
       continue;
     }
 
@@ -3792,7 +3793,7 @@ function normalizeLinearPersistedMarkdownForComparison(description: string): str
       continue;
     }
 
-    normalizedLines.push(normalizeLinearMarkdownBulletMarkerLine(line));
+    normalizedLines.push(normalizeLinearMarkdownBulletMarkerLine(line, normalizedLines));
   }
 
   return collapseLinearHeadingListSpacing(normalizedLines).join('\n');
@@ -3834,12 +3835,41 @@ function stripLinearMarkdownBlockquotePrefix(line: string): string {
   return line.replace(/^(?:[ \t]{0,3}>[ \t]?)+/u, '');
 }
 
-function isLinearMarkdownHtmlPreBlockStartLine(line: string): boolean {
-  return /^[ \t]{0,3}<pre(?:\s|>|$)/iu.test(stripLinearMarkdownBlockquotePrefix(line));
+type LinearMarkdownHtmlBlockState =
+  | { kind: 'until_close'; endPattern: RegExp }
+  | { kind: 'until_blank' };
+
+function parseLinearMarkdownHtmlBlockStartLine(line: string): LinearMarkdownHtmlBlockState | null {
+  const structuralLine = stripLinearMarkdownBlockquotePrefix(line);
+  const rawTextMatch = structuralLine.match(/^[ \t]{0,3}<(pre|script|style|textarea)(?:\s|>|$)/iu);
+  if (rawTextMatch) {
+    return { kind: 'until_close', endPattern: new RegExp(`</${rawTextMatch[1]}\\s*>`, 'iu') };
+  }
+  if (/^[ \t]{0,3}<!--/u.test(structuralLine)) {
+    return { kind: 'until_close', endPattern: /-->/u };
+  }
+  if (/^[ \t]{0,3}<\?/u.test(structuralLine)) {
+    return { kind: 'until_close', endPattern: /\?>/u };
+  }
+  if (/^[ \t]{0,3}<![A-Z]/u.test(structuralLine)) {
+    return { kind: 'until_close', endPattern: />/u };
+  }
+  if (/^[ \t]{0,3}<!\[CDATA\[/u.test(structuralLine)) {
+    return { kind: 'until_close', endPattern: /\]\]>/u };
+  }
+  if (
+    /^[ \t]{0,3}<\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)(?:\s|>|\/>)/iu.test(
+      structuralLine
+    )
+  ) {
+    return { kind: 'until_blank' };
+  }
+  return null;
 }
 
-function isLinearMarkdownHtmlPreBlockEndLine(line: string): boolean {
-  return /<\/pre\s*>/iu.test(stripLinearMarkdownBlockquotePrefix(line));
+function isLinearMarkdownHtmlBlockEndLine(line: string, block: LinearMarkdownHtmlBlockState): boolean {
+  const structuralLine = stripLinearMarkdownBlockquotePrefix(line);
+  return block.kind === 'until_blank' ? structuralLine.trim() === '' : block.endPattern.test(structuralLine);
 }
 
 function isLinearMarkdownIndentedCodeLine(line: string): boolean {
@@ -3882,13 +3912,13 @@ function isLinearMarkdownThematicBreakLine(line: string): boolean {
 function collapseLinearHeadingListSpacing(lines: string[]): string[] {
   const collapsed: string[] = [];
   let activeFence: LinearMarkdownFenceState | null = null;
-  let activeHtmlPreBlock = false;
+  let activeHtmlBlock: LinearMarkdownHtmlBlockState | null = null;
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    if (activeHtmlPreBlock) {
+    if (activeHtmlBlock !== null) {
       collapsed.push(line);
-      if (isLinearMarkdownHtmlPreBlockEndLine(line)) {
-        activeHtmlPreBlock = false;
+      if (isLinearMarkdownHtmlBlockEndLine(line, activeHtmlBlock)) {
+        activeHtmlBlock = null;
       }
       continue;
     }
@@ -3897,7 +3927,7 @@ function collapseLinearHeadingListSpacing(lines: string[]): string[] {
     if (
       line.trim() === '' &&
       activeFence === null &&
-      !activeHtmlPreBlock &&
+      activeHtmlBlock === null &&
       collapsed.length > 0 &&
       isLinearMarkdownNormalizationHeadingLine(collapsed[collapsed.length - 1]) &&
       isLinearMarkdownNormalizationListItemLine(lines[index + 1] ?? '')
@@ -3909,8 +3939,9 @@ function collapseLinearHeadingListSpacing(lines: string[]): string[] {
       activeFence = nextLinearMarkdownFenceState(activeFence, fence);
     }
     if (activeFence === null) {
-      if (isLinearMarkdownHtmlPreBlockStartLine(line)) {
-        activeHtmlPreBlock = !isLinearMarkdownHtmlPreBlockEndLine(line);
+      const htmlBlock = parseLinearMarkdownHtmlBlockStartLine(line);
+      if (htmlBlock !== null) {
+        activeHtmlBlock = isLinearMarkdownHtmlBlockEndLine(line, htmlBlock) ? null : htmlBlock;
       }
     }
   }
@@ -3944,13 +3975,49 @@ function getLinearMarkdownIndentWidth(indent: string): number {
   return [...indent].reduce((width, char) => width + (char === '\t' ? 4 : 1), 0);
 }
 
-function normalizeLinearMarkdownBulletMarkerLine(line: string): string {
+function normalizeLinearMarkdownBulletMarkerLine(line: string, previousLines: readonly string[] = []): string {
   if (isLinearMarkdownManagedMarkerLine(line)) {
     return line;
+  }
+  const blockquoteListItem =
+    parseLinearMarkdownBlockquoteListItemLine(line, '*') ?? parseLinearMarkdownBlockquoteListItemLine(line, '+');
+  if (
+    blockquoteListItem !== null &&
+    (blockquoteListItem.listItem.indent <= 3 ||
+      isLinearMarkdownListItemInListContext(
+        blockquoteListItem.listItem,
+        getLinearMarkdownBlockquoteContextLines(previousLines)
+      ))
+  ) {
+    return `${blockquoteListItem.prefix}${blockquoteListItem.content.replace(/^([ \t]*)[*+]\s+/u, '$1- ')}`;
   }
   return line
     .replace(/^([ \t]*)[*+]\s+/u, '$1- ')
     .replace(/^((?:[ \t]{0,3}>[ \t]?)+[ ]{0,3})[*+]\s+/u, '$1- ');
+}
+
+function parseLinearMarkdownBlockquoteListItemLine(
+  line: string,
+  marker: '*' | '+'
+): { prefix: string; content: string; listItem: LinearMarkdownNormalizationListItem } | null {
+  const quoteMatch = line.match(/^((?:[ \t]{0,3}>[ \t]?)+)(.*)$/u);
+  if (!quoteMatch) return null;
+  const listItem = parseLinearMarkdownNormalizationListItemLine(quoteMatch[2], marker);
+  return listItem === null ? null : { prefix: quoteMatch[1], content: quoteMatch[2], listItem };
+}
+
+function getLinearMarkdownBlockquoteContextLines(previousLines: readonly string[]): string[] {
+  const contextLines: string[] = [];
+  for (let index = previousLines.length - 1; index >= 0; index -= 1) {
+    const line = previousLines[index];
+    if (line.trim() === '') {
+      contextLines.unshift('');
+      continue;
+    }
+    if (!/^(?:[ \t]{0,3}>[ \t]?)+/u.test(line)) break;
+    contextLines.unshift(stripLinearMarkdownBlockquotePrefix(line));
+  }
+  return contextLines;
 }
 
 function isLinearMarkdownManagedMarkerLine(line: string): boolean {
