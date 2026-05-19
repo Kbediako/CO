@@ -1,6 +1,62 @@
 {
   "items": [
     {
+      "id": "20260519-linear-33117eac-b4d3-4eb0-889c-4527c9b79352",
+      "title": "CO-559 normalize Linear Markdown before create-follow-up post-create verification",
+      "relates_to": "tasks/tasks-linear-33117eac-b4d3-4eb0-889c-4527c9b79352.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-19",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-19",
+          "status": "confirmed_in_progress",
+          "summary": "Live issue-context verified CO-559 was Ready with no attached PR and no workpad; parent transitioned it to In Progress before active coding."
+        },
+        "parallelization": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-19",
+          "status": "parallelize_now_recorded",
+          "summary": "Pre-turn matrix identified a safe tests child lane for focused Markdown normalization regressions while parent retained docs and production facade ownership."
+        }
+      },
+      "validation": {
+        "status": "docs_review_clean_pending_child_lane",
+        "passed": [
+          "live issue-context",
+          "Ready -> In Progress transition",
+          "single workpad created",
+          "parallelization decision recorded",
+          "docs-first packet created",
+          "registry mirrors created",
+          "docs-review clean"
+        ],
+        "pending": [
+          "same-issue tests child lane",
+          "parent implementation",
+          "focused create-follow-up Markdown normalization tests",
+          "parent-required validation and review gates"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-33117eac-b4d3-4eb0-889c-4527c9b79352.md",
+        "prd": "docs/PRD-linear-33117eac-b4d3-4eb0-889c-4527c9b79352.md",
+        "docs": "docs/TECH_SPEC-linear-33117eac-b4d3-4eb0-889c-4527c9b79352.md",
+        "action_plan": "docs/ACTION_PLAN-linear-33117eac-b4d3-4eb0-889c-4527c9b79352.md",
+        "spec": "tasks/specs/linear-33117eac-b4d3-4eb0-889c-4527c9b79352.md",
+        "task": "tasks/tasks-linear-33117eac-b4d3-4eb0-889c-4527c9b79352.md"
+      },
+      "source_issue": {
+        "id": "33117eac-b4d3-4eb0-889c-4527c9b79352",
+        "identifier": "CO-559",
+        "url": "https://linear.app/asabeko/issue/CO-559/co-normalize-linear-markdown-before-create-follow-up-post-create"
+      }
+    },
+    {
       "id": "20260519-linear-aa075f78-940e-423b-a886-6f0f8012ae18",
       "title": "CO-562 hide passive owner claims from retry and failed status",
       "status": "in_progress",
