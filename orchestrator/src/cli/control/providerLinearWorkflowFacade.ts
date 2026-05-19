@@ -3835,11 +3835,11 @@ function stripLinearMarkdownBlockquotePrefix(line: string): string {
 }
 
 function isLinearMarkdownHtmlPreBlockStartLine(line: string): boolean {
-  return /^[ \t]{0,3}<pre(?:\s|>|$)/iu.test(line);
+  return /^[ \t]{0,3}<pre(?:\s|>|$)/iu.test(stripLinearMarkdownBlockquotePrefix(line));
 }
 
 function isLinearMarkdownHtmlPreBlockEndLine(line: string): boolean {
-  return /<\/pre\s*>/iu.test(line);
+  return /<\/pre\s*>/iu.test(stripLinearMarkdownBlockquotePrefix(line));
 }
 
 function isLinearMarkdownIndentedCodeLine(line: string): boolean {
@@ -3847,7 +3847,7 @@ function isLinearMarkdownIndentedCodeLine(line: string): boolean {
 }
 
 function isLinearMarkdownNestedListItemLine(line: string, previousLines: readonly string[]): boolean {
-  const nestedListItem = parseLinearMarkdownNormalizationListItemLine(line, '*');
+  const nestedListItem = parseLinearMarkdownNormalizationListItemLine(line, '*') ?? parseLinearMarkdownNormalizationListItemLine(line, '+');
   if (nestedListItem === null) return false;
   for (let index = previousLines.length - 1; index >= 0; index -= 1) {
     if (previousLines[index].trim() === '') continue;
@@ -3916,12 +3916,12 @@ function isLinearMarkdownNormalizationListItemLine(line: string): boolean {
 
 function parseLinearMarkdownNormalizationListItemLine(
   line: string,
-  marker: '-' | '*' | null = null
+  marker: '-' | '*' | '+' | null = null
 ): { indent: number; markerWidth: number } | null {
   if (isLinearMarkdownThematicBreakLine(line)) {
     return null;
   }
-  const markerPattern = marker === '*' ? '\\*' : marker ?? '(?:[-*]|\\d+[.)])';
+  const markerPattern = marker === '*' ? '\\*' : marker === '+' ? '\\+' : marker ?? '(?:[-*]|\\d+[.)])';
   const listItemMatch = line.match(new RegExp(`^([ \\t]*)(${markerPattern})\\s+\\S`, 'u'));
   return listItemMatch
     ? { indent: getLinearMarkdownIndentWidth(listItemMatch[1]), markerWidth: getLinearMarkdownIndentWidth(listItemMatch[2]) }
