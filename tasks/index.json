@@ -1,6 +1,51 @@
 {
   "items": [
     {
+      "id": "20260519-linear-c818e8f0-ab9d-471a-b030-4826c7d2b1dd",
+      "title": "CO-560 prevent provider-worker review-handoff false retry after clean nested review evidence",
+      "status": "in_progress",
+      "relates_to": "tasks/tasks-linear-c818e8f0-ab9d-471a-b030-4826c7d2b1dd.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "last_review": "2026-05-19",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-19",
+          "status": "confirmed_in_progress",
+          "summary": "Live issue-context verified CO-560 was Ready with no attached PR and no workpad; parent transitioned it to In Progress before active coding."
+        },
+        "parallelization": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-19",
+          "status": "stay_serial_recorded",
+          "summary": "Pre-turn matrix found no safely separable child-lane slice before source inspection; docs/test/research/review slice evidence was recorded in Linear."
+        },
+        "docs_review": {
+          "reviewer": "docs-review child stream",
+          "date": "2026-05-19",
+          "status": "succeeded",
+          "manifest": ".runs/linear-c818e8f0-ab9d-471a-b030-4826c7d2b1dd-docs-review/cli/2026-05-19T11-19-43-506Z-c91dc108/manifest.json",
+          "summary": "Pre-implementation docs-review succeeded before production implementation edits."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-c818e8f0-ab9d-471a-b030-4826c7d2b1dd.md",
+        "task": "tasks/tasks-linear-c818e8f0-ab9d-471a-b030-4826c7d2b1dd.md",
+        "agent_task": ".agent/task/linear-c818e8f0-ab9d-471a-b030-4826c7d2b1dd.md",
+        "prd": "docs/PRD-linear-c818e8f0-ab9d-471a-b030-4826c7d2b1dd.md",
+        "docs": "docs/TECH_SPEC-linear-c818e8f0-ab9d-471a-b030-4826c7d2b1dd.md",
+        "action_plan": "docs/ACTION_PLAN-linear-c818e8f0-ab9d-471a-b030-4826c7d2b1dd.md"
+      },
+      "source_issue": {
+        "id": "c818e8f0-ab9d-471a-b030-4826c7d2b1dd",
+        "identifier": "CO-560",
+        "url": "https://linear.app/asabeko/issue/CO-560/co-prevent-provider-worker-review-handoff-false-retry-after-clean"
+      }
+    },
+    {
       "id": "20260519-linear-aa075f78-940e-423b-a886-6f0f8012ae18",
       "title": "CO-562 hide passive owner claims from retry and failed status",
       "status": "in_progress",
