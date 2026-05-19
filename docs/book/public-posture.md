@@ -20,7 +20,7 @@ Newer stable and prerelease Codex CLI builds remain evidence-gated. The canonica
 
 - Release-facing downstream-smoke workflows intentionally hold `@openai/codex@0.125.0`.
 - `cloud-canary` intentionally holds `@openai/codex@0.124.0`.
-- Current local `0.128.0` evidence does not promote cloud execution while the configured cloud environment blocker remains unresolved.
+- Current local `0.130.0` evidence does not promote cloud execution or release-facing workflow pins while the configured cloud environment blocker and fallback cloud hold remain unresolved.
 
 ## Evidence Gates
 

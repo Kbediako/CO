@@ -55,7 +55,7 @@ The shipped marketplace files are:
 
 The plugin launcher reads the `codex-orchestrator` marketplace entry in `${CODEX_HOME:-~/.codex}/config.toml` and resolves the recorded source checkout before starting the packaged CO CLI with `node`. Local-directory sources run from the recorded path. Git-backed sources run from Codex's installed marketplace checkout under `${CODEX_HOME:-~/.codex}/.tmp/marketplaces/codex-orchestrator`.
 
-Downstream packaged plugin governance for Codex CLI `0.128.0`:
+Downstream packaged plugin governance for Codex CLI `0.130.0`:
 
 - Allowed: the marketplace install flow may use CO's shipped marketplace entry, plugin descriptor, MCP descriptor, launcher, and Codex's remote plugin bundle cache for the registered source checkout. `pack-smoke` governs `codex plugin marketplace add` / `upgrade` / `remove` command support plus cached plugin root shape.
 - Blocked unless governed and validated: plugin-bundled hooks, hook enablement state changes, and external-agent config import must not silently alter packaged CO behavior. If these surfaces are present but not covered by CO hook/config safety checks, they must fail closed or stay disabled for packaged downstream users.
