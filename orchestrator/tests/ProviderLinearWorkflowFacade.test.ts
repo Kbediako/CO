@@ -13168,6 +13168,7 @@ describe('providerLinearWorkflowFacade', () => {
       (description: string) => description.replace('    * Child item', '    - Child item')
     ],
     ['nested plus bullet markers', ['Investigate the remaining improvement.', '', '- Parent item', '    + Child item'].join('\n'), (description: string) => description.replace('    + Child item', '    - Child item')],
+    ['nested bullet markers under a plus parent', ['Investigate the remaining improvement.', '', '+ Parent item', '    * Child item'].join('\n'), (description: string) => description.replace('+ Parent item', '- Parent item').replace('    * Child item', '    - Child item')],
     ['nested plus bullet markers under an ordered parent', ['Investigate the remaining improvement.', '', '1. Parent item', '    + Child item'].join('\n'), (description: string) => description.replace('    + Child item', '    - Child item')],
     ['nested bullet markers under a wide ordered parent', ['Investigate the remaining improvement.', '', '10. Parent item', '     * Child item'].join('\n'), (description: string) => description.replace('     * Child item', '     - Child item')],
     ['nested sibling bullet markers', ['Investigate the remaining improvement.', '', '- Parent item', '    * First child', '    * Second child'].join('\n'), (description: string) => description.replaceAll('    * ', '    - ')],
@@ -13176,7 +13177,12 @@ describe('providerLinearWorkflowFacade', () => {
     ['heading spacing before an ordered list', ['Investigate the remaining improvement.', '', '## Steps', '1. Do it'].join('\n'), simulateLinearHeadingListSpacing],
     ['blockquoted bullet markers', ['Investigate the remaining improvement.', '', '> * Quoted item'].join('\n'), (description: string) => description.replace('> * Quoted item', '> - Quoted item')],
     ['nested blockquoted bullet markers', ['Investigate the remaining improvement.', '', '> - Parent item', '>     * Child item'].join('\n'), (description: string) => description.replace('>     * Child item', '>     - Child item')],
-    ['nested blockquoted plus bullet markers', ['Investigate the remaining improvement.', '', '> - Parent item', '>     + Child item'].join('\n'), (description: string) => description.replace('>     + Child item', '>     - Child item')]
+    ['nested blockquoted plus bullet markers', ['Investigate the remaining improvement.', '', '> - Parent item', '>     + Child item'].join('\n'), (description: string) => description.replace('>     + Child item', '>     - Child item')],
+    [
+      'blockquoted fenced code with a compact close before an outside bullet',
+      ['Investigate the remaining improvement.', '', '> ```md', '> * keep literal bullet.', '>```', '* Outside item'].join('\n'),
+      (description: string) => description.replace('* Outside item', '- Outside item')
+    ]
   ])('accepts Linear-normalized %s after follow-up traceability update', async (_label, inputDescription, normalize) => {
     const finalDescription = buildExpectedFollowUpDescription({
       includeTraceability: true
@@ -13249,9 +13255,15 @@ describe('providerLinearWorkflowFacade', () => {
       ['Investigate the remaining improvement.', '```md', '```not-a-close', '* keep literal bullet.', '```'].join('\n'),
       (description: string) => description.replace('* keep literal bullet.', '- keep literal bullet.')
     ],
+    [
+      'a blockquoted fence-looking content line inside an unquoted fence keeps the code fence open',
+      ['Investigate the remaining improvement.', '```md', '> ```', '* keep literal bullet.', '```'].join('\n'),
+      (description: string) => description.replace('* keep literal bullet.', '- keep literal bullet.')
+    ],
     ['a blockquoted fenced code line is not bullet-normalized', ['Investigate the remaining improvement.', '', '> ```md', '> * keep literal bullet.', '> ```'].join('\n'), (description: string) => description.replace('> * keep literal bullet.', '> - keep literal bullet.')],
     ['a raw HTML pre block line is not bullet-normalized', ['Investigate the remaining improvement.', '', '<pre>', '* keep literal bullet.', '</pre>'].join('\n'), (description: string) => description.replace('* keep literal bullet.', '- keep literal bullet.')],
     ['a raw HTML script block line is not bullet-normalized', ['Investigate the remaining improvement.', '', '<script>', '* keep literal bullet.', '</script>'].join('\n'), (description: string) => description.replace('* keep literal bullet.', '- keep literal bullet.')],
+    ['a custom raw HTML block line is not bullet-normalized', ['Investigate the remaining improvement.', '', '<custom-element>', '* keep literal bullet.', '</custom-element>'].join('\n'), (description: string) => description.replace('* keep literal bullet.', '- keep literal bullet.')],
     ['a blockquoted raw HTML pre block line is not bullet-normalized', ['Investigate the remaining improvement.', '', '> <pre>', '> * keep literal bullet.', '> </pre>'].join('\n'), (description: string) => description.replace('> * keep literal bullet.', '> - keep literal bullet.')],
     ['a blockquoted indented code line is not bullet-normalized', ['Investigate the remaining improvement.', '', '>     * keep literal bullet.'].join('\n'), (description: string) => description.replace('>     * keep literal bullet.', '>     - keep literal bullet.')],
     [

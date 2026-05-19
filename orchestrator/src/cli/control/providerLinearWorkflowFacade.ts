@@ -3799,11 +3799,14 @@ function normalizeLinearPersistedMarkdownForComparison(description: string): str
   return collapseLinearHeadingListSpacing(normalizedLines).join('\n');
 }
 
-type LinearMarkdownFenceState = { marker: '`' | '~'; length: number };
+type LinearMarkdownFenceState = { marker: '`' | '~'; length: number; blockquoteDepth: number };
 type LinearMarkdownFenceToken = LinearMarkdownFenceState & { trailing: string };
 
 function parseLinearMarkdownFence(line: string): LinearMarkdownFenceToken | null {
-  const fenceMatch = stripLinearMarkdownBlockquotePrefix(line).match(/^[ \t]{0,3}(`{3,}|~{3,})(.*)$/u);
+  const containerMatch = line.match(/^((?:[ \t]{0,3}>[ \t]?)*)/u);
+  const blockquotePrefix = containerMatch?.[1] ?? '';
+  const blockquoteDepth = (blockquotePrefix.match(/>/gu) ?? []).length;
+  const fenceMatch = line.slice(blockquotePrefix.length).match(/^[ \t]{0,3}(`{3,}|~{3,})(.*)$/u);
   if (!fenceMatch) {
     return null;
   }
@@ -3811,6 +3814,7 @@ function parseLinearMarkdownFence(line: string): LinearMarkdownFenceToken | null
   return {
     marker: delimiter[0] as '`' | '~',
     length: delimiter.length,
+    blockquoteDepth,
     trailing: fenceMatch[2] ?? ''
   };
 }
@@ -3822,10 +3826,16 @@ function nextLinearMarkdownFenceState(
   if (activeFence === null) {
     return {
       marker: fence.marker,
-      length: fence.length
+      length: fence.length,
+      blockquoteDepth: fence.blockquoteDepth
     };
   }
-  if (activeFence.marker === fence.marker && fence.length >= activeFence.length && fence.trailing.trim() === '') {
+  if (
+    activeFence.marker === fence.marker &&
+    activeFence.blockquoteDepth === fence.blockquoteDepth &&
+    fence.length >= activeFence.length &&
+    fence.trailing.trim() === ''
+  ) {
     return null;
   }
   return activeFence;
@@ -3862,6 +3872,9 @@ function parseLinearMarkdownHtmlBlockStartLine(line: string): LinearMarkdownHtml
       structuralLine
     )
   ) {
+    return { kind: 'until_blank' };
+  }
+  if (/^[ \t]{0,3}<\/?[A-Za-z][A-Za-z0-9-]*(?:\s+[^<>]*)?\s*\/?>\s*$/u.test(structuralLine)) {
     return { kind: 'until_blank' };
   }
   return null;
@@ -3964,7 +3977,7 @@ function parseLinearMarkdownNormalizationListItemLine(
   if (isLinearMarkdownThematicBreakLine(line)) {
     return null;
   }
-  const markerPattern = marker === '*' ? '\\*' : marker === '+' ? '\\+' : marker ?? '(?:[-*]|\\d+[.)])';
+  const markerPattern = marker === '*' ? '\\*' : marker === '+' ? '\\+' : marker ?? '(?:[-*+]|\\d+[.)])';
   const listItemMatch = line.match(new RegExp(`^([ \\t]*)(${markerPattern})\\s+\\S`, 'u'));
   return listItemMatch
     ? { indent: getLinearMarkdownIndentWidth(listItemMatch[1]), markerWidth: getLinearMarkdownIndentWidth(listItemMatch[2]) }
