@@ -13155,14 +13155,20 @@ describe('providerLinearWorkflowFacade', () => {
   });
 
   it.each([
-    ['bullet markers', simulateLinearBulletMarkerNormalization],
-    ['heading spacing', simulateLinearHeadingListSpacing]
-  ])('accepts Linear-normalized %s after follow-up traceability update', async (_label, normalize) => {
+    ['bullet markers', undefined, simulateLinearBulletMarkerNormalization],
+    ['heading spacing', undefined, simulateLinearHeadingListSpacing],
+    [
+      'nested bullet markers',
+      ['Investigate the remaining improvement.', '', '- Parent item', '    * Child item'].join('\n'),
+      (description: string) => description.replace('    * Child item', '    - Child item')
+    ]
+  ])('accepts Linear-normalized %s after follow-up traceability update', async (_label, inputDescription, normalize) => {
     const finalDescription = buildExpectedFollowUpDescription({
       includeTraceability: true
-    });
+    }).replace('Investigate the remaining improvement.', inputDescription ?? 'Investigate the remaining improvement.');
     const normalizedFinalDescription = normalize(finalDescription);
     const { result, calls } = await exerciseFollowUpTraceabilityUpdateScenario({
+      inputDescription,
       observedFinalDescription: normalizedFinalDescription,
       expectedOk: true
     });
@@ -16143,7 +16149,10 @@ describe('providerLinearWorkflowFacade', () => {
     expect(calls).toEqual(['owner-search', 'related-relation']);
   });
 
-  it('fails closed when a source-line-tolerated canonical owner has appended drift', async () => {
+  it.each([
+    ['raw Markdown', (description: string) => description],
+    ['Linear-normalized Markdown', simulateLinearMarkdownNormalization]
+  ])('fails closed when a source-line-tolerated canonical owner has appended drift in %s', async (_label, normalize) => {
     const canonicalOwnerKey =
       'docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-19|cadence_days:30';
     const canonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
@@ -16179,6 +16188,7 @@ describe('providerLinearWorkflowFacade', () => {
         '- Follow-up packet prefix: `linear-lin-issue-254`'
       ].join('\n')
     ].join('\n\n');
+    const observedDriftedDescription = normalize(driftedDescription);
     const calls: string[] = [];
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
@@ -16207,7 +16217,7 @@ describe('providerLinearWorkflowFacade', () => {
               id: 'lin-issue-254',
               identifier: 'CO-254',
               title: 'Apr 19 spec/docs freshness baseline owner',
-              description: driftedDescription,
+              description: observedDriftedDescription,
               state: {
                 id: 'state-backlog',
                 name: 'Backlog',
@@ -16254,11 +16264,11 @@ describe('providerLinearWorkflowFacade', () => {
         details: {
           failed_step: 'canonical_owner_traceability_update',
           expected_description: currentSourceDescription,
-          observed_description: driftedDescription,
+          observed_description: observedDriftedDescription,
           follow_up_issue: {
             id: 'lin-issue-254',
             identifier: 'CO-254',
-            description: driftedDescription
+            description: observedDriftedDescription
           }
         }
       }

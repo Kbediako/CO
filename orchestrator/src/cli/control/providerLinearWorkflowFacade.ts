@@ -3768,7 +3768,11 @@ function normalizeLinearPersistedMarkdownForComparison(description: string): str
       continue;
     }
 
-    if (isLinearMarkdownIndentedCodeLine(line) || isLinearMarkdownThematicBreakLine(line)) {
+    if (
+      (isLinearMarkdownIndentedCodeLine(line) &&
+        !isLinearMarkdownNestedListItemLine(line, peekPreviousNonEmptyLine(normalizedLines))) ||
+      isLinearMarkdownThematicBreakLine(line)
+    ) {
       normalizedLines.push(line);
       continue;
     }
@@ -3815,6 +3819,10 @@ function isLinearMarkdownIndentedCodeLine(line: string): boolean {
   return /^(?: {4,}|\t)/u.test(line);
 }
 
+function isLinearMarkdownNestedListItemLine(line: string, previousNonEmptyLine: string): boolean {
+  return /^(?: {4,}|\t)[ \t]*\*\s+\S/u.test(line) && isLinearMarkdownNormalizationListItemLine(previousNonEmptyLine);
+}
+
 function isLinearMarkdownThematicBreakLine(line: string): boolean {
   return /^[ \t]{0,3}(?:\*[ \t]*){3,}$/u.test(line);
 }
@@ -3851,6 +3859,15 @@ function peekNextNonEmptyLine(lines: readonly string[], startIndex: number): str
   return '';
 }
 
+function peekPreviousNonEmptyLine(lines: readonly string[]): string {
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (lines[index].trim() !== '') {
+      return lines[index];
+    }
+  }
+  return '';
+}
+
 function isLinearMarkdownNormalizationHeadingLine(line: string): boolean {
   return /^[ ]{0,3}#{1,6}\s+\S/u.test(line);
 }
@@ -3871,10 +3888,10 @@ function normalizeFollowUpSourceIssueTraceabilityLine(description: string): stri
     );
     const sectionEnd = nextHeadingIndex === -1 ? lines.length : nextHeadingIndex;
     const sectionLines = lines.slice(index + 1, sectionEnd);
-    if (!sectionLines.some((line) => line.startsWith('- Follow-up packet prefix:'))) {
+    if (!sectionLines.some(isFollowUpPacketPrefixTraceabilityLine)) {
       continue;
     }
-    const sourceLineOffset = sectionLines.findIndex((line) => /^- Source issue: .+$/u.test(line));
+    const sourceLineOffset = sectionLines.findIndex(isSourceIssueTraceabilityLine);
     if (sourceLineOffset === -1) {
       continue;
     }
@@ -3882,6 +3899,14 @@ function normalizeFollowUpSourceIssueTraceabilityLine(description: string): stri
     normalized = true;
   }
   return normalized ? lines.join('\n') : description;
+}
+
+function isFollowUpPacketPrefixTraceabilityLine(line: string): boolean {
+  return /^[-*] Follow-up packet prefix:/u.test(line);
+}
+
+function isSourceIssueTraceabilityLine(line: string): boolean {
+  return /^[-*] Source issue: .+$/u.test(line);
 }
 
 async function ensureFollowUpIssueTraceability(input: {
