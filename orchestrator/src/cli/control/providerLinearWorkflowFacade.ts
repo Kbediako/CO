@@ -3874,7 +3874,7 @@ function parseLinearMarkdownHtmlBlockStartLine(line: string): LinearMarkdownHtml
   ) {
     return { kind: 'until_blank' };
   }
-  if (/^[ \t]{0,3}<\/?[A-Za-z][A-Za-z0-9-]*(?:\s+[^<>]*)?\s*\/?>\s*$/u.test(structuralLine)) {
+  if (/^[ \t]{0,3}<\/?[A-Za-z][A-Za-z0-9-]*(?:\s+(?:"[^"]*"|'[^']*'|[^'"<>])*)?\s*\/?>\s*$/u.test(structuralLine)) {
     return { kind: 'until_blank' };
   }
   return null;
