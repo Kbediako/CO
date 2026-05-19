@@ -57,7 +57,8 @@ task_checklists:
   - claim state is `released`.
   - reason is `provider_issue_released:not_active`.
   - issue state is `Backlog` or issue state type is `backlog`.
-  - active retry metadata is absent (`retry_queued=null` or equivalent non-queued state).
+  - claim run identity matches the failed run artifact being reconciled.
+  - active retry metadata is absent (`retry_queued=null`, or explicit `retry_queued=false` with no due/error and only historical retry-attempt state).
 - Preserve failed projection for real failed runs without a passive released owner claim.
 - Preserve queued retry projection for non-terminal retry claims.
 - Preserve terminal retry/resumable exclusion behavior from CO-555.
@@ -90,6 +91,8 @@ Large-refactor check: a large status-read-model rewrite is not required; the cur
 ## Validation Plan
 - Focused tests covering:
   - passive CO-558 shape reconciles away from failed/retrying/current active work.
+  - passive released owner claims do not hide unrelated failed run artifacts for the same Linear issue.
+  - explicit idle retry metadata is accepted, while missing retry metadata remains visible.
   - real failed active/current run remains visible as failed.
   - terminal retry/resumable exclusion remains covered.
 - Required provider-worker gates: delegation guard, spec guard dry-run, build, lint, test, docs:check, docs:freshness, repo:stewardship, diff-budget, standalone review, elegance pass, PR ready-review before handoff.

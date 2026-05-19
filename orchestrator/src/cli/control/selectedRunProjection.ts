@@ -2109,17 +2109,33 @@ function isActiveLookingProviderLinearWorkerManifestStatus(status: string): bool
 }
 
 function isPassiveReleasedProviderLinearWorkerOwnerFailedRun(
-  context: Pick<ControlCompatibilitySourceContext, 'rawStatus'>,
+  context: Pick<ControlCompatibilitySourceContext, 'rawStatus' | 'runId' | 'manifestPath'>,
   claim: ProviderIntakeClaimRecord
 ): boolean {
+  return (
+    context.rawStatus === 'failed' &&
+    providerLinearWorkerClaimRunIdentityMatchesContext(claim, context) &&
+    isPassiveReleasedProviderOwnerClaim(claim)
+  );
+}
+
+function isPassiveReleasedProviderOwnerClaim(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    | 'state'
+    | 'reason'
+    | 'issue_state'
+    | 'issue_state_type'
+    | 'retry_queued'
+    | 'retry_attempt'
+    | 'retry_due_at'
+    | 'retry_error'
+  >
+): boolean {
   if (
-    context.rawStatus !== 'failed' ||
     claim.state !== 'released' ||
     claim.reason !== 'provider_issue_released:not_active' ||
-    claim.retry_queued !== null ||
-    claim.retry_attempt !== null ||
-    claim.retry_due_at !== null ||
-    claim.retry_error !== null
+    !hasPassiveReleasedProviderRetryState(claim)
   ) {
     return false;
   }
@@ -2130,6 +2146,25 @@ function isPassiveReleasedProviderLinearWorkerOwnerFailedRun(
   return (
     workflowState.normalizedState === 'backlog' ||
     workflowState.normalizedStateType === 'backlog'
+  );
+}
+
+function hasPassiveReleasedProviderRetryState(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'retry_queued' | 'retry_attempt' | 'retry_due_at' | 'retry_error'
+  >
+): boolean {
+  if (
+    (claim.retry_queued !== null && claim.retry_queued !== false) ||
+    claim.retry_due_at !== null ||
+    claim.retry_error !== null
+  ) {
+    return false;
+  }
+  return (
+    claim.retry_attempt === null ||
+    (typeof claim.retry_attempt === 'number' && Number.isFinite(claim.retry_attempt))
   );
 }
 
@@ -2506,7 +2541,7 @@ function providerLinearWorkerClaimHasRunIdentity(claim: ProviderIntakeClaimRecor
 
 function providerLinearWorkerClaimRunIdentityMatchesContext(
   claim: ProviderIntakeClaimRecord,
-  context: ControlCompatibilitySourceContext
+  context: Pick<ControlCompatibilitySourceContext, 'runId' | 'manifestPath'>
 ): boolean {
   const manifestPath = context.manifestPath ?? null;
   return Boolean(
@@ -3149,12 +3184,17 @@ function buildProviderRetryState(
     | 'issue_state_type'
     | 'issue_archived_at'
     | 'issue_trashed'
+    | 'state'
+    | 'reason'
   > | null
 ): ControlCompatibilitySourceContext['providerRetryState'] {
   if (!claim) {
     return null;
   }
   if (isTerminalProviderIntakeIssueState(claim)) {
+    return null;
+  }
+  if (isPassiveReleasedProviderOwnerClaim(claim)) {
     return null;
   }
   const active = hasQueuedProviderIntakeRetry(claim);
