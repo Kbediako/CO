@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp f4ca8a8611457aa704aa199090a1a44e3d91edad072ceac52ea6cdd3590905c1 -->
+<!-- codex:instruction-stamp e7973a7ef8df6286847cdb5856c70304a6d4c3b88324c2581df433ef6ab0bd41 -->
 # Repository Agent Guidance
 
 Task-specific historical project blocks were removed from this file in `CO-88`. Use the active task packet under `.agent/task/**` for lane-scoped instructions instead of treating old project ids as repo-wide defaults.
@@ -31,7 +31,7 @@ Task-specific historical project blocks were removed from this file in `CO-88`. 
 - Keep mode semantics explicit and orthogonal: `executionMode=mcp|cloud` and `runtimeMode=cli|appserver` are separate controls.
 - Local default runtime remains `appserver`, with `--runtime-mode cli` preserved as break-glass.
 - `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and must fail fast with actionable errors.
-- Upstream `rust-v0.128.0` removed `js_repl` and `js_repl_tools_only`; do not set `CODEX_CLOUD_ENABLE_FEATURES` / `CODEX_CLOUD_DISABLE_FEATURES` to either `js_repl` or `js_repl_tools_only`, or run `codex features enable/disable js_repl` / `codex features enable/disable js_repl_tools_only`. Use `CODEX_CLOUD_ENABLE_FEATURES` / `CODEX_CLOUD_DISABLE_FEATURES` only for active non-removed feature names after checking `codex features list`.
+- Upstream `rust-v0.128.0` removed `js_repl` and `js_repl_tools_only`, and current local `0.130.0` still reports both as removed; do not set `CODEX_CLOUD_ENABLE_FEATURES` / `CODEX_CLOUD_DISABLE_FEATURES` to either `js_repl` or `js_repl_tools_only`, or run `codex features enable/disable js_repl` / `codex features enable/disable js_repl_tools_only`. Use `CODEX_CLOUD_ENABLE_FEATURES` / `CODEX_CLOUD_DISABLE_FEATURES` only for active non-removed feature names after checking `codex features list`.
 - Keep `memories` scoped to explicit eval lanes until promoted by evidence (legacy alias `memory_tool` is compatibility-only).
 - Before implementation, run a standalone review of the task/spec against the user’s intent and record the approval in the spec + checklist notes. If anything is vague, infer with a subagent and self-approve or offer options; only ask the user when truly blocked.
 - Delegation is mandatory for top-level tasks once a task id exists: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible and record the justification.
@@ -42,7 +42,7 @@ Task-specific historical project blocks were removed from this file in `CO-88`. 
 - Follow `.agent/SOPs/oracle-usage.md` for Oracle runs (tool cap: 11 attachments; unique basenames; attachments-first workflow).
 
 ## Codex Version Policy (Execution)
-- Current CO-local ChatGPT-auth/appserver model posture is `gpt-5.5` / `xhigh` on Codex CLI `0.128.0` when live access smoke passes; release-facing package/downstream-smoke pins intentionally hold at Codex CLI `0.125.0`, and `cloud-canary` intentionally holds at Codex CLI `0.124.0`, as recorded in `docs/guides/codex-version-policy.md`.
+- Current CO-local ChatGPT-auth/appserver model posture is `gpt-5.5` / `xhigh` on Codex CLI `0.130.0` when live access smoke passes; release-facing package/downstream-smoke pins intentionally hold at Codex CLI `0.125.0`, and `cloud-canary` intentionally holds at Codex CLI `0.124.0`, as recorded in `docs/guides/codex-version-policy.md`.
 - Current `0.124.0` CO-local posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, live `gpt-5.5` `xhigh` availability, and a post-build runtime-mode canary pass (`20/20` per scenario, `ready_for_default_flip=true`).
 - Release-facing downstream-smoke workflows intentionally pin `@openai/codex@0.125.0`, and `cloud-canary` intentionally pins `@openai/codex@0.124.0` until the required gates in `docs/guides/codex-version-policy.md` pass.
 - Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.

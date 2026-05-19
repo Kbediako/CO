@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp 1ac223bf43a9a3c476cf71d007f8bcc28703440b20e8227eefeb27dc084f86e8 -->
+<!-- codex:instruction-stamp 057848cdce12d78008402877fc9dea0c110ae9d9437f3c663c7afacd8cbbf8e5 -->
 # Agent Instructions (Template)
 
 ## Orchestrator-first workflow
@@ -12,7 +12,7 @@
 - Delegation is mandatory for top-level tasks once a task id exists: spawn at least one subagent run using `MCP_RUNNER_TASK_ID=<task-id>-<stream>`, capture manifest evidence, and summarize in the main run. Use `DELEGATION_GUARD_OVERRIDE_REASON` only when delegation is impossible (technical/blocking limitation or explicit operational block) and record the justification.
 - Once a task id exists, prefer delegation for research, review, and planning work. Use `codex exec` only for pre-task triage (no task id yet) or when delegation is genuinely unavailable (technical/blocking limitation or explicit operational block), and set `DELEGATION_GUARD_OVERRIDE_REASON` with a clear justification.
 - Keep delegation MCP enabled by default (only MCP on by default). Enable other MCPs only when relevant to the task.
-- Codex CLI `0.128.0` deprecates `--full-auto`; do not present it as normal flow. Use explicit permission profiles and trust flows, with built-in config profile ids `:read-only`, `:workspace`, and `:danger-no-sandbox`; treat `default_permissions = ":danger-no-sandbox"` as a local-only no-sandbox advisory, not as a reason to weaken CO defaults.
+- Codex CLI `0.130.0` keeps the explicit permission-profile/trust-flow posture; do not present `--full-auto` as normal flow. Use explicit permission profiles and trust flows, with built-in config profile ids `:read-only`, `:workspace`, and `:danger-no-sandbox`; treat `default_permissions = ":danger-no-sandbox"` as a local-only no-sandbox advisory, not as a reason to weaken CO defaults.
 
 ## Docs-first (spec-driven)
 - Create or refresh PRD + TECH_SPEC + ACTION_PLAN + the task checklist before edits.
@@ -55,8 +55,8 @@
 - Built-in roles are `default`, `explorer`, `worker`, and `awaiter`; `researcher` is user-defined.
 - `spawn_agent` defaults to `default` when `agent_type` is omitted; always set `agent_type` explicitly.
 - For symbolic collab runs, prefix spawned prompts with `[agent_type:<role>]` on line one so role intent is auditable from JSONL/manifests.
-- CO-local ChatGPT-auth/appserver model posture is `gpt-5.5` / `xhigh` on Codex CLI `0.128.0` when live access smoke passes; release-facing package/downstream-smoke pins intentionally hold at Codex CLI `0.125.0`, and `cloud-canary` intentionally holds at Codex CLI `0.124.0`, as recorded in `docs/guides/codex-version-policy.md`.
-- Current `0.128.0` permission posture uses explicit permission profiles and active-profile metadata for durable config evidence; keep cwd/trust controls separate from sandbox/profile controls.
+- CO-local ChatGPT-auth/appserver model posture is `gpt-5.5` / `xhigh` on Codex CLI `0.130.0` when live access smoke passes; release-facing package/downstream-smoke pins intentionally hold at Codex CLI `0.125.0`, and `cloud-canary` intentionally holds at Codex CLI `0.124.0`, as recorded in `docs/guides/codex-version-policy.md`.
+- Current `0.130.0` permission posture uses explicit permission profiles and active-profile metadata for durable config evidence; keep cwd/trust controls separate from sandbox/profile controls.
 - `0.124.0` CO posture evidence confirmed `codex exec` prompt-plus-stdin support, `codex login --device-auth`, `codex review --help` exposing `[PROMPT]` alongside scoped review flags, packaged `gpt-5.4` `xhigh` fallback defaults, and a post-build runtime-mode canary pass.
 - Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions; keep `explorer_fast` on `gpt-5.3-codex-spark` for file/codebase search only.
 - Portable generated defaults still keep `model = "gpt-5.4"` and `model_reasoning_effort = "xhigh"` as fallback values in `~/.codex/config.toml`; operators should use `gpt-5.5` locally when access smoke passes.

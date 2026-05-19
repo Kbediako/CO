@@ -21,7 +21,7 @@ Node.js `>=20` is required. npm remains the supported baseline install path.
 
 ## Current Posture
 
-- Current CO-local Codex CLI `0.128.0` ChatGPT-auth/appserver posture
+- Current CO-local Codex CLI `0.130.0` ChatGPT-auth/appserver posture
 - Current model posture: `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions
 - Portable packaged/generated defaults keep `gpt-5.4` / `xhigh` as fallback values when `gpt-5.5`, API, or cloud portability is unavailable
 - Local default runtime: `appserver`
@@ -44,7 +44,7 @@ Use `codex login --device-auth` when browser login is not available.
 
 ## Plugin Install
 
-The npm CLI install is the baseline. Codex plugin marketplace setup is additive for Codex releases that expose plugin flows. Current local Codex CLI `0.128.0` keeps marketplace management under `codex plugin marketplace ...`, while release-facing smoke workflow pins intentionally hold on the version policy target:
+The npm CLI install is the baseline. Codex plugin marketplace setup is additive for Codex releases that expose plugin flows. Current local Codex CLI `0.130.0` keeps marketplace management under `codex plugin marketplace ...`, while release-facing smoke workflow pins intentionally hold on the version policy target:
 
 ```bash
 # Codex 0.121.0 accepts either command.
