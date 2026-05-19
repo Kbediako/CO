@@ -1931,13 +1931,16 @@ function resolveProviderLinearWorkerRunArtifactReconciliation(
   allContexts: ControlCompatibilitySourceContext[],
   providerIntakeState: ProviderIntakeState
 ): ProviderLinearWorkerRunArtifactReconciliationRecord | null {
+  const claim = findProviderLinearWorkerClaimForContext(providerIntakeState, context);
+  const passiveReleasedOwnerFailedRun =
+    claim !== null && isPassiveReleasedProviderLinearWorkerOwnerFailedRun(context, claim);
   if (
     !isProviderLinearWorkerReconciliationSource(context) ||
-    !isActiveLookingProviderLinearWorkerManifestStatus(context.rawStatus)
+    (!isActiveLookingProviderLinearWorkerManifestStatus(context.rawStatus) &&
+      !passiveReleasedOwnerFailedRun)
   ) {
     return null;
   }
-  const claim = findProviderLinearWorkerClaimForContext(providerIntakeState, context);
   if (claim && isActiveProviderLinearWorkerReconciliationClaim(claim)) {
     return null;
   }
@@ -2099,6 +2102,28 @@ async function writeProviderLinearWorkerRunArtifactReconciliation(
 
 function isActiveLookingProviderLinearWorkerManifestStatus(status: string): boolean {
   return status === 'in_progress' || status === 'launching';
+}
+
+function isPassiveReleasedProviderLinearWorkerOwnerFailedRun(
+  context: Pick<ControlCompatibilitySourceContext, 'rawStatus'>,
+  claim: ProviderIntakeClaimRecord
+): boolean {
+  if (
+    context.rawStatus !== 'failed' ||
+    claim.state !== 'released' ||
+    claim.reason !== 'provider_issue_released:not_active' ||
+    claim.retry_queued === true
+  ) {
+    return false;
+  }
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: claim.issue_state,
+    state_type: claim.issue_state_type
+  });
+  return (
+    workflowState.normalizedState === 'backlog' ||
+    workflowState.normalizedStateType === 'backlog'
+  );
 }
 
 function isProviderLinearWorkerReconciliationSource(

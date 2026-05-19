@@ -69,6 +69,8 @@ Exact canonical owner overrides are narrower than the global owner issue. `docs:
 
 Owned rolling debt is an `expire fallback`, not an indefinite exception. Every retained cohort emitted by `docs:freshness:maintain` carries `fallback_expiry` metadata with the owner, trigger, review date, maximum lifetime, `expires_after`, removal condition, and validation evidence. The maximum lifetime is the configured rolling window after normal cadence expiry, so the fallback must be removed by refreshing, archiving, reclassifying, or re-homing to a verified live same-project owner before that date.
 
+After a `docs:freshness:maintain` owner PR merges, do not treat the merge as proof that retained cohort debt is resolved. If `docs:freshness:maintain` still reports `pass_with_owned_rolling_debt` or `rolling_freshness_cohorts` still contains the retained cohort, keep the merged owner issue in `Backlog` as the non-terminal owner while no active repair is underway. That Backlog posture preserves exact-marker reuse without consuming an active worker lane; move the issue out of `Backlog` only to refresh the cohort, archive completed historical packets, reclassify rows from verified lifecycle evidence, or re-home the cohort to another verified live same-project owner. Closing the merged owner issue to `Done`, `Canceled`, `Duplicate`, or any other terminal state while the retained cohort remains visible will make the next maintenance run fail closed as terminal-owner debt.
+
 ## Preserved Historical Stub Status
 Some historical task-key stubs remain authoritative because current repo tooling still resolves their canonical task key from that path even after the rest of the historical packet is gone. Those rows should use docs-freshness registry status `preserved_historical_stub`.
 
@@ -115,6 +117,7 @@ Feature lanes may cite the owner issue for the rolling cohort, but they must sti
 - Do not omit or broaden `baseline_cohorts`; stale docs outside the declared baseline must remain blocking.
 - Do not treat a green `docs:freshness` exit as proof that rolling freshness debt is zero; inspect the report totals.
 - Do not reuse terminal owners as active owner issues, even when their title or older metadata looks relevant.
+- Do not close a merged `docs:freshness:maintain` owner issue while its retained cohort is still visible; leave it in `Backlog` until the cohort is refreshed, archived, reclassified, or re-homed.
 - Do not create a fresh owner when an open same-project exact-marker owner can be reused or updated.
 
 ## Escaped Recurrence History

@@ -1,0 +1,95 @@
+---
+id: 20260519-linear-aa075f78-940e-423b-a886-6f0f8012ae18
+title: CO-562 hide passive owner claims from retry and failed status
+relates_to: docs/PRD-linear-aa075f78-940e-423b-a886-6f0f8012ae18.md
+risk: medium
+owners:
+  - Codex
+last_review: 2026-05-19
+related_action_plan: docs/ACTION_PLAN-linear-aa075f78-940e-423b-a886-6f0f8012ae18.md
+task_checklists:
+  - tasks/tasks-linear-aa075f78-940e-423b-a886-6f0f8012ae18.md
+---
+
+# TECH_SPEC - CO-562 hide passive owner claims from retry and failed status
+
+## Canonical Reference
+- PRD: `docs/PRD-linear-aa075f78-940e-423b-a886-6f0f8012ae18.md`
+- TECH_SPEC canonical: `tasks/specs/linear-aa075f78-940e-423b-a886-6f0f8012ae18.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-aa075f78-940e-423b-a886-6f0f8012ae18.md`
+- Task checklist: `tasks/tasks-linear-aa075f78-940e-423b-a886-6f0f8012ae18.md`
+- Linear issue: `CO-562` / `aa075f78-940e-423b-a886-6f0f8012ae18`
+- Source anchor: `ctx:sha256:02c94024e99642ed656e935bb37609a31558f20adb016c152b48b5b503a6657d#chunk:c000001`
+
+## Summary
+- Objective: prevent passive released docs-freshness owner claims from showing as active retry/failed work because of historical run summaries.
+- Scope:
+  - selected-run / compatibility status projection reconciliation for provider-linear-worker artifacts.
+  - focused regression fixtures for the CO-558 shape and real failed active-run contrast.
+  - docs freshness operator guidance for merged owner issues that should remain Backlog.
+- Constraints:
+  - preserve raw provider-intake rows and old run manifests as audit history.
+  - do not hide genuine failed active workers.
+  - do not weaken retry/resumable behavior for non-terminal active work.
+
+## Issue-Shaping Contract
+- User-request translation carried forward: status should treat `provider_issue_released:not_active` + `Backlog` + `retry_queued=null` as passive owner evidence, not as current failed/retry work.
+- Protected terms / exact artifact and surface names: `provider-intake-state.json`, `co-status --format json`, `provider_issue_released:not_active`, `Backlog`, `docs:freshness:maintain`, `passive owner issue`, `retrying`, `failed run summary`, `run_summary`, `retry_queued=null`.
+- Nearby wrong interpretations to reject: deleting old manifests, deleting provider-intake rows, hiding active failed workers, treating terminal owner issues as live, or relying on operator restart/manual JSON cleanup.
+- Explicit non-goals carried forward: no retry/recovery weakening, no docs freshness owner contract rewrite beyond status clarity, no lifecycle automation expansion.
+
+## Parity / Alignment Matrix
+
+| Surface | Current truth | Reference truth | Target truth / intended delta | Out of scope |
+| --- | --- | --- | --- | --- |
+| Provider-intake claim | Released/not_active Backlog owner row is retained. | Retained rows are audit state, not always active work. | Current status suppresses active/retry/failed interpretation when retry is absent and issue is passive Backlog owner. | Deleting retained rows. |
+| Run summary | Historical failed run summary can still drive current failed display. | Failed active runs must remain visible. | Failed display requires active/current evidence; passive released owner truth reconciles the stale summary away from failed status. | Broad manifest pruning. |
+| Docs owner guidance | Existing docs explain live owner verification and terminal-owner failure. | CO-558 shows a merged owner may intentionally stay Backlog. | Guidance names the Backlog owner posture and when to leave it. | Freshness policy weakening. |
+
+## Readiness Gate
+- Not done if a released Backlog owner with `retry_queued=null` still appears active/retrying/failed, if real failed active workers disappear, or if closeout makes the docs-freshness owner terminal.
+- Pre-implementation issue-quality review evidence: parent provider worker reviewed the issue text, live issue-context, no attached PR, and existing projection seams on 2026-05-19.
+- Safeguard ownership split: parent owns production/tests and docs packet; accepted child lane owns only `docs/guides/docs-freshness-cohorts.md`.
+
+## Technical Requirements
+- Reconcile or suppress compatibility projection records only when the matching provider-intake claim is a passive released owner shape:
+  - provider is Linear.
+  - claim state is `released`.
+  - reason is `provider_issue_released:not_active`.
+  - issue state is `Backlog` or issue state type is `backlog`.
+  - active retry metadata is absent (`retry_queued=null` or equivalent non-queued state).
+- Preserve failed projection for real failed runs without a passive released owner claim.
+- Preserve queued retry projection for non-terminal retry claims.
+- Preserve terminal retry/resumable exclusion behavior from CO-555.
+- Keep audit surfaces readable: old run manifests and provider-intake rows remain available through their historical artifacts/provider-intake summary.
+
+## Fallback Expiry / Refactor Decision
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Status projection | Stale `failed` run summary can outrank passive released owner truth. | `remove fallback` | CO-562 | Provider-intake has `released` / `provider_issue_released:not_active`, Backlog issue metadata, and no active retry. | Existing pre-CO-562 behavior | 2026-05-19 | This issue | Passive owner no longer projects as active/retrying/failed while real failed runs remain visible. | Focused selected-run/status projection regressions. |
+| Provider-intake audit state | Raw released rows and old manifests remain available for audit. | `justify retaining fallback` | Provider-intake control-host | Operators need historical claim/run evidence after release. | Existing provider-intake contract | 2026-05-19 | Non-expiring durable audit contract | Replace only with an equivalent audited source of historical claim/run evidence. | Existing provider-intake summary plus focused projection tests. |
+
+Large-refactor check: a large status-read-model rewrite is not required; the current architecture already centralizes this projection in selected-run/compatibility status helpers.
+
+## Architecture & Data
+- No migration.
+- Expected code seams:
+  - `orchestrator/src/cli/control/selectedRunProjection.ts`
+  - `orchestrator/src/cli/control/compatibilityIssuePresenter.ts` if issue projection needs additional suppression.
+  - `tests/selected-run-projection.spec.ts`
+- Data stays backward compatible; any new status reason must be additive and machine-readable.
+
+## Validation Plan
+- Focused tests covering:
+  - passive CO-558 shape reconciles away from failed/retrying/current active work.
+  - real failed active/current run remains visible as failed.
+  - terminal retry/resumable exclusion remains covered.
+- Required provider-worker gates: delegation guard, spec guard dry-run, build, lint, test, docs:check, docs:freshness, repo:stewardship, diff-budget, standalone review, elegance pass, PR ready-review before handoff.
+
+## Open Questions
+- None blocking.
+
+## Approvals
+- Reviewer: parent provider worker.
+- Date: 2026-05-19.
