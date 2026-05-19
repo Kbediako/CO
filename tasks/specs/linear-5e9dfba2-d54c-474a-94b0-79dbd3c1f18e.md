@@ -18,6 +18,7 @@ task_checklists:
 - TECH_SPEC mirror: `docs/TECH_SPEC-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md`
 - Task checklist: `tasks/tasks-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md`
+- Agent task mirror: `.agent/task/linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md`
 - Registry: `tasks/index.json`
 - Task snapshot: `docs/TASKS.md`
 - Freshness registry: `docs/docs-freshness-registry.json`
@@ -109,6 +110,7 @@ task_checklists:
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `Yes`.
 - Decision: remove the cached-current source freshness seam for resident supervised control-host status.
 - Large-refactor check: keep this scoped to source freshness recheck/projection unless source inspection shows duplicate freshness refresh logic that must be consolidated to make stale-source detection trustworthy.
+- Minor-seam decision: acceptable because the recheck is read-only against local refs, removes stale cached-current authority, and keeps resident source-root freshness separate from shared-root posture.
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -138,7 +140,7 @@ task_checklists:
 
 ## Open Questions
 - Should recheck be performed at control-host polling refresh, at every `co-status --format json` read, or through a shared freshness refresh helper?
-- What structured status should missing local `origin/main` produce for resident host freshness: `unavailable`, `warning`, or an existing no-remote detail?
+- What structured status should a missing local `origin/main` produce for resident host freshness: `unavailable`, `warning`, or an existing `no-remote` detail?
 
 ## Approvals
 - Reviewer: CO-515 provider worker / parent lane.

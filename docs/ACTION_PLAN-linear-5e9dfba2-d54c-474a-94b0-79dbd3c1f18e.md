@@ -34,8 +34,8 @@
   - This task touches stale/cached status behavior. Decision: `remove fallback` for cached-current source freshness after local `origin/main` advances.
 - Durable retention evidence:
   - Not applicable. CO-515 retains no stale-current fallback. `provider-intake-state.json` remains separate operational evidence, not a retained source freshness fallback.
-- Large-refactor check:
-  - Keep this scoped to source freshness recheck/projection unless parent source inspection shows duplicated freshness refresh paths that must be consolidated to make detection trustworthy.
+- Large-refactor check: keep this scoped to source freshness recheck/projection unless parent source inspection shows duplicated freshness refresh paths that must be consolidated to make detection trustworthy.
+- Minor-seam decision: acceptable because the recheck is read-only against local refs, removes stale cached-current authority, and keeps resident source-root freshness separate from shared-root posture.
 
 ## Fallback Metadata
 

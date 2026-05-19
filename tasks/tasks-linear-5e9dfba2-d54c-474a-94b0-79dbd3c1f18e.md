@@ -7,6 +7,7 @@
 - TECH_SPEC: `tasks/specs/linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md`
 - TECH_SPEC mirror: `docs/TECH_SPEC-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md`
+- Agent task mirror: `.agent/task/linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md`
 - Canonical owner key: `control-host:source-freshness-recheck-after-main-advance`
 - Shared source anchor: `ctx:sha256:e50fbc86099d15a7bd5e45c23028430bd6de7f985de2237cb5ea66b7673567f2#chunk:c000001`
 - Child manifest: `.runs/linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e-docs-packet/cli/2026-05-18T23-15-56-334Z-bed38666/manifest.json`
@@ -20,8 +21,8 @@
 - [x] Task checklist created. Evidence: `tasks/tasks-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md`.
 - [x] Task registration updated in canonical `tasks/index.json` `items[]` shape. Evidence: `tasks/index.json`.
 - [x] Task snapshot updated. Evidence: `docs/TASKS.md`.
-- [x] Docs freshness registry updated for declared packet/checklist files. Evidence: `docs/docs-freshness-registry.json`.
-- [x] `.agent/task` mirror intentionally not created because it is outside this child lane's declared file scope. Evidence: user-provided file scope.
+- [x] Docs freshness registry updated for declared packet/checklist/mirror files. Evidence: `docs/docs-freshness-registry.json`.
+- [x] `.agent/task` mirror created and registered during parent review-feedback handling. Evidence: `.agent/task/linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md`.
 
 ## Protected Issue Terms
 - [x] `control-host source freshness`
@@ -66,12 +67,14 @@
 - [ ] Parent focused source freshness recheck tests.
 - [ ] Parent CO-555 recurrence fixture.
 - [ ] Parent `co-status --format json` or `/ui/data.json` projection assertion.
-- [ ] Parent implementation gate, standalone review, elegance pass, PR checks, ready-review drain, and Linear handoff.
+- [x] Parent implementation gate, standalone review, and elegance pass completed before PR #836.
+- [ ] PR feedback fix validation, ready-review drain, and Linear handoff.
 
 ## Fallback Metadata
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `Yes`.
 - Decision: remove cached-current source freshness after local `origin/main` advances.
 - Large-refactor check: keep this scoped to trustworthy stale-source detection/projection; CO-556 owns policy response after detection is reliable.
+- Minor-seam decision: acceptable because the recheck is read-only against local refs, removes stale cached-current authority, and keeps resident source-root freshness separate from shared-root posture.
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -80,6 +83,7 @@
 ## Progress Log
 - 2026-05-18: Bounded same-issue docs child lane created the CO-515 docs-first packet and task registration from the parent-provided issue contract. Scope stayed docs-only; no implementation, tests, Linear mutation, GitHub mutation, workpad mutation, or full repo validation was run.
 - 2026-05-18: Child scoped validation passed for JSON parsing, protected-term coverage, and `git diff --check` over the declared files. Parent implementation, docs-review, and review handoff remain pending.
+- 2026-05-19: Parent added the `.agent/task` mirror and registry path while addressing PR #836 feedback.
 
 ## Notes
 - Parent owns authoritative issue workspace, Linear state, workpad, implementation, tests, PR lifecycle, and review handoff.

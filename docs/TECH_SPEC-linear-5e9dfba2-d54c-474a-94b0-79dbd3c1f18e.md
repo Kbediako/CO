@@ -38,3 +38,4 @@ Parent owns focused source freshness recheck coverage, including a CO-555 recurr
 
 - For `justify retaining fallback`: Not applicable. CO-515 does not approve retaining stale current status.
 - Large-refactor check: keep CO-515 bounded to trustworthy stale-source detection and projection. CO-556 owns auto-restart/fail-closed policy after this detection is reliable.
+- Minor-seam decision: acceptable because the recheck is read-only against local refs, removes stale cached-current authority, and keeps resident source-root freshness separate from shared-root posture.

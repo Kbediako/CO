@@ -145,6 +145,7 @@
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `Yes`.
 - Decision: remove the stale cached-current source freshness seam. Current source freshness must be backed by a fresh local comparison between the resident supervised source root and local `origin/main`.
 - Large-refactor check: keep CO-515 bounded to trustworthy stale-source detection and projection. Defer auto-restart/fail-closed behavior to CO-556 unless parent source inspection proves detection cannot be made trustworthy without a broader source freshness helper consolidation.
+- Minor-seam decision: acceptable because the recheck is read-only against local refs, removes stale cached-current authority, and keeps resident source-root freshness separate from shared-root posture.
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

@@ -331,7 +331,7 @@ function refreshResidentSourceCheckout(input: {
     return {
       ...input.prior,
       repo_root: input.refreshed.repo_root,
-      upstream: input.refreshed.upstream ?? input.prior.upstream,
+      upstream: input.refreshed.upstream,
       status: 'unavailable',
       ahead: null,
       behind: null,
@@ -341,7 +341,7 @@ function refreshResidentSourceCheckout(input: {
   return {
     ...input.prior,
     repo_root: input.refreshed.repo_root,
-    upstream: input.refreshed.upstream ?? input.prior.upstream,
+    upstream: input.refreshed.upstream,
     status: comparison.status,
     ahead: comparison.ahead,
     behind: comparison.behind,
