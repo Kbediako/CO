@@ -23,7 +23,7 @@
 ## Parent Implementation
 - [x] Inspect provider-worker review evidence resolution in `orchestrator/src/cli/services/commandRunner.ts` and related provider truth/status surfaces. Evidence: parent provider stage previously required top-level `review/telemetry.json`; selected-run discovery queued manifest-only failed runs from historical provider artifacts.
 - [x] Add CO-515-shaped positive regression for successful review handoff with clean nested implementation-gate evidence and absent parent telemetry. Evidence: `orchestrator/tests/CommandRunnerReviewEvidenceConsistency.test.ts` case `accepts clean nested implementation-gate review evidence when parent provider telemetry is absent`.
-- [x] Preserve fail-closed regressions for missing clean evidence, unknown verdict, omitted verdict, missing contract evidence, invalid/non-clean contract verdicts, bounded-success, legacy fallback launch, unrouted agent-loop proposals, unbound nested evidence, unlineaged nested evidence, and stale default-root evidence under custom runs roots. Evidence: focused `CommandRunnerReviewEvidenceConsistency`/`SelectedRunProjection` run passed 185 tests.
+- [x] Preserve fail-closed regressions for missing clean evidence, unknown verdict, omitted verdict, missing contract evidence, invalid/non-clean contract verdicts, bounded-success, legacy fallback launch, unrouted agent-loop proposals, unbound nested evidence, unlineaged nested evidence, stale default-root evidence under custom runs roots, and governed-review failures that include only an expected telemetry path. Evidence: focused `CommandRunnerReviewEvidenceConsistency`/`SelectedRunProjection` run passed 186 tests.
 - [x] Implement explicit governed review evidence convergence and exact missing-path diagnostics. Evidence: `orchestrator/src/cli/services/commandRunner.ts` now resolves fresh same-issue nested implementation-gate telemetry from the configured runs root, records nested evidence source, supports nested contract artifact paths, requires provider-attempt lineage, and reports expected parent telemetry path on unknown review failure.
 - [x] Ensure control-host/co-status does not queue the contained handoff shape as active/retrying/failed current work. Evidence: `orchestrator/src/cli/control/selectedRunProjection.ts` suppresses manifest-only retry fallback only when a fresh terminal proof shows successful `issue_review_handoff` plus a succeeded implementation-gate child stream; failed review handoffs without clean child-stream proof remain retryable.
 
@@ -45,20 +45,20 @@
 ## Validation
 - [x] `node scripts/delegation-guard.mjs`. Evidence: OK, 1 subagent manifest found.
 - [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: OK.
-- [x] Focused provider-worker review evidence and status projection tests. Evidence: `npm run test -- CommandRunnerReviewEvidenceConsistency SelectedRunProjection` passed 185 tests.
+- [x] Focused provider-worker review evidence and status projection tests. Evidence: `npm run test -- CommandRunnerReviewEvidenceConsistency SelectedRunProjection` passed 186 tests.
 - [x] `npm run build`. Evidence: passed.
 - [x] `npm run lint`. Evidence: passed with existing warnings in `orchestrator/tests/DelegationMcpHealth.test.ts`.
-- [x] `npm run test`. Evidence: 363 test files and 5986 tests passed.
+- [x] `npm run test`. Evidence: 363 test files and 5987 tests passed.
 - [x] `npm run docs:check`. Evidence: OK.
 - [x] `npm run docs:freshness`. Evidence: OK, 5476 docs and 5479 registry entries; existing CO-558 rolling cohort warning remains non-blocking.
 - [x] `npm run repo:stewardship`. Evidence: OK, 6621 tracked files and 0 action-required.
-- [x] `node scripts/diff-budget.mjs`. Evidence: OK, hard working-tree gate 5/25 files and 486/1200 lines; advisory stacked aggregate 11/25 files and 1446/1200 lines.
+- [x] `node scripts/diff-budget.mjs`. Evidence: OK, hard working-tree gate 3/25 files and 104/1200 lines; advisory stacked aggregate 11/25 files and 1542/1200 lines.
 - [x] Manifest-backed standalone review with clean semantic verdict. Evidence: `../../.runs/linear-c818e8f0-ab9d-471a-b030-4826c7d2b1dd/cli/2026-05-19T11-11-15-864Z-934545e5/review/telemetry.json` recorded `status=succeeded`, `review_outcome=clean-success`, `review_verdict=clean`, contract mode `enforce`, validation `valid`, overall `clean`.
-- [x] Explicit elegance/minimality pass. Evidence: no extra code changes; helper boundaries retained because they preserve configured-root discovery, proof-linked child-stream lineage, parent-run lineage, and retry-suppression semantics; `git diff --check` passed.
+- [x] Explicit elegance/minimality pass. Evidence: `out/linear-c818e8f0-ab9d-471a-b030-4826c7d2b1dd/manual/elegance-review.md`; no extra code changes after the final clean review, and `git diff --check` passed.
 - [x] `npm run pack:smoke` if touched CLI/package/review-wrapper surfaces require it. Evidence: passed.
 
 ## Handoff Status
-- [ ] PR opened and attached to CO-560. Evidence: pending.
+- [x] PR opened and attached to CO-560. Evidence: PR #844, `https://github.com/Kbediako/CO/pull/844`.
 - [ ] `codex-orchestrator pr ready-review --pr <number> --quiet-minutes <window>` drained cleanly. Evidence: pending.
 - [ ] Workpad refreshed with final validation, review, and advisory goal evidence from current manifest snapshot. Evidence: pending.
 - [ ] Linear transitioned to `In Review` only after clean handoff gates. Evidence: pending.
@@ -71,6 +71,7 @@
 - 2026-05-19: First standalone review found an unbound nested evidence issue; tightened evidence discovery to exact same-issue task/manifest identity and added the negative regression.
 - 2026-05-19: Full validation, package smoke, clean enforce-mode standalone review, and elegance/minimality pass completed.
 - 2026-05-19: PR feedback and follow-up standalone review found configured runs-root isolation gaps; restricted nested review discovery to the configured runs root, added stale default-root negative coverage, reran the full validation floor, and obtained clean enforce-mode standalone review.
+- 2026-05-19: Follow-up CodeRabbit/Codex feedback identified an over-broad retry-suppression predicate and an overly weak identity-negative fixture; narrowed retry suppression to the exact missing-telemetry contract phrase, made the mismatched nested evidence fixture lineaged-but-wrong-issue, added a governed-review-failure retry regression, reran the full validation floor, and obtained clean enforce-mode standalone review.
 
 ## Relevant Files
 - `docs/PRD-linear-c818e8f0-ab9d-471a-b030-4826c7d2b1dd.md`

@@ -1161,7 +1161,9 @@ describe('runCommandStage review evidence consistency', () => {
         },
         {
           taskId: 'linear-CO-560',
-          omitIssueIdentity: true
+          parentRunId: String(execEnv.CODEX_ORCHESTRATOR_RUN_ID),
+          issueId: 'lin-issue-560',
+          issueIdentifier: 'CO-560'
         }
       );
       return buildSuccessfulExecResult();

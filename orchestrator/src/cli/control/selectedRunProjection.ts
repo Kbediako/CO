@@ -315,9 +315,25 @@ function isSucceededProviderReviewHandoffProofContext(context: ControlCompatibil
     if (context.rawStatus !== 'failed') {
       return true;
     }
-    return providerProofHasSucceededImplementationGateChildStream(proof, context);
+    return (
+      isProviderReviewMissingTelemetryFailureContext(context) &&
+      providerProofHasSucceededImplementationGateChildStream(proof, context)
+    );
   }
   return false;
+}
+
+function isProviderReviewMissingTelemetryFailureContext(context: ControlCompatibilitySourceContext): boolean {
+  const haystack = [
+    context.summary,
+    context.lastError,
+    context.latestEvent?.message,
+    context.latestEvent?.reason
+  ]
+    .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes('review contract: required but telemetry is missing');
 }
 
 function providerProofHasSucceededImplementationGateChildStream(
