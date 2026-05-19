@@ -2075,7 +2075,7 @@ function applyProviderLinearWorkerRunArtifactReconciliation(
     lastError:
       reconciliation.reconciled_status === 'failed'
         ? context.lastError ?? reconciliation.summary
-        : context.lastError,
+        : null,
     latestEvent: {
       ...(context.latestEvent ?? {
         requestedBy: null,

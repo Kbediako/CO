@@ -340,6 +340,7 @@ describe('createSelectedRunProjectionReader', () => {
       rawStatus: 'cancelled',
       displayStatus: 'cancelled',
       statusReason: 'provider_claim_released',
+      lastError: null,
       providerRetryState: null
     });
     expect(selected?.summary).toContain('provider claim is released');
@@ -392,6 +393,7 @@ describe('createSelectedRunProjectionReader', () => {
       rawStatus: 'cancelled',
       displayStatus: 'cancelled',
       statusReason: 'provider_claim_released',
+      lastError: null,
       providerRetryState: null
     });
   });
@@ -574,6 +576,7 @@ describe('createSelectedRunProjectionReader', () => {
       rawStatus: 'cancelled',
       displayStatus: 'cancelled',
       statusReason: 'provider_claim_released',
+      lastError: null,
       providerRetryState: null
     });
     expect(collection.all[0]?.summary).toContain('provider claim is released');
