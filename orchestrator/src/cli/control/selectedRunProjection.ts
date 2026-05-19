@@ -282,12 +282,82 @@ export async function discoverCompatibilityCollectionContexts(
       running.push(discoveredContext);
       continue;
     }
-    if ((context.providerIntakeState?.claims.length ?? 0) === 0 && entry.retryFallbackEligible) {
+    if (
+      (context.providerIntakeState?.claims.length ?? 0) === 0 &&
+      entry.retryFallbackEligible &&
+      isCompatibilityRetryFallbackContext(discoveredContext)
+    ) {
       retrying.push(discoveredContext);
     }
   }
 
   return { running, retrying, all };
+}
+
+function isCompatibilityRetryFallbackContext(context: ControlCompatibilitySourceContext): boolean {
+  if (isSucceededProviderReviewHandoffProofContext(context)) {
+    return false;
+  }
+  return context.rawStatus === 'failed' || context.rawStatus === 'cancelled' || context.rawStatus === 'canceled';
+}
+
+function isSucceededProviderReviewHandoffProofContext(context: ControlCompatibilitySourceContext): boolean {
+  const debugWorker = context.providerDebugSnapshot?.worker ?? null;
+  const proof = (context.providerLinearWorkerProof ?? {}) as Record<string, unknown>;
+  if (debugWorker) {
+    const succeededReviewHandoff =
+      debugWorker.owner_phase === 'ended' &&
+      debugWorker.owner_status === 'succeeded' &&
+      readStringValue(proof, 'end_reason') === 'issue_review_handoff';
+    if (!succeededReviewHandoff) {
+      return false;
+    }
+    if (context.rawStatus !== 'failed') {
+      return true;
+    }
+    return (
+      isProviderReviewMissingTelemetryFailureContext(context) &&
+      providerProofHasSucceededImplementationGateChildStream(proof, context)
+    );
+  }
+  return false;
+}
+
+function isProviderReviewMissingTelemetryFailureContext(context: ControlCompatibilitySourceContext): boolean {
+  const haystack = [
+    context.summary,
+    context.lastError,
+    context.latestEvent?.message,
+    context.latestEvent?.reason
+  ]
+    .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes('review contract: required but telemetry is missing');
+}
+
+function providerProofHasSucceededImplementationGateChildStream(
+  proof: Record<string, unknown>,
+  context: ControlCompatibilitySourceContext
+): boolean {
+  const childStreams = Array.isArray(proof.child_streams) ? proof.child_streams : [];
+  return childStreams.some((entry) => {
+    if (!isRecord(entry)) {
+      return false;
+    }
+    if (
+      readStringValue(entry, 'pipeline_id', 'pipelineId') !== 'implementation-gate' ||
+      readStringValue(entry, 'status') !== 'succeeded'
+    ) {
+      return false;
+    }
+    const issueId = readStringValue(entry, 'issue_id', 'issueId');
+    const issueIdentifier = readStringValue(entry, 'issue_identifier', 'issueIdentifier');
+    return (
+      (!context.issueId || issueId === context.issueId) &&
+      (!context.issueIdentifier || issueIdentifier === context.issueIdentifier)
+    );
+  });
 }
 
 async function readDiscoveredTaskCompatibilityContexts(
