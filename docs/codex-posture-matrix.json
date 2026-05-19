@@ -103,6 +103,21 @@
       ]
     },
     {
+      "path": "docs/skills-release.md",
+      "kind": "bundled_skills_release",
+      "status": "current",
+      "requirements": [
+        {
+          "label": "current CLI target",
+          "contains": "current local posture is Codex CLI `{{current_cli_version}}` with CO-local `{{current_model}}` / `xhigh`"
+        },
+        {
+          "label": "marketplace add expectation",
+          "contains": "Codex CLI `0.122.0+` requires `codex plugin marketplace add`"
+        }
+      ]
+    },
+    {
       "path": "docs/guides/codex-version-policy.md",
       "kind": "version_policy",
       "status": "current",
