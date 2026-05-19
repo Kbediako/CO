@@ -260,6 +260,40 @@ function createProviderIntakeState(
   };
 }
 
+function createTerminalRetryClaim(
+  issueIdentifier: string,
+  issueId: string
+): ProviderIntakeState['claims'][number] {
+  return {
+    provider: 'linear',
+    provider_key: `linear:${issueId}`,
+    issue_id: issueId,
+    issue_identifier: issueIdentifier,
+    issue_title: `${issueIdentifier} terminal retry recurrence`,
+    issue_state: 'Done',
+    issue_state_type: 'completed',
+    issue_updated_at: '2026-05-18T22:55:00.000Z',
+    task_id: `linear-${issueId}`,
+    mapping_source: 'provider_id_fallback',
+    state: 'running',
+    reason: 'provider_issue_rehydrated_active_run',
+    accepted_at: '2026-05-18T22:40:00.000Z',
+    updated_at: '2026-05-18T22:56:00.000Z',
+    last_delivery_id: `${issueId}-delivery`,
+    last_event: 'Issue',
+    last_action: 'update',
+    last_webhook_timestamp: 1_747_611_300_000,
+    run_id: `run-${issueId}`,
+    run_manifest_path: null,
+    launch_source: 'control-host',
+    launch_token: `launch-${issueId}`,
+    retry_queued: true,
+    retry_attempt: 3,
+    retry_due_at: '2026-05-18T23:00:00.000Z',
+    retry_error: 'terminal retry should not consume active WIP'
+  };
+}
+
 function buildLiveLinearDispatchPilot(): Record<string, unknown> {
   return {
     dispatch_pilot: {
@@ -8148,6 +8182,111 @@ describe('ControlRuntime', () => {
         behind: 1
       }
     });
+  });
+
+  it('surfaces stale resident source freshness after shared main fast-forwards without counting terminal retry claims', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T23:05:00.000Z'));
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        createTerminalRetryClaim('CO-512', 'lin-issue-512'),
+        createTerminalRetryClaim('CO-554', 'lin-issue-554'),
+        createTerminalRetryClaim('CO-555', 'lin-issue-555')
+      ]);
+      const fixture = await createFixture({
+        taskId: 'local-mcp',
+        providerIntakeState
+      });
+      const providerIssueHandoff = {
+        handleAcceptedTrackedIssue: vi.fn(),
+        rehydrate: vi.fn(async () => {}),
+        refresh: vi.fn(async () => {})
+      } as unknown as ProviderIssueHandoffService;
+      const repoRoot = await createSourceRootRepo('control-runtime-resident-fast-forward-');
+      const startupFreshness = inspectSourceRootFreshness({
+        intendedRepoRoot: repoRoot,
+        packageRoot: repoRoot,
+        argv: ['node', join(repoRoot, 'bin', 'codex-orchestrator.ts')],
+        cwd: repoRoot,
+        now: () => '2026-05-18T22:40:00.000Z'
+      });
+      const residentHash = git(repoRoot, ['rev-parse', 'HEAD']).stdout.trim();
+
+      initializeProviderPollingHealth(providerIssueHandoff, {
+        intervalMs: 15000,
+        controlHostOwner: {
+          status: 'owned',
+          reason: null,
+          updated_at: '2026-05-18T22:40:00.000Z',
+          diagnostic_path: null,
+          lock_dir: join(repoRoot, '.runs', 'control-host-owner.lock'),
+          owner_path: join(repoRoot, '.runs', 'control-host-owner.json'),
+          owner: {
+            owner_token: 'owner-token',
+            status: 'owned',
+            pid: 123,
+            ppid: 1,
+            hostname: 'host.local',
+            acquired_at: '2026-05-18T22:40:00.000Z',
+            updated_at: '2026-05-18T22:40:00.000Z',
+            released_at: null,
+            repo_root: repoRoot,
+            task_id: 'local-mcp',
+            run_id: 'control-host',
+            run_dir: join(repoRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+            pipeline_id: 'provider-linear-worker',
+            source_root_freshness: startupFreshness,
+            lock_dir: join(repoRoot, '.runs', 'control-host-owner.lock'),
+            owner_path: join(repoRoot, '.runs', 'control-host-owner.json')
+          }
+        }
+      });
+
+      await writeFile(join(repoRoot, 'co-555-recurrence.txt'), 'terminal claims after main advance\n', 'utf8');
+      git(repoRoot, ['add', '.']);
+      git(repoRoot, ['commit', '-m', 'CO-555 main advance']);
+      git(repoRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+      const currentHash = git(repoRoot, ['rev-parse', 'HEAD']).stdout.trim();
+
+      const runtime = createControlRuntime({
+        controlStore: fixture.controlStore,
+        questionQueue: { list: () => [] },
+        paths: fixture.paths,
+        linearAdvisoryState: { tracked_issue: null },
+        providerIntakeState,
+        readProviderIssueHandoff: () => providerIssueHandoff
+      });
+
+      const compatibilityProjection = await runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.providerIntake).toMatchObject({
+        claim_count: 3,
+        active_claim_count: 0,
+        running_claim_count: 0,
+        active_issue_identifiers: [],
+        running_issue_identifiers: []
+      });
+      expect(
+        compatibilityProjection.polling?.control_host_owner?.owner?.source_root_freshness
+      ).toMatchObject({
+        status: 'warning',
+        observed_at: '2026-05-18T23:05:00.000Z',
+        drift_classes: ['supervised_source_root_drift'],
+        source_checkout: {
+          status: 'stale',
+          behind: 1,
+          head: { hash: residentHash },
+          upstream: { hash: currentHash }
+        },
+        intended_checkout: {
+          status: 'current',
+          head: { hash: currentHash },
+          upstream: { hash: currentHash }
+        }
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps startup realpaths when a global control-host launcher is retargeted', async () => {

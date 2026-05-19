@@ -1,6 +1,57 @@
 {
   "items": [
     {
+      "id": "20260518-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e",
+      "title": "CO-515 control-host source freshness recheck after main advances",
+      "relates_to": "tasks/tasks-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "docs_packet_child_lane_produced",
+      "last_review": "2026-05-18",
+      "canonical_owner_key": "control-host:source-freshness-recheck-after-main-advance",
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet-2026-05-18T23-15-56-334Z-bed38666",
+          "date": "2026-05-18",
+          "status": "produced_for_parent_import",
+          "manifest": ".runs/linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e-docs-packet/cli/2026-05-18T23-15-56-334Z-bed38666/manifest.json",
+          "source_anchor": "ctx:sha256:e50fbc86099d15a7bd5e45c23028430bd6de7f985de2237cb5ea66b7673567f2#chunk:c000001",
+          "summary": "Docs-only child lane created the CO-515 packet and registry mirrors for trustworthy control-host source freshness rechecks after local origin/main advances."
+        }
+      },
+      "validation": {
+        "status": "docs_packet_created_parent_validation_pending",
+        "passed": [
+          "parent-relative source payload read",
+          "docs-first packet created",
+          "registry mirrors created",
+          "child scoped JSON parse",
+          "child scoped protected-term check",
+          "child scoped git diff --check"
+        ],
+        "pending": [
+          "parent docs-review before implementation",
+          "parent focused source freshness recheck tests",
+          "parent CO-555 recurrence fixture",
+          "parent implementation gate and review handoff"
+        ]
+      },
+      "paths": {
+        "prd": "docs/PRD-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md",
+        "docs": "docs/TECH_SPEC-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md",
+        "action_plan": "docs/ACTION_PLAN-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md",
+        "spec": "tasks/specs/linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md",
+        "task": "tasks/tasks-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md"
+      },
+      "source_issue": {
+        "id": "5e9dfba2-d54c-474a-94b0-79dbd3c1f18e",
+        "identifier": "CO-515",
+        "url": "https://linear.app/asabeko/issue/CO-515"
+      }
+    },
+    {
       "id": "20260518-linear-a91cfc38-be9e-496f-90bd-5cb2625763a5",
       "title": "CO-555 exclude terminal retryable provider claims from active WIP",
       "relates_to": "tasks/tasks-linear-a91cfc38-be9e-496f-90bd-5cb2625763a5.md",
