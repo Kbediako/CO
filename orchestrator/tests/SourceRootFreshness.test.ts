@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, realpath, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   inspectSourceRootFreshness,
@@ -14,6 +14,7 @@ const roots: string[] = [];
 
 describe('source root freshness inspection', () => {
   afterEach(async () => {
+    vi.useRealTimers();
     await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
   });
 
@@ -256,6 +257,43 @@ describe('source root freshness inspection', () => {
       package_root_source: 'command_path',
       source_root_source: 'package_root'
     });
+  });
+
+  it('does not let a shared-root fast-forward hide stale resident source freshness', async () => {
+    const repoRoot = await createPackageRepo('source-root-resident-fast-forward-', { stale: false });
+    const prior = inspectSourceRootFreshness({
+      intendedRepoRoot: repoRoot,
+      packageRoot: repoRoot,
+      argv: ['node', join(repoRoot, 'bin', 'codex-orchestrator.ts')],
+      cwd: repoRoot,
+      now: () => '2026-05-18T23:00:00.000Z'
+    });
+    const residentHash = git(repoRoot, ['rev-parse', 'HEAD']).stdout.trim();
+
+    await writeFile(join(repoRoot, 'co-555-recurrence.txt'), 'terminal claims after main advance\n', 'utf8');
+    git(repoRoot, ['add', '.']);
+    git(repoRoot, ['commit', '-m', 'CO-555 main advance']);
+    git(repoRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    const currentHash = git(repoRoot, ['rev-parse', 'HEAD']).stdout.trim();
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T23:05:00.000Z'));
+    const refreshed = refreshSourceRootFreshnessInspection(prior, repoRoot);
+
+    expect(refreshed.status).toBe('warning');
+    expect(refreshed.observed_at).toBe('2026-05-18T23:05:00.000Z');
+    expect(refreshed.source_checkout).toMatchObject({
+      status: 'stale',
+      behind: 1,
+      head: { hash: residentHash },
+      upstream: { hash: currentHash }
+    });
+    expect(refreshed.intended_checkout).toMatchObject({
+      status: 'current',
+      head: { hash: currentHash },
+      upstream: { hash: currentHash }
+    });
+    expect(refreshed.drift_classes).toEqual(['supervised_source_root_drift']);
   });
 });
 

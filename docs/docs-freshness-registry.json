@@ -3,6 +3,102 @@
   "generated_at": "2026-05-18",
   "entries": [
     {
+      "path": ".agent/task/linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-18",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5e9dfba2-d54c-474a-94b0-79dbd3c1f18e",
+        "identifier": "CO-515",
+        "url": "https://linear.app/asabeko/issue/CO-515"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-18",
+      "next_review": "2026-06-17"
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-18",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5e9dfba2-d54c-474a-94b0-79dbd3c1f18e",
+        "identifier": "CO-515",
+        "url": "https://linear.app/asabeko/issue/CO-515"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-18",
+      "next_review": "2026-06-17"
+    },
+    {
+      "path": "docs/PRD-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-18",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5e9dfba2-d54c-474a-94b0-79dbd3c1f18e",
+        "identifier": "CO-515",
+        "url": "https://linear.app/asabeko/issue/CO-515"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-18",
+      "next_review": "2026-06-17"
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-18",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5e9dfba2-d54c-474a-94b0-79dbd3c1f18e",
+        "identifier": "CO-515",
+        "url": "https://linear.app/asabeko/issue/CO-515"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-18",
+      "next_review": "2026-06-17"
+    },
+    {
+      "path": "tasks/specs/linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-18",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5e9dfba2-d54c-474a-94b0-79dbd3c1f18e",
+        "identifier": "CO-515",
+        "url": "https://linear.app/asabeko/issue/CO-515"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-18",
+      "next_review": "2026-06-17"
+    },
+    {
+      "path": "tasks/tasks-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-18",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "5e9dfba2-d54c-474a-94b0-79dbd3c1f18e",
+        "identifier": "CO-515",
+        "url": "https://linear.app/asabeko/issue/CO-515"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-18",
+      "next_review": "2026-06-17"
+    },
+    {
       "path": ".agent/AGENTS.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
