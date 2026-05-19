@@ -5,7 +5,7 @@
 - Scope: release-intake packet, registry mirrors, current version-policy classification, and evidence capture; no workflow pins, package pins, local install, cloud promotion, model defaults, or source behavior change.
 - Assumptions:
   - the parent-run source anchor is authoritative for this release-intake lane
-  - the parent source payload is available at `../../.runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/memory/source-0/source.txt` and parent owns final reconciliation
+  - the parent source payload is available at `.runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/memory/source-0/source.txt` and parent owns final reconciliation
   - `.agent/task/templates/codex-cli-release-intake-template.md` is the closeout checklist contract
   - parent owns registry mirrors, all release evidence, Linear/GitHub mutation, validation, workpad, PR lifecycle, and final patch integration
 
@@ -61,8 +61,8 @@
 ## Dependencies
 - Source anchor `ctx:sha256:2bc9d835d25cc769df42134a55d81362f859e6e881c0ba271234658d26152a4b#chunk:c000001`.
 - Source object id `sha256:2bc9d835d25cc769df42134a55d81362f859e6e881c0ba271234658d26152a4b`.
-- Parent manifest `../../.runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/manifest.json`.
-- Parent source payload `../../.runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/memory/source-0/source.txt`.
+- Parent manifest `.runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/manifest.json`.
+- Parent source payload `.runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/memory/source-0/source.txt`.
 - `.agent/task/templates/codex-cli-release-intake-template.md`.
 - `docs/guides/codex-version-policy.md`.
 - `docs/codex-posture-matrix.json`.

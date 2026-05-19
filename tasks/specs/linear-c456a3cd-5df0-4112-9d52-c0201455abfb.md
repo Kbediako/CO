@@ -49,7 +49,7 @@ task_checklists:
   - this lane edits source behavior, package/workflow pins, generated outputs, local install state, release publishing, or model defaults
 - Pre-implementation issue-quality review evidence:
   - 2026-05-19: approved for release-intake packet/classification. The micro-task path is not appropriate because correctness depends on exact release-intake wording, protected terms, evidence axes, and closeout classification.
-  - 2026-05-19: source payload pointer from the parent prompt was checked at `../../.runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/memory/source-0/source.txt`; the source payload, parent prompt, and release-intake template are the operative issue-shaping contract for this packet.
+  - 2026-05-19: source payload pointer from the parent prompt was checked at `.runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/memory/source-0/source.txt`; the source payload, parent prompt, and release-intake template are the operative issue-shaping contract for this packet.
 - Safeguard ownership split:
   - docs child lane owned the initial six-file packet scaffold
   - parent lane owns source reconciliation, registry mirrors, Linear/workpad state, evidence collection, validation, PR lifecycle, and final patch integration

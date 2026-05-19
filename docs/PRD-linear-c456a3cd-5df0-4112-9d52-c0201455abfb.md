@@ -13,8 +13,8 @@
 - Canonical owner marker: `codex-orchestrator:canonical-owner-key=codex-cli-release-intake:stable:0.131.0`
 - Source anchor: `ctx:sha256:2bc9d835d25cc769df42134a55d81362f859e6e881c0ba271234658d26152a4b#chunk:c000001`
 - Source object id: `sha256:2bc9d835d25cc769df42134a55d81362f859e6e881c0ba271234658d26152a4b`
-- Parent manifest pointer: `../../.runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/manifest.json`
-- Parent source payload pointer: `../../.runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/memory/source-0/source.txt`
+- Parent manifest pointer: `.runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/manifest.json`
+- Parent source payload pointer: `.runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/memory/source-0/source.txt`
 - Source payload note: the parent source payload exists at the pointer above and records provider-linear-worker run source metadata for CO-565; the accepted docs child-lane manifest remains separate packet-production evidence.
 
 ## Summary

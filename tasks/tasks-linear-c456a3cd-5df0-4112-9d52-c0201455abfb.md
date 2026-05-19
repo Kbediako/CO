@@ -7,14 +7,14 @@
 - TECH_SPEC mirror: `docs/TECH_SPEC-linear-c456a3cd-5df0-4112-9d52-c0201455abfb.md`
 - Canonical TECH_SPEC: `tasks/specs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-c456a3cd-5df0-4112-9d52-c0201455abfb.md`
-- Parent manifest pointer: `../../.runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/manifest.json`
+- Parent manifest pointer: `.runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/manifest.json`
 - Source anchor: `ctx:sha256:2bc9d835d25cc769df42134a55d81362f859e6e881c0ba271234658d26152a4b#chunk:c000001`
 - Source object id: `sha256:2bc9d835d25cc769df42134a55d81362f859e6e881c0ba271234658d26152a4b`
 - Canonical owner key: `codex-cli-release-intake:stable:0.131.0`
 - Canonical owner marker: `codex-orchestrator:canonical-owner-key=codex-cli-release-intake:stable:0.131.0`
 
 ## Docs-First
-- [x] Source payload path checked in the parent artifact root and reconciled to this packet. Evidence: `../../.runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/memory/source-0/source.txt` exists and records provider-linear-worker run source metadata for CO-565.
+- [x] Source payload path checked in the parent artifact root and reconciled to this packet. Evidence: `.runs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb/cli/2026-05-19T20-55-42-862Z-928a3f57/memory/source-0/source.txt` exists and records provider-linear-worker run source metadata for CO-565.
 - [x] PRD drafted for CO-565 Codex CLI candidate `0.131.0` release-intake. Evidence: `docs/PRD-linear-c456a3cd-5df0-4112-9d52-c0201455abfb.md`.
 - [x] TECH_SPEC mirror drafted with protected terms, evidence axes, supersedes/holds matrix, closeout classification, closure gate, and lane boundaries. Evidence: `docs/TECH_SPEC-linear-c456a3cd-5df0-4112-9d52-c0201455abfb.md`.
 - [x] Canonical task spec drafted with the same release-intake contract. Evidence: `tasks/specs/linear-c456a3cd-5df0-4112-9d52-c0201455abfb.md`.
