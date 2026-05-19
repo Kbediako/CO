@@ -3093,7 +3093,7 @@ export async function createProviderLinearFollowUpIssue(input: {
       followUpIssue: createdIssue
     })
   });
-  if (createdIssue.description !== finalizedDescription) {
+  if (!sameFollowUpDescriptionAfterLinearMarkdownNormalization(createdIssue.description, finalizedDescription)) {
     const updateDescriptionResult = await executeProviderLinearGraphql<IssueDescriptionUpdateMutationResponse>({
       session: session.session,
       operation: 'create-follow-up',
@@ -3820,7 +3820,14 @@ function isLinearMarkdownIndentedCodeLine(line: string): boolean {
 }
 
 function isLinearMarkdownNestedListItemLine(line: string, previousNonEmptyLine: string): boolean {
-  return /^(?: {4,}|\t)[ \t]*\*\s+\S/u.test(line) && isLinearMarkdownNormalizationListItemLine(previousNonEmptyLine);
+  const nestedListItem = parseLinearMarkdownNormalizationListItemLine(line, '*');
+  const parentListItem = parseLinearMarkdownNormalizationListItemLine(previousNonEmptyLine);
+  return (
+    nestedListItem !== null &&
+    parentListItem !== null &&
+    nestedListItem.indent > parentListItem.indent &&
+    nestedListItem.indent <= parentListItem.indent + 4
+  );
 }
 
 function isLinearMarkdownThematicBreakLine(line: string): boolean {
@@ -3873,7 +3880,23 @@ function isLinearMarkdownNormalizationHeadingLine(line: string): boolean {
 }
 
 function isLinearMarkdownNormalizationListItemLine(line: string): boolean {
-  return !isLinearMarkdownThematicBreakLine(line) && /^[ \t]*[-*+]\s+\S/u.test(line);
+  return parseLinearMarkdownNormalizationListItemLine(line) !== null;
+}
+
+function parseLinearMarkdownNormalizationListItemLine(
+  line: string,
+  marker: '-' | '*' | null = null
+): { indent: number } | null {
+  if (isLinearMarkdownThematicBreakLine(line)) {
+    return null;
+  }
+  const markerPattern = marker === '*' ? '\\*' : marker ?? '[-*]';
+  const listItemMatch = line.match(new RegExp(`^([ \\t]*)${markerPattern}\\s+\\S`, 'u'));
+  return listItemMatch ? { indent: getLinearMarkdownIndentWidth(listItemMatch[1]) } : null;
+}
+
+function getLinearMarkdownIndentWidth(indent: string): number {
+  return [...indent].reduce((width, char) => width + (char === '\t' ? 4 : 1), 0);
 }
 
 function normalizeFollowUpSourceIssueTraceabilityLine(description: string): string {
