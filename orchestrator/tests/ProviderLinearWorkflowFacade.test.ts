@@ -13243,6 +13243,11 @@ describe('providerLinearWorkflowFacade', () => {
       'a thematic break is not bullet-normalized',
       ['Investigate the remaining improvement.', '', '* * *'].join('\n'),
       (description: string) => description.replace('* * *', '- * *')
+    ],
+    [
+      'an indented code line after a thematic break is not bullet-normalized',
+      ['Investigate the remaining improvement.', '', '* * *', '    * keep literal bullet.'].join('\n'),
+      (description: string) => description.replace('    * keep literal bullet.', '    - keep literal bullet.')
     ]
   ])('fails closed when %s after follow-up traceability update', async (_label, inputDescription, drift) => {
     const finalDescription = buildExpectedFollowUpDescription({

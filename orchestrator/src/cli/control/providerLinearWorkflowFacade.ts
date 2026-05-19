@@ -3873,7 +3873,7 @@ function isLinearMarkdownNormalizationHeadingLine(line: string): boolean {
 }
 
 function isLinearMarkdownNormalizationListItemLine(line: string): boolean {
-  return /^[ \t]*[-*+]\s+\S/u.test(line);
+  return !isLinearMarkdownThematicBreakLine(line) && /^[ \t]*[-*+]\s+\S/u.test(line);
 }
 
 function normalizeFollowUpSourceIssueTraceabilityLine(description: string): string {
