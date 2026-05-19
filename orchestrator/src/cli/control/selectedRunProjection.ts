@@ -282,12 +282,36 @@ export async function discoverCompatibilityCollectionContexts(
       running.push(discoveredContext);
       continue;
     }
-    if ((context.providerIntakeState?.claims.length ?? 0) === 0 && entry.retryFallbackEligible) {
+    if (
+      (context.providerIntakeState?.claims.length ?? 0) === 0 &&
+      entry.retryFallbackEligible &&
+      isCompatibilityRetryFallbackContext(discoveredContext)
+    ) {
       retrying.push(discoveredContext);
     }
   }
 
   return { running, retrying, all };
+}
+
+function isCompatibilityRetryFallbackContext(context: ControlCompatibilitySourceContext): boolean {
+  if (isSucceededProviderReviewHandoffProofContext(context)) {
+    return false;
+  }
+  return context.rawStatus === 'failed' || context.rawStatus === 'cancelled' || context.rawStatus === 'canceled';
+}
+
+function isSucceededProviderReviewHandoffProofContext(context: ControlCompatibilitySourceContext): boolean {
+  const debugWorker = context.providerDebugSnapshot?.worker ?? null;
+  if (debugWorker) {
+    return (
+      debugWorker.owner_phase === 'ended' &&
+      debugWorker.owner_status === 'succeeded' &&
+      readStringValue((context.providerLinearWorkerProof ?? {}) as Record<string, unknown>, 'end_reason') ===
+        'issue_review_handoff'
+    );
+  }
+  return false;
 }
 
 async function readDiscoveredTaskCompatibilityContexts(

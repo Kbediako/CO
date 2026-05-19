@@ -1020,6 +1020,124 @@ describe('runCommandStage review evidence consistency', () => {
     expect(manifest.commands[0]?.error_file).toBeNull();
   });
 
+  it('accepts clean nested implementation-gate review evidence when parent provider telemetry is absent', async () => {
+    mockState.runImpl = async (input) => {
+      const execEnv = (input.env ?? {}) as NodeJS.ProcessEnv;
+      const proofAttemptStartedAt = new Date().toISOString();
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        attempt_started_at: proofAttemptStartedAt,
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff',
+        workspace_path: String(execEnv.CODEX_ORCHESTRATOR_ROOT),
+        linear_audit: {
+          latest_by_operation: {
+            transition: {
+              operation: 'transition',
+              ok: true,
+              issue_id: 'lin-issue-1',
+              action: 'In Progress -> In Review',
+              recorded_at: new Date(Date.parse(proofAttemptStartedAt) + 1).toISOString()
+            }
+          }
+        }
+      });
+      await rm(join(String(execEnv.CODEX_ORCHESTRATOR_RUN_DIR), 'review'), {
+        recursive: true,
+        force: true
+      });
+      await writeNestedImplementationGateReviewArtifacts(input, {
+        generated_at: new Date(Date.parse(proofAttemptStartedAt) + 2).toISOString()
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with nested review evidence',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with nested implementation-gate review evidence'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toContain('Provider linear worker reached review handoff.');
+    expect(result.summary).toContain('semantic review verdict: clean');
+    expect(result.summary).toContain('review contract: mode=enforce, validation=valid, overall=clean');
+    expect(result.summary).toContain('review evidence source: nested implementation-gate');
+    expect(manifest.commands[0]?.status).toBe('succeeded');
+    expect(manifest.commands[0]?.error_file).toBeNull();
+    await expect(readFile(join(paths.runDir, 'review', 'telemetry.json'), 'utf8')).rejects.toThrow();
+  });
+
+  it('fails closed when nested implementation-gate review evidence is not bound to the provider issue', async () => {
+    mockState.runImpl = async (input) => {
+      const execEnv = (input.env ?? {}) as NodeJS.ProcessEnv;
+      const proofAttemptStartedAt = new Date().toISOString();
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        issue_id: 'lin-issue-56',
+        issue_identifier: 'CO-56',
+        attempt_started_at: proofAttemptStartedAt,
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff',
+        workspace_path: String(execEnv.CODEX_ORCHESTRATOR_ROOT)
+      });
+      await rm(join(String(execEnv.CODEX_ORCHESTRATOR_RUN_DIR), 'review'), {
+        recursive: true,
+        force: true
+      });
+      await writeNestedImplementationGateReviewArtifacts(
+        input,
+        {
+          generated_at: new Date(Date.parse(proofAttemptStartedAt) + 2).toISOString()
+        },
+        {
+          taskId: 'linear-CO-560',
+          omitIssueIdentity: true
+        }
+      );
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with unbound nested review evidence',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with unbound nested implementation-gate review evidence'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('Provider linear worker failed because standalone review did not produce a concrete verdict.');
+    expect(result.summary).toContain('review contract: required but telemetry is missing');
+    expect(result.summary).toContain('expected review telemetry path:');
+    expect(result.summary).not.toContain('review evidence source: nested implementation-gate');
+
+    const errorPayload = JSON.parse(
+      await readFile(join(env.repoRoot, manifest.commands[0]?.error_file as string), 'utf8')
+    ) as { reason?: string; details?: Record<string, unknown> };
+    expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
+    expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_unknown');
+    expect(errorPayload.details?.review_telemetry_path).toBe(relative(env.repoRoot, join(paths.runDir, 'review', 'telemetry.json')));
+  });
+
   it('requires review telemetry to be fresh for the provider proof attempt', async () => {
     mockState.runImpl = async (input) => {
       const now = Date.now();
@@ -2765,6 +2883,85 @@ async function writeProviderLinearWorkerProofArtifacts(
       linear_audit: null,
       ...overrides
     }),
+    'utf8'
+  );
+}
+
+async function writeNestedImplementationGateReviewArtifacts(
+  input: Record<string, unknown>,
+  overrides: ReviewArtifactOverrides = {},
+  options: {
+    taskId?: string;
+    issueId?: string;
+    issueIdentifier?: string;
+    omitIssueIdentity?: boolean;
+  } = {}
+): Promise<void> {
+  const execEnv = (input.env ?? {}) as NodeJS.ProcessEnv;
+  const repoRoot = String(execEnv.CODEX_ORCHESTRATOR_ROOT);
+  const taskId = options.taskId ?? 'linear-lin-issue-1';
+  const runDir = join(repoRoot, '.runs', taskId, 'cli', '2026-05-19T00-00-00-000Z-implementation-gate');
+  const contractPath = join(runDir, 'review', 'contract.json');
+  const issueIdentity = options.omitIssueIdentity === true
+    ? {}
+    : {
+        issue_id: options.issueId ?? 'lin-issue-1',
+        issue_identifier: options.issueIdentifier ?? 'CO-2'
+      };
+  await mkdir(runDir, { recursive: true });
+  await writeFile(
+    join(runDir, 'manifest.json'),
+    `${JSON.stringify(
+      {
+        run_id: '2026-05-19T00-00-00-000Z-implementation-gate',
+        task_id: taskId,
+        pipeline_id: 'implementation-gate',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        ...issueIdentity,
+        started_at: '2026-05-19T00:00:00.000Z',
+        updated_at: overrides.generated_at ?? new Date().toISOString(),
+        completed_at: overrides.generated_at ?? new Date().toISOString()
+      },
+      null,
+      2
+    )}\n`,
+    'utf8'
+  );
+  await writeReviewArtifacts(
+    {
+      ...input,
+      env: {
+        ...execEnv,
+        CODEX_ORCHESTRATOR_RUN_DIR: runDir
+      }
+    },
+    {
+      ...cleanGovernedReviewArtifactOverrides({
+        contract_path: relative(repoRoot, contractPath),
+        omitContractArtifact: true
+      }),
+      ...overrides
+    }
+  );
+  await writeFile(
+    contractPath,
+    `${JSON.stringify(
+      {
+        schema_version: 'co.review.contract.v1',
+        overall_verdict: 'clean',
+        axes: {
+          spec_conformance: { verdict: 'clean', clean_signal: 'test fixture', findings: [] },
+          coding_standards: { verdict: 'clean', clean_signal: 'test fixture', findings: [] },
+          code_changes: { verdict: 'clean', clean_signal: 'test fixture', findings: [] },
+          agent_loop: { verdict: 'clean', clean_signal: 'test fixture', findings: [] }
+        },
+        code_change_proposals: [],
+        agent_loop_proposals: []
+      },
+      null,
+      2
+    )}\n`,
     'utf8'
   );
 }
