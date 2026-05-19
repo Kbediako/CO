@@ -364,7 +364,7 @@ function simulateLinearBulletMarkerNormalization(description: string): string {
 }
 
 function simulateLinearHeadingListSpacing(description: string): string {
-  return description.replace(/^(## [^\n]+)\n(?=[-*] )/gmu, '$1\n\n');
+  return description.replace(/^(## [^\n]+)\n(?=(?:[-*]|\d+[.)]) )/gmu, '$1\n\n');
 }
 
 function simulateLinearMarkdownNormalization(description: string): string {
@@ -13166,7 +13166,10 @@ describe('providerLinearWorkflowFacade', () => {
       'nested bullet markers under an ordered parent',
       ['Investigate the remaining improvement.', '', '1. Parent item', '    * Child item'].join('\n'),
       (description: string) => description.replace('    * Child item', '    - Child item')
-    ]
+    ],
+    ['nested sibling bullet markers', ['Investigate the remaining improvement.', '', '- Parent item', '    * First child', '    * Second child'].join('\n'), (description: string) => description.replaceAll('    * ', '    - ')],
+    ['heading spacing before an ordered list', ['Investigate the remaining improvement.', '', '## Steps', '1. Do it'].join('\n'), simulateLinearHeadingListSpacing],
+    ['blockquoted bullet markers', ['Investigate the remaining improvement.', '', '> * Quoted item'].join('\n'), (description: string) => description.replace('> * Quoted item', '> - Quoted item')]
   ])('accepts Linear-normalized %s after follow-up traceability update', async (_label, inputDescription, normalize) => {
     const finalDescription = buildExpectedFollowUpDescription({
       includeTraceability: true
@@ -13268,7 +13271,9 @@ describe('providerLinearWorkflowFacade', () => {
       'an indented code line after a dash thematic break is not bullet-normalized',
       ['Investigate the remaining improvement.', '', '- - -', '    * keep literal bullet.'].join('\n'),
       (description: string) => description.replace('    * keep literal bullet.', '    - keep literal bullet.')
-    ]
+    ],
+    ['a mixed space-tab indented code line is not bullet-normalized', ['Investigate the remaining improvement.', '', ' \t* keep literal bullet.'].join('\n'), (description: string) => description.replace(' \t* keep literal bullet.', ' \t- keep literal bullet.')],
+    ['a blockquoted thematic break is not bullet-normalized', ['Investigate the remaining improvement.', '', '> * * *'].join('\n'), (description: string) => description.replace('> * * *', '> - * *')]
   ])('fails closed when %s after follow-up traceability update', async (_label, inputDescription, drift) => {
     const finalDescription = buildExpectedFollowUpDescription({
       includeTraceability: true

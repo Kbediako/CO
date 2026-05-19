@@ -3770,14 +3770,14 @@ function normalizeLinearPersistedMarkdownForComparison(description: string): str
 
     if (
       (isLinearMarkdownIndentedCodeLine(line) &&
-        !isLinearMarkdownNestedListItemLine(line, peekPreviousNonEmptyLine(normalizedLines))) ||
-      isLinearMarkdownThematicBreakLine(line)
+        !isLinearMarkdownNestedListItemLine(line, normalizedLines)) ||
+      isLinearMarkdownThematicBreakLine(line) || isLinearMarkdownThematicBreakLine(line.replace(/^(?:[ \t]{0,3}>[ \t]?)+/u, ''))
     ) {
       normalizedLines.push(line);
       continue;
     }
 
-    normalizedLines.push(line.replace(/^([ \t]*)\*\s+/u, '$1- '));
+    normalizedLines.push(line.replace(/^([ \t]*)\*\s+/u, '$1- ').replace(/^((?:[ \t]{0,3}>[ \t]?)+[ ]{0,3})\*\s+/u, '$1- '));
   }
 
   return collapseLinearHeadingListSpacing(normalizedLines).join('\n');
@@ -3816,18 +3816,24 @@ function nextLinearMarkdownFenceState(
 }
 
 function isLinearMarkdownIndentedCodeLine(line: string): boolean {
-  return /^(?: {4,}|\t)/u.test(line);
+  return getLinearMarkdownIndentWidth(line.match(/^[ \t]*/u)?.[0] ?? '') >= 4;
 }
 
-function isLinearMarkdownNestedListItemLine(line: string, previousNonEmptyLine: string): boolean {
+function isLinearMarkdownNestedListItemLine(line: string, previousLines: readonly string[]): boolean {
   const nestedListItem = parseLinearMarkdownNormalizationListItemLine(line, '*');
-  const parentListItem = parseLinearMarkdownNormalizationListItemLine(previousNonEmptyLine);
-  return (
-    nestedListItem !== null &&
-    parentListItem !== null && parentListItem.indent <= 3 &&
-    nestedListItem.indent > parentListItem.indent &&
-    nestedListItem.indent <= parentListItem.indent + 4
-  );
+  if (nestedListItem === null) return false;
+  for (let index = previousLines.length - 1; index >= 0; index -= 1) {
+    if (previousLines[index].trim() === '') continue;
+    const parentListItem = parseLinearMarkdownNormalizationListItemLine(previousLines[index]);
+    if (parentListItem === null) {
+      return false;
+    }
+    if (parentListItem.indent >= nestedListItem.indent) {
+      continue;
+    }
+    return parentListItem.indent <= 3 && nestedListItem.indent <= parentListItem.indent + 4;
+  }
+  return false;
 }
 
 function isLinearMarkdownThematicBreakLine(line: string): boolean {
@@ -3859,15 +3865,6 @@ function collapseLinearHeadingListSpacing(lines: string[]): string[] {
 
 function peekNextNonEmptyLine(lines: readonly string[], startIndex: number): string {
   for (let index = startIndex; index < lines.length; index += 1) {
-    if (lines[index].trim() !== '') {
-      return lines[index];
-    }
-  }
-  return '';
-}
-
-function peekPreviousNonEmptyLine(lines: readonly string[]): string {
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
     if (lines[index].trim() !== '') {
       return lines[index];
     }
