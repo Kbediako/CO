@@ -16,6 +16,21 @@
 - Fallback / refactor decision: touches stale cached/run-summary projection behavior. Remove stale failed-summary current authority for passive released owner claims; justify retaining provider-intake/raw run artifacts as durable audit evidence.
 - Durable retention evidence: `provider-intake-state.json` rows and old run manifests remain retained as audit state, not current status authority.
 - Large-refactor check: no large refactor needed because selected-run/compatibility projection is the existing bounded authority seam.
+- Minor-seam decision: acceptable because the implementation removes stale failed-summary current authority at the existing selected-run projection seam without adding a second status authority.
+
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Status projection | Stale `failed` run summary can outrank passive released owner truth. | `remove fallback` | CO-562 | Provider-intake has `released` / `provider_issue_released:not_active`, Backlog issue metadata, and no active retry. | Existing pre-CO-562 behavior | 2026-05-19 | This issue | Passive owner no longer projects as active/retrying/failed while real failed runs remain visible. | Focused selected-run/status projection regressions. |
+| Provider-intake audit state | Contract name: provider-intake raw released-owner audit state; raw released rows and old manifests remain available for audit. | `justify retaining fallback` | Owning surface: provider-intake control-host state. | Steady-state proof: provider-intake remains raw audit authority while status projection chooses current display from claim state and workflow metadata. | Existing provider-intake contract | 2026-05-19 | Non-expiring durable retention only with rationale. | Non-expiring rationale: raw claim and run artifacts are durable audit evidence, not temporary status compatibility debt; replace only with equivalent source-labeled historical claim/run evidence. | Tests/docs: focused selected-run projection regressions plus docs packet prove retained audit state stays visible without current WIP or failed projection. |
+
+Durable retention evidence:
+- Contract name: provider-intake raw released-owner audit state.
+- Owning surface: provider-intake control-host state.
+- Steady-state proof: provider-intake remains raw audit authority while status projection chooses current display from claim state and workflow metadata.
+- Tests/docs: focused selected-run projection regressions plus docs packet prove retained audit state stays visible without current WIP or failed projection.
+- Non-expiring rationale: raw claim and run artifacts are durable audit evidence, not temporary status compatibility debt.
 
 ## Milestones & Sequencing
 1. Workflow setup.
