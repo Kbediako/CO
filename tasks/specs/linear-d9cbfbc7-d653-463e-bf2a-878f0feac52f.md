@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-d9cbfbc7-d653-463e-bf2a-878f0feac52f.md
 risk: medium
 owners:
   - Codex
-last_review: 2026-04-26
+last_review: 2026-05-19
 ---
 
 # Mini Spec - CO-374 archive Core Lane dispatch discovery break

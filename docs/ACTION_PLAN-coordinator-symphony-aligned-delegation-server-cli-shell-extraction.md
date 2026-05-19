@@ -1,8 +1,7 @@
 # ACTION_PLAN: Coordinator Symphony-Aligned Delegation Server CLI Shell Extraction
 
-## Steps
+<!-- docs-archive:stub -->
+> Archived on 2026-05-18. Full content: https://github.com/Kbediako/CO/blob/doc-archives/docs/ACTION_PLAN-coordinator-symphony-aligned-delegation-server-cli-shell-extraction.md
 
-1. Isolate the current `delegation-server` shell contract in `bin/codex-orchestrator.ts`.
-2. Extract that shell into a dedicated module while preserving help gating, mode resolution, override parsing, and warn-only fallback semantics.
-3. Add focused helper and/or CLI parity coverage for the extracted boundary.
-4. Run the bounded validation lane, recording any pre-existing unrelated carry-forwards explicitly.
+- Archive branch: doc-archives
+- Archive path: docs/ACTION_PLAN-coordinator-symphony-aligned-delegation-server-cli-shell-extraction.md

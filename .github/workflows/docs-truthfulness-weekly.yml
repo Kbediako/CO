@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
+      actions: write
       contents: read
     env:
       MCP_RUNNER_TASK_ID: docs-truthfulness-maintenance
@@ -43,12 +44,54 @@ jobs:
             --freshness-report "$REPORT_DIR/docs-freshness.json" \
             --report "$REPORT_DIR/docs-freshness-maintenance.json" \
             --summary-markdown "$REPORT_DIR/docs-freshness-summary.md"
+          npm run docs:archive-implementation -- \
+            --dry-run \
+            --out "$REPORT_DIR/implementation-docs-archive"
           npm run repo:stewardship -- \
             --warn \
             --report "$REPORT_DIR/repo-stewardship.json" \
             --summary-markdown "$REPORT_DIR/repo-stewardship-summary.md"
 
+      - name: Trigger mechanical archive self-heal when needed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ARCHIVE_SELF_HEAL_MODE="$(node <<'NODE'
+          const fs = require('fs');
+          const reportPath = `${process.env.REPORT_DIR}/implementation-docs-archive/docs-archive-report.json`;
+          const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+          const archived = report.totals?.archived ?? 0;
+          const registryRepairs = report.totals?.registry_repairs ?? 0;
+          const archivePayloadRequired =
+            report.action_path?.archive_payload_required === true ||
+            (report.action_path?.archive_payload_required !== false &&
+              report.action_path?.action_required === true &&
+              archived > 0);
+          const registryRepairRequired = report.action_path?.registry_repair_required === true;
+          const actionRequired = archivePayloadRequired || registryRepairRequired;
+          fs.appendFileSync(
+            process.env.GITHUB_STEP_SUMMARY,
+            [
+              '',
+              '## Implementation Docs Archive Forecast',
+              '',
+              `- Mechanical archive candidates: ${archived}`,
+              `- Registry-only repairs: ${registryRepairs}`,
+              `- Stray candidates: ${report.totals?.stray_candidates ?? 0}`,
+              `- Self-heal workflow: ${actionRequired ? 'requested' : 'not required'}`
+            ].join('\n') + '\n'
+          );
+          process.stdout.write(actionRequired ? (archivePayloadRequired ? 'archive' : 'registry-only') : 'none');
+          NODE
+          )"
+          if [ "$ARCHIVE_SELF_HEAL_MODE" = "archive" ]; then
+            gh workflow run implementation-docs-archive-automation.yml --ref main
+          elif [ "$ARCHIVE_SELF_HEAL_MODE" = "registry-only" ]; then
+            gh workflow run implementation-docs-archive-automation.yml --ref main -f allow_registry_only=true
+          fi
+
       - name: Publish workflow summary
+        if: always()
         run: |
           cat "$REPORT_DIR/docs-freshness-summary.md" >> "$GITHUB_STEP_SUMMARY"
           node <<'NODE'
@@ -60,6 +103,7 @@ jobs:
           const evidence = report.owner_action_evidence && typeof report.owner_action_evidence === 'object'
             ? report.owner_action_evidence
             : {};
+          const gate = report.repo_gate && typeof report.repo_gate === 'object' ? report.repo_gate : {};
           const actions = Array.isArray(evidence.actions) ? evidence.actions : [];
           const action = actions.find((item) => item && typeof item === 'object') || {};
           const copyableCommands = actions
@@ -90,6 +134,10 @@ jobs:
             `- Decision: ${report.freshness_decision || 'unknown'}`,
             `- Owner issue: ${report.owner_issue || 'none'}`,
             `- Policy capacity: ${report.policy_capacity_status?.status || 'unknown'}`,
+            `- Repo gate severity: ${gate.severity || 'unknown'}`,
+            `- Repo gate actions: ${gate.action_required_count ?? 0}`,
+            `- Blocks unrelated lanes: ${gate.blocks_unrelated_lanes === true ? 'yes' : 'no'}`,
+            `- Blocks handoff: ${gate.blocks_handoff === true ? 'yes' : 'no'}`,
             `- Recommended action: ${report.recommended_action || 'none'}`,
             '',
             '### Canonical Owner Action Evidence',
@@ -121,5 +169,6 @@ jobs:
             ${{ env.REPORT_DIR }}/docs-freshness.json
             ${{ env.REPORT_DIR }}/docs-freshness-maintenance.json
             ${{ env.REPORT_DIR }}/docs-freshness-summary.md
+            ${{ env.REPORT_DIR }}/implementation-docs-archive/docs-archive-report.json
             ${{ env.REPORT_DIR }}/repo-stewardship.json
             ${{ env.REPORT_DIR }}/repo-stewardship-summary.md

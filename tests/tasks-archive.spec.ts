@@ -603,6 +603,27 @@ describe('tasks-archive script', () => {
     expect(tasksContent).toContain('linear-6ed6ef11-538e-48f0-936c-8547632bf92e');
   });
 
+  it('reports terminal-looking snapshots blocked by nonterminal index status', async () => {
+    const repo = await initRepository({
+      completedTaskIndexEntry: {
+        status: 'approved'
+      }
+    });
+
+    await expect(
+      execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+        cwd: repo,
+        env: {
+          ...process.env,
+          CODEX_ORCHESTRATOR_ROOT: repo,
+          CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+        }
+      })
+    ).rejects.toThrow(
+      /Terminal-looking snapshots blocked by nonterminal tasks\/index\.json status: linear-6ed6ef11-538e-48f0-936c-8547632bf92e \(status=approved\)/i
+    );
+  });
+
   it('does not append duplicate header-only archive sections when the archive already contains the task key', async () => {
     const repo = await initRepository();
     const existingArchivePath = join(repo, 'docs', `TASKS-archive-${archiveYear}.md`);
@@ -694,5 +715,80 @@ describe('tasks-archive script', () => {
     expect(tasksContent).toContain('1004-active-task');
     expect(remainingCompletedCandidates).toHaveLength(1);
     expect(normalizedLineCount).toBeLessThanOrEqual(6);
+  });
+
+  it('does not archive the structural archive index with an adjacent header-only snapshot', async () => {
+    const repo = await mkdtemp(join(tmpdir(), 'tasks-archive-index-adjacent-'));
+    createdDirs.push(repo);
+
+    await mkdir(join(repo, 'docs'), { recursive: true });
+    await mkdir(join(repo, 'tasks'), { recursive: true });
+
+    await writeFile(
+      join(repo, 'docs', 'tasks-archive-policy.json'),
+      JSON.stringify(
+        {
+          version: 1,
+          max_lines: 5,
+          reserve_lines: 1,
+          archive_branch: 'task-archives',
+          archive_file_pattern: 'docs/TASKS-archive-YYYY.md',
+          repo_url: 'https://github.com/example/repo'
+        },
+        null,
+        2
+      )
+    );
+    await writeFile(
+      join(repo, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '1302',
+              title: 'Header-only completed candidate',
+              paths: {
+                task: 'tasks/tasks-1302-header-only-completed-candidate.md'
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeFile(
+      join(repo, 'docs', 'TASKS.md'),
+      [
+        '# Task List Snapshot - Header-only completed candidate (1302-header-only-completed-candidate) - Update 2026-04-13: completed',
+        '',
+        '<!-- tasks-archive-index:begin --> ## Archive index - archived task snapshots live on the task-archives branch. 2026: https://github.com/example/repo/blob/task-archives/docs/TASKS-archive-2026.md <!-- tasks-archive-index:end -->',
+        '',
+        '# Task List Snapshot - Active task (1303-active-task)',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    await execFileAsync('node', [scriptPath, '--out', 'docs/TASKS-archive-YYYY.md'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const tasksContent = await readFile(join(repo, 'docs', 'TASKS.md'), 'utf8');
+    const archiveContent = await readFile(join(repo, 'docs', 'TASKS-archive-2026.md'), 'utf8');
+    const normalizedLineCount = tasksContent.trimEnd().split('\n').length;
+
+    expect(tasksContent).toContain('tasks-archive-index:begin');
+    expect(tasksContent).toContain('1303-active-task');
+    expect(tasksContent).not.toContain('1302-header-only-completed-candidate');
+    expect(archiveContent).toContain('1302-header-only-completed-candidate');
+    expect(archiveContent).not.toContain('tasks-archive-index:begin');
+    expect(normalizedLineCount).toBeLessThanOrEqual(4);
   });
 });

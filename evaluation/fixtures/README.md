@@ -9,6 +9,7 @@ Fixtures provide deterministic workspaces for exercising language adapters in th
 - `rlm-oolong` — OOLONG-inspired linear aggregation fixture (local sample + optional HF fetch). Scenario: `rlm-oolong`.
 - `rlm-oolong-pairs` — OOLONG-Pairs fixture (pairwise constraints, local sample + optional HF fetch). Scenario: `rlm-oolong-pairs`.
 - `provider-linear-adoption` — Sanitized provider-linear run artifacts for `npm run eval:provider-adoption`, covering source_0, prompt-pack, parallelization, child-lane, follow-up, link, and workpad adoption metrics.
+- `review-contract` — Sanitized governed-review contract cases covering spec, standards, code proposal, agent-loop proposal, and legacy prose-clean fail-closed scenarios.
 
 All fixtures are treated as read-only source material. The harness copies the fixture to a temporary directory when a scenario or adapter command sets `requiresCleanFixture` to `true`.
 The OOLONG fixtures also support optional fallback length matching and repeatability checks; see each fixture README for configuration.

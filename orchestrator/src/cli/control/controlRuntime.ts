@@ -6,6 +6,7 @@ import {
   cloneProviderWorkflowStatusPayload,
   type ProviderWorkflowConfigStore
 } from './providerWorkflowConfigStore.js';
+import { readDocsFreshnessMaintainRepoGate } from './docsFreshnessRepoGate.js';
 import type { LinearBudgetStatus } from './linearBudgetState.js';
 import {
   readProviderPollingHealth,
@@ -17,7 +18,10 @@ import {
 } from './controlHostOwnership.js';
 import {
   buildProviderIntakeSummary,
+  hasQueuedProviderIntakeRetry,
+  isActiveProviderIntakeClaim,
   isRecordLike,
+  isTerminalProviderIntakeIssueState,
   type ProviderIntakeClaimRecord,
   type ProviderIntakeState
 } from './providerIntakeState.js';
@@ -196,7 +200,7 @@ function createControlRuntimeSnapshot(
     const authorityContext = buildProviderIntakeAuthorityContext(context, providerIntakeAuthority);
     const authorityFingerprint = buildProviderIntakeAuthorityFingerprint(providerIntakeAuthority);
     if (selectedRunSnapshotPromise && selectedRunAuthorityFingerprint === authorityFingerprint) {
-      return selectedRunSnapshotPromise;
+      return refreshSelectedRunSnapshotRepoGates(await selectedRunSnapshotPromise, context, providerIntakeAuthority);
     }
     selectedRunSnapshotPromise = null;
     selectedRunAuthorityFingerprint = authorityFingerprint;
@@ -234,10 +238,13 @@ function createControlRuntimeSnapshot(
         tracked,
         providerIntake,
         providerIntakeUnavailable: providerIntakeAuthority.unavailable,
-        providerWorkflow
+        providerWorkflow,
+        repoGates: {
+          docs_freshness_maintain: null
+        }
       };
     })();
-    return selectedRunSnapshotPromise;
+    return refreshSelectedRunSnapshotRepoGates(await selectedRunSnapshotPromise, context, providerIntakeAuthority);
   }
 
   async function readCompatibilityRuntimeSnapshot(
@@ -246,7 +253,11 @@ function createControlRuntimeSnapshot(
     const authorityContext = buildProviderIntakeAuthorityContext(context, providerIntakeAuthority);
     const authorityFingerprint = buildProviderIntakeAuthorityFingerprint(providerIntakeAuthority);
     if (compatibilityRuntimeSnapshotPromise && compatibilityAuthorityFingerprint === authorityFingerprint) {
-      return compatibilityRuntimeSnapshotPromise;
+      return refreshCompatibilityRuntimeSnapshotRepoGates(
+        await compatibilityRuntimeSnapshotPromise,
+        context,
+        providerIntakeAuthority
+      );
     }
     compatibilityRuntimeSnapshotPromise = null;
     compatibilityAuthorityFingerprint = authorityFingerprint;
@@ -338,10 +349,17 @@ function createControlRuntimeSnapshot(
         providerIntakeUnavailable: providerIntakeAuthority.unavailable,
         providerIntakeAuthority,
         providerWorkflow,
+        repoGates: {
+          docs_freshness_maintain: null
+        },
         polling
       };
     })();
-    return compatibilityRuntimeSnapshotPromise;
+    return refreshCompatibilityRuntimeSnapshotRepoGates(
+      await compatibilityRuntimeSnapshotPromise,
+      context,
+      providerIntakeAuthority
+    );
   }
 
   async function readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot> {
@@ -363,7 +381,14 @@ function createControlRuntimeSnapshot(
       rateLimits,
       polling,
       providerIntake: buildProviderIntakeSummary(providerIntakeAuthority.state),
-      providerIntakeUnavailable: providerIntakeAuthority.unavailable
+      providerIntakeUnavailable: providerIntakeAuthority.unavailable,
+      repoGates: {
+        docs_freshness_maintain: readRuntimeDocsFreshnessRepoGate(
+          context,
+          providerIntakeAuthority,
+          collectCompatibilityRepoGateTaskIds(runtimeSnapshot)
+        )
+      }
     };
   }
 
@@ -407,6 +432,77 @@ function createControlRuntimeSnapshot(
       await readSelectedRunSnapshot();
     }
   };
+}
+
+function readRuntimeDocsFreshnessRepoGate(
+  context: ControlRuntimeContext,
+  providerIntakeAuthority: ProviderIntakeAuthoritySnapshot,
+  extraTaskIds: Array<string | null | undefined> = []
+): ReturnType<typeof readDocsFreshnessMaintainRepoGate> {
+  const providerIntake = providerIntakeAuthority.state;
+  const taskIds = uniqueRuntimeTaskIds([
+    ...extraTaskIds,
+    ...(providerIntake?.claims
+      ?.filter(isActiveProviderIntakeClaim)
+      ?.map((claim) => claim.task_id) ?? [])
+  ]);
+  return readDocsFreshnessMaintainRepoGate({ env: context.env, taskIds });
+}
+
+function refreshSelectedRunSnapshotRepoGates(
+  snapshot: ControlSelectedRunRuntimeSnapshot,
+  context: ControlRuntimeContext,
+  providerIntakeAuthority: ProviderIntakeAuthoritySnapshot
+): ControlSelectedRunRuntimeSnapshot {
+  return {
+    ...snapshot,
+    repoGates: {
+      ...snapshot.repoGates,
+      docs_freshness_maintain: readRuntimeDocsFreshnessRepoGate(
+        context,
+        providerIntakeAuthority,
+        [snapshot.selected?.taskId]
+      )
+    }
+  };
+}
+
+function refreshCompatibilityRuntimeSnapshotRepoGates(
+  snapshot: InternalControlCompatibilityRuntimeSnapshot,
+  context: ControlRuntimeContext,
+  providerIntakeAuthority: ProviderIntakeAuthoritySnapshot
+): InternalControlCompatibilityRuntimeSnapshot {
+  return {
+    ...snapshot,
+    repoGates: {
+      ...snapshot.repoGates,
+      docs_freshness_maintain: readRuntimeDocsFreshnessRepoGate(
+        context,
+        providerIntakeAuthority,
+        collectCompatibilityRepoGateTaskIds(snapshot)
+      )
+    }
+  };
+}
+
+function collectCompatibilityRepoGateTaskIds(
+  snapshot: Pick<InternalControlCompatibilityRuntimeSnapshot, 'selected' | 'running' | 'retrying'>
+): Array<string | null | undefined> {
+  return [
+    snapshot.selected?.taskId,
+    ...snapshot.running.map((entry) => entry.taskId),
+    ...snapshot.retrying.map((entry) => entry.taskId)
+  ];
+}
+
+function uniqueRuntimeTaskIds(values: Array<string | null | undefined>): string[] {
+  return [
+    ...new Set(
+      values
+        .map((value) => (typeof value === 'string' ? value.trim() : ''))
+        .filter((value) => value.length > 0 && value !== 'local-mcp')
+    )
+  ];
 }
 
 function buildProviderIntakeAuthorityContext(
@@ -831,13 +927,14 @@ function enrichProjectionSourceWithProviderRetryState<
           rehydrated_at: providerIntakeState.rehydrated_at ?? null
         }) ?? source.providerDebugSnapshot ?? null
       : source.providerDebugSnapshot ?? null;
-  if (!retryState && providerDebugSnapshot === source.providerDebugSnapshot) {
+  const shouldClearRetryState = retryState === null && source.providerRetryState != null;
+  if (!retryState && !shouldClearRetryState && providerDebugSnapshot === source.providerDebugSnapshot) {
     return source;
   }
   return {
     ...source,
     ...(providerDebugSnapshot ? { providerDebugSnapshot } : {}),
-    ...(retryState ? { providerRetryState: retryState } : {})
+    ...(retryState || shouldClearRetryState ? { providerRetryState: retryState } : {})
   };
 }
 
@@ -847,7 +944,10 @@ function buildProviderRetryState(
   if (!claim) {
     return null;
   }
-  const active = claim.retry_queued === true;
+  if (isTerminalProviderIntakeIssueState(claim)) {
+    return null;
+  }
+  const active = hasQueuedProviderIntakeRetry(claim);
   const attempt = claim.retry_attempt ?? null;
   const dueAt = claim.retry_due_at ?? null;
   const error = claim.retry_error ?? null;

@@ -12,6 +12,7 @@ import type {
   ProviderLinearWorkerProof,
   ProviderLinearWorkerResolvedModelProvenance
 } from '../providerLinearWorkerRunner.js';
+import type { ControlRepoGatesPayload } from './docsFreshnessRepoGate.js';
 import type {
   ControlProviderDebugSnapshot,
   ProviderIntakeClaimFreshness,
@@ -582,6 +583,7 @@ export interface ControlSelectedRunRuntimeSnapshot {
   providerIntake?: ProviderIntakeSummaryPayload | null;
   providerIntakeUnavailable?: ControlProviderIntakeUnavailablePayload | null;
   providerWorkflow?: ControlProviderWorkflowPayload | null;
+  repoGates?: ControlRepoGatesPayload | null;
   polling?: ControlPollingHealthPayload | null;
 }
 
@@ -599,6 +601,7 @@ export interface ControlCompatibilityRuntimeSnapshot {
   providerIntake?: ProviderIntakeSummaryPayload | null;
   providerIntakeUnavailable?: ControlProviderIntakeUnavailablePayload | null;
   providerWorkflow?: ControlProviderWorkflowPayload | null;
+  repoGates?: ControlRepoGatesPayload | null;
   polling?: ControlPollingHealthPayload | null;
 }
 
@@ -621,6 +624,7 @@ export interface ControlCompatibilityProjectionSnapshot {
   providerIntake?: ProviderIntakeSummaryPayload | null;
   providerIntakeUnavailable?: ControlProviderIntakeUnavailablePayload | null;
   providerWorkflow?: ControlProviderWorkflowPayload | null;
+  repoGates?: ControlRepoGatesPayload | null;
   polling?: ControlPollingHealthPayload | null;
   fallbackExpiry?: ControlStatusFallbackExpiryMetadata[];
 }

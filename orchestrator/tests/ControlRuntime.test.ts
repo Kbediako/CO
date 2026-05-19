@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, mkdir, realpath, rm, symlink, unlink, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { ControlStateStore } from '../src/cli/control/controlState.js';
@@ -43,7 +43,7 @@ interface CreateFixtureOptions {
   providerIntakeState?: ProviderIntakeState;
   readPersistedProviderIntakeState?: () => ProviderIntakeState | null;
   questions?: QuestionRecord[];
-  env?: NodeJS.ProcessEnv;
+  env?: NodeJS.ProcessEnv | ((root: string) => NodeJS.ProcessEnv);
 }
 
 const cleanupRoots: string[] = [];
@@ -86,7 +86,7 @@ async function createFixture(options: CreateFixtureOptions = {}): Promise<TestFi
     linearAdvisoryState: options.linearAdvisoryState ?? { tracked_issue: null },
     providerIntakeState: options.providerIntakeState,
     readPersistedProviderIntakeState: options.readPersistedProviderIntakeState,
-    env: options.env
+    env: typeof options.env === 'function' ? options.env(root) : options.env
   });
 
   return { root, paths, controlStore, runtime };
@@ -124,6 +124,48 @@ async function seedControlState(
       run_id: 'run-1',
       control_seq: 0,
       ...overrides
+    }),
+    'utf8'
+  );
+}
+
+async function writeDocsFreshnessMaintenanceReport(
+  reportPath: string,
+  options: {
+    generatedAt: string;
+    severity: string;
+    freshnessDecision: string;
+    actionRequiredCount: number;
+  }
+): Promise<void> {
+  await mkdir(dirname(reportPath), { recursive: true });
+  await writeFile(
+    reportPath,
+    JSON.stringify({
+      generated_at: options.generatedAt,
+      repo_gate: {
+        severity: options.severity,
+        freshness_decision: options.freshnessDecision,
+        owner: {
+          issue: 'CO-522',
+          action: 'update_existing',
+          state: 'Blocked',
+          state_type: 'started',
+          verified: true
+        },
+        spec_guard: {
+          status: 'succeeded',
+          action_required_count: 0
+        },
+        capacity: {
+          status: 'ok'
+        },
+        next_expiry: null,
+        action_required_count: options.actionRequiredCount,
+        blocks_unrelated_lanes: false,
+        blocks_handoff: options.severity === 'blocking',
+        provider_wip_impact: 'excluded_repo_gate'
+      }
     }),
     'utf8'
   );
@@ -215,6 +257,40 @@ function createProviderIntakeState(
     latest_provider_key: claims.at(-1)?.provider_key ?? null,
     latest_reason: claims.at(-1)?.reason ?? null,
     claims
+  };
+}
+
+function createTerminalRetryClaim(
+  issueIdentifier: string,
+  issueId: string
+): ProviderIntakeState['claims'][number] {
+  return {
+    provider: 'linear',
+    provider_key: `linear:${issueId}`,
+    issue_id: issueId,
+    issue_identifier: issueIdentifier,
+    issue_title: `${issueIdentifier} terminal retry recurrence`,
+    issue_state: 'Done',
+    issue_state_type: 'completed',
+    issue_updated_at: '2026-05-18T22:55:00.000Z',
+    task_id: `linear-${issueId}`,
+    mapping_source: 'provider_id_fallback',
+    state: 'running',
+    reason: 'provider_issue_rehydrated_active_run',
+    accepted_at: '2026-05-18T22:40:00.000Z',
+    updated_at: '2026-05-18T22:56:00.000Z',
+    last_delivery_id: `${issueId}-delivery`,
+    last_event: 'Issue',
+    last_action: 'update',
+    last_webhook_timestamp: 1_747_611_300_000,
+    run_id: `run-${issueId}`,
+    run_manifest_path: null,
+    launch_source: 'control-host',
+    launch_token: `launch-${issueId}`,
+    retry_queued: true,
+    retry_attempt: 3,
+    retry_due_at: '2026-05-18T23:00:00.000Z',
+    retry_error: 'terminal retry should not consume active WIP'
   };
 }
 
@@ -361,6 +437,212 @@ describe('ControlRuntime', () => {
     expect(selectedSnapshot.providerWorkflow?.pipeline_id).toBe('provider-linear-worker');
     expect(providerWorkflowConfigStore.refreshStatus).toHaveBeenCalledTimes(1);
     expect(providerWorkflowConfigStore.refresh).not.toHaveBeenCalled();
+  });
+
+  it('passes provider-intake task ids into docs freshness repo-gate discovery', async () => {
+    const activeTaskId = 'linear-current-docs-gate';
+    const generatedAt = new Date().toISOString();
+    const providerIntakeState = createProviderIntakeState([
+      {
+        provider: 'linear',
+        provider_key: 'linear:CO-535',
+        issue_id: 'issue-current',
+        issue_identifier: 'CO-535',
+        issue_title: 'Current docs gate issue',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-14T00:50:00.000Z',
+        task_id: activeTaskId,
+        mapping_source: 'provider_id_fallback',
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        accepted_at: '2026-05-14T00:50:00.000Z',
+        updated_at: '2026-05-14T00:50:00.000Z',
+        last_delivery_id: 'delivery-current',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_778_700_000_000,
+        run_id: 'run-1',
+        run_manifest_path: null,
+        launch_source: 'control-host',
+        launch_token: 'current-launch'
+      },
+      {
+        provider: 'linear',
+        provider_key: 'linear:CO-534',
+        issue_id: 'issue-completed',
+        issue_identifier: 'CO-534',
+        issue_title: 'Completed docs gate issue',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-05-14T00:59:00.000Z',
+        task_id: 'linear-completed-docs-gate',
+        mapping_source: 'provider_id_fallback',
+        state: 'completed',
+        reason: 'provider_issue_terminal',
+        accepted_at: '2026-05-14T00:40:00.000Z',
+        updated_at: '2026-05-14T00:59:00.000Z',
+        last_delivery_id: 'delivery-completed',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_778_700_001_000,
+        run_id: 'run-completed',
+        run_manifest_path: null,
+        launch_source: 'control-host',
+        launch_token: 'completed-launch'
+      }
+    ]);
+    const fixture = await createFixture({
+      providerIntakeState,
+      env: (root) =>
+        ({
+          CODEX_ORCHESTRATOR_ROOT: root,
+          CODEX_ORCHESTRATOR_OUT_DIR: join(root, 'out')
+        }) as NodeJS.ProcessEnv
+    });
+    const currentReport = join(fixture.root, 'out', activeTaskId, 'docs-freshness-maintenance.json');
+    const completedReport = join(fixture.root, 'out', 'linear-completed-docs-gate', 'docs-freshness-maintenance.json');
+    const unrelatedReport = join(fixture.root, 'out', 'linear-unrelated', 'docs-freshness-maintenance.json');
+    await writeDocsFreshnessMaintenanceReport(currentReport, {
+      generatedAt,
+      severity: 'warning',
+      freshnessDecision: 'clean',
+      actionRequiredCount: 2
+    });
+    await writeDocsFreshnessMaintenanceReport(unrelatedReport, {
+      generatedAt,
+      severity: 'blocking',
+      freshnessDecision: 'block_policy_over_budget',
+      actionRequiredCount: 99
+    });
+    await writeDocsFreshnessMaintenanceReport(completedReport, {
+      generatedAt,
+      severity: 'blocking',
+      freshnessDecision: 'block_policy_over_budget',
+      actionRequiredCount: 98
+    });
+
+    const selectedSnapshot = await fixture.runtime.snapshot().readSelectedRunSnapshot();
+    const gate = selectedSnapshot.repoGates?.docs_freshness_maintain;
+
+    expect(gate).toMatchObject({
+      severity: 'warning',
+      freshness_decision: 'clean',
+      source_path: currentReport
+    });
+    expect(gate?.report_candidates).not.toEqual(expect.arrayContaining([expect.objectContaining({ path: unrelatedReport })]));
+    expect(gate?.report_candidates).not.toEqual(expect.arrayContaining([expect.objectContaining({ path: completedReport })]));
+  });
+
+  it('includes the selected run task id in docs freshness repo-gate discovery', async () => {
+    const selectedTaskId = 'selected-docs-gate';
+    const completedTaskId = 'completed-docs-gate';
+    const generatedAt = new Date().toISOString();
+    const providerIntakeState = createProviderIntakeState([
+      {
+        provider: 'linear',
+        provider_key: 'linear:CO-534',
+        issue_id: 'issue-completed',
+        issue_identifier: 'CO-534',
+        issue_title: 'Completed docs gate issue',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-05-14T00:59:00.000Z',
+        task_id: completedTaskId,
+        mapping_source: 'provider_id_fallback',
+        state: 'completed',
+        reason: 'provider_issue_terminal',
+        accepted_at: '2026-05-14T00:40:00.000Z',
+        updated_at: '2026-05-14T00:59:00.000Z',
+        last_delivery_id: 'delivery-completed',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_778_700_001_000,
+        run_id: 'run-completed',
+        run_manifest_path: null,
+        launch_source: 'control-host',
+        launch_token: 'completed-launch'
+      }
+    ]);
+    const fixture = await createFixture({
+      taskId: selectedTaskId,
+      providerIntakeState,
+      env: (root) =>
+        ({
+          CODEX_ORCHESTRATOR_ROOT: root,
+          CODEX_ORCHESTRATOR_OUT_DIR: join(root, 'out')
+        }) as NodeJS.ProcessEnv
+    });
+    const selectedReport = join(fixture.root, 'out', selectedTaskId, 'docs-freshness-maintenance.json');
+    const completedReport = join(fixture.root, 'out', completedTaskId, 'docs-freshness-maintenance.json');
+    await writeDocsFreshnessMaintenanceReport(selectedReport, {
+      generatedAt,
+      severity: 'blocking',
+      freshnessDecision: 'block_policy_over_budget',
+      actionRequiredCount: 7
+    });
+    await writeDocsFreshnessMaintenanceReport(completedReport, {
+      generatedAt,
+      severity: 'blocking',
+      freshnessDecision: 'block_policy_over_budget',
+      actionRequiredCount: 99
+    });
+
+    const selectedSnapshot = await fixture.runtime.snapshot().readSelectedRunSnapshot();
+    const gate = selectedSnapshot.repoGates?.docs_freshness_maintain;
+
+    expect(gate).toMatchObject({
+      severity: 'blocking',
+      freshness_decision: 'block_policy_over_budget',
+      action_required_count: 7,
+      source_path: selectedReport
+    });
+    expect(gate?.report_candidates).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: completedReport })])
+    );
+  });
+
+  it('refreshes docs freshness repo-gate evidence across cached selected-run reads', async () => {
+    const fixture = await createFixture({
+      env: (root) =>
+        ({
+          CODEX_ORCHESTRATOR_ROOT: root,
+          CODEX_ORCHESTRATOR_OUT_DIR: join(root, 'out')
+        }) as NodeJS.ProcessEnv
+    });
+    const localReport = join(fixture.root, 'out', 'local', 'docs-freshness-maintenance.json');
+    const initialGeneratedAt = new Date(Date.now() - 60_000).toISOString();
+    const refreshedGeneratedAt = new Date(Date.now() - 30_000).toISOString();
+    await writeDocsFreshnessMaintenanceReport(localReport, {
+      generatedAt: initialGeneratedAt,
+      severity: 'warning',
+      freshnessDecision: 'clean',
+      actionRequiredCount: 0
+    });
+    const snapshot = fixture.runtime.snapshot();
+
+    const initialSelectedRun = await snapshot.readSelectedRunSnapshot();
+    await seedManifest(fixture.paths, {
+      summary: 'selected summary should remain cached',
+      updated_at: '2026-03-07T00:12:00.000Z'
+    });
+    await writeDocsFreshnessMaintenanceReport(localReport, {
+      generatedAt: refreshedGeneratedAt,
+      severity: 'blocking',
+      freshnessDecision: 'block_policy_over_budget',
+      actionRequiredCount: 12
+    });
+
+    const repeatedSelectedRun = await snapshot.readSelectedRunSnapshot();
+
+    expect(initialSelectedRun.selected?.summary).toBe('initial summary');
+    expect(repeatedSelectedRun.selected?.summary).toBe('initial summary');
+    expect(repeatedSelectedRun.repoGates?.docs_freshness_maintain).toMatchObject({
+      severity: 'blocking',
+      freshness_decision: 'block_policy_over_budget',
+      action_required_count: 12,
+      source_path: localReport
+    });
   });
 
   it('reads max concurrent agents from control feature toggles into the compatibility projection', async () => {
@@ -748,6 +1030,72 @@ describe('ControlRuntime', () => {
       attempt: null,
       due_at: '2026-03-07T00:17:30.000Z',
       error: null
+    });
+  });
+
+  it('clears selected provider retry state when the matching authoritative claim is terminal', async () => {
+    const providerIntakeState = createProviderIntakeState([
+      {
+        provider: 'linear',
+        provider_key: 'linear:issue-co-554',
+        issue_id: 'issue-co-554',
+        issue_identifier: 'CO-554',
+        issue_title: 'Terminal completed retry claim',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        issue_updated_at: '2026-05-18T19:20:00.000Z',
+        task_id: 'task-co-554-completed-retry',
+        mapping_source: 'provider_id_fallback',
+        state: 'completed',
+        reason: 'provider_issue_rehydrated_completed_run',
+        accepted_at: '2026-05-18T19:05:00.000Z',
+        updated_at: '2026-05-18T20:35:00.000Z',
+        last_delivery_id: 'delivery-co-554-terminal-retry',
+        last_event: 'Issue',
+        last_action: 'update',
+        last_webhook_timestamp: 1_779_112_800_000,
+        run_id: 'run-co-554-completed',
+        run_manifest_path: null,
+        launch_source: null,
+        launch_token: null,
+        retry_queued: true,
+        retry_attempt: 1,
+        retry_due_at: '2026-05-18T20:36:00.000Z',
+        retry_error: 'stale completed-run continuation'
+      }
+    ]);
+    const fixture = await createFixture({
+      taskId: 'task-co-554-completed-retry',
+      providerIntakeState
+    });
+
+    await seedManifest(fixture.paths, {
+      task_id: 'task-co-554-completed-retry',
+      run_id: 'run-co-554-completed',
+      issue_provider: 'linear',
+      issue_id: 'issue-co-554',
+      issue_identifier: 'CO-554',
+      summary: 'selected run has stale retry fields after terminal issue refresh',
+      updated_at: '2026-05-18T20:35:00.000Z'
+    });
+
+    const selectedSnapshot = await fixture.runtime.snapshot().readSelectedRunSnapshot();
+
+    expect(selectedSnapshot.selected?.issueIdentifier).toBe('CO-554');
+    expect(selectedSnapshot.selected?.providerRetryState).toBeNull();
+    expect(selectedSnapshot.providerIntake).toMatchObject({
+      active_claim_count: 0,
+      running_claim_count: 0,
+      active_issue_identifiers: [],
+      selected_claim: {
+        issue_identifier: 'CO-554',
+        retry: {
+          active: false,
+          attempt: 1,
+          due_at: '2026-05-18T20:36:00.000Z',
+          error: 'stale completed-run continuation'
+        }
+      }
     });
   });
 
@@ -7834,6 +8182,111 @@ describe('ControlRuntime', () => {
         behind: 1
       }
     });
+  });
+
+  it('surfaces stale resident source freshness after shared main fast-forwards without counting terminal retry claims', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T23:05:00.000Z'));
+    try {
+      const providerIntakeState = createProviderIntakeState([
+        createTerminalRetryClaim('CO-512', 'lin-issue-512'),
+        createTerminalRetryClaim('CO-554', 'lin-issue-554'),
+        createTerminalRetryClaim('CO-555', 'lin-issue-555')
+      ]);
+      const fixture = await createFixture({
+        taskId: 'local-mcp',
+        providerIntakeState
+      });
+      const providerIssueHandoff = {
+        handleAcceptedTrackedIssue: vi.fn(),
+        rehydrate: vi.fn(async () => {}),
+        refresh: vi.fn(async () => {})
+      } as unknown as ProviderIssueHandoffService;
+      const repoRoot = await createSourceRootRepo('control-runtime-resident-fast-forward-');
+      const startupFreshness = inspectSourceRootFreshness({
+        intendedRepoRoot: repoRoot,
+        packageRoot: repoRoot,
+        argv: ['node', join(repoRoot, 'bin', 'codex-orchestrator.ts')],
+        cwd: repoRoot,
+        now: () => '2026-05-18T22:40:00.000Z'
+      });
+      const residentHash = git(repoRoot, ['rev-parse', 'HEAD']).stdout.trim();
+
+      initializeProviderPollingHealth(providerIssueHandoff, {
+        intervalMs: 15000,
+        controlHostOwner: {
+          status: 'owned',
+          reason: null,
+          updated_at: '2026-05-18T22:40:00.000Z',
+          diagnostic_path: null,
+          lock_dir: join(repoRoot, '.runs', 'control-host-owner.lock'),
+          owner_path: join(repoRoot, '.runs', 'control-host-owner.json'),
+          owner: {
+            owner_token: 'owner-token',
+            status: 'owned',
+            pid: 123,
+            ppid: 1,
+            hostname: 'host.local',
+            acquired_at: '2026-05-18T22:40:00.000Z',
+            updated_at: '2026-05-18T22:40:00.000Z',
+            released_at: null,
+            repo_root: repoRoot,
+            task_id: 'local-mcp',
+            run_id: 'control-host',
+            run_dir: join(repoRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+            pipeline_id: 'provider-linear-worker',
+            source_root_freshness: startupFreshness,
+            lock_dir: join(repoRoot, '.runs', 'control-host-owner.lock'),
+            owner_path: join(repoRoot, '.runs', 'control-host-owner.json')
+          }
+        }
+      });
+
+      await writeFile(join(repoRoot, 'co-555-recurrence.txt'), 'terminal claims after main advance\n', 'utf8');
+      git(repoRoot, ['add', '.']);
+      git(repoRoot, ['commit', '-m', 'CO-555 main advance']);
+      git(repoRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+      const currentHash = git(repoRoot, ['rev-parse', 'HEAD']).stdout.trim();
+
+      const runtime = createControlRuntime({
+        controlStore: fixture.controlStore,
+        questionQueue: { list: () => [] },
+        paths: fixture.paths,
+        linearAdvisoryState: { tracked_issue: null },
+        providerIntakeState,
+        readProviderIssueHandoff: () => providerIssueHandoff
+      });
+
+      const compatibilityProjection = await runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.providerIntake).toMatchObject({
+        claim_count: 3,
+        active_claim_count: 0,
+        running_claim_count: 0,
+        active_issue_identifiers: [],
+        running_issue_identifiers: []
+      });
+      expect(
+        compatibilityProjection.polling?.control_host_owner?.owner?.source_root_freshness
+      ).toMatchObject({
+        status: 'warning',
+        observed_at: '2026-05-18T23:05:00.000Z',
+        drift_classes: ['supervised_source_root_drift'],
+        source_checkout: {
+          status: 'stale',
+          behind: 1,
+          head: { hash: residentHash },
+          upstream: { hash: currentHash }
+        },
+        intended_checkout: {
+          status: 'current',
+          head: { hash: currentHash },
+          upstream: { hash: currentHash }
+        }
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps startup realpaths when a global control-host launcher is retargeted', async () => {

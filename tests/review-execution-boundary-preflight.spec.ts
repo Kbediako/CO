@@ -74,9 +74,11 @@ describe('review-execution-boundary-preflight', () => {
     expect(allowHeavyReviewCommands({})).toBe(false);
     expect(allowHeavyReviewCommands({ CODEX_REVIEW_ALLOW_HEAVY_COMMANDS: '1' })).toBe(true);
     expect(allowHeavyReviewCommands({ CODEX_REVIEW_ALLOW_HEAVY_COMMANDS: 'yes' })).toBe(true);
+    expect(allowHeavyReviewCommands({ CODEX_REVIEW_ALLOW_HEAVY_COMMANDS: 'on' })).toBe(true);
 
     expect(enforceBoundedReviewMode({})).toBe(false);
     expect(enforceBoundedReviewMode({ CODEX_REVIEW_ENFORCE_BOUNDED_MODE: 'true' })).toBe(true);
+    expect(enforceBoundedReviewMode({ CODEX_REVIEW_ENFORCE_BOUNDED_MODE: 'on' })).toBe(true);
   });
 
   it('resolves timeout, stall, startup-loop, and monitor interval envs', () => {

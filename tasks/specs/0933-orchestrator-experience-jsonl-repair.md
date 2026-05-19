@@ -1,38 +1,9 @@
----
-id: 20260105-experience-jsonl-repair
-title: ExperienceStore JSONL Line Repair
-relates_to: docs/PRD-orchestrator-experience-jsonl-repair.md
-risk: low
-owners:
-  - Codex (top-level agent)
-last_review: 2026-04-19
----
+# Archived Document
 
-## Summary
-- Objective: Preserve JSONL line boundaries when appending new experiences.
-- Constraints: Avoid full-file reads; keep append-only performance.
+last_review: 2026-05-13
 
-## Proposed Changes
-- Architecture / design adjustments:
-  - Add a tail newline check before appending new JSONL records.
-- Data model updates:
-  - None.
-- External dependencies:
-  - None.
+<!-- docs-archive:stub -->
+> Archived on 2026-05-13. Full content: https://github.com/Kbediako/CO/blob/doc-archives/tasks/specs/0933-orchestrator-experience-jsonl-repair.md
 
-## Impact Assessment
-- User impact: Improves reliability of experience retrieval after partial writes.
-- Operational risk: Low; limited to small file I/O changes.
-- Security / privacy: No impact.
-
-## Rollout Plan
-- Prerequisites: Diagnostics + RLM evidence recorded.
-- Testing strategy: Unit test for partial trailing line append behavior.
-- Launch steps: Merge after implementation-gate success.
-
-## Open Questions
-- Should we add compaction for malformed tails in a follow-up?
-
-## Approvals
-- Reviewer:
-- Date:
+- Archive branch: doc-archives
+- Archive path: tasks/specs/0933-orchestrator-experience-jsonl-repair.md

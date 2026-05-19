@@ -482,6 +482,67 @@ describe('provider/control-host freshness gauge', () => {
     expect(report.findings.map((finding) => finding.code)).not.toContain('terminal_proof_with_active_claim');
   });
 
+  it('ignores retained terminal Linear retry metadata in freshness-gauge retry age', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'provider-freshness-terminal-retry-'));
+    cleanupRoots.push(root);
+    const intakePath = join(root, 'provider-intake-state.json');
+    await writeFile(
+      intakePath,
+      JSON.stringify(
+        {
+          schema_version: 1,
+          updated_at: '2026-04-14T05:59:30.000Z',
+          polling: {
+            last_success_at: '2026-04-14T05:59:30.000Z',
+            stuck: false,
+            restart_required: false
+          },
+          claims: [
+            {
+              provider: 'linear',
+              provider_key: 'linear:terminal-retry',
+              issue_id: 'terminal-retry',
+              issue_identifier: 'CO-512',
+              issue_title: 'Governed review contract for spec standards code and agent loop',
+              issue_state: 'Done',
+              issue_state_type: 'completed',
+              task_id: 'linear-terminal-retry',
+              mapping_source: 'provider_id_fallback',
+              state: 'resumable',
+              reason: 'provider_issue_rehydrated_resumable_run',
+              accepted_at: '2026-04-14T05:20:00.000Z',
+              updated_at: '2026-04-14T05:59:30.000Z',
+              run_id: 'run-terminal-retry',
+              retry_queued: true,
+              retry_attempt: 1,
+              retry_due_at: '2026-04-14T05:30:00.000Z',
+              retry_error: 'retained terminal audit retry evidence'
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      paths: { provider_intake_state: [intakePath] },
+      now: NOW,
+      strict: true
+    });
+
+    expect(report.verdict).toBe('healthy');
+    expect(report.strict_failed).toBe(false);
+    expect(report.metrics.retry_backoff_age_ms).toMatchObject({
+      value: null,
+      verdict: 'unknown',
+      source_path: null,
+      reason: 'no retry/backoff evidence observed'
+    });
+    expect(report.findings.map((finding) => finding.code)).not.toContain('retry_queue_stale');
+    expect(report.findings.map((finding) => finding.code)).not.toContain('claim_queue_stale');
+  });
+
   it('flags running intake claims that have no matching active worker proof', async () => {
     const report = await evaluateProviderControlHostFreshnessGauge({
       artifactRoot: join(FIXTURE_ROOT, 'missing-active-worker-proof'),
@@ -497,6 +558,62 @@ describe('provider/control-host freshness gauge', () => {
       source_field: 'claims[].run_id'
     });
     expect(report.findings.map((finding) => finding.code)).toContain('active_worker_proof_missing');
+  });
+
+  it('does not require active worker proof for cached pending-revalidation claims without a run', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'provider-freshness-pending-revalidation-'));
+    cleanupRoots.push(root);
+    const intakePath = join(root, 'provider-intake-state.json');
+    await writeFile(
+      intakePath,
+      JSON.stringify({
+        schema_version: 1,
+        updated_at: NOW,
+        rehydrated_at: NOW,
+        polling: {
+          last_success_at: NOW
+        },
+        claims: [
+          {
+            provider: 'linear',
+            provider_key: 'linear:lin-issue-510',
+            issue_id: 'lin-issue-510',
+            issue_identifier: 'CO-510',
+            issue_title: 'Recognize clean review wording',
+            issue_state: 'In Progress',
+            issue_state_type: 'started',
+            issue_updated_at: '2026-05-14T12:00:00.000Z',
+            task_id: 'linear-lin-issue-510',
+            mapping_source: 'provider_id_fallback',
+            state: 'accepted',
+            reason: 'provider_issue_rehydration_pending_revalidation',
+            accepted_at: NOW,
+            updated_at: NOW,
+            run_id: null,
+            run_manifest_path: null,
+            launch_source: null,
+            launch_token: null
+          }
+        ]
+      })
+    );
+
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      paths: {
+        provider_intake_state: [intakePath]
+      },
+      now: NOW,
+      strict: true
+    });
+
+    expect(report.sources.provider_intake_state).toEqual([intakePath]);
+    expect(report.metrics.active_heartbeat_age_ms).toMatchObject({
+      value: null,
+      verdict: 'unknown',
+      source_field: null,
+      reason: 'no active provider proof observed'
+    });
+    expect(report.findings.map((finding) => finding.code)).not.toContain('active_worker_proof_missing');
   });
 
   it('follows claim run_manifest_path evidence outside the control-host artifact root', async () => {

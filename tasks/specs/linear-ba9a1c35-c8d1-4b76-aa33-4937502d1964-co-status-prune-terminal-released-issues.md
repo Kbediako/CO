@@ -1,11 +1,14 @@
 ---
 id: 20260414-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964
 title: CO: prune terminal released provider rows from CO STATUS JSON active counts
+status: done
 relates_to: docs/PRD-linear-ba9a1c35-c8d1-4b76-aa33-4937502d1964.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-14
+last_review: 2026-05-16
+review_notes:
+  - 2026-05-16: CO-545 strict spec-guard audit reclassified this stale Apr 14/15 row as inactive done; live `node bin/codex-orchestrator.js linear issue-context --issue-id ba9a1c35-c8d1-4b76-aa33-4937502d1964 --format json` verified CO-182 is Linear Done/completed and attached/related PR evidence https://github.com/Kbediako/CO/pull/480. No completed_at was inferred or fabricated.
 ---
 
 ## Canonical Reference

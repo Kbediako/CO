@@ -25,6 +25,7 @@ import * as questionChildResolutionAdapter from '../src/cli/control/questionChil
 import { resolveRunPaths } from '../src/cli/run/runPaths.js';
 import { resolveProviderWorkspacePath } from '../src/cli/run/workspacePath.js';
 import {
+  buildProviderIntakeSummary,
   normalizeProviderIntakeState,
   type ProviderIntakeClaimRecord,
   type ProviderIntakeState
@@ -1053,6 +1054,101 @@ describe('createProviderIssueHandoffService', () => {
         last_event: 'control_host_provider_worker_recover',
         last_action: action
       });
+      expect(persist).toHaveBeenCalled();
+    }
+  );
+
+  it.each(['recover', 'relaunch', 'nudge'] as const)(
+    'uses the recovery resolver for explicit %s while broad dispatch resolution is disabled',
+    async (action) => {
+      const { paths } = await createHostPaths();
+      const state = createProviderIntakeState();
+      state.claims.push(createProviderClaim({
+        issue_id: 'lin-issue-543',
+        issue_identifier: 'CO-543',
+        issue_title: 'Resolve rolling active spec-guard stale cohorts',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        issue_updated_at: '2026-05-17T03:45:00.000Z',
+        issue_blocked_by: [],
+        task_id: 'linear-lin-issue-543',
+        state: 'accepted',
+        reason: 'provider_issue_rehydration_pending_revalidation',
+        accepted_at: '2026-05-17T03:46:00.000Z',
+        updated_at: '2026-05-17T03:46:00.000Z',
+        run_id: null,
+        run_manifest_path: null,
+        launch_started_at: null,
+        launch_source: null,
+        launch_token: null,
+        retry_error: null
+      }));
+      const persist = vi.fn(async () => undefined);
+      const startedRun = {
+        runId: 'run-co-543-recovered',
+        manifestPath: join(paths.runDir, 'provider-run-co-543-recovered.json')
+      };
+      const launcher = { start: vi.fn(async () => startedRun), resume: vi.fn(async () => undefined) };
+      const resolveTrackedIssue = vi.fn(async () => ({
+        kind: 'skip' as const,
+        reason: 'dispatch_source_disabled'
+      }));
+      const resolveRecoveryTrackedIssue = vi.fn(async ({ issueId }: { provider: 'linear'; issueId: string }) => ({
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: issueId,
+          identifier: 'CO-543',
+          title: 'Resolve rolling active spec-guard stale cohorts',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-05-17T03:47:00.000Z',
+          blocked_by: []
+        })
+      }));
+      const service = createProviderIssueHandoffService({
+        paths,
+        state,
+        persist,
+        launcher,
+        startPipelineId: 'provider-linear-worker',
+        resolveTrackedIssue,
+        resolveRecoveryTrackedIssue
+      });
+
+      const result = await service.recoverIssue({ provider: 'linear', issueId: 'lin-issue-543', action });
+
+      expect(result).toMatchObject({
+        kind: 'start',
+        reason: 'provider_issue_start_launched',
+        claim: {
+          issue_id: 'lin-issue-543',
+          issue_identifier: 'CO-543',
+          issue_state: 'Ready',
+          issue_state_type: 'unstarted',
+          state: 'starting',
+          reason: 'provider_issue_start_launched',
+          task_id: 'linear-lin-issue-543',
+          run_id: startedRun.runId,
+          run_manifest_path: startedRun.manifestPath,
+          launch_source: 'control-host',
+          launch_token_present: true
+        }
+      });
+      expect(resolveTrackedIssue).not.toHaveBeenCalled();
+      expect(resolveRecoveryTrackedIssue).toHaveBeenCalledTimes(1);
+      expect(resolveRecoveryTrackedIssue).toHaveBeenCalledWith({
+        provider: 'linear',
+        issueId: 'lin-issue-543'
+      });
+      expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+        taskId: 'linear-lin-issue-543',
+        pipelineId: 'provider-linear-worker',
+        provider: 'linear',
+        issueId: 'lin-issue-543',
+        issueIdentifier: 'CO-543',
+        issueUpdatedAt: '2026-05-17T03:47:00.000Z',
+        launchToken: expect.any(String)
+      }));
       expect(persist).toHaveBeenCalled();
     }
   );
@@ -2544,6 +2640,364 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalledTimes(1);
   });
 
+  it('releases accepted pending-revalidation claims during rehydrate when live issue state is Blocked', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-510',
+      issue_identifier: 'CO-510',
+      issue_title: 'Recognize clean review wording',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:00:00.000Z',
+      task_id: 'linear-lin-issue-510',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      run_id: null,
+      run_manifest_path: null
+    }));
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-510',
+        identifier: 'CO-510',
+        title: 'Recognize clean review wording',
+        state: 'Blocked',
+        state_type: 'started',
+        updated_at: '2026-05-16T10:05:00.000Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue
+    });
+
+    await service.rehydrate();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-510'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-510',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T10:05:00.000Z',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: null,
+      run_manifest_path: null
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the revalidation resolver for accepted pending-revalidation release when broad dispatch is disabled', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-510',
+      issue_identifier: 'CO-510',
+      issue_title: 'Recognize clean review wording',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:00:00.000Z',
+      task_id: 'linear-lin-issue-510',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      run_id: null,
+      run_manifest_path: null
+    }));
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'skip' as const,
+      reason: 'dispatch_source_disabled'
+    }));
+    const resolveRevalidationTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-510',
+        identifier: 'CO-510',
+        title: 'Recognize clean review wording',
+        state: 'Blocked',
+        state_type: 'started',
+        updated_at: '2026-05-16T10:05:00.000Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue,
+      resolveRevalidationTrackedIssue
+    });
+
+    await service.rehydrate();
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(resolveRevalidationTrackedIssue).toHaveBeenCalledTimes(1);
+    expect(resolveRevalidationTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-510'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-510',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T10:05:00.000Z',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: null,
+      run_manifest_path: null
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes accepted claims after assigning the pending-revalidation reason during rehydrate', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-510',
+      issue_identifier: 'CO-510',
+      issue_title: 'Recognize clean review wording',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:00:00.000Z',
+      task_id: 'linear-lin-issue-510',
+      state: 'accepted',
+      reason: null,
+      run_id: null,
+      run_manifest_path: null
+    }));
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-510',
+        identifier: 'CO-510',
+        title: 'Recognize clean review wording',
+        state: 'Blocked',
+        state_type: 'started',
+        updated_at: '2026-05-16T10:05:00.000Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue
+    });
+
+    await service.rehydrate();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-510'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-510',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T10:05:00.000Z',
+      state: 'released',
+      reason: 'provider_issue_released:not_active'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes queued pending-revalidation claims during rehydrate and clears retry state on release', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-512',
+      issue_identifier: 'CO-512',
+      issue_title: 'Handle provider rehydration cache residue',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:30:00.000Z',
+      task_id: 'linear-lin-issue-512',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      retry_queued: true,
+      retry_attempt: 2,
+      retry_due_at: '2026-05-16T10:45:00.000Z',
+      retry_error: 'stale cached retry',
+      run_id: null,
+      run_manifest_path: null
+    }));
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-512',
+        identifier: 'CO-512',
+        title: 'Handle provider rehydration cache residue',
+        state: 'Blocked',
+        state_type: 'started',
+        updated_at: '2026-05-16T10:06:00.000Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue
+    });
+
+    await service.rehydrate();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-512'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-512',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T10:06:00.000Z',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps accepted pending-revalidation claims fail-closed during rehydrate when live evidence is unavailable', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-512',
+      issue_identifier: 'CO-512',
+      issue_title: 'Handle provider rehydration cache residue',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:30:00.000Z',
+      task_id: 'linear-lin-issue-512',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      run_id: null,
+      run_manifest_path: null
+    }));
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'skip' as const,
+      reason: 'linear_unavailable'
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue
+    });
+
+    await service.rehydrate();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-512'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-512',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:30:00.000Z',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      run_id: null,
+      run_manifest_path: null
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases stale running claims during rehydrate instead of demoting live Blocked work to cached pending revalidation', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-512',
+      issue_identifier: 'CO-512',
+      issue_title: 'Handle provider rehydration cache residue',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:30:00.000Z',
+      task_id: 'linear-lin-issue-512',
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'stale-run-co-512',
+      run_manifest_path: '/tmp/stale-run-co-512.json'
+    }));
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-512',
+        identifier: 'CO-512',
+        title: 'Handle provider rehydration cache residue',
+        state: 'Blocked',
+        state_type: 'started',
+        updated_at: '2026-05-16T10:06:00.000Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher: {
+        start: vi.fn(async () => null),
+        resume: vi.fn(async () => undefined)
+      },
+      resolveTrackedIssue
+    });
+
+    await service.rehydrate();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-512'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-512',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T10:06:00.000Z',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: 'stale-run-co-512',
+      run_manifest_path: '/tmp/stale-run-co-512.json'
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
   it('does not overwrite known tracked issue metadata during active-run rehydrate when the live updated_at is unknown', async () => {
     const { root, paths } = await createHostPaths();
     const activeEnv = {
@@ -3571,7 +4025,7 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
-  it('rolls back earlier rehydrate mutations when a later metadata refresh becomes stale', async () => {
+  it('leaves earlier rehydrate claims unchanged when a later metadata refresh becomes stale', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:00:00.000Z'));
 
@@ -3651,8 +4105,10 @@ describe('createProviderIssueHandoffService', () => {
     await waitForMockCalls(resolveTrackedIssue, 1);
     expect(state.claims.find((claim) => claim.issue_id === 'lin-earlier-accepted')).toMatchObject({
       state: 'accepted',
-      reason: 'provider_issue_rehydration_pending_revalidation'
+      reason: null,
+      updated_at: '2026-03-19T03:59:00.000Z'
     });
+    expect(persist).not.toHaveBeenCalled();
 
     service.resetStuckRefreshLifecycle?.();
     releaseTrackedIssue?.();
@@ -5550,8 +6006,11 @@ describe('createProviderIssueHandoffService', () => {
       deferFreshDiscovery: true
     });
 
-    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-issue-1' }]
+    ]);
     expect(refetchTrackedIssues).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
     expect(state.claims[0]).toMatchObject({
       state: 'accepted',
       reason: 'provider_issue_rehydration_pending_revalidation',
@@ -5576,6 +6035,7 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-issue-1' }],
       [{ provider: 'linear', issueId: 'lin-issue-1' }]
     ]);
     expect(launcher.start).toHaveBeenCalledTimes(1);
@@ -5664,6 +6124,469 @@ describe('createProviderIssueHandoffService', () => {
       issue_updated_at: '2026-04-12T07:20:00.000Z',
       run_id: 'run-startup-accepted-revalidation',
       run_manifest_path: '/tmp/provider-run/startup-accepted-revalidation-manifest.json'
+    });
+  });
+
+  it('releases stale pending-revalidation accepted claims when direct live issue state is Blocked', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-510',
+      issue_identifier: 'CO-510',
+      issue_title: 'Recognize clean review wording',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:00:00.000Z',
+      task_id: 'linear-lin-issue-510',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      accepted_at: '2026-05-16T05:59:00.000Z',
+      updated_at: '2026-05-16T05:59:30.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => {
+        throw new Error('blocked pending-revalidation claim must not launch');
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-510',
+        identifier: 'CO-510',
+        title: 'Recognize clean review wording',
+        state: 'Blocked',
+        state_type: 'started',
+        updated_at: '2026-05-16T06:45:00.000Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-issue-510' }]
+    ]);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-510',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T06:45:00.000Z',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
+  it('keeps pending-revalidation accepted claims fail-closed when direct issue evidence is unavailable', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-512',
+      issue_identifier: 'CO-512',
+      issue_title: 'Handle provider rehydration cache residue',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:30:00.000Z',
+      task_id: 'linear-lin-issue-512',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      accepted_at: '2026-05-16T05:59:00.000Z',
+      updated_at: '2026-05-16T05:59:30.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => {
+        throw new Error('unavailable pending-revalidation evidence must not launch');
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'skip' as const,
+      reason: 'linear_unavailable'
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-issue-512' }]
+    ]);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-512',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:30:00.000Z',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
+  it('does not launch runnable pending-revalidation claims supplied by deferred poll maps', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-runnable-pending',
+      issue_identifier: 'CO-520',
+      issue_title: 'Runnable pending revalidation',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:00:00.000Z',
+      task_id: 'linear-lin-issue-runnable-pending',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      accepted_at: '2026-05-16T05:59:00.000Z',
+      updated_at: '2026-05-16T05:59:30.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => {
+        throw new Error('deferred pending-revalidation poll-map runnable must not launch');
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => {
+      throw new Error('poll-map runnable pending revalidation should not need issue-by-id');
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue
+    });
+
+    await service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-issue-runnable-pending',
+          identifier: 'CO-520',
+          title: 'Runnable pending revalidation',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-05-16T06:45:00.000Z'
+        })
+      ],
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      issue_identifier: 'CO-520',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:00:00.000Z',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
+  it('releases handoff-state pending-revalidation claims supplied by deferred poll maps', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-handoff-pending',
+      issue_identifier: 'CO-521',
+      issue_title: 'Handoff pending revalidation',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:00:00.000Z',
+      task_id: 'linear-lin-issue-handoff-pending',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      accepted_at: '2026-05-16T05:59:00.000Z',
+      updated_at: '2026-05-16T05:59:30.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => {
+        throw new Error('handoff pending-revalidation claim must release, not launch');
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher
+    });
+
+    await service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-issue-handoff-pending',
+          identifier: 'CO-521',
+          title: 'Handoff pending revalidation',
+          state: 'In Review',
+          state_type: 'started',
+          updated_at: '2026-05-16T06:45:00.000Z'
+        })
+      ],
+      deferFreshDiscovery: true
+    });
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-521',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T06:45:00.000Z',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
+  it('keeps release probes available after runnable pending-revalidation confirmations', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        issue_id: 'lin-issue-runnable-first',
+        issue_identifier: 'CO-522',
+        issue_title: 'Runnable pending revalidation first',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-14T12:00:00.000Z',
+        task_id: 'linear-lin-issue-runnable-first',
+        state: 'accepted',
+        reason: 'provider_issue_rehydration_pending_revalidation',
+        accepted_at: '2026-05-16T05:59:00.000Z',
+        updated_at: '2026-05-16T05:59:30.000Z',
+        run_id: null,
+        run_manifest_path: null,
+        launch_source: null,
+        launch_token: null
+      }),
+      createProviderClaim({
+        issue_id: 'lin-issue-blocked-second',
+        issue_identifier: 'CO-523',
+        issue_title: 'Blocked pending revalidation second',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-14T12:30:00.000Z',
+        task_id: 'linear-lin-issue-blocked-second',
+        state: 'accepted',
+        reason: 'provider_issue_rehydration_pending_revalidation',
+        accepted_at: '2026-05-16T05:59:00.000Z',
+        updated_at: '2026-05-16T05:59:30.000Z',
+        run_id: null,
+        run_manifest_path: null,
+        launch_source: null,
+        launch_token: null
+      })
+    );
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => {
+        throw new Error('release-only pending revalidation must not launch');
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async (input: { issueId: string }) => {
+      if (input.issueId === 'lin-issue-runnable-first') {
+        return {
+          kind: 'ready' as const,
+          trackedIssue: createTrackedIssue({
+            id: 'lin-issue-runnable-first',
+            identifier: 'CO-522',
+            title: 'Runnable pending revalidation first',
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-05-16T06:45:00.000Z'
+          })
+        };
+      }
+      return {
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-blocked-second',
+          identifier: 'CO-523',
+          title: 'Blocked pending revalidation second',
+          state: 'Blocked',
+          state_type: 'started',
+          updated_at: '2026-05-16T06:46:00.000Z'
+        })
+      };
+    });
+    const refetchTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-issue-fresh-discovery',
+          identifier: 'CO-524',
+          state: 'In Progress',
+          state_type: 'started'
+        })
+      ]
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      refetchTrackedIssues,
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue.mock.calls).toEqual([
+      [{ provider: 'linear', issueId: 'lin-issue-runnable-first' }],
+      [{ provider: 'linear', issueId: 'lin-issue-blocked-second' }]
+    ]);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(getPersistedState().claims.find((claim) => claim.issue_id === 'lin-issue-runnable-first')).toMatchObject({
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:00:00.000Z'
+    });
+    expect(getPersistedState().claims.find((claim) => claim.issue_id === 'lin-issue-blocked-second')).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T06:46:00.000Z'
+    });
+  });
+
+  it('releases direct handoff-state pending-revalidation claims during non-deferred polls', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-direct-handoff',
+      issue_identifier: 'CO-525',
+      issue_title: 'Direct handoff pending revalidation',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T12:00:00.000Z',
+      task_id: 'linear-lin-issue-direct-handoff',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      accepted_at: '2026-05-16T05:59:00.000Z',
+      updated_at: '2026-05-16T05:59:30.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => {
+        throw new Error('direct handoff pending-revalidation claim must release, not launch');
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-direct-handoff',
+        identifier: 'CO-525',
+        title: 'Direct handoff pending revalidation',
+        state: 'In Review',
+        state_type: 'started',
+        updated_at: '2026-05-16T06:45:00.000Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue
+    });
+
+    await service.poll?.({
+      trackedIssues: [],
+      deferFreshDiscovery: false
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-issue-direct-handoff'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-525',
+      issue_state: 'In Review',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T06:45:00.000Z',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: null,
+      run_manifest_path: null
     });
   });
 
@@ -10462,7 +11385,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
-  it('keeps ignored terminal same-run queued occupancy blocking global admission capacity', async () => {
+  it('excludes ignored terminal same-run queued occupancy from global admission capacity', async () => {
     const { root, paths } = await createHostPaths();
     const queuedEnv = {
       repoRoot: root,
@@ -10536,15 +11459,15 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     expect(result).toMatchObject({
-      kind: 'ignored',
-      reason: 'provider_issue_start_blocked:max_concurrency',
+      kind: 'start',
+      reason: 'provider_issue_start_launched',
       claim: {
         provider_key: 'linear:lin-issue-fresh',
-        state: 'accepted',
-        reason: 'provider_issue_start_blocked:max_concurrency'
+        state: 'starting',
+        reason: 'provider_issue_start_launched'
       }
     });
-    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledTimes(1);
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
@@ -10638,7 +11561,7 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
-  it('treats terminal claim state for an inflight foreign queued run as unknown when enforcing per-state admission caps', async () => {
+  it('excludes terminal claim state for an inflight foreign queued run from per-state admission caps', async () => {
     const { root, paths } = await createHostPaths();
     const foreignEnv = {
       repoRoot: root,
@@ -10714,19 +11637,19 @@ describe('createProviderIssueHandoffService', () => {
     });
 
     expect(result).toMatchObject({
-      kind: 'ignored',
-      reason: 'provider_issue_start_blocked:max_concurrency',
+      kind: 'start',
+      reason: 'provider_issue_start_launched',
       claim: {
         provider_key: 'linear:lin-issue-fresh',
-        state: 'accepted',
-        reason: 'provider_issue_start_blocked:max_concurrency'
+        state: 'starting',
+        reason: 'provider_issue_start_launched'
       }
     });
-    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledTimes(1);
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
-  it('treats inflight terminal queued claim state as unknown when reporting fresh-discovery state slots', async () => {
+  it('excludes inflight terminal queued claim state when reporting fresh-discovery state slots', async () => {
     const { root, paths } = await createHostPaths();
     const foreignEnv = {
       repoRoot: root,
@@ -10805,8 +11728,11 @@ describe('createProviderIssueHandoffService', () => {
     expect(refetchTrackedIssues).toHaveBeenCalledTimes(1);
     expect(refetchTrackedIssues.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
       mode: 'fresh_discovery',
-      eligibleTargetCount: 1,
-      eligibleStateSlotCounts: {}
+      eligibleTargetCount: 2,
+      eligibleStateSlotCounts: {
+        'in progress': 1
+      },
+      excludedIssueIds: ['lin-issue-foreign-poll-queued-terminal']
     }));
     expect(launcher.start).not.toHaveBeenCalled();
     expect(launcher.resume).not.toHaveBeenCalled();
@@ -21286,7 +22212,9 @@ describe('createProviderIssueHandoffService', () => {
     const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
     expect(scheduledTimeoutCount).toBeGreaterThanOrEqual(1);
     const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
-    expect(delayMs).toBeGreaterThanOrEqual(999);
+    // The retry queue uses monotonic performance time, so allow a small
+    // amount of real elapsed time while the fake system clock stays pinned.
+    expect(delayMs).toBeGreaterThanOrEqual(990);
     expect(delayMs).toBeLessThanOrEqual(1_000);
     const startCallsBeforeRetry = launcher.start.mock.calls.length;
     getLatestScheduledTimeoutCallback(setTimeoutSpy)();
@@ -30080,6 +31008,165 @@ describe('createProviderIssueHandoffService', () => {
     expect(publishRuntime).toHaveBeenCalledWith('provider-intake.refresh');
   });
 
+  it('refreshes terminal retained released merge closeout residue through the release path', async () => {
+    const { paths } = await createHostPaths();
+    const co510BlockerSnapshot = {
+      id: 'lin-co-510',
+      identifier: 'CO-510',
+      state: 'Done',
+      state_type: 'completed'
+    };
+    const dependentBlocker = {
+      id: 'lin-dependent-blocker',
+      identifier: 'CO-BLOCK',
+      state: 'In Progress',
+      state_type: 'started'
+    };
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-510',
+      issue_identifier: 'CO-510',
+      issue_title: 'Cached stale released merge closeout residue',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-16T14:00:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-510-retained',
+      run_id: null,
+      run_manifest_path: null,
+      merge_closeout: {
+        recorded_at: '2026-05-16T15:01:00.000Z',
+        issue_id: 'lin-co-510',
+        issue_identifier: 'CO-510',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-16T14:53:00.000Z',
+        status: 'merged',
+        reason: 'merged_and_shared_root_reconciled_transition_deferred',
+        summary:
+          'Attached PR #817 was already merged and the shared root is reconciled; Linear Done transition was deferred by shared-budget cooldown.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/817'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/817',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 817
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-05-16T15:00:10.000Z',
+          merged_at: '2026-05-16T15:00:10.000Z',
+          head_oid: 'head817'
+        },
+        branch_recovery: null,
+        merge_attempt: null,
+        shared_root: {
+          status: 'reconciled',
+          attempted_at: '2026-05-16T15:00:30.000Z',
+          before_status: '## main...origin/main [behind 1]',
+          after_status: '## main...origin/main',
+          reason: 'shared_root_reconciled'
+        },
+        linear_transition: {
+          status: 'failed',
+          attempted_at: '2026-05-16T15:00:45.000Z',
+          previous_state: 'Merging',
+          target_state: 'Done',
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-05-16T14:53:00.000Z',
+          error: 'linear_rate_limited: Linear shared budget cooldown is active.'
+        }
+      }
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = createCo202Launcher(
+      'run-co-510-should-not-start',
+      '/tmp/provider-run/co-510-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-co-510',
+        identifier: 'CO-510',
+        title: 'Live terminal title should refresh stale released closeout residue',
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-05-16T15:04:00.000Z',
+        blocked_by: []
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    await service.poll?.({
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-co-511',
+          identifier: 'CO-511',
+          title: 'Dependent issue seeing terminal blocker truth',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-05-16T15:04:30.000Z',
+          blocked_by: [co510BlockerSnapshot, dependentBlocker]
+        })
+      ],
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-co-510'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_title: 'Live terminal title should refresh stale released closeout residue',
+      issue_state: co510BlockerSnapshot.state,
+      issue_state_type: co510BlockerSnapshot.state_type,
+      issue_updated_at: '2026-05-16T15:04:00.000Z',
+      task_id: 'linear-lin-co-510-retained',
+      run_id: null,
+      run_manifest_path: null
+    });
+    expect(state.claims[0]?.merge_closeout).toMatchObject({
+      status: 'merged',
+      reason: 'merged_and_shared_root_reconciled_transition_deferred',
+      issue_state: 'Merging',
+      linear_transition: {
+        status: 'failed',
+        target_state: 'Done'
+      }
+    });
+    expect(getPersistedState().claims[0]?.merge_closeout).toMatchObject({
+      status: 'merged',
+      reason: 'merged_and_shared_root_reconciled_transition_deferred'
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
   it('refreshes terminal retained metadata after a cached active blocker refresh', async () => {
     const { paths } = await createHostPaths();
     const co276TerminalBlockerSnapshot = {
@@ -38508,7 +39595,9 @@ describe('createProviderIssueHandoffService', () => {
     const scheduledTimeoutCount = setTimeoutSpy.mock.calls.length;
     expect(scheduledTimeoutCount).toBeGreaterThanOrEqual(1);
     const [, delayMs] = setTimeoutSpy.mock.calls[scheduledTimeoutCount - 1] ?? [];
-    expect(delayMs).toBeGreaterThanOrEqual(999);
+    // The retry queue uses monotonic performance time, so allow a small
+    // amount of real elapsed time while the fake system clock stays pinned.
+    expect(delayMs).toBeGreaterThanOrEqual(990);
     expect(delayMs).toBeLessThanOrEqual(1_000);
     vi.setSystemTime(new Date('2026-03-19T04:30:01.001Z'));
     const startCallsBeforeRetry = launcher.start.mock.calls.length;
@@ -40717,6 +41806,332 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('refreshes completed CO-492 PR 793-style merged closeout residue to live Done during rehydrate without dropping audit history', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-co-516-terminal-completed-closeout'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-co-516-terminal-completed-closeout');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-516-terminal-completed-closeout',
+        task_id: 'task-co-516-terminal-completed-closeout',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-co-492',
+        issue_identifier: 'CO-492',
+        issue_updated_at: '2026-05-14T16:05:00.000Z',
+        updated_at: '2026-05-14T16:10:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-co-492',
+      issue_id: 'lin-co-492',
+      issue_identifier: 'CO-492',
+      issue_title: 'Completed closeout residue',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T16:05:00.000Z',
+      issue_assignee_id: null,
+      issue_assignee_name: null,
+      task_id: 'task-co-516-terminal-completed-closeout',
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_merge_closeout_merged',
+      accepted_at: '2026-05-14T16:00:05.000Z',
+      updated_at: '2026-05-14T16:10:10.000Z',
+      last_delivery_id: 'delivery-co-516-completed-closeout',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_747_237_200_000,
+      run_id: 'run-co-516-terminal-completed-closeout',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      merge_closeout: {
+        recorded_at: '2026-05-14T16:10:00.000Z',
+        issue_id: 'lin-co-492',
+        issue_identifier: 'CO-492',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-14T16:05:00.000Z',
+        status: 'merged',
+        reason: 'merged_and_shared_root_reconciled_transition_deferred',
+        summary:
+          'Attached PR #793 was merged after In Review to Merging; local closeout retained audit truth while Linear Done arrived later.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/793'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/793',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 793
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-05-14T16:09:30.000Z',
+          merged_at: '2026-05-14T16:09:00.000Z',
+          head_oid: 'abc492'
+        },
+        merge_attempt: null,
+        shared_root: {
+          status: 'reconciled',
+          attempted_at: '2026-05-14T16:09:45.000Z',
+          before_status: '## main...origin/main',
+          after_status: '## main...origin/main',
+          reason: 'shared_root_reconciled'
+        },
+        linear_transition: {
+          status: 'failed',
+          attempted_at: '2026-05-14T16:09:50.000Z',
+          previous_state: 'Merging',
+          target_state: 'Done',
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-05-14T16:05:00.000Z',
+          error: 'linear_rate_limited: Linear shared budget cooldown is active.'
+        }
+      }
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const runMergeCloseout = vi.fn(async () => {
+      throw new Error('runMergeCloseout should not rerun after live Done terminal truth.');
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      runMergeCloseout,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          id: 'lin-co-492',
+          identifier: 'CO-492',
+          title: 'Completed closeout residue',
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: '2026-05-14T16:13:30.000Z',
+          assignee_id: null,
+          assignee_name: null
+        })
+      })
+    });
+
+    await service.rehydrate();
+
+    expect(runMergeCloseout).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_merge_closeout_merged',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-05-14T16:13:30.000Z',
+      task_id: 'task-co-516-terminal-completed-closeout',
+      run_id: 'run-co-516-terminal-completed-closeout',
+      run_manifest_path: childPaths.manifestPath
+    });
+    expect(state.claims[0]?.merge_closeout).toMatchObject({
+      status: 'merged',
+      reason: 'merged_and_shared_root_reconciled_transition_deferred',
+      pr: {
+        number: 793
+      }
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_merge_closeout_merged',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-05-14T16:13:30.000Z'
+    });
+    expect(getPersistedState().claims[0]?.merge_closeout).toMatchObject({
+      status: 'merged',
+      reason: 'merged_and_shared_root_reconciled_transition_deferred'
+    });
+  });
+
+  it('does not classify a merged closeout with a failed non-Done transition as terminal Done truth', async () => {
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-co-516-non-done-transition'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-co-516-non-done-transition');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-516-non-done-transition',
+        task_id: 'task-co-516-non-done-transition',
+        status: 'succeeded',
+        issue_provider: 'linear',
+        issue_id: 'lin-co-516-non-done',
+        issue_identifier: 'CO-516',
+        issue_updated_at: '2026-05-14T16:05:00.000Z',
+        updated_at: '2026-05-14T16:10:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-co-516-non-done',
+      issue_identifier: 'CO-516',
+      issue_title: 'Non-Done transition closeout residue',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T16:05:00.000Z',
+      task_id: 'task-co-516-non-done-transition',
+      state: 'completed',
+      reason: 'provider_issue_merge_closeout_merged',
+      run_id: 'run-co-516-non-done-transition',
+      run_manifest_path: childPaths.manifestPath,
+      merge_closeout: {
+        recorded_at: '2026-05-14T16:10:00.000Z',
+        issue_id: 'lin-co-516-non-done',
+        issue_identifier: 'CO-516',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-14T16:05:00.000Z',
+        status: 'merged',
+        reason: 'legacy_failed_transition',
+        summary:
+          'Attached PR was merged and shared root was reconciled, but the failed transition target was not terminal Done.',
+        attached_pr_urls: ['https://github.com/asabeko/CO/pull/793'],
+        ignored_historical_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: {
+          url: 'https://github.com/asabeko/CO/pull/793',
+          owner: 'asabeko',
+          repo: 'CO',
+          number: 793
+        },
+        snapshot: {
+          state: 'MERGED',
+          review_decision: 'APPROVED',
+          merge_state_status: 'UNKNOWN',
+          ready_to_merge: false,
+          gate_reasons: ['state=MERGED'],
+          action_required_reasons: [],
+          unresolved_thread_count: 0,
+          checks_pending: 0,
+          checks_failed: 0,
+          required_checks_pending: 0,
+          required_checks_failed: 0,
+          updated_at: '2026-05-14T16:09:30.000Z',
+          merged_at: '2026-05-14T16:09:00.000Z',
+          head_oid: 'abc516'
+        },
+        merge_attempt: null,
+        shared_root: {
+          status: 'reconciled',
+          attempted_at: '2026-05-14T16:09:45.000Z',
+          before_status: '## main...origin/main',
+          after_status: '## main...origin/main',
+          reason: 'shared_root_reconciled'
+        },
+        linear_transition: {
+          status: 'failed',
+          attempted_at: '2026-05-14T16:09:50.000Z',
+          previous_state: 'Merging',
+          target_state: 'In Review',
+          issue_state: 'Merging',
+          issue_state_type: 'started',
+          issue_updated_at: '2026-05-14T16:05:00.000Z',
+          error: 'linear_rate_limited: Linear shared budget cooldown is active.'
+        }
+      }
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const runMergeCloseout = vi.fn(async () => {
+      throw new Error('runMergeCloseout should not rerun for live terminal metadata refresh.');
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      runMergeCloseout,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          id: 'lin-co-516-non-done',
+          identifier: 'CO-516',
+          title: 'Live Done issue after non-Done transition residue',
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: '2026-05-14T16:13:30.000Z',
+          assignee_id: null,
+          assignee_name: null
+        })
+      })
+    });
+
+    await service.rehydrate();
+
+    expect(runMergeCloseout).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-14T16:05:00.000Z'
+    });
+    expect(state.claims[0]?.merge_closeout).toMatchObject({
+      status: 'merged',
+      reason: 'legacy_failed_transition',
+      linear_transition: {
+        status: 'failed',
+        target_state: 'In Review'
+      }
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      issue_state: 'Merging',
+      issue_state_type: 'started'
+    });
+  });
+
   it('does not leak stale failed proof summary or diagnostics onto a manifest-backed failed run', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-19T04:30:00.000Z'));
@@ -41133,6 +42548,464 @@ describe('createProviderIssueHandoffService', () => {
       retry_attempt: 2,
       retry_due_at: '2026-03-19T04:30:20.000Z',
       retry_error: null
+    });
+  });
+
+  it('releases CO-512-shaped retry-resumable WIP when live Linear truth is terminal Done', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T19:23:32.870Z'));
+
+    const { root, paths } = await createHostPaths();
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-co-512-terminal-retry'
+    };
+    const childPaths = resolveRunPaths(childEnv, 'run-co-512-resumable');
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-512-resumable',
+        task_id: 'task-co-512-terminal-retry',
+        status: 'failed',
+        summary: 'Provider worker failed before retry cleanup.',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-512',
+        issue_identifier: 'CO-512',
+        issue_updated_at: '2026-05-18T19:10:00.000Z',
+        workspace_path: join(root, '.workspaces', 'task-co-512-terminal-retry'),
+        updated_at: '2026-05-18T19:15:00.000Z'
+      }),
+      'utf8'
+    );
+    const workspacePath = resolveProviderWorkspacePath(root, 'task-co-512-terminal-retry');
+    await mkdir(workspacePath, { recursive: true });
+    await writeFile(join(workspacePath, '.git'), 'gitdir: /tmp/provider-worktree\n', 'utf8');
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-512',
+      issue_id: 'lin-issue-512',
+      issue_identifier: 'CO-512',
+      issue_title: 'Terminal retry-resumable claim',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-05-18T19:20:00.000Z',
+      task_id: 'task-co-512-terminal-retry',
+      mapping_source: 'provider_id_fallback',
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      accepted_at: '2026-05-18T19:10:00.000Z',
+      updated_at: '2026-05-18T19:18:00.000Z',
+      last_delivery_id: 'delivery-co-512-terminal-retry',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_779_112_800_000,
+      run_id: 'run-co-512-resumable',
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: 2,
+      retry_due_at: '2026-05-18T19:24:02.870Z',
+      retry_error: 'stale continuation queue'
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-512',
+          identifier: 'CO-512',
+          title: 'Terminal retry-resumable claim',
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: '2026-05-18T19:20:00.000Z',
+          assignee_id: 'viewer-1',
+          assignee_name: 'Codex'
+        })
+      })
+    });
+
+    await service.rehydrate();
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    const expectedClaim = {
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    };
+    expect(state.claims[0]).toMatchObject(expectedClaim);
+    expect(persist).toHaveBeenCalled();
+    expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
+    await expect(access(workspacePath)).rejects.toThrow();
+  });
+
+  it('cancels an active child run when rehydrate releases terminal live Linear truth', async () => {
+    const { root, paths } = await createHostPaths();
+    const taskId = 'task-co-512-terminal-active';
+    const runId = 'run-co-512-active';
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(childEnv, runId);
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: runId,
+        task_id: taskId,
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-512',
+        issue_identifier: 'CO-512',
+        issue_updated_at: '2026-05-18T19:10:00.000Z',
+        updated_at: '2026-05-18T19:15:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const cancelSpy = vi
+      .spyOn(questionChildResolutionAdapter, 'callChildControlEndpoint')
+      .mockResolvedValue(undefined);
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      provider_key: 'linear:lin-issue-512',
+      issue_id: 'lin-issue-512',
+      issue_identifier: 'CO-512',
+      issue_title: 'Terminal active claim',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-18T19:10:00.000Z',
+      task_id: taskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: runId,
+      run_manifest_path: childPaths.manifestPath
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-512',
+          identifier: 'CO-512',
+          title: 'Terminal active claim',
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: '2026-05-18T19:20:00.000Z',
+          assignee_id: 'viewer-1',
+          assignee_name: 'Codex'
+        })
+      })
+    });
+
+    await service.rehydrate();
+
+    expect(cancelSpy).toHaveBeenCalledWith(expect.objectContaining({
+      manifestPath: childPaths.manifestPath,
+      payload: {
+        action: 'cancel',
+        requested_by: 'control-host',
+        reason: 'provider_issue_released:not_active'
+      }
+    }));
+    const expectedClaim = {
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: null,
+      run_manifest_path: null
+    };
+    expect(state.claims[0]).toMatchObject(expectedClaim);
+    expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('runs terminal release side effects after an earlier claim already made rehydrate pending', async () => {
+    const { root, paths } = await createHostPaths();
+    const pendingTaskId = 'task-co-901-pending-active';
+    const pendingRunId = 'run-co-901-active';
+    const terminalTaskId = 'task-co-512-terminal-active-after-pending';
+    const terminalRunId = 'run-co-512-active-after-pending';
+    const pendingPaths = resolveRunPaths({
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: pendingTaskId
+    }, pendingRunId);
+    const terminalPaths = resolveRunPaths({
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: terminalTaskId
+    }, terminalRunId);
+    await mkdir(pendingPaths.runDir, { recursive: true });
+    await mkdir(terminalPaths.runDir, { recursive: true });
+    await writeFile(
+      pendingPaths.manifestPath,
+      JSON.stringify({
+        run_id: pendingRunId,
+        task_id: pendingTaskId,
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-901',
+        issue_identifier: 'CO-901',
+        issue_updated_at: '2026-05-18T19:10:00.000Z',
+        updated_at: '2026-05-18T19:15:00.000Z'
+      }),
+      'utf8'
+    );
+    await writeFile(
+      terminalPaths.manifestPath,
+      JSON.stringify({
+        run_id: terminalRunId,
+        task_id: terminalTaskId,
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-512',
+        issue_identifier: 'CO-512',
+        issue_updated_at: '2026-05-18T19:10:00.000Z',
+        updated_at: '2026-05-18T19:15:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const cancelSpy = vi
+      .spyOn(questionChildResolutionAdapter, 'callChildControlEndpoint')
+      .mockResolvedValue(undefined);
+    const state = createProviderIntakeState();
+    state.claims.push(
+      createProviderClaim({
+        provider_key: 'linear:lin-issue-901',
+        issue_id: 'lin-issue-901',
+        issue_identifier: 'CO-901',
+        issue_title: 'Still active claim',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-18T19:10:00.000Z',
+        task_id: pendingTaskId,
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        run_id: pendingRunId,
+        run_manifest_path: pendingPaths.manifestPath
+      }),
+      createProviderClaim({
+        provider_key: 'linear:lin-issue-512',
+        issue_id: 'lin-issue-512',
+        issue_identifier: 'CO-512',
+        issue_title: 'Terminal claim after pending claim',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-18T19:10:00.000Z',
+        task_id: terminalTaskId,
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        run_id: terminalRunId,
+        run_manifest_path: terminalPaths.manifestPath
+      })
+    );
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async ({ issueId }) => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          id: issueId,
+          identifier: issueId === 'lin-issue-901' ? 'CO-901' : 'CO-512',
+          title: issueId === 'lin-issue-901' ? 'Still active claim' : 'Terminal claim after pending claim',
+          state: issueId === 'lin-issue-901' ? 'In Progress' : 'Done',
+          state_type: issueId === 'lin-issue-901' ? 'started' : 'completed',
+          updated_at: '2026-05-18T19:20:00.000Z',
+          assignee_id: 'viewer-1',
+          assignee_name: 'Codex'
+        })
+      })
+    });
+
+    await service.rehydrate();
+
+    expect(cancelSpy).toHaveBeenCalledTimes(1);
+    expect(cancelSpy).toHaveBeenCalledWith(expect.objectContaining({
+      manifestPath: terminalPaths.manifestPath,
+      payload: {
+        action: 'cancel',
+        requested_by: 'control-host',
+        reason: 'provider_issue_released:not_active'
+      }
+    }));
+    expect(state.claims.find((claim) => claim.issue_identifier === 'CO-901')).toMatchObject({
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: pendingRunId,
+      run_manifest_path: pendingPaths.manifestPath
+    });
+    const expectedTerminalClaim = {
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: null,
+      run_manifest_path: null
+    };
+    expect(state.claims.find((claim) => claim.issue_identifier === 'CO-512')).toMatchObject(expectedTerminalClaim);
+    expect(getPersistedState().claims.find((claim) => claim.issue_identifier === 'CO-512')).toMatchObject(expectedTerminalClaim);
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+  });
+
+  it('clears CO-554-shaped completed retry WIP when stale cached issue state refreshes to terminal Done', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-18T20:35:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const taskId = 'task-co-554-completed-retry';
+    const runId = 'run-co-554-completed';
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(childEnv, runId);
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: runId,
+        task_id: taskId,
+        status: 'succeeded',
+        summary: 'Provider worker completed before stale retry metadata cleared.',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-554',
+        issue_identifier: 'CO-554',
+        issue_updated_at: '2026-05-18T19:10:00.000Z',
+        updated_at: '2026-05-18T19:15:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-554',
+      issue_id: 'lin-issue-554',
+      issue_identifier: 'CO-554',
+      issue_title: 'Stale completed retry claim',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-18T19:10:00.000Z',
+      task_id: taskId,
+      mapping_source: 'provider_id_fallback',
+      state: 'completed',
+      reason: 'provider_issue_rehydrated_completed_run',
+      accepted_at: '2026-05-18T19:05:00.000Z',
+      updated_at: '2026-05-18T19:18:00.000Z',
+      last_delivery_id: 'delivery-co-554-stale-completed-retry',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_779_112_800_000,
+      run_id: runId,
+      run_manifest_path: childPaths.manifestPath,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-05-18T20:36:00.000Z',
+      retry_error: 'stale completed-run continuation'
+    });
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-554',
+          identifier: 'CO-554',
+          title: 'Stale completed retry claim',
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: '2026-05-18T19:20:00.000Z',
+          assignee_id: 'viewer-1',
+          assignee_name: 'Codex'
+        })
+      })
+    });
+
+    await service.rehydrate();
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    const expectedClaim = {
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    };
+    expect(state.claims[0]).toMatchObject(expectedClaim);
+    expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
+    expect(buildProviderIntakeSummary(getPersistedState())).toMatchObject({
+      active_claim_count: 0,
+      running_claim_count: 0,
+      active_issue_identifiers: [],
+      running_issue_identifiers: [],
+      selected_claim: {
+        issue_identifier: 'CO-554',
+        state: 'released',
+        retry: null
+      }
     });
   });
 

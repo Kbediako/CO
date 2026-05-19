@@ -462,7 +462,9 @@ export function buildProviderIntakeSummary(
   const normalizedState = normalizeProviderIntakeState(state);
   const claims = [...normalizedState.claims].sort(compareProviderClaims);
   const activeClaims = claims.filter(isActiveProviderIntakeClaim);
-  const runningClaims = claims.filter((candidate) => candidate.state === 'running');
+  const runningClaims = claims.filter(
+    (candidate) => candidate.state === 'running' && isActiveProviderIntakeClaim(candidate)
+  );
   const claim = selectProviderIntakeClaim(normalizedState);
   if (!claim) {
     return null;
@@ -521,21 +523,37 @@ function buildProviderIntakeClaimSummary(input: {
 }
 
 export function hasQueuedProviderIntakeRetry(
-  claim: Pick<ProviderIntakeClaimRecord, 'retry_queued' | 'retry_attempt'> | null | undefined
+  claim:
+    | (Pick<ProviderIntakeClaimRecord, 'retry_queued' | 'retry_attempt'> &
+        Partial<
+          Pick<
+            ProviderIntakeClaimRecord,
+            'issue_state' | 'issue_state_type' | 'issue_archived_at' | 'issue_trashed'
+          >
+        >)
+    | null
+    | undefined
 ): boolean {
-  return claim?.retry_queued === true;
+  return claim?.retry_queued === true && !isTerminalProviderIntakeIssueState(claim);
 }
 
 function buildProviderIntakeRetrySummary(
   claim: Pick<
     ProviderIntakeClaimRecord,
-    'retry_queued' | 'retry_attempt' | 'retry_due_at' | 'retry_error'
+    | 'retry_queued'
+    | 'retry_attempt'
+    | 'retry_due_at'
+    | 'retry_error'
+    | 'issue_state'
+    | 'issue_state_type'
+    | 'issue_archived_at'
+    | 'issue_trashed'
   > | null
 ): ProviderIntakeRetrySummaryPayload | null {
   if (!claim) {
     return null;
   }
-  const active = claim.retry_queued === true;
+  const active = hasQueuedProviderIntakeRetry(claim);
   const attempt = claim.retry_attempt ?? null;
   const dueAt = claim.retry_due_at ?? null;
   const error = claim.retry_error ?? null;
@@ -578,7 +596,7 @@ function normalizeProviderIntakeClaim(
           (state === 'starting' || state === 'resuming')
         ? updatedAt
         : null;
-  return {
+  const normalized: ProviderIntakeClaimRecord = {
     provider: 'linear',
     provider_key: input.provider_key,
     issue_id: input.issue_id,
@@ -625,17 +643,30 @@ function normalizeProviderIntakeClaim(
     launch_source: launchSource,
     launch_token: typeof input.launch_token === 'string' ? input.launch_token : null,
     launch_started_at: launchStartedAt,
-    retry_queued: normalizeRetryQueued(input.retry_queued),
-    retry_attempt: normalizeRetryAttempt(input.retry_attempt),
-    retry_due_at: normalizeRetryTimestamp(input.retry_due_at),
-    retry_error: normalizeRetryError(input.retry_error),
     review_promotion: cloneProviderReviewHandoffPromotionRecord(input.review_promotion),
     merge_closeout: cloneProviderMergeCloseoutRecord(input.merge_closeout)
   };
+  if (hasOwnField(input, 'retry_queued')) {
+    normalized.retry_queued = normalizeRetryQueued(input.retry_queued);
+  }
+  if (hasOwnField(input, 'retry_attempt')) {
+    normalized.retry_attempt = normalizeRetryAttempt(input.retry_attempt);
+  }
+  if (hasOwnField(input, 'retry_due_at')) {
+    normalized.retry_due_at = normalizeRetryTimestamp(input.retry_due_at);
+  }
+  if (hasOwnField(input, 'retry_error')) {
+    normalized.retry_error = normalizeRetryError(input.retry_error);
+  }
+  return normalized;
 }
 
 export function isRecordLike(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasOwnField(value: object, key: PropertyKey): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
 }
 
 function normalizeRetryQueued(value: unknown): boolean | null {
@@ -723,8 +754,14 @@ export function isActiveProviderIntakeClaim(
   claim: Pick<
     ProviderIntakeClaimRecord,
     'state' | 'reason' | 'retry_queued' | 'issue_state' | 'issue_state_type'
+  > &
+    Partial<
+      Pick<ProviderIntakeClaimRecord, 'issue_archived_at' | 'issue_trashed'>
   >
 ): boolean {
+  if (isTerminalProviderIntakeIssueState(claim)) {
+    return false;
+  }
   if (claim.retry_queued === true) {
     return true;
   }
@@ -739,7 +776,7 @@ export function isActiveProviderIntakeClaim(
       if (claim.reason === 'provider_issue_merge_closeout_action_required') {
         return false;
       }
-      return !isTerminalProviderIntakeIssueState(claim);
+      return true;
     case 'released':
     case 'completed':
     case 'stale':
@@ -750,9 +787,20 @@ export function isActiveProviderIntakeClaim(
   }
 }
 
-function isTerminalProviderIntakeIssueState(
-  claim: Pick<ProviderIntakeClaimRecord, 'issue_state' | 'issue_state_type'>
+export function isTerminalProviderIntakeIssueState(
+  claim: Partial<
+    Pick<
+      ProviderIntakeClaimRecord,
+      'issue_state' | 'issue_state_type' | 'issue_archived_at' | 'issue_trashed'
+    >
+  >
 ): boolean {
+  if (claim.issue_trashed === true) {
+    return true;
+  }
+  if (normalizeProviderIntakeIssueStateValue(claim.issue_archived_at) !== null) {
+    return true;
+  }
   const normalizedState = normalizeProviderIntakeIssueStateValue(claim.issue_state);
   const normalizedStateType = normalizeProviderIntakeIssueStateValue(claim.issue_state_type);
   return (

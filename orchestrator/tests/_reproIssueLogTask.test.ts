@@ -96,6 +96,12 @@ const doctor: DoctorResult = {
       review_model: { status: 'ok', expected: 'gpt-5.3-codex', actual: 'gpt-5.3-codex' },
       model_reasoning_effort: { status: 'ok', expected_minimum: 'high', actual: 'xhigh' },
       max_threads: { status: 'ok', expected_minimum: 12, actual: 12 },
+      multi_agent_v2_thread_cap: {
+        status: 'not_applicable',
+        actual: null,
+        path: 'features.multi_agent_v2.max_concurrent_threads_per_session',
+        detail: 'MultiAgentV2 is not enabled; stable multi-agent uses agents.max_threads'
+      },
       max_depth: { status: 'ok', expected_minimum: 4, actual: 4 }
     },
     removed_features: {

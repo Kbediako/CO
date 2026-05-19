@@ -15,6 +15,10 @@ const FOLLOW_UP_PACKET_TRACEABILITY_SUPPRESSION_CODES = new Set([
   'linear_follow_up_packet_traceability_pending',
   'linear_follow_up_packet_traceability_retry_suppressed'
 ]);
+const FOLLOW_UP_LABEL_RESOLUTION_SUPPRESSION_CODES = new Set([
+  'linear_follow_up_label_resolution_failed',
+  'linear_follow_up_label_resolution_retry_suppressed'
+]);
 const CHILD_LANE_PARENT_DIRTY_SUPPRESSION_CODES = new Set([
   'provider_worker_child_lane_parent_dirty',
   'provider_worker_child_lane_parent_dirty_retry_suppressed'
@@ -172,11 +176,15 @@ export function deriveDeterministicProviderMutationSuppressions(
   const scopedEntries = selectProviderLinearMutationEntries(audit, latestByOperation)
     .filter((entry): entry is ProviderLinearAuditEntry => Boolean(entry))
     .filter((entry) => !issueId || entry.issue_id === issueId)
-    .filter((entry) => (
-      entry.operation !== 'create-follow-up'
-      || !followUpIntentKey
-      || entry.follow_up_intent_key === followUpIntentKey
-    ))
+    .filter((entry) => {
+      if (entry.operation !== 'create-follow-up' || !followUpIntentKey) {
+        return true;
+      }
+      if (isFollowUpLabelResolutionSuppressionCode(entry.error_code)) {
+        return true;
+      }
+      return entry.follow_up_intent_key === followUpIntentKey;
+    })
     .filter((entry) =>
       readTimestampMs(entry as unknown as Record<string, unknown>, 'recorded_at') >= recordedAtNotBeforeMs
     );
@@ -233,13 +241,21 @@ export function findDeterministicProviderMutationSuppression(
   } = {}
 ): ProviderLinearMutationSuppression | null {
   const requestedAction = normalizeAuditAction(options.action);
-  return (
-    deriveDeterministicProviderMutationSuppressions(audit, options).find(
+  const matchingSuppressions = deriveDeterministicProviderMutationSuppressions(audit, options)
+    .filter(
       (suppression) =>
         suppression.operation === operation &&
         (!requestedAction || suppression.action === requestedAction)
-    ) ?? null
-  );
+    );
+  if (operation === 'create-follow-up') {
+    const labelResolutionSuppression = matchingSuppressions.find((suppression) =>
+      isFollowUpLabelResolutionSuppressionCode(suppression.error_code)
+    );
+    if (labelResolutionSuppression) {
+      return labelResolutionSuppression;
+    }
+  }
+  return matchingSuppressions[0] ?? null;
 }
 
 export function isFollowUpParityMatrixSuppressionCode(
@@ -254,6 +270,13 @@ export function isFollowUpPacketTraceabilitySuppressionCode(
 ): boolean {
   const normalized = normalizeOptionalString(errorCode);
   return normalized ? FOLLOW_UP_PACKET_TRACEABILITY_SUPPRESSION_CODES.has(normalized) : false;
+}
+
+export function isFollowUpLabelResolutionSuppressionCode(
+  errorCode: string | null | undefined
+): boolean {
+  const normalized = normalizeOptionalString(errorCode);
+  return normalized ? FOLLOW_UP_LABEL_RESOLUTION_SUPPRESSION_CODES.has(normalized) : false;
 }
 
 export function isChildLaneParentDirtySuppressionCode(
@@ -292,13 +315,17 @@ function buildDeterministicProviderMutationSuppression(
         error_code: errorCode,
         error_message: errorMessage,
         instruction:
-          isFollowUpPacketTraceabilitySuppressionCode(errorCode)
+          isFollowUpLabelResolutionSuppressionCode(errorCode)
+            ? 'Do not retry `create-follow-up` in this attempt until you first source-label the Linear issue with the required lifecycle, priority, area, and type labels, then reread issue-context before retrying. Preserve the fail-closed label requirements instead of creating an under-labeled follow-up.'
+            : isFollowUpPacketTraceabilitySuppressionCode(errorCode)
             ? 'Do not retry `create-follow-up` in this attempt until you reconcile the existing follow-up issue from the error details and prove its packet prefix, packet files, docs/TASKS.md mirror, tasks/index.json entry, and docs-freshness registry entries are ready.'
             : isFollowUpParityMatrixSuppressionCode(errorCode)
             ? 'Do not retry `create-follow-up` in this attempt unless you first add the required parity matrix or explicitly reclassify the follow-up as non-parity/alignment and omit `--parity-lane`.'
             : buildGenericSuppressionInstruction(entry.operation, errorCode, errorMessage),
         summary:
-          isFollowUpPacketTraceabilitySuppressionCode(errorCode)
+          isFollowUpLabelResolutionSuppressionCode(errorCode)
+            ? 'deterministic provider mutation suppressed: create-follow-up retry is blocked until the source issue has the required live labels'
+            : isFollowUpPacketTraceabilitySuppressionCode(errorCode)
             ? 'deterministic provider mutation suppressed: create-follow-up retry is blocked until the existing follow-up packet and registry mirrors are ready'
             : isFollowUpParityMatrixSuppressionCode(errorCode)
             ? 'deterministic provider mutation suppressed: create-follow-up retry is blocked until a parity matrix is added or the follow-up is reclassified as non-parity/alignment with --parity-lane omitted'
@@ -431,6 +458,9 @@ function isDeterministicProviderMutationFailure(entry: ProviderLinearAuditEntry)
     return true;
   }
   if (isFollowUpPacketTraceabilitySuppressionCode(errorCode)) {
+    return true;
+  }
+  if (isFollowUpLabelResolutionSuppressionCode(errorCode)) {
     return true;
   }
   if (isChildLaneParentDirtySuppressionCode(errorCode)) {

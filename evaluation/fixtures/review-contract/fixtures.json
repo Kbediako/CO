@@ -1,0 +1,67 @@
+{
+  "schema_version": "co.review.contract.eval-fixtures.v1",
+  "description": "Sanitized governed-review contract fixtures for CO-512.",
+  "fixtures": [
+    {
+      "id": "spec-violation-green-tests",
+      "description": "Green tests do not override a spec conformance finding.",
+      "expected_contract": {
+        "overall_verdict": "findings",
+        "axis": "spec_conformance",
+        "proposal_counts": {
+          "code_change": 0,
+          "agent_loop": 0
+        }
+      }
+    },
+    {
+      "id": "coding-standard-fallback-violation",
+      "description": "Fallback-expiry policy violation is a coding standards finding.",
+      "expected_contract": {
+        "overall_verdict": "findings",
+        "axis": "coding_standards",
+        "proposal_counts": {
+          "code_change": 0,
+          "agent_loop": 0
+        }
+      }
+    },
+    {
+      "id": "real-code-bug-with-patch-proposal",
+      "description": "A concrete code bug includes a patchable code-change proposal without applying it.",
+      "expected_contract": {
+        "overall_verdict": "findings",
+        "axis": "code_changes",
+        "proposal_counts": {
+          "code_change": 1,
+          "agent_loop": 0
+        }
+      }
+    },
+    {
+      "id": "skipped-agent-loop-step",
+      "description": "A missed workpad/delegation/review-loop step routes through an agent-loop proposal.",
+      "expected_contract": {
+        "overall_verdict": "findings",
+        "axis": "agent_loop",
+        "proposal_counts": {
+          "code_change": 0,
+          "agent_loop": 1
+        }
+      }
+    },
+    {
+      "id": "legacy-prose-clean-output",
+      "description": "Prose-only clean output must fail closed in governed enforce mode.",
+      "legacy_output": "I found no actionable issues in the uncommitted diff.",
+      "expected_contract": {
+        "overall_verdict": "unknown",
+        "axis": null,
+        "proposal_counts": {
+          "code_change": 0,
+          "agent_loop": 0
+        }
+      }
+    }
+  ]
+}

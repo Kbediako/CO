@@ -1,19 +1,9 @@
----
-id: 20260215-0965-rlm-help-cloud-stdout
-title: RLM Help + Cloud Fallback Stdout
-doc_type: tech_spec
-relates_to: docs/PRD-rlm-help-cloud-stdout.md
-risk: low
-owners:
-  - Codex
-last_review: 2026-04-19
----
+# Archived Document
 
-## Summary
-- Objective: make `rlm --help` always print help without running, and surface cloud preflight fallback reasons directly in `start` stdout/JSON output.
-- Scope: CLI wiring, command-surface tests, doctor guidance, and support docs.
-- Constraints: minimal diff; preserve existing runtime semantics; ship via npm.
+last_review: 2026-05-17
 
-## Review Notes
-- Notes: this task intentionally avoids broader CLI parsing changes; it only addresses `rlm --help` correctness and cloud fallback UX.
+<!-- docs-archive:stub -->
+> Archived on 2026-05-17. Full content: https://github.com/Kbediako/CO/blob/doc-archives/tasks/specs/0965-rlm-help-cloud-stdout.md
 
+- Archive branch: doc-archives
+- Archive path: tasks/specs/0965-rlm-help-cloud-stdout.md

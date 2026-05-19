@@ -6,6 +6,8 @@ Install bundled skills into `$CODEX_HOME/skills`:
 codex-orchestrator skills install
 ```
 
+The command installs all bundled skills by default and skips files that already exist. Use `--force` to refresh installed copies after upgrading the package, or `--only <skill>` to install a bounded subset.
+
 Bundled skills:
 - `agent-first-adoption-steering`
 - `chrome-devtools`
@@ -23,4 +25,4 @@ Bundled skills:
 - `release`
 - `standalone-review`
 
-Prefer globally installed skills when present, fall back to bundled `skills/<name>/SKILL.md`, and refresh skills after upgrading the npm package when you need new workflow instructions.
+Prefer globally installed skills when present, fall back to bundled `skills/<name>/SKILL.md`, and refresh skills with `codex-orchestrator skills install --force` after upgrading the npm package when you need new workflow instructions.

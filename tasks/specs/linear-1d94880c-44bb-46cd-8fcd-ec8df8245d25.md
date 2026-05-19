@@ -1,10 +1,10 @@
 ---
 id: 20260414-linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25
 title: CO: add provider/control-host throughput and freshness gauge
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-14
-last_review: 2026-04-14
+last_review: 2026-05-16
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25.md
@@ -21,6 +21,7 @@ review_notes:
   - 2026-04-14: Audited docs-review rerun passed after the supported `npm run docs:archive-tasks` line-budget repair; evidence `.runs/linear-1d94880c-44bb-46cd-8fcd-ec8df8245d25-co-177-docs-review-r2/cli/2026-04-14T05-20-05-166Z-23f9d876/manifest.json`, review telemetry `status=succeeded`, `review_outcome=clean-success`.
   - 2026-04-14: Required validation floor passed from clean commit `454c4f4f3`; standalone review execution reached `failed-boundary` only because the bounded reviewer launched a validation suite (`command-intent` / `validation-suite`), so parent performed manual correctness and elegance fallback with no blocking findings.
   - 2026-04-14: PR feedback resolved by requiring `run_id` before terminal reconciliation matching and selecting the newest proof-level Linear budget snapshot for fallback headroom checks; focused regressions and full validation floor reran green.
+  - 2026-05-16: CO-545 strict spec-guard audit reclassified this stale Apr 14/15 row as inactive done; live `node bin/codex-orchestrator.js linear issue-context --issue-id 1d94880c-44bb-46cd-8fcd-ec8df8245d25 --format json` verified CO-177 is Linear Done/completed. No completed_at was inferred or fabricated.
 ---
 
 # Technical Specification

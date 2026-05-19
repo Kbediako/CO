@@ -300,6 +300,52 @@ if [[ "\${1:-}" == "--help" ]]; then
   echo "  review   Review changes"
   exit 0
 fi
+if [[ "\${1:-}" == "exec" ]]; then
+  mode="\${RUN_REVIEW_MODE:-ok}"
+  output_last_message="" stdin_payload=""
+  index=1
+  while [[ $index -le $# ]]; do
+    arg="\${!index}"
+    if [[ "$arg" == "--output-last-message" ]]; then
+      next=$((index + 1))
+      output_last_message="\${!next:-}"
+      index=$((index + 2))
+      continue
+    fi
+    index=$((index + 1))
+  done
+  for arg in "$@"; do [[ "$arg" == "-" ]] && stdin_payload="$(cat)" && break; done
+  [[ -z "\${RUN_REVIEW_STDIN_LOG:-}" ]] || printf '%s' "$stdin_payload" > "\${RUN_REVIEW_STDIN_LOG}"
+  if [[ "$mode" == "contract-clean-output" ]]; then
+    review_dir="$(dirname "\${MANIFEST}")/review"
+    evidence_path="\${review_dir}/inputs/spec-bundle.json"
+    evidence_rel="\${evidence_path#\${CODEX_ORCHESTRATOR_ROOT}/}"
+    evidence_sha="$(shasum -a 256 "$evidence_path" | awk '{print $1}')"
+    contract_json="$(cat <<JSON
+{"schema_version":"co.review.contract.v1","generated_at":"2026-05-18T00:00:00.000Z","overall_verdict":"clean","axes":{"spec_conformance":{"verdict":"clean","summary":"Spec checked.","clean_signal":"Spec checked.","evidence_refs":[{"path":"$evidence_rel","sha256":"$evidence_sha","description":"spec bundle"}],"findings":[]},"coding_standards":{"verdict":"clean","summary":"Standards checked.","clean_signal":"Standards checked.","evidence_refs":[{"path":"$evidence_rel","sha256":"$evidence_sha","description":"spec bundle"}],"findings":[]},"code_changes":{"verdict":"clean","summary":"Code checked.","clean_signal":"Code checked.","evidence_refs":[{"path":"$evidence_rel","sha256":"$evidence_sha","description":"spec bundle"}],"findings":[]},"agent_loop":{"verdict":"clean","summary":"Agent loop checked.","clean_signal":"Agent loop checked.","evidence_refs":[{"path":"$evidence_rel","sha256":"$evidence_sha","description":"spec bundle"}],"findings":[]}},"code_change_proposals":[],"agent_loop_proposals":[]}
+JSON
+)"
+    if [[ -n "$output_last_message" ]]; then
+      printf '%s\n' "$contract_json" > "$output_last_message"
+    fi
+    echo "codex"
+    printf '%s\n' "$contract_json"
+    echo "hook: Stop"
+    echo "hook: Stop Completed"
+    exit 0
+  fi
+  if [[ "$mode" == "telemetry-persist-failure" ]]; then
+    mkdir -p "$(dirname "\${MANIFEST}")/review/telemetry.json"
+    echo "codex"
+    echo "I found no actionable issues in the uncommitted diff."
+    exit 0
+  fi
+  echo "codex"
+  echo "I found no actionable issues in the uncommitted diff."
+  echo "hook: Stop"
+  echo "hook: Stop Completed"
+  exit 0
+fi
   if [[ "\${1:-}" == "review" ]]; then
     mode="\${RUN_REVIEW_MODE:-ok}"
     if [[ "$mode" == "thread-not-found-noise-ok" ]]; then
@@ -1305,6 +1351,11 @@ fi
         sleep 1
       done
     fi
+    if [[ "$mode" == "telemetry-persist-failure" ]]; then
+      mkdir -p "$(dirname "\${MANIFEST}")/review/telemetry.json"
+      echo "I found no actionable issues in the uncommitted diff."
+      exit 0
+    fi
     if [[ "$mode" == "heavy-hang-env-wrapper" ]]; then
       echo "thinking"
       echo "exec"
@@ -1519,6 +1570,7 @@ function baseEnv(sandbox: string, codexBin: string): Record<string, string | und
   delete env.CODEX_REVIEW_DEBUG_TELEMETRY;
   delete env.CODEX_REVIEW_SURFACE;
   delete env.CODEX_REVIEW_AUTHORITATIVE_GATE;
+  delete env.CODEX_REVIEW_CONTRACT_MODE;
   delete env.CODEX_REVIEW_BREAK_GLASS_NOTES_FALLBACK;
   delete env.CODEX_REVIEW_BREAK_GLASS_OWNER;
   delete env.CODEX_REVIEW_BREAK_GLASS_EXPIRES_AT;
@@ -2224,6 +2276,22 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(result.stderr).not.toContain('using a generated fallback');
   });
 
+  it('treats enforce contract mode as authoritative for missing NOTES', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      NOTES: '',
+      CODEX_REVIEW_AUTHORITATIVE_GATE: undefined,
+      CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('NOTES is required for the authoritative review gate');
+    expect(result.stderr).not.toContain('using a generated fallback');
+  });
+
   it('allows missing NOTES only with explicit break-glass waiver metadata', async () => {
     const sandbox = await makeSandbox();
     const manifestPath = await makeManifest(sandbox);
@@ -2232,6 +2300,7 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
       ...baseEnv(sandbox, codexBin),
       NOTES: '',
       CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+      CODEX_REVIEW_CONTRACT_MODE: 'off',
       CODEX_REVIEW_BREAK_GLASS_NOTES_FALLBACK: '1',
       CODEX_REVIEW_BREAK_GLASS_OWNER: 'parent-provider-worker',
       CODEX_REVIEW_BREAK_GLASS_EXPIRES_AT: '2099-01-01T00:00:00.000Z',
@@ -2248,6 +2317,283 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(prompt).toContain('expires_at=2099-01-01T00:00:00.000Z');
     expect(prompt).toContain('evidence=.runs/sample-task/cli/sample-run/manifest.json');
     expect(prompt).not.toContain('auto-generated NOTES fallback');
+  });
+
+  it('fails enforce-mode review when the governed contract is missing', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      NOTES: 'Goal: enforce contract test | Summary: fake review emits prose-only output | Risks: missing contract must fail closed',
+      CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+      CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('enforce contract gate failed: review contract validation is missing');
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status?: string;
+      error?: string;
+      contract_mode?: string;
+      contract_validation?: { status?: string };
+      review_verdict?: string;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.contract_mode).toBe('enforce');
+    expect(telemetry.contract_validation?.status).toBe('missing');
+    expect(telemetry.review_verdict).toBe('unknown');
+  });
+
+  it('uses structured-output exec as the enforce-mode contract transport', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const argsLogPath = join(sandbox, 'review-args.log');
+    const stdinLogPath = join(sandbox, 'review-stdin.log');
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'contract-clean-output',
+      RUN_REVIEW_ARGS_LOG: argsLogPath,
+      RUN_REVIEW_STDIN_LOG: stdinLogPath,
+      NOTES: 'Goal: enforce contract exec test | Summary: fake exec writes schema-shaped final message | Risks: stdout hook noise must not invalidate the last-message contract',
+      CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+      CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+    });
+
+    expect(result.exitCode).toBe(0);
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    expect(argsLog).toContain('argv=exec -s read-only --output-schema');
+    expect(argsLog).toContain('schemas/review-contract.v1.output.schema.json');
+    expect(argsLog).toContain('--output-last-message');
+    expect(argsLog).toContain('review/contract.json');
+    expect(argsLog).toContain(' -');
+    expect(argsLog).not.toContain('argv=review');
+    const stdinLog = await readFile(stdinLogPath, 'utf8');
+    expect(stdinLog).toContain('Goal: enforce contract exec test');
+    expect(stdinLog).toContain('co.review.contract.v1');
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status?: string;
+      error?: string | null;
+      review_verdict?: string;
+      contract_mode?: string;
+      contract_validation?: { status?: string };
+      contract_overall_verdict?: string | null;
+      launch_context?: {
+        transport?: string;
+        prompt_delivery?: string;
+        reviewer_visible_context_transport?: string;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.error).toBeNull();
+    expect(telemetry.review_verdict).toBe('clean');
+    expect(telemetry.contract_mode).toBe('enforce');
+    expect(telemetry.contract_validation?.status).toBe('valid');
+    expect(telemetry.contract_overall_verdict).toBe('clean');
+    expect(telemetry.launch_context?.transport).toBe('codex-exec-output-schema');
+    expect(telemetry.launch_context?.prompt_delivery).toBe('stdin');
+    expect(telemetry.launch_context?.reviewer_visible_context_transport).toBe('stdin-prompt');
+  });
+
+  it('keeps delegation disable config as a global option for structured-output exec', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const argsLogPath = join(sandbox, 'review-args.log');
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'contract-clean-output',
+      RUN_REVIEW_ARGS_LOG: argsLogPath,
+      CODEX_REVIEW_DISABLE_DELEGATION_MCP: '1',
+      CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+      CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+    });
+
+    expect(result.exitCode).toBe(0);
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    expect(argsLog).toContain('config=mcp_servers.delegation.enabled=false');
+    expect(argsLog).toContain('argv=exec -s read-only --output-schema');
+    expect(argsLog).not.toContain('argv=exec -c');
+  });
+
+  it('fails closed instead of printing a prompt-only handoff when enforce mode is set without the authoritative gate', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      FORCE_CODEX_REVIEW: undefined,
+      CODEX_REVIEW_AUTHORITATIVE_GATE: undefined,
+      NOTES: 'Goal: enforce contract no-handoff test | Summary: enforce mode alone must execute review | Risks: prompt-only handoff must fail closed',
+      CODEX_REVIEW_NON_INTERACTIVE: '1',
+      CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).not.toContain('Codex review handoff (non-interactive):');
+    expect(result.stderr).toContain('enforce contract gate failed: review contract validation is missing');
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status?: string;
+      error?: string;
+      contract_mode?: string;
+      contract_validation?: { status?: string };
+      review_verdict?: string;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.contract_mode).toBe('enforce');
+    expect(telemetry.contract_validation?.status).toBe('missing');
+    expect(telemetry.review_verdict).toBe('unknown');
+  });
+
+  it('respects explicit FORCE_CODEX_REVIEW=0 when enforce mode suppresses prompt-only handoff', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, '/missing/codex'),
+      FORCE_CODEX_REVIEW: '0',
+      CODEX_REVIEW_AUTHORITATIVE_GATE: undefined,
+      CODEX_REVIEW_CONTRACT_MODE: 'enforce',
+      NOTES: 'Goal: enforce contract explicit opt-out test | Summary: FORCE_CODEX_REVIEW=0 must not launch review | Risks: prompt-only handoff must fail closed',
+      CODEX_REVIEW_NON_INTERACTIVE: '1'
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).not.toContain('Codex review handoff (non-interactive):');
+    expect(result.stderr).toContain('CODEX_REVIEW_CONTRACT_MODE=enforce disallows prompt-only');
+    expect(result.stderr).not.toContain('spawn /missing/codex');
+  });
+
+  it('treats authoritative gate flag value "on" as enforce mode before prompt-only handoff', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      FORCE_CODEX_REVIEW: undefined,
+      CODEX_REVIEW_CONTRACT_MODE: undefined,
+      CODEX_REVIEW_AUTHORITATIVE_GATE: 'on',
+      NOTES: 'Goal: enforce contract flag parser test | Summary: authoritative gate on must execute review | Risks: prompt-only handoff must fail closed',
+      CODEX_REVIEW_NON_INTERACTIVE: '1'
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).not.toContain('Codex review handoff (non-interactive):');
+    expect(result.stderr).toContain('enforce contract gate failed: review contract validation is missing');
+    const telemetryPath = join(dirname(manifestPath), 'review', 'telemetry.json');
+    const telemetry = JSON.parse(await readFile(telemetryPath, 'utf8')) as {
+      status?: string;
+      error?: string;
+      contract_mode?: string;
+      contract_validation?: { status?: string };
+      review_verdict?: string;
+    };
+    expect(telemetry.status).toBe('failed');
+    expect(telemetry.error).toBeTruthy();
+    expect(telemetry.contract_mode).toBe('enforce');
+    expect(telemetry.contract_validation?.status).toBe('missing');
+    expect(telemetry.review_verdict).toBe('unknown');
+  });
+
+  it('accepts FORCE_CODEX_REVIEW flag value "on" for authoritative non-interactive execution', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      FORCE_CODEX_REVIEW: 'on',
+      CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+      CODEX_REVIEW_CONTRACT_MODE: 'off',
+      NOTES:
+        'Goal: force review flag parser test | Summary: FORCE_CODEX_REVIEW=on must execute review under authoritative gate | Risks: prompt-only handoff must fail closed',
+      CODEX_REVIEW_NON_INTERACTIVE: '1'
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).not.toContain('Codex review handoff (non-interactive):');
+    expect(result.stderr).not.toContain('CODEX_REVIEW_AUTHORITATIVE_GATE=1 disallows prompt-only');
+  });
+
+  it('fails enforce-mode review when contract telemetry cannot be persisted', async () => {
+    const sandbox = await makeSandbox();
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'telemetry-persist-failure',
+      NOTES: 'Goal: enforce contract telemetry test | Summary: fake review blocks telemetry persistence | Risks: missing telemetry must fail closed',
+      CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+      CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('enforce contract gate failed: review contract telemetry is missing');
+  });
+
+  it('runs enforce-mode explicit scoped review through structured stdin transport', async () => {
+    const sandbox = await makeSandbox();
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    await writeFile(join(sandbox, 'file-1.txt'), 'updated\n', 'utf8');
+    await runGit(['add', 'file-1.txt'], sandbox);
+    await runGit(['commit', '-m', 'update file'], sandbox);
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const argsLogPath = join(sandbox, 'review-args.log');
+    const stdinLogPath = join(sandbox, 'review-stdin.log');
+    const result = await runReviewCommand(
+      manifestPath,
+      {
+        ...baseEnv(sandbox, codexBin),
+        RUN_REVIEW_MODE: 'contract-clean-output',
+        RUN_REVIEW_ARGS_LOG: argsLogPath,
+        RUN_REVIEW_STDIN_LOG: stdinLogPath,
+        NOTES: 'Goal: enforce scoped contract test | Summary: explicit scoped launches must carry the contract prompt through structured stdin transport | Risks: missing scoped change-bundle must fail closed',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      },
+      ['--base', 'HEAD~1']
+    );
+
+    expect(result.exitCode).toBe(0);
+    const argsLog = await readFile(argsLogPath, 'utf8');
+    expect(argsLog).toContain('argv=exec -s read-only --output-schema');
+    expect(argsLog).toContain(' -');
+    expect(argsLog).not.toContain('--base HEAD~1');
+    const stdinLog = await readFile(stdinLogPath, 'utf8');
+    expect(stdinLog).toContain('Goal: enforce scoped contract test');
+    const changeBundle = JSON.parse(
+      await readFile(join(dirname(manifestPath), 'review', 'inputs', 'change-bundle.json'), 'utf8')
+    ) as {
+      scope_mode?: string;
+      scope_base?: string;
+      git_diff_name_status?: string;
+      git_diff_patch?: string;
+    };
+    expect(changeBundle.scope_mode).toBe('base');
+    expect(changeBundle.scope_base).toBe('HEAD~1');
+    expect(changeBundle.git_diff_name_status).toContain('file-1.txt');
+    expect(changeBundle.git_diff_patch).toContain('updated');
+    const telemetry = JSON.parse(
+      await readFile(join(dirname(manifestPath), 'review', 'telemetry.json'), 'utf8')
+    ) as {
+      status?: string;
+      review_verdict?: string;
+      launch_context?: {
+        scope_flag_mode?: string | null;
+        prompt_delivery?: string | null;
+        reviewer_visible_context_transport?: string | null;
+      };
+    };
+    expect(telemetry.status).toBe('succeeded');
+    expect(telemetry.review_verdict).toBe('clean');
+    expect(telemetry.launch_context?.scope_flag_mode).toBeNull();
+    expect(telemetry.launch_context?.prompt_delivery).toBe('stdin');
+    expect(telemetry.launch_context?.reviewer_visible_context_transport).toBe('stdin-prompt');
   });
 
   it('ignores ambient fake-codex harness env in baseEnv', async () => {

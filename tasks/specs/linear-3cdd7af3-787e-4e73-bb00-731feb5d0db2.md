@@ -1,10 +1,10 @@
 ---
 id: 20260414-linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2
 title: CO workflow: make parent-owned same-issue child lanes parallel-first by default where safe
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-14
-last_review: 2026-04-14
+last_review: 2026-05-16
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-3cdd7af3-787e-4e73-bb00-731feb5d0db2.md
@@ -15,6 +15,7 @@ review_notes:
   - 2026-04-14: Live issue context confirmed the workflow states, moved `Ready` -> `In Progress`, created branch `linear/co-174-parallel-first-child-lanes`, and created Linear workpad comment `027d42cb-b957-49f3-a6cf-6bfafec6a91f`.
   - 2026-04-14: The matrix found safe `surface-inventory`, recorded `parallelize_now` / `independent_scope_available`, launched the child lane, then parent invalidated the completed patch as stale after issue `updated_at` changed.
   - 2026-04-14: Issue-quality review approved this as a policy/adoption layer over `CO-35`, `CO-101`, and `CO-125`; audited docs-review succeeded with telemetry `clean-success`.
+  - 2026-05-16: CO-545 strict spec-guard audit reclassified this stale Apr 14/15 row as inactive done; live `node bin/codex-orchestrator.js linear issue-context --issue-id 3cdd7af3-787e-4e73-bb00-731feb5d0db2 --format json` verified CO-174 is Linear Done/completed and attached/related PR evidence https://github.com/Kbediako/CO/pull/470. No completed_at was inferred or fabricated.
 ---
 
 # Technical Specification

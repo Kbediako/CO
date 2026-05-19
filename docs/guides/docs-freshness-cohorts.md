@@ -10,16 +10,16 @@ The machine-readable policy lives in `docs/docs-catalog.json` under `policies.ro
 
 Current CO policy:
 
-- Owner issue: `CO-511`
+- Owner issue: `CO-558`
 - Canonical recurring owner key: `docs:freshness:maintain`
 - Live-owner verification: `docs:freshness:maintain` must verify the configured owner issue as a non-terminal issue in the configured Linear project before owned rolling debt can pass. Terminal, canceled, duplicate, out-of-project, or unverifiable owners are evidence only and must route to canonical owner reuse/re-home action instead of remaining live owner metadata.
 - Exact canonical owner overrides: `canonical_owner_issues[]` may map one `canonical_owner_key` to one live owner issue, such as `CO-320` for `docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30`
-- Historical owner lineage: `CO-175` established the Apr 14 baseline, `CO-267` owned the Apr 20/21 maintenance refreshes, `CO-300` owned the Apr 22 reset, `CO-324` owned the Apr 23 reset, `CO-343` owned the Apr 24/25 reset, `CO-401` owned the Apr 27 reset, `CO-420` temporarily re-homed the Mar 28 rolling cohort before reaching terminal `Done`, `CO-409` restored live same-project owner metadata after `CO-420` before also reaching terminal `Done`, `CO-423` restored live same-project owner metadata after `CO-409` before reaching terminal `Done`, `CO-425` restored live same-project owner metadata after `CO-423` before reaching terminal `Done`, `CO-430` briefly carried the integrated owner metadata from the CO-428 blocker-clear branch before also reaching terminal `Done`, `CO-427` restored live same-project owner metadata after `CO-425`/`CO-430` before reaching terminal `Done`, `CO-441` restored live same-project owner metadata after `CO-427` before reaching terminal `Done`, and `CO-444` restored live same-project owner metadata after `CO-441` before reaching terminal `Done`; these prior owners are now terminal or invalid evidence only and must not remain the live maintenance owner after they reach terminal or unverifiable states. `CO-511` is the current live same-project owner for the retained March 28 rolling cohort plus the April 6 completed-lane residue cleanup.
+- Historical owner lineage: `CO-175` established the Apr 14 baseline, `CO-267` owned the Apr 20/21 maintenance refreshes, `CO-300` owned the Apr 22 reset, `CO-324` owned the Apr 23 reset, `CO-343` owned the Apr 24/25 reset, `CO-401` owned the Apr 27 reset, `CO-420` temporarily re-homed the Mar 28 rolling cohort before reaching terminal `Done`, `CO-409` restored live same-project owner metadata after `CO-420` before also reaching terminal `Done`, `CO-423` restored live same-project owner metadata after `CO-409` before reaching terminal `Done`, `CO-425` restored live same-project owner metadata after `CO-423` before reaching terminal `Done`, `CO-430` briefly carried the integrated owner metadata from the CO-428 blocker-clear branch before also reaching terminal `Done`, `CO-427` restored live same-project owner metadata after `CO-425`/`CO-430` before reaching terminal `Done`, `CO-441` restored live same-project owner metadata after `CO-427` before reaching terminal `Done`, `CO-444` restored live same-project owner metadata after `CO-441` before reaching terminal `Done`, `CO-511` restored live same-project owner metadata after `CO-444` before reaching terminal `Done`, and `CO-522` restored live same-project owner metadata after `CO-511` before later reaching terminal `Done`; these prior owners are now terminal or invalid evidence only and must not remain the live maintenance owner after they reach terminal or unverifiable states. `CO-558` is the current live same-project owner for the retained rolling freshness maintenance track after terminal `CO-522`.
 - Window: `7` days after the normal freshness cadence expires
 - Maximum active rolling cohorts: `2`
 - Maximum rolling rows: `300`
 - Eligible doc classes: `Task Packet`, `Task Mirror`, and `Report Only`
-- Declared baseline cohorts: `co-175-apr-14-march-14-tasks-1164-1195`, `co-343-apr-25-march-25-task-packets-1311-1318`, `co-420-apr-28-march-28-task-packet-mirror`
+- Declared baseline cohorts: `co-175-apr-14-march-14-tasks-1164-1195`, `co-343-apr-25-march-25-task-packets-1311-1318`, `co-558-may-19-apr-18-task-report-maintenance`
 - Ineligible docs: Front Door, Public Guide, Repository Guide, Agent Policy, Active Guide, shipped skills, companions, templates, and uncatalogued docs
 
 Eligibility is not class-only. A stale row must match a declared baseline cohort by `last_review`, `cadence_days`, path family, and either task-number range or declared path prefix before it can move from blocking stale failures into rolling debt. This prevents a newly stale feature-lane packet from being hidden just because it is in an eligible doc class and still inside the rolling window.
@@ -36,6 +36,8 @@ Those report fields are not waivers. They are the repo-wide freshness debt ledge
 
 ## Maintenance Decision
 `npm run docs:freshness:maintain` is the provider-gate maintenance entrypoint. It runs `docs:freshness`, runs `spec-guard`, computes the current git diff, and writes `out/<task-id>/docs-freshness-maintenance.json`.
+
+`co-status` surfaces this maintenance decision through `repo_gates.docs_freshness_maintain`. The status reader checks an explicit report path when one is supplied; otherwise it searches scheduled output (`out/docs-truthfulness-maintenance/docs-freshness-maintenance.json`), local output (`out/local/docs-freshness-maintenance.json`), and task-scoped reports only for active task ids from the runtime environment or provider-intake claims. It does not scan arbitrary `out/*/docs-freshness-maintenance.json` reports, so unrelated historical task evidence cannot mask the current gate. It selects the freshest valid explicit candidate by `generated_at`, requires reports to be within `CODEX_DOCS_FRESHNESS_REPO_GATE_MAX_AGE_MS` (default 24 hours), and emits degraded `report_missing`, `report_stale`, or `report_invalid` evidence instead of treating absent/stale reports as clean.
 
 The maintenance report is the machine-readable decision future workers should cite instead of manually reclassifying date-boundary cohorts. It includes:
 
@@ -66,6 +68,8 @@ When the configured owner issue is terminal, canceled, duplicate, out-of-project
 Exact canonical owner overrides are narrower than the global owner issue. `docs:freshness:maintain` may surface a mapped live owner only when a candidate cohort's `canonical_owner_key` exactly matches an entry in `canonical_owner_issues[]`; unrelated candidate cohorts must keep the configured global owner evidence and remain blocked or independently owned. This keeps duplicate prevention keyed to `codex-orchestrator:canonical-owner-key=...` without broadening a cohort-specific owner into a repo-wide freshness owner.
 
 Owned rolling debt is an `expire fallback`, not an indefinite exception. Every retained cohort emitted by `docs:freshness:maintain` carries `fallback_expiry` metadata with the owner, trigger, review date, maximum lifetime, `expires_after`, removal condition, and validation evidence. The maximum lifetime is the configured rolling window after normal cadence expiry, so the fallback must be removed by refreshing, archiving, reclassifying, or re-homing to a verified live same-project owner before that date.
+
+After a `docs:freshness:maintain` owner PR merges, do not treat the merge as proof that retained cohort debt is resolved. If `docs:freshness:maintain` still reports `pass_with_owned_rolling_debt` or `rolling_freshness_cohorts` still contains the retained cohort, keep the merged owner issue in `Backlog` as the non-terminal owner while no active repair is underway. That Backlog posture preserves exact-marker reuse without consuming an active worker lane; move the issue out of `Backlog` only to refresh the cohort, archive completed historical packets, reclassify rows from verified lifecycle evidence, or re-home the cohort to another verified live same-project owner. Closing the merged owner issue to `Done`, `Canceled`, `Duplicate`, or any other terminal state while the retained cohort remains visible will make the next maintenance run fail closed as terminal-owner debt.
 
 ## Preserved Historical Stub Status
 Some historical task-key stubs remain authoritative because current repo tooling still resolves their canonical task key from that path even after the rest of the historical packet is gone. Those rows should use docs-freshness registry status `preserved_historical_stub`.
@@ -113,6 +117,7 @@ Feature lanes may cite the owner issue for the rolling cohort, but they must sti
 - Do not omit or broaden `baseline_cohorts`; stale docs outside the declared baseline must remain blocking.
 - Do not treat a green `docs:freshness` exit as proof that rolling freshness debt is zero; inspect the report totals.
 - Do not reuse terminal owners as active owner issues, even when their title or older metadata looks relevant.
+- Do not close a merged `docs:freshness:maintain` owner issue while its retained cohort is still visible; leave it in `Backlog` until the cohort is refreshed, archived, reclassified, or re-homed.
 - Do not create a fresh owner when an open same-project exact-marker owner can be reused or updated.
 
 ## Escaped Recurrence History
@@ -197,6 +202,35 @@ CO-239 reproduced the Apr 18 baseline failure in `out/linear-a710d9a7-5187-414d-
 - lineage: `1289-1298`
 
 The Apr 18 blocking cohort was reviewed in `docs/findings/linear-a710d9a7-5187-414d-8a8b-beab7853e446-docs-freshness-classification.md` and refreshed instead of added to rolling deferral. Adding the `70` rows beside the existing CO-175 `221` rows would create `291` candidate rows and `8` candidate cohorts, staying within `max_entries=300` but still exceeding `max_cohorts=2`, so CO-239 keeps the rolling policy unchanged and updates only the reviewed historical packet rows to `last_review=2026-04-18`.
+
+## May 19 Terminal Owner Re-home
+CO-558 reproduced the May 19 current-main freshness owner failure in `out/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/before/docs-freshness.json` and `out/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/before/docs-freshness-maintenance.json`:
+
+- `131` stale entries
+- `0` rolling cohort entries before the CO-558 policy update
+- `0` missing registry rows
+- `0` missing-on-disk rows
+- `0` invalid registry entries
+- `0` uncatalogued docs
+- `3` strict docs approaching expiry in `docs:freshness`
+- `21` active `tasks/specs/**` rows approaching strict `spec-guard` expiry
+- owner issue: `CO-522`
+- owner issue action: `create_required`
+- owner issue action reason: `configured_owner_terminal`
+- owner issue state: `Done` / `completed`
+- `blocking_changed_paths=[]`
+- canonical owner key: `docs:freshness:maintain`
+- canonical owner marker: `codex-orchestrator:canonical-owner-key=docs:freshness:maintain`
+- blocking classes: Task Packet `98`, Task Mirror `22`, Report Only `11`
+- blocking path families: `.agent/task` `22`, `docs/ACTION_PLAN-*` `22`, `docs/PRD-*` `22`, `docs/TECH_SPEC-*` `22`, `docs/findings` `11`, `tasks/specs` `10`, `tasks/tasks-*` `22`
+- date cohort: `2026-04-18` / `30` days (`131` rows)
+- lineage: `1289-1298` plus UUID-backed April 18 packet paths retained as exact policy prefixes
+
+CO-558 replaces the terminal `CO-522` owner metadata with a live same-project owner and declares `co-558-may-19-apr-18-task-report-maintenance` as the May 19 owner-backed rolling cohort. This is an owner re-home, not a hidden refresh: the `2026-04-18` task mirror, task packet, and report-only rows keep their original `last_review` evidence and remain visible in `rolling_freshness_cohorts` until the rolling window expires after `2026-05-25`.
+
+The same CO-558 pass directly reviewed the strict pre-expiry rows instead of adding them to rolling deferral. The release-intake issue template still matches the current required release evidence and closeout-axis contract, and the `agent-first-adoption-steering` and `long-poll-wait` shipped skills still match the current provider-worker guidance for docs-first delegation and patience-first monitors. The 21 active spec pre-expiry rows remain source specs for current implementation packets, so their frontmatter `last_review` values are updated to `2026-05-19` after source review instead of relying on registry-only metadata.
+
+CO-558 does not weaken `docs:freshness`, `docs:freshness:maintain`, `spec-guard`, or docs catalog coverage. It does not delete historical docs, broaden rolling caps, blindly bump the Apr 18 task/report cohort, or make CO-515 own unrelated docs freshness debt.
 
 ## Apr 19 Reviewed Refresh
 CO-254 reproduced the Apr 19 baseline failure in `out/linear-5348c2fb-8897-48e3-a848-7831778b1b00/before/docs-freshness.json`:
@@ -451,3 +485,38 @@ CO-511 reproduced the owner blocker after CO-444 reached terminal `Done`:
 ### Rolling Disposition
 
 CO-511 re-homes the live `docs:freshness:maintain` owner metadata from terminal `CO-444` to live same-project issue `CO-511`. The April 6 residue is not a new product implementation lane: the affected task-packet rows are archived as completed-lane historical metadata, the stale active specs are reclassified to terminal `done`, and `tasks/index.json` records the live Linear terminal evidence. This preserves historical packet evidence, avoids blind `last_review` churn, and keeps `docs:freshness` / `spec-guard` enforcement unchanged.
+
+## May 12 CO-511 Terminal Owner Re-home
+
+### Reproduction / Baseline Findings
+
+CO-522 reproduced the live-owner blocker after CO-511 reached terminal `Done`:
+
+- `docs:freshness:maintain -- --format json` reported configured owner `CO-511` with `owner_issue_action.reason=configured_owner_terminal`, `issue_state=Done`, `issue_state_type=completed`, and `blocking_changed_paths=[]`.
+- The same report preserved the stale docs baseline as repo-wide owner-routed debt: `617` stale entries, `611` blocking candidate entries, `33` candidate cohorts, and `6` hard-stale entries, without missing registry rows or changed-path blockers.
+- Fresh CO-514 evidence that created CO-522 showed provider-worker lanes were blocked by `configured_owner_terminal` for `canonical_owner_key=docs:freshness:maintain`, while CO-514's provider-worker manifest serialization scope stayed out of bounds for repo-wide freshness repair.
+
+### Rolling Disposition
+
+CO-522 re-homes only the live `docs:freshness:maintain` owner metadata from terminal `CO-511` to live same-project issue `CO-522`. This preserves the exact canonical owner marker `codex-orchestrator:canonical-owner-key=docs:freshness:maintain`, keeps stale docs visible for the maintenance owner, avoids blind `last_review` churn, does not delete stale packets or docs, and leaves `docs:freshness` / `spec-guard` enforcement unchanged.
+
+## May 13 April 9-12 Completed-Lane Residue Cleanup
+
+### Reproduction / Baseline Findings
+
+CO-530 reproduced the live owner-routed blocker after CO-522 was restored as the maintenance owner:
+
+- `docs:freshness:maintain -- --format json` reported `freshness_decision=block_policy_over_budget`, `owner_issue=CO-522`, `owner_issue_action.reason=succeeded`, `state=Blocked`, `state_type=started`, `usable=true`, and `blocking_changed_paths=[]`.
+- The report isolated `440` blocking candidate entries across `28` candidate cohorts, over the configured `max_entries=300` and `max_cohorts=2`; CO-530 owns the 434 rows tied to the `1076-1137` task lineage, while CO-536 owns the six adjacent CO-163 terminal packet rows.
+- All 28 candidate cohorts routed through `co-429-completed-lane-registry-residue` with `last_review=2026-04-09..2026-04-12`, path families `.agent/task`, `docs/ACTION_PLAN-*`, `docs/PRD-*`, `docs/TECH_SPEC-*`, `docs/findings`, `tasks/specs`, and `tasks/tasks-*`, and task lineages `1076-1137`.
+- The same report separately showed 5 hard-stale current/public docs; CO-530 does not classify those rows as historical task-packet debt.
+
+### May 14 Recurrence / Root Cause Expansion
+
+Current-head review on May 14 proved the same completed-packet root cause one day later: the Apr 13 `1138-1163` cohort, January delegation release packets `0942-0944`, CO-94, and several terminal Linear task specs had aged back into `docs:freshness` or `spec-guard` failure because their terminal lifecycle truth was not recorded consistently. CO-530 therefore owns this current-head recurrence as part of the root-cause reclassification, not as another review-date refresh.
+
+The repair must record terminal truth in `tasks/index.json`, align the archived registry rows, and update any affected spec frontmatter that still says `in_progress`. It must not hide active public/current docs, widen caps, or delete historical packets; rows without terminal evidence stay eligible for strict freshness action.
+
+### Rolling Disposition
+
+CO-530 keeps `docs:freshness:maintain` and the live CO-522 owner marker unchanged. The Apr 9-12 residue is not active product guidance: the affected Task Packet, Task Mirror, and Report Only registry rows are archived as completed-lane historical metadata, and the numbered task-index rows `1076-1137` are marked completed from their existing closeout/spec evidence. The adjacent `CO-163` packet is classified separately under CO-536 from live Linear `Done` evidence and merged PR #456. This preserves historical files on disk, avoids blind `last_review` churn, avoids cap/window widening, and keeps unrelated hard-stale current docs visible to strict freshness gates.

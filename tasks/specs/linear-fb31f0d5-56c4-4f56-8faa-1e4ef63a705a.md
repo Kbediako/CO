@@ -5,7 +5,7 @@ relates_to: docs/PRD-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md
 risk: high
 owners:
   - Codex
-last_review: 2026-04-26
+last_review: 2026-05-19
 related_action_plan: docs/ACTION_PLAN-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md
 task_checklists:
   - tasks/tasks-linear-fb31f0d5-56c4-4f56-8faa-1e4ef63a705a.md
@@ -63,8 +63,8 @@ task_checklists:
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `provider workflow` | provider-id mapping fallback | `expire fallback` | `CO-400` | Provider issue handoff derives task identity with buildProviderFallbackTaskId and persists mapping_source=provider_id_fallback when no canonical provider task mapping exists. | 2026-03-19 | 2026-05-10 | 2026-05-26 | Remove after provider issue current-state authority owns canonical task identity for fresh starts, retries, and rehydrated claims without relying on provider-id fallback mapping. | metadata regression plus existing provider start activation tests |
-| `provider workflow` | retained-claim/autopilot fallback | `expire fallback` | `CO-400` | Active claim refresh, retained released claims, and autopilot recovery fall back to cached claim issue state or retained run proof when fresh Linear state is unavailable or inconclusive. | 2026-03-20 | 2026-05-10 | 2026-05-26 | Remove after provider issue current-state authority resolves retained claim, autopilot, fresh Linear, and run-manifest state through one authoritative decision path. | metadata regression plus existing retained-claim activation and non-activation tests |
+| `provider workflow` | provider-id mapping fallback | `expire fallback` | `CO-400` | Provider issue handoff derives task identity with buildProviderFallbackTaskId and persists mapping_source=provider_id_fallback when no canonical provider task mapping exists. | 2026-05-19 CO-558 review; inherited 2026-03-19 | 2026-05-19 | 2026-05-26 | Remove after provider issue current-state authority owns canonical task identity for fresh starts, retries, and rehydrated claims without relying on provider-id fallback mapping. | metadata regression plus existing provider start activation tests |
+| `provider workflow` | retained-claim/autopilot fallback | `expire fallback` | `CO-400` | Active claim refresh, retained released claims, and autopilot recovery fall back to cached claim issue state or retained run proof when fresh Linear state is unavailable or inconclusive. | 2026-05-19 CO-558 review; inherited 2026-03-20 | 2026-05-19 | 2026-05-26 | Remove after provider issue current-state authority resolves retained claim, autopilot, fresh Linear, and run-manifest state through one authoritative decision path. | metadata regression plus existing retained-claim activation and non-activation tests |
 
 Large-refactor check: `CO-400` is required because the retained-claim/autopilot path splits authority across live issue state, provider-intake cache, retained run proof, and autopilot snapshots.
 

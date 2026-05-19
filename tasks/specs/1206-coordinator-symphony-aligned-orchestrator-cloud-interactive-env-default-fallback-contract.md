@@ -1,10 +1,10 @@
 ---
 id: 20260315-1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract
 title: Coordinator Symphony-Aligned Orchestrator Cloud Interactive Env Default Fallback Contract
-status: draft
+status: done
 owner: Codex
 created: 2026-03-15
-last_review: 2026-04-15
+last_review: 2026-05-16
 review_cadence_days: 30
 risk_level: medium
 related_prd: docs/PRD-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract.md
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract.md
 review_notes:
   - 2026-03-15: Local read-only review approves a narrow executor-local fix. The delegated `1205` guard run reproduced a real failure when blank parent interactive env values were forwarded instead of falling back to defaults. Evidence: `.runs/1205-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment-guard/cli/2026-03-15T01-15-08-231Z-2d90175f/commands/04-test.ndjson`, `orchestrator/src/cli/services/orchestratorCloudTargetExecutor.ts`, `orchestrator/tests/OrchestratorCloudTargetExecutor.test.ts`, `docs/findings/1206-orchestrator-cloud-interactive-env-default-fallback-contract-deliberation.md`.
+  - 2026-05-16: CO-545 strict spec-guard audit reclassified this stale Apr 14/15 row as inactive done; same-file checklist `tasks/tasks-1206-coordinator-symphony-aligned-orchestrator-cloud-interactive-env-default-fallback-contract.md` has 21 checked items and 0 unchecked items, so the old draft status was stale metadata rather than active implementation work.
 ---
 
 # Technical Specification
