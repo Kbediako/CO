@@ -1,6 +1,109 @@
 {
   "items": [
     {
+      "id": "20260519-linear-b9447b5a-224d-4731-bab9-95bb0597dbe0",
+      "title": "CO-558 replace terminal docs freshness maintenance owner after May 19 stale baseline",
+      "relates_to": "tasks/tasks-linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "validation_green_review_rerun_pending",
+      "last_review": "2026-05-19",
+      "canonical_owner_key": "docs:freshness:maintain",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-19",
+          "status": "confirmed_in_progress",
+          "summary": "Live issue-context verified CO-558 was In Progress with no attached PR and one active workpad before parent implementation."
+        },
+        "parallelization": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-19",
+          "status": "parallelize_now_recorded",
+          "decision_id": "provider-linear-parallelization:2026-05-19T01-42-00-773Z-7979b68d:019e3de5-b5f2-7783-a83e-cda33f334493:2026-05-19T01_43_04.839Z",
+          "summary": "Pre-turn matrix identified a safe docs-packet child lane while the parent retained owner re-home, registry, and validation ownership."
+        },
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet-r2",
+          "date": "2026-05-19",
+          "status": "accepted_for_parent_import",
+          "manifest": ".runs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0-docs-packet-r2/cli/2026-05-19T01-49-56-177Z-bae26d99/manifest.json",
+          "summary": "Docs-only child lane produced the CO-558 task checklist; parent reviewed and accepted it while keeping Linear, registry, owner metadata, and lifecycle evidence parent-owned."
+        },
+        "baseline_reproduction": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-19",
+          "status": "captured_before_rehome",
+          "report": "out/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/before/docs-freshness-maintenance.json",
+          "freshness_report": "out/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/before/docs-freshness.json",
+          "summary": "Captured CO-522 terminal owner evidence, blocking_changed_paths=[], 131 stale task/report rows, three strict docs pre-expiry rows, and 21 active spec pre-expiry rows before implementation."
+        },
+        "required_validation": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-19",
+          "status": "passed_after_review_fixes",
+          "reports": {
+            "docs_freshness_maintain": "out/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/after-action-plan-fix/docs-freshness-maintenance.json",
+            "docs_freshness": "out/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/after-action-plan-fix/docs-freshness.json"
+          },
+          "summary": "docs:freshness, docs:freshness:maintain, spec-guard dry-run, and docs:check passed after resolving review findings CO558-REVIEW-002, CO558-REVIEW-003, and CO558-REVIEW-004."
+        }
+      },
+      "validation": {
+        "status": "validation_green_review_rerun_pending",
+        "passed": [
+          "live issue-context",
+          "single workpad confirmed",
+          "parallelization decision recorded",
+          "docs-packet-r2 child lane completed and was accepted",
+          "baseline docs:freshness:maintain reproduction captured",
+          "docs-first packet created",
+          "CO-558 owner re-home metadata implemented",
+          "May 19 stale cohort policy evidence documented",
+          "21 reviewed active spec rows mirrored in docs/docs-freshness-registry.json",
+          "CO-558 packet expiry mirrors aligned to 2026-05-25",
+          "npm run docs:freshness",
+          "npm run docs:freshness:maintain",
+          "node scripts/spec-guard.mjs --dry-run",
+          "npm run docs:check",
+          "git diff --check and git diff --cached --check"
+        ],
+        "pending": [
+          "clean standalone review after review-finding fixes",
+          "elegance pass before PR handoff",
+          "PR attachment and ready-review drain before review-state transition"
+        ]
+      },
+      "paths": {
+        "prd": "docs/PRD-linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
+        "docs": "docs/TECH_SPEC-linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
+        "action_plan": "docs/ACTION_PLAN-linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
+        "spec": "tasks/specs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
+        "task": "tasks/tasks-linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
+        "agent_task": ".agent/task/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
+        "policy_doc": "docs/guides/docs-freshness-cohorts.md",
+        "catalog": "docs/docs-catalog.json",
+        "registry": "docs/docs-freshness-registry.json"
+      },
+      "source_issue": {
+        "id": "b9447b5a-224d-4731-bab9-95bb0597dbe0",
+        "identifier": "CO-558",
+        "url": "https://linear.app/asabeko/issue/CO-558/co-replace-terminal-docs-freshness-maintenance-owner-after-may-19"
+      },
+      "related_issues": [
+        {
+          "identifier": "CO-522",
+          "relation": "terminal_previous_docs_freshness_maintenance_owner"
+        },
+        {
+          "identifier": "CO-515",
+          "relation": "source_follow_up_issue_that_exposed_unrelated_baseline_debt"
+        }
+      ]
+    },
+    {
       "id": "20260518-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e",
       "title": "CO-515 control-host source freshness recheck after main advances",
       "relates_to": "tasks/tasks-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md",

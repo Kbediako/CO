@@ -4,7 +4,7 @@ title: CO-390 Upstream Codex CLI Release Detection And Release Intake
 status: in_progress
 owner: Codex
 created: 2026-04-26
-last_review: 2026-04-26
+last_review: 2026-05-19
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f.md
