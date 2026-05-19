@@ -713,6 +713,16 @@ async function summarizeAutomations(
       error: null
     };
   } catch (error) {
+    if (isMissingDirectoryError(error)) {
+      return {
+        status: 'available',
+        directory: automationsDir,
+        active_count: 0,
+        risk: 'green',
+        entries: [],
+        error: null
+      };
+    }
     const message = error instanceof Error ? error.message : String(error);
     findings.push({
       code: 'automation_inventory_unavailable',
@@ -906,6 +916,9 @@ function classifyCoStatusDataset(dataset: CoStatusJsonDataset): QuotaHygieneCoSt
 }
 
 function collectCoStatusLiveTokens(dataset: CoStatusJsonDataset): string[] {
+  if (dataset.degraded_read) {
+    return [];
+  }
   const tokens = new Set<string>();
   const add = (value: unknown): void => {
     const normalized = normalizeOptionalString(value);
@@ -937,6 +950,10 @@ function collectCoStatusLiveTokens(dataset: CoStatusJsonDataset): string[] {
     }
   }
   return [...tokens].sort();
+}
+
+function isMissingDirectoryError(error: unknown): boolean {
+  return isRecord(error) && error.code === 'ENOENT';
 }
 
 function normalizeAutomationEntry(

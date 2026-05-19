@@ -144,6 +144,30 @@ describe('quota hygiene audit', () => {
     expect(audit.findings.map((finding) => finding.code)).toContain('active_automations_present');
   });
 
+  it('treats a missing automations directory as an empty inventory', async () => {
+    const audit = await buildQuotaHygieneAudit({
+      flags: { 'automations-dir': '/codex-home/automations' },
+      dependencies: baseDependencies({
+        readDirectory: async () => {
+          const error = new Error('missing automations directory') as NodeJS.ErrnoException;
+          error.code = 'ENOENT';
+          throw error;
+        }
+      })
+    });
+
+    expect(audit.automations).toMatchObject({
+      status: 'available',
+      active_count: 0,
+      risk: 'green',
+      entries: [],
+      error: null
+    });
+    expect(audit.findings.map((finding) => finding.code)).not.toContain(
+      'automation_inventory_unavailable'
+    );
+  });
+
   it('keeps the audit zero-model and reports unknown cross-thread goal inventory without degrading verdict', async () => {
     const audit = await buildQuotaHygieneAudit({
       flags: {},
@@ -257,6 +281,61 @@ describe('quota hygiene audit', () => {
     expect(audit.co_status.live_tokens).toEqual([]);
     expect(audit.provider_intake.claims[0]).toMatchObject({
       issue_identifier: 'CO-610',
+      classification: 'stale_unconfirmed',
+      corroboration: {
+        process_pids: [],
+        co_status_tokens: []
+      }
+    });
+  });
+
+  it('does not let degraded co-status running overlays corroborate provider-intake claims', async () => {
+    const audit = await buildQuotaHygieneAudit({
+      flags: { 'provider-intake-state': '/provider/provider-intake-state.json' },
+      dependencies: baseDependencies({
+        readTextFile: async (path) => {
+          if (path === '/provider/provider-intake-state.json') {
+            return JSON.stringify(providerIntakeState({
+              state: 'running',
+              issueIdentifier: 'CO-611',
+              taskId: 'linear-co611'
+            }));
+          }
+          return defaultProviderState();
+        },
+        readCoStatus: async () => ({
+          generated_at: '2026-05-17T00:00:00.000Z',
+          mode: 'operator_dashboard',
+          read_only: true,
+          host: 'localhost',
+          counts: {
+            running: 1,
+            retrying: 0,
+            issues: 0,
+            max_allowed: null
+          },
+          selected_issue_identifier: null,
+          selected: null,
+          running: [
+            {
+              issue_id: 'issue-1',
+              issue_identifier: 'CO-611',
+              task_id: 'linear-co611',
+              run_id: 'run-1'
+            }
+          ],
+          retrying: [],
+          issues: [],
+          degraded_read: {
+            reason: 'stale endpoint after control-host restart'
+          }
+        }) as never
+      })
+    });
+
+    expect(audit.co_status.live_tokens).toEqual([]);
+    expect(audit.provider_intake.claims[0]).toMatchObject({
+      issue_identifier: 'CO-611',
       classification: 'stale_unconfirmed',
       corroboration: {
         process_pids: [],
