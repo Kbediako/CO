@@ -35,12 +35,30 @@ type RiskLevel = 'green' | 'degraded' | 'critical' | 'unknown';
 
 const DEFAULT_CONTROL_HOST_ARTIFACT_ROOT = '.runs/local-mcp/cli/control-host';
 const QUOTA_PROCESS_PATTERNS = [
-  /\bcodex(?:\S*)?\s+exec\b/u,
-  /\bcodex(?:\S*)?\s+review\b/u,
   /\bcodex-orchestrator(?:\.js)?\s+review\b/u,
-  /\bprovider-linear-worker\b/u,
   /\bproviderLinearWorkerRunner\.(?:js|ts)\b/u
 ];
+const CODEX_QUOTA_SUBCOMMANDS = new Set(['exec', 'review']);
+const CODEX_GLOBAL_OPTIONS_WITH_VALUE = new Set([
+  '-c',
+  '-m',
+  '--add-dir',
+  '--ask-for-approval',
+  '--cd',
+  '--color',
+  '--config',
+  '--config-file',
+  '--cwd',
+  '--image',
+  '--json-schema',
+  '--model',
+  '--model-provider',
+  '--model-reasoning-effort',
+  '--model-reasoning-summary',
+  '--output-schema',
+  '--profile',
+  '--sandbox'
+]);
 const RELEVANT_PROCESS_PATTERN =
   /\bcodex\b|codex-orchestrator|delegate-server|provider-linear-worker|providerLinearWorkerRunner|control-host|co-status/iu;
 
@@ -816,7 +834,7 @@ function summarizeProviderIntakeClaim(
     .map((token) => normalizeOptionalString(token))
     .filter((token): token is string => token !== null);
   const matchingProcesses = processes.filter((record) =>
-    record.quota_burning && tokens.some((token) => record.command.includes(token))
+    record.quota_burning && processOwnerMatchesClaimTokens(record, tokens)
   );
   const matchingCoStatusTokens = coStatusLiveTokens.filter((token) => tokens.includes(token));
   let classification: QuotaHygieneProviderIntakeClaimSummary['classification'] = 'not_active';
@@ -1016,7 +1034,70 @@ function collectFreshnessFindingCodes(report: ProviderControlHostFreshnessGaugeR
 }
 
 function isQuotaBurningCommand(command: string): boolean {
+  if (isCodexQuotaCommand(command)) {
+    return true;
+  }
   return QUOTA_PROCESS_PATTERNS.some((pattern) => pattern.test(command));
+}
+
+function isCodexQuotaCommand(command: string): boolean {
+  const tokens = tokenizeCommand(command);
+  for (let index = 0; index < tokens.length; index += 1) {
+    if (!isCodexExecutableToken(tokens[index])) {
+      continue;
+    }
+    return hasCodexQuotaSubcommand(tokens, index + 1);
+  }
+  return false;
+}
+
+function hasCodexQuotaSubcommand(tokens: string[], startIndex: number): boolean {
+  for (let index = startIndex; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    if (CODEX_QUOTA_SUBCOMMANDS.has(token)) {
+      return true;
+    }
+    if (token === '--') {
+      return false;
+    }
+    const optionName = token.includes('=') ? token.slice(0, token.indexOf('=')) : token;
+    if (CODEX_GLOBAL_OPTIONS_WITH_VALUE.has(optionName) && !token.includes('=')) {
+      index += 1;
+    }
+  }
+  return false;
+}
+
+function isCodexExecutableToken(token: string): boolean {
+  const name = basename(token);
+  return name === 'codex' || name === 'codex.js';
+}
+
+function tokenizeCommand(command: string): string[] {
+  return command.match(/"[^"]*"|'[^']*'|\S+/gu)?.map(stripTokenQuotes) ?? [];
+}
+
+function stripTokenQuotes(token: string): string {
+  if (
+    (token.startsWith('"') && token.endsWith('"')) ||
+    (token.startsWith("'") && token.endsWith("'"))
+  ) {
+    return token.slice(1, -1);
+  }
+  return token;
+}
+
+function processOwnerMatchesClaimTokens(
+  record: QuotaHygieneProcessSummary,
+  claimTokens: string[]
+): boolean {
+  const ownerTokens = [
+    record.owner.issue_identifier,
+    record.owner.issue_id,
+    record.owner.task_id,
+    record.owner.run_id
+  ].filter((token): token is string => token !== null);
+  return ownerTokens.some((token) => claimTokens.includes(token));
 }
 
 function extractProcessOwner(command: string): QuotaHygieneProcessSummary['owner'] {

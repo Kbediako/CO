@@ -387,6 +387,171 @@ describe('quota hygiene audit', () => {
     });
   });
 
+  it('does not count codex-orchestrator exec wrappers as model quota work', async () => {
+    const audit = await buildQuotaHygieneAudit({
+      flags: {},
+      dependencies: baseDependencies({
+        readProcessInventory: async () => [
+          {
+            pid: 650,
+            ppid: 1,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:10',
+            stat: 'S',
+            command: 'node /repo/bin/codex-orchestrator.js exec -- npm test -- QuotaHygieneCliShell.test.ts'
+          },
+          {
+            pid: 651,
+            ppid: 1,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:11',
+            stat: 'S',
+            command: 'node /repo/bin/codex-orchestrator.js review --task linear-co651 CO-651'
+          }
+        ]
+      })
+    });
+
+    expect(audit.process_inventory.processes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          pid: 650,
+          quota_burning: false
+        }),
+        expect.objectContaining({
+          pid: 651,
+          quota_burning: true
+        })
+      ])
+    );
+    expect(audit.process_inventory.unowned_quota_burning_count).toBe(0);
+  });
+
+  it('does not count control-host provider-worker pipeline configuration as model quota work', async () => {
+    const audit = await buildQuotaHygieneAudit({
+      flags: {},
+      dependencies: baseDependencies({
+        readProcessInventory: async () => [
+          {
+            pid: 652,
+            ppid: 1,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:10',
+            stat: 'S',
+            command:
+              'node /repo/bin/codex-orchestrator.js control-host --task local-mcp --run control-host --pipeline provider-linear-worker --format json'
+          }
+        ]
+      })
+    });
+
+    expect(audit.process_inventory.processes[0]).toMatchObject({
+      pid: 652,
+      quota_burning: false,
+      owner: {
+        status: 'identified',
+        task_id: 'local-mcp',
+        run_id: 'control-host'
+      }
+    });
+    expect(audit.process_inventory.quota_burning_count).toBe(0);
+  });
+
+  it('requires exact process-owner token matches for provider claim corroboration', async () => {
+    const audit = await buildQuotaHygieneAudit({
+      flags: { 'provider-intake-state': '/provider/provider-intake-state.json' },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => [
+          {
+            pid: 620,
+            ppid: 1,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:10',
+            stat: 'S',
+            command: 'codex exec --task linear-co620 --issue CO-620'
+          }
+        ],
+        readTextFile: async (path) => {
+          if (path === '/provider/provider-intake-state.json') {
+            return JSON.stringify(providerIntakeState({
+              state: 'running',
+              issueIdentifier: 'CO-6',
+              taskId: 'linear-co6'
+            }));
+          }
+          return defaultProviderState();
+        }
+      })
+    });
+
+    expect(audit.process_inventory.quota_burning_count).toBe(1);
+    expect(audit.provider_intake.claims[0]).toMatchObject({
+      issue_identifier: 'CO-6',
+      classification: 'stale_unconfirmed',
+      corroboration: {
+        process_pids: [],
+        co_status_tokens: []
+      }
+    });
+  });
+
+  it('recognizes Codex global options before quota-burning subcommands', async () => {
+    const audit = await buildQuotaHygieneAudit({
+      flags: { 'provider-intake-state': '/provider/provider-intake-state.json' },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => [
+          {
+            pid: 640,
+            ppid: 1,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:10',
+            stat: 'S',
+            command: 'codex -m gpt-5.5 exec --task linear-co640 --issue CO-640'
+          },
+          {
+            pid: 641,
+            ppid: 1,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:11',
+            stat: 'S',
+            command: 'codex --profile review review --task linear-co641 --issue CO-641'
+          }
+        ],
+        readTextFile: async (path) => {
+          if (path === '/provider/provider-intake-state.json') {
+            return JSON.stringify(providerIntakeState({
+              state: 'running',
+              issueIdentifier: 'CO-640',
+              taskId: 'linear-co640'
+            }));
+          }
+          return defaultProviderState();
+        }
+      })
+    });
+
+    expect(audit.process_inventory.processes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          pid: 640,
+          quota_burning: true
+        }),
+        expect.objectContaining({
+          pid: 641,
+          quota_burning: true
+        })
+      ])
+    );
+    expect(audit.provider_intake.claims[0]).toMatchObject({
+      issue_identifier: 'CO-640',
+      classification: 'live_process',
+      corroboration: {
+        process_pids: [640],
+        co_status_tokens: []
+      }
+    });
+  });
+
   it('reuses provider-intake active semantics for retry and handoff states', async () => {
     const audit = await buildQuotaHygieneAudit({
       flags: { 'provider-intake-state': '/provider/provider-intake-state.json' },

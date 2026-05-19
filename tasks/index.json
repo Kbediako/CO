@@ -58,8 +58,8 @@
           "node scripts/spec-guard.mjs --dry-run",
           "codex-orchestrator hygiene quota --format json",
           "npm run docs:freshness",
-          "current-main full test passed 364 files / 5993 tests",
-          "PR #842 review rework quota hygiene focused tests passed 13 cases"
+          "current-main full test passed 364 files / 5997 tests",
+          "PR #842 review rework quota hygiene focused tests passed 17 cases"
         ],
         "pending": [
           "PR handoff after branch push and ready-review drain",
