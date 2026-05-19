@@ -2495,6 +2495,26 @@ describe('runCommandStage review evidence consistency', () => {
       command: 'node providerLinearWorkerRunner.js',
       summaryHint: 'Provider linear worker completed with forced standalone review enabled for handoff'
     });
+    await writePersistedGoalEvidence(paths.manifestPath, {
+      source: 'codex-goals',
+      feature_available: true,
+      feature_enabled: true,
+      capture_mode: 'captured',
+      capture_timestamp: '2026-03-21T08:59:00.000Z',
+      thread_id: 'thread-goal',
+      turn_id: 'previous-turn',
+      objective: 'previous valid evidence must be cleared',
+      status: 'active',
+      token_budget: 5000,
+      tokens_used: 111,
+      elapsed_seconds: 10,
+      created_at: '2026-03-21T08:58:00.000Z',
+      updated_at: '2026-03-21T08:59:00.000Z',
+      authority: 'advisory_only',
+      linear_authority_preserved: true,
+      not_authorized_for: [...PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR],
+      reason: null
+    });
     const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
     const persisted = JSON.parse(await readFile(paths.manifestPath, 'utf8')) as {
       goal_evidence?: Record<string, unknown> | null;
@@ -2989,6 +3009,15 @@ async function writeProviderLinearWorkerProofArtifacts(
     }),
     'utf8'
   );
+}
+
+async function writePersistedGoalEvidence(
+  manifestPath: string,
+  goalEvidence: Record<string, unknown>
+): Promise<void> {
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as Record<string, unknown>;
+  manifest.goal_evidence = goalEvidence;
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
 }
 
 async function writeNestedImplementationGateReviewArtifacts(

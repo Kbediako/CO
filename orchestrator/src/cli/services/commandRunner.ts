@@ -15,6 +15,7 @@ import type { RunPaths } from '../run/runPaths.js';
 import { relativeToRepo } from '../run/runPaths.js';
 import {
   appendCommandError,
+  markManifestGoalEvidenceExplicitClear,
   updateCommandStatus
 } from '../run/manifest.js';
 import { persistManifest, type ManifestPersister } from '../run/manifestPersister.js';
@@ -529,8 +530,12 @@ export async function runCommandStage(
       }
       manifest.provider_linear_worker_tokens =
         buildProviderLinearWorkerManifestTokenUsage(providerLinearWorkerProof?.tokens) ?? null;
-      manifest.goal_evidence =
+      const providerLinearWorkerGoalEvidence =
         buildProviderLinearWorkerManifestGoalEvidence(providerLinearWorkerProof) ?? null;
+      manifest.goal_evidence = providerLinearWorkerGoalEvidence;
+      if (providerLinearWorkerGoalEvidence === null) {
+        markManifestGoalEvidenceExplicitClear(manifest);
+      }
       if (result.status === 'succeeded' && providerLinearWorkerProofRecord === null) {
         providerLinearWorkerFailureReason = 'provider_linear_worker_proof_missing_or_unreadable';
         effectiveSummary = buildProviderLinearWorkerTerminalSummary({

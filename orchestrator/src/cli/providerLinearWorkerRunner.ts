@@ -73,6 +73,7 @@ import {
   resolveGuardrailsRequiredSourceForManifest,
   stripNonApplicableGuardrailSummaryLines
 } from './run/manifest.js';
+import { patchRunManifestFile } from './run/manifestFile.js';
 import {
   buildRunMemoryPromptLines,
   selectRunMemoryForRole
@@ -3344,10 +3345,24 @@ export async function loadProviderLinearWorkerContext(
     : undefined;
   const maxTurns = await resolveProviderWorkerMaxTurns(env);
   if (controlHostManifestBackfilled) {
-    await writeJsonAtomic(controlHostManifestPath, controlHostManifest);
+    const result = await patchRunManifestFile(
+      controlHostManifestPath,
+      (current) => applyProviderWorkerControlHostBackfillToManifest(current, controlHostManifest),
+      { taskId, missing: 'error' }
+    );
+    if (result.manifest) {
+      replaceProviderWorkerManifestSnapshot(controlHostManifest, result.manifest);
+    }
   }
   if (selectedManifestBackfilled) {
-    await writeJsonAtomic(manifestPath, manifest);
+    const result = await patchRunManifestFile(
+      manifestPath,
+      (current) => applyProviderWorkerControlHostBackfillToManifest(current, manifest),
+      { taskId, missing: 'error' }
+    );
+    if (result.manifest) {
+      replaceProviderWorkerManifestSnapshot(manifest, result.manifest);
+    }
   }
   return {
     manifest,
@@ -10086,12 +10101,24 @@ function applyProviderWorkerGoalEvidenceToManifest(input: {
   return before !== JSON.stringify(input.manifest.goal_evidence ?? null);
 }
 
-async function readProviderWorkerManifestPatchBase(manifestPath: string): Promise<Record<string, unknown>> {
-  const parsed = JSON.parse(await readFile(manifestPath, 'utf8')) as unknown;
-  if (!isRecord(parsed)) {
-    throw new Error(`Provider-worker manifest patch base at ${manifestPath} is not a JSON object.`);
-  }
-  return parsed;
+function applyProviderWorkerControlHostBackfillToManifest(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>
+): boolean {
+  const before = JSON.stringify({
+    provider_launch_source: target.provider_launch_source ?? null,
+    provider_control_host_task_id: target.provider_control_host_task_id ?? null,
+    provider_control_host_run_id: target.provider_control_host_run_id ?? null
+  });
+  target.provider_launch_source = source.provider_launch_source ?? null;
+  target.provider_control_host_task_id = source.provider_control_host_task_id ?? null;
+  target.provider_control_host_run_id = source.provider_control_host_run_id ?? null;
+  const after = JSON.stringify({
+    provider_launch_source: target.provider_launch_source ?? null,
+    provider_control_host_task_id: target.provider_control_host_task_id ?? null,
+    provider_control_host_run_id: target.provider_control_host_run_id ?? null
+  });
+  return before !== after;
 }
 
 function replaceProviderWorkerManifestSnapshot(
@@ -10109,40 +10136,18 @@ async function patchProviderWorkerGoalEvidenceManifestFile(input: {
   fallbackManifest: Record<string, unknown>;
   goalEvidence: ProviderLinearGoalEvidence | null | undefined;
 }): Promise<void> {
-  let manifest: Record<string, unknown>;
-  try {
-    manifest = await readProviderWorkerManifestPatchBase(input.manifestPath);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
-      return;
-    }
-    throw error;
-  }
-  const changed = applyProviderWorkerGoalEvidenceToManifest({
-    manifest,
-    goalEvidence: input.goalEvidence
-  });
-  if (changed) {
-    let latestManifest = manifest;
-    try {
-      latestManifest = await readProviderWorkerManifestPatchBase(input.manifestPath);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
-        return;
-      }
-      throw error;
-    }
-    const latestChanged = applyProviderWorkerGoalEvidenceToManifest({
-      manifest: latestManifest,
+  const result = await patchRunManifestFile(input.manifestPath, (manifest) => {
+    return applyProviderWorkerGoalEvidenceToManifest({
+      manifest,
       goalEvidence: input.goalEvidence
     });
-    if (latestChanged) {
-      await writeJsonAtomic(input.manifestPath, latestManifest);
-    }
-    replaceProviderWorkerManifestSnapshot(input.fallbackManifest, latestManifest);
-    return;
+  }, {
+    taskId: 'provider-linear-worker-goal-evidence',
+    missing: 'skip'
+  });
+  if (result.manifest) {
+    replaceProviderWorkerManifestSnapshot(input.fallbackManifest, result.manifest);
   }
-  replaceProviderWorkerManifestSnapshot(input.fallbackManifest, manifest);
 }
 
 async function readProviderWorkerControlHostSourceRootFreshness(
@@ -10261,28 +10266,33 @@ async function persistProviderWorkerRuntimeSelectionToManifests(input: {
   runtime: RuntimeSelection;
   workerControl: ProviderLinearWorkerControlPlane;
 }): Promise<void> {
-  const controlHostChanged = applyProviderWorkerRuntimeSelectionToManifest({
-    manifest: input.context.controlHostManifest,
-    runtime: input.runtime,
-    workerControl: input.workerControl
-  });
+  const controlHostResult = await patchRunManifestFile(
+    input.context.controlHostManifestPath,
+    (manifest) => applyProviderWorkerRuntimeSelectionToManifest({
+      manifest,
+      runtime: input.runtime,
+      workerControl: input.workerControl
+    }),
+    { taskId: input.context.taskId, missing: 'error' }
+  );
+  if (controlHostResult.manifest) {
+    replaceProviderWorkerManifestSnapshot(input.context.controlHostManifest, controlHostResult.manifest);
+  }
   if (input.context.manifestPath === input.context.controlHostManifestPath) {
-    if (controlHostChanged) {
-      await writeJsonAtomic(input.context.controlHostManifestPath, input.context.controlHostManifest);
-    }
     return;
   }
 
-  const selectedChanged = applyProviderWorkerRuntimeSelectionToManifest({
-    manifest: input.context.manifest,
-    runtime: input.runtime,
-    workerControl: input.workerControl
-  });
-  if (controlHostChanged) {
-    await writeJsonAtomic(input.context.controlHostManifestPath, input.context.controlHostManifest);
-  }
-  if (selectedChanged) {
-    await writeJsonAtomic(input.context.manifestPath, input.context.manifest);
+  const selectedResult = await patchRunManifestFile(
+    input.context.manifestPath,
+    (manifest) => applyProviderWorkerRuntimeSelectionToManifest({
+      manifest,
+      runtime: input.runtime,
+      workerControl: input.workerControl
+    }),
+    { taskId: input.context.taskId, missing: 'error' }
+  );
+  if (selectedResult.manifest) {
+    replaceProviderWorkerManifestSnapshot(input.context.manifest, selectedResult.manifest);
   }
 }
 
