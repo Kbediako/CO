@@ -3846,19 +3846,31 @@ function isLinearMarkdownIndentedCodeLine(line: string): boolean {
   return getLinearMarkdownIndentWidth(line.match(/^[ \t]*/u)?.[0] ?? '') >= 4;
 }
 
+type LinearMarkdownNormalizationListItem = { indent: number; markerWidth: number };
+
 function isLinearMarkdownNestedListItemLine(line: string, previousLines: readonly string[]): boolean {
   const nestedListItem = parseLinearMarkdownNormalizationListItemLine(line, '*') ?? parseLinearMarkdownNormalizationListItemLine(line, '+');
   if (nestedListItem === null) return false;
+  return isLinearMarkdownListItemInListContext(nestedListItem, previousLines);
+}
+
+function isLinearMarkdownListItemInListContext(
+  listItem: LinearMarkdownNormalizationListItem,
+  previousLines: readonly string[]
+): boolean {
   for (let index = previousLines.length - 1; index >= 0; index -= 1) {
     if (previousLines[index].trim() === '') continue;
     const parentListItem = parseLinearMarkdownNormalizationListItemLine(previousLines[index]);
     if (parentListItem === null) {
       return false;
     }
-    if (parentListItem.indent >= nestedListItem.indent) {
+    if (parentListItem.indent >= listItem.indent) {
       continue;
     }
-    return parentListItem.indent <= 3 && nestedListItem.indent <= parentListItem.indent + 3 + parentListItem.markerWidth;
+    if (listItem.indent > parentListItem.indent + 3 + parentListItem.markerWidth) {
+      return false;
+    }
+    return parentListItem.indent <= 3 || isLinearMarkdownListItemInListContext(parentListItem, previousLines.slice(0, index));
   }
   return false;
 }
@@ -3917,7 +3929,7 @@ function isLinearMarkdownNormalizationListItemLine(line: string): boolean {
 function parseLinearMarkdownNormalizationListItemLine(
   line: string,
   marker: '-' | '*' | '+' | null = null
-): { indent: number; markerWidth: number } | null {
+): LinearMarkdownNormalizationListItem | null {
   if (isLinearMarkdownThematicBreakLine(line)) {
     return null;
   }

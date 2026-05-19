@@ -20,12 +20,6 @@
 4. Reconcile child test patch, run focused RED/GREEN evidence, and preserve structural hard-fail tests.
 5. Run required validation, standalone review, elegance pass, PR attach, ready-review drain, and Linear review handoff.
 
-## Dependencies
-- Linear issue state and workpad maintained through repo-local helper.
-- `orchestrator/src/cli/control/providerLinearWorkflowFacade.ts`.
-- `orchestrator/tests/ProviderLinearWorkflowFacade.test.ts`.
-- Existing label, relation, and canonical-owner-key helper tests.
-
 ## Validation
 - Checks / tests:
   - docs-review before implementation.
