@@ -13,6 +13,21 @@
 - Durable retention evidence: fail-closed governed review evidence remains supported safety behavior, owned by provider-worker review contract handling, and validated by negative regressions.
 - Large-refactor check: do not broaden into CO-478/CO-506 parser behavior; the bounded fix should use existing review telemetry/contract validation semantics.
 
+## CO-382 Fallback Decision Table
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Provider-worker review handoff | Parent stage treats missing top-level telemetry as the only review authority even when the worker recorded explicit clean nested governed evidence | remove fallback | CO-560 | Successful `issue_review_handoff` with clean nested implementation-gate evidence and absent parent telemetry | Existing pre-CO-560 behavior | 2026-05-19 | N/A after removal | Parent resolves review verdict from explicit governed nested evidence or records the expected missing path | CO-515-shaped positive regression; unbound and unlineaged negative regressions; clean standalone review |
+| Control-host status surfaces | Manifest-only retry projection treats successful review handoff proof as retryable failed WIP | remove fallback | CO-560 | Completed historical provider run has `owner_status=succeeded`, `end_reason=issue_review_handoff`, and a succeeded implementation-gate child stream | Existing pre-CO-560 behavior | 2026-05-19 | N/A after removal | Completed clean handoff proof with succeeded implementation-gate child stream is excluded from retry projection; failed handoffs without clean child evidence remain retryable | `SelectedRunProjection` positive and failed-handoff negative regressions; `co-status --format json` evidence |
+| Review fail-closed contract | Missing or unknown review evidence blocks provider-worker review handoff | justify retaining fallback | Provider-worker review contract | No explicit clean governed review evidence exists or lineage is not tied to the provider attempt | Existing review-verdict contract | 2026-05-19 | Non-expiring supported safety contract | Replace only with an equivalent stricter governed review contract | Negative regressions for absent, unbound, unlineaged, unknown, findings, and invalid contract evidence |
+
+- Contract name: provider-worker review evidence fail-closed contract.
+- Owning surface: `orchestrator/src/cli/services/commandRunner.ts` provider-linear-worker review contract.
+- Steady-state proof: missing, unknown, findings, invalid contract, unbound, or unlineaged review evidence blocks review handoff.
+- Tests/docs: `CommandRunnerReviewEvidenceConsistency` negative regressions plus this CO-560 packet describe the retained safety path.
+- Non-expiring rationale: fail-closed review evidence is a supported safety contract, not temporary fallback debt.
+- Large-refactor decision: no large refactor is warranted because CO-560 removes the top-level-only telemetry fallback and keeps the provider-worker review contract in the existing authority surface.
+- Minor-seam decision: this bounded seam is acceptable because it resolves only explicitly lineaged same-issue governed review evidence and does not add another review parser, lifecycle, or status authority.
+
 ## Milestones & Sequencing
 1. Register docs-first packet, task mirrors, and freshness registry entries; run pre-implementation docs review.
 2. Inspect current provider-worker review contract code and control-host rehydration/status projection.

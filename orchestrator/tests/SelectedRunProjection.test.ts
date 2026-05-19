@@ -6693,7 +6693,26 @@ describe('SelectedRunProjection', () => {
           owner_status: 'succeeded',
           end_reason: 'issue_review_handoff',
           attempt_started_at: '2026-03-20T01:10:01.000Z',
-          updated_at: '2026-03-20T01:15:28.970Z'
+          updated_at: '2026-03-20T01:15:28.970Z',
+          child_streams: [
+            {
+              stream: 'implementation-gate',
+              pipeline_id: 'implementation-gate',
+              task_id: 'linear-lin-issue-1',
+              run_id: 'run-implementation-gate',
+              status: 'succeeded',
+              manifest_path: join(root, '.runs', 'linear-lin-issue-1', 'cli', 'run-implementation-gate', 'manifest.json'),
+              artifact_root: join(root, '.runs', 'linear-lin-issue-1', 'cli', 'run-implementation-gate'),
+              log_path: null,
+              summary: 'implementation gate clean',
+              issue_id: 'lin-issue-1',
+              issue_identifier: 'CO-2',
+              workspace_path: root,
+              source_setup: null,
+              launched_at: '2026-03-20T01:12:00.000Z',
+              recorded_at: '2026-03-20T01:15:00.000Z'
+            }
+          ]
         })
       ),
       'utf8'
@@ -6707,6 +6726,65 @@ describe('SelectedRunProjection', () => {
     expect(discovery.all[0]?.providerDebugSnapshot?.worker).toMatchObject({
       owner_phase: 'ended',
       owner_status: 'succeeded'
+    });
+  });
+
+  it('keeps failed review handoffs retryable when no clean implementation-gate child stream is recorded', async () => {
+    const { root, paths } = await createHostPaths();
+    const retryEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'linear-lin-issue-1'
+    };
+    const retryPaths = resolveRunPaths(retryEnv, 'run-child');
+    await mkdir(retryPaths.runDir, { recursive: true });
+    await writeFile(
+      retryPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-child',
+        task_id: 'linear-lin-issue-1',
+        status: 'failed',
+        started_at: '2026-03-20T01:10:00.000Z',
+        updated_at: '2026-03-20T01:16:00.000Z',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-1',
+        issue_identifier: 'CO-2',
+        summary:
+          'Provider linear worker failed because standalone review detected actionable findings.',
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            status: 'failed',
+            summary:
+              'Provider linear worker failed because standalone review detected actionable findings. (semantic review verdict: findings)'
+          }
+        ]
+      }),
+      'utf8'
+    );
+    await writeFile(
+      join(retryPaths.runDir, PROVIDER_LINEAR_WORKER_PROOF_FILENAME),
+      JSON.stringify(
+        buildProviderLinearWorkerProof({
+          owner_phase: 'ended',
+          owner_status: 'succeeded',
+          end_reason: 'issue_review_handoff',
+          attempt_started_at: '2026-03-20T01:10:01.000Z',
+          updated_at: '2026-03-20T01:15:28.970Z'
+        })
+      ),
+      'utf8'
+    );
+
+    const discovery = await discoverCompatibilityCollectionContexts(createProjectionContext(paths));
+
+    expect(discovery.running).toEqual([]);
+    expect(discovery.retrying).toHaveLength(1);
+    expect(discovery.retrying[0]).toMatchObject({
+      issueIdentifier: 'CO-2',
+      runId: 'run-child',
+      rawStatus: 'failed'
     });
   });
 

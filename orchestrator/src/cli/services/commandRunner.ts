@@ -1,6 +1,6 @@
 import { createWriteStream, statSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import type { ExecEvent, UnifiedExecRunResult } from '../../../../packages/orchestrator/src/index.js';
 import { ToolInvocationFailedError } from '../../../../packages/orchestrator/src/index.js';
@@ -150,6 +150,14 @@ interface ProviderReviewTelemetryEvidence extends ReviewTelemetryEvidenceSource 
   telemetry: ReviewTelemetryEvidencePayload;
   generatedAt: string | null;
   manifestCompletedAt: string | null;
+}
+
+interface ProviderNestedReviewRunCandidate {
+  repoRoot: string;
+  runDir: string;
+  taskEntry: string;
+  runEntry: string;
+  proofLinked: boolean;
 }
 
 export async function runCommandStage(
@@ -1245,75 +1253,181 @@ async function loadProviderLinearWorkerNestedReviewTelemetryEvidence(options: {
     return null;
   }
   const issueIdentifier = coerceTelemetryString(options.proof?.issue_identifier);
-  const runsRoot = join(workspacePath, '.runs');
-  const taskEntries = await resolveProviderLinearWorkerNestedReviewTaskEntries(runsRoot, {
+  const parentRunId = basename(options.paths.runDir);
+  const runsRoots = resolveProviderLinearWorkerNestedReviewRunsRoots(options.env);
+  const runCandidates = new Map<string, ProviderNestedReviewRunCandidate>();
+  for (const candidate of collectProviderLinearWorkerProofNestedReviewRunCandidates(options.proof, {
     issueId,
-    issueIdentifier
-  });
+    issueIdentifier,
+    workspacePath
+  })) {
+    if (!runsRoots.some((runsRoot) => isPathWithin(runsRoot, candidate.runDir))) {
+      continue;
+    }
+    runCandidates.set(resolve(candidate.runDir), candidate);
+  }
+  for (const runsRoot of runsRoots) {
+    const taskEntries = await resolveProviderLinearWorkerNestedReviewTaskEntries(runsRoot, issueId);
+    for (const taskEntry of taskEntries) {
+      const cliRoot = join(runsRoot, taskEntry, 'cli');
+      for (const runEntry of await readDirectoryNames(cliRoot)) {
+        const runDir = join(cliRoot, runEntry);
+        const key = resolve(runDir);
+        if (!runCandidates.has(key)) {
+          runCandidates.set(key, {
+            repoRoot: workspacePath,
+            runDir,
+            taskEntry,
+            runEntry,
+            proofLinked: false
+          });
+        }
+      }
+    }
+  }
   const candidates: ProviderReviewTelemetryEvidence[] = [];
 
-  for (const taskEntry of taskEntries) {
-    const cliRoot = join(runsRoot, taskEntry, 'cli');
-    for (const runEntry of await readDirectoryNames(cliRoot)) {
-      const runDir = join(cliRoot, runEntry);
-      const manifest = await readJsonFile<Record<string, unknown>>(join(runDir, 'manifest.json'));
-      if (
-        !manifest ||
-        !isProviderLinearWorkerNestedReviewManifest(manifest, {
-          issueId,
-          issueIdentifier,
-          taskEntry
-        })
-      ) {
-        continue;
-      }
-      const telemetryPath = join(runDir, 'review', 'telemetry.json');
-      const telemetry = await readReviewTelemetryEvidence(telemetryPath);
-      if (!telemetry) {
-        continue;
-      }
-      const evidenceSource = buildNestedReviewTelemetryEvidenceSource({
-        repoRoot: workspacePath,
-        taskEntry,
-        runEntry,
-        runDir,
-        telemetryPath
-      });
-      const freshnessMismatch = verifyReviewTelemetryFreshness({
-        env: options.env,
-        paths: options.paths,
-        startedAt: options.proofAttemptStartedAt,
-        telemetry,
-        telemetryPath,
-        expectedOutputLogPath: evidenceSource.expectedOutputLogPath
-      });
-      if (freshnessMismatch) {
-        continue;
-      }
-      candidates.push({
-        ...evidenceSource,
-        telemetry,
-        generatedAt: coerceTelemetryString(telemetry.generated_at),
-        manifestCompletedAt:
-          coerceTelemetryString(manifest.completed_at) ??
-          coerceTelemetryString(manifest.updated_at) ??
-          coerceTelemetryString(manifest.started_at)
-      });
+  for (const candidate of runCandidates.values()) {
+    const manifest = await readJsonFile<Record<string, unknown>>(join(candidate.runDir, 'manifest.json'));
+    if (
+      !manifest ||
+      !isProviderLinearWorkerNestedReviewManifest(manifest, {
+        issueId,
+        issueIdentifier,
+        parentRunId,
+        proofLinked: candidate.proofLinked
+      })
+    ) {
+      continue;
     }
+    const telemetryPath = join(candidate.runDir, 'review', 'telemetry.json');
+    const telemetry = await readReviewTelemetryEvidence(telemetryPath);
+    if (!telemetry) {
+      continue;
+    }
+    const evidenceSource = buildNestedReviewTelemetryEvidenceSource({
+      repoRoot: candidate.repoRoot,
+      taskEntry: candidate.taskEntry,
+      runEntry: candidate.runEntry,
+      runDir: candidate.runDir,
+      telemetryPath
+    });
+    const freshnessMismatch = verifyReviewTelemetryFreshness({
+      env: options.env,
+      paths: options.paths,
+      startedAt: options.proofAttemptStartedAt,
+      telemetry,
+      telemetryPath,
+      expectedOutputLogPath: evidenceSource.expectedOutputLogPath
+    });
+    if (freshnessMismatch) {
+      continue;
+    }
+    candidates.push({
+      ...evidenceSource,
+      telemetry,
+      generatedAt: coerceTelemetryString(telemetry.generated_at),
+      manifestCompletedAt:
+        coerceTelemetryString(manifest.completed_at) ??
+        coerceTelemetryString(manifest.updated_at) ??
+        coerceTelemetryString(manifest.started_at)
+    });
   }
 
   return candidates.sort(compareProviderReviewTelemetryEvidenceDesc)[0] ?? null;
 }
 
+function resolveProviderLinearWorkerNestedReviewRunsRoots(env: EnvironmentPaths): string[] {
+  return [resolve(env.runsRoot)];
+}
+
+function collectProviderLinearWorkerProofNestedReviewRunCandidates(
+  proof: Record<string, unknown> | null,
+  identity: { issueId: string; issueIdentifier: string | null; workspacePath: string }
+): ProviderNestedReviewRunCandidate[] {
+  const childStreams = Array.isArray(proof?.child_streams) ? proof.child_streams : [];
+  const candidates: ProviderNestedReviewRunCandidate[] = [];
+  for (const rawChildStream of childStreams) {
+    const childStream = coerceTelemetryRecord(rawChildStream);
+    if (!childStream || !isProviderLinearWorkerNestedReviewChildStream(childStream, identity)) {
+      continue;
+    }
+    const runDir = resolveProviderLinearWorkerNestedReviewChildStreamRunDir(
+      childStream,
+      identity.workspacePath
+    );
+    if (!runDir) {
+      continue;
+    }
+    candidates.push({
+      repoRoot: identity.workspacePath,
+      runDir,
+      taskEntry: coerceTelemetryString(childStream.task_id) ?? basename(dirname(dirname(runDir))),
+      runEntry: coerceTelemetryString(childStream.run_id) ?? basename(runDir),
+      proofLinked: true
+    });
+  }
+  return candidates;
+}
+
+function isProviderLinearWorkerNestedReviewChildStream(
+  childStream: Record<string, unknown>,
+  identity: { issueId: string; issueIdentifier: string | null }
+): boolean {
+  if (coerceTelemetryString(childStream.pipeline_id) !== 'implementation-gate') {
+    return false;
+  }
+  if (coerceTelemetryString(childStream.status) !== 'succeeded') {
+    return false;
+  }
+  if (coerceTelemetryString(childStream.issue_id) !== identity.issueId) {
+    return false;
+  }
+  if (
+    identity.issueIdentifier &&
+    coerceTelemetryString(childStream.issue_identifier) !== identity.issueIdentifier
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function resolveProviderLinearWorkerNestedReviewChildStreamRunDir(
+  childStream: Record<string, unknown>,
+  workspacePath: string
+): string | null {
+  const manifestPath = resolveProviderLinearWorkerNestedReviewChildStreamPath(
+    coerceTelemetryString(childStream.manifest_path),
+    workspacePath
+  );
+  if (manifestPath) {
+    return dirname(manifestPath);
+  }
+  return resolveProviderLinearWorkerNestedReviewChildStreamPath(
+    coerceTelemetryString(childStream.artifact_root),
+    workspacePath
+  );
+}
+
+function resolveProviderLinearWorkerNestedReviewChildStreamPath(
+  value: string | null,
+  workspacePath: string
+): string | null {
+  if (!value) {
+    return null;
+  }
+  return isAbsolute(value) ? resolve(value) : resolve(workspacePath, value);
+}
+
 async function resolveProviderLinearWorkerNestedReviewTaskEntries(
   runsRoot: string,
-  identity: { issueId: string; issueIdentifier: string | null }
+  issueId: string
 ): Promise<string[]> {
-  const exactTaskEntry = `linear-${identity.issueId}`;
+  const exactTaskEntry = `linear-${issueId}`;
   const preferredEntries = new Set<string>([exactTaskEntry]);
   const entries = await readDirectoryNames(runsRoot);
   for (const entry of entries) {
-    if (entry === exactTaskEntry || entry.includes(identity.issueId)) {
+    if (entry === exactTaskEntry || entry.includes(issueId)) {
       preferredEntries.add(entry);
     }
   }
@@ -1322,7 +1436,7 @@ async function resolveProviderLinearWorkerNestedReviewTaskEntries(
 
 function isProviderLinearWorkerNestedReviewManifest(
   manifest: Record<string, unknown>,
-  identity: { issueId: string; issueIdentifier: string | null; taskEntry: string }
+  identity: { issueId: string; issueIdentifier: string | null; parentRunId: string; proofLinked: boolean }
 ): boolean {
   const pipelineId = coerceTelemetryString(manifest.pipeline_id) ?? coerceTelemetryString(manifest.pipelineId);
   if (pipelineId !== 'implementation-gate') {
@@ -1345,11 +1459,14 @@ function isProviderLinearWorkerNestedReviewManifest(
   ) {
     return false;
   }
-  return Boolean(
+  const manifestIssueMatches = Boolean(
     manifestIssueId === identity.issueId ||
-      (identity.issueIdentifier && manifestIssueIdentifier === identity.issueIdentifier) ||
-      identity.taskEntry === `linear-${identity.issueId}`
+      (identity.issueIdentifier && manifestIssueIdentifier === identity.issueIdentifier)
   );
+  const manifestParentRunId =
+    coerceTelemetryString(manifest.parent_run_id) ?? coerceTelemetryString(manifest.parentRunId);
+  const manifestLineageMatches = manifestParentRunId === identity.parentRunId;
+  return manifestIssueMatches && (identity.proofLinked || manifestLineageMatches);
 }
 
 function buildTopLevelReviewTelemetryEvidenceSource(options: {

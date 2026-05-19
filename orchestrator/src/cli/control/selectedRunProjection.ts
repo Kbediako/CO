@@ -303,15 +303,45 @@ function isCompatibilityRetryFallbackContext(context: ControlCompatibilitySource
 
 function isSucceededProviderReviewHandoffProofContext(context: ControlCompatibilitySourceContext): boolean {
   const debugWorker = context.providerDebugSnapshot?.worker ?? null;
+  const proof = (context.providerLinearWorkerProof ?? {}) as Record<string, unknown>;
   if (debugWorker) {
-    return (
+    const succeededReviewHandoff =
       debugWorker.owner_phase === 'ended' &&
       debugWorker.owner_status === 'succeeded' &&
-      readStringValue((context.providerLinearWorkerProof ?? {}) as Record<string, unknown>, 'end_reason') ===
-        'issue_review_handoff'
-    );
+      readStringValue(proof, 'end_reason') === 'issue_review_handoff';
+    if (!succeededReviewHandoff) {
+      return false;
+    }
+    if (context.rawStatus !== 'failed') {
+      return true;
+    }
+    return providerProofHasSucceededImplementationGateChildStream(proof, context);
   }
   return false;
+}
+
+function providerProofHasSucceededImplementationGateChildStream(
+  proof: Record<string, unknown>,
+  context: ControlCompatibilitySourceContext
+): boolean {
+  const childStreams = Array.isArray(proof.child_streams) ? proof.child_streams : [];
+  return childStreams.some((entry) => {
+    if (!isRecord(entry)) {
+      return false;
+    }
+    if (
+      readStringValue(entry, 'pipeline_id', 'pipelineId') !== 'implementation-gate' ||
+      readStringValue(entry, 'status') !== 'succeeded'
+    ) {
+      return false;
+    }
+    const issueId = readStringValue(entry, 'issue_id', 'issueId');
+    const issueIdentifier = readStringValue(entry, 'issue_identifier', 'issueIdentifier');
+    return (
+      (!context.issueId || issueId === context.issueId) &&
+      (!context.issueIdentifier || issueIdentifier === context.issueIdentifier)
+    );
+  });
 }
 
 async function readDiscoveredTaskCompatibilityContexts(

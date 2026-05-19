@@ -1046,9 +1046,16 @@ describe('runCommandStage review evidence consistency', () => {
         recursive: true,
         force: true
       });
-      await writeNestedImplementationGateReviewArtifacts(input, {
-        generated_at: new Date(Date.parse(proofAttemptStartedAt) + 2).toISOString()
-      });
+      await writeNestedImplementationGateReviewArtifacts(
+        input,
+        {
+          generated_at: new Date(Date.parse(proofAttemptStartedAt) + 2).toISOString()
+        },
+        {
+          parentRunId: String(execEnv.CODEX_ORCHESTRATOR_RUN_ID),
+          runsRoot: String(execEnv.CODEX_ORCHESTRATOR_RUNS_DIR)
+        }
+      );
       return buildSuccessfulExecResult();
     };
 
@@ -1066,6 +1073,7 @@ describe('runCommandStage review evidence consistency', () => {
         CODEX_REVIEW_CONTRACT_MODE: 'enforce'
       }
     );
+    env.runsRoot = join(env.repoRoot, 'custom-runs');
     const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
 
     expect(result.exitCode).toBe(0);
@@ -1076,6 +1084,57 @@ describe('runCommandStage review evidence consistency', () => {
     expect(manifest.commands[0]?.status).toBe('succeeded');
     expect(manifest.commands[0]?.error_file).toBeNull();
     await expect(readFile(join(paths.runDir, 'review', 'telemetry.json'), 'utf8')).rejects.toThrow();
+  });
+
+  it('fails closed when nested implementation-gate review evidence is outside the configured runs root', async () => {
+    mockState.runImpl = async (input) => {
+      const execEnv = (input.env ?? {}) as NodeJS.ProcessEnv;
+      const proofAttemptStartedAt = new Date().toISOString();
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        attempt_started_at: proofAttemptStartedAt,
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff',
+        workspace_path: String(execEnv.CODEX_ORCHESTRATOR_ROOT)
+      });
+      await rm(join(String(execEnv.CODEX_ORCHESTRATOR_RUN_DIR), 'review'), {
+        recursive: true,
+        force: true
+      });
+      await writeNestedImplementationGateReviewArtifacts(
+        input,
+        {
+          generated_at: new Date(Date.parse(proofAttemptStartedAt) + 2).toISOString()
+        },
+        {
+          parentRunId: String(execEnv.CODEX_ORCHESTRATOR_RUN_ID),
+          runsRoot: join(String(execEnv.CODEX_ORCHESTRATOR_ROOT), '.runs')
+        }
+      );
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with nested review evidence outside configured runs root',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with stale default-root nested implementation-gate review evidence'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    env.runsRoot = join(env.repoRoot, 'custom-runs');
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('review contract: required but telemetry is missing');
+    expect(result.summary).toContain('expected review telemetry path:');
+    expect(result.summary).not.toContain('review evidence source: nested implementation-gate');
   });
 
   it('fails closed when nested implementation-gate review evidence is not bound to the provider issue', async () => {
@@ -1136,6 +1195,49 @@ describe('runCommandStage review evidence consistency', () => {
     expect(errorPayload.reason).toBe('provider-linear-worker-authoritative-failed');
     expect(errorPayload.details?.failure_reason).toBe('provider_linear_worker_review_unknown');
     expect(errorPayload.details?.review_telemetry_path).toBe(relative(env.repoRoot, join(paths.runDir, 'review', 'telemetry.json')));
+  });
+
+  it('fails closed when same-issue nested implementation-gate review evidence lacks provider attempt lineage', async () => {
+    mockState.runImpl = async (input) => {
+      const execEnv = (input.env ?? {}) as NodeJS.ProcessEnv;
+      const proofAttemptStartedAt = new Date().toISOString();
+      await writeProviderLinearWorkerProofArtifacts(input, {
+        attempt_started_at: proofAttemptStartedAt,
+        owner_phase: 'ended',
+        owner_status: 'succeeded',
+        end_reason: 'issue_review_handoff',
+        workspace_path: String(execEnv.CODEX_ORCHESTRATOR_ROOT)
+      });
+      await rm(join(String(execEnv.CODEX_ORCHESTRATOR_RUN_DIR), 'review'), {
+        recursive: true,
+        force: true
+      });
+      await writeNestedImplementationGateReviewArtifacts(input, {
+        generated_at: new Date(Date.parse(proofAttemptStartedAt) + 2).toISOString()
+      });
+      return buildSuccessfulExecResult();
+    };
+
+    const { env, manifest, paths, stage } = await bootstrapCommandStage(
+      {
+        id: 'provider-linear-worker',
+        title: 'Run provider linear worker with unlineaged nested review evidence',
+        command: 'node providerLinearWorkerRunner.js',
+        summaryHint: 'Provider linear worker completed with unlineaged nested implementation-gate review evidence'
+      },
+      {
+        FORCE_CODEX_REVIEW: '1',
+        CODEX_REVIEW_NON_INTERACTIVE: '1',
+        CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+        CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+      }
+    );
+    const result = await runCommandStage({ env, paths, manifest, stage, index: 1 });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.summary).toContain('review contract: required but telemetry is missing');
+    expect(result.summary).toContain('expected review telemetry path:');
+    expect(result.summary).not.toContain('review evidence source: nested implementation-gate');
   });
 
   it('requires review telemetry to be fresh for the provider proof attempt', async () => {
@@ -2895,12 +2997,19 @@ async function writeNestedImplementationGateReviewArtifacts(
     issueId?: string;
     issueIdentifier?: string;
     omitIssueIdentity?: boolean;
+    parentRunId?: string;
+    runsRoot?: string;
   } = {}
 ): Promise<void> {
   const execEnv = (input.env ?? {}) as NodeJS.ProcessEnv;
   const repoRoot = String(execEnv.CODEX_ORCHESTRATOR_ROOT);
   const taskId = options.taskId ?? 'linear-lin-issue-1';
-  const runDir = join(repoRoot, '.runs', taskId, 'cli', '2026-05-19T00-00-00-000Z-implementation-gate');
+  const runDir = join(
+    options.runsRoot ?? join(repoRoot, '.runs'),
+    taskId,
+    'cli',
+    '2026-05-19T00-00-00-000Z-implementation-gate'
+  );
   const contractPath = join(runDir, 'review', 'contract.json');
   const issueIdentity = options.omitIssueIdentity === true
     ? {}
@@ -2918,6 +3027,7 @@ async function writeNestedImplementationGateReviewArtifacts(
         pipeline_id: 'implementation-gate',
         status: 'succeeded',
         issue_provider: 'linear',
+        ...(options.parentRunId ? { parent_run_id: options.parentRunId } : {}),
         ...issueIdentity,
         started_at: '2026-05-19T00:00:00.000Z',
         updated_at: overrides.generated_at ?? new Date().toISOString(),
