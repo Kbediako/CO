@@ -22,10 +22,24 @@
           "date": "2026-05-19",
           "status": "parallelize_now_recorded",
           "summary": "Pre-turn matrix identified a safe tests child lane for focused Markdown normalization regressions while parent retained docs and production facade ownership."
+        },
+        "markdown_normalization_tests_child_lane": {
+          "reviewer": "bounded same-issue child lane markdown-normalization-tests",
+          "date": "2026-05-19",
+          "status": "accepted",
+          "manifest": ".runs/linear-33117eac-b4d3-4eb0-889c-4527c9b79352-markdown-normalization-tests/cli/2026-05-19T11-30-42-776Z-acc30fc6/manifest.json",
+          "summary": "Tests child lane added focused create-follow-up Markdown normalization regressions for bullet markers, heading/list spacing, and canonical-owner-key reuse; parent accepted the in-scope tests-only patch."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-19",
+          "status": "clean",
+          "manifest": ".runs/linear-33117eac-b4d3-4eb0-889c-4527c9b79352/cli/2026-05-19T11-14-18-330Z-47b25076/manifest.json",
+          "summary": "Manifest-backed review ran under FORCE_CODEX_REVIEW=1; telemetry reports review_verdict=clean, contract_validation.status=valid, and contract_overall_verdict=clean. Explicit elegance/minimality pass required no simplification edits."
         }
       },
       "validation": {
-        "status": "docs_review_clean_pending_child_lane",
+        "status": "validation_green_pending_review_handoff",
         "passed": [
           "live issue-context",
           "Ready -> In Progress transition",
@@ -33,13 +47,27 @@
           "parallelization decision recorded",
           "docs-first packet created",
           "registry mirrors created",
-          "docs-review clean"
+          "docs-review clean",
+          "markdown-normalization-tests child lane accepted",
+          "new Linear-normalized regression tests RED before implementation",
+          "new Linear-normalized regression tests green after implementation",
+          "focused ProviderLinearWorkflowFacade suite 305/305",
+          "node scripts/delegation-guard.mjs",
+          "node scripts/spec-guard.mjs --dry-run",
+          "git diff --check",
+          "npm run build",
+          "npm run lint",
+          "npm run test",
+          "npm run docs:check",
+          "npm run docs:freshness",
+          "npm run repo:stewardship",
+          "node scripts/diff-budget.mjs",
+          "npm run pack:smoke",
+          "manifest-backed standalone review clean",
+          "explicit elegance/minimality pass complete"
         ],
         "pending": [
-          "same-issue tests child lane",
-          "parent implementation",
-          "focused create-follow-up Markdown normalization tests",
-          "parent-required validation and review gates"
+          "PR attach and ready-review drain"
         ]
       },
       "paths": {

@@ -3132,7 +3132,7 @@ export async function createProviderLinearFollowUpIssue(input: {
         false
       );
     }
-    if (updatedIssue.description !== finalizedDescription) {
+    if (!sameFollowUpDescriptionAfterLinearMarkdownNormalization(updatedIssue.description, finalizedDescription)) {
       return failure(
         'create-follow-up',
         'linear_follow_up_description_update_incomplete',
@@ -3227,7 +3227,7 @@ export async function createProviderLinearFollowUpIssue(input: {
       return traceableFollowUpIssue.result;
     }
   }
-  if (!canonicalOwnerKey && followUpIssue.description !== finalizedDescription) {
+  if (!canonicalOwnerKey && !sameFollowUpDescriptionAfterLinearMarkdownNormalization(followUpIssue.description, finalizedDescription)) {
     return failure(
       'create-follow-up',
       'linear_follow_up_description_update_incomplete',
@@ -3665,7 +3665,7 @@ function resolveFollowUpTraceabilityUpdate(input: {
     canonicalOwner: input.canonicalOwner,
     traceability
   });
-  if (observedDescription === finalizedDescription) {
+  if (sameFollowUpDescriptionAfterLinearMarkdownNormalization(observedDescription, finalizedDescription)) {
     return {
       finalizedDescription,
       shouldUpdate: false,
@@ -3692,7 +3692,7 @@ function resolveFollowUpTraceabilityUpdate(input: {
   });
   return {
     finalizedDescription,
-    shouldUpdate: observedDescription === unfinishedDescription,
+    shouldUpdate: sameFollowUpDescriptionAfterLinearMarkdownNormalization(observedDescription, unfinishedDescription),
     invalid: isManagedFollowUpDescriptionDrift(observedDescription, finalizedDescription, unfinishedDescription),
     observedDescription
   };
@@ -3704,10 +3704,16 @@ function isManagedFollowUpDescriptionDrift(observedDescription: string, ...expec
     if (hasTrailingManagedFollowUpDescriptionDrift(observedDescription, expectedDescription)) {
       return true;
     }
+    if (hasTrailingManagedFollowUpDescriptionDriftAfterLinearMarkdownNormalization(observedDescription, expectedDescription)) {
+      return true;
+    }
     const normalizedExpectedDescription = normalizeFollowUpSourceIssueTraceabilityLine(expectedDescription);
-    return hasTrailingManagedFollowUpDescriptionDrift(
-      normalizedObservedDescription,
-      normalizedExpectedDescription
+    return (
+      hasTrailingManagedFollowUpDescriptionDrift(normalizedObservedDescription, normalizedExpectedDescription) ||
+      hasTrailingManagedFollowUpDescriptionDriftAfterLinearMarkdownNormalization(
+        normalizedObservedDescription,
+        normalizedExpectedDescription
+      )
     );
   });
 }
@@ -3722,7 +3728,90 @@ function hasTrailingManagedFollowUpDescriptionDrift(observedDescription: string,
 function sameFollowUpDescriptionExceptSourceIssueTraceability(left: string, right: string): boolean {
   const normalizedLeft = normalizeFollowUpSourceIssueTraceabilityLine(left);
   const normalizedRight = normalizeFollowUpSourceIssueTraceabilityLine(right);
-  return normalizedLeft !== left && normalizedRight !== right && normalizedLeft === normalizedRight;
+  return (
+    normalizedLeft !== left &&
+    normalizedRight !== right &&
+    sameFollowUpDescriptionAfterLinearMarkdownNormalization(normalizedLeft, normalizedRight)
+  );
+}
+
+function sameFollowUpDescriptionAfterLinearMarkdownNormalization(left: string | null | undefined, right: string | null | undefined): boolean {
+  const normalizedLeft = normalizeLinearPersistedMarkdownForComparison(left ?? '');
+  const normalizedRight = normalizeLinearPersistedMarkdownForComparison(right ?? '');
+  return normalizedLeft === normalizedRight;
+}
+
+function hasTrailingManagedFollowUpDescriptionDriftAfterLinearMarkdownNormalization(
+  observedDescription: string,
+  expectedDescription: string
+): boolean {
+  const normalizedObserved = normalizeLinearPersistedMarkdownForComparison(observedDescription);
+  const normalizedExpected = normalizeLinearPersistedMarkdownForComparison(expectedDescription);
+  return hasTrailingManagedFollowUpDescriptionDrift(normalizedObserved, normalizedExpected);
+}
+
+function normalizeLinearPersistedMarkdownForComparison(description: string): string {
+  const lines = description.replace(/\r\n?/gu, '\n').split('\n');
+  const normalizedLines: string[] = [];
+  let activeFence: { marker: '`' | '~'; length: number } | null = null;
+
+  for (const line of lines) {
+    const fenceMatch = line.match(/^[ \t]{0,3}(`{3,}|~{3,})/u);
+    if (fenceMatch) {
+      const delimiter = fenceMatch[1];
+      const marker = delimiter[0] as '`' | '~';
+      if (activeFence === null) {
+        activeFence = { marker, length: delimiter.length };
+      } else if (activeFence.marker === marker && delimiter.length >= activeFence.length) {
+        activeFence = null;
+      }
+      normalizedLines.push(line);
+      continue;
+    }
+
+    if (activeFence !== null) {
+      normalizedLines.push(line);
+      continue;
+    }
+
+    normalizedLines.push(line.replace(/^([ \t]*)[*+]\s+/u, '$1- '));
+  }
+
+  return collapseLinearHeadingListSpacing(normalizedLines).join('\n');
+}
+
+function collapseLinearHeadingListSpacing(lines: string[]): string[] {
+  const collapsed: string[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (
+      line.trim() === '' &&
+      collapsed.length > 0 &&
+      isLinearMarkdownNormalizationHeadingLine(collapsed[collapsed.length - 1]) &&
+      isLinearMarkdownNormalizationListItemLine(peekNextNonEmptyLine(lines, index + 1))
+    ) {
+      continue;
+    }
+    collapsed.push(line);
+  }
+  return collapsed;
+}
+
+function peekNextNonEmptyLine(lines: readonly string[], startIndex: number): string {
+  for (let index = startIndex; index < lines.length; index += 1) {
+    if (lines[index].trim() !== '') {
+      return lines[index];
+    }
+  }
+  return '';
+}
+
+function isLinearMarkdownNormalizationHeadingLine(line: string): boolean {
+  return /^[ ]{0,3}#{1,6}\s+\S/u.test(line);
+}
+
+function isLinearMarkdownNormalizationListItemLine(line: string): boolean {
+  return /^[ \t]*[-*+]\s+\S/u.test(line);
 }
 
 function normalizeFollowUpSourceIssueTraceabilityLine(description: string): string {
@@ -3851,7 +3940,7 @@ async function ensureFollowUpIssueTraceability(input: {
       )
     };
   }
-  if (updatedIssue.description !== traceabilityUpdate.finalizedDescription) {
+  if (!sameFollowUpDescriptionAfterLinearMarkdownNormalization(updatedIssue.description, traceabilityUpdate.finalizedDescription)) {
     return {
       ok: false,
       result: failure(
@@ -3881,7 +3970,7 @@ async function ensureFollowUpIssueTraceability(input: {
   if (!labeledIssue.ok) {
     return labeledIssue;
   }
-  if (labeledIssue.issue.description !== traceabilityUpdate.finalizedDescription) {
+  if (!sameFollowUpDescriptionAfterLinearMarkdownNormalization(labeledIssue.issue.description, traceabilityUpdate.finalizedDescription)) {
     return {
       ok: false,
       result: failure(
@@ -3934,8 +4023,12 @@ function verifyFollowUpIssueTraceability(input: {
   const traceabilityUpdate = resolveFollowUpTraceabilityUpdate(input);
   const acceptedDescription = input.acceptedDescription ?? null;
   const traceabilityPreserved =
-    traceabilityUpdate.observedDescription === traceabilityUpdate.finalizedDescription ||
-    (acceptedDescription !== null && traceabilityUpdate.observedDescription === acceptedDescription);
+    sameFollowUpDescriptionAfterLinearMarkdownNormalization(
+      traceabilityUpdate.observedDescription,
+      traceabilityUpdate.finalizedDescription
+    ) ||
+    (acceptedDescription !== null &&
+      sameFollowUpDescriptionAfterLinearMarkdownNormalization(traceabilityUpdate.observedDescription, acceptedDescription));
   if (!traceabilityPreserved) {
     return {
       ok: false,

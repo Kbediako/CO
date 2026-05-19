@@ -359,6 +359,18 @@ function buildExpectedFollowUpDescriptionForIssue(options: {
     .replaceAll('CO-1', sourceIdentifier);
 }
 
+function simulateLinearBulletMarkerNormalization(description: string): string {
+  return description.replaceAll('\n- ', '\n* ');
+}
+
+function simulateLinearHeadingListSpacing(description: string): string {
+  return description.replace(/^(## [^\n]+)\n(?=[-*] )/gmu, '$1\n\n');
+}
+
+function simulateLinearMarkdownNormalization(description: string): string {
+  return simulateLinearHeadingListSpacing(simulateLinearBulletMarkerNormalization(description));
+}
+
 function buildCanonicalOwnerIssuesBody(
   nodes: unknown[],
   pageInfo: {
@@ -13028,6 +13040,232 @@ describe('providerLinearWorkflowFacade', () => {
     expect(calls).toEqual(['issue-summary', 'create', 'update-description', 'issue-summary', 'related-relation']);
   });
 
+  it('accepts Linear-normalized bullet markers after follow-up traceability update', async () => {
+    const initialDescription = buildExpectedFollowUpDescription();
+    const finalDescription = buildExpectedFollowUpDescription({
+      includeTraceability: true
+    });
+    const normalizedFinalDescription = simulateLinearBulletMarkerNormalization(finalDescription);
+    const calls: string[] = [];
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, unknown>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        calls.push('create');
+        expect(body.variables).toEqual({
+          input: {
+            teamId: 'lin-team-1',
+            projectId: 'lin-project-1',
+            stateId: 'state-backlog',
+            title: 'Follow-up issue',
+            labelIds: FOLLOW_UP_LABEL_IDS,
+            description: initialDescription
+          }
+        });
+        return jsonResponse({
+          data: {
+            issueCreate: {
+              success: true,
+              issue: buildCanonicalOwnerIssue({
+                id: 'lin-issue-2',
+                identifier: 'CO-2',
+                title: 'Follow-up issue',
+                description: initialDescription,
+                labels: buildIssueLabelsConnection(FOLLOW_UP_LABEL_NODES)
+              })
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearUpdateIssueDescription')) {
+        calls.push('update-description');
+        expect(body.variables).toEqual({
+          id: 'lin-issue-2',
+          description: finalDescription
+        });
+        return jsonResponse({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: buildCanonicalOwnerIssue({
+                id: 'lin-issue-2',
+                identifier: 'CO-2',
+                title: 'Follow-up issue',
+                description: normalizedFinalDescription,
+                labels: buildIssueLabelsConnection(FOLLOW_UP_LABEL_NODES)
+              })
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        calls.push('related-relation');
+        expect(body.variables).toEqual({
+          input: {
+            type: 'related',
+            issueId: 'lin-issue-1',
+            relatedIssueId: 'lin-issue-2'
+          }
+        });
+        return jsonResponse({
+          data: {
+            issueRelationCreate: {
+              success: true,
+              issueRelation: {
+                id: 'relation-related',
+                type: 'related'
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up issue',
+      description: 'Investigate the remaining improvement.',
+      intentChecksum: '- Preserve exact `CO STATUS` wording.',
+      nonGoals: '- [ ] Do not reopen the browser surface.',
+      notDoneIf: '- [ ] The issue still allows browser-first parity.',
+      acceptanceCriteria: '- [ ] Captured',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'create-follow-up',
+      action: 'created',
+      follow_up_issue: {
+        id: 'lin-issue-2',
+        identifier: 'CO-2',
+        description: normalizedFinalDescription
+      },
+      relations: {
+        related: true,
+        blocked_by_source: false
+      }
+    });
+    expect(calls).toEqual(['create', 'update-description', 'related-relation']);
+  });
+
+  it('accepts Linear-normalized heading spacing after follow-up traceability update', async () => {
+    const initialDescription = buildExpectedFollowUpDescription();
+    const finalDescription = buildExpectedFollowUpDescription({
+      includeTraceability: true
+    });
+    const normalizedFinalDescription = simulateLinearHeadingListSpacing(finalDescription);
+    const calls: string[] = [];
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, unknown>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        calls.push('create');
+        return jsonResponse({
+          data: {
+            issueCreate: {
+              success: true,
+              issue: buildCanonicalOwnerIssue({
+                id: 'lin-issue-2',
+                identifier: 'CO-2',
+                title: 'Follow-up issue',
+                description: initialDescription,
+                labels: buildIssueLabelsConnection(FOLLOW_UP_LABEL_NODES)
+              })
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearUpdateIssueDescription')) {
+        calls.push('update-description');
+        expect(body.variables).toEqual({
+          id: 'lin-issue-2',
+          description: finalDescription
+        });
+        return jsonResponse({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: buildCanonicalOwnerIssue({
+                id: 'lin-issue-2',
+                identifier: 'CO-2',
+                title: 'Follow-up issue',
+                description: normalizedFinalDescription,
+                labels: buildIssueLabelsConnection(FOLLOW_UP_LABEL_NODES)
+              })
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        calls.push('related-relation');
+        expect(body.variables).toMatchObject({
+          input: {
+            type: 'related',
+            issueId: 'lin-issue-1',
+            relatedIssueId: 'lin-issue-2'
+          }
+        });
+        return jsonResponse({
+          data: {
+            issueRelationCreate: {
+              success: true,
+              issueRelation: {
+                id: 'relation-related',
+                type: 'related'
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Follow-up issue',
+      description: 'Investigate the remaining improvement.',
+      intentChecksum: '- Preserve exact `CO STATUS` wording.',
+      nonGoals: '- [ ] Do not reopen the browser surface.',
+      notDoneIf: '- [ ] The issue still allows browser-first parity.',
+      acceptanceCriteria: '- [ ] Captured',
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'create-follow-up',
+      action: 'created',
+      follow_up_issue: {
+        id: 'lin-issue-2',
+        identifier: 'CO-2',
+        description: normalizedFinalDescription
+      },
+      relations: {
+        related: true,
+        blocked_by_source: false
+      }
+    });
+    expect(calls).toEqual(['create', 'update-description', 'related-relation']);
+  });
+
   it('fails closed before creation when source labels cannot satisfy the follow-up label policy', async () => {
     const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
@@ -16138,6 +16376,141 @@ describe('providerLinearWorkflowFacade', () => {
       }
     });
     expect(calls).toEqual(['owner-search', 'related-relation']);
+  });
+
+  it('reuses a canonical owner when traceability update returns Linear-normalized Markdown', async () => {
+    const canonicalOwnerKey = 'baseline_cohort_id:linear-normalized-markdown';
+    const canonicalOwnerMarker = `codex-orchestrator:canonical-owner-key=${canonicalOwnerKey}`;
+    const initialOwnerDescription = buildExpectedFollowUpDescription({
+      canonicalOwnerKey
+    });
+    const finalOwnerDescription = buildExpectedFollowUpDescriptionForIssue({
+      canonicalOwnerKey,
+      includeTraceability: true,
+      followUpId: 'lin-owner-issue',
+      followUpIdentifier: 'CO-254'
+    });
+    const normalizedFinalOwnerDescription = simulateLinearMarkdownNormalization(finalOwnerDescription);
+    const calls: string[] = [];
+    const fetchImpl: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        query?: string;
+        variables?: Record<string, unknown>;
+      };
+      if (body.query?.includes('ProviderLinearIssueSummary')) {
+        return jsonResponse(buildIssueContextBody());
+      }
+      if (body.query?.includes('ProviderLinearCanonicalFollowUpOwners')) {
+        calls.push('owner-search');
+        expect(body.variables).toMatchObject({
+          teamId: 'lin-team-1',
+          projectId: 'lin-project-1',
+          marker: canonicalOwnerMarker
+        });
+        return jsonResponse(
+          buildCanonicalOwnerIssuesBody([
+            buildCanonicalOwnerIssue({
+              id: 'lin-owner-issue',
+              identifier: 'CO-254',
+              title: 'Existing canonical owner',
+              description: initialOwnerDescription,
+              labels: buildIssueLabelsConnection(FOLLOW_UP_LABEL_NODES),
+              state: {
+                id: 'state-backlog',
+                name: 'Backlog',
+                type: 'unstarted'
+              }
+            })
+          ])
+        );
+      }
+      if (body.query?.includes('ProviderLinearUpdateIssueDescription')) {
+        calls.push('update-description');
+        expect(body.variables).toEqual({
+          id: 'lin-owner-issue',
+          description: finalOwnerDescription
+        });
+        return jsonResponse({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: buildCanonicalOwnerIssue({
+                id: 'lin-owner-issue',
+                identifier: 'CO-254',
+                title: 'Existing canonical owner',
+                description: normalizedFinalOwnerDescription,
+                labels: buildIssueLabelsConnection(FOLLOW_UP_LABEL_NODES),
+                state: {
+                  id: 'state-backlog',
+                  name: 'Backlog',
+                  type: 'unstarted'
+                }
+              })
+            }
+          }
+        });
+      }
+      if (body.query?.includes('ProviderLinearCreateFollowUpIssue')) {
+        throw new Error('canonical-owner-key reuse must not create a duplicate');
+      }
+      if (body.query?.includes('ProviderLinearCreateIssueRelation')) {
+        calls.push('related-relation');
+        expect(body.variables).toEqual({
+          input: {
+            type: 'related',
+            issueId: 'lin-issue-1',
+            relatedIssueId: 'lin-owner-issue'
+          }
+        });
+        return jsonResponse({
+          data: {
+            issueRelationCreate: {
+              success: true,
+              issueRelation: {
+                id: 'relation-related',
+                type: 'related'
+              }
+            }
+          }
+        });
+      }
+      throw new Error(`Unexpected query: ${body.query}`);
+    });
+
+    const result = await createProviderLinearFollowUpIssue({
+      issueId: 'lin-issue-1',
+      title: 'Existing canonical owner',
+      description: 'Investigate the remaining improvement.',
+      intentChecksum: '- Preserve exact `CO STATUS` wording.',
+      nonGoals: '- [ ] Do not reopen the browser surface.',
+      notDoneIf: '- [ ] The issue still allows browser-first parity.',
+      acceptanceCriteria: '- [ ] Captured',
+      canonicalOwnerKey,
+      env: {
+        CO_LINEAR_API_TOKEN: 'lin-api-token'
+      },
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      operation: 'create-follow-up',
+      action: 'reused',
+      follow_up_issue: {
+        id: 'lin-owner-issue',
+        identifier: 'CO-254',
+        description: normalizedFinalOwnerDescription
+      },
+      canonical_owner: {
+        key: canonicalOwnerKey,
+        marker: canonicalOwnerMarker
+      },
+      relations: {
+        related: true,
+        blocked_by_source: false
+      }
+    });
+    expect(calls).toEqual(['owner-search', 'update-description', 'related-relation']);
   });
 
   it('reuses an asterisk-bulleted oversized canonical owner marker without creating a duplicate', async () => {
