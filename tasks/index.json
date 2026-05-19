@@ -1,6 +1,67 @@
 {
   "items": [
     {
+      "id": "20260513-linear-5417819d-738d-4e72-ab1a-4085149ed737",
+      "title": "CO-518 Codex CLI 0.130.0 release-intake",
+      "relates_to": "tasks/tasks-linear-5417819d-738d-4e72-ab1a-4085149ed737.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "blocked",
+      "last_review": "2026-05-13",
+      "evidence": [
+        "docs/PRD-linear-5417819d-738d-4e72-ab1a-4085149ed737.md",
+        "docs/TECH_SPEC-linear-5417819d-738d-4e72-ab1a-4085149ed737.md",
+        "docs/ACTION_PLAN-linear-5417819d-738d-4e72-ab1a-4085149ed737.md",
+        "tasks/specs/linear-5417819d-738d-4e72-ab1a-4085149ed737.md",
+        "tasks/tasks-linear-5417819d-738d-4e72-ab1a-4085149ed737.md",
+        ".agent/task/linear-5417819d-738d-4e72-ab1a-4085149ed737.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-5417819d-738d-4e72-ab1a-4085149ed737-docs-packet-bootstrap/cli/2026-05-12T14-28-53-050Z-60c97bc2/manifest.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet-bootstrap-2026-05-12T14-28-53-050Z-60c97bc2",
+          "date": "2026-05-13",
+          "status": "produced_for_parent_import",
+          "manifest": ".runs/linear-5417819d-738d-4e72-ab1a-4085149ed737-docs-packet-bootstrap/cli/2026-05-12T14-28-53-050Z-60c97bc2/manifest.json",
+          "source_anchor": "ctx:sha256:74f030488eac6625e603794c414e27991b41d325cecb086be35f05042d18e4e6#chunk:c000001",
+          "canonical_owner_key": "codex-cli-release-intake:stable:0.130.0",
+          "summary": "Docs-only child lane bootstraps CO-518 as the candidate 0.130.0 Codex CLI release-intake owner. It preserves no-auto-promotion language, separate evidence axes for local CLI, package/downstream smoke, cloud-canary, workflow pins, model posture, docs surfaces, and release notes, plus supersedes/holds rows and closeout classification gates. Parent owns Linear/workpad reconciliation, release evidence collection, implementation, validation, PR lifecycle, and final closeout classification."
+        },
+        "release_intake_parent_closeout": {
+          "reviewer": "CO-518 parent provider worker",
+          "date": "2026-05-13",
+          "status": "review_clean_blocked_on_co_521",
+          "summary": "Parent release-intake evidence adopts local ChatGPT-auth/appserver CLI command/runtime posture on Codex CLI 0.130.0, intentionally holds release-facing downstream-smoke pins on 0.125.0 and cloud-canary pins on 0.124.0, keeps model posture gpt-5.5/xhigh with portable gpt-5.4 fallback unchanged, supersedes the 0.128.0 local current-facing audit, and records CO-521 as the linked owner for the out-of-scope docs:freshness:maintain validation dependency."
+        },
+        "standalone_review": {
+          "reviewer": "codex-orchestrator review --uncommitted",
+          "date": "2026-05-13",
+          "status": "clean",
+          "telemetry": ".runs/linear-5417819d-738d-4e72-ab1a-4085149ed737/cli/2026-05-12T14-23-53-360Z-4ba8ee81/review/telemetry.json",
+          "summary": "Manifest-backed review reran after the fallback-cloud gate wording fix and ended with semantic review_verdict=clean."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-05-13",
+          "status": "clean",
+          "summary": "Manual minimality pass found no avoidable abstractions or scope expansion; the remaining diff is the CO-518 packet, posture surfaces, matrix/registry updates, and validation-blocker wording."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-5417819d-738d-4e72-ab1a-4085149ed737.md",
+        "task": "tasks/tasks-linear-5417819d-738d-4e72-ab1a-4085149ed737.md",
+        "agent_task": ".agent/task/linear-5417819d-738d-4e72-ab1a-4085149ed737.md",
+        "prd": "docs/PRD-linear-5417819d-738d-4e72-ab1a-4085149ed737.md",
+        "docs": "docs/TECH_SPEC-linear-5417819d-738d-4e72-ab1a-4085149ed737.md",
+        "action_plan": "docs/ACTION_PLAN-linear-5417819d-738d-4e72-ab1a-4085149ed737.md"
+      }
+    },
+    {
       "id": "20260519-linear-33117eac-b4d3-4eb0-889c-4527c9b79352",
       "title": "CO-559 normalize Linear Markdown before create-follow-up post-create verification",
       "relates_to": "tasks/tasks-linear-33117eac-b4d3-4eb0-889c-4527c9b79352.md",

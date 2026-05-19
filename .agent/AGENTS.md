@@ -1,4 +1,4 @@
-<!-- codex:instruction-stamp d598ecb6d71d9353ae65f79f15bc8d6540b9abbfa9c47ee5f0c0d95db8e6a9fe -->
+<!-- codex:instruction-stamp 3a8b7e5aec6775222e24da7759cd5b8581905032f794b34b2b166a184cb7b615 -->
 # Agent Enablement
 
 Task-specific project blocks were removed from this file in `CO-88`. Keep repo-wide guidance here and use `.agent/task/**` for active task-scoped instructions.
@@ -19,7 +19,7 @@ Task-specific project blocks were removed from this file in `CO-88`. Keep repo-w
 - Keep mode semantics explicit and orthogonal: `executionMode=mcp|cloud` and `runtimeMode=cli|appserver` are separate controls.
 - Local default runtime remains `appserver`, with `--runtime-mode cli` preserved as break-glass.
 - `executionMode=cloud` with explicit `runtimeMode=appserver` is unsupported and must fail fast with actionable errors.
-- Upstream `rust-v0.128.0` removed `js_repl` and `js_repl_tools_only`; do not set `CODEX_CLOUD_ENABLE_FEATURES` / `CODEX_CLOUD_DISABLE_FEATURES` to either `js_repl` or `js_repl_tools_only`, or run `codex features enable/disable js_repl` / `codex features enable/disable js_repl_tools_only`. Use cloud feature env vars only for active non-removed feature names after checking `codex features list`.
+- Upstream `rust-v0.128.0` removed `js_repl` and `js_repl_tools_only`, and current local `0.130.0` still reports both as removed; do not set `CODEX_CLOUD_ENABLE_FEATURES` / `CODEX_CLOUD_DISABLE_FEATURES` to either `js_repl` or `js_repl_tools_only`, or run `codex features enable/disable js_repl` / `codex features enable/disable js_repl_tools_only`. Use cloud feature env vars only for active non-removed feature names after checking `codex features list`.
 - Keep `memories` scoped to explicit eval lanes until promoted by evidence (legacy alias `memory_tool` is compatibility-only).
 - Honor the safe `read/edit/run/network` approval profile. Capture escalations in the manifest `approvals` array with reviewer justification and timestamp.
 - Run `node scripts/delegation-guard.mjs` prior to requesting review; if delegation is not possible, set `DELEGATION_GUARD_OVERRIDE_REASON` and record the justification in the checklist.
