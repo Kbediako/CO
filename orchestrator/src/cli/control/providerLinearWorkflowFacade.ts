@@ -3754,8 +3754,17 @@ function normalizeLinearPersistedMarkdownForComparison(description: string): str
   const lines = description.replace(/\r\n?/gu, '\n').split('\n');
   const normalizedLines: string[] = [];
   let activeFence: LinearMarkdownFenceState | null = null;
+  let activeHtmlPreBlock = false;
 
   for (const line of lines) {
+    if (activeHtmlPreBlock) {
+      normalizedLines.push(line);
+      if (isLinearMarkdownHtmlPreBlockEndLine(line)) {
+        activeHtmlPreBlock = false;
+      }
+      continue;
+    }
+
     const fence = parseLinearMarkdownFence(line);
     if (fence !== null) {
       activeFence = nextLinearMarkdownFenceState(activeFence, fence);
@@ -3768,6 +3777,12 @@ function normalizeLinearPersistedMarkdownForComparison(description: string): str
       continue;
     }
 
+    if (isLinearMarkdownHtmlPreBlockStartLine(line)) {
+      normalizedLines.push(line);
+      activeHtmlPreBlock = !isLinearMarkdownHtmlPreBlockEndLine(line);
+      continue;
+    }
+
     if (
       (isLinearMarkdownIndentedCodeLine(line) &&
         !isLinearMarkdownNestedListItemLine(line, normalizedLines)) ||
@@ -3777,7 +3792,7 @@ function normalizeLinearPersistedMarkdownForComparison(description: string): str
       continue;
     }
 
-    normalizedLines.push(line.replace(/^([ \t]*)\*\s+/u, '$1- ').replace(/^((?:[ \t]{0,3}>[ \t]?)+[ ]{0,3})\*\s+/u, '$1- '));
+    normalizedLines.push(normalizeLinearMarkdownBulletMarkerLine(line));
   }
 
   return collapseLinearHeadingListSpacing(normalizedLines).join('\n');
@@ -3787,7 +3802,7 @@ type LinearMarkdownFenceState = { marker: '`' | '~'; length: number };
 type LinearMarkdownFenceToken = LinearMarkdownFenceState & { trailing: string };
 
 function parseLinearMarkdownFence(line: string): LinearMarkdownFenceToken | null {
-  const fenceMatch = line.match(/^[ \t]{0,3}(`{3,}|~{3,})(.*)$/u);
+  const fenceMatch = stripLinearMarkdownBlockquotePrefix(line).match(/^[ \t]{0,3}(`{3,}|~{3,})(.*)$/u);
   if (!fenceMatch) {
     return null;
   }
@@ -3815,6 +3830,18 @@ function nextLinearMarkdownFenceState(
   return activeFence;
 }
 
+function stripLinearMarkdownBlockquotePrefix(line: string): string {
+  return line.replace(/^(?:[ \t]{0,3}>[ \t]?)+/u, '');
+}
+
+function isLinearMarkdownHtmlPreBlockStartLine(line: string): boolean {
+  return /^[ \t]{0,3}<pre(?:\s|>|$)/iu.test(line);
+}
+
+function isLinearMarkdownHtmlPreBlockEndLine(line: string): boolean {
+  return /<\/pre\s*>/iu.test(line);
+}
+
 function isLinearMarkdownIndentedCodeLine(line: string): boolean {
   return getLinearMarkdownIndentWidth(line.match(/^[ \t]*/u)?.[0] ?? '') >= 4;
 }
@@ -3831,7 +3858,7 @@ function isLinearMarkdownNestedListItemLine(line: string, previousLines: readonl
     if (parentListItem.indent >= nestedListItem.indent) {
       continue;
     }
-    return parentListItem.indent <= 3 && nestedListItem.indent <= parentListItem.indent + 4;
+    return parentListItem.indent <= 3 && nestedListItem.indent <= parentListItem.indent + 3 + parentListItem.markerWidth;
   }
   return false;
 }
@@ -3843,12 +3870,22 @@ function isLinearMarkdownThematicBreakLine(line: string): boolean {
 function collapseLinearHeadingListSpacing(lines: string[]): string[] {
   const collapsed: string[] = [];
   let activeFence: LinearMarkdownFenceState | null = null;
+  let activeHtmlPreBlock = false;
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
+    if (activeHtmlPreBlock) {
+      collapsed.push(line);
+      if (isLinearMarkdownHtmlPreBlockEndLine(line)) {
+        activeHtmlPreBlock = false;
+      }
+      continue;
+    }
+
     const fence = parseLinearMarkdownFence(line);
     if (
       line.trim() === '' &&
       activeFence === null &&
+      !activeHtmlPreBlock &&
       collapsed.length > 0 &&
       isLinearMarkdownNormalizationHeadingLine(collapsed[collapsed.length - 1]) &&
       isLinearMarkdownNormalizationListItemLine(lines[index + 1] ?? '')
@@ -3858,6 +3895,11 @@ function collapseLinearHeadingListSpacing(lines: string[]): string[] {
     collapsed.push(line);
     if (fence !== null) {
       activeFence = nextLinearMarkdownFenceState(activeFence, fence);
+    }
+    if (activeFence === null) {
+      if (isLinearMarkdownHtmlPreBlockStartLine(line)) {
+        activeHtmlPreBlock = !isLinearMarkdownHtmlPreBlockEndLine(line);
+      }
     }
   }
   return collapsed;
@@ -3875,17 +3917,33 @@ function isLinearMarkdownNormalizationListItemLine(line: string): boolean {
 function parseLinearMarkdownNormalizationListItemLine(
   line: string,
   marker: '-' | '*' | null = null
-): { indent: number } | null {
+): { indent: number; markerWidth: number } | null {
   if (isLinearMarkdownThematicBreakLine(line)) {
     return null;
   }
   const markerPattern = marker === '*' ? '\\*' : marker ?? '(?:[-*]|\\d+[.)])';
-  const listItemMatch = line.match(new RegExp(`^([ \\t]*)${markerPattern}\\s+\\S`, 'u'));
-  return listItemMatch ? { indent: getLinearMarkdownIndentWidth(listItemMatch[1]) } : null;
+  const listItemMatch = line.match(new RegExp(`^([ \\t]*)(${markerPattern})\\s+\\S`, 'u'));
+  return listItemMatch
+    ? { indent: getLinearMarkdownIndentWidth(listItemMatch[1]), markerWidth: getLinearMarkdownIndentWidth(listItemMatch[2]) }
+    : null;
 }
 
 function getLinearMarkdownIndentWidth(indent: string): number {
   return [...indent].reduce((width, char) => width + (char === '\t' ? 4 : 1), 0);
+}
+
+function normalizeLinearMarkdownBulletMarkerLine(line: string): string {
+  if (isLinearMarkdownManagedMarkerLine(line)) {
+    return line;
+  }
+  return line
+    .replace(/^([ \t]*)[*+]\s+/u, '$1- ')
+    .replace(/^((?:[ \t]{0,3}>[ \t]?)+[ ]{0,3})[*+]\s+/u, '$1- ');
+}
+
+function isLinearMarkdownManagedMarkerLine(line: string): boolean {
+  const structuralLine = stripLinearMarkdownBlockquotePrefix(line).trimStart();
+  return /^\+\s+(?:Canonical owner marker|Follow-up packet prefix):/u.test(structuralLine);
 }
 
 function normalizeFollowUpSourceIssueTraceabilityLine(description: string): string {

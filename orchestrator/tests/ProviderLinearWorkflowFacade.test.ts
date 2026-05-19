@@ -13167,7 +13167,9 @@ describe('providerLinearWorkflowFacade', () => {
       ['Investigate the remaining improvement.', '', '1. Parent item', '    * Child item'].join('\n'),
       (description: string) => description.replace('    * Child item', '    - Child item')
     ],
+    ['nested bullet markers under a wide ordered parent', ['Investigate the remaining improvement.', '', '10. Parent item', '     * Child item'].join('\n'), (description: string) => description.replace('     * Child item', '     - Child item')],
     ['nested sibling bullet markers', ['Investigate the remaining improvement.', '', '- Parent item', '    * First child', '    * Second child'].join('\n'), (description: string) => description.replaceAll('    * ', '    - ')],
+    ['plus bullet markers', ['Investigate the remaining improvement.', '', '+ Plus item'].join('\n'), (description: string) => description.replace('+ Plus item', '- Plus item')],
     ['heading spacing before an ordered list', ['Investigate the remaining improvement.', '', '## Steps', '1. Do it'].join('\n'), simulateLinearHeadingListSpacing],
     ['blockquoted bullet markers', ['Investigate the remaining improvement.', '', '> * Quoted item'].join('\n'), (description: string) => description.replace('> * Quoted item', '> - Quoted item')]
   ])('accepts Linear-normalized %s after follow-up traceability update', async (_label, inputDescription, normalize) => {
@@ -13242,6 +13244,8 @@ describe('providerLinearWorkflowFacade', () => {
       ['Investigate the remaining improvement.', '```md', '```not-a-close', '* keep literal bullet.', '```'].join('\n'),
       (description: string) => description.replace('* keep literal bullet.', '- keep literal bullet.')
     ],
+    ['a blockquoted fenced code line is not bullet-normalized', ['Investigate the remaining improvement.', '', '> ```md', '> * keep literal bullet.', '> ```'].join('\n'), (description: string) => description.replace('> * keep literal bullet.', '> - keep literal bullet.')],
+    ['a raw HTML pre block line is not bullet-normalized', ['Investigate the remaining improvement.', '', '<pre>', '* keep literal bullet.', '</pre>'].join('\n'), (description: string) => description.replace('* keep literal bullet.', '- keep literal bullet.')],
     [
       'an indented code line is not bullet-normalized',
       ['Investigate the remaining improvement.', '', '    1. prior literal code.', '        * keep literal bullet.'].join('\n'),
