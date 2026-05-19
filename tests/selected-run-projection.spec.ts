@@ -11,6 +11,7 @@ import {
 } from '../orchestrator/src/cli/control/selectedRunProjection.js';
 import { buildCompatibilityProjectionSnapshot } from '../orchestrator/src/cli/control/compatibilityIssuePresenter.js';
 import { buildUiDataset } from '../orchestrator/src/cli/control/operatorDashboardPresenter.js';
+import { normalizeProviderIntakeState } from '../orchestrator/src/cli/control/providerIntakeState.js';
 import type { ControlState } from '../orchestrator/src/cli/control/controlState.js';
 import type {
   ProviderIntakeClaimRecord,
@@ -362,20 +363,22 @@ describe('createSelectedRunProjectionReader', () => {
         summary: 'Released Backlog run summary without explicit empty retry metadata.'
       })
     );
-    const providerIntakeState = buildProviderIntakeState([
-      buildProviderIntakeClaim(taskId, runId, manifestPath, {
-        provider_key: 'linear:b9447b5a-224d-4731-bab9-95bb0597dbe0',
-        issue_id: 'b9447b5a-224d-4731-bab9-95bb0597dbe0',
-        issue_identifier: 'CO-558',
-        issue_title: 'CO: replace terminal docs freshness maintenance owner after May 19',
-        issue_state: 'Backlog',
-        issue_state_type: 'backlog',
-        issue_updated_at: '2026-05-19T04:02:22.625Z',
-        state: 'released',
-        reason: 'provider_issue_released:not_active',
-        updated_at: '2026-05-19T04:04:34.521Z'
-      })
-    ]);
+    const providerIntakeState = normalizeProviderIntakeState(
+      buildProviderIntakeState([
+        buildProviderIntakeClaim(taskId, runId, manifestPath, {
+          provider_key: 'linear:b9447b5a-224d-4731-bab9-95bb0597dbe0',
+          issue_id: 'b9447b5a-224d-4731-bab9-95bb0597dbe0',
+          issue_identifier: 'CO-558',
+          issue_title: 'CO: replace terminal docs freshness maintenance owner after May 19',
+          issue_state: 'Backlog',
+          issue_state_type: 'backlog',
+          issue_updated_at: '2026-05-19T04:02:22.625Z',
+          state: 'released',
+          reason: 'provider_issue_released:not_active',
+          updated_at: '2026-05-19T04:04:34.521Z'
+        })
+      ])
+    );
     const projection = createSelectedRunProjectionReader(
       buildProjectionContext({ manifestPath, runId, providerIntakeState })
     );
