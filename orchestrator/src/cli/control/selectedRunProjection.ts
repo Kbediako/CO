@@ -783,9 +783,13 @@ async function reconcileSelectedProviderLinearWorkerContext<T extends ControlCom
   if (!selected || !context.providerIntakeState) {
     return selected;
   }
+  const claim = findProviderLinearWorkerClaimForContext(context.providerIntakeState, selected);
+  const passiveReleasedOwnerFailedRun =
+    claim !== null && isPassiveReleasedProviderLinearWorkerOwnerFailedRun(selected, claim);
   if (
     !isProviderLinearWorkerReconciliationSource(selected) ||
-    !isActiveLookingProviderLinearWorkerManifestStatus(selected.rawStatus)
+    (!isActiveLookingProviderLinearWorkerManifestStatus(selected.rawStatus) &&
+      !passiveReleasedOwnerFailedRun)
   ) {
     return selected;
   }

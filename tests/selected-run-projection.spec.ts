@@ -289,6 +289,61 @@ describe('createSelectedRunProjectionReader', () => {
     });
   });
 
+  it('reconciles selected passive released Backlog owner failed run summaries', async () => {
+    const sandbox = await makeSandbox();
+    const taskId = 'linear-b9447b5a-224d-4731-bab9-95bb0597dbe0';
+    const runId = '2026-05-19T03-40-00-000Z-selected-stale-failed';
+    const manifestPath = await writeRunManifest(
+      sandbox,
+      taskId,
+      runId,
+      buildProviderWorkerManifest(taskId, runId, {
+        issue_id: 'b9447b5a-224d-4731-bab9-95bb0597dbe0',
+        issue_identifier: 'CO-558',
+        issue_title: 'CO: replace terminal docs freshness maintenance owner after May 19',
+        status: 'failed',
+        completed_at: '2026-05-19T03:52:14.000Z',
+        updated_at: '2026-05-19T03:52:14.000Z',
+        summary: 'Selected stale failed run summary remained after PR #838 merged.'
+      })
+    );
+    const providerIntakeState = buildProviderIntakeState(
+      [
+        buildProviderIntakeClaim(taskId, runId, manifestPath, {
+          provider_key: 'linear:b9447b5a-224d-4731-bab9-95bb0597dbe0',
+          issue_id: 'b9447b5a-224d-4731-bab9-95bb0597dbe0',
+          issue_identifier: 'CO-558',
+          issue_title: 'CO: replace terminal docs freshness maintenance owner after May 19',
+          issue_state: 'Backlog',
+          issue_state_type: 'backlog',
+          issue_updated_at: '2026-05-19T04:02:22.625Z',
+          state: 'released',
+          reason: 'provider_issue_released:not_active',
+          updated_at: '2026-05-19T04:04:34.521Z',
+          retry_queued: null,
+          retry_attempt: null,
+          retry_due_at: null,
+          retry_error: null
+        })
+      ],
+      { updated_at: '2026-05-19T04:04:34.521Z' }
+    );
+    const projection = createSelectedRunProjectionReader(
+      buildProjectionContext({ manifestPath, runId, providerIntakeState })
+    );
+
+    const selected = await projection.buildSelectedRunContext();
+
+    expect(selected).toMatchObject({
+      issueIdentifier: 'CO-558',
+      rawStatus: 'cancelled',
+      displayStatus: 'cancelled',
+      statusReason: 'provider_claim_released',
+      providerRetryState: null
+    });
+    expect(selected?.summary).toContain('provider claim is released');
+  });
+
   it('reconciles passive released Backlog owner failed run summaries out of current failed status', async () => {
     const sandbox = await makeSandbox();
     const taskId = 'linear-b9447b5a-224d-4731-bab9-95bb0597dbe0';
