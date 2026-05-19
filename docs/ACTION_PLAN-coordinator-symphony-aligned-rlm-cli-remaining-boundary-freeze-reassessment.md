@@ -1,5 +1,7 @@
 # ACTION_PLAN: Coordinator Symphony-Aligned RLM CLI Remaining Boundary Freeze Reassessment
 
-1. Reinspect the reduced `handleRlm(...)` wrapper after `1279`.
-2. Confirm whether any mixed-ownership seam still remains locally or whether the residual surface is only binary-owned wrapper glue.
-3. Record an explicit freeze-or-go result with deterministic docs-first evidence.
+<!-- docs-archive:stub -->
+> Archived on 2026-05-18. Full content: https://github.com/Kbediako/CO/blob/doc-archives/docs/ACTION_PLAN-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment.md
+
+- Archive branch: doc-archives
+- Archive path: docs/ACTION_PLAN-coordinator-symphony-aligned-rlm-cli-remaining-boundary-freeze-reassessment.md

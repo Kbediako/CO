@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { existsSync, realpathSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, normalize, resolve, sep } from 'node:path';
 
@@ -59,6 +60,17 @@ export interface SourceRootFreshnessInspection {
   guidance: string[];
   detail: string;
 }
+
+const BASE_REF = 'origin/main';
+const GIT_TIMEOUT_MS = 5000;
+const GIT_REPO_SELECTION_ENV_KEYS = [
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_COMMON_DIR',
+  'GIT_DIR',
+  'GIT_INDEX_FILE',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_WORK_TREE'
+];
 
 export function inspectSourceRootFreshness(input: {
   intendedRepoRoot?: string | null;
@@ -142,7 +154,7 @@ export function inspectSourceRootFreshness(input: {
     source_root: sourceRoot,
     source_root_realpath: sourceRootRealpath,
     entrypoint_kind: entrypointKind,
-    base_ref: 'origin/main',
+    base_ref: BASE_REF,
     source_checkout: sourceCheckout,
     intended_checkout: intendedCheckout,
     drift_classes: driftClasses,
@@ -259,14 +271,164 @@ export function refreshSourceRootFreshnessInspection(
     sourceRootRealpath: prior.source_root_realpath,
     cwd: intendedRepoRoot ?? prior.source_root ?? null
   });
+  const sourceCheckout = refreshResidentSourceCheckout({
+    prior: prior.source_checkout,
+    refreshed: refreshed.source_checkout
+  });
+  const driftClasses = classifyDriftClasses({
+    intendedCheckout: refreshed.intended_checkout,
+    sourceCheckout,
+    sourceRootMatchesIntended: refreshed.provenance.source_root_matches_intended,
+    packageRootMatchesIntended: refreshed.provenance.package_root_matches_intended,
+    commandPathInsidePackage: refreshed.provenance.command_path_inside_package,
+    entrypointKind: refreshed.entrypoint_kind,
+    sourceEntryExists: refreshed.provenance.source_entry_exists
+  });
+  const status = resolveFreshnessStatus({
+    sourceRootRealpath: refreshed.source_root_realpath,
+    sourceCheckout,
+    driftClasses
+  });
   return {
     ...refreshed,
+    status,
+    observed_at: refreshed.observed_at || prior.observed_at,
+    source_checkout: sourceCheckout,
+    drift_classes: driftClasses,
     provenance: {
       ...refreshed.provenance,
       command_path_source: prior.provenance.command_path_source,
       package_root_source: prior.provenance.package_root_source,
       source_root_source: prior.provenance.source_root_source
-    }
+    },
+    guidance: buildSourceRootGuidance(driftClasses, status),
+    detail: buildSourceRootDetail(driftClasses, status)
+  };
+}
+
+function refreshResidentSourceCheckout(input: {
+  prior: SourceRootCheckoutFreshness | null;
+  refreshed: SourceRootCheckoutFreshness | null;
+}): SourceRootCheckoutFreshness | null {
+  if (!input.prior || !input.refreshed) {
+    return input.refreshed;
+  }
+  const priorHeadHash = input.prior.head?.hash ?? null;
+  const refreshedHeadHash = input.refreshed.head?.hash ?? null;
+  const priorUpstreamHash = input.prior.upstream?.hash ?? null;
+  const refreshedUpstreamHash = input.refreshed.upstream?.hash ?? null;
+  if (
+    priorHeadHash === refreshedHeadHash &&
+    priorUpstreamHash === refreshedUpstreamHash
+  ) {
+    return input.refreshed;
+  }
+  if (!priorHeadHash) {
+    return input.refreshed;
+  }
+  const comparison = compareCommitWithOriginMain(input.refreshed.repo_root, priorHeadHash);
+  if (!comparison) {
+    return {
+      ...input.prior,
+      repo_root: input.refreshed.repo_root,
+      upstream: input.refreshed.upstream,
+      status: 'unavailable',
+      ahead: null,
+      behind: null,
+      detail: `Unable to compare resident source checkout ${shortCommitHash(priorHeadHash)} with origin/main.`
+    };
+  }
+  return {
+    ...input.prior,
+    repo_root: input.refreshed.repo_root,
+    upstream: input.refreshed.upstream,
+    status: comparison.status,
+    ahead: comparison.ahead,
+    behind: comparison.behind,
+    detail: buildCheckoutDetail(comparison.status, comparison.ahead, comparison.behind)
+  };
+}
+
+function compareCommitWithOriginMain(
+  repoRoot: string,
+  commitHash: string
+): { status: CheckoutPostureStatus; ahead: number; behind: number } | null {
+  const comparison = runGit(repoRoot, [
+    'rev-list',
+    '--left-right',
+    '--count',
+    `${commitHash}...${BASE_REF}`
+  ]);
+  if (!comparison.ok) {
+    return null;
+  }
+  const counts = comparison.stdout.trim().split(/\s+/u);
+  const ahead = Number.parseInt(counts[0] ?? '', 10);
+  const behind = Number.parseInt(counts[1] ?? '', 10);
+  if (!Number.isFinite(ahead) || !Number.isFinite(behind)) {
+    return null;
+  }
+  return {
+    status: classifyCheckoutComparison(ahead, behind),
+    ahead,
+    behind
+  };
+}
+
+function classifyCheckoutComparison(ahead: number, behind: number): CheckoutPostureStatus {
+  if (behind > 0 && ahead > 0) {
+    return 'diverged';
+  }
+  if (behind > 0) {
+    return 'stale';
+  }
+  if (ahead > 0) {
+    return 'ahead';
+  }
+  return 'current';
+}
+
+function buildCheckoutDetail(status: CheckoutPostureStatus, ahead: number, behind: number): string {
+  switch (status) {
+    case 'stale':
+      return `HEAD is ${behind} commit${behind === 1 ? '' : 's'} behind ${BASE_REF}.`;
+    case 'diverged':
+      return `HEAD has local commits and is ${behind} commit${behind === 1 ? '' : 's'} behind ${BASE_REF}.`;
+    case 'ahead':
+      return `HEAD is ${ahead} commit${ahead === 1 ? '' : 's'} ahead of ${BASE_REF} and not behind.`;
+    case 'current':
+      return `HEAD and ${BASE_REF} point at the same commit for this local comparison ref.`;
+    case 'unavailable':
+      return 'Checkout posture comparison is unavailable.';
+  }
+}
+
+function shortCommitHash(hash: string): string {
+  return hash.slice(0, 10);
+}
+
+interface GitCommandResult {
+  ok: boolean;
+  stdout: string;
+}
+
+function runGit(repoRoot: string, args: string[]): GitCommandResult {
+  const env = { ...process.env };
+  for (const key of GIT_REPO_SELECTION_ENV_KEYS) {
+    delete env[key];
+  }
+  const result = spawnSync('git', ['-C', repoRoot, ...args], {
+    encoding: 'utf8',
+    env: {
+      ...env,
+      GIT_OPTIONAL_LOCKS: '0'
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: GIT_TIMEOUT_MS
+  });
+  return {
+    ok: !result.error && result.status === 0,
+    stdout: String(result.stdout ?? '')
   };
 }
 

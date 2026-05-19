@@ -3,10 +3,10 @@
 Purpose:
 - Track concrete Codex Orchestrator (CO) friction points observed in this repo so they can be addressed upstream.
 
-## Current status (2026-04-22 review)
+## Current status (2026-05-18 review)
 - `nested` and `git-boundary` issue-log routing friction is addressed in `orchestrator/src/cli/doctorIssueLog.ts`.
 - Coverage is locked by `orchestrator/tests/_reproIssueLogTask.test.ts` (including ambient `CODEX_ORCHESTRATOR_ROOT` conflict cases).
-- Apr 22 docs-freshness review confirmed the issue log remains a historical/reference surface on current `main`; no new open CO doctor issue-log entries are being carried here.
+- May 18 docs-freshness review confirmed the issue log remains a historical/reference surface on current `main`; no new open CO doctor issue-log entries are being carried here.
 - Remaining historical entries below are retained as capture history.
 - Open issues: `<none>`.
 

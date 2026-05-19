@@ -72,6 +72,8 @@ interface ReviewArgsOptions {
   disableDelegationMcp: boolean;
   inlineReadOnlySandbox?: boolean;
   readOnlyConfigOverride?: string;
+  contractOutputSchemaPath?: string | null;
+  contractOutputLastMessagePath?: string | null;
 }
 
 export interface ReviewArtifactPaths {
@@ -93,6 +95,7 @@ interface ReviewFailureIssueLogOptions {
 interface ResolvedReviewCommand {
   command: string;
   args: string[];
+  stdinInput?: string | null;
 }
 
 interface ReviewRunResult {
@@ -109,6 +112,8 @@ export interface ReviewLaunchAttemptShellOptions {
   repoRoot: string;
   manifestPath: string;
   artifactPaths: ReviewArtifactPaths;
+  contractOutputSchemaPath?: string | null;
+  contractOutputLastMessagePath?: string | null;
   autoIssueLogEnabled: boolean;
   telemetryDebugEnabled: boolean;
   telemetryDebugEnvKey: string;
@@ -204,12 +209,22 @@ export async function runReviewLaunchAttemptShell(
 
   const scopedReviewArgs = buildReviewArgs(options.cliOptions, options.prompt, {
     includeScopeFlags: true,
-    disableDelegationMcp
+    disableDelegationMcp,
+    contractOutputSchemaPath: options.contractOutputSchemaPath,
+    contractOutputLastMessagePath: options.contractOutputLastMessagePath
   });
   const scopedLaunchContext = buildReviewLaunchContext(options.cliOptions, {
-    includeScopeFlags: true
+    includeScopeFlags: true,
+    contractOutputSchemaPath: options.contractOutputSchemaPath,
+    contractOutputLastMessagePath: options.contractOutputLastMessagePath
   });
-  const resolvedScoped = resolveCommand(scopedReviewArgs, options.runtimeContext);
+  const scopedUsesStructuredContractExec = Boolean(
+    options.contractOutputSchemaPath?.trim() && options.contractOutputLastMessagePath?.trim()
+  );
+  const resolvedScoped = {
+    ...resolveCommand(scopedReviewArgs, options.runtimeContext),
+    stdinInput: scopedUsesStructuredContractExec ? `${options.prompt}\n` : null
+  };
   const launchedWithExplicitScope = scopedReviewArgs.some(
     (arg) => arg === '--base' || arg === '--commit' || arg === '--uncommitted'
   );
@@ -606,45 +621,73 @@ function buildReviewArgs(
   opts: ReviewArgsOptions
 ): string[] {
   const args: string[] = [];
-  if (opts.disableDelegationMcp) {
-    args.push('-c', REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE);
+  const contractOutputSchemaPath = opts.contractOutputSchemaPath?.trim() || null;
+  const contractOutputLastMessagePath = opts.contractOutputLastMessagePath?.trim() || null;
+  const useStructuredContractExec = Boolean(contractOutputSchemaPath && contractOutputLastMessagePath);
+  if (!useStructuredContractExec) {
+    if (opts.disableDelegationMcp) {
+      args.push('-c', REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE);
+    }
+    if (opts.inlineReadOnlySandbox) {
+      args.push('-c', opts.readOnlyConfigOverride ?? REVIEW_READ_ONLY_PERMISSION_PROFILE_CONFIG_OVERRIDE);
+    }
+    args.push('review');
+  } else {
+    if (opts.disableDelegationMcp) {
+      args.push('-c', REVIEW_DISABLE_DELEGATION_CONFIG_OVERRIDE);
+    }
+    args.push('exec');
+    args.push('-s', 'read-only');
+    args.push('--output-schema', contractOutputSchemaPath as string);
+    args.push('--output-last-message', contractOutputLastMessagePath as string);
   }
-  if (opts.inlineReadOnlySandbox) {
-    args.push('-c', opts.readOnlyConfigOverride ?? REVIEW_READ_ONLY_PERMISSION_PROFILE_CONFIG_OVERRIDE);
-  }
-  args.push('review');
   const reviewTitle = resolveReviewTitle(options);
-  if (reviewTitle.title) {
+  if (reviewTitle.title && !useStructuredContractExec) {
     args.push('--title', reviewTitle.title);
   }
 
   const scopeFlag = resolveScopeFlag(options);
-  if (opts.includeScopeFlags && scopeFlag) {
+  if (opts.includeScopeFlags && scopeFlag && !useStructuredContractExec) {
     args.push(...scopeFlag.args);
   }
 
   const launchContext = buildReviewLaunchContext(options, opts);
   if (launchContext.prompt_delivery === 'inline') {
     args.push(prompt);
+  } else if (launchContext.prompt_delivery === 'stdin') {
+    args.push('-');
   }
   return args;
 }
 
 function buildReviewLaunchContext(
   options: Pick<ReviewLaunchCliOptions, 'base' | 'commit' | 'title' | 'titleSource' | 'uncommitted'>,
-  opts: Pick<ReviewArgsOptions, 'includeScopeFlags'>
+  opts: Pick<ReviewArgsOptions, 'includeScopeFlags' | 'contractOutputSchemaPath' | 'contractOutputLastMessagePath'>
 ): ReviewLaunchContext {
   const scopedFlag = opts.includeScopeFlags ? resolveScopeFlag(options) : null;
   const reviewTitle = resolveReviewTitle(options);
+  const contractOutputSchemaPath = opts.contractOutputSchemaPath?.trim() || null;
+  const contractOutputLastMessagePath = opts.contractOutputLastMessagePath?.trim() || null;
+  const useStructuredContractExec = Boolean(contractOutputSchemaPath && contractOutputLastMessagePath);
+  const promptDelivery = useStructuredContractExec ? 'stdin' : scopedFlag ? 'artifact-only' : 'inline';
   return {
-    scope_flag_mode: scopedFlag?.mode ?? null,
-    prompt_delivery: scopedFlag ? 'artifact-only' : 'inline',
-    reviewer_visible_context_transport: scopedFlag
-      ? reviewTitle.source
-        ? 'scoped-title'
-        : 'artifact-only'
-      : 'inline-prompt',
-    reviewer_visible_title_source: scopedFlag ? reviewTitle.source : null
+    scope_flag_mode: useStructuredContractExec ? null : (scopedFlag?.mode ?? null),
+    prompt_delivery: promptDelivery,
+    reviewer_visible_context_transport: useStructuredContractExec
+      ? 'stdin-prompt'
+      : scopedFlag
+        ? reviewTitle.source
+          ? 'scoped-title'
+          : 'artifact-only'
+        : 'inline-prompt',
+    reviewer_visible_title_source: scopedFlag && !useStructuredContractExec ? reviewTitle.source : null,
+    ...(useStructuredContractExec
+      ? {
+          transport: 'codex-exec-output-schema' as const,
+          output_schema_path: contractOutputSchemaPath as string,
+          output_last_message_path: contractOutputLastMessagePath as string
+        }
+      : {})
   };
 }
 
@@ -694,7 +737,7 @@ function resolveReviewCommand(
   return resolveRuntimeCodexCommand(reviewArgs, context);
 }
 
-function resolveReviewArtifactsDir(manifestPath: string, repoRoot: string): string {
+export function resolveReviewArtifactsDir(manifestPath: string, repoRoot: string): string {
   const configuredRunDir = process.env.CODEX_ORCHESTRATOR_RUN_DIR?.trim();
   if (configuredRunDir && configuredRunDir.length > 0) {
     const resolvedRunDir = path.resolve(repoRoot, configuredRunDir);

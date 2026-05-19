@@ -1,10 +1,10 @@
 ---
 id: 20260315-1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction
 title: Coordinator Symphony-Aligned Orchestrator Cloud Branch Resolution Boundary Extraction
-status: draft
+status: done
 owner: Codex
 created: 2026-03-15
-last_review: 2026-04-15
+last_review: 2026-05-16
 review_cadence_days: 30
 risk_level: medium
 related_prd: docs/PRD-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction.md
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction.md
 review_notes:
   - 2026-03-15: Local read-only review approves the shared cloud branch-resolution contract as the next truthful Symphony-aligned seam after `1203`. Evidence: `orchestrator/src/cli/services/orchestratorCloudTargetExecutor.ts`, `orchestrator/src/cli/services/orchestratorCloudRouteShell.ts`, `orchestrator/src/cli/services/orchestratorAutoScoutEvidenceRecorder.ts`, `docs/findings/1204-orchestrator-cloud-branch-resolution-boundary-extraction-deliberation.md`.
+  - 2026-05-16: CO-545 strict spec-guard audit reclassified this stale Apr 14/15 row as inactive done; same-file checklist `tasks/tasks-1204-coordinator-symphony-aligned-orchestrator-cloud-branch-resolution-boundary-extraction.md` has 27 checked items and 0 unchecked items, so the old draft status was stale metadata rather than active implementation work.
 ---
 
 # Technical Specification

@@ -1,0 +1,408 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "co.review.contract.v1.output",
+  "title": "CO Governed Review Contract v1 Structured Output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at",
+    "overall_verdict",
+    "axes",
+    "code_change_proposals",
+    "agent_loop_proposals"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": [
+        "co.review.contract.v1"
+      ]
+    },
+    "generated_at": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "overall_verdict": {
+      "$ref": "#/definitions/verdict"
+    },
+    "axes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spec_conformance",
+        "coding_standards",
+        "code_changes",
+        "agent_loop"
+      ],
+      "properties": {
+        "spec_conformance": {
+          "$ref": "#/definitions/axis"
+        },
+        "coding_standards": {
+          "$ref": "#/definitions/axis"
+        },
+        "code_changes": {
+          "$ref": "#/definitions/axis"
+        },
+        "agent_loop": {
+          "$ref": "#/definitions/axis"
+        }
+      }
+    },
+    "code_change_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/code_change_proposal"
+      }
+    },
+    "agent_loop_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/agent_loop_proposal"
+      }
+    }
+  },
+  "definitions": {
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "clean",
+        "findings",
+        "blocked",
+        "unknown"
+      ]
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "P0",
+        "P1",
+        "P2",
+        "P3"
+      ]
+    },
+    "evidence_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "description"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "priority",
+        "title",
+        "body",
+        "evidence_refs"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "priority": {
+          "$ref": "#/definitions/priority"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "body": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/evidence_ref"
+          }
+        }
+      }
+    },
+    "axis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verdict",
+        "summary",
+        "clean_signal",
+        "evidence_refs",
+        "findings"
+      ],
+      "properties": {
+        "verdict": {
+          "$ref": "#/definitions/verdict"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "clean_signal": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/evidence_ref"
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/finding"
+          }
+        }
+      }
+    },
+    "proposal_target": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "section",
+        "function"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "section": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "function": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "code_change_proposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "rationale",
+        "unified_diff",
+        "target",
+        "tests",
+        "risk",
+        "evidence_refs"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "unified_diff": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "target": {
+          "$ref": "#/definitions/proposal_target"
+        },
+        "tests": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        },
+        "risk": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/evidence_ref"
+          }
+        }
+      }
+    },
+    "agent_loop_routing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default_route",
+        "follow_up_kind",
+        "intent_checksum",
+        "canonical_owner_key",
+        "non_goals",
+        "not_done_if",
+        "acceptance_criteria"
+      ],
+      "properties": {
+        "default_route": {
+          "type": "string",
+          "enum": [
+            "linear_follow_up"
+          ]
+        },
+        "follow_up_kind": {
+          "type": "string",
+          "enum": [
+            "agent_loop"
+          ]
+        },
+        "intent_checksum": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "canonical_owner_key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "non_goals": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        },
+        "not_done_if": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        }
+      }
+    },
+    "agent_loop_proposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "rationale",
+        "blocking",
+        "routing",
+        "evidence_refs"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "blocking": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "routing": {
+          "$ref": "#/definitions/agent_loop_routing"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/evidence_ref"
+          }
+        }
+      }
+    }
+  }
+}

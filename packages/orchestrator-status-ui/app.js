@@ -19,6 +19,8 @@ const elements = {
   pollMeta: document.getElementById('pollMeta'),
   rateLimitStatus: document.getElementById('rateLimitStatus'),
   rateLimitMeta: document.getElementById('rateLimitMeta'),
+  repoGateStatus: document.getElementById('repoGateStatus'),
+  repoGateMeta: document.getElementById('repoGateMeta'),
   runningList: document.getElementById('runningList'),
   retryList: document.getElementById('retryList'),
   statusFilter: document.getElementById('statusFilter'),
@@ -303,6 +305,7 @@ function renderSummary() {
   };
   const polling = state.data?.polling || null;
   const rateLimits = state.data?.rate_limits || null;
+  const docsFreshnessGate = state.data?.repo_gates?.docs_freshness_maintain || null;
 
   elements.runningCount.textContent = String(counts.running || 0);
   elements.runningMeta.textContent =
@@ -324,6 +327,12 @@ function renderSummary() {
   elements.pollMeta.textContent = formatPollMeta(polling);
   elements.rateLimitStatus.textContent = rateLimits ? 'Latest sample' : 'None';
   elements.rateLimitMeta.textContent = rateLimits ? summarizeRateLimits(rateLimits) : 'No latest rate-limit sample';
+  elements.repoGateStatus.textContent = docsFreshnessGate
+    ? formatRepoGateSeverity(docsFreshnessGate.severity)
+    : 'Unknown';
+  elements.repoGateMeta.textContent = docsFreshnessGate
+    ? summarizeDocsFreshnessGate(docsFreshnessGate)
+    : 'No repo-gate sample';
 }
 
 function renderQueues() {
@@ -874,6 +883,100 @@ function summarizeRateLimits(rateLimits) {
     .slice(0, 3)
     .map(([key, value]) => `${key}: ${String(value)}`)
     .join(' • ');
+}
+
+function formatRepoGateSeverity(severity) {
+  if (!severity) {
+    return 'Unknown';
+  }
+  return String(severity)
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function formatDocsFreshnessCapacity(capacity) {
+  if (!capacity?.status) {
+    return null;
+  }
+  const toFiniteNumber = (value) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
+  };
+  const currentEntries = toFiniteNumber(capacity.current_entries);
+  const maxEntries = toFiniteNumber(capacity.max_entries);
+  const entryExcess = toFiniteNumber(capacity.entry_excess) ?? 0;
+  const currentCohorts = toFiniteNumber(capacity.current_cohorts);
+  const maxCohorts = toFiniteNumber(capacity.max_cohorts);
+  const cohortExcess = toFiniteNumber(capacity.cohort_excess) ?? 0;
+  const expiredEntries = toFiniteNumber(capacity.expired_entries);
+  const parts = [`capacity ${capacity.status}`];
+  if (currentEntries !== null || maxEntries !== null) {
+    parts.push(
+      `entries ${formatNullableNumber(currentEntries)}/${formatNullableNumber(maxEntries)}${
+        entryExcess > 0 ? ` (+${entryExcess})` : ''
+      }`
+    );
+  }
+  if (currentCohorts !== null || maxCohorts !== null) {
+    parts.push(
+      `cohorts ${formatNullableNumber(currentCohorts)}/${formatNullableNumber(maxCohorts)}${
+        cohortExcess > 0 ? ` (+${cohortExcess})` : ''
+      }`
+    );
+  }
+  if (expiredEntries !== null) {
+    parts.push(`expired ${formatNullableNumber(expiredEntries)}`);
+  }
+  return parts.join(' ');
+}
+
+function summarizeDocsFreshnessGate(gate) {
+  const parts = [];
+  if (gate.evidence_status && gate.evidence_status !== 'fresh') {
+    parts.push(gate.evidence_reason ? `${gate.evidence_status}: ${gate.evidence_reason}` : gate.evidence_status);
+  }
+  if (gate.freshness_decision) {
+    parts.push(gate.freshness_decision);
+  }
+  parts.push(`${formatNullableNumber(gate.action_required_count)} actions`);
+  if (gate.owner?.issue) {
+    parts.push(`owner ${gate.owner.issue}`);
+  }
+  if (gate.owner?.canonical_owner_key || gate.canonical_owner_key) {
+    parts.push(`canonical ${gate.owner?.canonical_owner_key ?? gate.canonical_owner_key}`);
+  }
+  if (gate.spec_guard?.status) {
+    parts.push(`spec ${gate.spec_guard.status}`);
+  }
+  const capacitySummary = formatDocsFreshnessCapacity(gate.capacity);
+  if (capacitySummary) {
+    parts.push(capacitySummary);
+  }
+  if (gate.next_expiry) {
+    parts.push(`next ${gate.next_expiry}`);
+  }
+  if (gate.generated_at) {
+    parts.push(`generated ${formatTimestamp(gate.generated_at)}`);
+  }
+  if (gate.source_path) {
+    parts.push(`source ${formatRepoGateSource(gate.source_path)}`);
+  }
+  if (gate.provider_wip_impact === 'excluded_repo_gate') {
+    parts.push('not WIP');
+  }
+  return parts.join(' • ');
+}
+
+function formatRepoGateSource(sourcePath) {
+  const normalized = String(sourcePath || '').replace(/\\/g, '/');
+  if (!normalized) {
+    return 'unknown';
+  }
+  const marker = '/out/';
+  const markerIndex = normalized.lastIndexOf(marker);
+  return markerIndex >= 0 ? normalized.slice(markerIndex + 1) : normalized;
 }
 
 function setSyncStatus(message, syncing, error = false) {

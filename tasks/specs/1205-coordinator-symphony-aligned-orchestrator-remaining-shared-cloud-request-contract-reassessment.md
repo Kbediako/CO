@@ -1,10 +1,10 @@
 ---
 id: 20260315-1205-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment
 title: Coordinator Symphony-Aligned Orchestrator Remaining Shared Cloud Request-Contract Reassessment
-status: draft
+status: done
 owner: Codex
 created: 2026-03-15
-last_review: 2026-04-15
+last_review: 2026-05-16
 review_cadence_days: 30
 risk_level: medium
 related_prd: docs/PRD-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment.md
@@ -13,6 +13,7 @@ related_tasks:
   - tasks/tasks-1205-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment.md
 review_notes:
   - 2026-03-15: Local read-only review approves a reassessment-first lane here. Shared environment-id and branch contracts are already first-class, and the remaining nearby surfaces appear to be distinct preflight, execution, and evidence responsibilities rather than one truthful shared request contract. Evidence: `orchestrator/src/cli/services/orchestratorCloudEnvironmentResolution.ts`, `orchestrator/src/cli/services/orchestratorCloudBranchResolution.ts`, `orchestrator/src/cli/services/orchestratorCloudTargetExecutor.ts`, `orchestrator/src/cli/services/orchestratorCloudRouteShell.ts`, `orchestrator/src/cli/services/orchestratorAutoScoutEvidenceRecorder.ts`, `orchestrator/src/cli/utils/cloudPreflight.ts`, `docs/findings/1205-orchestrator-remaining-shared-cloud-request-contract-reassessment-deliberation.md`.
+  - 2026-05-16: CO-545 strict spec-guard audit reclassified this stale Apr 14/15 row as inactive done; same-file checklist `tasks/tasks-1205-coordinator-symphony-aligned-orchestrator-remaining-shared-cloud-request-contract-reassessment.md` has 17 checked items and 0 unchecked items, so the old draft status was stale metadata rather than active implementation work.
 ---
 
 # Technical Specification

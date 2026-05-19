@@ -1,6 +1,6 @@
-import { createWriteStream } from 'node:fs';
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { createWriteStream, statSync } from 'node:fs';
+import { readFile, readdir } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import type { ExecEvent, UnifiedExecRunResult } from '../../../../packages/orchestrator/src/index.js';
 import { ToolInvocationFailedError } from '../../../../packages/orchestrator/src/index.js';
@@ -34,6 +34,7 @@ import {
   coerceReviewFindingPriority,
   coerceReviewSemanticVerdict,
   deriveReviewOutcomeDisposition,
+  formatReviewContractTelemetrySummary,
   formatReviewSemanticVerdictSummary,
   type ReviewOutcomeDisposition
 } from '../../../../scripts/lib/review-execution-telemetry.js';
@@ -116,8 +117,16 @@ interface ReviewTelemetryEvidencePayload {
   review_verdict?: unknown;
   highest_finding_priority?: unknown;
   finding_count?: unknown;
+  contract_path?: unknown;
+  contract_mode?: unknown;
+  contract_validation?: unknown;
+  contract_overall_verdict?: unknown;
+  axis_verdicts?: unknown;
+  axis_finding_counts?: unknown;
+  proposal_counts?: unknown;
   error?: unknown;
   termination_boundary?: unknown;
+  launch_context?: unknown;
 }
 
 interface ReviewEvidenceMismatch {
@@ -126,6 +135,30 @@ interface ReviewEvidenceMismatch {
   telemetryStatus: string | null;
   telemetryGeneratedAt: string | null;
   telemetryOutputLogPath: string | null;
+}
+
+interface ReviewTelemetryEvidenceSource {
+  label: string;
+  repoRoot: string;
+  runDir: string;
+  telemetryPath: string;
+  outputLogPath: string;
+  expectedOutputLogPath: string;
+  topLevel: boolean;
+}
+
+interface ProviderReviewTelemetryEvidence extends ReviewTelemetryEvidenceSource {
+  telemetry: ReviewTelemetryEvidencePayload;
+  generatedAt: string | null;
+  manifestCompletedAt: string | null;
+}
+
+interface ProviderNestedReviewRunCandidate {
+  repoRoot: string;
+  runDir: string;
+  taskEntry: string;
+  runEntry: string;
+  proofLinked: boolean;
 }
 
 export async function runCommandStage(
@@ -426,6 +459,13 @@ export async function runCommandStage(
       providerReviewTelemetryMismatch === null
         ? reviewTelemetry
         : null;
+    let providerReviewTelemetrySource =
+      providerLinearWorkerStage && providerReviewTelemetry !== null
+        ? buildTopLevelReviewTelemetryEvidenceSource({ env, paths, telemetryPath: reviewTelemetryPath })
+        : null;
+    const providerReviewTelemetryExpectedPath = providerLinearWorkerStage
+      ? relativeToRepo(env, reviewTelemetryPath)
+      : null;
     const reviewEvidenceWaiverReason = resolveReviewEvidenceWaiverReason(stage.env);
     let effectiveSummary = summary;
     let forceReviewEvidenceFailure = false;
@@ -523,10 +563,12 @@ export async function runCommandStage(
           paths,
           startedAt: proofAttemptStartedAt,
           telemetry: providerReviewTelemetry,
-          telemetryPath: reviewTelemetryPath
+          telemetryPath: providerReviewTelemetrySource?.telemetryPath ?? reviewTelemetryPath,
+          expectedOutputLogPath: providerReviewTelemetrySource?.expectedOutputLogPath
         }) !== null
       ) {
         providerReviewTelemetry = null;
+        providerReviewTelemetrySource = null;
         reviewOutputLogNoiseSummary = null;
       }
       if (requiresProviderReviewSemanticVerdict && providerReviewTelemetry === null) {
@@ -542,18 +584,65 @@ export async function runCommandStage(
         });
         if (awaitedReviewTelemetry) {
           providerReviewTelemetry = awaitedReviewTelemetry;
+          providerReviewTelemetrySource = buildTopLevelReviewTelemetryEvidenceSource({
+            env,
+            paths,
+            telemetryPath: reviewTelemetryPath
+          });
           reviewOutputLogNoiseSummary = await formatReviewOutputLogNoiseSummary({
             paths,
-            telemetry: providerReviewTelemetry
+            telemetry: providerReviewTelemetry,
+            outputLogPath: providerReviewTelemetrySource.outputLogPath
+          });
+        }
+      }
+      if (requiresProviderReviewSemanticVerdict && providerReviewTelemetry === null) {
+        const nestedReviewEvidence = await loadProviderLinearWorkerNestedReviewTelemetryEvidence({
+          env,
+          paths,
+          proof: providerLinearWorkerProofRecord,
+          proofAttemptStartedAt
+        });
+        if (nestedReviewEvidence) {
+          providerReviewTelemetry = nestedReviewEvidence.telemetry;
+          providerReviewTelemetrySource = nestedReviewEvidence;
+          reviewOutputLogNoiseSummary = await formatReviewOutputLogNoiseSummary({
+            paths,
+            telemetry: providerReviewTelemetry,
+            outputLogPath: nestedReviewEvidence.outputLogPath
           });
         }
       }
       const reviewTelemetryStatus = coerceTelemetryStatusValue(providerReviewTelemetry?.status);
-      const reviewOutcomeSummary = formatReviewTelemetryOutcomeSummary(providerReviewTelemetry);
+      const requiresGovernedContract = requiresGovernedReviewContract(execEnv);
+      let reviewOutcomeSummary = appendReviewContractRequirementSummary(
+        formatReviewTelemetryOutcomeSummary(providerReviewTelemetry),
+        providerReviewTelemetry,
+        requiresGovernedContract
+      );
+      const reviewEvidenceSourceSummary = formatReviewTelemetryEvidenceSourceSummary(
+        providerReviewTelemetrySource,
+        env
+      );
+      if (reviewEvidenceSourceSummary) {
+        reviewOutcomeSummary = appendReviewOutcomeSummaryDetail(
+          reviewOutcomeSummary,
+          reviewEvidenceSourceSummary
+        );
+      }
       const reviewSemanticVerdict = providerReviewTelemetry
-        ? resolveReviewSemanticVerdict(providerReviewTelemetry)
+        ? resolveReviewSemanticVerdict(providerReviewTelemetry, {
+            requireContract: requiresGovernedContract
+          })
         : requiresProviderReviewSemanticVerdict
           ? 'unknown'
+          : null;
+      const governedReviewHandoffFailureReason =
+        requiresProviderReviewSemanticVerdict && requiresGovernedContract
+          ? resolveGovernedReviewHandoffFailureReason(
+              providerReviewTelemetry,
+              providerReviewTelemetrySource ?? buildTopLevelReviewTelemetryEvidenceSource({ env, paths, telemetryPath: reviewTelemetryPath })
+            )
           : null;
       providerLinearWorkerReviewOutcomeSummary = reviewOutcomeSummary;
       const mutationSuppressions = deriveDeterministicProviderMutationSuppressions(
@@ -585,6 +674,21 @@ export async function runCommandStage(
           degradationSummary
         });
         forceProviderLinearWorkerFailure = true;
+      } else if (providerLinearWorkerFailureReason === null && governedReviewHandoffFailureReason) {
+        const governedReviewOutcomeSummary = appendReviewOutcomeSummaryDetail(
+          reviewOutcomeSummary,
+          `governed review handoff failed: ${governedReviewHandoffFailureReason}`
+        );
+        providerLinearWorkerReviewOutcomeSummary = governedReviewOutcomeSummary;
+        providerLinearWorkerFailureReason = 'provider_linear_worker_review_not_clean';
+        effectiveSummary = buildProviderLinearWorkerTerminalSummary({
+          status: 'failed',
+          endReason: 'governed_review_handoff_not_clean',
+          reviewOutcomeSummary: governedReviewOutcomeSummary,
+          reviewOutputLogNoiseSummary,
+          degradationSummary
+        });
+        forceProviderLinearWorkerFailure = true;
       } else if (
         providerLinearWorkerFailureReason === null &&
         requiresProviderReviewSemanticVerdict &&
@@ -604,7 +708,10 @@ export async function runCommandStage(
         requiresProviderReviewSemanticVerdict &&
         reviewSemanticVerdict === 'unknown'
       ) {
-        const unknownReviewOutcomeSummary = reviewOutcomeSummary ?? 'semantic review verdict: unknown';
+        const unknownReviewOutcomeSummary = appendReviewOutcomeSummaryDetail(
+          reviewOutcomeSummary ?? 'semantic review verdict: unknown',
+          `expected review telemetry path: ${providerReviewTelemetryExpectedPath ?? reviewTelemetryPath}`
+        );
         providerLinearWorkerReviewOutcomeSummary = unknownReviewOutcomeSummary;
         providerLinearWorkerFailureReason = 'provider_linear_worker_review_unknown';
         effectiveSummary = buildProviderLinearWorkerTerminalSummary({
@@ -708,6 +815,11 @@ export async function runCommandStage(
       if (providerLinearWorkerReviewOutcomeSummary) {
         errorDetails.review_outcome_summary = providerLinearWorkerReviewOutcomeSummary;
       }
+      if (providerReviewTelemetryExpectedPath) {
+        errorDetails.review_telemetry_path = providerReviewTelemetrySource
+          ? relativeToRepo(env, providerReviewTelemetrySource.telemetryPath)
+          : providerReviewTelemetryExpectedPath;
+      }
       if (proofLockSecondaryDiagnostics) {
         errorDetails.secondary_diagnostics = {
           provider_linear_worker_proof_lock: {
@@ -749,6 +861,11 @@ export async function runCommandStage(
       }
       if (providerLinearWorkerReviewOutcomeSummary) {
         errorDetails.review_outcome_summary = providerLinearWorkerReviewOutcomeSummary;
+      }
+      if (providerReviewTelemetryExpectedPath) {
+        errorDetails.review_telemetry_path = providerReviewTelemetrySource
+          ? relativeToRepo(env, providerReviewTelemetrySource.telemetryPath)
+          : providerReviewTelemetryExpectedPath;
       }
       if (stdoutTruncated) {
         errorDetails.stdout_truncated = true;
@@ -1003,6 +1120,7 @@ function verifyReviewTelemetryFreshness(options: {
   startedAt: string | null | undefined;
   telemetry: ReviewTelemetryEvidencePayload;
   telemetryPath: string;
+  expectedOutputLogPath?: string;
 }): ReviewEvidenceMismatch | null {
   const { env, paths, startedAt, telemetry, telemetryPath } = options;
   const generatedAt =
@@ -1040,10 +1158,12 @@ function verifyReviewTelemetryFreshness(options: {
     };
   }
 
-  const expectedOutputLogPath = relativeToRepo(
-    env,
-    join(paths.runDir, 'review', 'output.log')
-  );
+  const expectedOutputLogPath =
+    options.expectedOutputLogPath ??
+    relativeToRepo(
+      env,
+      join(paths.runDir, 'review', 'output.log')
+    );
   const telemetryStatus = coerceTelemetryString(telemetry.status);
   const telemetryOutputLogPath = coerceTelemetryString(telemetry.output_log_path);
   if (telemetryOutputLogPath !== expectedOutputLogPath) {
@@ -1106,6 +1226,317 @@ async function readReviewTelemetryEvidence(
   } catch {
     return null;
   }
+}
+
+async function readJsonFile<T>(path: string): Promise<T | null> {
+  try {
+    const raw = await readFile(path, 'utf8');
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function readDirectoryNames(path: string): Promise<string[]> {
+  try {
+    const entries = await readdir(path, { withFileTypes: true });
+    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+}
+
+async function loadProviderLinearWorkerNestedReviewTelemetryEvidence(options: {
+  env: EnvironmentPaths;
+  paths: RunPaths;
+  proof: Record<string, unknown> | null;
+  proofAttemptStartedAt: string | null;
+}): Promise<ProviderReviewTelemetryEvidence | null> {
+  const workspacePath = coerceTelemetryString(options.proof?.workspace_path);
+  const issueId = coerceTelemetryString(options.proof?.issue_id);
+  if (!workspacePath || !isAbsolute(workspacePath) || !issueId) {
+    return null;
+  }
+  const issueIdentifier = coerceTelemetryString(options.proof?.issue_identifier);
+  const parentRunId = basename(options.paths.runDir);
+  const runsRoots = resolveProviderLinearWorkerNestedReviewRunsRoots(options.env);
+  const runCandidates = new Map<string, ProviderNestedReviewRunCandidate>();
+  for (const candidate of collectProviderLinearWorkerProofNestedReviewRunCandidates(options.proof, {
+    issueId,
+    issueIdentifier,
+    workspacePath
+  })) {
+    if (!runsRoots.some((runsRoot) => isPathWithin(runsRoot, candidate.runDir))) {
+      continue;
+    }
+    runCandidates.set(resolve(candidate.runDir), candidate);
+  }
+  for (const runsRoot of runsRoots) {
+    const taskEntries = await resolveProviderLinearWorkerNestedReviewTaskEntries(runsRoot, issueId);
+    for (const taskEntry of taskEntries) {
+      const cliRoot = join(runsRoot, taskEntry, 'cli');
+      for (const runEntry of await readDirectoryNames(cliRoot)) {
+        const runDir = join(cliRoot, runEntry);
+        const key = resolve(runDir);
+        if (!runCandidates.has(key)) {
+          runCandidates.set(key, {
+            repoRoot: workspacePath,
+            runDir,
+            taskEntry,
+            runEntry,
+            proofLinked: false
+          });
+        }
+      }
+    }
+  }
+  const candidates: ProviderReviewTelemetryEvidence[] = [];
+
+  for (const candidate of runCandidates.values()) {
+    const manifest = await readJsonFile<Record<string, unknown>>(join(candidate.runDir, 'manifest.json'));
+    if (
+      !manifest ||
+      !isProviderLinearWorkerNestedReviewManifest(manifest, {
+        issueId,
+        issueIdentifier,
+        parentRunId,
+        proofLinked: candidate.proofLinked
+      })
+    ) {
+      continue;
+    }
+    const telemetryPath = join(candidate.runDir, 'review', 'telemetry.json');
+    const telemetry = await readReviewTelemetryEvidence(telemetryPath);
+    if (!telemetry) {
+      continue;
+    }
+    const evidenceSource = buildNestedReviewTelemetryEvidenceSource({
+      repoRoot: candidate.repoRoot,
+      taskEntry: candidate.taskEntry,
+      runEntry: candidate.runEntry,
+      runDir: candidate.runDir,
+      telemetryPath
+    });
+    const freshnessMismatch = verifyReviewTelemetryFreshness({
+      env: options.env,
+      paths: options.paths,
+      startedAt: options.proofAttemptStartedAt,
+      telemetry,
+      telemetryPath,
+      expectedOutputLogPath: evidenceSource.expectedOutputLogPath
+    });
+    if (freshnessMismatch) {
+      continue;
+    }
+    candidates.push({
+      ...evidenceSource,
+      telemetry,
+      generatedAt: coerceTelemetryString(telemetry.generated_at),
+      manifestCompletedAt:
+        coerceTelemetryString(manifest.completed_at) ??
+        coerceTelemetryString(manifest.updated_at) ??
+        coerceTelemetryString(manifest.started_at)
+    });
+  }
+
+  return candidates.sort(compareProviderReviewTelemetryEvidenceDesc)[0] ?? null;
+}
+
+function resolveProviderLinearWorkerNestedReviewRunsRoots(env: EnvironmentPaths): string[] {
+  return [resolve(env.runsRoot)];
+}
+
+function collectProviderLinearWorkerProofNestedReviewRunCandidates(
+  proof: Record<string, unknown> | null,
+  identity: { issueId: string; issueIdentifier: string | null; workspacePath: string }
+): ProviderNestedReviewRunCandidate[] {
+  const childStreams = Array.isArray(proof?.child_streams) ? proof.child_streams : [];
+  const candidates: ProviderNestedReviewRunCandidate[] = [];
+  for (const rawChildStream of childStreams) {
+    const childStream = coerceTelemetryRecord(rawChildStream);
+    if (!childStream || !isProviderLinearWorkerNestedReviewChildStream(childStream, identity)) {
+      continue;
+    }
+    const runDir = resolveProviderLinearWorkerNestedReviewChildStreamRunDir(
+      childStream,
+      identity.workspacePath
+    );
+    if (!runDir) {
+      continue;
+    }
+    candidates.push({
+      repoRoot: identity.workspacePath,
+      runDir,
+      taskEntry: coerceTelemetryString(childStream.task_id) ?? basename(dirname(dirname(runDir))),
+      runEntry: coerceTelemetryString(childStream.run_id) ?? basename(runDir),
+      proofLinked: true
+    });
+  }
+  return candidates;
+}
+
+function isProviderLinearWorkerNestedReviewChildStream(
+  childStream: Record<string, unknown>,
+  identity: { issueId: string; issueIdentifier: string | null }
+): boolean {
+  if (coerceTelemetryString(childStream.pipeline_id) !== 'implementation-gate') {
+    return false;
+  }
+  if (coerceTelemetryString(childStream.status) !== 'succeeded') {
+    return false;
+  }
+  if (coerceTelemetryString(childStream.issue_id) !== identity.issueId) {
+    return false;
+  }
+  if (
+    identity.issueIdentifier &&
+    coerceTelemetryString(childStream.issue_identifier) !== identity.issueIdentifier
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function resolveProviderLinearWorkerNestedReviewChildStreamRunDir(
+  childStream: Record<string, unknown>,
+  workspacePath: string
+): string | null {
+  const manifestPath = resolveProviderLinearWorkerNestedReviewChildStreamPath(
+    coerceTelemetryString(childStream.manifest_path),
+    workspacePath
+  );
+  if (manifestPath) {
+    return dirname(manifestPath);
+  }
+  return resolveProviderLinearWorkerNestedReviewChildStreamPath(
+    coerceTelemetryString(childStream.artifact_root),
+    workspacePath
+  );
+}
+
+function resolveProviderLinearWorkerNestedReviewChildStreamPath(
+  value: string | null,
+  workspacePath: string
+): string | null {
+  if (!value) {
+    return null;
+  }
+  return isAbsolute(value) ? resolve(value) : resolve(workspacePath, value);
+}
+
+async function resolveProviderLinearWorkerNestedReviewTaskEntries(
+  runsRoot: string,
+  issueId: string
+): Promise<string[]> {
+  const exactTaskEntry = `linear-${issueId}`;
+  const preferredEntries = new Set<string>([exactTaskEntry]);
+  const entries = await readDirectoryNames(runsRoot);
+  for (const entry of entries) {
+    if (entry === exactTaskEntry || entry.includes(issueId)) {
+      preferredEntries.add(entry);
+    }
+  }
+  return [...preferredEntries].filter((entry) => entries.includes(entry));
+}
+
+function isProviderLinearWorkerNestedReviewManifest(
+  manifest: Record<string, unknown>,
+  identity: { issueId: string; issueIdentifier: string | null; parentRunId: string; proofLinked: boolean }
+): boolean {
+  const pipelineId = coerceTelemetryString(manifest.pipeline_id) ?? coerceTelemetryString(manifest.pipelineId);
+  if (pipelineId !== 'implementation-gate') {
+    return false;
+  }
+  const status = coerceTelemetryString(manifest.status);
+  if (status !== 'succeeded') {
+    return false;
+  }
+  const manifestIssueId = coerceTelemetryString(manifest.issue_id) ?? coerceTelemetryString(manifest.issueId);
+  if (manifestIssueId && manifestIssueId !== identity.issueId) {
+    return false;
+  }
+  const manifestIssueIdentifier =
+    coerceTelemetryString(manifest.issue_identifier) ?? coerceTelemetryString(manifest.issueIdentifier);
+  if (
+    identity.issueIdentifier &&
+    manifestIssueIdentifier &&
+    manifestIssueIdentifier !== identity.issueIdentifier
+  ) {
+    return false;
+  }
+  const manifestIssueMatches = Boolean(
+    manifestIssueId === identity.issueId ||
+      (identity.issueIdentifier && manifestIssueIdentifier === identity.issueIdentifier)
+  );
+  const manifestParentRunId =
+    coerceTelemetryString(manifest.parent_run_id) ?? coerceTelemetryString(manifest.parentRunId);
+  const manifestLineageMatches = manifestParentRunId === identity.parentRunId;
+  return manifestIssueMatches && (identity.proofLinked || manifestLineageMatches);
+}
+
+function buildTopLevelReviewTelemetryEvidenceSource(options: {
+  env: EnvironmentPaths;
+  paths: RunPaths;
+  telemetryPath: string;
+}): ReviewTelemetryEvidenceSource {
+  const outputLogPath = join(options.paths.runDir, 'review', 'output.log');
+  return {
+    label: 'parent provider run',
+    repoRoot: options.env.repoRoot,
+    runDir: options.paths.runDir,
+    telemetryPath: options.telemetryPath,
+    outputLogPath,
+    expectedOutputLogPath: relativeToRepo(options.env, outputLogPath),
+    topLevel: true
+  };
+}
+
+function buildNestedReviewTelemetryEvidenceSource(options: {
+  repoRoot: string;
+  taskEntry: string;
+  runEntry: string;
+  runDir: string;
+  telemetryPath: string;
+}): ReviewTelemetryEvidenceSource {
+  const outputLogPath = join(options.runDir, 'review', 'output.log');
+  return {
+    label: `nested implementation-gate ${options.taskEntry}/${options.runEntry}`,
+    repoRoot: options.repoRoot,
+    runDir: options.runDir,
+    telemetryPath: options.telemetryPath,
+    outputLogPath,
+    expectedOutputLogPath: relative(options.repoRoot, outputLogPath),
+    topLevel: false
+  };
+}
+
+function compareProviderReviewTelemetryEvidenceDesc(
+  left: ProviderReviewTelemetryEvidence,
+  right: ProviderReviewTelemetryEvidence
+): number {
+  const recency = compareOptionalIsoTimestampDesc(
+    left.generatedAt ?? left.manifestCompletedAt,
+    right.generatedAt ?? right.manifestCompletedAt
+  );
+  if (recency !== 0) {
+    return recency;
+  }
+  return right.runDir.localeCompare(left.runDir);
+}
+
+function compareOptionalIsoTimestampDesc(left: string | null | undefined, right: string | null | undefined): number {
+  const leftMs = typeof left === 'string' ? Date.parse(left) : Number.NaN;
+  const rightMs = typeof right === 'string' ? Date.parse(right) : Number.NaN;
+  if (Number.isFinite(leftMs) && Number.isFinite(rightMs)) {
+    return rightMs - leftMs;
+  }
+  if (Number.isFinite(leftMs)) {
+    return -1;
+  }
+  if (Number.isFinite(rightMs)) {
+    return 1;
+  }
+  return 0;
 }
 
 async function loadProviderLinearWorkerProof(
@@ -1214,6 +1645,13 @@ function coerceTelemetryString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function coerceTelemetryRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
 function coerceTelemetryStatusValue(value: unknown): 'succeeded' | 'failed' | null {
   if (value === 'succeeded' || value === 'failed') {
     return value;
@@ -1276,6 +1714,26 @@ function resolveReviewTelemetryOutcomeDisposition(
   return explicitDisposition === derivedDisposition ? explicitDisposition : derivedDisposition;
 }
 
+function resolveStrictReviewTelemetryOutcomeDisposition(
+  telemetry: ReviewTelemetryEvidencePayload | null
+): ReviewOutcomeDisposition | null {
+  if (!telemetry) {
+    return null;
+  }
+  const explicitDisposition = coerceReviewOutcomeDisposition(telemetry.review_outcome);
+  const telemetryStatus = coerceTelemetryStatusValue(telemetry.status);
+  if (!explicitDisposition || !telemetryStatus) {
+    return null;
+  }
+  const derivedDisposition = deriveReviewOutcomeDisposition({
+    status: telemetryStatus,
+    terminationBoundary: hasTelemetryTerminationBoundary(telemetry)
+      ? REVIEW_OUTCOME_BOUNDARY_PRESENCE_SENTINEL
+      : null
+  });
+  return explicitDisposition === derivedDisposition ? explicitDisposition : null;
+}
+
 function formatReviewTelemetryOutcomeSummary(
   telemetry: ReviewTelemetryEvidencePayload | null
 ): string | null {
@@ -1305,16 +1763,259 @@ function formatReviewTelemetryOutcomeSummary(
     highest_finding_priority: coerceReviewFindingPriority(telemetry?.highest_finding_priority),
     finding_count: coerceTelemetryFindingCount(telemetry?.finding_count)
   });
-  return semanticSummary ? `${outcomeSummary}; ${semanticSummary}` : outcomeSummary;
+  const contractSummary = formatReviewContractTelemetrySummary({
+    contract_mode: coerceReviewContractMode(telemetry?.contract_mode),
+    contract_validation: coerceReviewContractValidation(telemetry?.contract_validation),
+    contract_overall_verdict: coerceReviewContractAxisVerdict(telemetry?.contract_overall_verdict)
+  });
+  const proposalSummary = formatReviewContractProposalSummary(telemetry);
+  return [outcomeSummary, semanticSummary, contractSummary, proposalSummary].filter(Boolean).join('; ');
 }
 
 function resolveReviewSemanticVerdict(
-  telemetry: ReviewTelemetryEvidencePayload | null
+  telemetry: ReviewTelemetryEvidencePayload | null,
+  options: { requireContract?: boolean } = {}
 ): ReturnType<typeof coerceReviewSemanticVerdict> {
   if (!telemetry) {
     return null;
   }
+  if (options.requireContract || coerceTelemetryString(telemetry.contract_mode) === 'enforce') {
+    const validation = coerceReviewContractValidation(telemetry.contract_validation);
+    const overall = coerceReviewContractAxisVerdict(telemetry.contract_overall_verdict);
+    if (validation?.status !== 'valid') {
+      return 'unknown';
+    }
+    if (overall === 'clean') {
+      return 'clean';
+    }
+    if (overall === 'findings' || overall === 'blocked') {
+      return 'findings';
+    }
+    return 'unknown';
+  }
   return coerceReviewSemanticVerdict(telemetry.review_verdict) ?? 'unknown';
+}
+
+function requiresGovernedReviewContract(env: NodeJS.ProcessEnv): boolean {
+  const configured = coerceTelemetryString(env.CODEX_REVIEW_CONTRACT_MODE)?.toLowerCase();
+  if (configured) {
+    return configured === 'enforce';
+  }
+  return envFlagEnabled(env.CODEX_REVIEW_AUTHORITATIVE_GATE);
+}
+
+function envFlagEnabled(value: string | undefined): boolean {
+  if (value === undefined) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
+
+function coerceReviewContractMode(value: unknown): 'off' | 'shadow' | 'enforce' | null {
+  return value === 'off' || value === 'shadow' || value === 'enforce' ? value : null;
+}
+
+function coerceReviewContractAxisVerdict(
+  value: unknown
+): 'clean' | 'findings' | 'blocked' | 'unknown' | null {
+  return value === 'clean' || value === 'findings' || value === 'blocked' || value === 'unknown'
+    ? value
+    : null;
+}
+
+function coerceReviewContractValidation(value: unknown): {
+  status: 'off' | 'missing' | 'invalid' | 'valid';
+  errors: string[];
+} | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const status = record.status;
+  if (!(status === 'off' || status === 'missing' || status === 'invalid' || status === 'valid')) {
+    return null;
+  }
+  const errors = Array.isArray(record.errors)
+    ? record.errors.filter((entry): entry is string => typeof entry === 'string')
+    : [];
+  return { status, errors };
+}
+
+function formatReviewContractProposalSummary(
+  telemetry: ReviewTelemetryEvidencePayload | null
+): string | null {
+  const counts = telemetry?.proposal_counts;
+  if (!counts || typeof counts !== 'object' || Array.isArray(counts)) {
+    return null;
+  }
+  const record = counts as Record<string, unknown>;
+  const codeChange = coerceTelemetryFindingCount(record.code_change) ?? 0;
+  const agentLoop = coerceTelemetryFindingCount(record.agent_loop) ?? 0;
+  if (codeChange === 0 && agentLoop === 0) {
+    return null;
+  }
+  return `review contract proposals: code_change=${codeChange}, agent_loop=${agentLoop}`;
+}
+
+function appendReviewContractRequirementSummary(
+  summary: string | null,
+  telemetry: ReviewTelemetryEvidencePayload | null,
+  required: boolean
+): string | null {
+  if (!required) {
+    return summary;
+  }
+  if (!telemetry) {
+    return [summary, 'review contract: required but telemetry is missing'].filter(Boolean).join('; ');
+  }
+  const validation = coerceReviewContractValidation(telemetry.contract_validation);
+  if (validation) {
+    return summary;
+  }
+  return [summary, 'review contract: required but missing'].filter(Boolean).join('; ');
+}
+
+function appendReviewOutcomeSummaryDetail(summary: string | null, detail: string): string {
+  return [summary, detail].filter(Boolean).join('; ');
+}
+
+function formatReviewTelemetryEvidenceSourceSummary(
+  source: ReviewTelemetryEvidenceSource | null,
+  env: EnvironmentPaths
+): string | null {
+  if (!source || source.topLevel) {
+    return null;
+  }
+  return `review evidence source: ${source.label} (${relativeToRepo(env, source.telemetryPath)})`;
+}
+
+function resolveGovernedReviewHandoffFailureReason(
+  telemetry: ReviewTelemetryEvidencePayload | null,
+  source: ReviewTelemetryEvidenceSource
+): string | null {
+  if (!telemetry) {
+    return null;
+  }
+  const disposition = resolveStrictReviewTelemetryOutcomeDisposition(telemetry);
+  if (!disposition) {
+    return 'review outcome is missing or invalid';
+  }
+  if (disposition !== 'clean-success') {
+    return `review outcome is ${disposition}`;
+  }
+  const validation = coerceReviewContractValidation(telemetry.contract_validation);
+  const overall = coerceReviewContractAxisVerdict(telemetry.contract_overall_verdict);
+  if (validation?.status !== 'valid' || overall !== 'clean') {
+    return null;
+  }
+  const contractArtifactFailure = resolveGovernedReviewContractArtifactFailureReason(
+    telemetry,
+    source
+  );
+  if (contractArtifactFailure) {
+    return contractArtifactFailure;
+  }
+  const launchContext = coerceTelemetryRecord(telemetry.launch_context);
+  const launchFailure = resolveGovernedReviewLaunchContextFailureReason(launchContext);
+  if (launchFailure) {
+    return launchFailure;
+  }
+  const proposalCounts = coerceReviewContractProposalCounts(telemetry.proposal_counts);
+  if ((proposalCounts?.agent_loop ?? 0) > 0) {
+    return 'agent-loop proposals require routing before handoff';
+  }
+  return null;
+}
+
+function resolveGovernedReviewContractArtifactFailureReason(
+  telemetry: ReviewTelemetryEvidencePayload,
+  source: ReviewTelemetryEvidenceSource
+): string | null {
+  const contractPath = coerceTelemetryString(telemetry.contract_path);
+  if (!contractPath) {
+    return 'review contract path is missing';
+  }
+  const artifactPath = resolveReviewContractArtifactPath(contractPath, source);
+  if (!artifactPath) {
+    return `review contract path is ${contractPath}`;
+  }
+  try {
+    const artifact = statSync(artifactPath);
+    if (!artifact.isFile()) {
+      return 'review contract artifact is not a file';
+    }
+  } catch {
+    return 'review contract artifact is missing';
+  }
+  return null;
+}
+
+function resolveReviewContractArtifactPath(
+  contractPath: string,
+  source: ReviewTelemetryEvidenceSource
+): string | null {
+  const runDir = resolve(source.runDir);
+  const artifactPath =
+    contractPath === 'review/contract.json'
+      ? resolve(runDir, contractPath)
+      : isAbsolute(contractPath)
+        ? resolve(contractPath)
+        : resolve(source.repoRoot, contractPath);
+  if (!isPathWithin(runDir, artifactPath)) {
+    return null;
+  }
+  return artifactPath;
+}
+
+function isPathWithin(parent: string, child: string): boolean {
+  const path = relative(resolve(parent), resolve(child));
+  return path === '' || (!path.startsWith('..') && !isAbsolute(path));
+}
+
+function resolveGovernedReviewLaunchContextFailureReason(
+  launchContext: Record<string, unknown> | null
+): string | null {
+  if (!launchContext) {
+    return 'review launch context is missing';
+  }
+  const legacyFallbackAttempt = coerceTelemetryString(launchContext?.legacy_fallback_attempt);
+  if (legacyFallbackAttempt) {
+    return `review launch used legacy fallback ${legacyFallbackAttempt}`;
+  }
+  const transport = coerceTelemetryString(launchContext.transport);
+  if (transport !== 'codex-exec-output-schema') {
+    return `review launch transport is ${transport ?? 'missing'}`;
+  }
+  const promptDelivery = coerceTelemetryString(launchContext.prompt_delivery);
+  if (promptDelivery !== 'stdin') {
+    return `review prompt delivery is ${promptDelivery ?? 'missing'}`;
+  }
+  const contextTransport = coerceTelemetryString(launchContext.reviewer_visible_context_transport);
+  if (contextTransport !== 'stdin-prompt') {
+    return `reviewer-visible context transport is ${contextTransport ?? 'missing'}`;
+  }
+  if (!coerceTelemetryString(launchContext.output_schema_path)) {
+    return 'review output schema path is missing';
+  }
+  if (!coerceTelemetryString(launchContext.output_last_message_path)) {
+    return 'review output last-message path is missing';
+  }
+  return null;
+}
+
+function coerceReviewContractProposalCounts(value: unknown): {
+  code_change: number;
+  agent_loop: number;
+} | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  return {
+    code_change: coerceTelemetryFindingCount(record.code_change) ?? 0,
+    agent_loop: coerceTelemetryFindingCount(record.agent_loop) ?? 0
+  };
 }
 
 function coerceTelemetryFindingCount(value: unknown): number | null {
@@ -1324,6 +2025,7 @@ function coerceTelemetryFindingCount(value: unknown): number | null {
 async function formatReviewOutputLogNoiseSummary(options: {
   paths: RunPaths;
   telemetry: ReviewTelemetryEvidencePayload | null;
+  outputLogPath?: string;
 }): Promise<string | null> {
   const explicitDisposition = coerceReviewOutcomeDisposition(options.telemetry?.review_outcome);
   if (explicitDisposition !== 'clean-success' && explicitDisposition !== 'bounded-success') {
@@ -1338,7 +2040,7 @@ async function formatReviewOutputLogNoiseSummary(options: {
   }
 
   try {
-    const outputLog = await readFile(join(options.paths.runDir, 'review', 'output.log'), 'utf8');
+    const outputLog = await readFile(options.outputLogPath ?? join(options.paths.runDir, 'review', 'output.log'), 'utf8');
     const observedCleanupNoise = outputLog
       .split(/\r?\n/u)
       .some((line) => REVIEW_ROLLOUT_ITEM_THREAD_NOT_FOUND_LOG_LINE_PATTERN.test(line));

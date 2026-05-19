@@ -1,6 +1,7 @@
 # CO-345 Evidence Book: Local Hook Impact
 
-Date: 2026-04-24
+Original date: 2026-04-24
+Reviewed: 2026-05-18
 
 Scope: docs-only child lane for CO-345. This page covers local Codex hook impact only. It does not change hook configuration, repo policy, README content, task packets, Linear state, or PR state.
 

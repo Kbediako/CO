@@ -133,9 +133,9 @@ If you need delegation to respect a repo’s `.codex/orchestrator.toml` (e.g., s
 
 ## Version guard (JSONL handshake)
 
-Delegation MCP expects JSONL. Keep `codex-orchestrator` aligned with the current CO compatibility or adoption target (`codex-cli 0.128.0` for local ChatGPT-auth/appserver posture) unless a task-scoped canary is explicitly evaluating something newer.
+Delegation MCP expects JSONL. Keep `codex-orchestrator` aligned with the current CO compatibility or adoption target (`codex-cli 0.130.0` for local ChatGPT-auth/appserver posture) unless a task-scoped canary is explicitly evaluating something newer.
 
-Current `0.128.0` CO-local posture also confirms that:
+Current `0.130.0` CO-local posture also confirms that:
 - `codex exec` accepts a prompt argument plus piped stdin, with stdin appended as a `<stdin>` block.
 - `codex login --device-auth` is available for non-browser sign-in fallback.
 - App-server model/list evidence under ChatGPT auth can vary by account; keep `gpt-5.4` only as the fallback packaged default because it may still appear as the app-server `isDefault`.
@@ -157,14 +157,14 @@ Current `0.128.0` CO-local posture also confirms that:
 - `spawn_agent` omission defaults to `default`; require explicit `agent_type` for every spawn.
 - For symbolic collab runs, include a first-line role tag in spawned prompts: `[agent_type:<role>]`.
 - Multi-turn subagent loops are supported (`spawn_agent` -> `send_input` -> `wait`/`resume_agent` -> `close_agent`).
-- In Codex CLI `0.128.0`, built-in `explorer` continues to inherit top-level defaults unless overridden in `~/.codex/config.toml`.
+- In Codex CLI `0.130.0`, built-in `explorer` continues to inherit top-level defaults unless overridden in `~/.codex/config.toml`.
 - Current model posture is `gpt-5.5` / `xhigh` when available in ChatGPT-auth Codex sessions.
 - Portable generated config keeps `gpt-5.4` / `xhigh` as fallback values.
 - Recommended packaged baseline:
   - `model = "gpt-5.4"`
   - `review_model = "gpt-5.4"`
   - `model_reasoning_effort = "xhigh"`
-  - For normal `features.multi_agent=true` and older Codex behavior, `[agents] max_threads = 12` is the seeded baseline. For Codex CLI `0.125+` with `features.multi_agent_v2=true`, do not write or recommend `agents.max_threads`; upstream rejects the key, so doctor/default setup must omit it. Keep explicit `max_depth = 4` only when your local Codex parser accepts it, and treat `max_spawn_depth` as a legacy local override rather than current baseline guidance
+  - For normal `features.multi_agent=true` and older Codex behavior, `[agents] max_threads = 12` is the seeded baseline. For Codex CLI `0.125+` with `features.multi_agent_v2=true`, do not write or recommend `agents.max_threads`; upstream rejects the key, so doctor/default setup must omit it. For Codex CLI `0.128+`, the v2-specific cap `features.multi_agent_v2.max_concurrent_threads_per_session` is user-owned tuning and CO does not seed it by default. Keep explicit `max_depth = 4` only when your local Codex parser accepts it, and treat `max_spawn_depth` as a legacy local override rather than current baseline guidance
   - Leave `[agents.explorer]` undefined unless you intentionally want to override built-in explorer behavior.
   - Add optional `[agents.explorer_fast]` for `gpt-5.3-codex-spark` (file/codebase search only).
   - Add optional `[agents.awaiter]` override for `gpt-5.4` + `high` while preserving awaiter instructions.

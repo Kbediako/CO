@@ -4,7 +4,7 @@ title: Coordinator Live Linear Unassigned Active-Claim Alignment and Recovery
 status: in_progress
 owner: Codex
 created: 2026-03-23
-last_review: 2026-04-23
+last_review: 2026-05-18
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md
@@ -17,6 +17,7 @@ review_notes:
   - 2026-03-23: The current mismatch is internal to CO: fresh dispatch already accepts viewer-owned or unassigned issues, while existing-claim eligibility still treats `assignee_id: null` as a reassignment away from Codex.
   - 2026-03-23: The already-stuck live claim also needs a small refresh recovery seam because released claims currently reopen only on newer `updated_at`.
   - 2026-04-23: CO-321 freshness review retained this as an active historical remediation spec rather than archive/reclassification. The checklist records implementation, focused regressions, validation floor, and live `CO-3` recovery proof as complete; separate delivery closeout checkboxes remain in the task mirror and stay outside this tasks/specs-only refresh.
+  - 2026-05-18: CO-522 active-spec audit found 3 unchecked task checklist items, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 # Technical Specification

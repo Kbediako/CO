@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   evaluateTrackerDispatchPilot,
   evaluateTrackerDispatchPilotAsync,
+  resolveTrackerDispatchSourceSetup,
   summarizeTrackerDispatchPilotPolicy
 } from '../src/cli/control/trackerDispatchPilot.js';
 
@@ -24,6 +25,100 @@ describe('TrackerDispatchPilot', () => {
     });
     expect(evaluation.recommendation).toBeNull();
     expect(evaluation.failure).toBeNull();
+  });
+
+  it('resolves configured source binding for existing-claim reads while dispatch pilot is disabled', () => {
+    const resolution = resolveTrackerDispatchSourceSetup({
+      featureToggles: {
+        dispatch_pilot: {
+          enabled: false,
+          source: {
+            provider: 'linear',
+            live: true,
+            workspace_id: 'workspace-1',
+            team_id: 'team-1',
+            project_id: 'project-1'
+          }
+        }
+      },
+      env: {} as NodeJS.ProcessEnv
+    });
+
+    expect(resolution).toEqual({
+      sourceSetup: {
+        provider: 'linear',
+        workspace_id: 'workspace-1',
+        team_id: 'team-1',
+        project_id: 'project-1'
+      }
+    });
+  });
+
+  it('does not require advisory recommendation fields for existing-claim source binding reads', () => {
+    const resolution = resolveTrackerDispatchSourceSetup({
+      featureToggles: {
+        dispatch_pilot: {
+          enabled: false,
+          source: {
+            provider: 'linear',
+            team_id: 'team-1'
+          }
+        }
+      },
+      env: {} as NodeJS.ProcessEnv
+    });
+
+    expect(resolution).toEqual({
+      sourceSetup: {
+        provider: 'linear',
+        workspace_id: null,
+        team_id: 'team-1',
+        project_id: null
+      }
+    });
+  });
+
+  it('applies Linear source binding env fallbacks for existing-claim reads', () => {
+    const resolution = resolveTrackerDispatchSourceSetup({
+      featureToggles: {
+        dispatch_pilot: {
+          enabled: false,
+          source: {
+            provider: 'linear',
+            live: true
+          }
+        }
+      },
+      env: {
+        CO_LINEAR_WORKSPACE_ID: 'workspace-env',
+        CO_LINEAR_TEAM_ID: 'team-env',
+        CO_LINEAR_PROJECT_ID: 'project-env'
+      } as NodeJS.ProcessEnv
+    });
+
+    expect(resolution).toEqual({
+      sourceSetup: {
+        provider: 'linear',
+        workspace_id: 'workspace-env',
+        team_id: 'team-env',
+        project_id: 'project-env'
+      }
+    });
+  });
+
+  it('keeps configured source binding fail-closed when the dispatch source is missing', () => {
+    const resolution = resolveTrackerDispatchSourceSetup({
+      featureToggles: {
+        dispatch_pilot: {
+          enabled: false
+        }
+      }
+    });
+
+    expect(resolution).toEqual({
+      status: 503,
+      error: 'dispatch_source_unavailable'
+    });
   });
 
   it('returns advisory recommendation when enabled with valid static source', () => {

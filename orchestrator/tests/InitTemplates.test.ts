@@ -158,6 +158,67 @@ describe('initCodexTemplates', () => {
     }
   });
 
+  it('omits max_threads when global multi_agent_v2 is enabled in table form with a user-owned cap', async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-init-multi-agent-v2-table-cap-'));
+    const codexHome = await mkdtemp(path.join(os.tmpdir(), 'codex-home-init-v2-table-cap-'));
+
+    try {
+      await writeFile(
+        path.join(codexHome, 'config.toml'),
+        [
+          '[features.multi_agent_v2]',
+          'enabled = true',
+          'max_concurrent_threads_per_session = 7',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
+
+      await initCodexTemplates({
+        template: 'codex',
+        cwd: tempDir,
+        force: false,
+        env: buildInitEnv(codexHome)
+      });
+
+      const codexConfig = await readFile(path.join(tempDir, '.codex', 'config.toml'), 'utf8');
+      expect(codexConfig).not.toContain('max_threads');
+      expect(codexConfig).toContain('[agents.explorer_fast]');
+    } finally {
+      await rm(codexHome, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps max_threads when only global top-level multi_agent_v2 settings are configured', async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-init-multi-agent-v2-top-level-settings-'));
+    const codexHome = await mkdtemp(path.join(os.tmpdir(), 'codex-home-init-v2-top-level-settings-'));
+
+    try {
+      await writeFile(
+        path.join(codexHome, 'config.toml'),
+        [
+          '[multi_agent_v2]',
+          'enabled = true',
+          'max_concurrent_threads_per_session = 7',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
+
+      await initCodexTemplates({
+        template: 'codex',
+        cwd: tempDir,
+        force: false,
+        env: buildInitEnv(codexHome)
+      });
+
+      const codexConfig = await readFile(path.join(tempDir, '.codex', 'config.toml'), 'utf8');
+      expect(codexConfig).toContain('max_threads = 12');
+    } finally {
+      await rm(codexHome, { recursive: true, force: true });
+    }
+  });
+
   it('keeps max_threads when the feature probe explicitly disables multi_agent_v2', async () => {
     tempDir = await mkdtemp(path.join(os.tmpdir(), 'codex-init-multi-agent-v2-false-'));
     const codexHome = await mkdtemp(path.join(os.tmpdir(), 'codex-home-init-v2-false-'));

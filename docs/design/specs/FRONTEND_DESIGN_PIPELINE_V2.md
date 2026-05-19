@@ -1,5 +1,8 @@
 ---
-last_review: 2026-04-19
+last_review: 2026-05-18
+status: active
+review_notes:
+  - 2026-05-18: CO-522 active-spec audit reviewed this standalone design spec as still normative frontend design-pipeline guidance; it has no terminal task packet to archive, so it remains active. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 # Technical Spec — CO Frontend Design Pipeline v2 (Task 0412-frontend-design-pipeline-v2)

@@ -117,13 +117,10 @@ function normalizeClassMap(raw) {
   return result;
 }
 
-export async function loadDocsCatalog(repoRoot, relativePath = DEFAULT_DOCS_CATALOG_PATH) {
-  const absolutePath = path.resolve(repoRoot, relativePath);
-  const raw = JSON.parse(await readFile(absolutePath, 'utf8'));
-
+export function normalizeDocsCatalog(raw, relativePath = DEFAULT_DOCS_CATALOG_PATH, absolutePath = '') {
   return {
     version: Number.isFinite(raw?.version) ? Number(raw.version) : 1,
-    relative_path: toPosixPath(path.relative(repoRoot, absolutePath)),
+    relative_path: toPosixPath(relativePath),
     absolute_path: absolutePath,
     classes: normalizeClassMap(raw?.classes),
     policies: isObject(raw?.policies) ? raw.policies : {},
@@ -134,6 +131,13 @@ export async function loadDocsCatalog(repoRoot, relativePath = DEFAULT_DOCS_CATA
       ? raw.patterns.map((entry) => normalizeCatalogRule(entry, 'pattern'))
       : []
   };
+}
+
+export async function loadDocsCatalog(repoRoot, relativePath = DEFAULT_DOCS_CATALOG_PATH) {
+  const absolutePath = path.resolve(repoRoot, relativePath);
+  const raw = JSON.parse(await readFile(absolutePath, 'utf8'));
+
+  return normalizeDocsCatalog(raw, path.relative(repoRoot, absolutePath), absolutePath);
 }
 
 export async function maybeLoadDocsCatalog(repoRoot, relativePath = DEFAULT_DOCS_CATALOG_PATH) {
@@ -193,6 +197,7 @@ export function summarizeDocsByClass(items, catalog) {
         missing_on_disk: 0,
         invalid_entries: 0,
         stale_entries: 0,
+        terminal_lifecycle_entries: 0,
         uncatalogued_docs: 0
       });
     }
@@ -213,6 +218,8 @@ export function summarizeDocsByClass(items, catalog) {
       bucket.invalid_entries += 1;
     } else if (item.metric === 'stale_entries') {
       bucket.stale_entries += 1;
+    } else if (item.metric === 'terminal_lifecycle_entries') {
+      bucket.terminal_lifecycle_entries += 1;
     } else if (item.metric === 'uncatalogued_docs') {
       bucket.uncatalogued_docs += 1;
     }

@@ -2,7 +2,7 @@
 
 ## Stable Compatibility Vs Local Posture
 
-CO's current local ChatGPT-auth/appserver posture is Codex CLI `0.128.0` with `gpt-5.5` / `xhigh` when live access smoke passes. CO's current release-facing package/downstream-smoke compatibility target is Codex CLI `0.125.0`, and cloud execution remains separately gated by the canonical version policy.
+CO's current local ChatGPT-auth/appserver posture is Codex CLI `0.130.0` with `gpt-5.5` / `xhigh` when live access smoke passes. CO's current release-facing package/downstream-smoke compatibility target is Codex CLI `0.125.0`, and cloud execution remains separately gated by the canonical version policy.
 
 Newer stable and prerelease Codex CLI builds remain evidence-gated. The canonical policy is [docs/guides/codex-version-policy.md](../guides/codex-version-policy.md).
 
@@ -14,6 +14,13 @@ Newer stable and prerelease Codex CLI builds remain evidence-gated. The canonica
 - `explorer_fast` remains the explicit `gpt-5.3-codex-spark` exception for file/codebase search only.
 - Local appserver remains the expected default runtime path.
 - Provider workers keep the current `codex exec` / `codex exec resume` supervision seam until a separate governed lane promotes a replacement.
+- Permission posture uses explicit profiles and trust flows. Built-in profile ids are `:read-only`, `:workspace`, and `:danger-no-sandbox`; `--full-auto` is not normal current guidance.
+
+## Release-Facing Holds
+
+- Release-facing downstream-smoke workflows intentionally hold `@openai/codex@0.125.0`.
+- `cloud-canary` intentionally holds `@openai/codex@0.124.0`.
+- Current local `0.130.0` evidence does not promote cloud execution or release-facing workflow pins while the configured cloud environment blocker and fallback cloud hold remain unresolved.
 
 ## Evidence Gates
 

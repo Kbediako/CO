@@ -104,6 +104,13 @@ async function assertFileIncludes(filePath, text, label) {
   }
 }
 
+async function assertFileExcludes(filePath, text, label) {
+  const raw = await readFile(filePath, 'utf8');
+  if (raw.includes(text)) {
+    throw new Error(`${label} must not include ungoverned text "${text}" (${filePath})`);
+  }
+}
+
 async function readJsonFile(filePath, label) {
   try {
     return JSON.parse(await readFile(filePath, 'utf8'));
@@ -557,6 +564,35 @@ async function assertPluginLauncherShape(pluginRoot, label) {
   return launcher;
 }
 
+export async function assertPackagedPluginGovernanceShape(pluginRoot, label) {
+  const pluginManifestPath = path.join(pluginRoot, '.codex-plugin', 'plugin.json');
+  const pluginManifest = await readJsonFile(pluginManifestPath, `${label} plugin manifest`);
+  if (Object.prototype.hasOwnProperty.call(pluginManifest, 'hooks')) {
+    throw new Error(
+      `${label} plugin manifest must not declare plugin-bundled hooks without explicit CO hook governance`
+    );
+  }
+  await assertPathMissing(
+    path.join(pluginRoot, 'hooks', 'hooks.json'),
+    `${label} default plugin-bundled hooks manifest`
+  );
+  await assertPathMissing(path.join(pluginRoot, 'hooks.json'), `${label} default plugin-bundled hooks config`);
+  await assertPathMissing(path.join(pluginRoot, '.codex', 'config.toml'), `${label} imported Codex config`);
+  await assertPathMissing(path.join(pluginRoot, '.codex', 'hooks.json'), `${label} imported hooks config`);
+  await assertPathMissing(path.join(pluginRoot, '.codex', 'hooks'), `${label} imported hook scripts`);
+  await assertPathMissing(path.join(pluginRoot, '.codex', 'agents'), `${label} imported subagent config`);
+  await assertPathMissing(path.join(pluginRoot, '.agents', 'skills'), `${label} imported external-agent skills`);
+  await assertPathMissing(path.join(pluginRoot, 'CLAUDE.md'), `${label} external-agent guidance source`);
+  await assertPathMissing(path.join(pluginRoot, 'AGENTS.md'), `${label} migrated external-agent guidance source`);
+}
+
+export async function assertPluginInstallConfigGovernance(configPath, label) {
+  await assertFileExcludes(configPath, 'hooks.state', `${label} plugin install config`);
+  await assertFileExcludes(configPath, 'codex_hooks', `${label} plugin install config`);
+  await assertFileExcludes(configPath, 'plugin_hooks', `${label} plugin install config`);
+  await assertFileExcludes(configPath, 'external_migration', `${label} plugin install config`);
+}
+
 function resolveLauncherInvocationArgs(pluginRoot, launcherArgs) {
   if (!Array.isArray(launcherArgs) || launcherArgs.length === 0) {
     return [];
@@ -797,11 +833,13 @@ async function installMarketplacePlugin(codexBin, env, pluginVersion, label) {
       `[plugins."${PLUGIN_NAME}@${MARKETPLACE_NAME}"]`,
       `${label} plugin enablement config`
     );
+    await assertPluginInstallConfigGovernance(configPath, label);
 
     const cachedPluginRoot = path.join(codexHome, 'plugins', 'cache', MARKETPLACE_NAME, PLUGIN_NAME, pluginVersion);
     await assertPathExists(path.join(cachedPluginRoot, '.codex-plugin', 'plugin.json'), `${label} cached plugin manifest`);
     await assertPathExists(path.join(cachedPluginRoot, '.mcp.json'), `${label} cached plugin mcp manifest`);
     await assertPathExists(path.join(cachedPluginRoot, 'launcher.mjs'), `${label} cached plugin launcher`);
+    await assertPackagedPluginGovernanceShape(cachedPluginRoot, `${label} cached plugin`);
     const mcpStatuses = await appServer.request('mcpServerStatus/list', { detail: 'full', limit: 100 });
     const registeredServer = Array.isArray(mcpStatuses?.data)
       ? mcpStatuses.data.find((entry) => entry?.name === PLUGIN_NAME)
@@ -945,6 +983,7 @@ async function runMarketplacePluginSmoke(packageRoot, tempDir) {
     );
   }
   await assertPluginLauncherShape(pluginRoot, 'packaged plugin');
+  await assertPackagedPluginGovernanceShape(pluginRoot, 'packaged plugin');
 
   await runMarketplaceInstallScenario({
     label: 'local-marketplace',
@@ -1030,6 +1069,7 @@ async function main() {
     await assertPathExists(path.join(packagedPluginRoot, '.codex-plugin', 'plugin.json'), 'packaged plugin manifest');
     await assertPathExists(path.join(packagedPluginRoot, '.mcp.json'), 'packaged plugin mcp manifest');
     await assertPathExists(path.join(packagedPluginRoot, 'launcher.mjs'), 'packaged plugin launcher');
+    await assertPackagedPluginGovernanceShape(packagedPluginRoot, 'packaged plugin');
     await assertPathExists(path.join(packageRoot, 'bin', 'codex-orchestrator.js'), 'packaged bootstrap bin');
     await assertPathExists(path.join(packageRoot, 'dist', 'bin', 'codex-orchestrator.js'), 'packaged dist bin');
     await assertPathMissing(path.join(packageRoot, 'bin', 'codex-orchestrator.ts'), 'repo-only source CLI');

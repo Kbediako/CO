@@ -1,11 +1,14 @@
 ---
 id: 20260421-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb
 title: CO-276 remaining dead-code-pruning README archive pointer replacement
+status: in_progress
 relates_to: docs/PRD-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md
 risk: low
 owners:
   - Codex
-last_review: 2026-04-21
+last_review: 2026-05-18
+review_notes:
+  - 2026-05-18: CO-522 active-spec audit found 2 unchecked task checklist items, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 ## Canonical Reference

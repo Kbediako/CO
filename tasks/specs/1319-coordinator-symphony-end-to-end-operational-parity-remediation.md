@@ -4,7 +4,7 @@ title: Coordinator Symphony End-to-End Operational Parity Remediation
 status: in_progress
 owner: Codex
 created: 2026-03-23
-last_review: 2026-04-23
+last_review: 2026-05-18
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-coordinator-symphony-end-to-end-operational-parity-remediation.md
@@ -20,6 +20,7 @@ review_notes:
   - 2026-03-23: Live Linear issue-context evidence initially showed the CO team exposed `In Review` but not `Merging` or `Rework`; the team was updated the same day to add `Rework` and `Merging` while keeping `In Review` as the only review-handoff alias.
   - 2026-03-23: Follow-up parity audit found three narrower remaining deltas: CO still accepted arbitrary non-review `state_type: started` states for execution eligibility, the live team still uses `Ready` instead of Symphony's queued `Todo`, and the repo-local `Rework` contract still reused the old PR/workpad instead of resetting.
   - 2026-04-23: CO-321 freshness review retained this as an active historical parity remediation spec. The related checklist records active-state routing, `Ready` queue aliasing, review/rework/merge/done lifecycle parity, exact `Rework` reset semantics, stale dispatch traceability cleanup, validation floor, and zero unresolved actionable PR threads; live retest and final PR/merge closeout remain open.
+  - 2026-05-18: CO-522 active-spec audit found 2 unchecked task checklist items, so this spec remains active and was reviewed for current lifecycle ownership rather than archived. Evidence: `out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json`.
 ---
 
 # Technical Specification

@@ -1,16 +1,18 @@
 ---
 id: 20260314-1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation
 title: Coordinator Symphony-Aligned Orchestrator Run Lifecycle Task Manager Tracker Delegation
-status: draft
+status: done
 owners:
   - Codex
 created: 2026-03-14
-last_review: 2026-04-14
+last_review: 2026-05-16
 review_cadence_days: 30
 related_prd: docs/PRD-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation.md
 related_action_plan: docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation.md
 related_tasks:
   - tasks/tasks-1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation.md
+review_notes:
+  - 2026-05-16: CO-545 strict spec-guard audit reclassified this stale Apr 14/15 row as inactive done; same-file checklist `tasks/tasks-1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation.md` has 19 checked items and 0 unchecked items, so the old draft status was stale metadata rather than active implementation work.
 ---
 
 # Task Spec - Coordinator Symphony-Aligned Orchestrator Run Lifecycle Task Manager Tracker Delegation

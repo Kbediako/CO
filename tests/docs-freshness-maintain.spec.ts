@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import {
   buildDocsFreshnessOwnerActionEvidence,
   buildDocsFreshnessMaintenanceDecision,
+  buildDocsFreshnessRepoGate,
   collectChangedPaths,
   runDocsFreshnessMaintain
 } from '../scripts/docs-freshness-maintain.mjs';
@@ -50,6 +51,22 @@ function rollingFreshnessPolicy(overrides: Record<string, unknown> = {}) {
       }
     ],
     action_after_window: 'refresh_archive_or_reclassify_before_provider_handoff',
+    ...overrides
+  };
+}
+
+function staleTaskPacketEntry(overrides: Record<string, unknown> = {}) {
+  return {
+    path: 'tasks/tasks-1164-historical.md',
+    doc_class: 'task_packet',
+    doc_class_label: 'Task Packet',
+    path_family: 'tasks/tasks-*',
+    task_number: '1164',
+    last_review: reviewDateDaysAgo(31),
+    cadence_days: 30,
+    age_days: 31,
+    overdue_days: 1,
+    registry_status: 'active',
     ...overrides
   };
 }
@@ -178,6 +195,943 @@ async function createGitRepo(prefix: string) {
 }
 
 describe('docs freshness maintenance decisions', () => {
+  it('surfaces terminal lifecycle debt as an action-required repo gate outside provider WIP', () => {
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          stale_entries: 0,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [
+          {
+            path: 'tasks/tasks-linear-terminal.md',
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'tasks/tasks-*',
+            last_review: '2026-04-01',
+            cadence_days: 30,
+            age_days: 42,
+            overdue_days: 12,
+            registry_status: 'active',
+            lifecycle_state: 'terminal_pending_archive',
+            task_id: '20260401-linear-terminal',
+            task_key: 'linear-terminal',
+            status: 'done',
+            source_issue: {
+              identifier: 'CO-999'
+            }
+          }
+        ],
+        rolling_freshness_policy: rollingFreshnessPolicy()
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'provided',
+        specGuard: { status: 'succeeded' }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_terminal_lifecycle');
+    expect(decision.lifecycle_actions).toEqual([
+      expect.objectContaining({
+        type: 'terminal_task_packet_archive_or_reclassify',
+        path: 'tasks/tasks-linear-terminal.md',
+        lifecycle_state: 'terminal_pending_archive',
+        task_key: 'linear-terminal'
+      })
+    ]);
+    expect(decision.repo_gate).toMatchObject({
+      id: 'docs_freshness_maintain',
+      severity: 'action_required',
+      action_required_count: 1,
+      blocks_handoff: true,
+      blocks_unrelated_lanes: false,
+      provider_wip_impact: 'excluded_repo_gate'
+    });
+    expect(buildDocsFreshnessRepoGate(decision)).toMatchObject(decision.repo_gate);
+  });
+
+  it('keeps pure diff-base proof failures local to the current run', () => {
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 0,
+          registry_entries: 0,
+          stale_entries: 0,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [],
+        rolling_freshness_policy: rollingFreshnessPolicy()
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'missing_base',
+        specGuard: { status: 'succeeded' }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_diff_local');
+    expect(decision.repo_gate).toMatchObject({
+      action_required_count: 0,
+      blocks_handoff: true,
+      blocks_unrelated_lanes: false
+    });
+  });
+
+  it('keeps unrelated lanes blocked when terminal lifecycle debt coexists with repo-wide debt', () => {
+    const lastReview = reviewDateDaysAgo(31);
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 2,
+          registry_entries: 2,
+          stale_entries: 1,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [
+          {
+            path: 'tasks/tasks-2001-historical.md',
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'tasks/tasks-*',
+            task_number: '2001',
+            last_review: lastReview,
+            cadence_days: 30,
+            age_days: 31,
+            overdue_days: 1
+          }
+        ],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [
+          {
+            path: 'tasks/tasks-linear-terminal.md',
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'tasks/tasks-*',
+            last_review: lastReview,
+            cadence_days: 30,
+            age_days: 31,
+            overdue_days: 1,
+            registry_status: 'active',
+            lifecycle_state: 'terminal_pending_archive',
+            task_key: 'linear-terminal',
+            status: 'done'
+          }
+        ],
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          max_entries: 0,
+          max_cohorts: 0
+        })
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'provided',
+        specGuard: { status: 'succeeded' }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_terminal_lifecycle');
+    expect(decision.policy_capacity_status.status).toBe('over_budget');
+    expect(decision.repo_gate).toMatchObject({
+      blocks_handoff: true,
+      blocks_unrelated_lanes: true
+    });
+  });
+
+  it('keeps active spec pre-expiry from being masked by terminal lifecycle debt', () => {
+    const terminalPath = 'tasks/tasks-linear-terminal.md';
+    const specPath = 'tasks/specs/linear-open-spec.md';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 2,
+          registry_entries: 2,
+          stale_entries: 0,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [
+          {
+            path: terminalPath,
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'tasks/tasks-*',
+            last_review: reviewDateDaysAgo(31),
+            cadence_days: 30,
+            age_days: 31,
+            overdue_days: 1,
+            registry_status: 'active',
+            lifecycle_state: 'terminal_pending_archive',
+            task_key: 'linear-terminal',
+            status: 'done'
+          }
+        ],
+        rolling_freshness_policy: rollingFreshnessPolicy()
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'provided',
+        specGuard: { status: 'succeeded' },
+        specGuardPreExpiryEntries: [
+          {
+            path: specPath,
+            path_family: 'tasks/specs',
+            last_review: reviewDateDaysAgo(27),
+            cadence_days: 30,
+            age_days: 27,
+            days_until_expiry: 3
+          }
+        ]
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_spec_guard_pre_expiry');
+    expect(decision.lifecycle_actions).toEqual([
+      expect.objectContaining({
+        path: terminalPath,
+        lifecycle_state: 'terminal_pending_archive'
+      })
+    ]);
+    expect(decision.spec_guard_pre_expiry_entries).toEqual([
+      expect.objectContaining({
+        path: specPath,
+        days_until_expiry: 3,
+        failure_kind: 'active_spec_pre_expiry'
+      })
+    ]);
+    expect(decision.repo_gate).toMatchObject({
+      severity: 'blocking',
+      action_required_count: 2,
+      blocks_handoff: true,
+      blocks_unrelated_lanes: true,
+      sample_paths: expect.objectContaining({
+        terminal_lifecycle_paths: [terminalPath],
+        spec_guard_pre_expiry_paths: [specPath]
+      })
+    });
+  });
+
+  it('requires live owner verification for active spec pre-expiry blockers', () => {
+    const specPath = 'tasks/specs/linear-open-spec.md';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          stale_entries: 0,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [],
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          require_live_owner_verification: true
+        })
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'provided',
+        specGuard: { status: 'succeeded' },
+        ownerIssueVerification: {
+          issue: 'CO-175',
+          state: 'Done',
+          state_type: 'completed',
+          is_terminal: true,
+          usable: false,
+          same_project: true,
+          verification_status: 'succeeded'
+        },
+        specGuardPreExpiryEntries: [
+          {
+            path: specPath,
+            path_family: 'tasks/specs',
+            last_review: reviewDateDaysAgo(27),
+            cadence_days: 30,
+            age_days: 27,
+            days_until_expiry: 3
+          }
+        ]
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_spec_guard_pre_expiry');
+    expect(decision.owner_issue_verification).toEqual(
+      expect.objectContaining({
+        issue: 'CO-175',
+        is_terminal: true,
+        verification_status: 'succeeded'
+      })
+    );
+    expect(decision.owner_issue_action).toMatchObject({
+      mode: 'create_required',
+      existing_issue: 'CO-175',
+      reason: 'configured_owner_terminal'
+    });
+    expect(decision.repo_gate.owner).toMatchObject({
+      issue: 'CO-175',
+      action: 'create_required',
+      configured_issue: 'CO-175',
+      verified: false
+    });
+
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(decision, {
+      env: {} as NodeJS.ProcessEnv,
+      dryRunLinearActions: true
+    });
+    expect(ownerActionEvidence).toMatchObject({
+      status: 'credentials_missing',
+      write_status: 'dry_run_credentials_missing',
+      should_block: true,
+      required_actions: 1,
+      actions: [
+        expect.objectContaining({
+          route_id: 'co-554-spec-guard-pre-expiry',
+          mode: 'replace_terminal_owner',
+          owner_issue: 'CO-175',
+          copyable_command: expect.stringContaining('--canonical-owner-key "docs:freshness:maintain"')
+        })
+      ]
+    });
+  });
+
+  it('keeps active spec pre-expiry repo-wide when diff proof is unavailable', () => {
+    const specPath = 'tasks/specs/linear-open-spec.md';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          stale_entries: 0,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [],
+        rolling_freshness_policy: rollingFreshnessPolicy()
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'missing_base',
+        specGuard: { status: 'succeeded' },
+        specGuardPreExpiryEntries: [
+          {
+            path: specPath,
+            path_family: 'tasks/specs',
+            last_review: reviewDateDaysAgo(27),
+            cadence_days: 30,
+            age_days: 27,
+            days_until_expiry: 3
+          }
+        ]
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_spec_guard_pre_expiry');
+    expect(decision.diff_status).toBe('missing_base');
+    expect(decision.repo_gate).toMatchObject({
+      severity: 'blocking',
+      blocks_handoff: true,
+      blocks_unrelated_lanes: true,
+      sample_paths: expect.objectContaining({
+        spec_guard_pre_expiry_paths: [specPath]
+      })
+    });
+  });
+
+  it('keeps unrelated lanes blocked when spec-guard failure coexists with repo-wide debt', () => {
+    const lastReview = reviewDateDaysAgo(31);
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 2,
+          registry_entries: 2,
+          stale_entries: 1,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [
+          {
+            path: 'tasks/tasks-2001-historical.md',
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'tasks/tasks-*',
+            task_number: '2001',
+            last_review: lastReview,
+            cadence_days: 30,
+            age_days: 31,
+            overdue_days: 1
+          }
+        ],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [],
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          max_entries: 0,
+          max_cohorts: 0
+        })
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'provided',
+        specGuard: {
+          status: 'failed',
+          parsed_failures: [
+            {
+              path: 'tasks/specs/linear-co-428.md',
+              path_family: 'tasks/specs',
+              last_review: lastReview,
+              cadence_days: 30,
+              age_days: 31,
+              overdue_days: 1
+            }
+          ]
+        }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_diff_local');
+    expect(decision.policy_capacity_status.status).toBe('over_budget');
+    expect(decision.repo_gate).toMatchObject({
+      spec_guard: {
+        status: 'failed',
+        action_required_count: 1
+      },
+      blocks_handoff: true,
+      blocks_unrelated_lanes: true
+    });
+  });
+
+  it('surfaces strict public-doc pre-expiry actions without treating them as rolling deferral', () => {
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          stale_entries: 0,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 0,
+          pre_expiry_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [],
+        pre_expiry_entries: [
+          {
+            path: 'docs/public/provider-onboarding.md',
+            doc_class: 'public_guide',
+            doc_class_label: 'Public Guide',
+            path_family: 'docs/public',
+            last_review: '2026-04-16',
+            cadence_days: 30,
+            age_days: 27,
+            days_until_expiry: 3,
+            next_review: '2026-05-16',
+            direct_action_required: true,
+            rolling_deferral_eligible: false
+          }
+        ],
+        rolling_freshness_policy: rollingFreshnessPolicy()
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'provided',
+        specGuard: { status: 'succeeded' }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('clean');
+    expect(decision.public_current_actions).toEqual([
+      expect.objectContaining({
+        type: 'strict_pre_expiry_review',
+        path: 'docs/public/provider-onboarding.md',
+        days_until_expiry: 3,
+        rolling_deferral_eligible: false
+      })
+    ]);
+    expect(decision.repo_gate).toMatchObject({
+      severity: 'warning',
+      action_required_count: 1,
+      blocks_handoff: false,
+      blocks_unrelated_lanes: false
+    });
+    expect(decision.recommended_action).toContain('Review or assign direct action for 1 public/current doc');
+  });
+
+  it('surfaces active specs approaching spec-guard expiry before the hard boundary', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-spec-pre-expiry-'));
+    createdDirs.push(repoRoot);
+    const specPath = 'tasks/specs/linear-open-spec.md';
+    const lastReview = reviewDateDaysAgo(27);
+    await writeFixture(repoRoot, {
+      entries: [{ path: specPath, lastReview }],
+      catalogPatterns: [
+        {
+          glob: 'tasks/specs/*.md',
+          doc_class: 'task_packet'
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, specPath),
+      `---
+id: 20260517-linear-open-spec
+title: Open spec approaching expiry
+status: in_progress
+last_review: ${lastReview}
+---
+
+# Spec
+`,
+      'utf8'
+    );
+
+    const { decision, shouldBlock } = await runMaintain(repoRoot);
+
+    expect(shouldBlock).toBe(true);
+    expect(decision.freshness_decision).toBe('block_spec_guard_pre_expiry');
+    expect(decision.totals.spec_guard_pre_expiry_entries).toBe(1);
+    expect(decision.spec_guard_pre_expiry_entries).toEqual([
+      expect.objectContaining({
+        path: specPath,
+        days_until_expiry: 3,
+        failure_kind: 'active_spec_pre_expiry'
+      })
+    ]);
+    expect(decision.public_current_actions).toEqual([
+      expect.objectContaining({
+        type: 'spec_guard_pre_expiry_review',
+        path: specPath,
+        rolling_deferral_eligible: false
+      })
+    ]);
+    expect(decision.repo_gate).toMatchObject({
+      severity: 'blocking',
+      action_required_count: 2,
+      blocks_handoff: true,
+      blocks_unrelated_lanes: true,
+      sample_paths: expect.objectContaining({
+        spec_guard_pre_expiry_paths: [specPath]
+      })
+    });
+    expect(decision.recommended_action).toContain('active spec approaching spec-guard expiry');
+    expect(decision.recommended_action).toContain('do not wait for the hard 30-day failure');
+  });
+
+  it('surfaces legacy active specs approaching spec-guard expiry without reopening archived stubs', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-legacy-spec-pre-expiry-'));
+    createdDirs.push(repoRoot);
+    const legacySpecPath = 'tasks/specs/linear-legacy-open-spec.md';
+    const archivedSpecPath = 'tasks/specs/linear-archived-stub.md';
+    const lastReview = reviewDateDaysAgo(27);
+    await writeFixture(repoRoot, {
+      entries: [
+        { path: legacySpecPath, lastReview },
+        { path: archivedSpecPath, lastReview }
+      ],
+      catalogPatterns: [
+        {
+          glob: 'tasks/specs/*.md',
+          doc_class: 'task_packet'
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, legacySpecPath),
+      `# Legacy Open Spec
+
+last_review: ${lastReview}
+
+## Scope
+Legacy specs without YAML front matter still follow spec-guard freshness.
+`,
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, archivedSpecPath),
+      `# Archived Stub
+
+last_review: 2026-05-17
+
+<!-- docs-archive:stub -->
+> Archived on 2026-05-17. Full content: https://github.com/example/repo/blob/doc-archives/${archivedSpecPath}
+
+- Archive branch: doc-archives
+- Archive path: ${archivedSpecPath}
+`,
+      'utf8'
+    );
+
+    const { decision, shouldBlock } = await runMaintain(repoRoot);
+
+    expect(shouldBlock).toBe(true);
+    expect(decision.freshness_decision).toBe('block_spec_guard_pre_expiry');
+    expect(decision.totals.spec_guard_pre_expiry_entries).toBe(1);
+    expect(decision.spec_guard_pre_expiry_entries).toEqual([
+      expect.objectContaining({
+        path: legacySpecPath,
+        days_until_expiry: 3,
+        failure_kind: 'active_spec_pre_expiry'
+      })
+    ]);
+    expect(decision.sample_paths.spec_guard_pre_expiry_paths).toEqual([legacySpecPath]);
+  });
+
+  it('surfaces archive stubs with blank archive branch as active spec pre-expiry', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-blank-archive-branch-'));
+    createdDirs.push(repoRoot);
+    const archivedSpecPath = 'tasks/specs/linear-blank-archive-branch.md';
+    const lastReview = reviewDateDaysAgo(27);
+    await writeFixture(repoRoot, {
+      entries: [{ path: archivedSpecPath, lastReview }],
+      catalogPatterns: [
+        {
+          glob: 'tasks/specs/*.md',
+          doc_class: 'task_packet'
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, archivedSpecPath),
+      `# Archived Stub
+
+last_review: ${lastReview}
+
+<!-- docs-archive:stub -->
+> Archived on 2026-05-17.
+
+- Archive branch:
+- Archive path: ${archivedSpecPath}
+`,
+      'utf8'
+    );
+
+    const { decision, shouldBlock } = await runMaintain(repoRoot);
+
+    expect(shouldBlock).toBe(true);
+    expect(decision.freshness_decision).toBe('block_spec_guard_pre_expiry');
+    expect(decision.totals.spec_guard_pre_expiry_entries).toBe(1);
+    expect(decision.spec_guard_pre_expiry_entries).toEqual([
+      expect.objectContaining({
+        path: archivedSpecPath,
+        days_until_expiry: 3,
+        failure_kind: 'active_spec_pre_expiry'
+      })
+    ]);
+  });
+
+  it('matches spec-guard file selection for spec pre-expiry warnings', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-spec-selection-parity-'));
+    createdDirs.push(repoRoot);
+    const activeSpecPath = 'docs/design/specs/active-design-spec.md';
+    const taskReadmePath = 'tasks/specs/README.md';
+    const nestedTaskSpecPath = 'tasks/specs/nested/linear-nested-spec.md';
+    const designReadmePath = 'docs/design/specs/README.md';
+    const nestedDesignSpecPath = 'docs/design/specs/nested/design-nested-spec.md';
+    const lastReview = reviewDateDaysAgo(27);
+    await writeFixture(repoRoot, {
+      entries: [
+        { path: activeSpecPath, lastReview },
+        { path: taskReadmePath, lastReview },
+        { path: nestedTaskSpecPath, lastReview },
+        { path: designReadmePath, lastReview },
+        { path: nestedDesignSpecPath, lastReview }
+      ],
+      catalogPatterns: [
+        {
+          glob: 'tasks/specs/**/*.md',
+          doc_class: 'task_packet'
+        },
+        {
+          glob: 'docs/design/specs/**/*.md',
+          doc_class: 'task_packet'
+        }
+      ]
+    });
+    for (const specPath of [
+      activeSpecPath,
+      taskReadmePath,
+      nestedTaskSpecPath,
+      designReadmePath,
+      nestedDesignSpecPath
+    ]) {
+      await writeFile(
+        join(repoRoot, specPath),
+        `---
+id: 20260517-selection-parity
+title: Selection parity
+status: in_progress
+last_review: ${lastReview}
+---
+
+# Spec
+`,
+        'utf8'
+      );
+    }
+
+    const { decision } = await runMaintain(repoRoot);
+
+    expect(decision.totals.spec_guard_pre_expiry_entries).toBe(1);
+    expect(decision.spec_guard_pre_expiry_entries).toEqual([
+      expect.objectContaining({
+        path: activeSpecPath,
+        days_until_expiry: 3
+      })
+    ]);
+    expect(decision.sample_paths.spec_guard_pre_expiry_paths).toEqual([activeSpecPath]);
+  });
+
+  it('does not warn for legacy tasks[] terminal specs that spec-guard skips', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-legacy-tasks-terminal-spec-'));
+    createdDirs.push(repoRoot);
+    const specPath = 'tasks/specs/linear-legacy-terminal-spec.md';
+    const lastReview = reviewDateDaysAgo(27);
+    await writeFixture(repoRoot, {
+      entries: [{ path: specPath, lastReview }],
+      catalogPatterns: [
+        {
+          glob: 'tasks/specs/*.md',
+          doc_class: 'task_packet'
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, specPath),
+      `---
+id: 20260517-linear-legacy-terminal-spec
+title: Legacy terminal spec
+status: in_progress
+last_review: ${lastReview}
+---
+
+# Spec
+`,
+      'utf8'
+    );
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'tasks/index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260517-active-canonical-item',
+              title: 'Active canonical item',
+              status: 'in_progress',
+              paths: {
+                spec: 'tasks/specs/active-canonical-item.md'
+              }
+            }
+          ],
+          tasks: [
+            {
+              id: '20260517-linear-legacy-terminal-spec',
+              title: 'Legacy terminal spec',
+              status: 'done',
+              paths: {
+                spec: specPath,
+                task: 'tasks/tasks-linear-legacy-terminal-spec.md'
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const { decision } = await runMaintain(repoRoot);
+
+    expect(decision.totals.spec_guard_pre_expiry_entries).toBe(0);
+    expect(decision.spec_guard_pre_expiry_entries).toEqual([]);
+    expect(decision.sample_paths.spec_guard_pre_expiry_paths).toEqual([]);
+    expect(decision.totals.terminal_lifecycle_entries).toBe(1);
+  });
+
+  it('does not warn for inactive specs with spec-guard frontmatter formatting', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-frontmatter-parity-'));
+    createdDirs.push(repoRoot);
+    const specPath = 'tasks/specs/linear-inactive-crlf-spec.md';
+    const lastReview = reviewDateDaysAgo(27);
+    await writeFixture(repoRoot, {
+      entries: [{ path: specPath, lastReview }],
+      catalogPatterns: [
+        {
+          glob: 'tasks/specs/*.md',
+          doc_class: 'task_packet'
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, specPath),
+      [
+        '',
+        '---',
+        'status: done',
+        `last_review: ${lastReview}`,
+        '---',
+        '',
+        '# Done Spec',
+        ''
+      ].join('\r\n'),
+      'utf8'
+    );
+
+    const { decision } = await runMaintain(repoRoot);
+
+    expect(decision.totals.spec_guard_pre_expiry_entries).toBe(0);
+    expect(decision.spec_guard_pre_expiry_entries).toEqual([]);
+    expect(decision.sample_paths.spec_guard_pre_expiry_paths).toEqual([]);
+  });
+
+  it('surfaces hard-stale current docs as direct action outside legacy cohort cleanup', () => {
+    const taskLastReview = reviewDateDaysAgo(31);
+    const publicLastReview = reviewDateDaysAgo(19);
+    const currentDocPath = 'docs/book/operations.md';
+    const repoGuidePath = 'docs/README.md';
+    const legacyTaskPath = 'tasks/tasks-1164-historical.md';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 3,
+          registry_entries: 3,
+          stale_entries: 3,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 0,
+          pre_expiry_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [
+          {
+            path: currentDocPath,
+            doc_class: 'public_guide',
+            doc_class_label: 'Public Guide',
+            path_family: 'docs/book',
+            task_number: null,
+            last_review: publicLastReview,
+            cadence_days: 14,
+            age_days: 19,
+            overdue_days: 5
+          },
+          {
+            path: repoGuidePath,
+            doc_class: 'repo_guide',
+            doc_class_label: 'Repository Guide',
+            path_family: 'docs',
+            task_number: null,
+            last_review: publicLastReview,
+            cadence_days: 14,
+            age_days: 19,
+            overdue_days: 5
+          },
+          {
+            path: legacyTaskPath,
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'tasks/tasks-*',
+            task_number: '1164',
+            last_review: taskLastReview,
+            cadence_days: 30,
+            age_days: 31,
+            overdue_days: 1
+          }
+        ],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [],
+        pre_expiry_entries: [],
+        rolling_freshness_policy: rollingFreshnessPolicy()
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'ok',
+        specGuard: { status: 'succeeded' }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_unowned_repo_debt');
+    expect(decision.candidate_cohorts).toEqual([
+      expect.objectContaining({
+        sample_paths: [legacyTaskPath],
+        class_breakdown: { 'Task Packet': 1 }
+      })
+    ]);
+    expect(decision.public_current_actions).toEqual([
+      expect.objectContaining({
+        type: 'strict_hard_stale_review',
+        path: currentDocPath,
+        doc_class: 'public_guide',
+        overdue_days: 5,
+        rolling_deferral_eligible: false
+      }),
+      expect.objectContaining({
+        type: 'strict_hard_stale_review',
+        path: repoGuidePath,
+        doc_class: 'repo_guide',
+        overdue_days: 5,
+        rolling_deferral_eligible: false
+      })
+    ]);
+    expect(decision.sample_paths.hard_stale_paths).toEqual([currentDocPath, repoGuidePath]);
+    expect(decision.totals.hard_stale_entries).toBe(2);
+  });
+
   it('passes owned in-window historical debt when the current diff is clean', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-owned-'));
     createdDirs.push(repoRoot);
@@ -202,6 +1156,107 @@ describe('docs freshness maintenance decisions', () => {
         sample_paths: [historicalPath]
       })
     ]);
+  });
+
+  it('routes the CO-163 terminal packet to lifecycle action instead of owned rolling debt', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-co-163-terminal-'));
+    createdDirs.push(repoRoot);
+    const issueId = 'b84c9a78-b62f-48fa-b1c4-88f8222535da';
+    const taskKey = `linear-${issueId}`;
+    const taskId = `20260412-${taskKey}`;
+    const lastReview = reviewDateDaysAgo(31);
+    const packetPaths = [
+      `.agent/task/${taskKey}.md`,
+      `docs/ACTION_PLAN-${taskKey}.md`,
+      `docs/PRD-${taskKey}.md`,
+      `docs/TECH_SPEC-${taskKey}.md`,
+      `tasks/specs/${taskKey}.md`,
+      `tasks/tasks-${taskKey}.md`
+    ];
+
+    await writeFixture(repoRoot, {
+      entries: packetPaths.map((path) => ({ path, lastReview })),
+      policy: rollingFreshnessPolicy({
+        owner_issue: 'CO-536',
+        baseline_cohorts: [
+          {
+            id: 'co-163-terminal-packet-active-rows',
+            last_review: lastReview,
+            cadence_days: 30,
+            path_families: [
+              '.agent/task',
+              'docs/ACTION_PLAN-*',
+              'docs/PRD-*',
+              'docs/TECH_SPEC-*',
+              'tasks/specs',
+              'tasks/tasks-*'
+            ]
+          }
+        ]
+      }),
+      catalogPatterns: [
+        { glob: '.agent/task/*.md', doc_class: 'task_mirror' },
+        { glob: 'docs/ACTION_PLAN-*.md', doc_class: 'task_packet' },
+        { glob: 'docs/PRD-*.md', doc_class: 'task_packet' },
+        { glob: 'docs/TECH_SPEC-*.md', doc_class: 'task_packet' },
+        { glob: 'tasks/specs/*.md', doc_class: 'task_packet' },
+        { glob: 'tasks/tasks-*.md', doc_class: 'task_packet' }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: taskId,
+              title: 'CO: harden control-host supervise restart against orphaned duplicate host burn',
+              status: 'done',
+              completed_at: `${reviewDateDaysAgo(1)}T06:59:43.056Z`,
+              relates_to: `tasks/tasks-${taskKey}.md`,
+              paths: {
+                spec: `tasks/specs/${taskKey}.md`,
+                task: `tasks/tasks-${taskKey}.md`,
+                agent_task: `.agent/task/${taskKey}.md`,
+                prd: `docs/PRD-${taskKey}.md`,
+                action_plan: `docs/ACTION_PLAN-${taskKey}.md`,
+                docs: `docs/TECH_SPEC-${taskKey}.md`
+              },
+              source_issue: {
+                id: issueId,
+                identifier: 'CO-163'
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const { decision, shouldBlock } = await runMaintain(repoRoot);
+
+    expect(shouldBlock).toBe(true);
+    expect(decision.freshness_decision).toBe('block_terminal_lifecycle');
+    expect(decision.totals.rolling_cohort_entries).toBe(0);
+    expect(decision.totals.owned_rolling_entries).toBe(0);
+    expect(decision.totals.terminal_lifecycle_entries).toBe(packetPaths.length);
+    expect(decision.candidate_cohorts).toEqual([]);
+    expect(decision.lifecycle_actions).toEqual(
+      expect.arrayContaining(
+        packetPaths.map((path) =>
+          expect.objectContaining({
+            path,
+            task_key: taskKey,
+            task_status: 'done',
+            source_issue: expect.objectContaining({ identifier: 'CO-163' })
+          })
+        )
+      )
+    );
+    expect(decision.sample_paths.terminal_lifecycle_paths).toHaveLength(packetPaths.length);
+    expect(decision.sample_paths.terminal_lifecycle_paths).toEqual(expect.arrayContaining(packetPaths));
   });
 
   it('blocks owned rolling debt when the diff base is unavailable', () => {
@@ -643,6 +1698,99 @@ describe('docs freshness maintenance decisions', () => {
     );
   });
 
+  it('preserves verified policy-owner state for owned rolling cohorts', () => {
+    const policy = rollingFreshnessPolicy({
+      canonical_owner_key: 'docs:freshness:maintain',
+      require_live_owner_verification: true,
+      owner_issue_project_id: 'project-1'
+    });
+    const baseline = policy.baseline_cohorts[0];
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: policy,
+        stale_entries: [],
+        rolling_cohort_entries: [
+          {
+            path: 'tasks/tasks-1164-historical.md',
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'tasks/tasks-*',
+            task_number: '1164',
+            last_review: baseline.last_review,
+            cadence_days: baseline.cadence_days,
+            age_days: 31,
+            overdue_days: 1,
+            baseline_cohort_id: baseline.id
+          }
+        ],
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 0,
+          rolling_cohort_entries: 1,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: { status: 'succeeded' },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main',
+        ownerIssueVerification: {
+          issue: 'CO-175',
+          issue_id: 'owner-id',
+          state: 'In Progress',
+          state_type: 'started',
+          is_terminal: false,
+          usable: true,
+          workspace_id: 'workspace-1',
+          team_id: 'team-1',
+          project_id: 'project-1',
+          project_name: 'CO Control and Advisory',
+          expected_project_id: 'project-1',
+          same_project: true,
+          verification_status: 'succeeded',
+          checked_at: null,
+          source: 'linear issue-context',
+          error: null
+        }
+      }
+    );
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(decision, {
+      env: { LINEAR_API_KEY: 'token' } as NodeJS.ProcessEnv
+    });
+    const repoGate = buildDocsFreshnessRepoGate({
+      ...decision,
+      owner_action_evidence: ownerActionEvidence
+    });
+
+    expect(decision.freshness_decision).toBe('pass_with_owned_rolling_debt');
+    expect(ownerActionEvidence).toEqual(
+      expect.objectContaining({
+        status: 'resolved',
+        should_block: false,
+        actions: [
+          expect.objectContaining({
+            mode: 'update_existing',
+            owner_issue: 'CO-175',
+            copyable_command: null
+          })
+        ]
+      })
+    );
+    expect(repoGate.owner).toMatchObject({
+      issue: 'CO-175',
+      action: 'update_existing',
+      state: 'In Progress',
+      state_type: 'started',
+      verified: true
+    });
+  });
+
   it('reuses an exact canonical owner without repointing the global terminal owner', () => {
     const lastReview = '2026-03-23';
     const canonicalOwnerKey =
@@ -737,6 +1885,17 @@ describe('docs freshness maintenance decisions', () => {
       })
     );
     expect(decision.recommended_action).toContain('owner issue CO-320');
+    expect(decision.repo_gate.owner).toMatchObject({
+      issue: 'CO-320',
+      canonical_owner_key: canonicalOwnerKey,
+      action: 'update_existing',
+      reason: 'succeeded',
+      configured_issue: null,
+      state: 'Blocked',
+      state_type: 'started',
+      verified: true
+    });
+    expect(decision.repo_gate.canonical_owner_key).toBe(canonicalOwnerKey);
     const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(decision, {
       env: { LINEAR_API_KEY: 'token' } as NodeJS.ProcessEnv
     });
@@ -766,6 +1925,7 @@ describe('docs freshness maintenance decisions', () => {
       {
         rolling_freshness_policy: rollingFreshnessPolicy({
           canonical_owner_key: 'docs:freshness:maintain',
+          owner_issue: 'CO-522',
           require_live_owner_verification: true,
           owner_issue_project_id: 'project-1'
         }),
@@ -881,6 +2041,7 @@ describe('docs freshness maintenance decisions', () => {
       {
         rolling_freshness_policy: rollingFreshnessPolicy({
           canonical_owner_key: 'docs:freshness:maintain',
+          owner_issue: 'CO-522',
           require_live_owner_verification: true,
           owner_issue_project_id: 'project-1'
         }),
@@ -965,6 +2126,184 @@ describe('docs freshness maintenance decisions', () => {
         sample_paths: ['tasks/specs/linear-co-428.md']
       })
     ]);
+  });
+
+  it('routes non-date spec-guard fallback metadata failures through owner action evidence', () => {
+    const canonicalOwnerKey =
+      'spec_guard_fallback_seam|path_family:.agent/task|failure_kind:fallback_expiry_metadata_stale';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          canonical_owner_key: 'docs:freshness:maintain',
+          owner_issue: 'CO-522',
+          require_live_owner_verification: true,
+          owner_issue_project_id: 'project-1'
+        }),
+        stale_entries: [],
+        rolling_cohort_entries: [],
+        totals: {
+          docs_scanned: 0,
+          registry_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 0,
+          rolling_cohort_entries: 0,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: {
+          status: 'failed',
+          full_output: [
+            'Spec guard failed:',
+            ' - .agent/task/linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md: fallback expiry metadata is stale; review date 2026-05-12 is stale'
+          ].join('\n')
+        },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main',
+        ownerIssueVerification: {
+          issue: 'CO-522',
+          issue_id: 'owner-id',
+          state: 'Blocked',
+          state_type: 'started',
+          is_terminal: false,
+          usable: true,
+          project_id: 'project-1',
+          expected_project_id: 'project-1',
+          same_project: true,
+          verification_status: 'succeeded',
+          checked_at: null,
+          source: 'linear issue-context',
+          error: null
+        }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_diff_local');
+    expect(decision.spec_guard.parsed_failures).toEqual([
+      expect.objectContaining({
+        path: '.agent/task/linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md',
+        path_family: '.agent/task',
+        failure_kind: 'fallback_expiry_metadata_stale',
+        message: 'fallback expiry metadata is stale; review date 2026-05-12 is stale',
+        evidence_date: '2026-05-12'
+      })
+    ]);
+    expect(decision.totals.spec_guard_candidate_cohorts).toBe(1);
+    expect(decision.candidate_cohorts).toEqual([
+      expect.objectContaining({
+        route_id: 'co-382-fallback-seam-metadata',
+        status: 'spec_guard_fallback_seam_candidate',
+        canonical_owner_key: canonicalOwnerKey,
+        source_breakdown: { spec_guard: 1 },
+        sample_paths: ['.agent/task/linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md'],
+        sample_messages: ['fallback expiry metadata is stale; review date 2026-05-12 is stale']
+      })
+    ]);
+    expect(decision.repo_gate.spec_guard).toEqual({
+      status: 'failed',
+      action_required_count: 1
+    });
+    expect(decision.repo_gate.sample_paths.spec_guard_paths).toEqual([
+      '.agent/task/linear-b642e879-ba50-45ef-b0d9-b059afa9e932.md'
+    ]);
+
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(decision, {
+      env: {} as NodeJS.ProcessEnv
+    });
+    expect(ownerActionEvidence.actions).toEqual([
+      expect.objectContaining({
+        route_id: 'co-382-fallback-seam-metadata',
+        mode: 'create_or_update_required',
+        owner_issue: 'CO-522',
+        canonical_owner_key: canonicalOwnerKey,
+        body: expect.objectContaining({
+          description: expect.stringContaining('fallback/seam metadata routing')
+        })
+      })
+    ]);
+  });
+
+  it('routes pathless spec-guard fallback summary failures through owner action evidence', () => {
+    const canonicalOwnerKey =
+      'spec_guard_fallback_seam|path_family:scripts|failure_kind:fallback_seam_decision_missing';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          canonical_owner_key: 'docs:freshness:maintain',
+          owner_issue: 'CO-522',
+          require_live_owner_verification: true,
+          owner_issue_project_id: 'project-1'
+        }),
+        stale_entries: [],
+        rolling_cohort_entries: [],
+        totals: {
+          docs_scanned: 0,
+          registry_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 0,
+          rolling_cohort_entries: 0,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: {
+          status: 'failed',
+          full_output: [
+            'Spec guard failed:',
+            ' - fallback/seam-touching changes require updated PRD decision evidence (scripts/docs-freshness-maintain.mjs, orchestrator/src/cli/control/providerLinearWorkflowFacade.ts)'
+          ].join('\n')
+        },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main',
+        ownerIssueVerification: {
+          issue: 'CO-522',
+          issue_id: 'owner-id',
+          state: 'Blocked',
+          state_type: 'started',
+          is_terminal: false,
+          usable: true,
+          project_id: 'project-1',
+          expected_project_id: 'project-1',
+          same_project: true,
+          verification_status: 'succeeded',
+          checked_at: null,
+          source: 'linear issue-context',
+          error: null
+        }
+      }
+    );
+
+    expect(decision.spec_guard.parsed_failures).toEqual([
+      expect.objectContaining({
+        path: 'scripts/docs-freshness-maintain.mjs',
+        path_family: 'scripts',
+        failure_kind: 'fallback_seam_decision_missing',
+        message:
+          'fallback/seam-touching changes require updated PRD decision evidence (scripts/docs-freshness-maintain.mjs, orchestrator/src/cli/control/providerLinearWorkflowFacade.ts)'
+      })
+    ]);
+    expect(decision.totals.spec_guard_candidate_cohorts).toBe(1);
+    expect(decision.candidate_cohorts).toEqual([
+      expect.objectContaining({
+        route_id: 'co-382-fallback-seam-metadata',
+        status: 'spec_guard_fallback_seam_candidate',
+        canonical_owner_key: canonicalOwnerKey,
+        source_breakdown: { spec_guard: 1 },
+        sample_paths: ['scripts/docs-freshness-maintain.mjs']
+      })
+    ]);
+    expect(decision.repo_gate.spec_guard).toEqual({
+      status: 'failed',
+      action_required_count: 1
+    });
   });
 
   it('does not reuse canonical owner verification across different scoped configs for the same issue', () => {
@@ -1074,6 +2413,20 @@ describe('docs freshness maintenance decisions', () => {
         })
       })
     );
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(decision, {
+      env: {} as NodeJS.ProcessEnv
+    });
+    const repoGate = buildDocsFreshnessRepoGate({
+      ...decision,
+      owner_action_evidence: ownerActionEvidence
+    });
+    expect(repoGate.owner).toMatchObject({
+      issue: 'CO-320',
+      action: 'create_required',
+      state: 'In Progress',
+      state_type: 'started',
+      verified: false
+    });
   });
 
   it('does not accept stale same-key canonical owner verification from another scope', () => {
@@ -1418,6 +2771,58 @@ describe('docs freshness maintenance decisions', () => {
     expect(decision.freshness_decision).toBe('pass_with_owned_rolling_debt');
     expect(decision.recommended_action).toContain('owner issues CO-320 and CO-321');
     expect(decision.recommended_action).not.toContain('configured owner CO-300 is terminal');
+  });
+
+  it('keeps a copyable command on consolidated owner action evidence', () => {
+    const evidence = buildDocsFreshnessOwnerActionEvidence(
+      {
+        freshness_decision: 'block_unowned_repo_debt',
+        owner_issue: 'CO-522',
+        owner_issue_action: {
+          mode: 'update_existing',
+          canonical_owner_key: 'docs:freshness:maintain'
+        },
+        candidate_cohorts: [
+          {
+            id: 'cohort-a',
+            canonical_owner_key: 'key-a',
+            canonical_owner_marker: 'codex-orchestrator:canonical-owner-key=key-a',
+            owner_issue: 'CO-522',
+            owner_issue_action: { mode: 'create_required' },
+            source_breakdown: { blocking_candidate: 1 },
+            sample_paths: ['tasks/tasks-a.md']
+          },
+          {
+            id: 'cohort-b',
+            canonical_owner_key: 'key-b',
+            canonical_owner_marker: 'codex-orchestrator:canonical-owner-key=key-b',
+            owner_issue: 'CO-522',
+            owner_issue_action: { mode: 'create_required' },
+            source_breakdown: { blocking_candidate: 1 },
+            sample_paths: ['tasks/tasks-b.md']
+          }
+        ],
+        repo_gate: {
+          severity: 'blocking',
+          action_required_count: 2
+        }
+      },
+      { env: {} as NodeJS.ProcessEnv }
+    );
+
+    expect(evidence).toEqual(
+      expect.objectContaining({
+        status: 'credentials_missing',
+        should_block: true,
+        actions: [
+          expect.objectContaining({
+            route_id: 'docs-freshness-maintain-owner-workpad',
+            owner_issue: 'CO-522',
+            copyable_command: expect.stringContaining('--canonical-owner-key "docs:freshness:maintain"')
+          })
+        ]
+      })
+    );
   });
 
   it('blocks exact canonical owner reuse when the rolling policy is invalid', () => {
@@ -2286,6 +3691,616 @@ describe('docs freshness maintenance decisions', () => {
     expect(decision.policy_capacity_status).toEqual(expect.objectContaining({ status: 'expired' }));
   });
 
+  it('excludes terminal and historical rows from live policy capacity', () => {
+    const terminalPath = 'tasks/tasks-1164-terminal.md';
+    const archivedPath = 'tasks/tasks-1165-archived.md';
+    const historicalPath = 'tasks/tasks-1166-historical-stub.md';
+    const statusArchivedPath = 'tasks/tasks-1167-status-archived.md';
+    const statusHistoricalPath = 'tasks/tasks-1168-status-historical-stub.md';
+    const statusTerminalPath = 'tasks/tasks-1169-status-succeeded.md';
+    const duplicateTerminalPath = 'tasks/tasks-1170-status-duplicate.md';
+    const registryTerminalPath = 'tasks/tasks-1171-registry-terminal-pending-archive.md';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 8,
+          registry_entries: 8,
+          stale_entries: 8,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [
+          staleTaskPacketEntry({
+            path: terminalPath,
+            lifecycle_state: 'terminal_pending_archive',
+            task_status: 'done',
+            source_issue: { identifier: 'CO-163' }
+          }),
+          staleTaskPacketEntry({
+            path: archivedPath,
+            task_number: '1165',
+            registry_status: 'archived'
+          }),
+          staleTaskPacketEntry({
+            path: historicalPath,
+            task_number: '1166',
+            registry_status: 'preserved_historical_stub'
+          }),
+          staleTaskPacketEntry({
+            path: statusArchivedPath,
+            task_number: '1167',
+            registry_status: undefined,
+            status: 'archived'
+          }),
+          staleTaskPacketEntry({
+            path: statusHistoricalPath,
+            task_number: '1168',
+            registry_status: undefined,
+            status: 'preserved_historical_stub'
+          }),
+          staleTaskPacketEntry({
+            path: statusTerminalPath,
+            task_number: '1169',
+            registry_status: undefined,
+            status: 'succeeded'
+          }),
+          staleTaskPacketEntry({
+            path: duplicateTerminalPath,
+            task_number: '1170',
+            registry_status: undefined,
+            status: 'duplicate'
+          }),
+          staleTaskPacketEntry({
+            path: registryTerminalPath,
+            task_number: '1171',
+            registry_status: 'terminal_pending_archive'
+          })
+        ],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [
+          staleTaskPacketEntry({
+            path: terminalPath,
+            lifecycle_state: 'terminal_pending_archive',
+            status: 'done',
+            source_issue: { identifier: 'CO-163' }
+          })
+        ],
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          max_entries: 1,
+          max_cohorts: 1
+        })
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'provided',
+        specGuard: { status: 'succeeded' }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_terminal_lifecycle');
+    expect(decision.policy_capacity_status).toEqual(
+      expect.objectContaining({
+        status: 'no_candidates',
+        current_entries: 0,
+        current_cohorts: 0
+      })
+    );
+    expect(decision.totals).toEqual(
+      expect.objectContaining({
+        candidate_entries: 0,
+        hard_stale_entries: 0,
+        terminal_lifecycle_entries: 3
+      })
+    );
+    expect(decision.candidate_cohorts).toEqual([]);
+    expect(decision.sample_paths).toEqual(
+      expect.objectContaining({
+        candidate_paths: [],
+        hard_stale_paths: [],
+        terminal_lifecycle_paths: [terminalPath, statusTerminalPath, duplicateTerminalPath]
+      })
+    );
+    expect(decision.repo_gate).toMatchObject({
+      capacity: expect.objectContaining({ status: 'no_candidates' }),
+      action_required_count: 3,
+      blocks_handoff: true,
+      blocks_unrelated_lanes: false
+    });
+  });
+
+  it('routes unarchived stale rows with terminal task status to terminal lifecycle debt', () => {
+    const activeTerminalPath = 'tasks/tasks-1172-active-closed.md';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          stale_entries: 1,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [
+          staleTaskPacketEntry({
+            path: activeTerminalPath,
+            task_status: 'closed'
+          })
+        ],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [],
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          max_entries: 300,
+          max_cohorts: 2
+        })
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'provided',
+        specGuard: { status: 'succeeded' }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_terminal_lifecycle');
+    expect(decision.policy_capacity_status).toEqual(
+      expect.objectContaining({
+        status: 'no_candidates',
+        current_entries: 0,
+        current_cohorts: 0
+      })
+    );
+    expect(decision.lifecycle_actions).toEqual([
+      expect.objectContaining({
+        path: activeTerminalPath,
+        lifecycle_state: 'terminal_pending_archive',
+        task_status: 'closed',
+        recommended_action: 'archive_or_reclassify_terminal_packet'
+      })
+    ]);
+    expect(decision.sample_paths).toEqual(
+      expect.objectContaining({
+        candidate_paths: [],
+        terminal_lifecycle_paths: [activeTerminalPath]
+      })
+    );
+  });
+
+  it('routes rolling cohort rows with terminal task status to terminal lifecycle debt', () => {
+    const rollingTerminalPath = 'tasks/tasks-1173-rolling-completed.md';
+    const policy = rollingFreshnessPolicy();
+    const baseline = policy.baseline_cohorts[0];
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          stale_entries: 0,
+          rolling_cohort_entries: 1,
+          terminal_lifecycle_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [],
+        rolling_cohort_entries: [
+          staleTaskPacketEntry({
+            path: rollingTerminalPath,
+            baseline_cohort_id: baseline.id,
+            task_status: 'completed'
+          })
+        ],
+        terminal_lifecycle_entries: [],
+        rolling_freshness_policy: policy
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'provided',
+        specGuard: { status: 'succeeded' }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_terminal_lifecycle');
+    expect(decision.totals).toEqual(
+      expect.objectContaining({
+        candidate_entries: 0,
+        owned_rolling_entries: 0,
+        terminal_lifecycle_entries: 1
+      })
+    );
+    expect(decision.lifecycle_actions).toEqual([
+      expect.objectContaining({
+        path: rollingTerminalPath,
+        lifecycle_state: 'terminal_pending_archive',
+        task_status: 'completed'
+      })
+    ]);
+    expect(decision.sample_paths).toEqual(
+      expect.objectContaining({
+        candidate_paths: [],
+        terminal_lifecycle_paths: [rollingTerminalPath]
+      })
+    );
+  });
+
+  it('keeps terminal task status on non-task docs as hard stale direct-action debt', () => {
+    const currentDocPath = 'docs/guides/public-guide.md';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          stale_entries: 1,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [
+          staleTaskPacketEntry({
+            path: currentDocPath,
+            doc_class: 'public_guide',
+            doc_class_label: 'Public Guide',
+            path_family: 'docs/guides',
+            task_number: null,
+            task_status: 'completed'
+          })
+        ],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [],
+        rolling_freshness_policy: rollingFreshnessPolicy()
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'provided',
+        specGuard: { status: 'succeeded' }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_unowned_repo_debt');
+    expect(decision.totals).toEqual(
+      expect.objectContaining({
+        hard_stale_entries: 1,
+        terminal_lifecycle_entries: 0,
+        candidate_entries: 0
+      })
+    );
+    expect(decision.public_current_actions).toEqual([
+      expect.objectContaining({
+        type: 'strict_hard_stale_review',
+        path: currentDocPath,
+        doc_class: 'public_guide'
+      })
+    ]);
+    expect(decision.sample_paths).toEqual(
+      expect.objectContaining({
+        hard_stale_paths: [currentDocPath],
+        terminal_lifecycle_paths: []
+      })
+    );
+  });
+
+  it('surfaces non-candidate rolling current docs as direct-action debt', () => {
+    const currentDocPath = 'docs/book/operations.md';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          stale_entries: 0,
+          rolling_cohort_entries: 1,
+          terminal_lifecycle_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [],
+        rolling_cohort_entries: [
+          staleTaskPacketEntry({
+            path: currentDocPath,
+            doc_class: 'public_guide',
+            doc_class_label: 'Public Guide',
+            path_family: 'docs/book',
+            task_number: null,
+            task_status: 'completed'
+          })
+        ],
+        terminal_lifecycle_entries: [],
+        rolling_freshness_policy: rollingFreshnessPolicy()
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'provided',
+        specGuard: { status: 'succeeded' }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_unowned_repo_debt');
+    expect(decision.totals).toEqual(
+      expect.objectContaining({
+        candidate_entries: 0,
+        hard_stale_entries: 0,
+        rolling_non_candidate_entries: 1,
+        rolling_current_action_entries: 1,
+        terminal_lifecycle_entries: 0
+      })
+    );
+    expect(decision.public_current_actions).toEqual([
+      expect.objectContaining({
+        type: 'rolling_current_action_review',
+        path: currentDocPath,
+        doc_class: 'public_guide',
+        direct_action_required: true,
+        rolling_deferral_eligible: false
+      })
+    ]);
+    expect(decision.sample_paths).toEqual(
+      expect.objectContaining({
+        hard_stale_paths: [],
+        rolling_current_action_paths: [currentDocPath],
+        rolling_non_candidate_paths: [currentDocPath],
+        terminal_lifecycle_paths: []
+      })
+    );
+    expect(decision.repo_gate).toMatchObject({
+      action_required_count: 1,
+      blocks_handoff: true,
+      sample_paths: {
+        rolling_current_action_paths: [currentDocPath],
+        rolling_non_candidate_paths: [currentDocPath]
+      }
+    });
+  });
+
+  it('does not route excluded historical-only stale rows through invalid live-owner policy checks', () => {
+    const archivedPath = 'tasks/tasks-1165-archived.md';
+    const historicalPath = 'tasks/tasks-1166-historical-stub.md';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 2,
+          registry_entries: 2,
+          stale_entries: 2,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [
+          staleTaskPacketEntry({
+            path: archivedPath,
+            task_number: '1165',
+            registry_status: 'archived'
+          }),
+          staleTaskPacketEntry({
+            path: historicalPath,
+            task_number: '1166',
+            registry_status: 'preserved_historical_stub'
+          })
+        ],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [],
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          is_valid: false,
+          owner_issue: null
+        })
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'provided',
+        specGuard: { status: 'succeeded' }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('clean');
+    expect(decision.policy_capacity_status).toEqual(
+      expect.objectContaining({
+        status: 'invalid_policy',
+        current_entries: 0,
+        current_cohorts: 0
+      })
+    );
+    expect(decision.owner_issue_verification).toBeNull();
+    expect(decision.totals).toEqual(
+      expect.objectContaining({
+        candidate_entries: 0,
+        hard_stale_entries: 0
+      })
+    );
+    expect(decision.sample_paths).toEqual(
+      expect.objectContaining({
+        candidate_paths: [],
+        hard_stale_paths: []
+      })
+    );
+  });
+
+  it('does not let excluded historical-only stale rows make diff-local blocks repo-wide', () => {
+    const archivedPath = 'tasks/tasks-1165-archived.md';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          stale_entries: 1,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [
+          staleTaskPacketEntry({
+            path: archivedPath,
+            task_number: '1165',
+            registry_status: 'archived'
+          })
+        ],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [],
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          is_valid: false,
+          owner_issue: null
+        })
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'missing_base',
+        specGuard: { status: 'succeeded' }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_diff_local');
+    expect(decision.policy_capacity_status).toEqual(
+      expect.objectContaining({
+        status: 'invalid_policy',
+        current_entries: 0
+      })
+    );
+    expect(decision.repo_gate).toMatchObject({
+      blocks_handoff: true,
+      blocks_unrelated_lanes: false,
+      capacity: expect.objectContaining({ status: 'invalid_policy', current_entries: 0 })
+    });
+  });
+
+  it('still fails closed when active stale rows exceed policy capacity after exclusions', () => {
+    const activePaths = ['tasks/tasks-1164-active-a.md', 'tasks/tasks-1165-active-b.md'];
+    const archivedPath = 'tasks/tasks-1166-archived.md';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 3,
+          registry_entries: 3,
+          stale_entries: 3,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [
+          staleTaskPacketEntry({ path: activePaths[0] }),
+          staleTaskPacketEntry({
+            path: activePaths[1],
+            task_number: '1165'
+          }),
+          staleTaskPacketEntry({
+            path: archivedPath,
+            task_number: '1166',
+            registry_status: 'archived'
+          })
+        ],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [],
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          max_entries: 1,
+          max_cohorts: 2
+        })
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'provided',
+        specGuard: { status: 'succeeded' }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_policy_over_budget');
+    expect(decision.policy_capacity_status).toEqual(
+      expect.objectContaining({
+        status: 'over_budget',
+        current_entries: activePaths.length,
+        max_entries: 1,
+        over_entry_budget: true
+      })
+    );
+    expect(decision.totals).toEqual(
+      expect.objectContaining({
+        candidate_entries: activePaths.length,
+        hard_stale_entries: 0
+      })
+    );
+    expect(decision.sample_paths).toEqual(
+      expect.objectContaining({
+        candidate_paths: activePaths,
+        hard_stale_paths: []
+      })
+    );
+  });
+
+  it('keeps archived registry rows live when explicit task lifecycle is nonterminal', () => {
+    const nonterminalPath = 'tasks/tasks-1164-nonterminal.md';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          stale_entries: 1,
+          rolling_cohort_entries: 0,
+          terminal_lifecycle_entries: 0,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          uncatalogued_docs: 0
+        },
+        stale_entries: [
+          staleTaskPacketEntry({
+            path: nonterminalPath,
+            registry_status: 'archived',
+            task_status: 'in-progress'
+          })
+        ],
+        rolling_cohort_entries: [],
+        terminal_lifecycle_entries: [],
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          max_entries: 0,
+          max_cohorts: 1
+        })
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        diffStatus: 'provided',
+        specGuard: { status: 'succeeded' }
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('block_policy_over_budget');
+    expect(decision.policy_capacity_status).toEqual(
+      expect.objectContaining({
+        status: 'over_budget',
+        current_entries: 1,
+        over_entry_budget: true
+      })
+    );
+    expect(decision.sample_paths).toEqual(
+      expect.objectContaining({
+        candidate_paths: [nonterminalPath]
+      })
+    );
+  });
+
   it('routes the Apr 15 CO-184 over-cap shape to owner action instead of broadening policy', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-over-budget-'));
     createdDirs.push(repoRoot);
@@ -2323,6 +4338,24 @@ describe('docs freshness maintenance decisions', () => {
       })
     );
     expect(decision.recommended_action).toContain('do not expand rolling caps');
+
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(decision, {
+      env: {} as NodeJS.ProcessEnv
+    });
+    expect(ownerActionEvidence.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          route_id: 'docs-freshness-maintain-owner-workpad',
+          mode: 'update_existing',
+          owner_issue: 'CO-175',
+          cohort_count: 2,
+          body: expect.objectContaining({
+            description: expect.stringContaining('Freshness decision: `block_policy_over_budget`')
+          })
+        })
+      ])
+    );
+    expect(ownerActionEvidence.actions[0].body.description).toContain('rolling-cap widening');
   });
 
   it('counts distinct declared baseline cohorts even when their review dates match', async () => {
@@ -2389,6 +4422,29 @@ describe('docs freshness maintenance decisions', () => {
     expect(shouldBlock).toBe(true);
     expect(decision.freshness_decision).toBe('block_missing_or_invalid_registry');
     expect(decision.totals.uncatalogued_docs).toBe(1);
+  });
+
+  it('keeps the guide declared baseline cohorts in catalog policy parity', async () => {
+    const guide = await readFile(join(process.cwd(), 'docs/guides/docs-freshness-cohorts.md'), 'utf8');
+    const catalog = JSON.parse(await readFile(join(process.cwd(), 'docs/docs-catalog.json'), 'utf8'));
+    const declaredLine = guide.match(/^- Declared baseline cohorts: (?<cohorts>.+)$/mu);
+    const declaredCohorts = declaredLine?.groups?.cohorts;
+
+    expect(declaredCohorts).toBeTruthy();
+    if (!declaredCohorts) {
+      throw new Error('docs freshness guide must declare baseline cohorts');
+    }
+
+    const guideCohorts = declaredCohorts
+      .split(',')
+      .map((cohort) => cohort.trim().replace(/^`|`$/gu, ''));
+    const catalogCohorts = catalog.policies.rolling_freshness_cohorts.baseline_cohorts.map(
+      (cohort: { id: string }) => cohort.id
+    );
+
+    expect(new Set(guideCohorts).size).toBe(guideCohorts.length);
+    expect(new Set(catalogCohorts).size).toBe(catalogCohorts.length);
+    expect(catalogCohorts).toEqual(guideCohorts);
   });
 
   it('wires docs-review and implementation-gate freshness to the maintenance decision command', async () => {
