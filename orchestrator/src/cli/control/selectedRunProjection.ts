@@ -2116,7 +2116,10 @@ function isPassiveReleasedProviderLinearWorkerOwnerFailedRun(
     context.rawStatus !== 'failed' ||
     claim.state !== 'released' ||
     claim.reason !== 'provider_issue_released:not_active' ||
-    claim.retry_queued === true
+    claim.retry_queued !== null ||
+    claim.retry_attempt !== null ||
+    claim.retry_due_at !== null ||
+    claim.retry_error !== null
   ) {
     return false;
   }
