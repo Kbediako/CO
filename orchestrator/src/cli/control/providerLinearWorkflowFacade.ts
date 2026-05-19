@@ -3824,14 +3824,14 @@ function isLinearMarkdownNestedListItemLine(line: string, previousNonEmptyLine: 
   const parentListItem = parseLinearMarkdownNormalizationListItemLine(previousNonEmptyLine);
   return (
     nestedListItem !== null &&
-    parentListItem !== null &&
+    parentListItem !== null && parentListItem.indent <= 3 &&
     nestedListItem.indent > parentListItem.indent &&
     nestedListItem.indent <= parentListItem.indent + 4
   );
 }
 
 function isLinearMarkdownThematicBreakLine(line: string): boolean {
-  return /^[ \t]{0,3}(?:\*[ \t]*){3,}$/u.test(line);
+  return /^[ \t]{0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$/u.test(line);
 }
 
 function collapseLinearHeadingListSpacing(lines: string[]): string[] {
@@ -3880,7 +3880,8 @@ function isLinearMarkdownNormalizationHeadingLine(line: string): boolean {
 }
 
 function isLinearMarkdownNormalizationListItemLine(line: string): boolean {
-  return parseLinearMarkdownNormalizationListItemLine(line) !== null;
+  const listItem = parseLinearMarkdownNormalizationListItemLine(line);
+  return listItem !== null && listItem.indent <= 3;
 }
 
 function parseLinearMarkdownNormalizationListItemLine(
@@ -3890,7 +3891,7 @@ function parseLinearMarkdownNormalizationListItemLine(
   if (isLinearMarkdownThematicBreakLine(line)) {
     return null;
   }
-  const markerPattern = marker === '*' ? '\\*' : marker ?? '[-*]';
+  const markerPattern = marker === '*' ? '\\*' : marker ?? '(?:[-*]|\\d+[.)])';
   const listItemMatch = line.match(new RegExp(`^([ \\t]*)${markerPattern}\\s+\\S`, 'u'));
   return listItemMatch ? { indent: getLinearMarkdownIndentWidth(listItemMatch[1]) } : null;
 }

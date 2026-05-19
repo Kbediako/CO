@@ -13161,6 +13161,11 @@ describe('providerLinearWorkflowFacade', () => {
       'nested bullet markers',
       ['Investigate the remaining improvement.', '', '- Parent item', '    * Child item'].join('\n'),
       (description: string) => description.replace('    * Child item', '    - Child item')
+    ],
+    [
+      'nested bullet markers under an ordered parent',
+      ['Investigate the remaining improvement.', '', '1. Parent item', '    * Child item'].join('\n'),
+      (description: string) => description.replace('    * Child item', '    - Child item')
     ]
   ])('accepts Linear-normalized %s after follow-up traceability update', async (_label, inputDescription, normalize) => {
     const finalDescription = buildExpectedFollowUpDescription({
@@ -13236,8 +13241,8 @@ describe('providerLinearWorkflowFacade', () => {
     ],
     [
       'an indented code line is not bullet-normalized',
-      ['Investigate the remaining improvement.', '', '    * keep literal bullet.'].join('\n'),
-      (description: string) => description.replace('    * keep literal bullet.', '    - keep literal bullet.')
+      ['Investigate the remaining improvement.', '', '    1. prior literal code.', '        * keep literal bullet.'].join('\n'),
+      (description: string) => description.replace('        * keep literal bullet.', '        - keep literal bullet.')
     ],
     [
       'a thematic break is not bullet-normalized',
@@ -13253,6 +13258,16 @@ describe('providerLinearWorkflowFacade', () => {
       'a list-contained indented code line is not bullet-normalized',
       ['Investigate the remaining improvement.', '', '- Parent item', '      * keep literal code.'].join('\n'),
       (description: string) => description.replace('      * keep literal code.', '      - keep literal code.')
+    ],
+    [
+      'heading spacing before indented code is preserved',
+      ['Investigate the remaining improvement.', '', '## Example', '', '    - keep literal code.'].join('\n'),
+      (description: string) => description.replace('## Example\n\n    - keep literal code.', '## Example\n    - keep literal code.')
+    ],
+    [
+      'an indented code line after a dash thematic break is not bullet-normalized',
+      ['Investigate the remaining improvement.', '', '- - -', '    * keep literal bullet.'].join('\n'),
+      (description: string) => description.replace('    * keep literal bullet.', '    - keep literal bullet.')
     ]
   ])('fails closed when %s after follow-up traceability update', async (_label, inputDescription, drift) => {
     const finalDescription = buildExpectedFollowUpDescription({
