@@ -144,7 +144,7 @@ describe('quota hygiene audit', () => {
     expect(audit.findings.map((finding) => finding.code)).toContain('active_automations_present');
   });
 
-  it('keeps the audit zero-model and reports unknown cross-thread goal inventory', async () => {
+  it('keeps the audit zero-model and reports unknown cross-thread goal inventory without degrading verdict', async () => {
     const audit = await buildQuotaHygieneAudit({
       flags: {},
       dependencies: baseDependencies()
@@ -159,8 +159,212 @@ describe('quota hygiene audit', () => {
       status: 'unavailable',
       risk: 'unknown'
     });
-    expect(audit.findings.map((finding) => finding.code)).toContain(
+    expect(audit.verdict).toBe('healthy');
+    expect(audit.findings.map((finding) => finding.code)).not.toContain(
       'cross_thread_goal_inventory_unavailable'
+    );
+  });
+
+  it('classifies degraded co-status datasets as non-healthy control-host evidence', async () => {
+    const audit = await buildQuotaHygieneAudit({
+      flags: {},
+      dependencies: baseDependencies({
+        readCoStatus: async () => ({
+          generated_at: '2026-05-17T00:00:00.000Z',
+          mode: 'operator_dashboard',
+          read_only: true,
+          host: 'localhost',
+          counts: {
+            running: 0,
+            retrying: 0,
+            issues: 0,
+            max_allowed: null
+          },
+          selected_issue_identifier: null,
+          selected: null,
+          running: [],
+          retrying: [],
+          issues: [],
+          degraded_read: {
+            reason: 'stale endpoint after control-host restart'
+          }
+        }) as never
+      })
+    });
+
+    expect(audit.co_status.classification).toBe('stale_endpoint');
+    expect(audit.control_host.status).toBe('stale_endpoint');
+    expect(audit.findings.map((finding) => finding.code)).toEqual(
+      expect.arrayContaining(['co_status_stale_endpoint', 'control_host_stale_endpoint'])
+    );
+  });
+
+  it('does not let provider-intake selected_claim projection corroborate itself', async () => {
+    const audit = await buildQuotaHygieneAudit({
+      flags: { 'provider-intake-state': '/provider/provider-intake-state.json' },
+      dependencies: baseDependencies({
+        readTextFile: async (path) => {
+          if (path === '/provider/provider-intake-state.json') {
+            return JSON.stringify(providerIntakeState({
+              state: 'running',
+              issueIdentifier: 'CO-610',
+              taskId: 'linear-co610'
+            }));
+          }
+          return defaultProviderState();
+        },
+        readCoStatus: async () => ({
+          generated_at: '2026-05-17T00:00:00.000Z',
+          mode: 'operator_dashboard',
+          read_only: true,
+          host: 'localhost',
+          counts: {
+            running: 0,
+            retrying: 0,
+            issues: 1,
+            max_allowed: null
+          },
+          selected_issue_identifier: 'CO-610',
+          selected: {
+            issue_id: 'issue-1',
+            issue_identifier: 'CO-610',
+            task_id: 'linear-co610',
+            run_id: 'run-1'
+          },
+          running: [],
+          retrying: [],
+          issues: [
+            {
+              issue_id: 'issue-1',
+              issue_identifier: 'CO-610',
+              task_id: 'linear-co610',
+              run_id: 'run-1'
+            }
+          ],
+          provider_intake: {
+            active_claim_count: 1,
+            selected_claim: {
+              issue_id: 'issue-1',
+              issue_identifier: 'CO-610',
+              task_id: 'linear-co610',
+              run_id: 'run-1'
+            }
+          }
+        }) as never
+      })
+    });
+
+    expect(audit.co_status.live_tokens).toEqual([]);
+    expect(audit.provider_intake.claims[0]).toMatchObject({
+      issue_identifier: 'CO-610',
+      classification: 'stale_unconfirmed',
+      corroboration: {
+        process_pids: [],
+        co_status_tokens: []
+      }
+    });
+  });
+
+  it('marks providerLinearWorkerRunner processes as quota-burning live provider work', async () => {
+    const audit = await buildQuotaHygieneAudit({
+      flags: { 'provider-intake-state': '/provider/provider-intake-state.json' },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => [
+          {
+            pid: 620,
+            ppid: 1,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:10',
+            stat: 'S',
+            command:
+              'node /repo/dist/cli/providerLinearWorkerRunner.js --task linear-co620 --issue CO-620'
+          }
+        ],
+        readTextFile: async (path) => {
+          if (path === '/provider/provider-intake-state.json') {
+            return JSON.stringify(providerIntakeState({
+              state: 'running',
+              issueIdentifier: 'CO-620',
+              taskId: 'linear-co620'
+            }));
+          }
+          return defaultProviderState();
+        }
+      })
+    });
+
+    expect(audit.process_inventory.processes[0]).toMatchObject({
+      pid: 620,
+      relevant: true,
+      quota_burning: true
+    });
+    expect(audit.provider_intake.claims[0]).toMatchObject({
+      issue_identifier: 'CO-620',
+      classification: 'live_process',
+      corroboration: {
+        process_pids: [620],
+        co_status_tokens: []
+      }
+    });
+  });
+
+  it('reuses provider-intake active semantics for retry and handoff states', async () => {
+    const audit = await buildQuotaHygieneAudit({
+      flags: { 'provider-intake-state': '/provider/provider-intake-state.json' },
+      dependencies: baseDependencies({
+        readTextFile: async (path) => {
+          if (path === '/provider/provider-intake-state.json') {
+            return JSON.stringify({
+              schema_version: 1,
+              updated_at: '2026-05-17T00:00:00.000Z',
+              rehydrated_at: null,
+              latest_provider_key: null,
+              latest_reason: null,
+              claims: [
+                providerIntakeClaim({
+                  state: 'handoff_failed',
+                  issueIdentifier: 'CO-630',
+                  taskId: 'linear-co630'
+                }),
+                providerIntakeClaim({
+                  state: 'released',
+                  issueIdentifier: 'CO-631',
+                  taskId: 'linear-co631',
+                  retryQueued: true
+                }),
+                providerIntakeClaim({
+                  state: 'running',
+                  issueIdentifier: 'CO-632',
+                  taskId: 'linear-co632',
+                  issueStateType: 'completed'
+                })
+              ]
+            });
+          }
+          return defaultProviderState();
+        }
+      })
+    });
+
+    expect(audit.provider_intake.active_like_count).toBe(2);
+    expect(audit.provider_intake.claims).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          issue_identifier: 'CO-630',
+          active_like: true,
+          classification: 'stale_unconfirmed'
+        }),
+        expect.objectContaining({
+          issue_identifier: 'CO-631',
+          active_like: true,
+          classification: 'stale_unconfirmed'
+        }),
+        expect.objectContaining({
+          issue_identifier: 'CO-632',
+          active_like: false,
+          classification: 'not_active'
+        })
+      ])
     );
   });
 
@@ -280,38 +484,48 @@ function providerIntakeState(input: {
   issueIdentifier?: string;
   taskId?: string;
 }): Record<string, unknown> {
-  const issueIdentifier = input.issueIdentifier ?? 'CO-1';
   return {
     schema_version: 1,
     updated_at: '2026-05-17T00:00:00.000Z',
     rehydrated_at: null,
     latest_provider_key: null,
     latest_reason: null,
-    claims: [
-      {
-        provider: 'linear',
-        provider_key: 'linear:issue-1',
-        issue_id: 'issue-1',
-        issue_identifier: issueIdentifier,
-        issue_title: 'quota hygiene test',
-        issue_state: 'In Progress',
-        issue_state_type: 'started',
-        issue_updated_at: '2026-05-17T00:00:00.000Z',
-        task_id: input.taskId ?? 'linear-issue-1',
-        mapping_source: 'provider_id_fallback',
-        state: input.state,
-        reason: null,
-        accepted_at: '2026-05-17T00:00:00.000Z',
-        updated_at: '2026-05-17T00:00:00.000Z',
-        last_delivery_id: null,
-        last_event: null,
-        last_action: null,
-        last_webhook_timestamp: null,
-        run_id: 'run-1',
-        run_manifest_path: null,
-        launch_source: 'control-host',
-        launch_token: null
-      }
-    ]
+    claims: [providerIntakeClaim(input)]
+  };
+}
+
+function providerIntakeClaim(input: {
+  state: string;
+  issueIdentifier?: string;
+  taskId?: string;
+  reason?: string | null;
+  retryQueued?: boolean | null;
+  issueStateType?: string;
+}): Record<string, unknown> {
+  const issueIdentifier = input.issueIdentifier ?? 'CO-1';
+  return {
+    provider: 'linear',
+    provider_key: 'linear:issue-1',
+    issue_id: 'issue-1',
+    issue_identifier: issueIdentifier,
+    issue_title: 'quota hygiene test',
+    issue_state: 'In Progress',
+    issue_state_type: input.issueStateType ?? 'started',
+    issue_updated_at: '2026-05-17T00:00:00.000Z',
+    task_id: input.taskId ?? 'linear-issue-1',
+    mapping_source: 'provider_id_fallback',
+    state: input.state,
+    reason: input.reason ?? null,
+    accepted_at: '2026-05-17T00:00:00.000Z',
+    updated_at: '2026-05-17T00:00:00.000Z',
+    last_delivery_id: null,
+    last_event: null,
+    last_action: null,
+    last_webhook_timestamp: null,
+    run_id: 'run-1',
+    run_manifest_path: null,
+    launch_source: 'control-host',
+    launch_token: null,
+    retry_queued: input.retryQueued ?? null
   };
 }

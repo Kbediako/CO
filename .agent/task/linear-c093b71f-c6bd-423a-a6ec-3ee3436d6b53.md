@@ -24,6 +24,7 @@
 - [x] Parent implementation and focused validation complete.
 - [x] Prior review handoff blocker cleared by live `docs:freshness:maintain` on 2026-05-19: `freshness_decision=pass_with_owned_rolling_debt`, owner `CO-558`, `blocks_handoff=false`.
 - [x] Rebased validation passed after current-main recovery.
+- [x] PR #842 review rework addressed stale selected-claim corroboration, degraded `co-status` reads, provider runner detection, canonical provider-intake active semantics, and unknown cross-thread goal reporting.
 - [ ] PR handoff after branch push and review drain.
 
 ## Implementation Evidence
@@ -32,7 +33,7 @@
 - Tests: `orchestrator/tests/QuotaHygieneCliShell.test.ts`.
 - Focused smoke: `codex-orchestrator hygiene quota --format json` reported `model_calls.budget=0`, `observed=0`, `read_only=true`, and `mutation_mode=disabled`.
 - Historical validation: build, lint, focused tests, full tests, docs:check, repo:stewardship, diff-budget override, and pack:smoke passed before the CO-522 blocker cleared.
-- Current recovery validation: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test` (364 files / 5987 tests), `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, `node scripts/diff-budget.mjs`, `npm run pack:smoke`, and `codex-orchestrator hygiene quota --format json` passed on latest `origin/main`.
+- Current recovery validation: `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run test` (364 files / 5991 tests), `npm run docs:check`, `npm run docs:freshness`, `npm run repo:stewardship`, `node scripts/diff-budget.mjs`, `npm run pack:smoke`, and `codex-orchestrator hygiene quota --format json` passed on latest `origin/main`; review rework focused tests passed 11 quota hygiene cases.
 
 ## Fallback Decision Table
 - Large-refactor decision: not required for the packet; parent should start with a read-only evidence classifier.

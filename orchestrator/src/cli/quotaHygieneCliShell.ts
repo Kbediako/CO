@@ -16,6 +16,7 @@ import {
   type ProviderControlHostFreshnessGaugeReport
 } from './control/providerControlHostFreshnessGauge.js';
 import {
+  isActiveProviderIntakeClaim,
   normalizeProviderIntakeState,
   type ProviderIntakeClaimRecord,
   type ProviderIntakeState
@@ -33,21 +34,15 @@ type FindingSeverity = 'degraded' | 'critical';
 type RiskLevel = 'green' | 'degraded' | 'critical' | 'unknown';
 
 const DEFAULT_CONTROL_HOST_ARTIFACT_ROOT = '.runs/local-mcp/cli/control-host';
-const ACTIVE_PROVIDER_INTAKE_STATES = new Set([
-  'accepted',
-  'starting',
-  'running',
-  'resuming',
-  'resumable'
-]);
 const QUOTA_PROCESS_PATTERNS = [
   /\bcodex(?:\S*)?\s+exec\b/u,
   /\bcodex(?:\S*)?\s+review\b/u,
   /\bcodex-orchestrator(?:\.js)?\s+review\b/u,
-  /\bprovider-linear-worker\b/u
+  /\bprovider-linear-worker\b/u,
+  /\bproviderLinearWorkerRunner\.(?:js|ts)\b/u
 ];
 const RELEVANT_PROCESS_PATTERN =
-  /\bcodex\b|codex-orchestrator|delegate-server|provider-linear-worker|control-host|co-status/iu;
+  /\bcodex\b|codex-orchestrator|delegate-server|provider-linear-worker|providerLinearWorkerRunner|control-host|co-status/iu;
 
 interface RunHygieneCliShellParams {
   positionals: string[];
@@ -149,6 +144,7 @@ interface QuotaHygieneProviderIntakeClaimSummary {
   task_id: string;
   run_id: string | null;
   state: string;
+  active_like: boolean;
   updated_at: string;
   classification: 'live_process' | 'live_cheap_state' | 'live_correlated' | 'stale_unconfirmed' | 'not_active';
   corroboration: {
@@ -566,10 +562,7 @@ async function summarizeCoStatus(
 ): Promise<QuotaHygieneCoStatusSummary> {
   try {
     const dataset = await dependencies.readCoStatus({ artifactRoot });
-    const classification =
-      dataset.degraded_read?.reason === 'current_host_unhealthy'
-        ? 'unhealthy_live_host'
-        : 'healthy';
+    const classification = classifyCoStatusDataset(dataset);
     const liveTokens = collectCoStatusLiveTokens(dataset);
     const risk: RiskLevel = classification === 'healthy' ? 'green' : 'degraded';
     if (classification !== 'healthy') {
@@ -631,7 +624,7 @@ async function summarizeProviderIntake(
     const claims = state.claims.map((claim) =>
       summarizeProviderIntakeClaim(claim, processes, coStatusLiveTokens)
     );
-    const activeLikeClaims = claims.filter((claim) => ACTIVE_PROVIDER_INTAKE_STATES.has(claim.state));
+    const activeLikeClaims = claims.filter((claim) => claim.active_like);
     const staleUnconfirmed = activeLikeClaims.filter(
       (claim) => claim.classification === 'stale_unconfirmed'
     );
@@ -794,14 +787,6 @@ async function summarizeGoals(
       };
     }
   }
-  findings.push({
-    code: 'cross_thread_goal_inventory_unavailable',
-    severity: 'degraded',
-    summary: 'Cross-thread goal inventory is unavailable without a deterministic non-model inventory surface.',
-    evidence: {
-      status: 'unknown'
-    }
-  });
   return {
     current_thread: currentThread,
     cross_thread: {
@@ -825,7 +810,8 @@ function summarizeProviderIntakeClaim(
   );
   const matchingCoStatusTokens = coStatusLiveTokens.filter((token) => tokens.includes(token));
   let classification: QuotaHygieneProviderIntakeClaimSummary['classification'] = 'not_active';
-  if (ACTIVE_PROVIDER_INTAKE_STATES.has(claim.state)) {
+  const activeLike = isActiveProviderIntakeClaim(claim);
+  if (activeLike) {
     if (matchingProcesses.length > 0 && matchingCoStatusTokens.length > 0) {
       classification = 'live_correlated';
     } else if (matchingProcesses.length > 0) {
@@ -842,6 +828,7 @@ function summarizeProviderIntakeClaim(
     task_id: claim.task_id,
     run_id: claim.run_id,
     state: claim.state,
+    active_like: activeLike,
     updated_at: claim.updated_at,
     classification,
     corroboration: {
@@ -893,6 +880,31 @@ function classifyCoStatusError(message: string): QuotaHygieneCoStatusSummary['cl
   return 'unavailable';
 }
 
+function classifyCoStatusDataset(dataset: CoStatusJsonDataset): QuotaHygieneCoStatusSummary['classification'] {
+  const reason = normalizeOptionalString(dataset.degraded_read?.reason);
+  if (reason === null) {
+    return 'healthy';
+  }
+  const normalizedReason = reason.toLowerCase();
+  if (
+    normalizedReason.includes('stale') ||
+    normalizedReason.includes('endpoint') ||
+    normalizedReason.includes('econnrefused') ||
+    normalizedReason.includes('not rotated')
+  ) {
+    return 'stale_endpoint';
+  }
+  if (
+    normalizedReason.includes('current_host_unhealthy') ||
+    normalizedReason.includes('current-host-unhealthy') ||
+    normalizedReason.includes('unhealthy') ||
+    normalizedReason.includes('not readable')
+  ) {
+    return 'unhealthy_live_host';
+  }
+  return 'unavailable';
+}
+
 function collectCoStatusLiveTokens(dataset: CoStatusJsonDataset): string[] {
   const tokens = new Set<string>();
   const add = (value: unknown): void => {
@@ -901,13 +913,6 @@ function collectCoStatusLiveTokens(dataset: CoStatusJsonDataset): string[] {
       tokens.add(normalized);
     }
   };
-  add(dataset.selected_issue_identifier);
-  if (isRecord(dataset.selected)) {
-    add(dataset.selected.issue_id);
-    add(dataset.selected.issue_identifier);
-    add(dataset.selected.task_id);
-    add(dataset.selected.run_id);
-  }
   for (const item of Array.isArray(dataset.running) ? dataset.running : []) {
     const record = item as unknown as Record<string, unknown>;
     add(record.issue_id);
@@ -924,22 +929,12 @@ function collectCoStatusLiveTokens(dataset: CoStatusJsonDataset): string[] {
   }
   for (const issue of Array.isArray(dataset.issues) ? dataset.issues : []) {
     const record = issue as unknown as Record<string, unknown>;
-    add(record.issue_id);
-    add(record.issue_identifier);
-    add(record.task_id);
-    add(record.run_id);
     if (isRecord(record.provider_linear_worker_proof)) {
       add(record.provider_linear_worker_proof.issue_id);
       add(record.provider_linear_worker_proof.issue_identifier);
       add(record.provider_linear_worker_proof.task_id);
       add(record.provider_linear_worker_proof.run_id);
     }
-  }
-  if (isRecord(dataset.provider_intake?.selected_claim)) {
-    add(dataset.provider_intake.selected_claim.issue_id);
-    add(dataset.provider_intake.selected_claim.issue_identifier);
-    add(dataset.provider_intake.selected_claim.task_id);
-    add(dataset.provider_intake.selected_claim.run_id);
   }
   return [...tokens].sort();
 }
