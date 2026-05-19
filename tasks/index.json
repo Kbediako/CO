@@ -1,6 +1,95 @@
 {
   "items": [
     {
+      "id": "linear-c093b71f-c6bd-423a-a6ec-3ee3436d6b53",
+      "title": "CO-542 deterministic quota hygiene audit",
+      "relates_to": "tasks/tasks-linear-c093b71f-c6bd-423a-a6ec-3ee3436d6b53.md",
+      "risk": "medium",
+      "owners": [
+        "Codex"
+      ],
+      "status": "recovered_validation_green",
+      "last_review": "2026-05-19",
+      "approvals": {
+        "docs_packet": {
+          "reviewer": "CO-542 docs child lane",
+          "date": "2026-05-17",
+          "status": "created_before_implementation",
+          "summary": "Created the CO-542 docs-first packet for a zero-model deterministic quota hygiene audit, preserving no default mutations, unknown cross-thread goals, corroboration requirements for app-managed delegate false positives, and live-evidence requirements before stale provider-intake claims can count as live WIP."
+        },
+        "scope_guard": {
+          "reviewer": "CO-542 docs child lane",
+          "date": "2026-05-17",
+          "status": "docs_only_child_lane",
+          "summary": "Child lane stayed inside declared docs/index scope; parent owns Linear state, workpad, implementation, validation, review, and PR lifecycle."
+        },
+        "implementation": {
+          "reviewer": "CO-542 provider worker",
+          "date": "2026-05-17",
+          "status": "implemented_recovered_validation_green",
+          "summary": "Added codex-orchestrator hygiene quota as a deterministic read-only quota hygiene audit with zero model budget, no default mutations, process/delegate/control-host/co-status/provider-intake/automation/goal coverage, and explicit escalation policy. The original CO-522 docs-freshness blocker has been cleared by live CO-558 owner evidence, and current-main recovery validation is green."
+        },
+        "blocker_cleared": {
+          "reviewer": "parent CO orchestration",
+          "date": "2026-05-19",
+          "status": "docs_freshness_maintain_blocks_handoff_false",
+          "summary": "Live docs:freshness:maintain on current main reports pass_with_owned_rolling_debt under CO-558 with blocks_handoff=false, clearing the prior CO-522 blocker for CO-542 review handoff."
+        }
+      },
+      "validation": {
+        "status": "recovered_validation_green",
+        "passed": [
+          "docs-first packet created",
+          "protected issue wording preserved",
+          "task registry entry added",
+          "docs/TASKS snapshot added",
+          "zero-model deterministic audit implementation",
+          "focused deterministic fixtures",
+          "npm run build",
+          "npm run lint",
+          "npm run test",
+          "npm run docs:check",
+          "npm run repo:stewardship",
+          "diff-budget override recorded",
+          "npm run pack:smoke",
+          "CO-522 docs-freshness blocker cleared by live CO-558 owner evidence",
+          "current-main rebase completed",
+          "focused quota hygiene tests passed after rebase",
+          "node scripts/spec-guard.mjs --dry-run",
+          "codex-orchestrator hygiene quota --format json",
+          "npm run docs:freshness",
+          "current-main full test passed 364 files / 6004 tests",
+          "PR #842 review rework quota hygiene focused tests passed 24 cases"
+        ],
+        "pending": [
+          "PR handoff after branch push and ready-review drain",
+          "final Linear workpad closeout"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-c093b71f-c6bd-423a-a6ec-3ee3436d6b53.md",
+        "prd": "docs/PRD-linear-c093b71f-c6bd-423a-a6ec-3ee3436d6b53.md",
+        "docs": "tasks/specs/linear-c093b71f-c6bd-423a-a6ec-3ee3436d6b53.md",
+        "action_plan": "docs/ACTION_PLAN-linear-c093b71f-c6bd-423a-a6ec-3ee3436d6b53.md",
+        "spec": "tasks/specs/linear-c093b71f-c6bd-423a-a6ec-3ee3436d6b53.md",
+        "task": "tasks/tasks-linear-c093b71f-c6bd-423a-a6ec-3ee3436d6b53.md"
+      },
+      "source_issue": {
+        "id": "c093b71f-c6bd-423a-a6ec-3ee3436d6b53",
+        "identifier": "CO-542"
+      },
+      "related_issues": [
+        {
+          "identifier": "CO-544",
+          "relation": "adjacent_provider_intake_stale_wip_context"
+        },
+        {
+          "identifier": "CO-546",
+          "relation": "adjacent_provider_intake_live_evidence_context"
+        }
+      ]
+    },
+    {
       "id": "20260519-linear-aa075f78-940e-423b-a886-6f0f8012ae18",
       "title": "CO-562 hide passive owner claims from retry and failed status",
       "status": "in_progress",
