@@ -31780,6 +31780,7 @@ describe('createProviderIssueHandoffService', () => {
       'run-co-571-stale-promotion-deferred-should-not-start',
       '/tmp/provider-run/co-571-stale-promotion-deferred-should-not-start-manifest.json'
     );
+    const persist = vi.fn(async () => undefined);
     const resolveTrackedIssue = vi.fn(async () => {
       throw new Error('stale promoted terminal history should not use direct issue-by-id');
     });
@@ -31787,7 +31788,7 @@ describe('createProviderIssueHandoffService', () => {
     const service = createProviderIssueHandoffService({
       paths,
       state,
-      persist: vi.fn(async () => undefined),
+      persist,
       launcher,
       resolveTrackedIssue,
       startPipelineId: 'diagnostics'
@@ -31817,6 +31818,7 @@ describe('createProviderIssueHandoffService', () => {
       run_id: null,
       run_manifest_path: null
     });
+    expect(persist).toHaveBeenCalledTimes(1);
   });
 
   it('reopens pending-reopen released claims from direct issue-by-id when the poll snapshot is unavailable', async () => {
