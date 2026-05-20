@@ -5447,10 +5447,6 @@ export function createProviderIssueHandoffService(
             releasedFailClosedDisqualifyingRetainedCount += 1;
           }
           refreshCounts.claims_scanned += 1;
-          recordRefreshProgress('refresh:claim_reconcile', {
-            requestClass: `claim_reconcile:${claim.state ?? 'unknown'}`,
-            providerKeys: [claimProviderKey]
-          });
           try {
           const claimRuns =
             runsByProviderIssue.get(claimProviderKey) ?? [];
@@ -5530,6 +5526,20 @@ export function createProviderIssueHandoffService(
             claim.reason === 'provider_issue_released:not_active' &&
             isTerminalProviderIntakeIssueState(claim) &&
             !canTreatReviewPromotionAsStaleForReleasedTerminalHistoricalClaim(claim);
+          const currentPollTrackedIssue = trackedIssuesByKey?.get(claimProviderKey) ?? null;
+          if (
+            shouldKeepCurrentPollReleasedTerminalHistoricalClaimPassive({
+              claim,
+              trackedIssue: currentPollTrackedIssue,
+              canUseCachedReleasedTerminalHistoricalClaim
+            })
+          ) {
+            consumedTrackedIssueKeys.add(claimProviderKey);
+            releasedFailClosedSkipCount += 1;
+            releasedFreshDiscoveryReplayBlockedProviderKeys.add(claimProviderKey);
+            deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
+            continue;
+          }
           if (
             pollInput?.deferFreshDiscovery === true &&
             trackedIssueRefetch &&
@@ -5556,6 +5566,10 @@ export function createProviderIssueHandoffService(
           const shouldCountNoRunPendingReopenLiveStartedProbe =
             !normallyAllowDirectIssueById && canUseNoRunPendingReopenLiveStartedProbe;
           let usedNoRunPendingReopenLiveStartedProbe = false;
+          recordRefreshProgress('refresh:claim_reconcile', {
+            requestClass: `claim_reconcile:${claim.state ?? 'unknown'}`,
+            providerKeys: [claimProviderKey]
+          });
           const resolution = await resolveRefreshTrackedIssueResolution({
             claim,
             trackedIssuesByKey,
@@ -9706,6 +9720,44 @@ function shouldUseCachedReleasedTerminalHistoricalClaimResolution(input: {
     (input.claim.retry_due_at ?? null) === null &&
     (input.claim.retry_error ?? null) === null
   );
+}
+
+function shouldKeepCurrentPollReleasedTerminalHistoricalClaimPassive(input: {
+  claim: Pick<ProviderIntakeClaimRecord, 'issue_updated_at'>;
+  trackedIssue: Pick<
+    LiveLinearTrackedIssue,
+    | 'state'
+    | 'state_type'
+    | 'updated_at'
+    | 'archived_at'
+    | 'trashed'
+    | 'viewer_id'
+    | 'assignee_id'
+    | 'blocked_by'
+  > | null;
+  canUseCachedReleasedTerminalHistoricalClaim: boolean;
+}): boolean {
+  if (!input.canUseCachedReleasedTerminalHistoricalClaim || !input.trackedIssue) {
+    return false;
+  }
+  const workflowState = classifyProviderLinearWorkflowState(input.trackedIssue);
+  if (!workflowState.isTerminal) {
+    return false;
+  }
+  const eligibility = assessProviderTrackedIssueEligibility(input.trackedIssue, {
+    hasExistingClaim: true
+  });
+  if (
+    eligibility.eligible ||
+    eligibility.releaseReason !== 'provider_issue_released:not_active'
+  ) {
+    return false;
+  }
+  const freshness = compareTrackedIssueUpdatedAt({
+    existingIssueUpdatedAt: input.claim.issue_updated_at,
+    nextIssueUpdatedAt: input.trackedIssue.updated_at
+  });
+  return freshness === 'equal' || freshness === 'newer';
 }
 
 function canTreatReviewPromotionAsStaleForReleasedTerminalHistoricalClaim(

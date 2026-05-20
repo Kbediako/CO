@@ -8861,13 +8861,12 @@ describe('ControlRuntime', () => {
     expect(compatibilityProjection.retrying).toEqual([]);
   });
 
-  it('falls back to persisted stale authority when duplicate diagnostics only have attempted-owner freshness', async () => {
-    const cases = [
-      { status: 'duplicate_rejected', reason: 'duplicate_control_host_owner' },
-      { status: 'ambiguous_rejected', reason: 'ambiguous_control_host_owner' }
-    ] as const;
-
-    for (const { status, reason } of cases) {
+  it.each([
+    ['duplicate_rejected', 'duplicate_control_host_owner'],
+    ['ambiguous_rejected', 'ambiguous_control_host_owner']
+  ] as const)(
+    'falls back to persisted stale authority when %s diagnostics only have attempted-owner freshness',
+    async (status, reason) => {
       const fixture = await createFixture({ taskId: 'local-mcp' });
       const providerIssueHandoff = {
         handleAcceptedTrackedIssue: vi.fn(),
@@ -8948,7 +8947,7 @@ describe('ControlRuntime', () => {
       expect(compatibilityProjection.running).toEqual([]);
       expect(compatibilityProjection.retrying).toEqual([]);
     }
-  });
+  );
 
   it('falls back to persisted stale authority when live freshness refresh is unavailable', async () => {
     const fixture = await createFixture({ taskId: 'local-mcp' });
