@@ -19,7 +19,7 @@ Current CO policy:
 - Maximum active rolling cohorts: `2`
 - Maximum rolling rows: `300`
 - Eligible doc classes: `Task Packet`, `Task Mirror`, and `Report Only`
-- Declared baseline cohorts: `co-175-apr-14-march-14-tasks-1164-1195`, `co-343-apr-25-march-25-task-packets-1311-1318`, `co-558-may-19-apr-18-task-report-maintenance`
+- Declared baseline cohorts: `co-175-apr-14-march-14-tasks-1164-1195`, `co-343-apr-25-march-25-task-packets-1311-1318`, `co-558-may-19-apr-18-task-report-maintenance`, `co-558-may-20-apr-19-task-report-maintenance`
 - Ineligible docs: Front Door, Public Guide, Repository Guide, Agent Policy, Active Guide, shipped skills, companions, templates, and uncatalogued docs
 
 Eligibility is not class-only. A stale row must match a declared baseline cohort by `last_review`, `cadence_days`, path family, and either task-number range or declared path prefix before it can move from blocking stale failures into rolling debt. This prevents a newly stale feature-lane packet from being hidden just because it is in an eligible doc class and still inside the rolling window.
@@ -228,7 +228,9 @@ CO-558 reproduced the May 19 current-main freshness owner failure in `out/linear
 
 CO-558 replaces the terminal `CO-522` owner metadata with a live same-project owner and declares `co-558-may-19-apr-18-task-report-maintenance` as the May 19 owner-backed rolling cohort. This is an owner re-home, not a hidden refresh: the `2026-04-18` task mirror, task packet, and report-only rows keep their original `last_review` evidence and remain visible in `rolling_freshness_cohorts` until the rolling window expires after `2026-05-25`.
 
-The same CO-558 pass directly reviewed the strict pre-expiry rows instead of adding them to rolling deferral. The release-intake issue template still matches the current required release evidence and closeout-axis contract, and the `agent-first-adoption-steering` and `long-poll-wait` shipped skills still match the current provider-worker guidance for docs-first delegation and patience-first monitors. The 21 active spec pre-expiry rows remain source specs for current implementation packets, so their frontmatter `last_review` values are updated to `2026-05-19` after source review instead of relying on registry-only metadata.
+The May 20 date rollover added `co-558-may-20-apr-19-task-report-maintenance` under the same live owner. The `2026-04-19` task mirror, task packet, and report-only rows also keep their original `last_review` evidence and remain visible in `rolling_freshness_cohorts` until the rolling window expires after `2026-05-26`.
+
+The CO-558 passes directly reviewed strict pre-expiry rows instead of adding them to rolling deferral. The release-intake issue template, public book guides, `skills/README.md`, and the shipped `agent-first-adoption-steering` and `long-poll-wait` skills still match current provider-worker guidance after review. The May 20 refresh also verified twelve spec pre-expiry rows whose source issues are terminal; the spec frontmatter records that terminal disposition, so maintenance can skip active-spec pre-expiry action without editing legacy fallback content or archiving packet docs.
 
 CO-558 does not weaken `docs:freshness`, `docs:freshness:maintain`, `spec-guard`, or docs catalog coverage. It does not delete historical docs, broaden rolling caps, blindly bump the Apr 18 task/report cohort, or make CO-515 own unrelated docs freshness debt.
 

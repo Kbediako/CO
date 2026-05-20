@@ -1,0 +1,67 @@
+# Task Checklist - linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5
+
+- Linear Issue: `CO-566` / `b30c4be7-d186-490e-863b-8ba57a6cb9a5`
+- MCP Task ID: `linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5`
+- Primary PRD: `docs/PRD-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md`
+- TECH_SPEC mirror: `docs/TECH_SPEC-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md`
+- Canonical TECH_SPEC: `tasks/specs/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md`
+- `.agent` mirror: `.agent/task/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md`
+- Parent manifest pointer: `.runs/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5-docs-packet/cli/2026-05-20T03-01-24-615Z-49668b4b/manifest.json`
+- Source anchor: `ctx:sha256:4b0810177126360ba862e82ae588b6fff3ddbb23e51d40f70b84d4bfc6ce9da2#chunk:c000001`
+- Source object id: `sha256:4b0810177126360ba862e82ae588b6fff3ddbb23e51d40f70b84d4bfc6ce9da2`
+- Canonical owner key: `provider-intake:ready-resumable-recover-dispatch-source-disabled:v1`
+- Canonical owner marker: `codex-orchestrator:canonical-owner-key=provider-intake:ready-resumable-recover-dispatch-source-disabled:v1`
+
+## Docs-First
+- [x] PRD drafted for CO-566 Ready resumable recovery. Evidence: `docs/PRD-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md`.
+- [x] TECH_SPEC mirror drafted with issue-shaping contract, parity matrix, Not Done If, fallback decision, and parent-owned boundaries. Evidence: `docs/TECH_SPEC-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md`.
+- [x] Canonical task spec drafted with the same recovery contract. Evidence: `tasks/specs/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md`.
+- [x] ACTION_PLAN drafted for docs packet handoff and parent-owned implementation sequencing. Evidence: `docs/ACTION_PLAN-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md`.
+- [x] Checklist mirrored to `.agent/task`. Evidence: `.agent/task/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md`.
+- [x] Parent integrates registry mirrors if this packet is accepted. Evidence: `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated for `20260520-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5`.
+
+## Source / Assumptions
+- [x] Parent-provided source anchor preserved. Evidence: `ctx:sha256:4b0810177126360ba862e82ae588b6fff3ddbb23e51d40f70b84d4bfc6ce9da2#chunk:c000001`.
+- [x] Protected terms preserved. Evidence: packet includes `Ready`, `Rework`, `terminal failed historical runs`, `resumable`, `dispatch source disabled`, `dispatch_pilot.enabled=true`, `provider-intake-state.json`, `manual provider-intake-state deletion`, `CO-558 docs-freshness scope`, and `provider-intake:ready-resumable-recover-dispatch-source-disabled:v1`.
+- [x] Child lane did not call Linear mutation helpers. Evidence: packet-only docs lane.
+
+## Packet Content
+- [x] Ready/Rework recovery contract is explicit. Evidence: PRD and specs distinguish non-terminal Ready/Rework issues from terminal issue states.
+- [x] Not Done If rejects broad `dispatch_pilot.enabled=true`. Evidence: PRD, TECH_SPEC, task spec, ACTION_PLAN, and `.agent` mirror.
+- [x] Not Done If rejects manual provider-intake-state deletion. Evidence: PRD, TECH_SPEC, task spec, ACTION_PLAN, and `.agent` mirror.
+- [x] Not Done If rejects CO-558 docs-freshness scope drift. Evidence: PRD, TECH_SPEC, task spec, ACTION_PLAN, and `.agent` mirror.
+- [x] Parity matrix is present. Evidence: PRD and specs include current/reference/target/out-of-scope alignment.
+- [x] Fallback/refactor decision is present. Evidence: specs record `remove fallback` for broad dispatch-pilot/manual state deletion workaround.
+
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `provider workflow` Ready/Rework recovery | Stale `resumable` provider-intake claims with terminal failed historical runs can make targeted recovery appear dependent on broad `dispatch_pilot.enabled=true` admission or manual `provider-intake-state.json` deletion. | remove fallback | CO-566 | Ready/Rework issue has a terminal failed historical run and stale `resumable` provider-intake claim while dispatch source is disabled. | 2026-05-20 | 2026-05-20 | this issue | Explicit recover/relaunch/nudge launches new governed work or returns an actionable blocked classification while preserving historical failed-run audit evidence. | Focused provider handoff regression plus full provider handoff test file, spec guard, docs check, and PR ready-review drain. |
+
+- Large-refactor decision: no large refactor is warranted because CO-566 removes one stale Ready/Rework recovery fallback and reuses the existing provider workflow admission/start path.
+- Minor-seam decision: acceptable only while the fix stays bounded to explicit recovery of existing stale `resumable` claims; escalate if recovery authority must split across unrelated provider-intake lifecycle phases.
+
+## Child-Lane Validation
+- [x] Protected-term scan over declared files. Evidence: scoped `rg -n "provider-intake:ready-resumable-recover-dispatch-source-disabled:v1|dispatch_pilot\\.enabled=true|provider-intake-state\\.json|CO-558 docs-freshness scope|Ready/Rework|terminal failed historical runs|resumable|Not Done If|parity matrix" <six declared files>` returned matches across the packet.
+- [x] Scoped markdown trailing-whitespace check over declared files. Evidence: `rg -n "[[:blank:]]+$" <six declared files>` returned no matches.
+- [x] Changed-file scope check confirms only declared files changed in the child lane. Evidence: accepted child run `2026-05-20T03-01-24-615Z-49668b4b` produced only the six CO-566 packet/checklist files before parent integration.
+
+## Parent-Owned Implementation Validation
+- [x] Focused regression: Ready/Rework issue with terminal failed historical run and stale `resumable` claim launches new governed work through explicit recovery. Evidence: `npm run test:core -- orchestrator/tests/ProviderIssueHandoff.test.ts -t "Ready resumable claims|uses the recovery resolver|CO-512-shaped retry-resumable"` passed 7 focused tests.
+- [x] Focused regression: terminal live issue safety remains covered by nearby provider handoff regressions and full file execution. Evidence: `npm run test:core -- orchestrator/tests/ProviderIssueHandoff.test.ts` passed 433 tests.
+- [x] Proof: recovery does not require broad `dispatch_pilot.enabled=true`. Evidence: focused fixture has broad dispatch source resolver returning `dispatch_source_disabled` while explicit recovery resolver still launches a governed worker.
+- [x] Proof: recovery does not require manual `provider-intake-state.json` deletion. Evidence: focused fixture preserves the existing claim and historical failed manifest path while replacing current state with a fresh `starting` claim.
+- [x] Status projection proof: current recovery status is visible while historical failed run/provider-intake evidence remains auditable. Evidence: focused fixture asserts fresh `run_id` / `run_manifest_path`, `state: starting`, and preserved `retry_error`.
+
+## Handoff Status
+- [x] Child lane leaves workspace changes in place for parent patch export. Evidence: six uncommitted packet/checklist files were accepted from child run `2026-05-20T03-01-24-615Z-49668b4b`.
+- [x] Parent reconciles packet against current CO-566 Linear issue/workpad truth. Evidence: packet wording now targets new governed work or actionable blocked classification instead of rehydrating terminal failed runs as active `resumable` work.
+- [x] Parent owns registry mirror integration. Evidence: `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json` updated in the parent lane.
+- [ ] Parent owns implementation, validation, PR lifecycle, and Linear state. Evidence pending standalone review, PR, ready-review drain, and final Linear handoff.
+
+## Notes
+- The child packet intentionally did not edit `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`, or `docs/docs-catalog.json`; parent integrated the required mirrors after accepting it.
+- Parent implementation intentionally does not change CO-558 docs-freshness scope.
+- Validation note: `npm run docs:freshness` currently fails on pre-existing CO-558 rolling freshness cohort debt (`out/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5/docs-freshness.json`); CO-566 preserves that owner boundary instead of weakening or bypassing the gate.
