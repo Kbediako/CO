@@ -21,7 +21,7 @@
 - CO-555 comments add the invariant that terminal Linear truth must dominate retry/resume cache when computing WIP, status, and quota-hygiene active state.
 - CO-512/CO-516 comments show stale provider-intake state can preserve retry/released projections after live Linear state changes.
 
-## CO-382 Fallback Decision Table
+## CO-552 Fallback Decision Table
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -70,7 +70,7 @@
 - Risk: immediate owners such as CO-522, CO-553, CO-554, or CO-555 get absorbed and become ambiguous.
   - Mitigation: keep CO-552 as recurrence/invariant owner and link narrower issues instead of replacing them.
 - Risk: implementation adds another fallback seam.
-  - Mitigation: require the CO-382 table and prefer removal or large refactor when authority is split.
+  - Mitigation: require the CO-552 table and prefer removal or large refactor when authority is split.
 - Risk: status proof is collected from the wrong root or branch.
   - Mitigation: distinguish branch-local proof from shared-root/control-host proof and require typed landing exceptions plus post-merge reruns.
 - Risk: review state becomes stale after a push.

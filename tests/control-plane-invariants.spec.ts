@@ -99,6 +99,28 @@ describe('control-plane operational drift invariants', () => {
     );
   });
 
+  it('fails closed when guard semantics fields are missing from both modes', async () => {
+    const repoRoot = await writeFixture({
+      mutateConfig(config) {
+        delete config.guard_contracts[0].dry_run.selector_engine;
+        delete config.guard_contracts[0].non_dry.selector_engine;
+      }
+    });
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'guard_semantics_field_missing'
+        })
+      ])
+    );
+  });
+
   it('rejects prose-only fallback metadata contracts', async () => {
     const repoRoot = await writeFixture({
       mutateConfig(config) {
@@ -138,6 +160,28 @@ describe('control-plane operational drift invariants', () => {
       expect.arrayContaining([
         expect.objectContaining({
           code: 'freshness_registry_entry_missing'
+        })
+      ])
+    );
+  });
+
+  it('fails when a linked freshness registry row omits lifecycle state', async () => {
+    const config = buildValidConfig();
+    const registryEntries = [CONFIG_PATH, ...config.task_packet.paths].map((path) => freshnessRegistryEntry(path));
+    delete registryEntries[1].lifecycle_state;
+    const repoRoot = await writeFixture({
+      registryEntries
+    });
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'freshness_registry_lifecycle_mismatch'
         })
       ])
     );
@@ -276,6 +320,26 @@ describe('control-plane operational drift invariants', () => {
     );
   });
 
+  it('rejects task packet paths that resolve to directories', async () => {
+    const repoRoot = await writeFixture();
+    const config = buildValidConfig();
+    config.task_packet.paths[0] = 'docs';
+    await writeJson(join(repoRoot, CONFIG_PATH), config);
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'task_packet_path_not_file'
+        })
+      ])
+    );
+  });
+
   it('rejects absolute task packet paths', async () => {
     const repoRoot = await writeFixture();
     const config = buildValidConfig();
@@ -294,6 +358,16 @@ describe('control-plane operational drift invariants', () => {
         })
       ])
     );
+  });
+
+  it('sanitizes default report task id path segments', async () => {
+    const repoRoot = await writeFixture();
+
+    const { outputPath } = await runControlPlaneInvariants(repoRoot, {
+      taskId: '../../outside'
+    });
+
+    expect(outputPath).toBe(join(repoRoot, 'out', 'outside', 'control-plane-invariants.json'));
   });
 });
 

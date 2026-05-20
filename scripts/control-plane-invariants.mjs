@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const CONTROL_PLANE_INVARIANTS_SCHEMA = 'codex.control-plane.operational-drift-invariants';
@@ -283,7 +283,19 @@ function validateGuardContracts(contracts, findings) {
       continue;
     }
     for (const key of ['selector_engine', 'rule_engine', 'validation_semantics']) {
-      if (dryRun[key] !== nonDry[key]) {
+      const dryRunValue = readNonEmptyString(dryRun[key]);
+      const nonDryValue = readNonEmptyString(nonDry[key]);
+      if (!dryRunValue || !nonDryValue) {
+        addFinding(
+          findings,
+          'error',
+          'guard_semantics_field_missing',
+          `Guard dry-run and non-dry modes must both define ${key}.`,
+          `${contractPath}.${key}`
+        );
+        continue;
+      }
+      if (dryRunValue !== nonDryValue) {
         addFinding(
           findings,
           'error',
@@ -591,7 +603,7 @@ async function validateTaskPacket(config, input) {
         'docs/docs-freshness-registry.json'
       );
     }
-    if (entry.lifecycle_state && entry.lifecycle_state !== 'active') {
+    if (entry.lifecycle_state !== 'active') {
       addFinding(
         input.findings,
         'error',
@@ -661,7 +673,7 @@ async function validateRepoPathExists(repoRoot, repoPath, findings, sourcePath) 
   const normalized = normalizeRepoPath(repoPath);
   const absolutePath = resolve(repoRoot, normalized);
   const absoluteRoot = resolve(repoRoot);
-  const escapesRepo = absolutePath !== absoluteRoot && !absolutePath.startsWith(`${absoluteRoot}/`);
+  const escapesRepo = pathEscapesRoot(absoluteRoot, absolutePath);
   if (
     !normalized ||
     isAbsolute(normalized) ||
@@ -674,7 +686,10 @@ async function validateRepoPathExists(repoRoot, repoPath, findings, sourcePath) 
     return;
   }
   try {
-    await access(resolve(repoRoot, normalized));
+    const pathStat = await stat(resolve(repoRoot, normalized));
+    if (!pathStat.isFile()) {
+      addFinding(findings, 'error', 'task_packet_path_not_file', `Repo path ${normalized} is not a file.`, sourcePath);
+    }
   } catch (error) {
     if (error?.code === 'ENOENT') {
       addFinding(findings, 'error', 'task_packet_path_missing', `Missing repo path ${normalized}.`, sourcePath);
@@ -722,7 +737,7 @@ function resolveOutputPath(repoRoot, options) {
     readNonEmptyString(process.env.CODEX_ORCHESTRATOR_TASK_ID) ??
     'control-plane-invariants';
   const outRoot = resolve(repoRoot, options.outRoot ?? 'out');
-  return join(outRoot, taskId, 'control-plane-invariants.json');
+  return join(outRoot, sanitizePathSegment(taskId), 'control-plane-invariants.json');
 }
 
 function parseArgs(argv) {
@@ -814,9 +829,27 @@ function normalizeRepoPath(value) {
 function relativeToRepo(repoRoot, path) {
   const normalizedRoot = resolve(repoRoot);
   const normalizedPath = resolve(path);
-  return normalizedPath.startsWith(`${normalizedRoot}/`)
-    ? normalizedPath.slice(normalizedRoot.length + 1)
-    : normalizedPath;
+  const repoRelative = relative(normalizedRoot, normalizedPath);
+  return pathEscapesRoot(normalizedRoot, normalizedPath) ? normalizedPath : normalizeRepoPath(repoRelative || '.');
+}
+
+function pathEscapesRoot(root, candidate) {
+  const repoRelative = relative(root, candidate);
+  return repoRelative === '..' || repoRelative.startsWith(`..${sep}`) || isAbsolute(repoRelative);
+}
+
+function sanitizePathSegment(value) {
+  const text = readNonEmptyString(value);
+  if (!text) {
+    return 'control-plane-invariants';
+  }
+  const flattened = text
+    .replace(/\\/g, '/')
+    .split('/')
+    .filter((part) => part && part !== '.' && part !== '..')
+    .join('-');
+  const sanitized = flattened.replace(/[^A-Za-z0-9._-]+/gu, '-').replace(/^-+|-+$/gu, '');
+  return sanitized || 'control-plane-invariants';
 }
 
 async function main() {
