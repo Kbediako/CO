@@ -9,7 +9,7 @@ This folder keeps the long-form public and maintainer guidance out of the GitHub
 - [Bundled Skills](skills.md): install behavior, refresh flags, and pointer to the canonical roster in [skills/README.md](../../skills/README.md)
 - [Public Posture](public-posture.md): current compatibility target, model/runtime posture, and evidence gates
 - [Local Hook Impact](local-hook-impact.md): evidence for the local CO auto-continue hook and whether it affects subagents/provider agents
-- [Historical Codex CLI 0.124.0 Evidence](archive/codex-cli-0124-adoption.md): archive-only CO-341/CO-345 evidence for the `0.124.0` step; see the canonical version policy for the current local `0.128.0` ChatGPT-auth appserver/model posture, package/downstream-smoke `0.125.0` compatibility hold, and cloud-only `0.124.0` candidate split
+- [Historical Codex CLI 0.124.0 Evidence](archive/codex-cli-0124-adoption.md): archive-only CO-341/CO-345 evidence for the `0.124.0` step; see the canonical version policy for the current local `0.130.0` ChatGPT-auth appserver/model posture, package/downstream-smoke `0.125.0` compatibility hold, and cloud-only `0.124.0` candidate split
 
 ## Navigation Contract
 

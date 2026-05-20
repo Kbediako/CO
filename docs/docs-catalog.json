@@ -380,9 +380,105 @@
             "start": "1289",
             "end": "1298"
           }
+        },
+        {
+          "id": "co-558-may-20-apr-19-task-report-maintenance",
+          "last_review": "2026-04-19",
+          "cadence_days": 30,
+          "path_families": [
+            ".agent/task",
+            "docs/ACTION_PLAN-*",
+            "docs/findings",
+            "docs/PRD-*",
+            "docs/TECH_SPEC-*",
+            "tasks/specs",
+            "tasks/tasks-*"
+          ],
+          "path_prefixes": [
+            ".agent/task/1299-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
+            ".agent/task/1300-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
+            ".agent/task/1301-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
+            ".agent/task/1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+            ".agent/task/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
+            ".agent/task/linear-20dbc119-a30e-4cf8-a61a-6277cf169170.md",
+            ".agent/task/linear-31794e73-bc33-44b7-96d0-41334119a038.md",
+            ".agent/task/linear-5348c2fb-8897-48e3-a848-7831778b1b00.md",
+            ".agent/task/linear-af97d673-43a4-4a36-8738-b7f61e5b71a1.md",
+            ".agent/task/linear-c9e99e2c-bc48-48f1-a8ca-4bd2a9289be2.md",
+            ".agent/task/linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
+            ".agent/task/linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md",
+            "docs/ACTION_PLAN-CO-260-local-rollout-executor.md",
+            "docs/ACTION_PLAN-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+            "docs/ACTION_PLAN-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
+            "docs/ACTION_PLAN-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
+            "docs/ACTION_PLAN-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
+            "docs/ACTION_PLAN-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
+            "docs/ACTION_PLAN-linear-20dbc119-a30e-4cf8-a61a-6277cf169170.md",
+            "docs/ACTION_PLAN-linear-31794e73-bc33-44b7-96d0-41334119a038.md",
+            "docs/ACTION_PLAN-linear-5348c2fb-8897-48e3-a848-7831778b1b00.md",
+            "docs/ACTION_PLAN-linear-af97d673-43a4-4a36-8738-b7f61e5b71a1.md",
+            "docs/ACTION_PLAN-linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
+            "docs/ACTION_PLAN-linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md",
+            "docs/findings/1299-frontend-test-cli-remaining-boundary-freeze-reassessment-deliberation.md",
+            "docs/findings/1300-frontend-test-cli-help-surface-completion-deliberation.md",
+            "docs/findings/1301-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit-deliberation.md",
+            "docs/findings/1302-linear-and-telegram-provider-setup-and-smoke-testing-deliberation.md",
+            "docs/findings/1303-symphony-parity-linear-autonomous-intake-and-run-handoff-deliberation.md",
+            "docs/findings/linear-5348c2fb-8897-48e3-a848-7831778b1b00-docs-freshness-classification.md",
+            "docs/PRD-CO-260-local-rollout-executor.md",
+            "docs/PRD-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+            "docs/PRD-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
+            "docs/PRD-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
+            "docs/PRD-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
+            "docs/PRD-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
+            "docs/PRD-linear-20dbc119-a30e-4cf8-a61a-6277cf169170.md",
+            "docs/PRD-linear-31794e73-bc33-44b7-96d0-41334119a038.md",
+            "docs/PRD-linear-5348c2fb-8897-48e3-a848-7831778b1b00.md",
+            "docs/PRD-linear-af97d673-43a4-4a36-8738-b7f61e5b71a1.md",
+            "docs/PRD-linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
+            "docs/PRD-linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md",
+            "docs/TECH_SPEC-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+            "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
+            "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
+            "docs/TECH_SPEC-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
+            "docs/TECH_SPEC-linear-20dbc119-a30e-4cf8-a61a-6277cf169170.md",
+            "docs/TECH_SPEC-linear-31794e73-bc33-44b7-96d0-41334119a038.md",
+            "docs/TECH_SPEC-linear-5348c2fb-8897-48e3-a848-7831778b1b00.md",
+            "docs/TECH_SPEC-linear-af97d673-43a4-4a36-8738-b7f61e5b71a1.md",
+            "docs/TECH_SPEC-linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
+            "docs/TECH_SPEC-linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md",
+            "tasks/specs/1299-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
+            "tasks/specs/1300-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
+            "tasks/specs/1301-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
+            "tasks/specs/1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+            "tasks/tasks-1299-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment.md",
+            "tasks/tasks-1300-coordinator-symphony-aligned-frontend-test-cli-help-surface-completion.md",
+            "tasks/tasks-1301-coordinator-symphony-aligned-frontend-test-cli-remaining-boundary-freeze-reassessment-revisit.md",
+            "tasks/tasks-1302-coordinator-linear-and-telegram-provider-setup-and-smoke-testing.md",
+            "tasks/tasks-1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
+            "tasks/tasks-linear-20dbc119-a30e-4cf8-a61a-6277cf169170.md",
+            "tasks/tasks-linear-31794e73-bc33-44b7-96d0-41334119a038.md",
+            "tasks/tasks-linear-5348c2fb-8897-48e3-a848-7831778b1b00.md",
+            "tasks/tasks-linear-af97d673-43a4-4a36-8738-b7f61e5b71a1.md",
+            "tasks/tasks-linear-c9e99e2c-bc48-48f1-a8ca-4bd2a9289be2.md",
+            "tasks/tasks-linear-d334cd3d-b560-497c-9e07-ec8084890493.md",
+            "tasks/tasks-linear-fb4c95d0-da68-4312-b3bb-3bd6282aa79f.md"
+          ],
+          "task_number_range": {
+            "start": "1299",
+            "end": "1303"
+          }
         }
       ],
       "canonical_owner_issues": [
+        {
+          "canonical_owner_key": "baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance",
+          "owner_issue": "CO-568"
+        },
+        {
+          "canonical_owner_key": "baseline_cohort_id:co-558-may-20-apr-19-task-report-maintenance",
+          "owner_issue": "CO-569"
+        },
         {
           "canonical_owner_key": "docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30",
           "owner_issue": "CO-320"
@@ -895,6 +991,25 @@
         "task snapshot refreshes",
         "task checklist sync changes",
         "task archive automation changes"
+      ],
+      "truth_checks": []
+    },
+    {
+      "path": "docs/control-plane-invariants.json",
+      "status": "active",
+      "tier": 2,
+      "doc_class": "active_guide",
+      "audience": "contributors and maintainers",
+      "source_of_truth": [
+        "tasks/specs/linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md",
+        "scripts/control-plane-invariants.mjs"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "control-plane invariant contract changes",
+        "guard selector or rule changes",
+        "status monitor authority changes"
       ],
       "truth_checks": []
     }

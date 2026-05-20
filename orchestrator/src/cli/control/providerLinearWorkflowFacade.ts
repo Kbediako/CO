@@ -3093,7 +3093,7 @@ export async function createProviderLinearFollowUpIssue(input: {
       followUpIssue: createdIssue
     })
   });
-  if (createdIssue.description !== finalizedDescription) {
+  if (!sameFollowUpDescriptionAfterLinearMarkdownNormalization(createdIssue.description, finalizedDescription)) {
     const updateDescriptionResult = await executeProviderLinearGraphql<IssueDescriptionUpdateMutationResponse>({
       session: session.session,
       operation: 'create-follow-up',
@@ -3132,7 +3132,7 @@ export async function createProviderLinearFollowUpIssue(input: {
         false
       );
     }
-    if (updatedIssue.description !== finalizedDescription) {
+    if (!sameFollowUpDescriptionAfterLinearMarkdownNormalization(updatedIssue.description, finalizedDescription)) {
       return failure(
         'create-follow-up',
         'linear_follow_up_description_update_incomplete',
@@ -3227,7 +3227,7 @@ export async function createProviderLinearFollowUpIssue(input: {
       return traceableFollowUpIssue.result;
     }
   }
-  if (!canonicalOwnerKey && followUpIssue.description !== finalizedDescription) {
+  if (!canonicalOwnerKey && !sameFollowUpDescriptionAfterLinearMarkdownNormalization(followUpIssue.description, finalizedDescription)) {
     return failure(
       'create-follow-up',
       'linear_follow_up_description_update_incomplete',
@@ -3665,7 +3665,7 @@ function resolveFollowUpTraceabilityUpdate(input: {
     canonicalOwner: input.canonicalOwner,
     traceability
   });
-  if (observedDescription === finalizedDescription) {
+  if (sameFollowUpDescriptionAfterLinearMarkdownNormalization(observedDescription, finalizedDescription)) {
     return {
       finalizedDescription,
       shouldUpdate: false,
@@ -3692,7 +3692,7 @@ function resolveFollowUpTraceabilityUpdate(input: {
   });
   return {
     finalizedDescription,
-    shouldUpdate: observedDescription === unfinishedDescription,
+    shouldUpdate: sameFollowUpDescriptionAfterLinearMarkdownNormalization(observedDescription, unfinishedDescription),
     invalid: isManagedFollowUpDescriptionDrift(observedDescription, finalizedDescription, unfinishedDescription),
     observedDescription
   };
@@ -3704,10 +3704,16 @@ function isManagedFollowUpDescriptionDrift(observedDescription: string, ...expec
     if (hasTrailingManagedFollowUpDescriptionDrift(observedDescription, expectedDescription)) {
       return true;
     }
+    if (hasTrailingManagedFollowUpDescriptionDriftAfterLinearMarkdownNormalization(observedDescription, expectedDescription)) {
+      return true;
+    }
     const normalizedExpectedDescription = normalizeFollowUpSourceIssueTraceabilityLine(expectedDescription);
-    return hasTrailingManagedFollowUpDescriptionDrift(
-      normalizedObservedDescription,
-      normalizedExpectedDescription
+    return (
+      hasTrailingManagedFollowUpDescriptionDrift(normalizedObservedDescription, normalizedExpectedDescription) ||
+      hasTrailingManagedFollowUpDescriptionDriftAfterLinearMarkdownNormalization(
+        normalizedObservedDescription,
+        normalizedExpectedDescription
+      )
     );
   });
 }
@@ -3722,7 +3728,314 @@ function hasTrailingManagedFollowUpDescriptionDrift(observedDescription: string,
 function sameFollowUpDescriptionExceptSourceIssueTraceability(left: string, right: string): boolean {
   const normalizedLeft = normalizeFollowUpSourceIssueTraceabilityLine(left);
   const normalizedRight = normalizeFollowUpSourceIssueTraceabilityLine(right);
-  return normalizedLeft !== left && normalizedRight !== right && normalizedLeft === normalizedRight;
+  return (
+    normalizedLeft !== left &&
+    normalizedRight !== right &&
+    sameFollowUpDescriptionAfterLinearMarkdownNormalization(normalizedLeft, normalizedRight)
+  );
+}
+
+function sameFollowUpDescriptionAfterLinearMarkdownNormalization(left: string | null | undefined, right: string | null | undefined): boolean {
+  const normalizedLeft = normalizeLinearPersistedMarkdownForComparison(left ?? '');
+  const normalizedRight = normalizeLinearPersistedMarkdownForComparison(right ?? '');
+  return normalizedLeft === normalizedRight;
+}
+
+function hasTrailingManagedFollowUpDescriptionDriftAfterLinearMarkdownNormalization(
+  observedDescription: string,
+  expectedDescription: string
+): boolean {
+  const normalizedObserved = normalizeLinearPersistedMarkdownForComparison(observedDescription);
+  const normalizedExpected = normalizeLinearPersistedMarkdownForComparison(expectedDescription);
+  return hasTrailingManagedFollowUpDescriptionDrift(normalizedObserved, normalizedExpected);
+}
+
+function normalizeLinearPersistedMarkdownForComparison(description: string): string {
+  const lines = description.replace(/\r\n?/gu, '\n').split('\n');
+  const normalizedLines: string[] = [];
+  let activeFence: LinearMarkdownFenceState | null = null;
+  let activeHtmlBlock: LinearMarkdownHtmlBlockState | null = null;
+
+  for (const line of lines) {
+    if (activeHtmlBlock !== null) {
+      normalizedLines.push(line);
+      if (isLinearMarkdownHtmlBlockEndLine(line, activeHtmlBlock)) {
+        activeHtmlBlock = null;
+      }
+      continue;
+    }
+
+    const fence = parseLinearMarkdownFence(line);
+    if (fence !== null) {
+      activeFence = nextLinearMarkdownFenceState(activeFence, fence);
+      normalizedLines.push(line);
+      continue;
+    }
+
+    if (activeFence !== null) {
+      normalizedLines.push(line);
+      continue;
+    }
+
+    const htmlBlock = parseLinearMarkdownHtmlBlockStartLine(line);
+    if (htmlBlock !== null) {
+      normalizedLines.push(line);
+      activeHtmlBlock = isLinearMarkdownHtmlBlockEndLine(line, htmlBlock) ? null : htmlBlock;
+      continue;
+    }
+
+    if (
+      (isLinearMarkdownIndentedCodeLine(line) &&
+        !isLinearMarkdownNestedListItemLine(line, normalizedLines)) ||
+      isLinearMarkdownThematicBreakLine(line) || isLinearMarkdownThematicBreakLine(line.replace(/^(?:[ \t]{0,3}>[ \t]?)+/u, ''))
+    ) {
+      normalizedLines.push(line);
+      continue;
+    }
+
+    normalizedLines.push(normalizeLinearMarkdownBulletMarkerLine(line, normalizedLines));
+  }
+
+  return collapseLinearHeadingListSpacing(normalizedLines).join('\n');
+}
+
+type LinearMarkdownFenceState = { marker: '`' | '~'; length: number; blockquoteDepth: number };
+type LinearMarkdownFenceToken = LinearMarkdownFenceState & { trailing: string };
+
+function parseLinearMarkdownFence(line: string): LinearMarkdownFenceToken | null {
+  const containerMatch = line.match(/^((?:[ \t]{0,3}>[ \t]?)*)/u);
+  const blockquotePrefix = containerMatch?.[1] ?? '';
+  const blockquoteDepth = (blockquotePrefix.match(/>/gu) ?? []).length;
+  const fenceMatch = line.slice(blockquotePrefix.length).match(/^[ \t]{0,3}(`{3,}|~{3,})(.*)$/u);
+  if (!fenceMatch) {
+    return null;
+  }
+  const delimiter = fenceMatch[1];
+  return {
+    marker: delimiter[0] as '`' | '~',
+    length: delimiter.length,
+    blockquoteDepth,
+    trailing: fenceMatch[2] ?? ''
+  };
+}
+
+function nextLinearMarkdownFenceState(
+  activeFence: LinearMarkdownFenceState | null,
+  fence: LinearMarkdownFenceToken
+): LinearMarkdownFenceState | null {
+  if (activeFence === null) {
+    return {
+      marker: fence.marker,
+      length: fence.length,
+      blockquoteDepth: fence.blockquoteDepth
+    };
+  }
+  if (
+    activeFence.marker === fence.marker &&
+    activeFence.blockquoteDepth === fence.blockquoteDepth &&
+    fence.length >= activeFence.length &&
+    fence.trailing.trim() === ''
+  ) {
+    return null;
+  }
+  return activeFence;
+}
+
+function stripLinearMarkdownBlockquotePrefix(line: string): string {
+  return line.replace(/^(?:[ \t]{0,3}>[ \t]?)+/u, '');
+}
+
+type LinearMarkdownHtmlBlockState =
+  | { kind: 'until_close'; endPattern: RegExp }
+  | { kind: 'until_blank' };
+
+function parseLinearMarkdownHtmlBlockStartLine(line: string): LinearMarkdownHtmlBlockState | null {
+  const structuralLine = stripLinearMarkdownBlockquotePrefix(line);
+  const rawTextMatch = structuralLine.match(/^[ \t]{0,3}<(pre|script|style|textarea)(?:\s|>|$)/iu);
+  if (rawTextMatch) {
+    return { kind: 'until_close', endPattern: new RegExp(`</${rawTextMatch[1]}\\s*>`, 'iu') };
+  }
+  if (/^[ \t]{0,3}<!--/u.test(structuralLine)) {
+    return { kind: 'until_close', endPattern: /-->/u };
+  }
+  if (/^[ \t]{0,3}<\?/u.test(structuralLine)) {
+    return { kind: 'until_close', endPattern: /\?>/u };
+  }
+  if (/^[ \t]{0,3}<![A-Z]/u.test(structuralLine)) {
+    return { kind: 'until_close', endPattern: />/u };
+  }
+  if (/^[ \t]{0,3}<!\[CDATA\[/u.test(structuralLine)) {
+    return { kind: 'until_close', endPattern: /\]\]>/u };
+  }
+  if (
+    /^[ \t]{0,3}<\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)(?:\s|>|\/>)/iu.test(
+      structuralLine
+    )
+  ) {
+    return { kind: 'until_blank' };
+  }
+  if (/^[ \t]{0,3}<\/?[A-Za-z][A-Za-z0-9-]*(?:\s+(?:"[^"]*"|'[^']*'|[^'"<>])*)?\s*\/?>\s*$/u.test(structuralLine)) {
+    return { kind: 'until_blank' };
+  }
+  return null;
+}
+
+function isLinearMarkdownHtmlBlockEndLine(line: string, block: LinearMarkdownHtmlBlockState): boolean {
+  const structuralLine = stripLinearMarkdownBlockquotePrefix(line);
+  return block.kind === 'until_blank' ? structuralLine.trim() === '' : block.endPattern.test(structuralLine);
+}
+
+function isLinearMarkdownIndentedCodeLine(line: string): boolean {
+  return getLinearMarkdownIndentWidth(line.match(/^[ \t]*/u)?.[0] ?? '') >= 4;
+}
+
+type LinearMarkdownNormalizationListItem = { indent: number; markerWidth: number };
+
+function isLinearMarkdownNestedListItemLine(line: string, previousLines: readonly string[]): boolean {
+  const nestedListItem = parseLinearMarkdownNormalizationListItemLine(line, '*') ?? parseLinearMarkdownNormalizationListItemLine(line, '+');
+  if (nestedListItem === null) return false;
+  return isLinearMarkdownListItemInListContext(nestedListItem, previousLines);
+}
+
+function isLinearMarkdownListItemInListContext(
+  listItem: LinearMarkdownNormalizationListItem,
+  previousLines: readonly string[]
+): boolean {
+  for (let index = previousLines.length - 1; index >= 0; index -= 1) {
+    if (previousLines[index].trim() === '') continue;
+    const parentListItem = parseLinearMarkdownNormalizationListItemLine(previousLines[index]);
+    if (parentListItem === null) {
+      return false;
+    }
+    if (parentListItem.indent >= listItem.indent) {
+      continue;
+    }
+    if (listItem.indent > parentListItem.indent + 3 + parentListItem.markerWidth) {
+      return false;
+    }
+    return parentListItem.indent <= 3 || isLinearMarkdownListItemInListContext(parentListItem, previousLines.slice(0, index));
+  }
+  return false;
+}
+
+function isLinearMarkdownThematicBreakLine(line: string): boolean {
+  return /^[ \t]{0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$/u.test(line);
+}
+
+function collapseLinearHeadingListSpacing(lines: string[]): string[] {
+  const collapsed: string[] = [];
+  let activeFence: LinearMarkdownFenceState | null = null;
+  let activeHtmlBlock: LinearMarkdownHtmlBlockState | null = null;
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (activeHtmlBlock !== null) {
+      collapsed.push(line);
+      if (isLinearMarkdownHtmlBlockEndLine(line, activeHtmlBlock)) {
+        activeHtmlBlock = null;
+      }
+      continue;
+    }
+
+    const fence = parseLinearMarkdownFence(line);
+    if (
+      line.trim() === '' &&
+      activeFence === null &&
+      activeHtmlBlock === null &&
+      collapsed.length > 0 &&
+      isLinearMarkdownNormalizationHeadingLine(collapsed[collapsed.length - 1]) &&
+      isLinearMarkdownNormalizationListItemLine(lines[index + 1] ?? '')
+    ) {
+      continue;
+    }
+    collapsed.push(line);
+    if (fence !== null) {
+      activeFence = nextLinearMarkdownFenceState(activeFence, fence);
+    }
+    if (activeFence === null) {
+      const htmlBlock = parseLinearMarkdownHtmlBlockStartLine(line);
+      if (htmlBlock !== null) {
+        activeHtmlBlock = isLinearMarkdownHtmlBlockEndLine(line, htmlBlock) ? null : htmlBlock;
+      }
+    }
+  }
+  return collapsed;
+}
+
+function isLinearMarkdownNormalizationHeadingLine(line: string): boolean {
+  return /^[ ]{0,3}#{1,6}\s+\S/u.test(line);
+}
+
+function isLinearMarkdownNormalizationListItemLine(line: string): boolean {
+  const listItem = parseLinearMarkdownNormalizationListItemLine(line);
+  return listItem !== null && listItem.indent <= 3;
+}
+
+function parseLinearMarkdownNormalizationListItemLine(
+  line: string,
+  marker: '-' | '*' | '+' | null = null
+): LinearMarkdownNormalizationListItem | null {
+  if (isLinearMarkdownThematicBreakLine(line)) {
+    return null;
+  }
+  const markerPattern = marker === '*' ? '\\*' : marker === '+' ? '\\+' : marker ?? '(?:[-*+]|\\d+[.)])';
+  const listItemMatch = line.match(new RegExp(`^([ \\t]*)(${markerPattern})\\s+\\S`, 'u'));
+  return listItemMatch
+    ? { indent: getLinearMarkdownIndentWidth(listItemMatch[1]), markerWidth: getLinearMarkdownIndentWidth(listItemMatch[2]) }
+    : null;
+}
+
+function getLinearMarkdownIndentWidth(indent: string): number {
+  return [...indent].reduce((width, char) => width + (char === '\t' ? 4 : 1), 0);
+}
+
+function normalizeLinearMarkdownBulletMarkerLine(line: string, previousLines: readonly string[] = []): string {
+  if (isLinearMarkdownManagedMarkerLine(line)) {
+    return line;
+  }
+  const blockquoteListItem =
+    parseLinearMarkdownBlockquoteListItemLine(line, '*') ?? parseLinearMarkdownBlockquoteListItemLine(line, '+');
+  if (
+    blockquoteListItem !== null &&
+    (blockquoteListItem.listItem.indent <= 3 ||
+      isLinearMarkdownListItemInListContext(
+        blockquoteListItem.listItem,
+        getLinearMarkdownBlockquoteContextLines(previousLines)
+      ))
+  ) {
+    return `${blockquoteListItem.prefix}${blockquoteListItem.content.replace(/^([ \t]*)[*+]\s+/u, '$1- ')}`;
+  }
+  return line
+    .replace(/^([ \t]*)[*+]\s+/u, '$1- ')
+    .replace(/^((?:[ \t]{0,3}>[ \t]?)+[ ]{0,3})[*+]\s+/u, '$1- ');
+}
+
+function parseLinearMarkdownBlockquoteListItemLine(
+  line: string,
+  marker: '*' | '+'
+): { prefix: string; content: string; listItem: LinearMarkdownNormalizationListItem } | null {
+  const quoteMatch = line.match(/^((?:[ \t]{0,3}>[ \t]?)+)(.*)$/u);
+  if (!quoteMatch) return null;
+  const listItem = parseLinearMarkdownNormalizationListItemLine(quoteMatch[2], marker);
+  return listItem === null ? null : { prefix: quoteMatch[1], content: quoteMatch[2], listItem };
+}
+
+function getLinearMarkdownBlockquoteContextLines(previousLines: readonly string[]): string[] {
+  const contextLines: string[] = [];
+  for (let index = previousLines.length - 1; index >= 0; index -= 1) {
+    const line = previousLines[index];
+    if (line.trim() === '') {
+      contextLines.unshift('');
+      continue;
+    }
+    if (!/^(?:[ \t]{0,3}>[ \t]?)+/u.test(line)) break;
+    contextLines.unshift(stripLinearMarkdownBlockquotePrefix(line));
+  }
+  return contextLines;
+}
+
+function isLinearMarkdownManagedMarkerLine(line: string): boolean {
+  const structuralLine = stripLinearMarkdownBlockquotePrefix(line).trimStart();
+  return /^\+\s+(?:Canonical owner marker|Follow-up packet prefix):/u.test(structuralLine);
 }
 
 function normalizeFollowUpSourceIssueTraceabilityLine(description: string): string {
@@ -3737,10 +4050,10 @@ function normalizeFollowUpSourceIssueTraceabilityLine(description: string): stri
     );
     const sectionEnd = nextHeadingIndex === -1 ? lines.length : nextHeadingIndex;
     const sectionLines = lines.slice(index + 1, sectionEnd);
-    if (!sectionLines.some((line) => line.startsWith('- Follow-up packet prefix:'))) {
+    if (!sectionLines.some(isFollowUpPacketPrefixTraceabilityLine)) {
       continue;
     }
-    const sourceLineOffset = sectionLines.findIndex((line) => /^- Source issue: .+$/u.test(line));
+    const sourceLineOffset = sectionLines.findIndex(isSourceIssueTraceabilityLine);
     if (sourceLineOffset === -1) {
       continue;
     }
@@ -3748,6 +4061,14 @@ function normalizeFollowUpSourceIssueTraceabilityLine(description: string): stri
     normalized = true;
   }
   return normalized ? lines.join('\n') : description;
+}
+
+function isFollowUpPacketPrefixTraceabilityLine(line: string): boolean {
+  return /^[-*] Follow-up packet prefix:/u.test(line);
+}
+
+function isSourceIssueTraceabilityLine(line: string): boolean {
+  return /^[-*] Source issue: .+$/u.test(line);
 }
 
 async function ensureFollowUpIssueTraceability(input: {
@@ -3851,7 +4172,7 @@ async function ensureFollowUpIssueTraceability(input: {
       )
     };
   }
-  if (updatedIssue.description !== traceabilityUpdate.finalizedDescription) {
+  if (!sameFollowUpDescriptionAfterLinearMarkdownNormalization(updatedIssue.description, traceabilityUpdate.finalizedDescription)) {
     return {
       ok: false,
       result: failure(
@@ -3881,7 +4202,7 @@ async function ensureFollowUpIssueTraceability(input: {
   if (!labeledIssue.ok) {
     return labeledIssue;
   }
-  if (labeledIssue.issue.description !== traceabilityUpdate.finalizedDescription) {
+  if (!sameFollowUpDescriptionAfterLinearMarkdownNormalization(labeledIssue.issue.description, traceabilityUpdate.finalizedDescription)) {
     return {
       ok: false,
       result: failure(
@@ -3934,8 +4255,12 @@ function verifyFollowUpIssueTraceability(input: {
   const traceabilityUpdate = resolveFollowUpTraceabilityUpdate(input);
   const acceptedDescription = input.acceptedDescription ?? null;
   const traceabilityPreserved =
-    traceabilityUpdate.observedDescription === traceabilityUpdate.finalizedDescription ||
-    (acceptedDescription !== null && traceabilityUpdate.observedDescription === acceptedDescription);
+    sameFollowUpDescriptionAfterLinearMarkdownNormalization(
+      traceabilityUpdate.observedDescription,
+      traceabilityUpdate.finalizedDescription
+    ) ||
+    (acceptedDescription !== null &&
+      sameFollowUpDescriptionAfterLinearMarkdownNormalization(traceabilityUpdate.observedDescription, acceptedDescription));
   if (!traceabilityPreserved) {
     return {
       ok: false,

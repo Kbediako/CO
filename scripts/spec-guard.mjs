@@ -1059,7 +1059,9 @@ async function checkFallbackDecisionEvidence(baseRef, changedFiles) {
   }
 
   const sourceEntries = await readChangedFallbackDecisionSources(changedFiles);
-  const decisionSourceEntries = sourceEntries.filter((entry) => !isArchivedSpecStub(entry.file, entry.content));
+  const decisionSourceEntries = sourceEntries.filter(
+    (entry) => !isArchivedSpecStub(entry.file, entry.content) && !isInactiveSpec(entry.content)
+  );
   const rowsBySource = decisionSourceEntries.map((entry) => ({
     ...entry,
     rows: parseFallbackDecisionRows(entry.content)

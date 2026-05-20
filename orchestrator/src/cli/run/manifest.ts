@@ -15,6 +15,7 @@ import type {
 import { writeJsonAtomic } from '../utils/fs.js';
 import { slugify } from '../utils/strings.js';
 import { isoTimestamp } from '../utils/time.js';
+import { writeRunManifestSnapshot } from './manifestFile.js';
 import { loadInstructionSet } from '../../../../packages/orchestrator/src/instructions/loader.js';
 import type { EnvironmentPaths } from './environment.js';
 import type { RunPaths } from './runPaths.js';
@@ -93,6 +94,26 @@ const HEARTBEAT_INTERVAL_SECONDS = 5;
 const HEARTBEAT_STALE_AFTER_SECONDS = 30;
 const MAX_ERROR_DETAIL_CHARS = 8 * 1024;
 const DEFAULT_MIN_EXPERIENCE_REWARD = 0.1;
+const PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR = [
+  'linear_transition',
+  'workpad_replacement',
+  'pr_attachment',
+  'review_handoff',
+  'ready_review_success',
+  'merge_closeout',
+  'hook_recovery_success',
+  'long_poll_terminal_status',
+  'hook_resume_control_integration',
+  'tui_automation'
+] as const;
+const PROVIDER_WORKER_RUNTIME_SELECTION_FIELDS = [
+  'runtime_mode_requested',
+  'runtime_mode',
+  'runtime_provider',
+  'runtime_fallback',
+  'provider_worker_control'
+] as const;
+const MANIFESTS_WITH_EXPLICIT_GOAL_EVIDENCE_CLEAR = new WeakSet<object>();
 const KNOWN_NON_GUARDRAIL_PIPELINE_IDS = new Set([
   'provider-linear-worker',
   'provider-linear-child-lane'
@@ -307,7 +328,78 @@ export async function saveManifest(paths: RunPaths, manifest: CliManifest): Prom
     backfillProviderControlHostLocatorFromEnv(manifest);
   }
   manifest.updated_at = isoTimestamp();
-  await writeJsonAtomic(paths.manifestPath, manifest);
+  const manifestRecord = manifest as unknown as Record<string, unknown>;
+  const explicitGoalEvidenceClear = MANIFESTS_WITH_EXPLICIT_GOAL_EVIDENCE_CLEAR.has(manifestRecord);
+  let saveSucceeded = false;
+  try {
+    const result = await writeRunManifestSnapshot(paths.manifestPath, manifestRecord, {
+      taskId: manifest.task_id,
+      preserveCurrentFields: PROVIDER_WORKER_RUNTIME_SELECTION_FIELDS.map((field) => ({
+        field,
+        preserveCurrent: ({ current }) => hasProviderWorkerRuntimeSelection(current)
+      })),
+      preserveCurrentFieldsWhenSnapshotNull: [
+        {
+          field: 'goal_evidence',
+          preserveCurrent: ({ currentValue }) =>
+            !explicitGoalEvidenceClear &&
+            isProviderLinearAdvisoryGoalEvidence(currentValue)
+        }
+      ]
+    });
+    if (result.manifest) {
+      replaceManifestRecord(manifestRecord, result.manifest);
+    }
+    saveSucceeded = true;
+  } finally {
+    if (saveSucceeded) {
+      MANIFESTS_WITH_EXPLICIT_GOAL_EVIDENCE_CLEAR.delete(manifestRecord);
+    }
+  }
+}
+
+export function markManifestGoalEvidenceExplicitClear(manifest: CliManifest): void {
+  MANIFESTS_WITH_EXPLICIT_GOAL_EVIDENCE_CLEAR.add(manifest as unknown as Record<string, unknown>);
+}
+
+function replaceManifestRecord(target: Record<string, unknown>, source: Record<string, unknown>): void {
+  for (const key of Object.keys(target)) {
+    delete target[key];
+  }
+  Object.assign(target, source);
+}
+
+function isProviderLinearAdvisoryGoalEvidence(value: unknown): boolean {
+  if (!isPlainRecord(value)) {
+    return false;
+  }
+  if (value.authority !== 'advisory_only' || value.linear_authority_preserved !== true) {
+    return false;
+  }
+  if (!Array.isArray(value.not_authorized_for)) {
+    return false;
+  }
+  const notAuthorizedFor = value.not_authorized_for
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter((item): item is string => item.length > 0);
+  const notAuthorizedForSet = new Set(notAuthorizedFor);
+  return (
+    notAuthorizedFor.length === PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR.length &&
+    notAuthorizedForSet.size === PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR.length &&
+    PROVIDER_LINEAR_GOAL_EVIDENCE_NOT_AUTHORIZED_FOR.every((item) => notAuthorizedForSet.has(item))
+  );
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasProviderWorkerRuntimeSelection(manifest: Record<string, unknown>): boolean {
+  const workerControl = manifest.provider_worker_control;
+  if (!isPlainRecord(workerControl)) {
+    return false;
+  }
+  return workerControl.authority === 'appserver' || workerControl.authority === 'legacy_cli_break_glass';
 }
 
 export async function loadManifest(env: EnvironmentPaths, runId: string): Promise<{ manifest: CliManifest; paths: RunPaths }> {

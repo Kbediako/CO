@@ -61,6 +61,12 @@ import {
   readProviderPollingHealth,
   recordProviderPollingProgress
 } from './providerPollingHealth.js';
+import {
+  normalizeControlHostOwnershipPollingPayload,
+  refreshControlHostOwnershipPollingPayload,
+  resolveControlHostAuthoritativeSourceFreshness,
+  resolveControlHostSourceFreshnessPolicyFromPolling
+} from './controlHostOwnership.js';
 import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
 import {
   cloneProviderWorkerHostConfigs,
@@ -462,6 +468,7 @@ const BEST_EFFORT_REHYDRATE_MAX_ATTEMPTS = 5;
 const BEST_EFFORT_REHYDRATE_TIMEOUT_MS =
   BEST_EFFORT_REHYDRATE_DELAY_MS * BEST_EFFORT_REHYDRATE_MAX_ATTEMPTS;
 const PROVIDER_LAUNCH_SOURCE: ProviderLaunchSource = 'control-host';
+const PROVIDER_STALE_SUPERVISED_SOURCE_REASON = 'stale_supervised_control_host_source';
 const PROVIDER_RELEASED_PENDING_REOPEN_PREFIX = 'provider_issue_released_pending_reopen:';
 const PROVIDER_POST_WORKER_EXIT_REFRESH_PENDING_REASON =
   'provider_issue_post_worker_exit_refresh_pending';
@@ -576,10 +583,53 @@ export function createProviderIssueHandoffService(
     const lifecycleScope = refreshLifecycleScope.getStore();
     return Boolean(lifecycleScope && lifecycleScope.epoch !== refreshLifecycleEpoch);
   };
-  const shouldAbortRefreshCycle = (): boolean =>
-    isStaleRefreshLifecycleOperation() ||
-    hasConcurrentRestartRequiredPollingSnapshot() ||
-    (providerIssueHandoffService !== null && isProviderPollingStuck(providerIssueHandoffService));
+  const resolveProviderHandoffSourceFreshnessPolicy = () => {
+    const liveControlHostOwner =
+      readProviderPollingHealth(providerIssueHandoffService)?.control_host_owner ??
+      null;
+    if (liveControlHostOwner) {
+      const refreshedLiveOwner = refreshControlHostOwnershipPollingPayload(
+        normalizeControlHostOwnershipPollingPayload(liveControlHostOwner)
+      );
+      const livePolicy = resolveControlHostSourceFreshnessPolicyFromPolling(
+        refreshedLiveOwner,
+        { refresh: false }
+      );
+      const liveFreshness = resolveControlHostAuthoritativeSourceFreshness(refreshedLiveOwner);
+      if (livePolicy || isAuthoritativeProviderHandoffLiveControlHostFreshness(liveFreshness)) {
+        return livePolicy;
+      }
+    }
+    return resolveControlHostSourceFreshnessPolicyFromPolling(
+      options.state.polling?.control_host_owner
+    );
+  };
+  const isAuthoritativeProviderHandoffLiveControlHostFreshness = (
+    freshness: ReturnType<typeof resolveControlHostAuthoritativeSourceFreshness>
+  ): boolean =>
+    freshness?.status === 'current' ||
+    (freshness?.status === 'warning' && freshness.drift_classes.length > 0);
+  const resolveProviderHandoffSourceFreshnessAbortReason = (): string | null =>
+    resolveProviderHandoffSourceFreshnessPolicy()
+      ? PROVIDER_STALE_SUPERVISED_SOURCE_REASON
+      : null;
+  const resolveRefreshCycleAbortReason = (): string | null => {
+    if (isStaleRefreshLifecycleOperation()) {
+      return 'provider_refresh_lifecycle_stuck';
+    }
+    const sourceFreshnessAbortReason = resolveProviderHandoffSourceFreshnessAbortReason();
+    if (sourceFreshnessAbortReason) {
+      return sourceFreshnessAbortReason;
+    }
+    if (
+      hasConcurrentRestartRequiredPollingSnapshot() ||
+      (providerIssueHandoffService !== null && isProviderPollingStuck(providerIssueHandoffService))
+    ) {
+      return 'provider_refresh_lifecycle_stuck';
+    }
+    return null;
+  };
+  const shouldAbortRefreshCycle = (): boolean => resolveRefreshCycleAbortReason() !== null;
   const buildRefreshLifecycleStuckError = (
     message = 'provider_refresh_lifecycle_stuck'
   ): Error => {
@@ -587,8 +637,10 @@ export function createProviderIssueHandoffService(
     error.name = 'ProviderRefreshLifecycleStuckError';
     return error;
   };
-  const throwRefreshLifecycleStuckError = (): never => {
-    const error = buildRefreshLifecycleStuckError();
+  const throwRefreshLifecycleStuckError = (
+    message = 'provider_refresh_lifecycle_stuck'
+  ): never => {
+    const error = buildRefreshLifecycleStuckError(message);
     throw error;
   };
   const assertRefreshLifecycleCurrent = (): void => {
@@ -608,13 +660,20 @@ export function createProviderIssueHandoffService(
     }
   };
   const assertRefreshCycleNotStuck = (): void => {
-    if (shouldAbortRefreshCycle()) {
-      throwRefreshLifecycleStuckError();
+    const abortReason = resolveRefreshCycleAbortReason();
+    if (abortReason) {
+      throwRefreshLifecycleStuckError(abortReason);
+    }
+  };
+  const assertProviderHandoffSourceFreshnessTrusted = (): void => {
+    const abortReason = resolveProviderHandoffSourceFreshnessAbortReason();
+    if (abortReason) {
+      throwRefreshLifecycleStuckError(abortReason);
     }
   };
   const buildRefreshCycleStuckSkipResolution = (): { kind: 'skip'; reason: string } => ({
     kind: 'skip',
-    reason: 'provider_refresh_lifecycle_stuck'
+    reason: resolveRefreshCycleAbortReason() ?? 'provider_refresh_lifecycle_stuck'
   });
   const resolveTrackedIssue = options.resolveTrackedIssue;
   const resolveRevalidationTrackedIssue = options.resolveRevalidationTrackedIssue ?? resolveTrackedIssue;
@@ -785,8 +844,10 @@ export function createProviderIssueHandoffService(
     input: Parameters<ProviderIssueLauncher['start']>[0]
   ): Promise<Awaited<ReturnType<ProviderIssueLauncher['start']>>> => {
     assertRefreshLifecycleCurrent();
+    assertProviderHandoffSourceFreshnessTrusted();
     const result = await options.launcher.start(input);
     assertRefreshLifecycleCurrent();
+    assertProviderHandoffSourceFreshnessTrusted();
     return result;
   };
 
@@ -794,8 +855,10 @@ export function createProviderIssueHandoffService(
     input: Parameters<ProviderIssueLauncher['resume']>[0]
   ): Promise<void> => {
     assertRefreshLifecycleCurrent();
+    assertProviderHandoffSourceFreshnessTrusted();
     await options.launcher.resume(input);
     assertRefreshLifecycleCurrent();
+    assertProviderHandoffSourceFreshnessTrusted();
   };
 
   type ProviderStateSnapshot = {
@@ -2002,6 +2065,7 @@ export function createProviderIssueHandoffService(
     seedRetryAttemptFromPreviousRun?: boolean;
   }): Promise<void> => {
     await runWithConfiguredWorkerHostsCache(async () => {
+      assertProviderHandoffSourceFreshnessTrusted();
       const workerHost = resolveRehydratedActiveRunWorkerHost(input.run, input.claim);
       const resumeWorkerHost = await resolveResumeWorkerHost(workerHost);
       const admissionGate = await createProviderAdmissionGate({
@@ -2039,6 +2103,7 @@ export function createProviderIssueHandoffService(
         });
         return;
       }
+      assertProviderHandoffSourceFreshnessTrusted();
       const launchToken = createProviderLaunchToken();
       await upsertProviderClaimAndPersist({
         ...input.claim,
@@ -2112,6 +2177,7 @@ export function createProviderIssueHandoffService(
     seedRetryAttemptFromPreviousRun?: boolean;
   }): Promise<ProviderIssueHandoffResult> => {
     return await runWithConfiguredWorkerHostsCache(async () => {
+      assertProviderHandoffSourceFreshnessTrusted();
       const taskId = buildProviderFallbackTaskId(input.trackedIssue);
       const preferredWorkerHost = resolvePreferredStartWorkerHost({
         claimWorkerHost: input.claim.worker_host ?? null,
@@ -2191,6 +2257,7 @@ export function createProviderIssueHandoffService(
         }, { rollbackOnPersistFailure: false });
         throw error;
       }
+      assertProviderHandoffSourceFreshnessTrusted();
       const launchToken = createProviderLaunchToken();
       await upsertProviderClaimAndPersist({
         ...input.claim,
@@ -3788,6 +3855,22 @@ export function createProviderIssueHandoffService(
             if (isProviderIssuePollFailClosedReason(resolution.reason)) {
               return;
             }
+            if (isProviderStaleSupervisedSourceReason(resolution.reason)) {
+              const staleSourceSnapshot = captureProviderStateSnapshot();
+              upsertProviderIntakeClaim(options.state, {
+                ...claim,
+                state: 'ignored',
+                reason: PROVIDER_STALE_SUPERVISED_SOURCE_REASON,
+                launch_source: null,
+                launch_token: null,
+                review_promotion: null,
+                merge_closeout: null,
+                ...clearProviderRetryFields()
+              });
+              await persistStateOrRollback(staleSourceSnapshot, { rollbackOnPersistFailure: false });
+              options.publishRuntime?.('provider-intake.refresh');
+              return;
+            }
             const retrySkipSnapshot = captureProviderStateSnapshot();
             upsertProviderIntakeClaim(options.state, {
               ...claim,
@@ -4191,6 +4274,26 @@ export function createProviderIssueHandoffService(
         return { kind: 'ignored', reason: eligibility.claimReason, claim };
       }
 
+      const sourceFreshnessPolicy = resolveProviderHandoffSourceFreshnessPolicy();
+      if (sourceFreshnessPolicy) {
+        const claim = await upsertProviderClaimAndPersist({
+          ...claimBase,
+          task_id: existing?.task_id ?? taskId,
+          mapping_source: existing?.mapping_source ?? mappingSource,
+          state: 'ignored',
+          reason: PROVIDER_STALE_SUPERVISED_SOURCE_REASON,
+          run_id: existing?.run_id ?? null,
+          run_manifest_path: existing?.run_manifest_path ?? null,
+          worker_host: existing?.worker_host ?? null,
+          launch_source: null,
+          launch_token: null,
+          review_promotion: null,
+          merge_closeout: null,
+          ...clearProviderRetryFields()
+        });
+        return { kind: 'ignored', reason: PROVIDER_STALE_SUPERVISED_SOURCE_REASON, claim };
+      }
+
       if (existing && eligibility.claimReason === 'provider_issue_handoff_owned') {
         const discoveredRuns = await discoverProviderIssueRunsForCurrentOperation({
           provider: 'linear',
@@ -4412,8 +4515,14 @@ export function createProviderIssueHandoffService(
             previousRun: latestRun
           })
         : null;
+      const shouldRelaunchExplicitRecoveryFromResumableRun =
+        explicitProviderWorkerRecovery &&
+        latestExisting?.state === 'resumable';
       if (latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)) {
-        if (hasPendingReleaseCancel(releasedRun?.manifestPath ?? latestRun.manifestPath)) {
+        if (
+          !shouldRelaunchExplicitRecoveryFromResumableRun &&
+          hasPendingReleaseCancel(releasedRun?.manifestPath ?? latestRun.manifestPath)
+        ) {
           const claim = await upsertProviderClaimAndPersist({
             ...latestClaimBase,
             task_id: latestRun.taskId,
@@ -4426,26 +4535,28 @@ export function createProviderIssueHandoffService(
           });
           return { kind: 'ignored', reason: 'provider_issue_release_cancel_inflight', claim };
         }
-        const workerHost = resolveRehydratedActiveRunWorkerHost(latestRun, latestExisting);
-        const claim = await upsertProviderClaimAndPersist({
-          ...latestClaimBase,
-          task_id: latestRun.taskId,
-          mapping_source: latestExisting?.mapping_source ?? mappingSource,
-          state: 'resumable',
-          reason: 'provider_issue_rehydrated_resumable_run',
-          run_id: latestRun.runId,
-          run_manifest_path: latestRun.manifestPath,
-          worker_host: workerHost,
-          ...buildQueuedProviderRetryFields({
-            claim: latestRetryStateBase,
-            previousRun: latestRun,
-            preserveCurrentAttempt: latestExisting?.retry_queued === true,
-            preserveExistingDueAt: latestExisting?.retry_queued === true,
-            error: resolveProviderRetryErrorFromRun(latestRun),
-            delayType: 'failure'
-          })
-        });
-        return { kind: 'ignored', reason: claim.reason ?? 'provider_issue_rehydrated_resumable_run', claim };
+        if (!shouldRelaunchExplicitRecoveryFromResumableRun) {
+          const workerHost = resolveRehydratedActiveRunWorkerHost(latestRun, latestExisting);
+          const claim = await upsertProviderClaimAndPersist({
+            ...latestClaimBase,
+            task_id: latestRun.taskId,
+            mapping_source: latestExisting?.mapping_source ?? mappingSource,
+            state: 'resumable',
+            reason: 'provider_issue_rehydrated_resumable_run',
+            run_id: latestRun.runId,
+            run_manifest_path: latestRun.manifestPath,
+            worker_host: workerHost,
+            ...buildQueuedProviderRetryFields({
+              claim: latestRetryStateBase,
+              previousRun: latestRun,
+              preserveCurrentAttempt: latestExisting?.retry_queued === true,
+              preserveExistingDueAt: latestExisting?.retry_queued === true,
+              error: resolveProviderRetryErrorFromRun(latestRun),
+              delayType: 'failure'
+            })
+          });
+          return { kind: 'ignored', reason: claim.reason ?? 'provider_issue_rehydrated_resumable_run', claim };
+        }
       }
 
       // Older manifests may predate explicit issue_updated_at recording. Fall back to the
@@ -4628,6 +4739,29 @@ export function createProviderIssueHandoffService(
             claimWorkerHost: lockedExisting?.worker_host ?? null,
             previousRun: lockedLatestRun ?? null
           });
+          const lockedSourceFreshnessPolicy = resolveProviderHandoffSourceFreshnessPolicy();
+          if (lockedSourceFreshnessPolicy) {
+            const claim = await upsertProviderClaimAndPersist({
+              ...lockedLatestClaimBase,
+              task_id: lockedExisting?.task_id ?? taskId,
+              mapping_source: lockedExisting?.mapping_source ?? mappingSource,
+              state: 'ignored',
+              reason: PROVIDER_STALE_SUPERVISED_SOURCE_REASON,
+              run_id: lockedLatestRun?.runId ?? lockedExisting?.run_id ?? null,
+              run_manifest_path:
+                lockedLatestRun?.manifestPath ?? lockedExisting?.run_manifest_path ?? null,
+              worker_host: lockedPreferredWorkerHost,
+              launch_source: null,
+              launch_token: null,
+              review_promotion: null,
+              merge_closeout: null,
+              ...clearProviderRetryFields()
+            });
+            return {
+              kind: 'settled',
+              result: { kind: 'ignored', reason: PROVIDER_STALE_SUPERVISED_SOURCE_REASON, claim }
+            };
+          }
           const lockedLatestCompletedClaimIssueUpdatedAt =
             lockedExisting?.state === 'completed' ? lockedExisting.issue_updated_at ?? null : null;
           const lockedLatestCompletedRunIssueUpdatedAt =
@@ -4830,6 +4964,7 @@ export function createProviderIssueHandoffService(
             throw new Error(`Failed to start provider issue ${input.trackedIssue.identifier}: ${claim.reason}`);
           }
 
+          assertProviderHandoffSourceFreshnessTrusted();
           const launchToken = createProviderLaunchToken();
           const inflightClaimSnapshot = captureProviderStateSnapshot();
           const inflightClaim = upsertProviderIntakeClaim(options.state, {
@@ -9512,6 +9647,10 @@ function shouldReleaseCachedPendingRevalidationHandoffClaim(
 
 function isProviderIssuePollFailClosedReason(reason: string | null | undefined): boolean {
   return typeof reason === 'string' && reason.startsWith('provider_issue_poll_cached_');
+}
+
+function isProviderStaleSupervisedSourceReason(reason: string | null | undefined): boolean {
+  return reason === PROVIDER_STALE_SUPERVISED_SOURCE_REASON;
 }
 
 function shouldSuppressFreshDiscoveryForPollFailClosedReason(
