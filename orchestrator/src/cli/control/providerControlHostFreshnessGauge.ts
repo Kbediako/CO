@@ -238,7 +238,7 @@ export async function evaluateProviderControlHostFreshnessGauge(
     child_lane_cap_pressure: evaluateChildLaneCapPressure(proofs, nowMs, thresholds, findings),
     stale_source_verdict: buildUnknownVerdictMetric()
   };
-  evaluateStaleSupervisedSourceActiveClaims(intakeState, findings);
+  evaluateStaleSupervisedSourceActiveClaims({ intakeState, pollingHealth, statusDataset }, findings);
   evaluateLinearBudget(linearBudget, thresholds, findings);
   evaluateWorkerAuditHealth(artifacts.workerAudits, findings);
   if (!hasCoreFreshnessSources(sources)) {
@@ -1010,27 +1010,68 @@ function evaluateRetryBackoffAge(
 }
 
 function evaluateStaleSupervisedSourceActiveClaims(
-  intakeState: JsonArtifact | null,
+  input: {
+    intakeState: JsonArtifact | null;
+    pollingHealth: JsonArtifact | null;
+    statusDataset: JsonArtifact | null;
+  },
   findings: ProviderControlHostFreshnessGaugeFinding[]
 ): void {
-  const value = asRecord(intakeState?.value);
+  const pollingValue = asRecord(input.pollingHealth?.value);
   const policy = resolveControlHostSourceFreshnessPolicyFromPolling(
-    asRecord(value?.polling)?.control_host_owner
+    pollingValue?.control_host_owner
   );
   if (!policy) {
     return;
   }
-  const activeClaims = collectClaims(intakeState).filter(isActiveOrRetryQueuedClaim);
-  if (activeClaims.length === 0) {
+  const activeWipCount = countActiveStaleSourceWip(input);
+  if (activeWipCount === 0) {
     return;
   }
   findings.push({
     code: 'stale_supervised_source_active_claims',
     verdict: 'stale',
-    message: `Supervised control-host source freshness is not current while ${activeClaims.length} provider-intake claim(s) are active; policy action=${policy.action}.`,
-    source_path: intakeState?.path ?? null,
-    source_field: 'polling.control_host_owner.owner.source_root_freshness'
+    message: `Supervised control-host source freshness is not current while ${activeWipCount} provider-intake claim(s) or WIP projection(s) are active; policy action=${policy.action}.`,
+    source_path: input.pollingHealth?.path ?? input.intakeState?.path ?? null,
+    source_field: pollingHealthControlHostOwnerSourceField(input)
   });
+}
+
+function countActiveStaleSourceWip(input: {
+  intakeState: JsonArtifact | null;
+  statusDataset: JsonArtifact | null;
+}): number {
+  const activeClaims = collectClaims(input.intakeState).filter(isActiveOrRetryQueuedClaim);
+  const statusDatasetActiveWip = countStatusDatasetActiveWip(input.statusDataset);
+  return Math.max(activeClaims.length, statusDatasetActiveWip);
+}
+
+function countStatusDatasetActiveWip(statusDataset: JsonArtifact | null): number {
+  const value = asRecord(statusDataset?.value);
+  const counts = asRecord(value?.counts);
+  const providerIntake = asRecord(value?.provider_intake);
+  const candidates = [
+    finiteNumber(counts?.running),
+    finiteNumber(counts?.retrying),
+    collectArrayRecords(value?.running).length,
+    collectArrayRecords(value?.retrying).length,
+    finiteNumber(providerIntake?.active_claim_count),
+    finiteNumber(providerIntake?.running_claim_count)
+  ].filter((candidate): candidate is number => candidate !== null && candidate > 0);
+  return candidates.length === 0 ? 0 : Math.max(...candidates);
+}
+
+function pollingHealthControlHostOwnerSourceField(input: {
+  intakeState: JsonArtifact | null;
+  pollingHealth: JsonArtifact | null;
+  statusDataset: JsonArtifact | null;
+}): string {
+  const pollingValue = input.pollingHealth?.value;
+  const embeddedIntakePolling = asRecord(input.intakeState?.value)?.polling;
+  const embeddedStatusPolling = asRecord(input.statusDataset?.value)?.polling;
+  return pollingValue === embeddedIntakePolling || pollingValue === embeddedStatusPolling
+    ? 'polling.control_host_owner.owner.source_root_freshness'
+    : 'control_host_owner.owner.source_root_freshness';
 }
 
 function evaluateChildLaneCapPressure(

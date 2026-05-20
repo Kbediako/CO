@@ -550,31 +550,8 @@ function readProviderIntakeAuthorityState(
   if (context.readPersistedProviderIntakeState) {
     try {
       const state = context.readPersistedProviderIntakeState();
-      const sourceFreshnessPolicy = state
-        ? resolveProviderIntakeSourceFreshnessPolicy(state, context)
-        : null;
-      if (state && sourceFreshnessPolicy) {
-        return {
-          state: buildUnavailableProviderIntakeState(state),
-          unavailable: {
-            reason: 'stale_supervised_control_host_source',
-            updated_at: sourceFreshnessPolicy.updated_at,
-            action: sourceFreshnessPolicy.action,
-            detail: sourceFreshnessPolicy.detail
-          }
-        };
-      }
-      if (state?.authority?.status === 'unavailable') {
-        return {
-          state: buildUnavailableProviderIntakeState(state),
-          unavailable: {
-            reason: state.authority.reason,
-            updated_at: state.authority.updated_at
-          }
-        };
-      }
       return state
-        ? { state, unavailable: null }
+        ? buildProviderIntakeAuthorityStateFromState(state, context)
         : {
             state: null,
             unavailable: {
@@ -592,10 +569,52 @@ function readProviderIntakeAuthorityState(
       };
     }
   }
+  const state = context.providerIntakeState ?? null;
+  if (state) {
+    return buildProviderIntakeAuthorityStateFromState(state, context, {
+      requireActiveWipForSourcePolicy: true
+    });
+  }
   return {
-    state: context.providerIntakeState ?? null,
+    state,
     unavailable: null
   };
+}
+
+function buildProviderIntakeAuthorityStateFromState(
+  state: ProviderIntakeState,
+  context: Pick<ControlRuntimeContext, 'readProviderIssueHandoff'>,
+  options: { requireActiveWipForSourcePolicy?: boolean } = {}
+): ProviderIntakeAuthoritySnapshot {
+  const sourceFreshnessPolicy =
+    options.requireActiveWipForSourcePolicy && !hasActiveProviderIntakeAuthorityWip(state)
+      ? null
+      : resolveProviderIntakeSourceFreshnessPolicy(state, context);
+  if (sourceFreshnessPolicy) {
+    return {
+      state: buildUnavailableProviderIntakeState(state),
+      unavailable: {
+        reason: 'stale_supervised_control_host_source',
+        updated_at: sourceFreshnessPolicy.updated_at,
+        action: sourceFreshnessPolicy.action,
+        detail: sourceFreshnessPolicy.detail
+      }
+    };
+  }
+  if (state.authority?.status === 'unavailable') {
+    return {
+      state: buildUnavailableProviderIntakeState(state),
+      unavailable: {
+        reason: state.authority.reason,
+        updated_at: state.authority.updated_at
+      }
+    };
+  }
+  return { state, unavailable: null };
+}
+
+function hasActiveProviderIntakeAuthorityWip(state: ProviderIntakeState): boolean {
+  return state.claims.some((claim) => isActiveProviderIntakeClaim(claim));
 }
 
 function resolveProviderIntakeSourceFreshnessPolicy(

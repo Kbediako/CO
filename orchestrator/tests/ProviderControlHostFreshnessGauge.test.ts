@@ -64,6 +64,21 @@ function createControlHostOwner(repoRoot: string, sourceRootFreshness: unknown) 
   };
 }
 
+function createStaleSupervisedControlHostOwner(repoRoot = '/repo') {
+  return createControlHostOwner(repoRoot, {
+    schema_version: 1,
+    status: 'warning',
+    observed_at: NOW,
+    entrypoint_kind: 'bootstrap',
+    source_checkout: { status: 'stale', repo_root: repoRoot, dirty: { status: 'clean' } },
+    intended_checkout: { status: 'current', repo_root: repoRoot, dirty: { status: 'clean' } },
+    drift_classes: ['supervised_source_root_drift'],
+    provenance: {},
+    guidance: [],
+    detail: 'Detected source/root drift: supervised_source_root_drift.'
+  });
+}
+
 async function createCurrentAtAcquisitionOwnerThatBecomesStale() {
   const repoRoot = await createSourceRootRepo('provider-freshness-current-at-acquisition-stale-');
   const sourceRootFreshness = inspectSourceRootFreshness({
@@ -616,34 +631,7 @@ describe('provider/control-host freshness gauge', () => {
         schema_version: 1,
         updated_at: NOW,
         polling: {
-          control_host_owner: {
-            status: 'owned',
-            updated_at: NOW,
-            owner: {
-              owner_token: 'owner-token',
-              status: 'owned',
-              pid: 123,
-              hostname: 'host.local',
-              acquired_at: NOW,
-              updated_at: NOW,
-              run_id: 'control-host',
-              run_dir: '/repo/.runs/local-mcp/cli/control-host',
-              lock_dir: '/repo/.runs/control-host-owner.lock',
-              owner_path: '/repo/.runs/control-host-owner.json',
-              source_root_freshness: {
-                schema_version: 1,
-                status: 'warning',
-                observed_at: NOW,
-                entrypoint_kind: 'bootstrap',
-                source_checkout: { status: 'stale', repo_root: '/repo', dirty: { status: 'clean' } },
-                intended_checkout: { status: 'current', repo_root: '/repo', dirty: { status: 'clean' } },
-                drift_classes: ['supervised_source_root_drift'],
-                provenance: {},
-                guidance: [],
-                detail: 'Detected source/root drift: supervised_source_root_drift.'
-              }
-            }
-          }
+          control_host_owner: createStaleSupervisedControlHostOwner()
         },
         claims: [
           {
@@ -668,6 +656,104 @@ describe('provider/control-host freshness gauge', () => {
         expect.objectContaining({
           code: 'stale_supervised_source_active_claims',
           verdict: 'stale'
+        })
+      ])
+    );
+  });
+
+  it('fails strict audit when selected polling health has stale supervised source with active provider-intake claims', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'provider-freshness-stale-polling-health-claims-'));
+    cleanupRoots.push(root);
+    const intakePath = join(root, 'provider-intake-state.json');
+    const pollingHealthPath = join(root, 'provider-polling-health.json');
+    await writeFile(
+      intakePath,
+      JSON.stringify({
+        schema_version: 1,
+        updated_at: NOW,
+        claims: [
+          {
+            state: 'resumable',
+            retry_queued: true,
+            issue_state: 'In Progress',
+            issue_state_type: 'started'
+          }
+        ]
+      })
+    );
+    await writeFile(
+      pollingHealthPath,
+      JSON.stringify({
+        schema_version: 1,
+        updated_at: NOW,
+        control_host_owner: createStaleSupervisedControlHostOwner()
+      })
+    );
+
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      paths: {
+        provider_intake_state: [intakePath],
+        polling_health: [pollingHealthPath]
+      },
+      now: NOW,
+      strict: true
+    });
+
+    expect(report.strict_failed).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'stale_supervised_source_active_claims',
+          verdict: 'stale',
+          source_path: pollingHealthPath,
+          source_field: 'control_host_owner.owner.source_root_freshness'
+        })
+      ])
+    );
+  });
+
+  it('fails strict audit when a status dataset has stale supervised source with active WIP', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'provider-freshness-stale-status-dataset-wip-'));
+    cleanupRoots.push(root);
+    const statusDatasetPath = join(root, 'co-status-dataset.json');
+    await writeFile(
+      statusDatasetPath,
+      JSON.stringify({
+        generated_at: NOW,
+        polling: {
+          control_host_owner: createStaleSupervisedControlHostOwner()
+        },
+        counts: {
+          running: 0,
+          retrying: 3
+        },
+        running: [],
+        retrying: [
+          { issue_identifier: 'CO-512' },
+          { issue_identifier: 'CO-554' },
+          { issue_identifier: 'CO-555' }
+        ],
+        provider_intake: {
+          active_claim_count: 3,
+          running_claim_count: 0
+        }
+      })
+    );
+
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      paths: { status_datasets: [statusDatasetPath] },
+      now: NOW,
+      strict: true
+    });
+
+    expect(report.strict_failed).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'stale_supervised_source_active_claims',
+          verdict: 'stale',
+          source_path: statusDatasetPath,
+          source_field: 'polling.control_host_owner.owner.source_root_freshness'
         })
       ])
     );
