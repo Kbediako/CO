@@ -4412,8 +4412,14 @@ export function createProviderIssueHandoffService(
             previousRun: latestRun
           })
         : null;
+      const shouldRelaunchExplicitRecoveryFromResumableRun =
+        explicitProviderWorkerRecovery &&
+        latestExisting?.state === 'resumable';
       if (latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)) {
-        if (hasPendingReleaseCancel(releasedRun?.manifestPath ?? latestRun.manifestPath)) {
+        if (
+          !shouldRelaunchExplicitRecoveryFromResumableRun &&
+          hasPendingReleaseCancel(releasedRun?.manifestPath ?? latestRun.manifestPath)
+        ) {
           const claim = await upsertProviderClaimAndPersist({
             ...latestClaimBase,
             task_id: latestRun.taskId,
@@ -4426,26 +4432,28 @@ export function createProviderIssueHandoffService(
           });
           return { kind: 'ignored', reason: 'provider_issue_release_cancel_inflight', claim };
         }
-        const workerHost = resolveRehydratedActiveRunWorkerHost(latestRun, latestExisting);
-        const claim = await upsertProviderClaimAndPersist({
-          ...latestClaimBase,
-          task_id: latestRun.taskId,
-          mapping_source: latestExisting?.mapping_source ?? mappingSource,
-          state: 'resumable',
-          reason: 'provider_issue_rehydrated_resumable_run',
-          run_id: latestRun.runId,
-          run_manifest_path: latestRun.manifestPath,
-          worker_host: workerHost,
-          ...buildQueuedProviderRetryFields({
-            claim: latestRetryStateBase,
-            previousRun: latestRun,
-            preserveCurrentAttempt: latestExisting?.retry_queued === true,
-            preserveExistingDueAt: latestExisting?.retry_queued === true,
-            error: resolveProviderRetryErrorFromRun(latestRun),
-            delayType: 'failure'
-          })
-        });
-        return { kind: 'ignored', reason: claim.reason ?? 'provider_issue_rehydrated_resumable_run', claim };
+        if (!shouldRelaunchExplicitRecoveryFromResumableRun) {
+          const workerHost = resolveRehydratedActiveRunWorkerHost(latestRun, latestExisting);
+          const claim = await upsertProviderClaimAndPersist({
+            ...latestClaimBase,
+            task_id: latestRun.taskId,
+            mapping_source: latestExisting?.mapping_source ?? mappingSource,
+            state: 'resumable',
+            reason: 'provider_issue_rehydrated_resumable_run',
+            run_id: latestRun.runId,
+            run_manifest_path: latestRun.manifestPath,
+            worker_host: workerHost,
+            ...buildQueuedProviderRetryFields({
+              claim: latestRetryStateBase,
+              previousRun: latestRun,
+              preserveCurrentAttempt: latestExisting?.retry_queued === true,
+              preserveExistingDueAt: latestExisting?.retry_queued === true,
+              error: resolveProviderRetryErrorFromRun(latestRun),
+              delayType: 'failure'
+            })
+          });
+          return { kind: 'ignored', reason: claim.reason ?? 'provider_issue_rehydrated_resumable_run', claim };
+        }
       }
 
       // Older manifests may predate explicit issue_updated_at recording. Fall back to the
