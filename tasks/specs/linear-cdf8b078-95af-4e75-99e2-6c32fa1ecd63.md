@@ -93,7 +93,7 @@ task_checklists:
 | Retry projection | CO-471 Done can be selected as `claim_reconcile:released` while the status count reports `retrying=1` even though selected claim retry fields are null. | Terminal released claims with null retry metadata should not themselves count as retrying work. | Selected released terminal claims are excluded from retrying projection unless separate active retry evidence exists. | Hiding separate real retrying claims. |
 | Active refresh stalls | Active claims can still stall during refresh. | Active stalls must fail closed with provider keys and phase evidence. | Active stuck path still emits `provider_refresh_lifecycle_stuck` and `restart_required`. | Treating all refresh stalls as benign. |
 | Status truth | `/ui/data.json` and `co-status --format json` can expose unhealthy or timeout states. | Operators need truthful, not fabricated, state. | Terminal released claim filtering does not fabricate healthy snapshots. | Status UI redesign. |
-| No current poll snapshot | After PR #855 merged, skipped/unavailable tracked-issue polling left `trackedIssuesByKey=null`, then the no-map resolver entered `claim_issue_by_id:released` direct issue-by-id reads for terminal history. | The classification authority must not depend on a bulk poll map when the cached row is already a strong terminal released historical claim. | Strong terminal released rows skip the direct issue-by-id sweep even without a current poll snapshot; weak or reopened rows still revalidate. | Treating all missing-poll states as clean. |
+| No current poll snapshot | After PR #855 merged, skipped/unavailable tracked-issue polling left `trackedIssuesByKey=null`, then the no-map resolver entered `claim_issue_by_id:released` direct issue-by-id reads for terminal history. | The classification authority must not depend on a bulk poll map when the cached row is already a strong terminal released historical claim. | Strong terminal released rows skip the direct issue-by-id sweep even without a current poll snapshot; weak, reopened, accepted pending-revalidation, or current-promotion rows still revalidate. | Treating all missing-poll states as clean. |
 | Retained `review_promotion` metadata | CO-468 can retain a promoted `Merging` review-promotion snapshot that predates newer terminal Done issue truth. | Stale promotion metadata is history; current promotion metadata is still live routing evidence. | Stale promotions are ignored only when terminal issue truth is newer; current promotions force revalidation. | Dropping review/merge promotion truth globally. |
 
 ## Readiness Gate
@@ -106,7 +106,7 @@ task_checklists:
   - the behavior is only repaired by restarting the host
 - Pre-implementation issue-quality review evidence:
   - 2026-05-20: live issue-context plus parent evidence show a narrow root-fix issue. The issue is not merely a timeout problem, not a provider-intake cleanup lane, and not a queue-capacity lane. The added CO-469 Duplicate/canceled case and CO-471 retry projection mismatch stay inside terminal released historical claim scope.
-  - 2026-05-20 rework: PR #855's normalization-only fix was partial. Live current-main evidence still looped through the no-current-poll-snapshot `claim_issue_by_id:released` path, and CO-468 retained stale `review_promotion` metadata. PR #856 must bind the terminal released classifier before direct issue-by-id, and it must keep current promotion/reopen/weak rows revalidating.
+  - 2026-05-20 rework: PR #855's normalization-only fix was partial. Live current-main evidence still looped through the no-current-poll-snapshot `claim_issue_by_id:released` path, and CO-468 retained stale `review_promotion` metadata. PR #856 must bind the terminal released classifier before direct issue-by-id, and it must keep current promotion, reopen, accepted pending-revalidation, and weak rows revalidating.
 - Safeguard ownership split:
   - parent worker owns docs packet, source inspection, implementation, tests, validation, workpad, PR, and handoff
   - no same-issue child lane is active; serial decision recorded because docs/source/tests share one classification boundary and provider admission is unstable
@@ -153,6 +153,7 @@ task_checklists:
 - CO-468 Done `claim_issue_by_id:released` path is covered and benign without active corroboration.
 - A real active/stuck path still fails closed with `provider_refresh_lifecycle_stuck` / `restart_required`.
 - Strong terminal released claims skip direct issue-by-id when current tracked-issue polling is unavailable or skipped.
+- Accepted `provider_issue_rehydration_pending_revalidation` claims keep direct issue-by-id revalidation when bulk polling is unavailable.
 - Stale retained `review_promotion` metadata does not keep terminal released history active, while current promotion metadata still revalidates.
 - `co-status --format json` and `/ui/data.json` remain truthful.
 - No provider-intake manual edits or timeout-only fix is introduced.
@@ -162,6 +163,7 @@ task_checklists:
 - Focused projection test or assertion for released terminal claims with null retry metadata.
 - Focused active stuck refresh negative test.
 - Focused no-current-poll-snapshot regression.
+- Focused accepted pending-revalidation no-current-poll regression.
 - Focused stale/current `review_promotion` regressions.
 - Spec guard, build, lint, test, docs checks, freshness, diff budget.
 - Pack smoke for downstream CLI/control-host surface.

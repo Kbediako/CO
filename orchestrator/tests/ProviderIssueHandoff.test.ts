@@ -31290,6 +31290,92 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('revalidates accepted cached-pending claims when the current poll snapshot is unavailable', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-co-571-pending-revalidation',
+      issue_identifier: 'CO-571-PENDING-REVALIDATION',
+      issue_title: 'Cached pending revalidation should not stay stuck',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-20T18:00:00.000Z',
+      task_id: 'linear-lin-co-571-pending-revalidation',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      run_id: null,
+      run_manifest_path: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-571-pending-revalidation-should-not-start',
+      '/tmp/provider-run/co-571-pending-revalidation-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssues = vi.fn(async () => ({
+      kind: 'skip' as const,
+      reason: 'dispatch_source_unavailable'
+    }));
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-co-571-pending-revalidation',
+        identifier: 'CO-571-PENDING-REVALIDATION',
+        title: 'Cached pending revalidation should not stay stuck',
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-05-20T18:30:00.000Z',
+        blocked_by: []
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssues,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    markProviderPollingStarted(service, { mode: 'refresh' });
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(resolveTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-co-571-pending-revalidation'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false,
+      refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+      refresh_request_class: 'claim_issue_by_id:accepted',
+      refresh_provider_keys: ['linear:lin-co-571-pending-revalidation'],
+      refresh_counts: expect.objectContaining({
+        issue_by_id_reads: 1
+      })
+    });
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-05-20T18:30:00.000Z',
+      run_id: null,
+      run_manifest_path: null
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
   it('skips stale promoted CO-468 released terminal history when the current poll snapshot is unavailable', async () => {
     const { root, paths } = await createHostPaths();
     const issueId = '6d7e842c-b10a-42f5-a7e0-8a30a8dd9442';

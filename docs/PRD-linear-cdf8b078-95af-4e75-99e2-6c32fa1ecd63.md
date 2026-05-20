@@ -25,7 +25,7 @@
   - add CO-469 Duplicate/canceled and CO-471 Done as additional terminal released historical claim examples without widening beyond terminal released claims
   - add CO-476, CO-451, and CO-468 as further terminal released historical claim examples, including retained run_id/run_manifest_path bindings for CO-451 and CO-468
   - account for the observed `retrying=1` projection mismatch when the selected CO-471 released claim has `run_id=null` and all retry fields null
-  - handle the no-current-poll-snapshot path without relying on direct issue-by-id sweeps for strong terminal released history
+  - handle the no-current-poll-snapshot path without relying on direct issue-by-id sweeps for strong terminal released history, while preserving accepted pending-revalidation rechecks
   - distinguish stale retained `review_promotion` metadata from current promotion metadata
 - Success criteria / acceptance:
   - `claim_issue_by_id:released` terminal claims for CO-472 and CO-469 do not cause `provider_refresh_lifecycle_stuck` / `restart_required` without active worker/live issue corroboration
@@ -100,7 +100,7 @@
 | Active refresh stalls | Real active work can still get stuck during provider refresh. | Real active stalls must fail closed with phase/provider evidence. | Active stuck paths still emit `provider_refresh_lifecycle_stuck`, `restart_required`, and provider keys. | Declaring all refresh stalls benign. |
 | Status surfaces | `co-status --format json` and `/ui/data.json` can time out or show unhealthy host state. | Status must be truthful even during degraded reads. | No fabricated coherent snapshot; no hiding of genuine unhealthy host states. | Broader status dashboard redesign. |
 | Provider-intake evidence | `provider-intake-state.json` retains released historical claims and audit history. | Intake history is audit evidence, not a manual repair target. | Code-level classification ignores terminal released claims only for active restart decisions. | Manual state-file edits or cleanup. |
-| No current poll snapshot | A skipped/unavailable tracked-issue poll can leave no bulk issue map, after which the no-map resolver re-enters direct issue-by-id for terminal released history. | Strong cached terminal released issue truth is sufficient to avoid a direct issue-by-id sweep. | Strong terminal released rows skip direct issue-by-id even without a current poll map; weak, pending-reopen, or current-promotion rows still revalidate. | Treating every missing poll snapshot as healthy. |
+| No current poll snapshot | A skipped/unavailable tracked-issue poll can leave no bulk issue map, after which the no-map resolver re-enters direct issue-by-id for terminal released history. | Strong cached terminal released issue truth is sufficient to avoid a direct issue-by-id sweep, but cached pending-revalidation claims still need a live issue read. | Strong terminal released rows skip direct issue-by-id even without a current poll map; weak, pending-reopen, accepted pending-revalidation, or current-promotion rows still revalidate. | Treating every missing poll snapshot as healthy. |
 | Retained review promotion | CO-468 can retain a promoted `Merging` review-promotion snapshot older than newer terminal Done issue truth. | Promotion metadata is active only when it is current relative to terminal issue truth. | Stale promotion metadata is ignored for terminal history; current promotion metadata forces revalidation. | Dropping review/merge promotion routing globally. |
 
 ## Not Done If
@@ -137,6 +137,7 @@
 - CO-451 Done retained-run `claim_issue_by_id:released` is covered by a regression that no longer drives restart-required health without active corroboration.
 - CO-468 Done retained-run `claim_issue_by_id:released` is covered by a regression that no longer drives restart-required health without active corroboration.
 - A no-current-poll-snapshot terminal released row is covered by a regression that does not enter direct issue-by-id.
+- An accepted `provider_issue_rehydration_pending_revalidation` row is covered by a no-current-poll regression that still enters direct issue-by-id and releases terminal truth.
 - Stale retained `review_promotion` is covered by a regression, with a current-promotion negative regression that still revalidates.
 - A real active/stuck provider refresh path still fails closed with `provider_refresh_lifecycle_stuck` / `restart_required`.
 - Status projection remains truthful and does not fabricate a healthy snapshot after timeout or health failure.
@@ -147,6 +148,7 @@
 - Focused tests for `claim_reconcile:released` terminal Done claims.
 - Focused projection coverage for terminal released claims with null retry fields so they do not count as retrying work.
 - Focused no-current-poll-snapshot coverage for terminal released history before direct issue-by-id.
+- Focused no-current-poll accepted pending-revalidation coverage.
 - Focused stale/current `review_promotion` coverage.
 - Focused negative test for real active stuck refresh behavior.
 - `node scripts/spec-guard.mjs --dry-run`.

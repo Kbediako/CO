@@ -3544,7 +3544,10 @@ export function createProviderIssueHandoffService(
       (input.allowReleasedPollFailClosed === true
         ? resolveReleasedProviderIssuePollFailClosedReason(input.claim)
         : null);
-    if (failClosedReason) {
+    const shouldRevalidateCachedPendingClaim =
+      failClosedReason === 'provider_issue_poll_cached_revalidation_pending' &&
+      input.allowDirectIssueById !== false;
+    if (failClosedReason && !shouldRevalidateCachedPendingClaim) {
       return {
         kind: 'skip',
         reason: failClosedReason

@@ -9,7 +9,7 @@
 
 ## Agent-Facing Scope
 - [x] Preserve protected terms: `provider_refresh_lifecycle_stuck`, `restart_required`, `refresh:claim_issue_by_id_reconcile`, `claim_issue_by_id:released`, `refresh:claim_reconcile`, `claim_reconcile:released`, released terminal historical claims, CO-472, CO-461, CO-469, CO-471, CO-476, CO-451, CO-468, no active workers/WIP 0/3, `retrying=1` projection mismatch, no fabricated coherent snapshot, and no provider-intake manual edits.
-- [x] Preserve rework protected terms: no-current-poll-snapshot path, direct issue-by-id fallback, stale `review_promotion`, and current promotion revalidation.
+- [x] Preserve rework protected terms: no-current-poll-snapshot path, direct issue-by-id fallback, accepted `provider_issue_rehydration_pending_revalidation`, stale `review_promotion`, and current promotion revalidation.
 - [x] Keep CO-469 Duplicate/canceled inside terminal released historical claim scope, not as a separate queue-capacity or workflow-state redesign.
 - [x] Keep CO-471 retry projection mismatch inside terminal released historical claim scope: selected released claim with null retry metadata must not manufacture retrying WIP, while separate real retrying claims remain visible.
 - [x] Preserve genuine active refresh stall fail-closed behavior.
@@ -28,7 +28,7 @@
 - Contract name: provider-intake released historical claim audit retention.
 - Owning surface: provider-intake state and control-host status/read models.
 - Steady-state proof: raw released claim rows remain source-labeled audit evidence, while terminal released `not_active` claims with complete cached metadata, null retry fields, and no active or cancelable retained run do not drive `restart_required` or retrying WIP.
-- Tests/docs: `ProviderIssueHandoff.test.ts` terminal released metadata-only table, no-current-poll-snapshot regression, stale/current `review_promotion` regressions, active-stuck regression, `ControlRuntime.test.ts` retry projection regression, and this CO-571 packet.
+- Tests/docs: `ProviderIssueHandoff.test.ts` terminal released metadata-only table, no-current-poll-snapshot regression, accepted pending-revalidation no-current-poll regression, stale/current `review_promotion` regressions, active-stuck regression, `ControlRuntime.test.ts` retry projection regression, and this CO-571 packet.
 - Non-expiring rationale: retained released claim history is durable operator/audit evidence, not temporary compatibility debt; removal requires an approved archival redesign that preserves equivalent source-labeled claim/run evidence.
 
 ## Validation Snapshot

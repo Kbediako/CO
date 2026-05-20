@@ -661,7 +661,7 @@
           "reviewer": "CO-571 provider worker",
           "date": "2026-05-20",
           "status": "approved_for_implementation",
-          "summary": "CO-571 is scoped to terminal released historical claim reconciliation, the retry projection mismatch for selected released claims with null retry metadata, the no-current-poll-snapshot direct issue-by-id fallback, and stale/current review_promotion handling. It explicitly rejects timeout-only fixes, provider-intake manual edits, fabricated snapshots, and hiding real active refresh stalls."
+          "summary": "CO-571 is scoped to terminal released historical claim reconciliation, the retry projection mismatch for selected released claims with null retry metadata, the no-current-poll-snapshot direct issue-by-id fallback, accepted pending-revalidation rechecks, and stale/current review_promotion handling. It explicitly rejects timeout-only fixes, provider-intake manual edits, fabricated snapshots, and hiding real active refresh stalls."
         },
         "parallelization": {
           "decision": "stay_serial",

@@ -45,7 +45,7 @@
   - stale `review_promotion` keeps terminal history active, or current promotion truth is hidden
 - Pre-implementation issue-quality review:
   - 2026-05-20: CO-571 is a narrow root-cause lane for released terminal historical claim reconciliation. CO-469 Duplicate/canceled and CO-471 Done are included because both are terminal released history with null run/retry fields, not new active-work behaviors.
-  - 2026-05-20 rework: after PR #855 merged, live current-main evidence still hit `claim_issue_by_id:released` when no current poll snapshot existed. The rework must bind the terminal released classifier before direct issue-by-id and distinguish stale `review_promotion` from current promotion metadata.
+  - 2026-05-20 rework: after PR #855 merged, live current-main evidence still hit `claim_issue_by_id:released` when no current poll snapshot existed. The rework must bind the terminal released classifier before direct issue-by-id, preserve accepted `provider_issue_rehydration_pending_revalidation` direct rechecks, and distinguish stale `review_promotion` from current promotion metadata.
 - Fallback / refactor decision:
   - This task touches retained historical/cached provider-intake evidence. Decision: `remove fallback` for terminal released claims being treated as active stuck refresh health; retain historical claim records as supported audit evidence.
 - Durable retention evidence:
@@ -69,7 +69,7 @@
 1. Register the CO-571 docs-first packet: PRD, canonical TECH_SPEC, TECH_SPEC mirror, ACTION_PLAN, task checklist, `.agent/task` mirror, `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json`.
 2. Run docs-review or record exact blocker before implementation.
 3. Inspect provider refresh lifecycle authority around `providerIssueHandoff`, provider polling health, and control-host supervision/status projection.
-4. Add focused failing regressions for CO-472 / CO-469 `claim_issue_by_id:released`, CO-461 / CO-471 `claim_reconcile:released`, selected-claim retry projection, no-current-poll-snapshot direct issue-by-id suppression, stale/current `review_promotion`, and a real active stuck path.
+4. Add focused failing regressions for CO-472 / CO-469 `claim_issue_by_id:released`, CO-461 / CO-471 `claim_reconcile:released`, selected-claim retry projection, no-current-poll-snapshot direct issue-by-id suppression, accepted pending-revalidation rechecks, stale/current `review_promotion`, and a real active stuck path.
 5. Implement the smallest classification fix at the authority seam before direct issue-by-id while preserving weak/reopened/current-promotion revalidation.
 6. Rerun focused tests and update docs/task mirrors with validation evidence.
 7. Run required gates: spec guard, build, lint, test, docs checks, freshness, diff budget, pack smoke, review/elegance where feasible.
@@ -89,6 +89,7 @@
   - focused released terminal claim tests
   - focused retry projection consistency test for released terminal claims with null retry fields
   - focused no-current-poll-snapshot direct issue-by-id regression
+  - focused accepted pending-revalidation no-current-poll regression
   - focused stale/current `review_promotion` regressions
   - focused active stuck refresh test
   - `node scripts/spec-guard.mjs --dry-run`

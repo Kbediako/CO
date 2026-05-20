@@ -71,6 +71,7 @@
 - [x] CO-451 Done `claim_issue_by_id:released` terminal path does not drive restart-required health without active corroboration. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] CO-468 Done `claim_issue_by_id:released` terminal path does not drive restart-required health without active corroboration. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] No-current-poll-snapshot terminal released path skips direct issue-by-id for strong terminal history. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
+- [x] Accepted `provider_issue_rehydration_pending_revalidation` claims still revalidate through direct issue-by-id when current polling is unavailable. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] Stale retained `review_promotion` metadata is treated as historical only when newer terminal issue truth supersedes it, while current promotion metadata revalidates. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] Real active/stuck refresh path still fails closed with `provider_refresh_lifecycle_stuck` / `restart_required`. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] `co-status --format json` and `/ui/data.json` remain truthful with no fabricated coherent snapshot. Evidence: `npm run test -- ControlRuntime.test.ts`.
@@ -84,6 +85,7 @@
 - [x] Focused released terminal claim regressions. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] Focused retry projection consistency regression for released terminal claims with null retry fields. Evidence: `npm run test -- ControlRuntime.test.ts`.
 - [x] Focused no-current-poll-snapshot regression. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
+- [x] Focused accepted pending-revalidation no-current-poll regression. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] Focused stale/current `review_promotion` regressions. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] Focused active stuck refresh regression. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] `node scripts/spec-guard.mjs --dry-run`.
@@ -110,7 +112,7 @@
 - Contract name: provider-intake released historical claim audit retention.
 - Owning surface: provider-intake state and control-host status/read models.
 - Steady-state proof: raw released claim rows remain source-labeled audit evidence, while terminal released `not_active` claims with complete cached metadata, null retry fields, and no active or cancelable retained run do not drive `restart_required` or retrying WIP.
-- Tests/docs: `ProviderIssueHandoff.test.ts` terminal released metadata-only table, no-current-poll-snapshot regression, stale/current `review_promotion` regressions, active-stuck regression, `ControlRuntime.test.ts` retry projection regression, and this CO-571 packet.
+- Tests/docs: `ProviderIssueHandoff.test.ts` terminal released metadata-only table, no-current-poll-snapshot regression, accepted pending-revalidation no-current-poll regression, stale/current `review_promotion` regressions, active-stuck regression, `ControlRuntime.test.ts` retry projection regression, and this CO-571 packet.
 - Non-expiring rationale: retained released claim history is durable operator/audit evidence, not temporary compatibility debt; removal requires an approved archival redesign that preserves equivalent source-labeled claim/run evidence.
 
 ## Progress Log
