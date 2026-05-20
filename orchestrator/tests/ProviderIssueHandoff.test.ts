@@ -31290,6 +31290,175 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('keeps current-poll terminal released history passive without claim reconcile churn', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: '203c5fad-698f-4094-970c-06de5743d94c',
+      issue_identifier: 'CO-482',
+      issue_title: 'CO: make create-follow-up assign follow-up labels',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-05-07T15:49:03.994Z',
+      issue_blocked_by: [],
+      task_id: 'linear-203c5fad-698f-4094-970c-06de5743d94c',
+      run_id: null,
+      run_manifest_path: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null,
+      review_promotion: null,
+      merge_closeout: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-482-passive-current-poll-should-not-start',
+      '/tmp/provider-run/co-482-passive-current-poll-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: [
+        createTrackedIssue({
+          id: '203c5fad-698f-4094-970c-06de5743d94c',
+          identifier: 'CO-482',
+          title: 'CO: make create-follow-up assign follow-up labels',
+          state: 'Done',
+          state_type: 'completed',
+          updated_at: '2026-05-07T15:49:03.994Z',
+          blocked_by: []
+        })
+      ]
+    }));
+    const resolveTrackedIssue = vi.fn(async () => {
+      throw new Error('passive terminal history should not use direct issue-by-id');
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssues,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    markProviderPollingStarted(service, { mode: 'refresh' });
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(resolveTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(persist).toHaveBeenCalledTimes(1);
+    const pollingHealth = readProviderPollingHealth(service);
+    expect(pollingHealth).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false,
+      refresh_counts: expect.objectContaining({
+        claims_scanned: 1,
+        issue_by_id_reads: 0,
+        issue_by_id_deferred: 0
+      })
+    });
+    expect(pollingHealth?.refresh_request_class).not.toBe('claim_reconcile:released');
+    expect(pollingHealth?.refresh_request_class).not.toBe('claim_issue_by_id:released');
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-05-07T15:49:03.994Z',
+      updated_at: '2026-04-14T09:00:10.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null,
+      review_promotion: null,
+      merge_closeout: null
+    });
+  });
+
+  it('reopens terminal released history when the current poll snapshot becomes active', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-571-terminal-reopened',
+      issue_identifier: 'CO-571-REOPENED',
+      issue_title: 'Terminal released history became active again',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-05-20T18:00:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-571-terminal-reopened',
+      run_id: null,
+      run_manifest_path: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-571-terminal-reopened',
+      '/tmp/provider-run/co-571-terminal-reopened-manifest.json'
+    );
+    const resolveTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-co-571-terminal-reopened',
+          identifier: 'CO-571-REOPENED',
+          title: 'Terminal released history became active again',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-05-20T18:10:00.000Z',
+          blocked_by: []
+        })
+      ]
+    }));
+    const resolveTrackedIssue = vi.fn(async () => {
+      throw new Error('current poll snapshot should drive the reopened issue');
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssues,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    markProviderPollingStarted(service, { mode: 'refresh' });
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'linear',
+      issueId: 'lin-co-571-terminal-reopened',
+      issueIdentifier: 'CO-571-REOPENED',
+      issueUpdatedAt: '2026-05-20T18:10:00.000Z'
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_refresh_start_launched',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-05-20T18:10:00.000Z',
+      run_id: 'run-co-571-terminal-reopened',
+      run_manifest_path: '/tmp/provider-run/co-571-terminal-reopened-manifest.json'
+    });
+  });
+
   it('revalidates accepted cached-pending claims when the current poll snapshot is unavailable', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
