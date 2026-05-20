@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const CONTROL_PLANE_INVARIANTS_SCHEMA = 'codex.control-plane.operational-drift-invariants';
@@ -61,6 +61,14 @@ const REQUIRED_STATUS_DIMENSIONS = [
   'branch_posture',
   'review_state',
   'gate_state'
+];
+const TASK_PACKET_INDEX_PATH_FIELDS = [
+  ['prd', 0],
+  ['docs', 1],
+  ['action_plan', 2],
+  ['spec', 3],
+  ['task', 4],
+  ['agent_task', 5]
 ];
 
 export async function runControlPlaneInvariants(repoRoot = process.cwd(), options = {}) {
@@ -482,6 +490,7 @@ async function validateTaskPacket(config, input) {
       'tasks/index.json'
     );
   }
+  validateTaskIndexPacketPaths(registryEntry, packetPaths, input.findings);
 
   const freshnessEntries = Array.isArray(input.freshnessRegistry?.entries)
     ? input.freshnessRegistry.entries
@@ -520,9 +529,73 @@ async function validateTaskPacket(config, input) {
   }
 }
 
+function validateTaskIndexPacketPaths(registryEntry, packetPaths, findings) {
+  if (!registryEntry) {
+    return;
+  }
+  const indexPaths = isRecord(registryEntry.paths) ? registryEntry.paths : null;
+  if (!indexPaths) {
+    addFinding(
+      findings,
+      'error',
+      'task_registry_paths_missing',
+      'tasks/index.json entry must include packet paths.',
+      'tasks/index.json'
+    );
+    return;
+  }
+  for (const [field, packetIndex] of TASK_PACKET_INDEX_PATH_FIELDS) {
+    const expected = normalizeRepoPath(packetPaths[packetIndex]);
+    if (!expected) {
+      continue;
+    }
+    const actual = normalizeRepoPath(indexPaths[field]);
+    if (!actual) {
+      addFinding(
+        findings,
+        'error',
+        'task_registry_path_missing',
+        `tasks/index.json missing paths.${field} for ${expected}.`,
+        'tasks/index.json'
+      );
+      continue;
+    }
+    if (actual !== expected) {
+      addFinding(
+        findings,
+        'error',
+        'task_registry_path_mismatch',
+        `tasks/index.json paths.${field} expected ${expected}, found ${actual}.`,
+        'tasks/index.json'
+      );
+    }
+  }
+  const expectedRelatesTo = normalizeRepoPath(packetPaths[4]);
+  const actualRelatesTo = normalizeRepoPath(registryEntry.relates_to);
+  if (expectedRelatesTo && actualRelatesTo !== expectedRelatesTo) {
+    addFinding(
+      findings,
+      'error',
+      'task_registry_relates_to_mismatch',
+      `tasks/index.json relates_to expected ${expectedRelatesTo}, found ${actualRelatesTo || 'missing'}.`,
+      'tasks/index.json'
+    );
+  }
+}
+
 async function validateRepoPathExists(repoRoot, repoPath, findings, sourcePath) {
   const normalized = normalizeRepoPath(repoPath);
-  if (!normalized || normalized.startsWith('../') || normalized === '..') {
+  const absolutePath = resolve(repoRoot, normalized);
+  const absoluteRoot = resolve(repoRoot);
+  const escapesRepo = absolutePath !== absoluteRoot && !absolutePath.startsWith(`${absoluteRoot}/`);
+  if (
+    !normalized ||
+    isAbsolute(normalized) ||
+    /^[A-Za-z]:\//u.test(normalized) ||
+    normalized.startsWith('../') ||
+    normalized === '..' ||
+    escapesRepo
+  ) {
     addFinding(findings, 'error', 'task_packet_path_invalid', `Invalid repo-relative path ${repoPath}.`, sourcePath);
     return;
   }

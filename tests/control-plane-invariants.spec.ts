@@ -99,10 +99,56 @@ describe('control-plane operational drift invariants', () => {
       ])
     );
   });
+
+  it('fails when task-index packet paths drift from the catalog', async () => {
+    const repoRoot = await writeFixture({
+      mutateTaskIndex(entry) {
+        const paths = entry.paths as Record<string, string>;
+        paths.spec = 'tasks/specs/wrong-co552-spec.md';
+      }
+    });
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'task_registry_path_mismatch'
+        })
+      ])
+    );
+  });
+
+  it('rejects absolute task packet paths', async () => {
+    const repoRoot = await writeFixture();
+    const config = buildValidConfig();
+    config.task_packet.paths[0] = '/tmp/co552-absolute-packet.md';
+    await writeJson(join(repoRoot, 'docs', 'control-plane-invariants.json'), config);
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'task_packet_path_invalid'
+        })
+      ])
+    );
+  });
 });
 
 async function writeFixture(options: {
   mutateConfig?: (config: ReturnType<typeof buildValidConfig>) => void;
+  mutateTaskIndex?: (
+    entry: Record<string, unknown>,
+    config: ReturnType<typeof buildValidConfig>
+  ) => void;
   registryEntries?: Array<Record<string, unknown>>;
 } = {}) {
   const repoRoot = await mkdirFixture();
@@ -117,21 +163,24 @@ async function writeFixture(options: {
       await writeFile(join(repoRoot, path), '# Fixture\n', 'utf8');
     })
   );
+  const taskIndexEntry: Record<string, unknown> = {
+    id: config.task_packet.task_registry_id,
+    title: 'CO-552 recurring operational drift invariants',
+    relates_to: packetPaths[4],
+    status: config.task_packet.expected_task_status,
+    paths: {
+      spec: packetPaths[3],
+      task: packetPaths[4],
+      agent_task: packetPaths[5],
+      prd: packetPaths[0],
+      docs: packetPaths[1],
+      action_plan: packetPaths[2]
+    }
+  };
+  options.mutateTaskIndex?.(taskIndexEntry, config);
   await writeJson(join(repoRoot, 'tasks', 'index.json'), {
     items: [
-      {
-        id: config.task_packet.task_registry_id,
-        title: 'CO-552 recurring operational drift invariants',
-        status: config.task_packet.expected_task_status,
-        paths: {
-          spec: packetPaths[3],
-          task: packetPaths[4],
-          agent_task: packetPaths[5],
-          prd: packetPaths[0],
-          docs: packetPaths[1],
-          action_plan: packetPaths[2]
-        }
-      }
+      taskIndexEntry
     ]
   });
   await writeJson(join(repoRoot, 'docs', 'docs-freshness-registry.json'), {
