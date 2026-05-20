@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { mkdir, readFile, realpath, stat, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute, join, posix, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const CONTROL_PLANE_INVARIANTS_SCHEMA = 'codex.control-plane.operational-drift-invariants';
@@ -92,16 +92,17 @@ export async function runControlPlaneInvariants(repoRoot = process.cwd(), option
   );
 
   validateCatalogEnvelope(config, findings, configPath);
-  validateLifecycle(config.task_spec_lifecycle, findings);
-  validateGuardContracts(config.guard_contracts, findings);
-  validateFallbackMetadata(config.fallback_refactor_metadata, findings);
-  validateDesiredStateReconciler(config.desired_state_reconciler, findings);
-  validateReviewAutomation(config.codex_review_automation, findings);
-  validateLinearHygiene(config.linear_hygiene, findings);
-  validateReviewWorkflow(config.review_workflow, findings);
-  validateStatusMonitor(config.status_monitor, findings);
-  validateChildWorkstreams(config.child_workstreams, findings);
-  await validateTaskPacket(config, {
+  const catalog = isRecord(config) ? config : {};
+  validateLifecycle(catalog.task_spec_lifecycle, findings);
+  validateGuardContracts(catalog.guard_contracts, findings);
+  validateFallbackMetadata(catalog.fallback_refactor_metadata, findings);
+  validateDesiredStateReconciler(catalog.desired_state_reconciler, findings);
+  validateReviewAutomation(catalog.codex_review_automation, findings);
+  validateLinearHygiene(catalog.linear_hygiene, findings);
+  validateReviewWorkflow(catalog.review_workflow, findings);
+  validateStatusMonitor(catalog.status_monitor, findings);
+  validateChildWorkstreams(catalog.child_workstreams, findings);
+  await validateTaskPacket(catalog, {
     findings,
     configRepoPath: relativeToRepo(absoluteRoot, configPath),
     repoRoot: absoluteRoot,
@@ -120,16 +121,16 @@ export async function runControlPlaneInvariants(repoRoot = process.cwd(), option
       errors: findings.filter((finding) => finding.severity === 'error').length,
       warnings: findings.filter((finding) => finding.severity === 'warning').length
     },
-    owner: config.owner ?? null,
-    canonical_owner_key: config.canonical_owner_key ?? null,
-    task_registry_id: config.task_packet?.task_registry_id ?? null,
+    owner: catalog.owner ?? null,
+    canonical_owner_key: catalog.canonical_owner_key ?? null,
+    task_registry_id: catalog.task_packet?.task_registry_id ?? null,
     invariants: {
-      lifecycle_states: normalizeStringArray(config.task_spec_lifecycle?.states),
-      guard_contract_count: Array.isArray(config.guard_contracts)
-        ? config.guard_contracts.length
+      lifecycle_states: normalizeStringArray(catalog.task_spec_lifecycle?.states),
+      guard_contract_count: Array.isArray(catalog.guard_contracts)
+        ? catalog.guard_contracts.length
         : 0,
-      desired_state_domains: normalizeStringArray(config.desired_state_reconciler?.domains?.map((domain) => domain?.id)),
-      status_monitor_dimensions: normalizeStringArray(config.status_monitor?.dimensions)
+      desired_state_domains: normalizeStringArray(catalog.desired_state_reconciler?.domains?.map((domain) => domain?.id)),
+      status_monitor_dimensions: normalizeStringArray(catalog.status_monitor?.dimensions)
     },
     findings
   };
@@ -677,7 +678,7 @@ async function validateRepoPathExists(repoRoot, repoPath, findings, sourcePath) 
   if (
     !normalized ||
     isAbsolute(normalized) ||
-    /^[A-Za-z]:\//u.test(normalized) ||
+    /^[A-Za-z]:(?:\/|$)/u.test(normalized) ||
     normalized.startsWith('../') ||
     normalized === '..' ||
     escapesRepo
@@ -686,9 +687,20 @@ async function validateRepoPathExists(repoRoot, repoPath, findings, sourcePath) 
     return;
   }
   try {
-    const pathStat = await stat(resolve(repoRoot, normalized));
+    const pathStat = await stat(absolutePath);
     if (!pathStat.isFile()) {
       addFinding(findings, 'error', 'task_packet_path_not_file', `Repo path ${normalized} is not a file.`, sourcePath);
+    }
+    const canonicalRoot = await realpath(absoluteRoot);
+    const canonicalPath = await realpath(absolutePath);
+    if (pathEscapesRoot(canonicalRoot, canonicalPath)) {
+      addFinding(
+        findings,
+        'error',
+        'task_packet_path_symlink_escapes_repo',
+        `Repo path ${normalized} resolves outside the repository root.`,
+        sourcePath
+      );
     }
   } catch (error) {
     if (error?.code === 'ENOENT') {
@@ -823,7 +835,8 @@ function normalizeRepoPath(value) {
   if (!text) {
     return '';
   }
-  return text.replace(/\\/g, '/').replace(/^\.\//, '');
+  const normalized = posix.normalize(text.replace(/\\/g, '/')).replace(/\/+$/u, '');
+  return normalized === '.' ? '' : normalized.replace(/^\.\//u, '');
 }
 
 function relativeToRepo(repoRoot, path) {

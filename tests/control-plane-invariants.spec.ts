@@ -1,4 +1,4 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -33,6 +33,27 @@ describe('control-plane operational drift invariants', () => {
     expect(report.status).toBe('passed');
     expect(report.invariants.desired_state_domains).toEqual(
       expect.arrayContaining(['wip_cap', 'goal_duplication', 'linear_relation_label'])
+    );
+  });
+
+  it('fails closed with structured findings when the catalog is not an object', async () => {
+    const repoRoot = await writeFixture();
+    await writeJson(join(repoRoot, CONFIG_PATH), null);
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'catalog_not_object'
+        }),
+        expect.objectContaining({
+          code: 'lifecycle_missing'
+        })
+      ])
     );
   });
 
@@ -298,6 +319,28 @@ describe('control-plane operational drift invariants', () => {
     );
   });
 
+  it('fails closed when task packet path duplicates are hidden by dot segments', async () => {
+    const repoRoot = await writeFixture({
+      mutateConfig(config) {
+        config.task_packet.paths[2] = `./docs//${config.task_packet.paths[1].slice('docs/'.length)}`;
+      }
+    });
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'task_packet_path_duplicate',
+          path: '$.task_packet.paths[2]'
+        })
+      ])
+    );
+  });
+
   it('fails when task-index packet paths drift from the catalog', async () => {
     const repoRoot = await writeFixture({
       mutateTaskIndex(entry) {
@@ -335,6 +378,30 @@ describe('control-plane operational drift invariants', () => {
       expect.arrayContaining([
         expect.objectContaining({
           code: 'task_packet_path_not_file'
+        })
+      ])
+    );
+  });
+
+  it('rejects task packet symlinks that resolve outside the repository', async () => {
+    const repoRoot = await writeFixture();
+    const config = buildValidConfig();
+    const outsideDir = await mkdirFixture();
+    const outsideFile = join(outsideDir, 'outside-packet.md');
+    const packetPath = join(repoRoot, config.task_packet.paths[0]);
+    await writeFile(outsideFile, '# Outside packet\n', 'utf8');
+    await rm(packetPath, { force: true });
+    await symlink(outsideFile, packetPath);
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'task_packet_path_symlink_escapes_repo'
         })
       ])
     );
