@@ -540,13 +540,16 @@ function buildProviderIntakeAuthorityFingerprint(
 }
 
 function readProviderIntakeAuthorityState(
-  context: Pick<ControlRuntimeContext, 'providerIntakeState' | 'readPersistedProviderIntakeState'>
+  context: Pick<
+    ControlRuntimeContext,
+    'providerIntakeState' | 'readPersistedProviderIntakeState' | 'readProviderIssueHandoff'
+  >
 ): ProviderIntakeAuthoritySnapshot {
   if (context.readPersistedProviderIntakeState) {
     try {
       const state = context.readPersistedProviderIntakeState();
       const sourceFreshnessPolicy = state
-        ? resolveProviderIntakeSourceFreshnessPolicy(state)
+        ? resolveProviderIntakeSourceFreshnessPolicy(state, context)
         : null;
       if (state && sourceFreshnessPolicy) {
         return {
@@ -593,7 +596,18 @@ function readProviderIntakeAuthorityState(
   };
 }
 
-function resolveProviderIntakeSourceFreshnessPolicy(state: ProviderIntakeState | null) {
+function resolveProviderIntakeSourceFreshnessPolicy(
+  state: ProviderIntakeState | null,
+  context: Pick<ControlRuntimeContext, 'readProviderIssueHandoff'>
+) {
+  const liveControlHostOwner =
+    readProviderPollingHealth(context.readProviderIssueHandoff?.() ?? null)?.control_host_owner ??
+    null;
+  if (liveControlHostOwner) {
+    return resolveControlHostSourceFreshnessPolicyFromPolling(liveControlHostOwner, {
+      refresh: false
+    });
+  }
   if (!state?.polling || !isRecordLike(state.polling)) {
     return null;
   }

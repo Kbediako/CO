@@ -8613,6 +8613,95 @@ describe('ControlRuntime', () => {
     });
   });
 
+  it('clears persisted stale provider-intake authority when live control-host ownership is current', async () => {
+    const fixture = await createFixture();
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {}),
+      refresh: vi.fn(async () => {})
+    } as unknown as ProviderIssueHandoffService;
+    const repoRoot = await createSourceRootRepo('control-runtime-live-owner-authority-');
+    const liveFreshness = inspectSourceRootFreshness({
+      intendedRepoRoot: repoRoot,
+      packageRoot: repoRoot,
+      argv: ['node', join(repoRoot, 'bin', 'codex-orchestrator.ts')],
+      cwd: repoRoot,
+      now: () => '2026-05-18T23:12:00.000Z'
+    });
+    const persistedFreshness = {
+      ...liveFreshness,
+      status: 'warning' as const,
+      command_path: '/stale/bin/codex-orchestrator.ts',
+      command_path_realpath: '/stale/bin/codex-orchestrator.ts',
+      package_root: '/stale',
+      package_root_realpath: '/stale',
+      source_root: '/stale',
+      source_root_realpath: '/stale',
+      drift_classes: ['supervised_source_root_drift' as const]
+    };
+    const liveOwner = refreshControlHostOwnershipPollingPayload(
+      createControlHostOwnerPayload(repoRoot, liveFreshness)
+    );
+    if (!liveOwner?.owner) {
+      throw new Error('Expected live control-host owner test payload.');
+    }
+    liveOwner.updated_at = '2026-05-18T23:12:00.000Z';
+    liveOwner.owner.owner_token = 'live-owner-token';
+    liveOwner.owner.updated_at = '2026-05-18T23:12:00.000Z';
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 15000,
+      stuckAfterMs: 45000,
+      skipInitialUpdate: true,
+      controlHostOwner: liveOwner
+    });
+
+    const persistedOwner = refreshControlHostOwnershipPollingPayload(
+      createControlHostOwnerPayload('/stale', persistedFreshness)
+    );
+    if (!persistedOwner?.owner) {
+      throw new Error('Expected persisted control-host owner test payload.');
+    }
+    persistedOwner.updated_at = '2026-05-18T23:08:00.000Z';
+    persistedOwner.owner.owner_token = 'persisted-owner-token';
+    persistedOwner.owner.updated_at = '2026-05-18T23:08:00.000Z';
+    const providerIntakeState = createProviderIntakeState([
+      createReleasedTerminalClaim('CO-512', 'lin-issue-512'),
+      createReleasedTerminalClaim('CO-554', 'lin-issue-554'),
+      createReleasedTerminalClaim('CO-555', 'lin-issue-555')
+    ]);
+    providerIntakeState.polling = {
+      updated_at: '2026-05-18T23:08:00.000Z',
+      restart_required: false,
+      control_host_owner: persistedOwner
+    };
+    const runtime = createControlRuntime({
+      controlStore: fixture.controlStore,
+      questionQueue: { list: () => [] },
+      paths: fixture.paths,
+      linearAdvisoryState: { tracked_issue: null },
+      readPersistedProviderIntakeState: () => providerIntakeState,
+      readProviderIssueHandoff: () => providerIssueHandoff
+    });
+
+    const compatibilityProjection = await runtime.snapshot().readCompatibilityProjection();
+
+    expect(compatibilityProjection.providerIntakeUnavailable).toBeNull();
+    expect(compatibilityProjection.providerIntake).toMatchObject({
+      active_claim_count: 0,
+      running_claim_count: 0
+    });
+    expect(compatibilityProjection.polling).toMatchObject({
+      control_host_owner: {
+        owner: {
+          owner_token: 'live-owner-token',
+          source_root_freshness: {
+            status: 'current'
+          }
+        }
+      }
+    });
+  });
+
   it('falls back to the persisted polling snapshot before live polling health restarts', async () => {
     const fixture = await createFixture();
     const providerIssueHandoff = {

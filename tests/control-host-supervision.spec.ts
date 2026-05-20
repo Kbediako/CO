@@ -248,6 +248,41 @@ describe('control-host supervision probe contract', () => {
     expect(evaluation.message).toContain('bounded launchd restart');
   });
 
+  it('does not request restart from a stale supervised source snapshot before current child start', () => {
+    const payload = {
+      counts: {
+        running: 0,
+        retrying: 3,
+        max_allowed: 3
+      },
+      polling: {
+        updated_at: '2026-05-18T23:10:00.000Z',
+        stuck: false,
+        restart_required: false,
+        control_host_owner: buildControlHostOwner(
+          buildSourceRootFreshness({
+            sourceStatus: 'stale',
+            intendedStatus: 'current'
+          })
+        )
+      },
+      running: []
+    };
+
+    const evaluation = evaluateControlHostSupervisionHealthPayload(payload, {
+      minPollingUpdatedAt: '2026-05-18T23:12:00.000Z',
+      staleRestartRequiredGraceMs: 30_000,
+      now: '2026-05-18T23:12:10.000Z'
+    });
+
+    expect(evaluation).toMatchObject({
+      healthy: true,
+      reason: 'stale_restart_required'
+    });
+    expect(evaluation.message).toContain('stale supervised source freshness snapshot');
+    expect(evaluation.message).not.toContain('bounded launchd restart');
+  });
+
   it('fails closed without restart when stale source recovery would loop on an unsafe checkout', () => {
     const payload = {
       counts: {

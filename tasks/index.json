@@ -374,7 +374,7 @@
       "owners": [
         "Codex"
       ],
-      "status": "docs_packet_child_lane_produced",
+      "status": "validation_green_before_review",
       "last_review": "2026-05-20",
       "canonical_owner_key": "control-host:stale-resident-code-auto-restart-fail-closed",
       "evidence": [
@@ -402,7 +402,7 @@
         }
       },
       "validation": {
-        "status": "docs_packet_created_parent_validation_pending",
+        "status": "validation_green_before_review",
         "passed": [
           "parent-relative source payload read",
           "docs-first packet created",
@@ -410,14 +410,28 @@
           "registry mirrors created",
           "child scoped JSON parse",
           "child scoped protected-term check",
-          "child scoped git diff --check"
+          "child scoped git diff --check",
+          "focused stale resident code policy tests",
+          "auto-restart and fail-closed coverage",
+          "CO-555 terminal precedence regression",
+          "review-remediation stale snapshot and persisted live-owner regressions",
+          "delegation guard",
+          "spec guard dry-run",
+          "build",
+          "lint",
+          "full core test suite",
+          "docs:check",
+          "docs:freshness",
+          "repo:stewardship",
+          "diff-budget",
+          "pack:smoke"
         ],
         "pending": [
-          "parent docs-review before implementation",
-          "parent focused stale resident code policy tests",
-          "parent auto-restart and fail closed coverage",
-          "parent CO-555 terminal precedence regression",
-          "parent implementation gate and review handoff"
+          "standalone review clean rerun",
+          "elegance pass",
+          "PR attach",
+          "ready-review drain",
+          "Linear review handoff"
         ]
       },
       "paths": {
