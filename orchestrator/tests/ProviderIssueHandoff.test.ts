@@ -1276,6 +1276,7 @@ describe('createProviderIssueHandoffService', () => {
         reason: 'provider_issue_start_launched',
         run_id: startedRun.runId,
         run_manifest_path: startedRun.manifestPath,
+        launch_token: expect.any(String),
         retry_queued: false,
         retry_attempt: 3,
         retry_due_at: null,
