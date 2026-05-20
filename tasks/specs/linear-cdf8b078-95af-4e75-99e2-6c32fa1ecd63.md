@@ -94,7 +94,7 @@ task_checklists:
 | Active refresh stalls | Active claims can still stall during refresh. | Active stalls must fail closed with provider keys and phase evidence. | Active stuck path still emits `provider_refresh_lifecycle_stuck` and `restart_required`. | Treating all refresh stalls as benign. |
 | Status truth | `/ui/data.json` and `co-status --format json` can expose unhealthy or timeout states. | Operators need truthful, not fabricated, state. | Terminal released claim filtering does not fabricate healthy snapshots. | Status UI redesign. |
 | No current poll snapshot | After PR #855 merged, skipped/unavailable tracked-issue polling left `trackedIssuesByKey=null`, then the no-map resolver entered `claim_issue_by_id:released` direct issue-by-id reads for terminal history. | The classification authority must not depend on a bulk poll map when the cached row is already a strong terminal released historical claim. | Strong terminal released rows skip the direct issue-by-id sweep even without a current poll snapshot; weak, reopened, accepted pending-revalidation, or current-promotion rows still revalidate. | Treating all missing-poll states as clean. |
-| Retained `review_promotion` metadata | CO-468 can retain a promoted `Merging` review-promotion snapshot that predates newer terminal Done issue truth. | Stale promotion metadata is history; current promotion metadata is still live routing evidence. | Stale promotions are ignored only when terminal issue truth is newer; current promotions force revalidation. | Dropping review/merge promotion truth globally. |
+| Retained `review_promotion` metadata | CO-468 can retain a promoted `Merging` review-promotion snapshot that predates newer terminal Done issue truth. | Stale promotion metadata is history; current promotion metadata is still live routing evidence. | Stale promotions are ignored only when terminal issue truth is newer; current promotions force revalidation, including deferred-poll fail-closed paths. | Dropping review/merge promotion truth globally. |
 
 ## Readiness Gate
 - Not done if:
@@ -154,7 +154,7 @@ task_checklists:
 - A real active/stuck path still fails closed with `provider_refresh_lifecycle_stuck` / `restart_required`.
 - Strong terminal released claims skip direct issue-by-id when current tracked-issue polling is unavailable or skipped.
 - Accepted `provider_issue_rehydration_pending_revalidation` claims keep direct issue-by-id revalidation when bulk polling is unavailable.
-- Stale retained `review_promotion` metadata does not keep terminal released history active, while current promotion metadata still revalidates.
+- Stale retained `review_promotion` metadata does not keep terminal released history active, while current promotion metadata still revalidates in no-map and deferred-poll fail-closed paths.
 - `co-status --format json` and `/ui/data.json` remain truthful.
 - No provider-intake manual edits or timeout-only fix is introduced.
 
@@ -164,7 +164,7 @@ task_checklists:
 - Focused active stuck refresh negative test.
 - Focused no-current-poll-snapshot regression.
 - Focused accepted pending-revalidation no-current-poll regression.
-- Focused stale/current `review_promotion` regressions.
+- Focused stale/current `review_promotion` regressions, including deferred-poll stale suppression and current-promotion revalidation.
 - Spec guard, build, lint, test, docs checks, freshness, diff budget.
 - Pack smoke for downstream CLI/control-host surface.
 - Standalone review and elegance pass where tooling permits.

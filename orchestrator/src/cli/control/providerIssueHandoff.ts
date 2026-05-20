@@ -5525,6 +5525,11 @@ export function createProviderIssueHandoffService(
             });
           const canUseCachedReleasedTerminalHistoricalClaim =
             shouldUseCachedReleasedTerminalHistoricalClaim;
+          const shouldRevalidateCurrentReleasedReviewPromotion =
+            claim.state === 'released' &&
+            claim.reason === 'provider_issue_released:not_active' &&
+            isTerminalProviderIntakeIssueState(claim) &&
+            !canTreatReviewPromotionAsStaleForReleasedTerminalHistoricalClaim(claim);
           if (
             pollInput?.deferFreshDiscovery === true &&
             trackedIssueRefetch &&
@@ -5562,6 +5567,7 @@ export function createProviderIssueHandoffService(
                 pollInput?.deferFreshDiscovery === true ||
                 canUseCachedReleasedTerminalHistoricalClaim
               ) &&
+              !shouldRevalidateCurrentReleasedReviewPromotion &&
               !canFreshDiscoverReleasedLiveWorker &&
               !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot,
             allowDirectIssueById,

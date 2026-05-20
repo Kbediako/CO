@@ -661,7 +661,7 @@
           "reviewer": "CO-571 provider worker",
           "date": "2026-05-20",
           "status": "approved_for_implementation",
-          "summary": "CO-571 is scoped to terminal released historical claim reconciliation, the retry projection mismatch for selected released claims with null retry metadata, the no-current-poll-snapshot direct issue-by-id fallback, accepted pending-revalidation rechecks, and stale/current review_promotion handling. It explicitly rejects timeout-only fixes, provider-intake manual edits, fabricated snapshots, and hiding real active refresh stalls."
+          "summary": "CO-571 is scoped to terminal released historical claim reconciliation, the retry projection mismatch for selected released claims with null retry metadata, the no-current-poll-snapshot direct issue-by-id fallback, accepted pending-revalidation rechecks, and stale/current review_promotion handling across no-map and deferred-poll fail-closed paths. It explicitly rejects timeout-only fixes, provider-intake manual edits, fabricated snapshots, and hiding real active refresh stalls."
         },
         "parallelization": {
           "decision": "stay_serial",
@@ -694,7 +694,7 @@
           "PR #855 opened, attached to Linear, and marked ready for review",
           "CI Core Lane passed on PR #855",
           "PR #856 rework opened after PR #855 merged but live current-main evidence still looped",
-          "PR #856 focused no-current-poll-snapshot and stale/current review_promotion regressions",
+          "PR #856 focused no-current-poll-snapshot and stale/current review_promotion regressions, including deferred-poll stale suppression and current-promotion revalidation",
           "manual Codex review returned clean on PR #856 head 60055e3aabd8f69f5e916036204756da9bfac63e"
         ],
         "pending": [

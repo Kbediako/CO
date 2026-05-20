@@ -101,7 +101,7 @@
 | Status surfaces | `co-status --format json` and `/ui/data.json` can time out or show unhealthy host state. | Status must be truthful even during degraded reads. | No fabricated coherent snapshot; no hiding of genuine unhealthy host states. | Broader status dashboard redesign. |
 | Provider-intake evidence | `provider-intake-state.json` retains released historical claims and audit history. | Intake history is audit evidence, not a manual repair target. | Code-level classification ignores terminal released claims only for active restart decisions. | Manual state-file edits or cleanup. |
 | No current poll snapshot | A skipped/unavailable tracked-issue poll can leave no bulk issue map, after which the no-map resolver re-enters direct issue-by-id for terminal released history. | Strong cached terminal released issue truth is sufficient to avoid a direct issue-by-id sweep, but cached pending-revalidation claims still need a live issue read. | Strong terminal released rows skip direct issue-by-id even without a current poll map; weak, pending-reopen, accepted pending-revalidation, or current-promotion rows still revalidate. | Treating every missing poll snapshot as healthy. |
-| Retained review promotion | CO-468 can retain a promoted `Merging` review-promotion snapshot older than newer terminal Done issue truth. | Promotion metadata is active only when it is current relative to terminal issue truth. | Stale promotion metadata is ignored for terminal history; current promotion metadata forces revalidation. | Dropping review/merge promotion routing globally. |
+| Retained review promotion | CO-468 can retain a promoted `Merging` review-promotion snapshot older than newer terminal Done issue truth. | Promotion metadata is active only when it is current relative to terminal issue truth. | Stale promotion metadata is ignored for terminal history; current promotion metadata forces revalidation, including deferred-poll fail-closed paths. | Dropping review/merge promotion routing globally. |
 
 ## Not Done If
 - Released Done, Duplicate, Cancelled/Canceled, or Duplicate/canceled claims can still trigger `restart_required` without active worker/live issue corroboration.
@@ -138,7 +138,7 @@
 - CO-468 Done retained-run `claim_issue_by_id:released` is covered by a regression that no longer drives restart-required health without active corroboration.
 - A no-current-poll-snapshot terminal released row is covered by a regression that does not enter direct issue-by-id.
 - An accepted `provider_issue_rehydration_pending_revalidation` row is covered by a no-current-poll regression that still enters direct issue-by-id and releases terminal truth.
-- Stale retained `review_promotion` is covered by a regression, with a current-promotion negative regression that still revalidates.
+- Stale retained `review_promotion` is covered by regressions, including deferred-poll suppression, with current-promotion negative regressions that still revalidate in no-map and deferred-poll fail-closed paths.
 - A real active/stuck provider refresh path still fails closed with `provider_refresh_lifecycle_stuck` / `restart_required`.
 - Status projection remains truthful and does not fabricate a healthy snapshot after timeout or health failure.
 - `provider-intake-state.json` is not manually edited as part of the repair.
@@ -149,7 +149,7 @@
 - Focused projection coverage for terminal released claims with null retry fields so they do not count as retrying work.
 - Focused no-current-poll-snapshot coverage for terminal released history before direct issue-by-id.
 - Focused no-current-poll accepted pending-revalidation coverage.
-- Focused stale/current `review_promotion` coverage.
+- Focused stale/current `review_promotion` coverage, including deferred-poll stale suppression and current-promotion revalidation.
 - Focused negative test for real active stuck refresh behavior.
 - `node scripts/spec-guard.mjs --dry-run`.
 - `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run docs:freshness`, `node scripts/diff-budget.mjs`.

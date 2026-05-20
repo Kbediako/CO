@@ -31626,6 +31626,199 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalled();
   });
 
+  it('revalidates current promoted released terminal history during deferred poll fail-closed', async () => {
+    const { root, paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    const runId = 'run-co-571-current-promotion-deferred';
+    const runManifestPath = join(
+      root,
+      '.runs',
+      'linear-lin-co-571-current-promotion-deferred',
+      'cli',
+      runId,
+      'manifest.json'
+    );
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-571-current-promotion-deferred',
+      issue_identifier: 'CO-571-CURRENT-PROMOTION-DEFERRED',
+      issue_title: 'Current promoted review metadata should revalidate in deferred poll',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-05-20T18:00:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-571-current-promotion-deferred',
+      run_id: runId,
+      run_manifest_path: runManifestPath,
+      review_promotion: {
+        recorded_at: '2026-05-20T18:10:00.000Z',
+        issue_id: 'lin-co-571-current-promotion-deferred',
+        issue_identifier: 'CO-571-CURRENT-PROMOTION-DEFERRED',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-20T18:10:00.000Z',
+        status: 'promoted',
+        reason: 'promoted_to_merging',
+        summary: 'Promoted attached PR from review handoff into Merging.',
+        attached_pr_urls: ['https://github.com/Kbediako/CO/pull/858'],
+        ignored_historical_pr_urls: [],
+        ignored_closed_unmerged_pr_urls: [],
+        ignored_cross_issue_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: null,
+        snapshot: null,
+        branch_recovery: null,
+        linear_transition: null,
+        github_rate_limit: null
+      },
+      merge_closeout: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-571-current-promotion-deferred-should-not-start',
+      '/tmp/provider-run/co-571-current-promotion-deferred-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-co-571-current-promotion-deferred',
+        identifier: 'CO-571-CURRENT-PROMOTION-DEFERRED',
+        title: 'Current promoted review metadata should revalidate in deferred poll',
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-05-20T18:15:00.000Z',
+        blocked_by: []
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    markProviderPollingStarted(service, { mode: 'poll' });
+    await service.poll?.({
+      trackedIssues: [],
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-co-571-current-promotion-deferred'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false,
+      refresh_counts: expect.objectContaining({
+        issue_by_id_reads: 1
+      })
+    });
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_updated_at: '2026-05-20T18:15:00.000Z',
+      run_id: runId,
+      run_manifest_path: runManifestPath
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
+  it('keeps stale promoted released terminal history suppressed during deferred poll fail-closed', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-571-stale-promotion-deferred',
+      issue_identifier: 'CO-571-STALE-PROMOTION-DEFERRED',
+      issue_title: 'Stale promoted review metadata should stay suppressed in deferred poll',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-05-20T18:15:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-571-stale-promotion-deferred',
+      run_id: null,
+      run_manifest_path: null,
+      review_promotion: {
+        recorded_at: '2026-05-20T18:10:00.000Z',
+        issue_id: 'lin-co-571-stale-promotion-deferred',
+        issue_identifier: 'CO-571-STALE-PROMOTION-DEFERRED',
+        issue_state: 'Merging',
+        issue_state_type: 'started',
+        issue_updated_at: '2026-05-20T18:10:00.000Z',
+        status: 'promoted',
+        reason: 'promoted_to_merging',
+        summary: 'Promoted attached PR from review handoff into Merging.',
+        attached_pr_urls: ['https://github.com/Kbediako/CO/pull/859'],
+        ignored_historical_pr_urls: [],
+        ignored_closed_unmerged_pr_urls: [],
+        ignored_cross_issue_pr_urls: [],
+        conflicting_attached_pr_urls: [],
+        pr: null,
+        snapshot: null,
+        branch_recovery: null,
+        linear_transition: null,
+        github_rate_limit: null
+      },
+      merge_closeout: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    }));
+
+    const launcher = createCo202Launcher(
+      'run-co-571-stale-promotion-deferred-should-not-start',
+      '/tmp/provider-run/co-571-stale-promotion-deferred-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssue = vi.fn(async () => {
+      throw new Error('stale promoted terminal history should not use direct issue-by-id');
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist: vi.fn(async () => undefined),
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    markProviderPollingStarted(service, { mode: 'poll' });
+    await service.poll?.({
+      trackedIssues: [],
+      deferFreshDiscovery: true
+    });
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false,
+      refresh_counts: expect.objectContaining({
+        issue_by_id_reads: 0
+      })
+    });
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_updated_at: '2026-05-20T18:15:00.000Z',
+      run_id: null,
+      run_manifest_path: null
+    });
+  });
+
   it('reopens pending-reopen released claims from direct issue-by-id when the poll snapshot is unavailable', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
