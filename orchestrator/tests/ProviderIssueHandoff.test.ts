@@ -1153,6 +1153,140 @@ describe('createProviderIssueHandoffService', () => {
     }
   );
 
+  it.each(['recover', 'relaunch', 'nudge'] as const)(
+    'relaunches Ready resumable claims with terminal failed historical runs through explicit %s without broad dispatch',
+    async (action) => {
+      const { root, paths } = await createHostPaths();
+      const oldRunEnv = {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'linear-lin-issue-558'
+      };
+      const oldRun = resolveRunPaths(oldRunEnv, '2026-05-19T01-42-00-773Z-7979b68d');
+      await mkdir(oldRun.runDir, { recursive: true });
+      await writeFile(
+        oldRun.manifestPath,
+        JSON.stringify({
+          run_id: '2026-05-19T01-42-00-773Z-7979b68d',
+          task_id: 'linear-lin-issue-558',
+          status: 'failed',
+          summary: 'retry poll failed: dispatch_source_disabled',
+          issue_provider: 'linear',
+          issue_id: 'lin-issue-558',
+          issue_identifier: 'CO-558',
+          issue_updated_at: '2026-05-20T02:55:00.000Z',
+          workspace_path: join(root, '.workspaces', 'linear-lin-issue-558'),
+          updated_at: '2026-05-19T01:43:00.000Z'
+        }),
+        'utf8'
+      );
+
+      const state = createProviderIntakeState();
+      state.claims.push(createProviderClaim({
+        issue_id: 'lin-issue-558',
+        issue_identifier: 'CO-558',
+        issue_title: 'Replace terminal docs freshness maintenance owner after May 19',
+        issue_state: 'Ready',
+        issue_state_type: 'unstarted',
+        issue_updated_at: '2026-05-20T02:55:00.000Z',
+        issue_blocked_by: [],
+        task_id: 'linear-lin-issue-558',
+        state: 'resumable',
+        reason: 'provider_issue_rehydrated_resumable_run',
+        accepted_at: '2026-05-19T01:42:00.000Z',
+        updated_at: '2026-05-20T02:55:05.000Z',
+        run_id: oldRun.runId,
+        run_manifest_path: oldRun.manifestPath,
+        launch_source: null,
+        launch_token: null,
+        retry_queued: true,
+        retry_attempt: 3,
+        retry_due_at: '2026-05-20T02:56:05.000Z',
+        retry_error: 'retry poll failed: dispatch_source_disabled'
+      }));
+      const persist = vi.fn(async () => undefined);
+      const startedRun = {
+        runId: `run-co-558-${action}`,
+        manifestPath: join(paths.runDir, `provider-run-co-558-${action}.json`)
+      };
+      const launcher = { start: vi.fn(async () => startedRun), resume: vi.fn(async () => undefined) };
+      const resolveTrackedIssue = vi.fn(async () => ({
+        kind: 'skip' as const,
+        reason: 'dispatch_source_disabled'
+      }));
+      const resolveRecoveryTrackedIssue = vi.fn(async ({ issueId }: { provider: 'linear'; issueId: string }) => ({
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: issueId,
+          identifier: 'CO-558',
+          title: 'Replace terminal docs freshness maintenance owner after May 19',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-05-20T02:55:00.000Z',
+          blocked_by: []
+        })
+      }));
+      const service = createProviderIssueHandoffService({
+        paths,
+        state,
+        persist,
+        launcher,
+        startPipelineId: 'provider-linear-worker',
+        resolveTrackedIssue,
+        resolveRecoveryTrackedIssue
+      });
+
+      const result = await service.recoverIssue({ provider: 'linear', issueId: 'lin-issue-558', action });
+
+      expect(resolveTrackedIssue).not.toHaveBeenCalled();
+      expect(resolveRecoveryTrackedIssue).toHaveBeenCalledWith({
+        provider: 'linear',
+        issueId: 'lin-issue-558'
+      });
+      expect(result).toMatchObject({
+        kind: 'start',
+        reason: 'provider_issue_start_launched',
+        claim: {
+          issue_id: 'lin-issue-558',
+          issue_identifier: 'CO-558',
+          issue_state: 'Ready',
+          issue_state_type: 'unstarted',
+          state: 'starting',
+          reason: 'provider_issue_start_launched',
+          task_id: 'linear-lin-issue-558',
+          run_id: startedRun.runId,
+          run_manifest_path: startedRun.manifestPath,
+          launch_source: 'control-host',
+          launch_token_present: true
+        }
+      });
+      expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+        taskId: 'linear-lin-issue-558',
+        pipelineId: 'provider-linear-worker',
+        provider: 'linear',
+        issueId: 'lin-issue-558',
+        issueIdentifier: 'CO-558',
+        issueUpdatedAt: '2026-05-20T02:55:00.000Z',
+        launchToken: expect.any(String)
+      }));
+      expect(launcher.resume).not.toHaveBeenCalled();
+      expect(state.claims[0]).toMatchObject({
+        state: 'starting',
+        reason: 'provider_issue_start_launched',
+        run_id: startedRun.runId,
+        run_manifest_path: startedRun.manifestPath,
+        retry_queued: false,
+        retry_attempt: 3,
+        retry_due_at: null,
+        retry_error: 'retry poll failed: dispatch_source_disabled',
+        last_event: 'control_host_provider_worker_recover',
+        last_action: action
+      });
+      expect(persist).toHaveBeenCalled();
+    }
+  );
+
   it('keeps a fresh manifestless explicit-recovery claim inflight before relaunching once stale', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();

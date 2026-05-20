@@ -26081,6 +26081,54 @@
         "url": "https://linear.app/asabeko/issue/CO-565/co-codex-cli-01310-release-intake-and-posture-audit"
       },
       "canonical_owner_key": "codex-cli-release-intake:stable:0.131.0"
+    },
+    {
+      "id": "20260520-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5",
+      "title": "CO-566 recover Ready resumable provider claims without dispatch-pilot admission",
+      "relates_to": "tasks/tasks-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-20",
+      "evidence": [
+        "docs/PRD-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "docs/TECH_SPEC-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "docs/ACTION_PLAN-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "tasks/specs/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "tasks/tasks-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        ".agent/task/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5-docs-packet/cli/2026-05-20T03-01-24-615Z-49668b4b/manifest.json",
+        ".runs/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5-docs-packet/cli/2026-05-20T03-01-24-615Z-49668b4b/provider-linear-child-lane.patch"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet plus parent provider worker",
+          "date": "2026-05-20",
+          "status": "accepted_for_parent_integration",
+          "manifest": ".runs/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5-docs-packet/cli/2026-05-20T03-01-24-615Z-49668b4b/manifest.json",
+          "canonical_owner_key": "provider-intake:ready-resumable-recover-dispatch-source-disabled:v1",
+          "summary": "Docs-only child lane bootstrapped the six-file CO-566 Ready resumable recovery packet; parent verified and accepted the patch for integration before implementation."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "task": "tasks/tasks-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "agent_task": ".agent/task/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "prd": "docs/PRD-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "docs": "docs/TECH_SPEC-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "action_plan": "docs/ACTION_PLAN-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md"
+      },
+      "source_issue": {
+        "id": "b30c4be7-d186-490e-863b-8ba57a6cb9a5",
+        "identifier": "CO-566",
+        "url": "https://linear.app/asabeko/issue/CO-566/co-recover-ready-resumable-provider-claims-without-dispatch-pilot"
+      },
+      "canonical_owner_key": "provider-intake:ready-resumable-recover-dispatch-source-disabled:v1"
     }
   ]
 }
