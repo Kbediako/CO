@@ -472,6 +472,14 @@
       ],
       "canonical_owner_issues": [
         {
+          "canonical_owner_key": "baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance",
+          "owner_issue": "CO-568"
+        },
+        {
+          "canonical_owner_key": "baseline_cohort_id:co-558-may-20-apr-19-task-report-maintenance",
+          "owner_issue": "CO-569"
+        },
+        {
           "canonical_owner_key": "docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30",
           "owner_issue": "CO-320"
         }
