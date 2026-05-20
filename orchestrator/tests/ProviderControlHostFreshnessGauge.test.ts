@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,6 +9,7 @@ import {
   evaluateProviderControlHostFreshnessGauge
 } from '../src/cli/control/providerControlHostFreshnessGauge.js';
 import { runControlHostFreshnessGaugeCliShell } from '../src/cli/controlHostFreshnessGaugeCliShell.js';
+import { inspectSourceRootFreshness } from '../src/cli/utils/sourceRootFreshness.js';
 
 const FIXTURE_ROOT = join(process.cwd(), 'orchestrator/tests/fixtures/provider-control-host-freshness');
 const NOW = '2026-04-14T06:00:00.000Z';
@@ -18,6 +20,67 @@ afterEach(async () => {
   process.exitCode = 0;
   await Promise.all(cleanupRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
+
+function git(root: string, args: string[]): string {
+  const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+  if (result.status !== 0) {
+    throw new Error(`git ${args.join(' ')} failed: ${result.stderr || result.stdout}`);
+  }
+  return result.stdout;
+}
+
+async function createSourceRootRepo(prefix: string): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), prefix));
+  cleanupRoots.push(root);
+  await mkdir(join(root, 'bin'), { recursive: true });
+  await writeFile(join(root, 'bin', 'codex-orchestrator.ts'), 'console.log("control host");\n', 'utf8');
+  git(root, ['init']);
+  git(root, ['config', 'user.email', 'codex@example.com']);
+  git(root, ['config', 'user.name', 'Codex']);
+  git(root, ['add', '.']);
+  git(root, ['commit', '-m', 'initial control host source']);
+  git(root, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  return root;
+}
+
+function createControlHostOwner(repoRoot: string, sourceRootFreshness: unknown) {
+  return {
+    status: 'owned',
+    updated_at: NOW,
+    owner: {
+      owner_token: 'owner-token',
+      status: 'owned',
+      pid: 123,
+      hostname: 'host.local',
+      acquired_at: NOW,
+      updated_at: NOW,
+      repo_root: repoRoot,
+      run_id: 'control-host',
+      run_dir: join(repoRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      lock_dir: join(repoRoot, '.runs', 'control-host-owner.lock'),
+      owner_path: join(repoRoot, '.runs', 'control-host-owner.json'),
+      source_root_freshness: sourceRootFreshness
+    }
+  };
+}
+
+async function createCurrentAtAcquisitionOwnerThatBecomesStale() {
+  const repoRoot = await createSourceRootRepo('provider-freshness-current-at-acquisition-stale-');
+  const sourceRootFreshness = inspectSourceRootFreshness({
+    intendedRepoRoot: repoRoot,
+    packageRoot: repoRoot,
+    argv: ['node', join(repoRoot, 'bin', 'codex-orchestrator.ts')],
+    cwd: repoRoot,
+    now: () => NOW
+  });
+  const residentHash = git(repoRoot, ['rev-parse', 'HEAD']).trim();
+  await writeFile(join(repoRoot, 'co-556-main-advance.txt'), 'main advanced\n', 'utf8');
+  git(repoRoot, ['add', '.']);
+  git(repoRoot, ['commit', '-m', 'CO-556 main advance']);
+  git(repoRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  git(repoRoot, ['reset', '--hard', residentHash]);
+  return createControlHostOwner(repoRoot, sourceRootFreshness);
+}
 
 describe('provider/control-host freshness gauge', () => {
   it('emits a healthy machine-readable report from replayed provider/control-host artifacts', async () => {
@@ -581,6 +644,46 @@ describe('provider/control-host freshness gauge', () => {
               }
             }
           }
+        },
+        claims: [
+          {
+            state: 'resumable',
+            retry_queued: true,
+            issue_state: 'In Progress',
+            issue_state_type: 'started'
+          }
+        ]
+      })
+    );
+
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      paths: { provider_intake_state: [intakePath] },
+      now: NOW,
+      strict: true
+    });
+
+    expect(report.strict_failed).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'stale_supervised_source_active_claims',
+          verdict: 'stale'
+        })
+      ])
+    );
+  });
+
+  it('refreshes owner freshness before auditing stale supervised source active claims', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'provider-freshness-stale-after-acquisition-claims-'));
+    cleanupRoots.push(root);
+    const intakePath = join(root, 'provider-intake-state.json');
+    await writeFile(
+      intakePath,
+      JSON.stringify({
+        schema_version: 1,
+        updated_at: NOW,
+        polling: {
+          control_host_owner: await createCurrentAtAcquisitionOwnerThatBecomesStale()
         },
         claims: [
           {

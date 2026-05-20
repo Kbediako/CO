@@ -580,8 +580,7 @@ export function createProviderIssueHandoffService(
   };
   const resolveProviderHandoffSourceFreshnessPolicy = () =>
     resolveControlHostSourceFreshnessPolicyFromPolling(
-      options.state.polling?.control_host_owner,
-      { refresh: false }
+      options.state.polling?.control_host_owner
     );
   const resolveProviderHandoffSourceFreshnessAbortReason = (): string | null =>
     resolveProviderHandoffSourceFreshnessPolicy()

@@ -299,10 +299,16 @@ export function resolveControlHostSourceFreshnessPolicyFromPolling(
   options: { refresh?: boolean } = {}
 ): ControlHostSourceFreshnessPolicy | null {
   const normalized = normalizeControlHostOwnershipPollingPayload(value);
+  if (options.refresh === false) {
+    return resolveControlHostSourceFreshnessPolicy(normalized);
+  }
+  const refreshed = refreshControlHostOwnershipPollingPayload(normalized);
+  const refreshedPolicy = resolveControlHostSourceFreshnessPolicy(refreshed);
+  if (refreshedPolicy || isAuthoritativeControlHostSourceFreshness(refreshed)) {
+    return refreshedPolicy;
+  }
   return resolveControlHostSourceFreshnessPolicy(
-    options.refresh === false
-      ? normalized
-      : refreshControlHostOwnershipPollingPayload(normalized)
+    normalized
   );
 }
 
@@ -352,6 +358,13 @@ export function resolveControlHostAuthoritativeSourceFreshness(
     );
   }
   return payload.owner?.source_root_freshness ?? null;
+}
+
+function isAuthoritativeControlHostSourceFreshness(
+  payload: ControlHostOwnershipPollingPayload | null
+): boolean {
+  const freshness = resolveControlHostAuthoritativeSourceFreshness(payload);
+  return freshness?.status === 'current' || freshness?.status === 'warning';
 }
 
 function isRestartSafeStaleSupervisedSourceRoot(
