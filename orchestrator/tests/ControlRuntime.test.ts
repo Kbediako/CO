@@ -8662,6 +8662,68 @@ describe('ControlRuntime', () => {
     });
   });
 
+  it('falls back to persisted stale authority when live ownership has no freshness signal', async () => {
+    const fixture = await createFixture({ taskId: 'local-mcp' });
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {}),
+      refresh: vi.fn(async () => {})
+    } as unknown as ProviderIssueHandoffService;
+    const repoRoot = await createSourceRootRepo('control-runtime-live-owner-missing-freshness-');
+    const startupFreshness = inspectSourceRootFreshness({
+      intendedRepoRoot: repoRoot,
+      packageRoot: repoRoot,
+      argv: ['node', join(repoRoot, 'bin', 'codex-orchestrator.ts')],
+      cwd: repoRoot,
+      now: () => '2026-05-18T22:55:00.000Z'
+    });
+    const residentHash = git(repoRoot, ['rev-parse', 'HEAD']).stdout.trim();
+    const liveOwner = createControlHostOwnerPayload(repoRoot, null);
+    if (!liveOwner.owner) {
+      throw new Error('Expected live control-host owner test payload.');
+    }
+    liveOwner.owner.owner_token = 'live-owner-missing-freshness-token';
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 15000,
+      stuckAfterMs: 45000,
+      skipInitialUpdate: true,
+      controlHostOwner: liveOwner
+    });
+    await writeFile(join(repoRoot, 'co-556-main-advance.txt'), 'main advanced\n', 'utf8');
+    git(repoRoot, ['add', '.']);
+    git(repoRoot, ['commit', '-m', 'CO-556 main advance']);
+    git(repoRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    git(repoRoot, ['reset', '--hard', residentHash]);
+    const providerIntakeState = createProviderIntakeState([
+      createTerminalRetryClaim('CO-512', 'lin-issue-512'),
+      createTerminalRetryClaim('CO-554', 'lin-issue-554'),
+      createTerminalRetryClaim('CO-555', 'lin-issue-555')
+    ]);
+    providerIntakeState.polling = {
+      updated_at: '2026-05-18T23:08:00.000Z',
+      restart_required: false,
+      control_host_owner: createControlHostOwnerPayload(repoRoot, startupFreshness)
+    };
+    const runtime = createControlRuntime({
+      controlStore: fixture.controlStore,
+      questionQueue: { list: () => [] },
+      paths: fixture.paths,
+      linearAdvisoryState: { tracked_issue: null },
+      readPersistedProviderIntakeState: () => providerIntakeState,
+      readProviderIssueHandoff: () => providerIssueHandoff
+    });
+
+    const compatibilityProjection = await runtime.snapshot().readCompatibilityProjection();
+
+    expect(compatibilityProjection.providerIntake).toBeNull();
+    expect(compatibilityProjection.providerIntakeUnavailable).toMatchObject({
+      reason: 'stale_supervised_control_host_source',
+      action: 'fail_closed'
+    });
+    expect(compatibilityProjection.running).toEqual([]);
+    expect(compatibilityProjection.retrying).toEqual([]);
+  });
+
   it('clears persisted stale provider-intake authority when live control-host ownership is current', async () => {
     const fixture = await createFixture();
     const providerIssueHandoff = {

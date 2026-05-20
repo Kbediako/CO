@@ -11,7 +11,7 @@
 - Canonical owner key: `control-host:stale-resident-code-auto-restart-fail-closed`
 - Shared source anchor: `ctx:sha256:ae0909adb0536f00cad4a362edd1e495157b446bb95ab0c17655b489a548065f#chunk:c000001`
 - Child manifest: `.runs/linear-2d28fad8-60e7-462d-9c70-dec1d421b55c-docs-packet/cli/2026-05-20T00-20-24-774Z-cc622583/manifest.json`
-- Source payload note: source payload was absent under this child checkout's own `.runs` tree and was read read-only from the parent-relative source path; it contained run and issue provenance for CO-556, so this packet preserves the parent-provided issue wording.
+- Source payload note: source payload was absent under this child checkout's own `.runs` tree and was read-only from the parent-relative source path; it contained run and issue provenance for CO-556, so this packet preserves the parent-provided issue wording.
 
 ## Docs-First
 - [x] PRD created with user-request translation, intent checksum, parity matrix, non-goals, Not Done If, acceptance criteria, validation plan, and fallback/refactor decision. Evidence: `docs/PRD-linear-2d28fad8-60e7-462d-9c70-dec1d421b55c.md`.

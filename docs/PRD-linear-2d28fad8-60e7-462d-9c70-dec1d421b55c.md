@@ -14,7 +14,7 @@
 - Source anchor: `ctx:sha256:ae0909adb0536f00cad4a362edd1e495157b446bb95ab0c17655b489a548065f#chunk:c000001`
 - Source object id: `sha256:ae0909adb0536f00cad4a362edd1e495157b446bb95ab0c17655b489a548065f`
 - Source manifest: `.runs/linear-2d28fad8-60e7-462d-9c70-dec1d421b55c-docs-packet/cli/2026-05-20T00-20-24-774Z-cc622583/manifest.json`
-- Source payload note: this child checkout has no `.runs` tree at its root; the source payload was read read-only from the parent-relative path `../../.runs/linear-2d28fad8-60e7-462d-9c70-dec1d421b55c-docs-packet/cli/2026-05-20T00-20-24-774Z-cc622583/memory/source-0/source.txt` and contains run/issue provenance only. The issue-shaping contract below is anchored on the parent-provided CO-556 wording.
+- Source payload note: this child checkout has no `.runs` tree at its root; the source payload was read in read-only mode from the parent-relative path `../../.runs/linear-2d28fad8-60e7-462d-9c70-dec1d421b55c-docs-packet/cli/2026-05-20T00-20-24-774Z-cc622583/memory/source-0/source.txt` and contains run/issue provenance only. The issue-shaping contract below is anchored on the parent-provided CO-556 wording.
 
 ## Summary
 - Problem Statement: once CO-515 makes `supervised control-host source freshness` trustworthy, the resident control-host still needs a governed policy for stale resident code. If `control-host-owner.json` or `co-status --format json` shows `source_root_freshness` behind `origin/main`, the provider-worker control plane must not continue treating active WIP as safely actionable on stale code.

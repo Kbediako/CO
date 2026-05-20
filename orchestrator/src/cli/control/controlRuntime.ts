@@ -604,7 +604,23 @@ function resolveProviderIntakeSourceFreshnessPolicy(
     readProviderPollingHealth(context.readProviderIssueHandoff?.() ?? null)?.control_host_owner ??
     null;
   if (liveControlHostOwner) {
-    return resolveControlHostSourceFreshnessPolicyFromPolling(liveControlHostOwner);
+    const livePolicy = resolveControlHostSourceFreshnessPolicyFromPolling(liveControlHostOwner);
+    const normalizedLiveOwner = normalizeControlHostOwnershipPollingPayload(liveControlHostOwner);
+    const liveFreshness =
+      normalizedLiveOwner?.status === 'owned'
+        ? (
+            normalizedLiveOwner.owner?.source_root_freshness ??
+            normalizedLiveOwner.attempted_owner?.source_root_freshness ??
+            null
+          )
+        : (
+            normalizedLiveOwner?.attempted_owner?.source_root_freshness ??
+            normalizedLiveOwner?.owner?.source_root_freshness ??
+            null
+          );
+    if (livePolicy || liveFreshness?.status === 'current') {
+      return livePolicy;
+    }
   }
   if (!state?.polling || !isRecordLike(state.polling)) {
     return null;

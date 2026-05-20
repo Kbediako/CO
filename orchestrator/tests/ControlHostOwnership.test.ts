@@ -9,6 +9,8 @@ import {
   acquireControlHostOwnership,
   readControlHostOwnerMetadata,
   readControlHostOwnershipOperatorHint,
+  resolveControlHostSourceFreshnessPolicy,
+  type ControlHostOwnershipPollingPayload,
   type ControlHostOwnerMetadata
 } from '../src/cli/control/controlHostOwnership.js';
 import {
@@ -313,6 +315,81 @@ describe('control host ownership', () => {
       code: 'ENOENT'
     });
     await clean.release();
+  });
+
+  it('prefers attempted owner freshness after stale owner reclamation', () => {
+    const staleReclaimedPayload = {
+      status: 'stale_reclaimed',
+      reason: 'stale_control_host_owner',
+      updated_at: '2026-05-18T23:08:00.000Z',
+      diagnostic_path: null,
+      lock_dir: '/repo/.runs/control-host-owner.lock',
+      owner_path: '/repo/.runs/control-host-owner.json',
+      owner: {
+        owner_token: 'stale-owner-token',
+        status: 'owned',
+        pid: 123,
+        ppid: 1,
+        hostname: TEST_HOST,
+        acquired_at: '2026-05-18T22:55:00.000Z',
+        updated_at: '2026-05-18T23:00:00.000Z',
+        released_at: null,
+        repo_root: '/repo',
+        task_id: 'local-mcp',
+        run_id: 'control-host',
+        run_dir: '/repo/.runs/local-mcp/cli/control-host',
+        pipeline_id: 'provider-linear-worker',
+        source_root_freshness: {
+          status: 'warning',
+          observed_at: '2026-05-18T23:00:00.000Z',
+          drift_classes: ['supervised_source_root_drift'],
+          source_checkout: {
+            status: 'stale',
+            dirty: { status: 'clean' }
+          },
+          intended_checkout: {
+            status: 'current',
+            dirty: { status: 'clean' }
+          },
+          detail: 'stale source'
+        },
+        lock_dir: '/repo/.runs/control-host-owner.lock',
+        owner_path: '/repo/.runs/control-host-owner.json'
+      },
+      attempted_owner: {
+        owner_token: 'current-owner-token',
+        status: 'owned',
+        pid: 456,
+        ppid: 1,
+        hostname: TEST_HOST,
+        acquired_at: '2026-05-18T23:08:00.000Z',
+        updated_at: '2026-05-18T23:08:00.000Z',
+        released_at: null,
+        repo_root: '/repo',
+        task_id: 'local-mcp',
+        run_id: 'control-host',
+        run_dir: '/repo/.runs/local-mcp/cli/control-host',
+        pipeline_id: 'provider-linear-worker',
+        source_root_freshness: {
+          status: 'current',
+          observed_at: '2026-05-18T23:08:00.000Z',
+          drift_classes: [],
+          source_checkout: {
+            status: 'current',
+            dirty: { status: 'clean' }
+          },
+          intended_checkout: {
+            status: 'current',
+            dirty: { status: 'clean' }
+          },
+          detail: 'current source'
+        },
+        lock_dir: '/repo/.runs/control-host-owner.lock',
+        owner_path: '/repo/.runs/control-host-owner.json'
+      }
+    } as ControlHostOwnershipPollingPayload;
+
+    expect(resolveControlHostSourceFreshnessPolicy(staleReclaimedPayload)).toBeNull();
   });
 
   it('does not release a lock that changed owners after acquisition', async () => {

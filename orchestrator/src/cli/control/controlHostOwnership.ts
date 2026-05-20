@@ -310,9 +310,17 @@ export function resolveControlHostSourceFreshnessPolicy(
   payload: ControlHostOwnershipPollingPayload | null
 ): ControlHostSourceFreshnessPolicy | null {
   const freshness =
-    payload?.owner?.source_root_freshness ??
-    payload?.attempted_owner?.source_root_freshness ??
-    null;
+    payload?.status === 'owned'
+      ? (
+          payload.owner?.source_root_freshness ??
+          payload.attempted_owner?.source_root_freshness ??
+          null
+        )
+      : (
+          payload?.attempted_owner?.source_root_freshness ??
+          payload?.owner?.source_root_freshness ??
+          null
+        );
   if (!freshness || freshness.status === 'current') {
     return null;
   }
