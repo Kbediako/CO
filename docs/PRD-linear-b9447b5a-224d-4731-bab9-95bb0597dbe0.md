@@ -16,7 +16,8 @@
 - Replace terminal `CO-522` as the usable `docs:freshness:maintain` owner for canonical owner key `docs:freshness:maintain`.
 - Preserve the exact blocker evidence: `CO-522 terminal owner`, `configured_owner_terminal`, `blocking_changed_paths=[]`, `task_mirror`, `task_packet`, `report_only`, `pre_expiry_entries`, and `docs/docs-freshness-registry.json`.
 - Keep CO-515 source freshness changes out of scope unless direct CO-515 docs freshness regression evidence appears.
-- Use source-specific lifecycle evidence for the May 19 and May 20 stale historical task/report cohorts, direct review evidence for strict public/skill/template rows, and terminal frontmatter disposition for completed spec rows.
+- Use source-specific lifecycle evidence for the May 19 and May 20 stale historical task/report cohorts, direct review evidence for strict public/skill/template rows, and terminal frontmatter plus active reviewed registry metadata for completed spec rows that are not archive-ready.
+- Preserve active `spec-guard` fallback/seam enforcement while ensuring completed inactive specs are not reused as live fallback decision evidence.
 - Validate with `npm run docs:freshness`, `npm run docs:freshness:maintain`, `node scripts/spec-guard.mjs --dry-run`, and `npm run docs:check`.
 
 ## Intent Checksum
@@ -42,7 +43,7 @@
 | Maintenance output | `docs:freshness:maintain` reports `configured_owner_terminal`, `blocking_changed_paths=[]`, and owner action mode `create_required`. | Provider-worker gates require live same-project owner truth. | Owner verification resolves to live `CO-558` and no longer blocks on terminal `CO-522`. | Faking owner state or reopening CO-522. |
 | Historical stale cohort | May 19 report has 131 stale Apr 18 task/report rows across `.agent/task`, task packet, and report-only surfaces. | Stale historical docs stay visible and owner-routable. | Cohort is re-homed to CO-558 with retained rolling evidence or refreshed from source-specific lifecycle evidence. | Deleting historical packets or broad cap/window weakening. |
 | May 20 stale cohort | Current-main verification has 68 stale Apr 19 task/report rows and `blocking_changed_paths=[]`. | New date-boundary cohorts reuse the same live owner instead of creating duplicate canonical owners. | Cohort is declared under CO-558 with retained rolling evidence through 2026-05-26. | Broadening caps/windows or blind refreshes. |
-| Strict pre-expiry surfaces | Skill/template rows are inside the pre-expiry window; May 20 spec rows map to terminal source issues. | Current guidance/specs require direct review or terminal lifecycle evidence before handoff. | Public/skill rows are reviewed and refreshed; spec rows carry terminal frontmatter disposition without editing legacy fallback content. | Metadata-only bumps without reviewing source content or lifecycle evidence. |
+| Strict pre-expiry surfaces | Skill/template rows are inside the pre-expiry window; May 20 spec rows map to terminal source issues. | Current guidance/specs require direct review or terminal lifecycle evidence before handoff; inactive specs are not active fallback decision evidence sources. Archive-stub audit blocks archiving full packets with open linked checklist items. | Public/skill rows are reviewed and refreshed; spec rows carry terminal frontmatter plus active reviewed registry metadata without editing legacy fallback content, and `spec-guard` remains strict for active fallback/seam diffs. | Metadata-only bumps without reviewing source content or lifecycle evidence, invalid archive-stub disposition, or weakening active `spec-guard` coverage. |
 | CO-515 boundary | CO-515 produced the follow-up evidence but owns control-host source freshness. | Unrelated implementation lanes do not absorb repo-wide docs freshness debt. | CO-515 changed paths remain out of the CO-558 maintenance diff. | Provider-intake, WIP cap, or lifecycle authority changes. |
 
 ## Fallback Expiry / Refactor Decision
@@ -66,6 +67,7 @@ Minor-seam decision: The retained cohort is bounded owner-routed debt under the 
 - Re-home `rolling_freshness_cohorts.owner_issue` to non-terminal `CO-558`.
 - Preserve machine-visible stale/pre-expiry evidence in reports and docs.
 - Account for May 19 and May 20 `.agent/task`, task packet, report-only, public/skill/template, and terminal-disposition spec pre-expiry rows.
+- Keep `scripts/spec-guard.mjs` aligned with the terminal spec disposition so inactive specs are skipped as fallback evidence sources but active fallback/seam changes still require CO-382 packet evidence.
 - Keep the current diff bounded to docs freshness ownership and packet/registry mirrors.
 - Reach review handoff with validation and review evidence, not guard weakening.
 
@@ -109,7 +111,7 @@ Minor-seam decision: The retained cohort is bounded owner-routed debt under the 
 - Review date: 2026-05-20 for the current Apr 19/public refresh and completed-spec frontmatter disposition; May 19 remains the Apr 18 owner re-home evidence date.
 - Maximum lifetime: 7 days after normal cadence expiry for the Apr 18 and Apr 19 cohorts, ending no later than 2026-05-25 and 2026-05-26 respectively.
 - Removal condition: Refresh, archive, or reclassify the underlying cohort before expiry; if CO-558 reaches terminal first, route through canonical owner reuse again.
-- Validation: `npm run docs:freshness`, `npm run docs:freshness:maintain`, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`, and review handoff evidence.
+- Validation: `npm run docs:freshness`, `npm run docs:freshness:maintain`, `node scripts/spec-guard.mjs --dry-run`, focused `tests/spec-guard.spec.ts`, `npm run docs:check`, and review handoff evidence.
 - Large-refactor check: Bounded owner re-home is acceptable because the existing owner verification and canonical owner helper already model this recurrence; this lane changes current owner metadata and cohort evidence, not the owner-resolution architecture.
 
 ## Open Questions

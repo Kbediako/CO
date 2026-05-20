@@ -15,6 +15,7 @@
 - [x] Preserve the CO-558 protected terms and owner-maintenance boundary for parent import.
 - [x] Parent reconciles this checklist against live CO-558 Linear issue context before updating issue state.
 - [ ] Parent updates any required packet mirrors, registry entries, owner metadata, workpad, PR, and Linear lifecycle surfaces.
+- [x] Parent keeps inactive completed specs out of active fallback decision evidence-source parsing without weakening `spec-guard` for active fallback/seam changes.
 
 ## Protected Terms
 - [x] `docs:freshness`
@@ -67,6 +68,7 @@ Minor-seam decision: The retained cohort is bounded owner-routed debt under the 
 - [x] Parent `npm run docs:freshness`.
 - [x] Parent `npm run docs:freshness:maintain`.
 - [x] Parent `node scripts/spec-guard.mjs --dry-run`.
+- [x] Parent focused `npx vitest run --config vitest.config.core.ts tests/spec-guard.spec.ts`.
 - [x] Parent `npm run docs:check`.
 - [x] Parent protected-term scan across imported packet surfaces includes every CO-558 protected term listed above.
 - [ ] Parent records final PR and Linear handoff evidence after checks and review feedback drain cleanly.
@@ -74,4 +76,4 @@ Minor-seam decision: The retained cohort is bounded owner-routed debt under the 
 ## Progress Log
 - 2026-05-19: Bounded same-issue child lane created the CO-558 task checklist file only. The supplied source payload path was unavailable in this checkout, so the checklist falls back to the child-lane instructions and keeps registry, owner metadata, Linear, workpad, PR, and validation work parent-owned.
 - 2026-05-19: Parent lane re-homed `docs:freshness:maintain` from terminal `CO-522` to live `CO-558`, preserved the May 19 Apr 18 rolling cohort as owner-backed evidence through `2026-05-25`, mirrored the 21 reviewed active spec rows in `docs/docs-freshness-registry.json`, and reran the required docs freshness/spec/docs checks cleanly.
-- 2026-05-20: Parent lane reran current-main owner truth, confirmed `CO-558` remains non-terminal and usable, declared the Apr 19 task/report cohort as owner-backed rolling evidence through `2026-05-26`, reviewed the public/skill pre-expiry rows before refreshing their freshness metadata, and recorded terminal frontmatter disposition for completed spec rows instead of editing legacy fallback content when no content update was needed.
+- 2026-05-20: Parent lane reran current-main owner truth, confirmed `CO-558` remains non-terminal and usable, declared the Apr 19 task/report cohort as owner-backed rolling evidence through `2026-05-26`, reviewed the public/skill pre-expiry rows before refreshing their freshness metadata, recorded terminal frontmatter plus active reviewed registry metadata for completed spec rows instead of editing legacy fallback content when no content update was needed, and kept `spec-guard` strict by excluding inactive completed specs only from active fallback evidence-source parsing.

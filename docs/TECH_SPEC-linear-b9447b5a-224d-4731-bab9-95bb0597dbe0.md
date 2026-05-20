@@ -16,7 +16,7 @@ canonical_owner_marker: codex-orchestrator:canonical-owner-key=docs:freshness:ma
 
 ## Summary
 - Objective: Replace terminal `CO-522` with non-terminal same-project `CO-558` as the usable docs freshness maintenance owner and clear the May 19 maintenance blockers without weakening docs freshness gates.
-- Scope: Docs freshness owner metadata, cohort guide, CO-558 docs-first packet, task/index mirrors, freshness registry metadata for reviewed pre-expiry rows, terminal frontmatter disposition for completed spec rows, May 19/May 20 rolling cohorts, and preserved evidence reports.
+- Scope: Docs freshness owner metadata, cohort guide, CO-558 docs-first packet, task/index mirrors, freshness registry metadata for reviewed pre-expiry rows, terminal frontmatter plus active reviewed registry metadata for completed spec rows, inactive-spec fallback evidence-source handling in `scripts/spec-guard.mjs`, May 19/May 20 rolling cohorts, and preserved evidence reports.
 - Constraints: No CO-515 implementation changes; no blind `last_review` bumps; no stale-doc deletion; no cap/window expansion; no owner-verification code changes unless fresh evidence proves metadata-only repair cannot satisfy the issue.
 
 ## Issue-Shaping Contract
@@ -32,7 +32,7 @@ canonical_owner_marker: codex-orchestrator:canonical-owner-key=docs:freshness:ma
 | `rolling_freshness_cohorts.owner_issue` | `CO-522`, terminal `Done`. | Terminal owners fail closed. | `CO-558`, live same-project non-terminal. | Reopening `CO-522`. |
 | Apr 18 historical cohort | 131 stale rows, no changed-path blockers. | Historical rows can be owner-routed only with explicit rolling/lifecycle evidence. | May 19 cohort is declared or refreshed under CO-558 while remaining visible in reports. | Deleting packet files. |
 | Apr 19 historical cohort | 68 stale rows reached the rolling window on May 20 with `blocking_changed_paths=[]`. | The existing owner must route new date-boundary cohorts without creating duplicate owners. | May 20 cohort is declared under CO-558 while remaining visible in reports. | Broad cap/window changes or blind refreshes. |
-| Pre-expiry skills/templates/specs | Direct-action rows are inside the review window, and the May 20 spec rows map to terminal source issues. | Current docs/specs require real review or lifecycle evidence. | Public/skill review metadata names CO-558 evidence; spec rows use terminal frontmatter disposition and keep legacy fallback content unchanged when no content update is needed. | Metadata-only churn. |
+| Pre-expiry skills/templates/specs | Direct-action rows are inside the review window, and the May 20 spec rows map to terminal source issues. | Current docs/specs require real review or lifecycle evidence, while inactive specs should not be parsed as active fallback decision evidence. Archive-stub audit blocks archiving full packets with open linked checklist items. | Public/skill review metadata names CO-558 evidence; spec rows use terminal frontmatter plus active reviewed registry metadata and `spec-guard` continues to require CO-382 evidence for active fallback/seam changes. | Metadata-only churn, invalid archive-stub disposition, or weakening active `spec-guard` coverage. |
 | CO-515 source issue | Source of follow-up evidence. | CO-515 owns control-host source freshness only. | CO-558 owns repo-wide docs freshness maintenance. | CO-515 implementation edits. |
 
 ## Readiness Gate
@@ -46,10 +46,11 @@ canonical_owner_marker: codex-orchestrator:canonical-owner-key=docs:freshness:ma
   2. Update `docs/guides/docs-freshness-cohorts.md` so `CO-522` is historical terminal evidence and `CO-558` is the live May 19 owner.
   3. Preserve May 19 baseline evidence: terminal `CO-522`, `configured_owner_terminal`, `blocking_changed_paths=[]`, 131 stale entries, 3 strict pre-expiry docs, and 21 spec pre-expiry entries.
   4. Re-home or refresh the Apr 18 historical `.agent/task`, task packet, and report-only cohort with source-specific lifecycle evidence.
-  5. Review and disposition strict pre-expiry skill/template rows plus completed-spec frontmatter disposition with explicit CO-558 evidence.
+  5. Review and disposition strict pre-expiry skill/template rows plus completed-spec frontmatter and active reviewed registry metadata with explicit CO-558 evidence.
   6. Register the CO-558 packet in `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json`.
 - Non-functional requirements: Keep diffs reviewable and preserve existing JSON formatting.
 - Interfaces / contracts: `docs:freshness`, `docs:freshness:maintain`, `spec-guard`, docs catalog policy, Linear owner verification.
+- `spec-guard` correction: inactive completed specs are skipped as fallback decision evidence sources; active fallback/seam diffs still require PRD, TECH_SPEC, ACTION_PLAN, and task checklist CO-382 evidence.
 
 ## Fallback Expiry / Refactor Decision
 
@@ -71,6 +72,7 @@ canonical_owner_marker: codex-orchestrator:canonical-owner-key=docs:freshness:ma
   - `npm run docs:freshness`
   - `npm run docs:freshness:maintain`
   - `node scripts/spec-guard.mjs --dry-run`
+  - `npx vitest run --config vitest.config.core.ts tests/spec-guard.spec.ts`
   - `npm run docs:check`
   - standalone review and elegance/minimality pass before review handoff
 - Rollout verification: Attach PR to CO-558, drain `pr ready-review`, then transition to `In Review` only after gates are clean or explicitly waived.

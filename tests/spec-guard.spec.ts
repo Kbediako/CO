@@ -899,6 +899,39 @@ describe('spec-guard script', () => {
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
   });
 
+  it('does not parse inactive specs as active fallback decision evidence sources', async () => {
+    const repo = await initRepository();
+    const decisionBody = fallbackDecisionTable([completeExpireFallbackRow()]);
+    const today = new Date().toISOString().slice(0, 10);
+
+    await mkdir(join(repo, 'tasks/specs'), { recursive: true });
+    await writeFile(
+      join(repo, 'tasks/specs/linear-terminal-fallback-history.md'),
+      [
+        '---',
+        'id: terminal-fallback-history',
+        'title: "terminal fallback history"',
+        'status: done',
+        `last_review: ${today}`,
+        '---',
+        '',
+        '# Terminal fallback history',
+        '',
+        'This completed spec preserves historical fallback context without acting as live decision evidence.',
+        ''
+      ].join('\n')
+    );
+
+    await commitFallbackGuardChange(repo, { decisionBody });
+
+    const { stdout } = await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout.trim()).toContain('✅ Spec guard: OK');
+  });
+
   it('accepts URL autolinks as concrete fallback decision evidence', async () => {
     const repo = await initRepository();
     const decisionBody = fallbackDecisionTable([

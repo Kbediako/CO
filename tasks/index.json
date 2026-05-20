@@ -244,7 +244,7 @@
         "Codex"
       ],
       "status": "validation_green_review_rerun_pending",
-      "last_review": "2026-05-19",
+      "last_review": "2026-05-20",
       "canonical_owner_key": "docs:freshness:maintain",
       "approvals": {
         "issue_context": {
@@ -284,6 +284,23 @@
             "docs_freshness": "out/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/after-action-plan-fix/docs-freshness.json"
           },
           "summary": "docs:freshness, docs:freshness:maintain, spec-guard dry-run, and docs:check passed after resolving review findings CO558-REVIEW-002, CO558-REVIEW-003, and CO558-REVIEW-004."
+        },
+        "may20_owner_window_refresh": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-20",
+          "status": "validation_green_review_rerun_pending",
+          "reports": {
+            "docs_freshness": "out/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/2026-05-20-verification/docs-freshness-after-active-spec-disposition.json",
+            "docs_freshness_maintain": "out/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/2026-05-20-verification/docs-freshness-maintenance-after-active-spec-disposition.json"
+          },
+          "summary": "Current-main refresh keeps CO-558 as the live non-terminal docs:freshness:maintain owner, adds the Apr 19 task/report cohort as owner-backed rolling debt through 2026-05-26, refreshes reviewed public/skill pre-expiry rows, records terminal frontmatter plus active reviewed registry metadata for completed spec rows that are not archive-ready, and preserves stale/pre-expiry evidence without weakening freshness gates; spec-guard remains strict for active fallback/seam changes while inactive completed specs are excluded from live fallback evidence-source parsing."
+        },
+        "standalone_review_20260520": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-20",
+          "status": "findings_addressed_rerun_pending",
+          "telemetry": ".runs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/cli/2026-05-20T05-42-16-678Z-149a19d9/review/telemetry.json",
+          "summary": "May 20 reruns reported CO558-REVIEW-001 for stale task-index wording and CO558-REVIEW-REGISTRY-001 / CO558-CODE-001 for completed spec row disposition. The task-index wording is fixed; archive-stub audit proved archived registry status is invalid while linked historical checklists remain open, so the rows now retain active reviewed registry metadata plus explicit lifecycle notes and terminal spec frontmatter. A fresh clean review rerun remains required before handoff."
         }
       },
       "validation": {
@@ -299,14 +316,23 @@
           "May 19 stale cohort policy evidence documented",
           "21 reviewed active spec rows mirrored in docs/docs-freshness-registry.json",
           "CO-558 packet expiry mirrors aligned to 2026-05-25",
+          "May 20 Apr 19 task/report cohort registered as CO-558-owned rolling evidence",
+          "six strict public/skill pre-expiry rows reviewed and refreshed",
+          "twelve completed spec pre-expiry rows marked with terminal frontmatter and active reviewed registry metadata",
+          "inactive completed spec fallback evidence-source handling covered in tests/spec-guard.spec.ts",
           "npm run docs:freshness",
           "npm run docs:freshness:maintain",
           "node scripts/spec-guard.mjs --dry-run",
           "npm run docs:check",
-          "git diff --check and git diff --cached --check"
+          "npx vitest run --config vitest.config.core.ts tests/spec-guard.spec.ts",
+          "focused docs-freshness-maintain regression",
+          "diff-budget",
+          "git diff --check",
+          "docs:archive-stub-check via npm run docs:check",
+          "archive-stub audit rejected invalid archive disposition and active reviewed metadata was retained"
         ],
         "pending": [
-          "clean standalone review after review-finding fixes",
+          "clean standalone review rerun after CO558-REVIEW-001 fix",
           "elegance pass before PR handoff",
           "PR attachment and ready-review drain before review-state transition"
         ]
@@ -320,7 +346,9 @@
         "agent_task": ".agent/task/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
         "policy_doc": "docs/guides/docs-freshness-cohorts.md",
         "catalog": "docs/docs-catalog.json",
-        "registry": "docs/docs-freshness-registry.json"
+        "registry": "docs/docs-freshness-registry.json",
+        "spec_guard": "scripts/spec-guard.mjs",
+        "spec_guard_tests": "tests/spec-guard.spec.ts"
       },
       "source_issue": {
         "id": "b9447b5a-224d-4731-bab9-95bb0597dbe0",

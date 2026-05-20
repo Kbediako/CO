@@ -2,7 +2,7 @@
 
 ## Summary
 - Goal: Replace terminal `CO-522` as the live `docs:freshness:maintain` owner and clear the May 19 freshness maintenance blockers with source-specific evidence.
-- Scope: Owner metadata, cohort guide, docs packet, registry/index mirrors, May 19 and May 20 historical cohort routing, pre-expiry review metadata, validation, and review handoff.
+- Scope: Owner metadata, cohort guide, docs packet, registry/index mirrors, May 19 and May 20 historical cohort routing, pre-expiry review metadata, inactive-spec fallback evidence-source handling, validation, and review handoff.
 - Assumptions: CO-558 is the intended same-project non-terminal owner for canonical owner key `docs:freshness:maintain`; CO-515 remains out of scope.
 
 ## Issue Readiness Gate
@@ -32,10 +32,12 @@ Minor-seam decision: The retained cohort stays inside the existing owner-routed 
    - Re-home/declare the May 20 Apr 19 task mirror, task packet, and report-only cohort without hiding stale evidence.
 3. Pre-expiry direct review
    - Review `.agent/task/templates/codex-cli-release-intake-template.md`, `skills/agent-first-adoption-steering/SKILL.md`, `skills/long-poll-wait/SKILL.md`, and spec pre-expiry rows.
-   - Review `docs/book/**`, `skills/README.md`, and the May 20 spec pre-expiry rows before changing freshness metadata; record terminal frontmatter disposition for completed source issues instead of editing legacy fallback content when no content change is needed.
+   - Review `docs/book/**`, `skills/README.md`, and the May 20 spec pre-expiry rows before changing freshness metadata; record terminal frontmatter plus active reviewed registry metadata for completed source issues instead of editing legacy fallback content when no content change is needed.
+   - Keep inactive completed specs out of active fallback decision evidence parsing while preserving CO-382 evidence requirements for active fallback/seam changes.
    - Update only backed review metadata and record evidence.
 4. Validation and handoff
    - Run `npm run docs:freshness`, `npm run docs:freshness:maintain`, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`.
+   - Run focused `npx vitest run --config vitest.config.core.ts tests/spec-guard.spec.ts` for the inactive-spec guard correction.
    - Run standalone review, elegance pass, PR checks, and `pr ready-review` before `In Review`.
 
 ## Dependencies
@@ -48,6 +50,7 @@ Minor-seam decision: The retained cohort stays inside the existing owner-routed 
   - `npm run docs:freshness`
   - `npm run docs:freshness:maintain`
   - `node scripts/spec-guard.mjs --dry-run`
+  - `npx vitest run --config vitest.config.core.ts tests/spec-guard.spec.ts`
   - `npm run docs:check`
   - review telemetry and `pr ready-review`
 - Rollback plan: Revert the CO-558 branch; terminal `CO-522` blocker remains visible and fail-closed, so rollback does not hide stale docs.
@@ -61,4 +64,4 @@ Minor-seam decision: The retained cohort stays inside the existing owner-routed 
 ## Approvals
 - Reviewer: Pending.
 - Date: 2026-05-19.
-- May 20 update: current-main verification added the Apr 19 rolling cohort, refreshed reviewed public/skill pre-expiry metadata, and added terminal frontmatter disposition for completed spec rows under the same CO-558 owner evidence.
+- May 20 update: current-main verification added the Apr 19 rolling cohort, refreshed reviewed public/skill pre-expiry metadata, added terminal frontmatter plus active reviewed registry metadata for completed spec rows, and kept `spec-guard` strict by excluding inactive completed specs only from active fallback evidence-source parsing.
