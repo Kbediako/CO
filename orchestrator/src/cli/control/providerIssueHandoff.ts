@@ -3537,6 +3537,26 @@ export function createProviderIssueHandoffService(
       );
     }
 
+    const failClosedReason =
+      (input.allowPollFailClosed === true
+        ? resolveProviderIssuePollFailClosedReason(input.claim)
+        : null) ??
+      (input.allowReleasedPollFailClosed === true
+        ? resolveReleasedProviderIssuePollFailClosedReason(input.claim)
+        : null);
+    if (failClosedReason) {
+      return {
+        kind: 'skip',
+        reason: failClosedReason
+      };
+    }
+    if (input.allowDirectIssueById === false) {
+      return {
+        kind: 'skip',
+        reason: 'provider_issue_poll_deferred_for_fresh_discovery'
+      };
+    }
+
     if (!resolveTrackedIssueWhenNotStuck) {
       return { kind: 'skip', reason: 'provider_issue_refresh_resolution_unavailable' };
     }
@@ -5501,7 +5521,7 @@ export function createProviderIssueHandoffService(
                 shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot
             });
           const canUseCachedReleasedTerminalHistoricalClaim =
-            shouldUseCachedReleasedTerminalHistoricalClaim && trackedIssuesByKey !== null;
+            shouldUseCachedReleasedTerminalHistoricalClaim;
           if (
             pollInput?.deferFreshDiscovery === true &&
             trackedIssueRefetch &&
@@ -9630,6 +9650,7 @@ function shouldUseCachedReleasedTerminalHistoricalClaimResolution(input: {
     | 'retry_due_at'
     | 'retry_error'
     | 'merge_closeout'
+    | 'review_promotion'
   >;
   activeRun: ProviderIssueRunRecord | null;
   releaseRun: ProviderIssueRunRecord | null;
@@ -9664,6 +9685,9 @@ function shouldUseCachedReleasedTerminalHistoricalClaimResolution(input: {
   if (input.claim.merge_closeout || input.refreshFromBlockerSnapshot) {
     return false;
   }
+  if (!canTreatReviewPromotionAsStaleForReleasedTerminalHistoricalClaim(input.claim)) {
+    return false;
+  }
   if (!Array.isArray(input.claim.issue_blocked_by)) {
     return false;
   }
@@ -9673,6 +9697,22 @@ function shouldUseCachedReleasedTerminalHistoricalClaimResolution(input: {
     (input.claim.retry_due_at ?? null) === null &&
     (input.claim.retry_error ?? null) === null
   );
+}
+
+function canTreatReviewPromotionAsStaleForReleasedTerminalHistoricalClaim(
+  claim: Pick<ProviderIntakeClaimRecord, 'issue_updated_at' | 'review_promotion'>
+): boolean {
+  const reviewPromotion = claim.review_promotion ?? null;
+  if (!reviewPromotion) {
+    return true;
+  }
+  if (reviewPromotion.status !== 'promoted') {
+    return false;
+  }
+  return compareTrackedIssueUpdatedAt({
+    existingIssueUpdatedAt: reviewPromotion.issue_updated_at ?? null,
+    nextIssueUpdatedAt: claim.issue_updated_at
+  }) === 'newer';
 }
 
 function shouldProviderClaimDisqualifyAllReleasedSuppressor(
