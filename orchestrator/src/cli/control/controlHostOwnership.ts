@@ -309,18 +309,7 @@ export function resolveControlHostSourceFreshnessPolicyFromPolling(
 export function resolveControlHostSourceFreshnessPolicy(
   payload: ControlHostOwnershipPollingPayload | null
 ): ControlHostSourceFreshnessPolicy | null {
-  const freshness =
-    payload?.status === 'stale_reclaimed'
-      ? (
-          payload.attempted_owner?.source_root_freshness ??
-          payload.owner?.source_root_freshness ??
-          null
-        )
-      : (
-          payload?.owner?.source_root_freshness ??
-          payload?.attempted_owner?.source_root_freshness ??
-          null
-        );
+  const freshness = resolveControlHostAuthoritativeSourceFreshness(payload);
   if (
     !freshness ||
     freshness.status === 'current' ||
@@ -347,6 +336,22 @@ export function resolveControlHostSourceFreshnessPolicy(
         ? `Supervised control-host source root is stale relative to origin/main (${freshness.detail || sourceStatus || freshness.status}); restart is bounded because the intended checkout is current and clean.`
         : `Supervised control-host source freshness is ${freshness.status} (${freshness.detail || sourceStatus || 'unknown'}); provider-intake must fail closed until the checkout is safe to restart or the source signal returns current.`
   };
+}
+
+export function resolveControlHostAuthoritativeSourceFreshness(
+  payload: ControlHostOwnershipPollingPayload | null
+): SourceRootFreshnessInspection | null {
+  if (!payload) {
+    return null;
+  }
+  if (payload.status === 'stale_reclaimed') {
+    return (
+      payload.attempted_owner?.source_root_freshness ??
+      payload.owner?.source_root_freshness ??
+      null
+    );
+  }
+  return payload.owner?.source_root_freshness ?? null;
 }
 
 function isRestartSafeStaleSupervisedSourceRoot(

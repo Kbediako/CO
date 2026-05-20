@@ -8724,6 +8724,95 @@ describe('ControlRuntime', () => {
     expect(compatibilityProjection.retrying).toEqual([]);
   });
 
+  it('falls back to persisted stale authority when duplicate diagnostics only have attempted-owner freshness', async () => {
+    const cases = [
+      { status: 'duplicate_rejected', reason: 'duplicate_control_host_owner' },
+      { status: 'ambiguous_rejected', reason: 'ambiguous_control_host_owner' }
+    ] as const;
+
+    for (const { status, reason } of cases) {
+      const fixture = await createFixture({ taskId: 'local-mcp' });
+      const providerIssueHandoff = {
+        handleAcceptedTrackedIssue: vi.fn(),
+        rehydrate: vi.fn(async () => {}),
+        refresh: vi.fn(async () => {})
+      } as unknown as ProviderIssueHandoffService;
+      const repoRoot = await createSourceRootRepo(`control-runtime-live-${status}-missing-active-freshness-`);
+      const attemptedRepoRoot = await createSourceRootRepo(`control-runtime-live-${status}-attempted-current-`);
+      const startupFreshness = inspectSourceRootFreshness({
+        intendedRepoRoot: repoRoot,
+        packageRoot: repoRoot,
+        argv: ['node', join(repoRoot, 'bin', 'codex-orchestrator.ts')],
+        cwd: repoRoot,
+        now: () => '2026-05-18T22:55:00.000Z'
+      });
+      const attemptedCurrentFreshness = inspectSourceRootFreshness({
+        intendedRepoRoot: attemptedRepoRoot,
+        packageRoot: attemptedRepoRoot,
+        argv: ['node', join(attemptedRepoRoot, 'bin', 'codex-orchestrator.ts')],
+        cwd: attemptedRepoRoot,
+        now: () => '2026-05-18T23:08:00.000Z'
+      });
+      const residentHash = git(repoRoot, ['rev-parse', 'HEAD']).stdout.trim();
+      const attemptedOwnerPayload = createControlHostOwnerPayload(attemptedRepoRoot, attemptedCurrentFreshness);
+      const liveOwner = {
+        ...createControlHostOwnerPayload(repoRoot, null),
+        status,
+        reason,
+        diagnostic_path: join(repoRoot, '.runs', 'control-host-duplicate-owner.json'),
+        attempted_owner: attemptedOwnerPayload.owner
+          ? {
+              ...attemptedOwnerPayload.owner,
+              owner_token: `attempted-${status}-token`
+            }
+          : null
+      };
+      if (!liveOwner.owner || !liveOwner.attempted_owner) {
+        throw new Error('Expected live control-host owner and attempted owner test payloads.');
+      }
+      liveOwner.owner.owner_token = `active-${status}-missing-freshness-token`;
+      initializeProviderPollingHealth(providerIssueHandoff, {
+        intervalMs: 15000,
+        stuckAfterMs: 45000,
+        skipInitialUpdate: true,
+        controlHostOwner: liveOwner
+      });
+      await writeFile(join(repoRoot, 'co-556-main-advance.txt'), 'main advanced\n', 'utf8');
+      git(repoRoot, ['add', '.']);
+      git(repoRoot, ['commit', '-m', 'CO-556 main advance']);
+      git(repoRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+      git(repoRoot, ['reset', '--hard', residentHash]);
+      const providerIntakeState = createProviderIntakeState([
+        createTerminalRetryClaim('CO-512', 'lin-issue-512'),
+        createTerminalRetryClaim('CO-554', 'lin-issue-554'),
+        createTerminalRetryClaim('CO-555', 'lin-issue-555')
+      ]);
+      providerIntakeState.polling = {
+        updated_at: '2026-05-18T23:08:00.000Z',
+        restart_required: false,
+        control_host_owner: createControlHostOwnerPayload(repoRoot, startupFreshness)
+      };
+      const runtime = createControlRuntime({
+        controlStore: fixture.controlStore,
+        questionQueue: { list: () => [] },
+        paths: fixture.paths,
+        linearAdvisoryState: { tracked_issue: null },
+        readPersistedProviderIntakeState: () => providerIntakeState,
+        readProviderIssueHandoff: () => providerIssueHandoff
+      });
+
+      const compatibilityProjection = await runtime.snapshot().readCompatibilityProjection();
+
+      expect(compatibilityProjection.providerIntake).toBeNull();
+      expect(compatibilityProjection.providerIntakeUnavailable).toMatchObject({
+        reason: 'stale_supervised_control_host_source',
+        action: 'fail_closed'
+      });
+      expect(compatibilityProjection.running).toEqual([]);
+      expect(compatibilityProjection.retrying).toEqual([]);
+    }
+  });
+
   it('falls back to persisted stale authority when live freshness refresh is unavailable', async () => {
     const fixture = await createFixture({ taskId: 'local-mcp' });
     const providerIssueHandoff = {

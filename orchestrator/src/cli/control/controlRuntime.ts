@@ -16,6 +16,7 @@ import {
 import {
   normalizeControlHostOwnershipPollingPayload,
   refreshControlHostOwnershipPollingPayload,
+  resolveControlHostAuthoritativeSourceFreshness,
   resolveControlHostSourceFreshnessPolicyFromPolling
 } from './controlHostOwnership.js';
 import {
@@ -612,18 +613,7 @@ function resolveProviderIntakeSourceFreshnessPolicy(
       refreshedLiveOwner,
       { refresh: false }
     );
-    const liveFreshness =
-      refreshedLiveOwner?.status === 'owned'
-        ? (
-            refreshedLiveOwner.owner?.source_root_freshness ??
-            refreshedLiveOwner.attempted_owner?.source_root_freshness ??
-            null
-          )
-        : (
-            refreshedLiveOwner?.attempted_owner?.source_root_freshness ??
-            refreshedLiveOwner?.owner?.source_root_freshness ??
-            null
-          );
+    const liveFreshness = resolveControlHostAuthoritativeSourceFreshness(refreshedLiveOwner);
     if (livePolicy || isAuthoritativeLiveControlHostFreshness(liveFreshness)) {
       return livePolicy;
     }

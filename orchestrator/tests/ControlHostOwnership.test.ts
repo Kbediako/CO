@@ -485,6 +485,14 @@ describe('control host ownership', () => {
         reason: 'stale_supervised_source_root',
         updated_at: '2026-05-18T23:00:00.000Z'
       });
+
+      const missingActiveFreshnessPayload = {
+        ...payload,
+        owner: buildOwner('active-owner-token', null),
+        attempted_owner: buildOwner('attempted-owner-token', currentFreshness)
+      } as ControlHostOwnershipPollingPayload;
+
+      expect(resolveControlHostSourceFreshnessPolicy(missingActiveFreshnessPayload)).toBeNull();
     }
   });
 
