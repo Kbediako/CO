@@ -568,6 +568,15 @@ async function validateTaskPacket(config, input) {
     addFinding(input.findings, 'error', 'task_registry_entry_missing', `tasks/index.json missing ${registryId}.`, 'tasks/index.json');
   }
   const expectedStatus = readNonEmptyString(packet.expected_task_status);
+  if (!expectedStatus) {
+    addFinding(
+      input.findings,
+      'error',
+      'task_packet_expected_status_missing',
+      'Task packet must name expected task status.',
+      `${path}.expected_task_status`
+    );
+  }
   if (registryEntry && expectedStatus && registryEntry.status !== expectedStatus) {
     addFinding(
       input.findings,
@@ -582,7 +591,11 @@ async function validateTaskPacket(config, input) {
   const freshnessEntries = Array.isArray(input.freshnessRegistry?.entries)
     ? input.freshnessRegistry.entries
     : [];
-  const freshnessByPath = new Map(freshnessEntries.map((entry) => [entry?.path, entry]));
+  const freshnessByPath = new Map(
+    freshnessEntries
+      .map((entry) => [normalizeRepoPath(entry?.path), entry])
+      .filter(([entryPath]) => entryPath)
+  );
   for (const packetPath of uniqueStrings([input.configRepoPath, ...declaredPacketPaths])) {
     const entry = freshnessByPath.get(packetPath);
     if (!entry) {

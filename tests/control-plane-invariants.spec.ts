@@ -186,6 +186,45 @@ describe('control-plane operational drift invariants', () => {
     );
   });
 
+  it('fails closed when the task packet omits expected task status', async () => {
+    const repoRoot = await writeFixture({
+      mutateConfig(config) {
+        delete config.task_packet.expected_task_status;
+      }
+    });
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'task_packet_expected_status_missing',
+          path: '$.task_packet.expected_task_status'
+        })
+      ])
+    );
+  });
+
+  it('normalizes freshness registry paths before packet lookups', async () => {
+    const config = buildValidConfig();
+    const registryEntries = [CONFIG_PATH, ...config.task_packet.paths].map((path) =>
+      freshnessRegistryEntry(path.replace(/\//gu, '\\'))
+    );
+    const repoRoot = await writeFixture({
+      registryEntries
+    });
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(false);
+    expect(report.status).toBe('passed');
+  });
+
   it('fails when a linked freshness registry row omits lifecycle state', async () => {
     const config = buildValidConfig();
     const registryEntries = [CONFIG_PATH, ...config.task_packet.paths].map((path) => freshnessRegistryEntry(path));
