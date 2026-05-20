@@ -2,7 +2,7 @@
 
 ## Summary
 - Goal: Replace terminal `CO-522` as the live `docs:freshness:maintain` owner and clear the May 19 freshness maintenance blockers with source-specific evidence.
-- Scope: Owner metadata, cohort guide, docs packet, registry/index mirrors, May 19 and May 20 historical cohort routing, pre-expiry review metadata, validation, and review handoff.
+- Scope: Owner metadata, cohort guide, docs packet, registry/index mirrors, May 19 and May 20 historical cohort routing, pre-expiry review/lifecycle metadata, validation, and review handoff.
 - Assumptions: CO-558 is the intended same-project non-terminal owner for canonical owner key `docs:freshness:maintain`; CO-515 remains out of scope.
 
 ## Issue Readiness Gate
@@ -31,8 +31,8 @@ Minor-seam decision: The retained cohort stays inside the existing owner-routed 
    - Re-home/declare or refresh the Apr 18 `.agent/task`, task packet, and report-only cohort without hiding stale evidence.
    - Re-home/declare the May 20 Apr 19 task mirror, task packet, and report-only cohort without hiding stale evidence.
 3. Pre-expiry direct review
-   - Review `.agent/task/templates/codex-cli-release-intake-template.md`, `skills/agent-first-adoption-steering/SKILL.md`, `skills/long-poll-wait/SKILL.md`, and spec pre-expiry rows.
-   - Review `docs/book/**`, `skills/README.md`, and the May 20 active spec pre-expiry rows before changing freshness metadata.
+   - Review `.agent/task/templates/codex-cli-release-intake-template.md`, `skills/agent-first-adoption-steering/SKILL.md`, `skills/long-poll-wait/SKILL.md`, and completed-lane spec pre-expiry rows.
+   - Review `docs/book/**` and `skills/README.md` before changing freshness metadata; archive completed-lane spec packets from live Linear `Done` evidence instead of editing legacy fallback specs.
    - Update only backed review metadata and record evidence.
 4. Validation and handoff
    - Run `npm run docs:freshness`, `npm run docs:freshness:maintain`, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`.
@@ -61,4 +61,4 @@ Minor-seam decision: The retained cohort stays inside the existing owner-routed 
 ## Approvals
 - Reviewer: Pending.
 - Date: 2026-05-19.
-- May 20 update: current-main verification added the Apr 19 rolling cohort and refreshed reviewed public/skill/spec pre-expiry metadata under the same CO-558 owner.
+- May 20 update: current-main verification added the Apr 19 rolling cohort, refreshed reviewed public/skill pre-expiry metadata, and archived completed-lane spec packets under the same CO-558 owner evidence.
