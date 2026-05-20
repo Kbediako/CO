@@ -415,6 +415,7 @@
           "auto-restart and fail-closed coverage",
           "CO-555 terminal precedence regression",
           "review-remediation stale snapshot and persisted live-owner regressions",
+          "CO556-REVIEW-003 refreshed authority regression",
           "delegation guard",
           "spec guard dry-run",
           "build",

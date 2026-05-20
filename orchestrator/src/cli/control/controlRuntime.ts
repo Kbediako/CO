@@ -604,17 +604,12 @@ function resolveProviderIntakeSourceFreshnessPolicy(
     readProviderPollingHealth(context.readProviderIssueHandoff?.() ?? null)?.control_host_owner ??
     null;
   if (liveControlHostOwner) {
-    return resolveControlHostSourceFreshnessPolicyFromPolling(liveControlHostOwner, {
-      refresh: false
-    });
+    return resolveControlHostSourceFreshnessPolicyFromPolling(liveControlHostOwner);
   }
   if (!state?.polling || !isRecordLike(state.polling)) {
     return null;
   }
-  return resolveControlHostSourceFreshnessPolicyFromPolling(
-    state.polling.control_host_owner,
-    { refresh: false }
-  );
+  return resolveControlHostSourceFreshnessPolicyFromPolling(state.polling.control_host_owner);
 }
 
 function buildUnavailableProviderIntakeState(state: ProviderIntakeState): ProviderIntakeState {

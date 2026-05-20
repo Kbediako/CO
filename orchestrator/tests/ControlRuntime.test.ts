@@ -8374,6 +8374,55 @@ describe('ControlRuntime', () => {
     expect(projection.retrying).toEqual([]);
   });
 
+  it('refreshes current-at-acquisition owner freshness before trusting provider-intake', async () => {
+    const repoRoot = await createSourceRootRepo('control-runtime-stale-authority-refresh-');
+    const startupFreshness = inspectSourceRootFreshness({
+      intendedRepoRoot: repoRoot,
+      packageRoot: repoRoot,
+      argv: ['node', join(repoRoot, 'bin', 'codex-orchestrator.ts')],
+      cwd: repoRoot,
+      now: () => '2026-05-18T22:55:00.000Z'
+    });
+    const residentHash = git(repoRoot, ['rev-parse', 'HEAD']).stdout.trim();
+    const currentAtAcquisitionOwner = createControlHostOwnerPayload(repoRoot, startupFreshness);
+    await writeFile(join(repoRoot, 'co-556-main-advance.txt'), 'main advanced\n', 'utf8');
+    git(repoRoot, ['add', '.']);
+    git(repoRoot, ['commit', '-m', 'CO-556 main advance']);
+    git(repoRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    git(repoRoot, ['reset', '--hard', residentHash]);
+    const providerIntakeState = createProviderIntakeState([
+      createTerminalRetryClaim('CO-512', 'lin-issue-512'),
+      createTerminalRetryClaim('CO-554', 'lin-issue-554'),
+      createTerminalRetryClaim('CO-555', 'lin-issue-555')
+    ]);
+    providerIntakeState.polling = {
+      updated_at: '2026-05-18T23:08:00.000Z',
+      restart_required: false,
+      control_host_owner: currentAtAcquisitionOwner
+    };
+    const fixture = await createFixture({
+      taskId: 'local-mcp',
+      readPersistedProviderIntakeState: () => providerIntakeState
+    });
+
+    const projection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+    expect(projection.providerIntake).toBeNull();
+    expect(projection.providerIntakeUnavailable).toMatchObject({
+      reason: 'stale_supervised_control_host_source',
+      action: 'fail_closed'
+    });
+    expect(projection.polling?.control_host_owner?.owner?.source_root_freshness).toMatchObject({
+      status: 'warning',
+      source_checkout: {
+        status: 'stale',
+        behind: 1
+      }
+    });
+    expect(projection.running).toEqual([]);
+    expect(projection.retrying).toEqual([]);
+  });
+
   it('keeps post-recovery terminal claims released and out of active WIP', async () => {
     const providerIntakeState = createProviderIntakeState([
       createReleasedTerminalClaim('CO-512', 'lin-issue-512'),
