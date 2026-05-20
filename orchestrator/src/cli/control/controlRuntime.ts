@@ -1,4 +1,5 @@
 import type { RunPaths } from '../run/runPaths.js';
+import type { SourceRootFreshnessInspection } from '../utils/sourceRootFreshness.js';
 import type { ControlState } from './controlState.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
@@ -618,7 +619,7 @@ function resolveProviderIntakeSourceFreshnessPolicy(
             normalizedLiveOwner?.owner?.source_root_freshness ??
             null
           );
-    if (livePolicy || liveFreshness?.status === 'current') {
+    if (livePolicy || isAuthoritativeLiveControlHostFreshness(liveFreshness)) {
       return livePolicy;
     }
   }
@@ -626,6 +627,15 @@ function resolveProviderIntakeSourceFreshnessPolicy(
     return null;
   }
   return resolveControlHostSourceFreshnessPolicyFromPolling(state.polling.control_host_owner);
+}
+
+function isAuthoritativeLiveControlHostFreshness(
+  freshness: SourceRootFreshnessInspection | null
+): boolean {
+  return (
+    freshness?.status === 'current' ||
+    (freshness?.status === 'warning' && freshness.drift_classes.length > 0)
+  );
 }
 
 function buildUnavailableProviderIntakeState(state: ProviderIntakeState): ProviderIntakeState {

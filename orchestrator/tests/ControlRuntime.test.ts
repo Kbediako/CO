@@ -8813,6 +8813,98 @@ describe('ControlRuntime', () => {
     });
   });
 
+  it('clears persisted stale provider-intake authority when live ownership has non-supervised freshness warning', async () => {
+    const fixture = await createFixture();
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => {}),
+      refresh: vi.fn(async () => {})
+    } as unknown as ProviderIssueHandoffService;
+    const liveRepoRoot = await createSourceRootRepo('control-runtime-live-owner-warning-authority-');
+    const liveFreshness = {
+      ...inspectSourceRootFreshness({
+        intendedRepoRoot: liveRepoRoot,
+        packageRoot: liveRepoRoot,
+        argv: ['node', join(liveRepoRoot, 'bin', 'codex-orchestrator.ts')],
+        cwd: liveRepoRoot,
+        now: () => '2026-05-18T23:12:00.000Z'
+      }),
+      status: 'warning' as const,
+      drift_classes: ['source_vs_dist_drift' as const],
+      detail: 'Detected source/root drift: source_vs_dist_drift.'
+    };
+    const staleRepoRoot = await createSourceRootRepo('control-runtime-persisted-stale-authority-');
+    const staleStartupFreshness = inspectSourceRootFreshness({
+      intendedRepoRoot: staleRepoRoot,
+      packageRoot: staleRepoRoot,
+      argv: ['node', join(staleRepoRoot, 'bin', 'codex-orchestrator.ts')],
+      cwd: staleRepoRoot,
+      now: () => '2026-05-18T22:55:00.000Z'
+    });
+    const residentHash = git(staleRepoRoot, ['rev-parse', 'HEAD']).stdout.trim();
+    await writeFile(join(staleRepoRoot, 'co-556-main-advance.txt'), 'main advanced\n', 'utf8');
+    git(staleRepoRoot, ['add', '.']);
+    git(staleRepoRoot, ['commit', '-m', 'CO-556 main advance']);
+    git(staleRepoRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    git(staleRepoRoot, ['reset', '--hard', residentHash]);
+    const liveOwner = createControlHostOwnerPayload(liveRepoRoot, liveFreshness);
+    if (!liveOwner.owner) {
+      throw new Error('Expected live control-host owner test payload.');
+    }
+    liveOwner.updated_at = '2026-05-18T23:12:00.000Z';
+    liveOwner.owner.owner_token = 'live-owner-warning-token';
+    liveOwner.owner.updated_at = '2026-05-18T23:12:00.000Z';
+    initializeProviderPollingHealth(providerIssueHandoff, {
+      intervalMs: 15000,
+      stuckAfterMs: 45000,
+      skipInitialUpdate: true,
+      controlHostOwner: liveOwner
+    });
+
+    const persistedOwner = refreshControlHostOwnershipPollingPayload(
+      createControlHostOwnerPayload(staleRepoRoot, staleStartupFreshness)
+    );
+    if (!persistedOwner?.owner) {
+      throw new Error('Expected persisted control-host owner test payload.');
+    }
+    persistedOwner.updated_at = '2026-05-18T23:08:00.000Z';
+    persistedOwner.owner.owner_token = 'persisted-stale-owner-token';
+    persistedOwner.owner.updated_at = '2026-05-18T23:08:00.000Z';
+    const providerIntakeState = createProviderIntakeState([
+      createReleasedTerminalClaim('CO-512', 'lin-issue-512'),
+      createReleasedTerminalClaim('CO-554', 'lin-issue-554'),
+      createReleasedTerminalClaim('CO-555', 'lin-issue-555')
+    ]);
+    providerIntakeState.polling = {
+      updated_at: '2026-05-18T23:08:00.000Z',
+      restart_required: false,
+      control_host_owner: persistedOwner
+    };
+    const runtime = createControlRuntime({
+      controlStore: fixture.controlStore,
+      questionQueue: { list: () => [] },
+      paths: fixture.paths,
+      linearAdvisoryState: { tracked_issue: null },
+      readPersistedProviderIntakeState: () => providerIntakeState,
+      readProviderIssueHandoff: () => providerIssueHandoff
+    });
+
+    const compatibilityProjection = await runtime.snapshot().readCompatibilityProjection();
+
+    expect(compatibilityProjection.providerIntakeUnavailable).toBeNull();
+    expect(compatibilityProjection.providerIntake).toMatchObject({
+      active_claim_count: 0,
+      running_claim_count: 0
+    });
+    expect(compatibilityProjection.polling).toMatchObject({
+      control_host_owner: {
+        owner: {
+          owner_token: 'live-owner-warning-token'
+        }
+      }
+    });
+  });
+
   it('falls back to the persisted polling snapshot before live polling health restarts', async () => {
     const fixture = await createFixture();
     const providerIssueHandoff = {
