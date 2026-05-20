@@ -32,14 +32,14 @@
   - this child lane edits registry mirrors, source, tests, Linear state, workpad, PR lifecycle, or provider-intake artifacts
 - Pre-implementation issue-quality review:
   - 2026-05-20: approved as a docs-first packet for a narrow provider-intake recovery issue. The issue is not a micro-task because it depends on exact protected terms, fallback/seam classification, Not Done If, and a parity matrix.
-- Fallback / refactor decision:
-  - This task touches stale/cached provider-intake recovery behavior.
-  - Decision: `remove fallback` for the workaround where recovery depends on broad `dispatch_pilot.enabled=true` or manual `provider-intake-state.json` deletion.
-  - Owner: `CO-566`.
-  - Trigger: Ready/Rework issue with terminal failed historical run and stale `resumable` claim while dispatch source is disabled.
-  - Review date: 2026-05-20.
-  - Maximum lifetime: this issue.
-  - Removal condition: targeted recovery launches new governed work or returns an actionable blocked classification while preserving historical failed run evidence, without broad dispatch-pilot enablement or manual state deletion.
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `provider workflow` Ready/Rework recovery | Stale `resumable` provider-intake claims with terminal failed historical runs can make targeted recovery appear dependent on broad `dispatch_pilot.enabled=true` admission or manual `provider-intake-state.json` deletion. | remove fallback | CO-566 | Ready/Rework issue with terminal failed historical run and stale `resumable` claim while dispatch source is disabled. | 2026-05-20 | 2026-05-20 | N/A after removal | Targeted recovery launches new governed work or returns an actionable blocked classification while preserving historical failed-run audit evidence. | Focused provider handoff regression plus full provider handoff test file, spec guard, docs check, and PR ready-review drain. |
+
+- Large-refactor decision: no large refactor is warranted because CO-566 removes one stale Ready/Rework recovery fallback and reuses the existing provider workflow admission/start path.
+- Minor-seam decision: acceptable only while the implementation stays bounded to explicit recovery of existing stale `resumable` claims; escalate if recovery authority must split across unrelated provider-intake lifecycle phases.
 
 ## Milestones & Sequencing
 1. [x] Create PRD, TECH_SPEC mirror, ACTION_PLAN, canonical task spec, task checklist, and `.agent` mirror.

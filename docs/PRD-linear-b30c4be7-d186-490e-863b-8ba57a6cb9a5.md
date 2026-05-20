@@ -66,6 +66,15 @@
   - "edit registry mirrors from this child lane"
   - "change source code or tests from the docs packet lane"
 
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `provider workflow` Ready/Rework recovery | Stale `resumable` provider-intake claims with terminal failed historical runs can make targeted recovery appear dependent on broad `dispatch_pilot.enabled=true` admission or manual `provider-intake-state.json` deletion. | remove fallback | CO-566 | Ready/Rework issue has a terminal failed historical run and stale `resumable` provider-intake claim while dispatch source is disabled. | 2026-05-20 | 2026-05-20 | N/A after removal | Explicit recover/relaunch/nudge launches new governed work or returns an actionable blocked classification while preserving historical failed-run audit evidence. | Focused provider handoff regression plus full provider handoff test file, spec guard, docs check, and PR ready-review drain. |
+
+- Large-refactor decision: no large refactor is warranted because CO-566 removes one stale Ready/Rework recovery fallback and reuses the existing provider workflow admission/start path.
+- Minor-seam decision: acceptable only while the fix stays bounded to explicit recovery of existing stale `resumable` claims; escalate if recovery authority must split across unrelated provider-intake lifecycle phases.
+
 ## Parity / Alignment Matrix
 
 | Surface | Current truth | Reference truth | Target truth / intended delta | Explicitly out-of-scope differences |

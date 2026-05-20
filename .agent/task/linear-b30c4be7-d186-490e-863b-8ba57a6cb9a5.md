@@ -34,6 +34,15 @@
 - [x] Parity matrix is present. Evidence: PRD and specs include current/reference/target/out-of-scope alignment.
 - [x] Fallback/refactor decision is present. Evidence: specs record `remove fallback` for broad dispatch-pilot/manual state deletion workaround.
 
+## CO-382 Fallback Decision Table
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `provider workflow` Ready/Rework recovery | Stale `resumable` provider-intake claims with terminal failed historical runs can make targeted recovery appear dependent on broad `dispatch_pilot.enabled=true` admission or manual `provider-intake-state.json` deletion. | remove fallback | CO-566 | Ready/Rework issue has a terminal failed historical run and stale `resumable` provider-intake claim while dispatch source is disabled. | 2026-05-20 | 2026-05-20 | N/A after removal | Explicit recover/relaunch/nudge launches new governed work or returns an actionable blocked classification while preserving historical failed-run audit evidence. | Focused provider handoff regression plus full provider handoff test file, spec guard, docs check, and PR ready-review drain. |
+
+- Large-refactor decision: no large refactor is warranted because CO-566 removes one stale Ready/Rework recovery fallback and reuses the existing provider workflow admission/start path.
+- Minor-seam decision: acceptable only while the fix stays bounded to explicit recovery of existing stale `resumable` claims; escalate if recovery authority must split across unrelated provider-intake lifecycle phases.
+
 ## Child-Lane Validation
 - [x] Protected-term scan over declared files. Evidence: scoped `rg -n "provider-intake:ready-resumable-recover-dispatch-source-disabled:v1|dispatch_pilot\\.enabled=true|provider-intake-state\\.json|CO-558 docs-freshness scope|Ready/Rework|terminal failed historical runs|resumable|Not Done If|parity matrix" <six declared files>` returned matches across the packet.
 - [x] Scoped markdown trailing-whitespace check over declared files. Evidence: `rg -n "[[:blank:]]+$" <six declared files>` returned no matches.
