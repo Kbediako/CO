@@ -10,6 +10,7 @@
 - Agent task mirror: `.agent/task/linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md`
 - Canonical owner key: `control-host:released-claim-reconcile-restart-loop`
 - Workpad comment: `e7bfc570-8142-462c-8ab3-b852c50e3187`
+- Rework workpad comment: `f1814ce7-2a75-480b-ac58-de341c820504`
 
 ## Workflow Setup
 - [x] Live `linear issue-context` read for CO-571. Evidence: helper output on 2026-05-20 confirmed `In Progress`, no current PR, and no existing workpad.
@@ -46,6 +47,8 @@
 - [x] CO-468
 - [x] no active workers/WIP 0/3
 - [x] `retrying=1` projection mismatch
+- [x] no-current-poll-snapshot path
+- [x] stale `review_promotion`
 - [x] no fabricated coherent snapshot
 - [x] no provider-intake manual edits
 
@@ -57,6 +60,7 @@
 - [x] clearing genuine active refresh stalls
 - [x] deleting released historical claim evidence
 - [x] broadening into quota hygiene or unrelated capacity work
+- [x] relying on retry-field normalization only
 
 ## Acceptance Criteria
 - [x] CO-472 Done `claim_issue_by_id:released` terminal path does not drive restart-required health without active corroboration. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
@@ -66,6 +70,8 @@
 - [x] CO-476 Duplicate/canceled `claim_issue_by_id:released` terminal path does not drive restart-required health without active corroboration. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] CO-451 Done `claim_issue_by_id:released` terminal path does not drive restart-required health without active corroboration. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] CO-468 Done `claim_issue_by_id:released` terminal path does not drive restart-required health without active corroboration. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
+- [x] No-current-poll-snapshot terminal released path skips direct issue-by-id for strong terminal history. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
+- [x] Stale retained `review_promotion` metadata is treated as historical only when newer terminal issue truth supersedes it, while current promotion metadata revalidates. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] Real active/stuck refresh path still fails closed with `provider_refresh_lifecycle_stuck` / `restart_required`. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] `co-status --format json` and `/ui/data.json` remain truthful with no fabricated coherent snapshot. Evidence: `npm run test -- ControlRuntime.test.ts`.
 - [x] No provider-intake manual edits, timeout-only fix, or one-off restart workaround. Evidence: implementation diff only changes classification/tests/docs.
@@ -77,6 +83,8 @@
 - [x] Scoped whitespace/diff check. Evidence: `git diff --check -- <declared CO-571 docs and registry files>` exited 0.
 - [x] Focused released terminal claim regressions. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] Focused retry projection consistency regression for released terminal claims with null retry fields. Evidence: `npm run test -- ControlRuntime.test.ts`.
+- [x] Focused no-current-poll-snapshot regression. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
+- [x] Focused stale/current `review_promotion` regressions. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] Focused active stuck refresh regression. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] `node scripts/spec-guard.mjs --dry-run`.
 - [x] `npm run build`.
@@ -96,15 +104,16 @@
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Provider refresh lifecycle classification | Terminal released historical claims can escalate to active stuck refresh health. | remove fallback | CO-571 | Released terminal claim with no active run/retry/worker corroboration. | Observed 2026-05-20 | 2026-05-20 | This issue | Terminal released claims stop driving `restart_required`. | Focused released-claim regressions. |
+| Provider refresh lifecycle classification | Terminal released historical claims can escalate to active stuck refresh health. | remove fallback | CO-571 | Released terminal claim with no active run/retry/worker corroboration, including no-current-poll-snapshot direct issue-by-id fallback. | Observed 2026-05-20 | 2026-05-20 | This issue | Terminal released claims stop driving `restart_required`. | Focused released-claim, no-snapshot, stale-promotion, and active-stall regressions. |
 | Provider-intake history | Released historical claims stay retained for traceability. | justify retaining fallback | Provider-intake audit contract / CO-571 | Terminal issue release records historical claim state. | Existing behavior before CO-571 | 2026-05-20 | Non-expiring durable retention only with rationale | Separate approved audit-history redesign replaces retained claim history with equivalent source-labeled evidence. | Tests keep claims inactive without deleting evidence. |
 
 - Contract name: provider-intake released historical claim audit retention.
 - Owning surface: provider-intake state and control-host status/read models.
 - Steady-state proof: raw released claim rows remain source-labeled audit evidence, while terminal released `not_active` claims with complete cached metadata, null retry fields, and no active or cancelable retained run do not drive `restart_required` or retrying WIP.
-- Tests/docs: `ProviderIssueHandoff.test.ts` terminal released metadata-only table, active-stuck regression, `ControlRuntime.test.ts` retry projection regression, and this CO-571 packet.
+- Tests/docs: `ProviderIssueHandoff.test.ts` terminal released metadata-only table, no-current-poll-snapshot regression, stale/current `review_promotion` regressions, active-stuck regression, `ControlRuntime.test.ts` retry projection regression, and this CO-571 packet.
 - Non-expiring rationale: retained released claim history is durable operator/audit evidence, not temporary compatibility debt; removal requires an approved archival redesign that preserves equivalent source-labeled claim/run evidence.
 
 ## Progress Log
 - 2026-05-20: Live issue-context read, initial workpad created, serial same-turn parallelization decision recorded, and docs-first packet started. Parent later supplied CO-469 Duplicate/canceled evidence and CO-471 Done retry-projection mismatch evidence; packet included both as terminal released historical claim scope.
 - 2026-05-20: Implementation committed and draft PR #855 opened after focused validation, pack smoke, and enforced `gpt-5.5/xhigh` review returned clean.
+- 2026-05-20: PR #855 merged, but live current-main evidence still looped on no-current-poll-snapshot `claim_issue_by_id:released`. CO-571 reopened to Rework and PR #856 updates the classifier before direct issue-by-id, with stale/current `review_promotion` regression coverage.

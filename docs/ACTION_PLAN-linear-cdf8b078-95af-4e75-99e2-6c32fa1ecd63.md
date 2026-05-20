@@ -7,6 +7,7 @@
   - CO-556 source freshness policy already landed on `origin/main` `da785a065d79d9680e189368ce24aafe2cd96178`.
   - CO-472, CO-461, CO-469, CO-471, CO-476, CO-451, and CO-468 are terminal released historical claims, not current active workers.
   - `provider-intake-state.json` remains audit evidence and is not a manual repair target.
+  - PR #855's normalization-only fix was partial; PR #856 must cover no-current-poll-snapshot direct issue-by-id fallback and stale/current `review_promotion` behavior.
 
 ## Issue Readiness Gate
 - Intent checksum / protected terms carried forward:
@@ -26,6 +27,8 @@
   - CO-468
   - no active workers/WIP 0/3
   - `retrying=1` projection mismatch
+  - no-current-poll-snapshot path
+  - stale `review_promotion`
   - no fabricated coherent snapshot
   - no provider-intake manual edits
   - `co-status --format json`
@@ -38,8 +41,11 @@
   - status surfaces fabricate healthy state
   - provider-intake state is manually edited
   - the fix is only a timeout bump or one-off restart
+  - no-current-poll-snapshot terminal history still reaches direct issue-by-id
+  - stale `review_promotion` keeps terminal history active, or current promotion truth is hidden
 - Pre-implementation issue-quality review:
   - 2026-05-20: CO-571 is a narrow root-cause lane for released terminal historical claim reconciliation. CO-469 Duplicate/canceled and CO-471 Done are included because both are terminal released history with null run/retry fields, not new active-work behaviors.
+  - 2026-05-20 rework: after PR #855 merged, live current-main evidence still hit `claim_issue_by_id:released` when no current poll snapshot existed. The rework must bind the terminal released classifier before direct issue-by-id and distinguish stale `review_promotion` from current promotion metadata.
 - Fallback / refactor decision:
   - This task touches retained historical/cached provider-intake evidence. Decision: `remove fallback` for terminal released claims being treated as active stuck refresh health; retain historical claim records as supported audit evidence.
 - Durable retention evidence:
@@ -50,21 +56,21 @@
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Provider refresh lifecycle classification | Terminal released historical claims can still be interpreted as active stuck refresh evidence. | remove fallback | CO-571 | `claim_issue_by_id:released` or `claim_reconcile:released` with terminal issue truth and no active run/retry/worker corroboration. | Observed 2026-05-20 | 2026-05-20 | This issue | Terminal released claims stop driving `restart_required` while active stalls still fail closed. | Focused released-claim and active-stall regressions. |
+| Provider refresh lifecycle classification | Terminal released historical claims can still be interpreted as active stuck refresh evidence. | remove fallback | CO-571 | `claim_issue_by_id:released` or `claim_reconcile:released` with terminal issue truth and no active run/retry/worker corroboration, including no-current-poll-snapshot direct issue-by-id fallback. | Observed 2026-05-20 | 2026-05-20 | This issue | Terminal released claims stop driving `restart_required` while active stalls still fail closed. | Focused released-claim, no-snapshot, stale-promotion, and active-stall regressions. |
 | Retained released claim audit history | Released historical claims remain in `provider-intake-state.json`. | justify retaining fallback | Provider-intake audit contract / CO-571 | Terminal issue release leaves historical claim evidence for operator traceability. | Existing behavior before CO-571 | 2026-05-20 | Non-expiring durable retention only with rationale | Separate approved audit-history redesign replaces retained claim history with equivalent source-labeled evidence. | Tests keep terminal claims inactive without deleting evidence. |
 
 - Contract name: provider-intake released historical claim audit retention.
 - Owning surface: provider-intake state and control-host status/read models.
 - Steady-state proof: raw released claim rows remain source-labeled audit evidence, while terminal released `not_active` claims with complete cached metadata, null retry fields, and no active or cancelable retained run do not drive `restart_required` or retrying WIP.
-- Tests/docs: `ProviderIssueHandoff.test.ts` terminal released metadata-only table, active-stuck regression, `ControlRuntime.test.ts` retry projection regression, and this CO-571 packet.
+- Tests/docs: `ProviderIssueHandoff.test.ts` terminal released metadata-only table, no-current-poll-snapshot regression, stale/current `review_promotion` regressions, active-stuck regression, `ControlRuntime.test.ts` retry projection regression, and this CO-571 packet.
 - Non-expiring rationale: retained released claim history is durable operator/audit evidence, not temporary compatibility debt; removal requires an approved archival redesign that preserves equivalent source-labeled claim/run evidence.
 
 ## Milestones & Sequencing
 1. Register the CO-571 docs-first packet: PRD, canonical TECH_SPEC, TECH_SPEC mirror, ACTION_PLAN, task checklist, `.agent/task` mirror, `tasks/index.json`, `docs/TASKS.md`, and `docs/docs-freshness-registry.json`.
 2. Run docs-review or record exact blocker before implementation.
 3. Inspect provider refresh lifecycle authority around `providerIssueHandoff`, provider polling health, and control-host supervision/status projection.
-4. Add focused failing regressions for CO-472 / CO-469 `claim_issue_by_id:released`, CO-461 / CO-471 `claim_reconcile:released`, selected-claim retry projection, and a real active stuck path.
-5. Implement the smallest classification fix at the authority seam.
+4. Add focused failing regressions for CO-472 / CO-469 `claim_issue_by_id:released`, CO-461 / CO-471 `claim_reconcile:released`, selected-claim retry projection, no-current-poll-snapshot direct issue-by-id suppression, stale/current `review_promotion`, and a real active stuck path.
+5. Implement the smallest classification fix at the authority seam before direct issue-by-id while preserving weak/reopened/current-promotion revalidation.
 6. Rerun focused tests and update docs/task mirrors with validation evidence.
 7. Run required gates: spec guard, build, lint, test, docs checks, freshness, diff budget, pack smoke, review/elegance where feasible.
 8. Push branch and open/update a draft PR linked to CO-571. Do not merge.
@@ -82,6 +88,8 @@
 - Checks / tests:
   - focused released terminal claim tests
   - focused retry projection consistency test for released terminal claims with null retry fields
+  - focused no-current-poll-snapshot direct issue-by-id regression
+  - focused stale/current `review_promotion` regressions
   - focused active stuck refresh test
   - `node scripts/spec-guard.mjs --dry-run`
   - `npm run build`

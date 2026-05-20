@@ -34,6 +34,8 @@ task_checklists:
   - terminal Done claims CO-472, CO-461, CO-451, and CO-468
   - terminal Duplicate/canceled claims CO-469 and CO-476
   - terminal Done claim CO-471 with `retrying=1` projection mismatch despite null retry metadata
+  - no-current-poll-snapshot reconciliation when `resolveTrackedIssues` skips or is unavailable
+  - stale `review_promotion` metadata on retained released claims
   - active stuck refresh behavior that must still fail closed
 - Constraints:
   - no timeout-only fix
@@ -91,6 +93,8 @@ task_checklists:
 | Retry projection | CO-471 Done can be selected as `claim_reconcile:released` while the status count reports `retrying=1` even though selected claim retry fields are null. | Terminal released claims with null retry metadata should not themselves count as retrying work. | Selected released terminal claims are excluded from retrying projection unless separate active retry evidence exists. | Hiding separate real retrying claims. |
 | Active refresh stalls | Active claims can still stall during refresh. | Active stalls must fail closed with provider keys and phase evidence. | Active stuck path still emits `provider_refresh_lifecycle_stuck` and `restart_required`. | Treating all refresh stalls as benign. |
 | Status truth | `/ui/data.json` and `co-status --format json` can expose unhealthy or timeout states. | Operators need truthful, not fabricated, state. | Terminal released claim filtering does not fabricate healthy snapshots. | Status UI redesign. |
+| No current poll snapshot | After PR #855 merged, skipped/unavailable tracked-issue polling left `trackedIssuesByKey=null`, then the no-map resolver entered `claim_issue_by_id:released` direct issue-by-id reads for terminal history. | The classification authority must not depend on a bulk poll map when the cached row is already a strong terminal released historical claim. | Strong terminal released rows skip the direct issue-by-id sweep even without a current poll snapshot; weak or reopened rows still revalidate. | Treating all missing-poll states as clean. |
+| Retained `review_promotion` metadata | CO-468 can retain a promoted `Merging` review-promotion snapshot that predates newer terminal Done issue truth. | Stale promotion metadata is history; current promotion metadata is still live routing evidence. | Stale promotions are ignored only when terminal issue truth is newer; current promotions force revalidation. | Dropping review/merge promotion truth globally. |
 
 ## Readiness Gate
 - Not done if:
@@ -102,6 +106,7 @@ task_checklists:
   - the behavior is only repaired by restarting the host
 - Pre-implementation issue-quality review evidence:
   - 2026-05-20: live issue-context plus parent evidence show a narrow root-fix issue. The issue is not merely a timeout problem, not a provider-intake cleanup lane, and not a queue-capacity lane. The added CO-469 Duplicate/canceled case and CO-471 retry projection mismatch stay inside terminal released historical claim scope.
+  - 2026-05-20 rework: PR #855's normalization-only fix was partial. Live current-main evidence still looped through the no-current-poll-snapshot `claim_issue_by_id:released` path, and CO-468 retained stale `review_promotion` metadata. PR #856 must bind the terminal released classifier before direct issue-by-id, and it must keep current promotion/reopen/weak rows revalidating.
 - Safeguard ownership split:
   - parent worker owns docs packet, source inspection, implementation, tests, validation, workpad, PR, and handoff
   - no same-issue child lane is active; serial decision recorded because docs/source/tests share one classification boundary and provider admission is unstable
@@ -117,7 +122,9 @@ task_checklists:
 4. Preserve active stuck refresh failure behavior for non-terminal or active claims.
 5. Ensure terminal released claims with null retry fields do not manufacture retrying WIP projection.
 6. Preserve status truth in `co-status --format json` and `/ui/data.json`.
-7. Avoid timeout-only changes and provider-intake manual edits.
+7. Apply the strong terminal released claim classification before direct issue-by-id when the current tracked-issue poll snapshot is skipped or unavailable.
+8. Treat retained `review_promotion` as stale only when cached terminal issue truth is newer than the promotion metadata; otherwise revalidate.
+9. Avoid timeout-only changes and provider-intake manual edits.
 
 ## CO-382 Fallback Decision Table
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `Yes`.
@@ -127,13 +134,13 @@ task_checklists:
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Provider refresh lifecycle classification | Terminal released historical claims can escalate to active stuck refresh health. | remove fallback | CO-571 | Released terminal claim with no active run/retry/worker corroboration. | Observed 2026-05-20 | 2026-05-20 | This issue | Terminal released claims stop driving `restart_required`. | Focused released-claim regressions. |
+| Provider refresh lifecycle classification | Terminal released historical claims can escalate to active stuck refresh health. | remove fallback | CO-571 | Released terminal claim with no active run/retry/worker corroboration, including no-current-poll-snapshot direct issue-by-id fallback. | Observed 2026-05-20 | 2026-05-20 | This issue | Terminal released claims stop driving `restart_required`. | Focused released-claim, no-snapshot, stale-promotion, and active-stall regressions. |
 | Provider-intake history | Released historical claims stay retained for traceability. | justify retaining fallback | Provider-intake audit contract / CO-571 | Terminal issue release records historical claim state. | Existing behavior before CO-571 | 2026-05-20 | Non-expiring durable retention only with rationale | Separate approved audit-history redesign replaces retained claim history with equivalent source-labeled evidence. | Tests keep claims inactive without deleting evidence. |
 
 - Contract name: provider-intake released historical claim audit retention.
 - Owning surface: provider-intake state and control-host status/read models.
 - Steady-state proof: raw released claim rows remain source-labeled audit evidence, while terminal released `not_active` claims with complete cached metadata, null retry fields, and no active or cancelable retained run do not drive `restart_required` or retrying WIP.
-- Tests/docs: `ProviderIssueHandoff.test.ts` terminal released metadata-only table, active-stuck regression, `ControlRuntime.test.ts` retry projection regression, and this CO-571 packet.
+- Tests/docs: `ProviderIssueHandoff.test.ts` terminal released metadata-only table, no-current-poll-snapshot regression, stale/current `review_promotion` regressions, active-stuck regression, `ControlRuntime.test.ts` retry projection regression, and this CO-571 packet.
 - Non-expiring rationale: retained released claim history is durable operator/audit evidence, not temporary compatibility debt; removal requires an approved archival redesign that preserves equivalent source-labeled claim/run evidence.
 
 ## Acceptance Criteria
@@ -145,6 +152,8 @@ task_checklists:
 - CO-451 Done `claim_issue_by_id:released` path is covered and benign without active corroboration.
 - CO-468 Done `claim_issue_by_id:released` path is covered and benign without active corroboration.
 - A real active/stuck path still fails closed with `provider_refresh_lifecycle_stuck` / `restart_required`.
+- Strong terminal released claims skip direct issue-by-id when current tracked-issue polling is unavailable or skipped.
+- Stale retained `review_promotion` metadata does not keep terminal released history active, while current promotion metadata still revalidates.
 - `co-status --format json` and `/ui/data.json` remain truthful.
 - No provider-intake manual edits or timeout-only fix is introduced.
 
@@ -152,6 +161,8 @@ task_checklists:
 - Focused released terminal claim tests for `claim_issue_by_id:released` and `claim_reconcile:released`.
 - Focused projection test or assertion for released terminal claims with null retry metadata.
 - Focused active stuck refresh negative test.
+- Focused no-current-poll-snapshot regression.
+- Focused stale/current `review_promotion` regressions.
 - Spec guard, build, lint, test, docs checks, freshness, diff budget.
 - Pack smoke for downstream CLI/control-host surface.
 - Standalone review and elegance pass where tooling permits.

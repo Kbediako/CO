@@ -9,6 +9,7 @@
 
 ## Agent-Facing Scope
 - [x] Preserve protected terms: `provider_refresh_lifecycle_stuck`, `restart_required`, `refresh:claim_issue_by_id_reconcile`, `claim_issue_by_id:released`, `refresh:claim_reconcile`, `claim_reconcile:released`, released terminal historical claims, CO-472, CO-461, CO-469, CO-471, CO-476, CO-451, CO-468, no active workers/WIP 0/3, `retrying=1` projection mismatch, no fabricated coherent snapshot, and no provider-intake manual edits.
+- [x] Preserve rework protected terms: no-current-poll-snapshot path, direct issue-by-id fallback, stale `review_promotion`, and current promotion revalidation.
 - [x] Keep CO-469 Duplicate/canceled inside terminal released historical claim scope, not as a separate queue-capacity or workflow-state redesign.
 - [x] Keep CO-471 retry projection mismatch inside terminal released historical claim scope: selected released claim with null retry metadata must not manufacture retrying WIP, while separate real retrying claims remain visible.
 - [x] Preserve genuine active refresh stall fail-closed behavior.
@@ -21,13 +22,13 @@
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Provider refresh lifecycle classification | Terminal released historical claims can escalate to active stuck refresh health. | `remove fallback` | CO-571 | Released terminal claim with no active run/retry/worker corroboration. | Observed 2026-05-20 | 2026-05-20 | This issue | Terminal released claims stop driving `restart_required`. | Focused released-claim regressions. |
+| Provider refresh lifecycle classification | Terminal released historical claims can escalate to active stuck refresh health. | `remove fallback` | CO-571 | Released terminal claim with no active run/retry/worker corroboration, including no-current-poll-snapshot direct issue-by-id fallback. | Observed 2026-05-20 | 2026-05-20 | This issue | Terminal released claims stop driving `restart_required`. | Focused released-claim, no-snapshot, stale-promotion, and active-stall regressions. |
 | Provider-intake history | Released historical claims stay retained for traceability. | `justify retaining fallback` | Provider-intake audit contract / CO-571 | Terminal issue release records historical claim state. | Existing behavior before CO-571 | 2026-05-20 | Non-expiring durable retention only with rationale | Separate approved audit-history redesign replaces retained claim history with equivalent source-labeled evidence. | Tests keep claims inactive without deleting evidence. |
 
 - Contract name: provider-intake released historical claim audit retention.
 - Owning surface: provider-intake state and control-host status/read models.
 - Steady-state proof: raw released claim rows remain source-labeled audit evidence, while terminal released `not_active` claims with complete cached metadata, null retry fields, and no active or cancelable retained run do not drive `restart_required` or retrying WIP.
-- Tests/docs: `ProviderIssueHandoff.test.ts` terminal released metadata-only table, active-stuck regression, `ControlRuntime.test.ts` retry projection regression, and this CO-571 packet.
+- Tests/docs: `ProviderIssueHandoff.test.ts` terminal released metadata-only table, no-current-poll-snapshot regression, stale/current `review_promotion` regressions, active-stuck regression, `ControlRuntime.test.ts` retry projection regression, and this CO-571 packet.
 - Non-expiring rationale: retained released claim history is durable operator/audit evidence, not temporary compatibility debt; removal requires an approved archival redesign that preserves equivalent source-labeled claim/run evidence.
 
 ## Validation Snapshot
@@ -41,4 +42,6 @@
 - [x] Validation completed: spec guard, build, lint, focused tests, diagnostics child `npm test`, docs gates, diff budget, delegation guard, repo stewardship, pack smoke, and enforced standalone review.
 - [x] Review/elegance completed. Evidence: enforced `gpt-5.5/xhigh` review returned `overall_verdict=clean`; post-review minimality pass kept the scoped predicate/test shape unchanged.
 - [x] Draft PR opened. Evidence: PR #855, `https://github.com/Kbediako/CO/pull/855`.
-- [ ] GitHub checks, CodeRabbit, Codex review, and handoff pending.
+- [x] Rework PR opened after PR #855 merged but live main still looped. Evidence: PR #856, `https://github.com/Kbediako/CO/pull/856`.
+- [x] Manual Codex review triggered for PR #856 head `60055e3aabd8f69f5e916036204756da9bfac63e`; Codex returned clean.
+- [ ] GitHub Core Lane, CodeRabbit after ready-for-review, and handoff pending.
