@@ -605,18 +605,23 @@ function resolveProviderIntakeSourceFreshnessPolicy(
     readProviderPollingHealth(context.readProviderIssueHandoff?.() ?? null)?.control_host_owner ??
     null;
   if (liveControlHostOwner) {
-    const livePolicy = resolveControlHostSourceFreshnessPolicyFromPolling(liveControlHostOwner);
-    const normalizedLiveOwner = normalizeControlHostOwnershipPollingPayload(liveControlHostOwner);
+    const refreshedLiveOwner = refreshControlHostOwnershipPollingPayload(
+      normalizeControlHostOwnershipPollingPayload(liveControlHostOwner)
+    );
+    const livePolicy = resolveControlHostSourceFreshnessPolicyFromPolling(
+      refreshedLiveOwner,
+      { refresh: false }
+    );
     const liveFreshness =
-      normalizedLiveOwner?.status === 'owned'
+      refreshedLiveOwner?.status === 'owned'
         ? (
-            normalizedLiveOwner.owner?.source_root_freshness ??
-            normalizedLiveOwner.attempted_owner?.source_root_freshness ??
+            refreshedLiveOwner.owner?.source_root_freshness ??
+            refreshedLiveOwner.attempted_owner?.source_root_freshness ??
             null
           )
         : (
-            normalizedLiveOwner?.attempted_owner?.source_root_freshness ??
-            normalizedLiveOwner?.owner?.source_root_freshness ??
+            refreshedLiveOwner?.attempted_owner?.source_root_freshness ??
+            refreshedLiveOwner?.owner?.source_root_freshness ??
             null
           );
     if (livePolicy || isAuthoritativeLiveControlHostFreshness(liveFreshness)) {
