@@ -129,7 +129,11 @@ export async function runControlPlaneInvariants(repoRoot = process.cwd(), option
       guard_contract_count: Array.isArray(catalog.guard_contracts)
         ? catalog.guard_contracts.length
         : 0,
-      desired_state_domains: normalizeStringArray(catalog.desired_state_reconciler?.domains?.map((domain) => domain?.id)),
+      desired_state_domains: normalizeStringArray(
+        Array.isArray(catalog.desired_state_reconciler?.domains)
+          ? catalog.desired_state_reconciler.domains.map((domain) => domain?.id)
+          : []
+      ),
       status_monitor_dimensions: normalizeStringArray(catalog.status_monitor?.dimensions)
     },
     findings

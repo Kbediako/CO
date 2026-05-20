@@ -268,6 +268,25 @@ describe('control-plane operational drift invariants', () => {
     );
   });
 
+  it('fails closed when desired-state domains are not an array', async () => {
+    const repoRoot = await writeFixture({
+      mutateConfig(config) {
+        (config.desired_state_reconciler as { domains: unknown }).domains = {
+          id: 'wip_cap'
+        };
+      }
+    });
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'desired_state_domain_missing' })])
+    );
+  });
+
   it('fails closed when a required child workstream id is missing', async () => {
     const repoRoot = await writeFixture({
       mutateConfig(config) {
