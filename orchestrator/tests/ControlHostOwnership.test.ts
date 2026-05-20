@@ -392,6 +392,102 @@ describe('control host ownership', () => {
     expect(resolveControlHostSourceFreshnessPolicy(staleReclaimedPayload)).toBeNull();
   });
 
+  it('uses active owner freshness for rejected duplicate and ambiguous diagnostics', () => {
+    const staleFreshness = {
+      schema_version: 1,
+      status: 'warning',
+      observed_at: '2026-05-18T23:00:00.000Z',
+      intended_repo_root: '/repo',
+      intended_repo_root_realpath: '/repo',
+      command_path: '/repo/bin/codex-orchestrator.ts',
+      command_path_realpath: '/repo/bin/codex-orchestrator.ts',
+      package_root: '/repo',
+      package_root_realpath: '/repo',
+      source_root: '/repo',
+      source_root_realpath: '/repo',
+      entrypoint_kind: 'source',
+      base_ref: 'origin/main',
+      drift_classes: ['supervised_source_root_drift'],
+      source_checkout: {
+        status: 'stale',
+        repo_root: '/repo',
+        dirty: { status: 'clean' }
+      },
+      intended_checkout: {
+        status: 'current',
+        repo_root: '/repo',
+        dirty: { status: 'clean' }
+      },
+      provenance: {
+        command_path_source: 'explicit',
+        package_root_source: 'explicit',
+        source_root_source: 'package_root',
+        command_path_inside_package: true,
+        package_root_matches_intended: true,
+        source_root_matches_intended: true,
+        source_entry_exists: true,
+        dist_entry_exists: true
+      },
+      guidance: ['Restart or relaunch the supervised control-host from the intended current source root before trusting provider-worker posture.'],
+      detail: 'Detected source/root drift: supervised_source_root_drift.'
+    };
+    const currentFreshness = {
+      ...staleFreshness,
+      status: 'current',
+      observed_at: '2026-05-18T23:08:00.000Z',
+      drift_classes: [],
+      source_checkout: {
+        status: 'current',
+        repo_root: '/repo',
+        dirty: { status: 'clean' }
+      },
+      guidance: ['Supervised command, package root, and source checkout match the intended repo root for the local origin/main ref.'],
+      detail: 'The supervised source root matches the intended repository root and is current against local origin/main.'
+    };
+    const buildOwner = (ownerToken: string, freshness: unknown) => ({
+      owner_token: ownerToken,
+      status: 'owned',
+      pid: ownerToken === 'active-owner-token' ? 123 : 456,
+      ppid: 1,
+      hostname: TEST_HOST,
+      acquired_at: '2026-05-18T22:55:00.000Z',
+      updated_at: '2026-05-18T23:00:00.000Z',
+      released_at: null,
+      repo_root: '/repo',
+      task_id: 'local-mcp',
+      run_id: 'control-host',
+      run_dir: '/repo/.runs/local-mcp/cli/control-host',
+      pipeline_id: 'provider-linear-worker',
+      source_root_freshness: freshness,
+      lock_dir: '/repo/.runs/control-host-owner.lock',
+      owner_path: '/repo/.runs/control-host-owner.json'
+    });
+
+    const cases = [
+      { status: 'duplicate_rejected', reason: 'duplicate_control_host_owner' },
+      { status: 'ambiguous_rejected', reason: 'ambiguous_control_host_owner' }
+    ] as const;
+
+    for (const { status, reason } of cases) {
+      const payload = {
+        status,
+        reason,
+        updated_at: '2026-05-18T23:08:00.000Z',
+        diagnostic_path: '/repo/.runs/control-host-duplicate-owner.json',
+        lock_dir: '/repo/.runs/control-host-owner.lock',
+        owner_path: '/repo/.runs/control-host-owner.json',
+        owner: buildOwner('active-owner-token', staleFreshness),
+        attempted_owner: buildOwner('attempted-owner-token', currentFreshness)
+      } as ControlHostOwnershipPollingPayload;
+
+      expect(resolveControlHostSourceFreshnessPolicy(payload)).toMatchObject({
+        action: 'restart',
+        reason: 'stale_supervised_source_root',
+        updated_at: '2026-05-18T23:00:00.000Z'
+      });
+    }
+  });
+
   it('ignores non-supervised source-root freshness warnings', () => {
     const distOnlyPayload = {
       status: 'owned',

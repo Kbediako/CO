@@ -310,15 +310,15 @@ export function resolveControlHostSourceFreshnessPolicy(
   payload: ControlHostOwnershipPollingPayload | null
 ): ControlHostSourceFreshnessPolicy | null {
   const freshness =
-    payload?.status === 'owned'
+    payload?.status === 'stale_reclaimed'
       ? (
-          payload.owner?.source_root_freshness ??
           payload.attempted_owner?.source_root_freshness ??
+          payload.owner?.source_root_freshness ??
           null
         )
       : (
-          payload?.attempted_owner?.source_root_freshness ??
           payload?.owner?.source_root_freshness ??
+          payload?.attempted_owner?.source_root_freshness ??
           null
         );
   if (
