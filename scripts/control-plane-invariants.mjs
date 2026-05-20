@@ -93,6 +93,7 @@ export async function runControlPlaneInvariants(repoRoot = process.cwd(), option
   validateChildWorkstreams(config.child_workstreams, findings);
   await validateTaskPacket(config, {
     findings,
+    configRepoPath: relativeToRepo(absoluteRoot, configPath),
     repoRoot: absoluteRoot,
     taskIndex,
     freshnessRegistry
@@ -496,7 +497,7 @@ async function validateTaskPacket(config, input) {
     ? input.freshnessRegistry.entries
     : [];
   const freshnessByPath = new Map(freshnessEntries.map((entry) => [entry?.path, entry]));
-  for (const packetPath of packetPaths) {
+  for (const packetPath of uniqueStrings([input.configRepoPath, ...packetPaths])) {
     const entry = freshnessByPath.get(packetPath);
     if (!entry) {
       addFinding(
@@ -723,6 +724,10 @@ function normalizeStringArray(value) {
   return value
     .map((entry) => readNonEmptyString(entry))
     .filter((entry) => entry !== null);
+}
+
+function uniqueStrings(values) {
+  return [...new Set(values.filter((value) => typeof value === 'string' && value.length > 0))];
 }
 
 function normalizeRepoPath(value) {

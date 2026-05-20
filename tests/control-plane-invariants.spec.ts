@@ -10,6 +10,7 @@ import {
 } from '../scripts/control-plane-invariants.mjs';
 
 const createdDirs: string[] = [];
+const CONFIG_PATH = 'docs/control-plane-invariants.json';
 
 afterEach(async () => {
   while (createdDirs.length > 0) {
@@ -100,6 +101,27 @@ describe('control-plane operational drift invariants', () => {
     );
   });
 
+  it('fails when the invariant catalog is missing registry truth', async () => {
+    const config = buildValidConfig();
+    const repoRoot = await writeFixture({
+      registryEntries: config.task_packet.paths.map((path) => freshnessRegistryEntry(path))
+    });
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'freshness_registry_entry_missing',
+          message: expect.stringContaining(CONFIG_PATH)
+        })
+      ])
+    );
+  });
+
   it('fails when task-index packet paths drift from the catalog', async () => {
     const repoRoot = await writeFixture({
       mutateTaskIndex(entry) {
@@ -126,7 +148,7 @@ describe('control-plane operational drift invariants', () => {
     const repoRoot = await writeFixture();
     const config = buildValidConfig();
     config.task_packet.paths[0] = '/tmp/co552-absolute-packet.md';
-    await writeJson(join(repoRoot, 'docs', 'control-plane-invariants.json'), config);
+    await writeJson(join(repoRoot, CONFIG_PATH), config);
 
     const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
       outputPath: false
@@ -156,7 +178,7 @@ async function writeFixture(options: {
   options.mutateConfig?.(config);
   const packetPaths = config.task_packet.paths;
 
-  await writeJson(join(repoRoot, 'docs', 'control-plane-invariants.json'), config);
+  await writeJson(join(repoRoot, CONFIG_PATH), config);
   await Promise.all(
     packetPaths.map(async (path) => {
       await mkdir(dirname(join(repoRoot, path)), { recursive: true });
@@ -187,14 +209,7 @@ async function writeFixture(options: {
     version: 1,
     entries:
       options.registryEntries ??
-      packetPaths.map((path) => ({
-        path,
-        owner: 'Codex',
-        status: 'active',
-        lifecycle_state: 'active',
-        last_review: '2026-05-20',
-        cadence_days: 30
-      }))
+      [CONFIG_PATH, ...packetPaths].map((path) => freshnessRegistryEntry(path))
   });
   return repoRoot;
 }
@@ -210,6 +225,17 @@ async function mkdirFixture() {
 async function writeJson(path: string, value: unknown) {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+}
+
+function freshnessRegistryEntry(path: string) {
+  return {
+    path,
+    owner: 'Codex',
+    status: 'active',
+    lifecycle_state: 'active',
+    last_review: '2026-05-20',
+    cadence_days: 30
+  };
 }
 
 function buildValidConfig() {
