@@ -460,6 +460,89 @@
       ]
     },
     {
+      "id": "20260520-linear-2d28fad8-60e7-462d-9c70-dec1d421b55c",
+      "title": "CO-556 auto-restart or fail closed on stale resident code",
+      "relates_to": "tasks/tasks-linear-2d28fad8-60e7-462d-9c70-dec1d421b55c.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "validation_green_before_review",
+      "last_review": "2026-05-20",
+      "canonical_owner_key": "control-host:stale-resident-code-auto-restart-fail-closed",
+      "evidence": [
+        "docs/PRD-linear-2d28fad8-60e7-462d-9c70-dec1d421b55c.md",
+        "docs/TECH_SPEC-linear-2d28fad8-60e7-462d-9c70-dec1d421b55c.md",
+        "docs/ACTION_PLAN-linear-2d28fad8-60e7-462d-9c70-dec1d421b55c.md",
+        "tasks/specs/linear-2d28fad8-60e7-462d-9c70-dec1d421b55c.md",
+        "tasks/tasks-linear-2d28fad8-60e7-462d-9c70-dec1d421b55c.md",
+        ".agent/task/linear-2d28fad8-60e7-462d-9c70-dec1d421b55c.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-2d28fad8-60e7-462d-9c70-dec1d421b55c-docs-packet/cli/2026-05-20T00-20-24-774Z-cc622583/manifest.json",
+        ".runs/linear-2d28fad8-60e7-462d-9c70-dec1d421b55c-docs-packet/cli/2026-05-20T00-20-24-774Z-cc622583/memory/source-0/source.txt"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet-2026-05-20T00-20-24-774Z-cc622583",
+          "date": "2026-05-20",
+          "status": "produced_for_parent_import",
+          "manifest": ".runs/linear-2d28fad8-60e7-462d-9c70-dec1d421b55c-docs-packet/cli/2026-05-20T00-20-24-774Z-cc622583/manifest.json",
+          "source_anchor": "ctx:sha256:ae0909adb0536f00cad4a362edd1e495157b446bb95ab0c17655b489a548065f#chunk:c000001",
+          "canonical_owner_key": "control-host:stale-resident-code-auto-restart-fail-closed",
+          "summary": "Docs-only child lane created the CO-556 packet and registry mirrors for stale resident code policy: consume trustworthy source_root_freshness, auto-restart when safe and verified, or fail closed while preserving terminal Linear truth and provider-intake-state.json audit evidence."
+        }
+      },
+      "validation": {
+        "status": "validation_green_before_review",
+        "passed": [
+          "parent-relative source payload read",
+          "docs-first packet created",
+          "canonical TECH_SPEC linked",
+          "registry mirrors created",
+          "child scoped JSON parse",
+          "child scoped protected-term check",
+          "child scoped git diff --check",
+          "focused stale resident code policy tests",
+          "auto-restart and fail-closed coverage",
+          "CO-555 terminal precedence regression",
+          "review-remediation stale snapshot and persisted live-owner regressions",
+          "CO556-REVIEW-003 refreshed authority regression",
+          "delegation guard",
+          "spec guard dry-run",
+          "build",
+          "lint",
+          "full core test suite",
+          "docs:check",
+          "docs:freshness",
+          "repo:stewardship",
+          "diff-budget",
+          "pack:smoke"
+        ],
+        "pending": [
+          "standalone review clean rerun",
+          "elegance pass",
+          "PR attach",
+          "ready-review drain",
+          "Linear review handoff"
+        ]
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-2d28fad8-60e7-462d-9c70-dec1d421b55c.md",
+        "task": "tasks/tasks-linear-2d28fad8-60e7-462d-9c70-dec1d421b55c.md",
+        "agent_task": ".agent/task/linear-2d28fad8-60e7-462d-9c70-dec1d421b55c.md",
+        "prd": "docs/PRD-linear-2d28fad8-60e7-462d-9c70-dec1d421b55c.md",
+        "docs": "docs/TECH_SPEC-linear-2d28fad8-60e7-462d-9c70-dec1d421b55c.md",
+        "action_plan": "docs/ACTION_PLAN-linear-2d28fad8-60e7-462d-9c70-dec1d421b55c.md"
+      },
+      "source_issue": {
+        "id": "2d28fad8-60e7-462d-9c70-dec1d421b55c",
+        "identifier": "CO-556",
+        "url": "https://linear.app/asabeko/issue/CO-556"
+      }
+    },
+    {
       "id": "20260518-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e",
       "title": "CO-515 control-host source freshness recheck after main advances",
       "relates_to": "tasks/tasks-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md",

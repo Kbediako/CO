@@ -1,6 +1,8 @@
 import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 
+import { resolveControlHostSourceFreshnessPolicyFromPolling } from './controlHostOwnership.js';
+
 export const DEFAULT_CONTROL_HOST_SUPERVISION_LABEL =
   'com.kbediako.co.control-host';
 export const DEFAULT_CONTROL_HOST_SUPERVISION_TASK_ID = 'local-mcp';
@@ -147,6 +149,8 @@ export interface ControlHostSupervisionHealthEvaluation {
     | 'ok'
     | 'restart_required'
     | 'stale_restart_required'
+    | 'stale_supervised_source_root'
+    | 'stale_supervised_source_fail_closed'
     | 'active_worker_restart_quarantine'
     | 'active_worker_probe_timeout_quarantine'
     | 'invalid_payload';
@@ -440,6 +444,44 @@ export function evaluateControlHostSupervisionHealthPayload(
       message: 'co-status payload omitted polling state; treating it as healthy.'
     };
   }
+  const sourceFreshnessPolicy = resolveControlHostSourceFreshnessPolicyFromPolling(
+    polling.control_host_owner,
+    { refresh: false }
+  );
+  if (sourceFreshnessPolicy?.action === 'restart') {
+    if (
+      isStaleRecoverableSourceFreshnessPolicySnapshot(polling, sourceFreshnessPolicy, {
+        minPollingUpdatedAt: options.minPollingUpdatedAt,
+        staleRestartRequiredGraceMs: options.staleRestartRequiredGraceMs,
+        now: options.now
+      })
+    ) {
+      const graceSeconds =
+        typeof options.staleRestartRequiredGraceMs === 'number' &&
+        Number.isFinite(options.staleRestartRequiredGraceMs)
+          ? Math.max(0, Math.round(options.staleRestartRequiredGraceMs / 1_000))
+          : null;
+      return {
+        healthy: true,
+        reason: 'stale_restart_required',
+        message: `co-status reported a stale supervised source freshness snapshot from before the current supervised child start; treating it as quiescent${
+          graceSeconds === null ? '' : ` for the bounded ${graceSeconds}s startup grace window`
+        } while the current host refreshes.`
+      };
+    }
+    return {
+      healthy: false,
+      reason: 'stale_supervised_source_root',
+      message: `${sourceFreshnessPolicy.detail} Supervision will request a bounded launchd restart before trusting provider-intake.`
+    };
+  }
+  if (sourceFreshnessPolicy?.action === 'fail_closed') {
+    return {
+      healthy: true,
+      reason: 'stale_supervised_source_fail_closed',
+      message: `${sourceFreshnessPolicy.detail} Restart is not attempted to avoid an unsafe restart loop.`
+    };
+  }
   if (polling.restart_required === true) {
     if (
       isStaleRecoverableProviderRestartRequiredPolling(polling, {
@@ -484,6 +526,35 @@ export function evaluateControlHostSupervisionHealthPayload(
     reason: 'ok',
     message: 'co-status reported a healthy polling state.'
   };
+}
+
+function isStaleRecoverableSourceFreshnessPolicySnapshot(
+  polling: Record<string, unknown>,
+  policy: NonNullable<ReturnType<typeof resolveControlHostSourceFreshnessPolicyFromPolling>>,
+  options: {
+    minPollingUpdatedAt: string | null | undefined;
+    staleRestartRequiredGraceMs?: number | null;
+    now?: string | null;
+  }
+): boolean {
+  const minimumUpdatedAt = parseIsoTimestampToMs(options.minPollingUpdatedAt);
+  if (minimumUpdatedAt === null) {
+    return false;
+  }
+  const policyUpdatedAt = parseIsoTimestampToMs(policy.updated_at);
+  const pollingUpdatedAt = parseIsoTimestampToMs(polling.updated_at);
+  const snapshotUpdatedAt = policyUpdatedAt ?? pollingUpdatedAt;
+  if (snapshotUpdatedAt === null || snapshotUpdatedAt >= minimumUpdatedAt) {
+    return false;
+  }
+  if (
+    typeof options.staleRestartRequiredGraceMs !== 'number' ||
+    !Number.isFinite(options.staleRestartRequiredGraceMs)
+  ) {
+    return true;
+  }
+  const now = parseIsoTimestampToMs(options.now ?? new Date().toISOString());
+  return now !== null && now - minimumUpdatedAt <= Math.max(0, options.staleRestartRequiredGraceMs);
 }
 
 function isStaleRecoverableProviderRestartRequiredPolling(

@@ -98,7 +98,8 @@ export interface ProviderIntakeState {
 
 export type ProviderIntakeAuthorityUnavailableReason =
   | 'raw_provider_intake_unavailable'
-  | 'raw_provider_intake_read_failed';
+  | 'raw_provider_intake_read_failed'
+  | 'stale_supervised_control_host_source';
 
 export interface ProviderIntakeAuthorityMetadata {
   status: 'unavailable';
@@ -214,7 +215,8 @@ function normalizeProviderIntakeAuthority(value: unknown): ProviderIntakeAuthori
     status: 'unavailable',
     reason:
       value.reason === 'raw_provider_intake_unavailable' ||
-      value.reason === 'raw_provider_intake_read_failed'
+      value.reason === 'raw_provider_intake_read_failed' ||
+      value.reason === 'stale_supervised_control_host_source'
         ? value.reason
         : 'raw_provider_intake_unavailable',
     updated_at: typeof value.updated_at === 'string' ? value.updated_at : null
