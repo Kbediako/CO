@@ -32,7 +32,7 @@ Minor-seam decision: The retained cohort stays inside the existing owner-routed 
    - Re-home/declare the May 20 Apr 19 task mirror, task packet, and report-only cohort without hiding stale evidence.
 3. Pre-expiry direct review
    - Review `.agent/task/templates/codex-cli-release-intake-template.md`, `skills/agent-first-adoption-steering/SKILL.md`, `skills/long-poll-wait/SKILL.md`, and spec pre-expiry rows.
-   - Review `docs/book/**`, `skills/README.md`, and the May 20 spec pre-expiry rows before changing freshness metadata; keep legacy spec files unchanged when review finds no content change is needed.
+   - Review `docs/book/**`, `skills/README.md`, and the May 20 spec pre-expiry rows before changing freshness metadata; record terminal frontmatter disposition for completed source issues instead of editing legacy fallback content when no content change is needed.
    - Update only backed review metadata and record evidence.
 4. Validation and handoff
    - Run `npm run docs:freshness`, `npm run docs:freshness:maintain`, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`.
@@ -61,4 +61,4 @@ Minor-seam decision: The retained cohort stays inside the existing owner-routed 
 ## Approvals
 - Reviewer: Pending.
 - Date: 2026-05-19.
-- May 20 update: current-main verification added the Apr 19 rolling cohort and refreshed reviewed public/skill/spec pre-expiry metadata under the same CO-558 owner evidence.
+- May 20 update: current-main verification added the Apr 19 rolling cohort, refreshed reviewed public/skill pre-expiry metadata, and added terminal frontmatter disposition for completed spec rows under the same CO-558 owner evidence.

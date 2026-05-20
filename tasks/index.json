@@ -5353,7 +5353,8 @@
         "task": "tasks/tasks-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
         "agent_task": ".agent/task/linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
         "docs": "docs/TECH_SPEC-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260427-linear-c8e3a464-ec50-4fa4-aff5-d8a780626600",
@@ -5379,7 +5380,8 @@
         "task": "tasks/tasks-linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",
         "agent_task": ".agent/task/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",
         "docs": "tasks/specs/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260427-linear-f04ab1c2-79e6-4a98-84e1-85efb6583116",
@@ -5403,7 +5405,8 @@
         "task": "tasks/tasks-linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md",
         "agent_task": ".agent/task/linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md",
         "docs": "docs/TECH_SPEC-linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260427-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba",
@@ -5428,7 +5431,8 @@
         "task": "tasks/tasks-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
         "agent_task": ".agent/task/linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
         "docs": "docs/TECH_SPEC-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260427-linear-5ef45396-4546-4699-9d4a-c69fb9179868",
@@ -5456,7 +5460,8 @@
           "TECH_SPEC": "docs/TECH_SPEC-linear-5ef45396-4546-4699-9d4a-c69fb9179868.md",
           "ACTION_PLAN": "docs/ACTION_PLAN-linear-5ef45396-4546-4699-9d4a-c69fb9179868.md"
         }
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260427-linear-e6039710-4596-45b2-a268-53bfa3cb2ac9",
@@ -5496,7 +5501,8 @@
         "task": "tasks/tasks-linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md",
         "agent_task": ".agent/task/linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md",
         "docs": "docs/TECH_SPEC-linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260427-linear-86da539a-e106-44d9-87ea-759281a00a81",
@@ -5523,7 +5529,8 @@
         "task": "tasks/tasks-linear-86da539a-e106-44d9-87ea-759281a00a81.md",
         "agent_task": ".agent/task/linear-86da539a-e106-44d9-87ea-759281a00a81.md",
         "docs": "docs/TECH_SPEC-linear-86da539a-e106-44d9-87ea-759281a00a81.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260426-linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f",
@@ -15409,7 +15416,8 @@
         "task": "tasks/tasks-linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md",
         "agent_task": ".agent/task/linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md",
         "docs": "docs/TECH_SPEC-linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260327-linear-da290822-55a2-4794-8caa-3a6f1d9c3eff",
@@ -15433,7 +15441,8 @@
         "task": "tasks/tasks-linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md",
         "agent_task": ".agent/task/linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md",
         "docs": "docs/TECH_SPEC-linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260327-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29",
@@ -15456,7 +15465,8 @@
         "task": "tasks/tasks-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md",
         "agent_task": ".agent/task/linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md",
         "docs": "docs/TECH_SPEC-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260327-linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8",
@@ -15479,7 +15489,8 @@
         "task": "tasks/tasks-linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md",
         "agent_task": ".agent/task/linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md",
         "docs": "docs/TECH_SPEC-linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260326-linear-df2bd49b-2dd6-413f-8d90-af40d033dace",
@@ -25810,7 +25821,8 @@
         "task": "tasks/tasks-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md",
         "agent_task": ".agent/task/linear-fd05f8a0-420a-4313-a462-690881c0a45c.md",
         "docs": "docs/TECH_SPEC-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260501-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc",
