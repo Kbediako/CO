@@ -1,4 +1,5 @@
 import type { RunPaths } from '../run/runPaths.js';
+import type { SourceRootFreshnessInspection } from '../utils/sourceRootFreshness.js';
 import type { ControlState } from './controlState.js';
 import type { LiveLinearTrackedIssue } from './linearDispatchSource.js';
 import type { ProviderIssueHandoffService } from './providerIssueHandoff.js';
@@ -14,7 +15,9 @@ import {
 } from './providerPollingHealth.js';
 import {
   normalizeControlHostOwnershipPollingPayload,
-  refreshControlHostOwnershipPollingPayload
+  refreshControlHostOwnershipPollingPayload,
+  resolveControlHostAuthoritativeSourceFreshness,
+  resolveControlHostSourceFreshnessPolicyFromPolling
 } from './controlHostOwnership.js';
 import {
   buildProviderIntakeSummary,
@@ -539,11 +542,28 @@ function buildProviderIntakeAuthorityFingerprint(
 }
 
 function readProviderIntakeAuthorityState(
-  context: Pick<ControlRuntimeContext, 'providerIntakeState' | 'readPersistedProviderIntakeState'>
+  context: Pick<
+    ControlRuntimeContext,
+    'providerIntakeState' | 'readPersistedProviderIntakeState' | 'readProviderIssueHandoff'
+  >
 ): ProviderIntakeAuthoritySnapshot {
   if (context.readPersistedProviderIntakeState) {
     try {
       const state = context.readPersistedProviderIntakeState();
+      const sourceFreshnessPolicy = state
+        ? resolveProviderIntakeSourceFreshnessPolicy(state, context)
+        : null;
+      if (state && sourceFreshnessPolicy) {
+        return {
+          state: buildUnavailableProviderIntakeState(state),
+          unavailable: {
+            reason: 'stale_supervised_control_host_source',
+            updated_at: sourceFreshnessPolicy.updated_at,
+            action: sourceFreshnessPolicy.action,
+            detail: sourceFreshnessPolicy.detail
+          }
+        };
+      }
       if (state?.authority?.status === 'unavailable') {
         return {
           state: buildUnavailableProviderIntakeState(state),
@@ -576,6 +596,41 @@ function readProviderIntakeAuthorityState(
     state: context.providerIntakeState ?? null,
     unavailable: null
   };
+}
+
+function resolveProviderIntakeSourceFreshnessPolicy(
+  state: ProviderIntakeState | null,
+  context: Pick<ControlRuntimeContext, 'readProviderIssueHandoff'>
+) {
+  const liveControlHostOwner =
+    readProviderPollingHealth(context.readProviderIssueHandoff?.() ?? null)?.control_host_owner ??
+    null;
+  if (liveControlHostOwner) {
+    const refreshedLiveOwner = refreshControlHostOwnershipPollingPayload(
+      normalizeControlHostOwnershipPollingPayload(liveControlHostOwner)
+    );
+    const livePolicy = resolveControlHostSourceFreshnessPolicyFromPolling(
+      refreshedLiveOwner,
+      { refresh: false }
+    );
+    const liveFreshness = resolveControlHostAuthoritativeSourceFreshness(refreshedLiveOwner);
+    if (livePolicy || isAuthoritativeLiveControlHostFreshness(liveFreshness)) {
+      return livePolicy;
+    }
+  }
+  if (!state?.polling || !isRecordLike(state.polling)) {
+    return null;
+  }
+  return resolveControlHostSourceFreshnessPolicyFromPolling(state.polling.control_host_owner);
+}
+
+function isAuthoritativeLiveControlHostFreshness(
+  freshness: SourceRootFreshnessInspection | null
+): boolean {
+  return (
+    freshness?.status === 'current' ||
+    (freshness?.status === 'warning' && freshness.drift_classes.length > 0)
+  );
 }
 
 function buildUnavailableProviderIntakeState(state: ProviderIntakeState): ProviderIntakeState {

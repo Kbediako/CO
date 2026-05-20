@@ -6,6 +6,7 @@ import {
   summarizeProviderLinearAuditPath,
   type ProviderLinearAuditSummary
 } from './providerLinearWorkflowAudit.js';
+import { resolveControlHostSourceFreshnessPolicyFromPolling } from './controlHostOwnership.js';
 import { isTerminalProviderIntakeIssueState } from './providerIntakeState.js';
 
 export type ProviderControlHostFreshnessVerdict =
@@ -237,6 +238,7 @@ export async function evaluateProviderControlHostFreshnessGauge(
     child_lane_cap_pressure: evaluateChildLaneCapPressure(proofs, nowMs, thresholds, findings),
     stale_source_verdict: buildUnknownVerdictMetric()
   };
+  evaluateStaleSupervisedSourceActiveClaims(intakeState, findings);
   evaluateLinearBudget(linearBudget, thresholds, findings);
   evaluateWorkerAuditHealth(artifacts.workerAudits, findings);
   if (!hasCoreFreshnessSources(sources)) {
@@ -1007,6 +1009,30 @@ function evaluateRetryBackoffAge(
   );
 }
 
+function evaluateStaleSupervisedSourceActiveClaims(
+  intakeState: JsonArtifact | null,
+  findings: ProviderControlHostFreshnessGaugeFinding[]
+): void {
+  const value = asRecord(intakeState?.value);
+  const policy = resolveControlHostSourceFreshnessPolicyFromPolling(
+    asRecord(value?.polling)?.control_host_owner
+  );
+  if (!policy) {
+    return;
+  }
+  const activeClaims = collectClaims(intakeState).filter(isActiveOrRetryQueuedClaim);
+  if (activeClaims.length === 0) {
+    return;
+  }
+  findings.push({
+    code: 'stale_supervised_source_active_claims',
+    verdict: 'stale',
+    message: `Supervised control-host source freshness is not current while ${activeClaims.length} provider-intake claim(s) are active; policy action=${policy.action}.`,
+    source_path: intakeState?.path ?? null,
+    source_field: 'polling.control_host_owner.owner.source_root_freshness'
+  });
+}
+
 function evaluateChildLaneCapPressure(
   proofs: ProofArtifact[],
   nowMs: number,
@@ -1240,6 +1266,13 @@ function collectClaims(intakeState: JsonArtifact | null): Record<string, unknown
 
 function isActiveClaim(claim: Record<string, unknown>): boolean {
   return ACTIVE_CLAIM_STATES.has(readState(claim)) && !isTerminalProviderIntakeGaugeClaim(claim);
+}
+
+function isActiveOrRetryQueuedClaim(claim: Record<string, unknown>): boolean {
+  return (
+    (isActiveClaim(claim) || claim.retry_queued === true) &&
+    !isTerminalProviderIntakeGaugeClaim(claim)
+  );
 }
 
 function isQueuedClaim(claim: Record<string, unknown>): boolean {
