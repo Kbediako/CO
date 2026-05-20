@@ -8330,6 +8330,83 @@ describe('ControlRuntime', () => {
     }
   });
 
+  it('does not project restart-required released terminal historical claims as retrying WIP', async () => {
+    const providerKey = 'linear:d7000137-f984-4275-85a0-dc5c14f09e64';
+    const providerIntakeState = createProviderIntakeState([
+      {
+        ...createReleasedTerminalClaim('CO-476', 'd7000137-f984-4275-85a0-dc5c14f09e64'),
+        provider_key: providerKey,
+        issue_id: 'd7000137-f984-4275-85a0-dc5c14f09e64',
+        issue_title: 'CO: make co-status degrade on recurring same-endpoint /ui/data timeout',
+        issue_state: 'Duplicate',
+        issue_state_type: 'canceled',
+        issue_updated_at: '2026-05-14T04:05:53.346Z',
+        task_id: 'linear-d7000137-f984-4275-85a0-dc5c14f09e64-retained',
+        run_id: null,
+        run_manifest_path: null,
+        retry_queued: null,
+        retry_attempt: null,
+        retry_due_at: null,
+        retry_error: null
+      }
+    ]);
+    providerIntakeState.polling = {
+      updated_at: '2026-05-20T18:10:00.000Z',
+      checking: false,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+      refresh_request_class: 'claim_issue_by_id:released',
+      refresh_provider_keys: [providerKey],
+      refresh_counts: {
+        claims_total: 1,
+        claims_scanned: 1,
+        issue_by_id_reads: 1,
+        issue_by_id_deferred: 0,
+        occupied_slots: 0,
+        fresh_discovery_runs: 0,
+        fresh_discovery_candidates: 0,
+        fresh_discovery_started: 0
+      }
+    };
+    const fixture = await createFixture({
+      taskId: 'local-mcp',
+      providerIntakeState
+    });
+    await seedManifest(fixture.paths, {
+      status: 'succeeded',
+      completed_at: '2026-05-20T18:09:00.000Z',
+      updated_at: '2026-05-20T18:09:00.000Z'
+    });
+
+    const compatibilityProjection = await fixture.runtime.snapshot().readCompatibilityProjection();
+    const statePayload = await readCompatibilityState({
+      controlStore: fixture.controlStore,
+      paths: fixture.paths,
+      readCompatibilityProjection: async () => compatibilityProjection
+    });
+
+    expect(compatibilityProjection.providerIntake).toMatchObject({
+      claim_count: 1,
+      active_claim_count: 0,
+      running_claim_count: 0,
+      active_issue_identifiers: [],
+      running_issue_identifiers: []
+    });
+    expect(compatibilityProjection.retrying).toEqual([]);
+    expect(statePayload.counts.retrying).toBe(0);
+    expect(statePayload.retrying_ids).toEqual([]);
+    expect(statePayload.polling).toMatchObject({
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+      refresh_request_class: 'claim_issue_by_id:released',
+      refresh_provider_keys: [providerKey]
+    });
+  });
+
   it('blocks trusting persisted stale terminal retry claims before source recovery', async () => {
     const repoRoot = await createSourceRootRepo('control-runtime-stale-authority-');
     const startupFreshness = inspectSourceRootFreshness({

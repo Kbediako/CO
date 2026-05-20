@@ -632,6 +632,118 @@
       }
     },
     {
+      "id": "20260520-linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63",
+      "title": "CO-571 released terminal claim reconciliation restart loop",
+      "relates_to": "tasks/tasks-linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "implementation_complete_in_review",
+      "last_review": "2026-05-20",
+      "canonical_owner_key": "control-host:released-claim-reconcile-restart-loop",
+      "evidence": [
+        "docs/PRD-linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md",
+        "docs/TECH_SPEC-linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md",
+        "docs/ACTION_PLAN-linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md",
+        "tasks/specs/linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md",
+        "tasks/tasks-linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md",
+        ".agent/task/linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        "linear issue-context cdf8b078-95af-4e75-99e2-6c32fa1ecd63",
+        "linear workpad comment e7bfc570-8142-462c-8ab3-b852c50e3187",
+        "linear parallelization stay_serial/single_bounded_change"
+      ],
+      "approvals": {
+        "issue_quality_review": {
+          "reviewer": "CO-571 provider worker",
+          "date": "2026-05-20",
+          "status": "approved_for_implementation",
+          "summary": "CO-571 is scoped to terminal released historical claim reconciliation and the retry projection mismatch for selected released claims with null retry metadata. It explicitly rejects timeout-only fixes, provider-intake manual edits, fabricated snapshots, and hiding real active refresh stalls."
+        },
+        "parallelization": {
+          "decision": "stay_serial",
+          "reason": "single_bounded_change",
+          "date": "2026-05-20",
+          "summary": "docs/source/tests/review all share one provider refresh classification boundary and provider admission is unstable; no safe child lane launched."
+        }
+      },
+      "validation": {
+        "status": "pr_open_validation_complete",
+        "passed": [
+          "live Linear issue-context read",
+          "single workpad created",
+          "same-turn linear parallelization decision recorded",
+          "docs-first packet created",
+          "CO-469 Duplicate/canceled terminal released claim added to repro scope",
+          "CO-471 retry projection mismatch added to repro scope",
+          "docs-review before implementation",
+          "focused released terminal claim regressions",
+          "focused active stuck refresh regression",
+          "spec guard dry-run",
+          "build",
+          "lint",
+          "test",
+          "docs:check",
+          "docs:freshness",
+          "diff-budget",
+          "pack:smoke",
+          "standalone review and elegance pass",
+          "PR #855 opened, attached to Linear, and marked ready for review",
+          "CI Core Lane passed on PR #855"
+        ],
+        "pending": [
+          "current-head CodeRabbit/Codex review drain",
+          "merge closeout and Linear Done transition"
+        ]
+      },
+      "paths": {
+        "prd": "docs/PRD-linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md",
+        "docs": "docs/TECH_SPEC-linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md",
+        "action_plan": "docs/ACTION_PLAN-linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md",
+        "spec": "tasks/specs/linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md",
+        "task": "tasks/tasks-linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md",
+        "agent_task": ".agent/task/linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md"
+      },
+      "source_issue": {
+        "id": "cdf8b078-95af-4e75-99e2-6c32fa1ecd63",
+        "identifier": "CO-571",
+        "url": "https://linear.app/asabeko/issue/CO-571/co-stop-control-host-restart-loops-on-released-historical-claim"
+      },
+      "related_issues": [
+        {
+          "identifier": "CO-472",
+          "relation": "terminal_done_released_claim_issue_by_id_reconcile_evidence"
+        },
+        {
+          "identifier": "CO-461",
+          "relation": "terminal_done_released_claim_reconcile_evidence"
+        },
+        {
+          "identifier": "CO-469",
+          "relation": "terminal_duplicate_canceled_released_claim_issue_by_id_evidence"
+        },
+        {
+          "identifier": "CO-471",
+          "relation": "terminal_done_released_claim_reconcile_retry_projection_evidence"
+        },
+        {
+          "identifier": "CO-476",
+          "relation": "terminal_duplicate_canceled_released_claim_reconcile_evidence"
+        },
+        {
+          "identifier": "CO-451",
+          "relation": "terminal_done_released_claim_issue_by_id_evidence"
+        },
+        {
+          "identifier": "CO-468",
+          "relation": "terminal_done_released_claim_reconcile_evidence"
+        }
+      ]
+    },
+    {
       "id": "20260518-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e",
       "title": "CO-515 control-host source freshness recheck after main advances",
       "relates_to": "tasks/tasks-linear-5e9dfba2-d54c-474a-94b0-79dbd3c1f18e.md",

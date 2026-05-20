@@ -5491,6 +5491,17 @@ export function createProviderIssueHandoffService(
               claim,
               blocker: retainedReleasedBlockerSnapshot
             });
+          const shouldUseCachedReleasedTerminalHistoricalClaim =
+            shouldUseCachedReleasedTerminalHistoricalClaimResolution({
+              claim,
+              activeRun,
+              releaseRun,
+              latestRun,
+              refreshFromBlockerSnapshot:
+                shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot
+            });
+          const canUseCachedReleasedTerminalHistoricalClaim =
+            shouldUseCachedReleasedTerminalHistoricalClaim && trackedIssuesByKey !== null;
           if (
             pollInput?.deferFreshDiscovery === true &&
             trackedIssueRefetch &&
@@ -5511,7 +5522,9 @@ export function createProviderIssueHandoffService(
             ) &&
             !shouldBlockPendingReopenFreshDiscovery;
           const allowDirectIssueById =
-            normallyAllowDirectIssueById || canUseNoRunPendingReopenLiveStartedProbe;
+            canUseCachedReleasedTerminalHistoricalClaim
+              ? false
+              : normallyAllowDirectIssueById || canUseNoRunPendingReopenLiveStartedProbe;
           const shouldCountNoRunPendingReopenLiveStartedProbe =
             !normallyAllowDirectIssueById && canUseNoRunPendingReopenLiveStartedProbe;
           let usedNoRunPendingReopenLiveStartedProbe = false;
@@ -5521,7 +5534,11 @@ export function createProviderIssueHandoffService(
             consumedTrackedIssueKeys,
             allowPollFailClosed: pollInput?.deferFreshDiscovery === true,
             allowReleasedPollFailClosed:
-              (pollInput?.allowPollFailClosed === true || pollInput?.deferFreshDiscovery === true) &&
+              (
+                pollInput?.allowPollFailClosed === true ||
+                pollInput?.deferFreshDiscovery === true ||
+                canUseCachedReleasedTerminalHistoricalClaim
+              ) &&
               !canFreshDiscoverReleasedLiveWorker &&
               !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot,
             allowDirectIssueById,
@@ -8166,6 +8183,7 @@ function shouldRetainedProviderClaimOccupyPollDispatchSlot(
     | 'issue_state_type'
     | 'issue_archived_at'
     | 'issue_trashed'
+    | 'issue_blocked_by'
     | 'run_id'
     | 'run_manifest_path'
   >,
@@ -9592,6 +9610,69 @@ function resolveReleasedProviderIssuePollFailClosedReason(
     return 'provider_issue_poll_cached_released_not_mutable';
   }
   return null;
+}
+
+function shouldUseCachedReleasedTerminalHistoricalClaimResolution(input: {
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    | 'state'
+    | 'reason'
+    | 'issue_state'
+    | 'issue_state_type'
+    | 'issue_updated_at'
+    | 'issue_archived_at'
+    | 'issue_trashed'
+    | 'issue_blocked_by'
+    | 'run_id'
+    | 'run_manifest_path'
+    | 'retry_queued'
+    | 'retry_attempt'
+    | 'retry_due_at'
+    | 'retry_error'
+    | 'merge_closeout'
+  >;
+  activeRun: ProviderIssueRunRecord | null;
+  releaseRun: ProviderIssueRunRecord | null;
+  latestRun: ProviderIssueRunRecord | null;
+  refreshFromBlockerSnapshot: boolean;
+}): boolean {
+  if (
+    input.claim.state !== 'released' ||
+    input.claim.reason !== 'provider_issue_released:not_active'
+  ) {
+    return false;
+  }
+  if (!isTerminalProviderIntakeIssueState(input.claim)) {
+    return false;
+  }
+  if (input.activeRun) {
+    return false;
+  }
+  if (
+    typeof input.claim.issue_updated_at !== 'string' ||
+    input.claim.issue_updated_at.trim().length === 0 ||
+    !Number.isFinite(Date.parse(input.claim.issue_updated_at))
+  ) {
+    return false;
+  }
+  const retainedRuns = [input.releaseRun, input.latestRun].filter(
+    (run): run is ProviderIssueRunRecord => run !== null
+  );
+  if (retainedRuns.some((run) => shouldAttemptReleaseCancel(run))) {
+    return false;
+  }
+  if (input.claim.merge_closeout || input.refreshFromBlockerSnapshot) {
+    return false;
+  }
+  if (!Array.isArray(input.claim.issue_blocked_by)) {
+    return false;
+  }
+  return (
+    input.claim.retry_queued !== true &&
+    (input.claim.retry_attempt ?? null) === null &&
+    (input.claim.retry_due_at ?? null) === null &&
+    (input.claim.retry_error ?? null) === null
+  );
 }
 
 function shouldProviderClaimDisqualifyAllReleasedSuppressor(

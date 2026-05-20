@@ -1,0 +1,165 @@
+---
+id: 20260520-linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63
+title: CO-571 released terminal claim reconciliation restart loop
+relates_to: docs/PRD-linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md
+risk: high
+owners:
+  - Codex
+last_review: 2026-05-20
+related_action_plan: docs/ACTION_PLAN-linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md
+task_checklists:
+  - tasks/tasks-linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md
+---
+
+# TECH_SPEC - CO-571 released terminal claim reconciliation restart loop
+
+## Canonical Reference
+- Linear issue: `CO-571` / `cdf8b078-95af-4e75-99e2-6c32fa1ecd63`
+- PRD: `docs/PRD-linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md`
+- TECH_SPEC mirror: `docs/TECH_SPEC-linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md`
+- ACTION_PLAN: `docs/ACTION_PLAN-linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md`
+- Task checklist: `tasks/tasks-linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md`
+- Agent task mirror: `.agent/task/linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md`
+- Registry: `tasks/index.json`
+- Task snapshot: `docs/TASKS.md`
+- Freshness registry: `docs/docs-freshness-registry.json`
+- Canonical owner key: `control-host:released-claim-reconcile-restart-loop`
+
+## Summary
+- Objective: repair provider refresh lifecycle classification so retained released terminal historical claims do not drive `provider_refresh_lifecycle_stuck` / `restart_required` when WIP is `0/3` and no active run/retry/worker corroboration exists.
+- Scope:
+  - released terminal historical claims in provider-intake/reconciliation state
+  - `refresh:claim_issue_by_id_reconcile` / `claim_issue_by_id:released`
+  - `refresh:claim_reconcile` / `claim_reconcile:released`
+  - terminal Done claims CO-472, CO-461, CO-451, and CO-468
+  - terminal Duplicate/canceled claims CO-469 and CO-476
+  - terminal Done claim CO-471 with `retrying=1` projection mismatch despite null retry metadata
+  - active stuck refresh behavior that must still fail closed
+- Constraints:
+  - no timeout-only fix
+  - no fabricated coherent snapshot
+  - no provider-intake manual edits
+  - no deletion of historical released claim audit evidence
+  - no weakening of genuine `provider_refresh_lifecycle_stuck` / `restart_required` signals
+
+## Issue-Shaping Contract
+- User-request translation carried forward:
+  - fix the reconciliation/classification authority, not the symptoms
+  - terminal released historical claims are not active WIP when run and retry fields are null and live issue state is terminal
+  - Done and Duplicate/canceled terminal released claims belong to the same inactive historical family
+  - status surfaces stay truthful for both terminal benign claims and real active stalls
+- Protected terms / exact artifact and surface names:
+  - `provider_refresh_lifecycle_stuck`
+  - `restart_required`
+  - `refresh:claim_issue_by_id_reconcile`
+  - `claim_issue_by_id:released`
+  - `refresh:claim_reconcile`
+  - `claim_reconcile:released`
+  - released terminal historical claims
+  - CO-472
+  - CO-461
+  - CO-469
+  - CO-471
+  - CO-476
+  - CO-451
+  - CO-468
+  - no active workers/WIP 0/3
+  - `retrying=1` projection mismatch
+  - no fabricated coherent snapshot
+  - no provider-intake manual edits
+  - `provider-intake-state.json`
+  - `co-status --format json`
+  - `/ui/data.json`
+- Nearby wrong interpretations to reject:
+  - treating endpoint timeouts as healthy
+  - clearing restart-required state for real active stalls
+  - deleting historical claims from provider intake
+  - relying on an operator restart
+  - broadening into quota hygiene, admission capacity, or all freshness-gauge behavior
+- Explicit non-goals carried forward:
+  - no manual provider-intake repair
+  - no timeout bump as the fix
+  - no disabling workers or oversight
+  - no unrelated queue-capacity or quota work
+
+## Parity / Alignment Matrix
+
+| Surface | Current Truth | Reference Truth | Target Truth | Explicitly Out Of Scope |
+| --- | --- | --- | --- | --- |
+| `claim_issue_by_id:released` | CO-472 Done and CO-469 Duplicate/canceled can be present as released historical claims. | Terminal released claims without active run/retry/worker evidence are inactive history. | They do not drive `restart_required`; they remain audit-visible. | Removing provider-intake history. |
+| `claim_reconcile:released` | CO-461 Done can be present as released historical claim reconciliation. | Terminal released claim reconciliation should not be active work. | It does not drive `restart_required` without active corroboration. | Skipping all reconciliation. |
+| Retry projection | CO-471 Done can be selected as `claim_reconcile:released` while the status count reports `retrying=1` even though selected claim retry fields are null. | Terminal released claims with null retry metadata should not themselves count as retrying work. | Selected released terminal claims are excluded from retrying projection unless separate active retry evidence exists. | Hiding separate real retrying claims. |
+| Active refresh stalls | Active claims can still stall during refresh. | Active stalls must fail closed with provider keys and phase evidence. | Active stuck path still emits `provider_refresh_lifecycle_stuck` and `restart_required`. | Treating all refresh stalls as benign. |
+| Status truth | `/ui/data.json` and `co-status --format json` can expose unhealthy or timeout states. | Operators need truthful, not fabricated, state. | Terminal released claim filtering does not fabricate healthy snapshots. | Status UI redesign. |
+
+## Readiness Gate
+- Not done if:
+  - released Done/Duplicate/Cancelled/Canceled claims can still trigger `restart_required` without active worker corroboration
+  - released terminal claims with null retry metadata can still be counted as retrying work
+  - the fix suppresses real active `provider_refresh_lifecycle_stuck`
+  - provider-intake state is manually edited or deleted
+  - status surfaces fabricate a coherent snapshot after timeout
+  - the behavior is only repaired by restarting the host
+- Pre-implementation issue-quality review evidence:
+  - 2026-05-20: live issue-context plus parent evidence show a narrow root-fix issue. The issue is not merely a timeout problem, not a provider-intake cleanup lane, and not a queue-capacity lane. The added CO-469 Duplicate/canceled case and CO-471 retry projection mismatch stay inside terminal released historical claim scope.
+- Safeguard ownership split:
+  - parent worker owns docs packet, source inspection, implementation, tests, validation, workpad, PR, and handoff
+  - no same-issue child lane is active; serial decision recorded because docs/source/tests share one classification boundary and provider admission is unstable
+
+## Technical Requirements
+1. Identify the authority that turns provider refresh/reconcile outcome into polling health and restart-required state.
+2. Classify released terminal historical claims as inactive for restart-required health when all of the following are true:
+   - claim state is released
+   - issue state/type is terminal (`completed`, `canceled`, `duplicate`, or equivalent terminal truth)
+   - active run id, launch token, and retry fields are absent
+   - no active worker/live issue corroboration says the claim is current work
+3. Preserve released historical claim audit visibility.
+4. Preserve active stuck refresh failure behavior for non-terminal or active claims.
+5. Ensure terminal released claims with null retry fields do not manufacture retrying WIP projection.
+6. Preserve status truth in `co-status --format json` and `/ui/data.json`.
+7. Avoid timeout-only changes and provider-intake manual edits.
+
+## CO-382 Fallback Decision Table
+- Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `Yes`.
+- Decision: remove the fallback where terminal released historical claim reconciliation can be mistaken for active stuck refresh health.
+- Retention decision: retain historical released claim records as a supported audit contract.
+- Large-refactor check: keep the implementation narrow unless source inspection proves restart-required authority is split across unrelated modules and needs shared classification.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Provider refresh lifecycle classification | Terminal released historical claims can escalate to active stuck refresh health. | remove fallback | CO-571 | Released terminal claim with no active run/retry/worker corroboration. | Observed 2026-05-20 | 2026-05-20 | This issue | Terminal released claims stop driving `restart_required`. | Focused released-claim regressions. |
+| Provider-intake history | Released historical claims stay retained for traceability. | justify retaining fallback | Provider-intake audit contract / CO-571 | Terminal issue release records historical claim state. | Existing behavior before CO-571 | 2026-05-20 | Non-expiring durable retention only with rationale | Separate approved audit-history redesign replaces retained claim history with equivalent source-labeled evidence. | Tests keep claims inactive without deleting evidence. |
+
+- Contract name: provider-intake released historical claim audit retention.
+- Owning surface: provider-intake state and control-host status/read models.
+- Steady-state proof: raw released claim rows remain source-labeled audit evidence, while terminal released `not_active` claims with complete cached metadata, null retry fields, and no active or cancelable retained run do not drive `restart_required` or retrying WIP.
+- Tests/docs: `ProviderIssueHandoff.test.ts` terminal released metadata-only table, active-stuck regression, `ControlRuntime.test.ts` retry projection regression, and this CO-571 packet.
+- Non-expiring rationale: retained released claim history is durable operator/audit evidence, not temporary compatibility debt; removal requires an approved archival redesign that preserves equivalent source-labeled claim/run evidence.
+
+## Acceptance Criteria
+- CO-472 Done `claim_issue_by_id:released` path is covered and benign without active corroboration.
+- CO-461 Done `claim_reconcile:released` path is covered and benign without active corroboration.
+- CO-469 Duplicate/canceled `claim_issue_by_id:released` path is covered and benign without active corroboration.
+- CO-471 Done `claim_reconcile:released` with null retry metadata is covered so the selected released claim does not manufacture retrying WIP.
+- CO-476 Duplicate/canceled `claim_issue_by_id:released` path is covered and benign without active corroboration.
+- CO-451 Done `claim_issue_by_id:released` path is covered and benign without active corroboration.
+- CO-468 Done `claim_issue_by_id:released` path is covered and benign without active corroboration.
+- A real active/stuck path still fails closed with `provider_refresh_lifecycle_stuck` / `restart_required`.
+- `co-status --format json` and `/ui/data.json` remain truthful.
+- No provider-intake manual edits or timeout-only fix is introduced.
+
+## Validation Plan
+- Focused released terminal claim tests for `claim_issue_by_id:released` and `claim_reconcile:released`.
+- Focused projection test or assertion for released terminal claims with null retry metadata.
+- Focused active stuck refresh negative test.
+- Spec guard, build, lint, test, docs checks, freshness, diff budget.
+- Pack smoke for downstream CLI/control-host surface.
+- Standalone review and elegance pass where tooling permits.
+
+## Open Questions
+- Whether the classification should be centralized in `providerIssueHandoff.ts` or exposed as a helper consumed by supervision/status projection too.
+- Whether skipped terminal released claim counts should be exposed as advisory metadata without changing host health.
+
+## Approvals
+- Reviewer: CO-571 provider worker.
+- Date: 2026-05-20.
