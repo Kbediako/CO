@@ -188,6 +188,50 @@ describe('control-plane operational drift invariants', () => {
     );
   });
 
+  it('fails closed when required task packet path slots are omitted', async () => {
+    const repoRoot = await writeFixture();
+    const config = buildValidConfig();
+    config.task_packet.paths = [config.task_packet.paths[0]];
+    await writeJson(join(repoRoot, CONFIG_PATH), config);
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'task_packet_path_count_mismatch'
+        }),
+        expect.objectContaining({
+          code: 'task_packet_required_path_missing'
+        })
+      ])
+    );
+  });
+
+  it('fails closed when the task checklist path slot is blank', async () => {
+    const repoRoot = await writeFixture();
+    const config = buildValidConfig();
+    config.task_packet.paths[4] = '';
+    await writeJson(join(repoRoot, CONFIG_PATH), config);
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'task_packet_required_path_missing',
+          path: '$.task_packet.paths[4]'
+        })
+      ])
+    );
+  });
+
   it('fails when task-index packet paths drift from the catalog', async () => {
     const repoRoot = await writeFixture({
       mutateTaskIndex(entry) {

@@ -79,6 +79,7 @@ const TASK_PACKET_INDEX_PATH_FIELDS = [
   ['task', 4],
   ['agent_task', 5]
 ];
+const TASK_PACKET_REQUIRED_PATH_COUNT = TASK_PACKET_INDEX_PATH_FIELDS.length;
 
 export async function runControlPlaneInvariants(repoRoot = process.cwd(), options = {}) {
   const absoluteRoot = resolve(repoRoot);
@@ -500,11 +501,33 @@ async function validateTaskPacket(config, input) {
   if (!registryId) {
     addFinding(input.findings, 'error', 'task_packet_registry_id_missing', 'Task packet must name registry id.', `${path}.task_registry_id`);
   }
-  const packetPaths = normalizeStringArray(packet.paths);
-  if (packetPaths.length === 0) {
+  const rawPacketPaths = Array.isArray(packet.paths) ? packet.paths : [];
+  if (rawPacketPaths.length === 0) {
     addFinding(input.findings, 'error', 'task_packet_paths_missing', 'Task packet must name packet paths.', `${path}.paths`);
   }
-  for (const packetPath of packetPaths) {
+  if (rawPacketPaths.length !== TASK_PACKET_REQUIRED_PATH_COUNT) {
+    addFinding(
+      input.findings,
+      'error',
+      'task_packet_path_count_mismatch',
+      `Task packet must list exactly ${TASK_PACKET_REQUIRED_PATH_COUNT} required paths.`,
+      `${path}.paths`
+    );
+  }
+  const packetPaths = rawPacketPaths.map((packetPath) => normalizeRepoPath(packetPath));
+  for (const [field, packetIndex] of TASK_PACKET_INDEX_PATH_FIELDS) {
+    if (!packetPaths[packetIndex]) {
+      addFinding(
+        input.findings,
+        'error',
+        'task_packet_required_path_missing',
+        `Task packet missing required ${field} path.`,
+        `${path}.paths[${packetIndex}]`
+      );
+    }
+  }
+  const declaredPacketPaths = packetPaths.filter(Boolean);
+  for (const packetPath of declaredPacketPaths) {
     await validateRepoPathExists(input.repoRoot, packetPath, input.findings, `${path}.paths`);
   }
 
@@ -529,7 +552,7 @@ async function validateTaskPacket(config, input) {
     ? input.freshnessRegistry.entries
     : [];
   const freshnessByPath = new Map(freshnessEntries.map((entry) => [entry?.path, entry]));
-  for (const packetPath of uniqueStrings([input.configRepoPath, ...packetPaths])) {
+  for (const packetPath of uniqueStrings([input.configRepoPath, ...declaredPacketPaths])) {
     const entry = freshnessByPath.get(packetPath);
     if (!entry) {
       addFinding(
