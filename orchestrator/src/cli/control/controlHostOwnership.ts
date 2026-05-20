@@ -97,6 +97,23 @@ export interface ControlHostOwnershipPollingPayload {
   owner_path: string | null;
 }
 
+export type ControlHostSourceFreshnessAction = 'restart' | 'fail_closed';
+
+export type ControlHostSourceFreshnessPolicyReason =
+  | 'stale_supervised_source_root'
+  | 'unsafe_stale_supervised_source_root';
+
+export interface ControlHostSourceFreshnessPolicy {
+  action: ControlHostSourceFreshnessAction;
+  reason: ControlHostSourceFreshnessPolicyReason;
+  updated_at: string | null;
+  status: SourceRootFreshnessInspection['status'];
+  source_checkout_status: string | null;
+  intended_checkout_status: string | null;
+  drift_classes: SourceRootFreshnessInspection['drift_classes'];
+  detail: string;
+}
+
 export interface ControlHostOwnershipHandle {
   metadata: ControlHostOwnerMetadata;
   polling: ControlHostOwnershipPollingPayload;
@@ -275,6 +292,64 @@ export function refreshControlHostOwnershipPollingPayload(
     owner: refreshControlHostOwnerSummary(payload.owner),
     ...(attemptedOwner !== undefined ? { attempted_owner: attemptedOwner } : {})
   };
+}
+
+export function resolveControlHostSourceFreshnessPolicyFromPolling(
+  value: unknown,
+  options: { refresh?: boolean } = {}
+): ControlHostSourceFreshnessPolicy | null {
+  const normalized = normalizeControlHostOwnershipPollingPayload(value);
+  return resolveControlHostSourceFreshnessPolicy(
+    options.refresh === false
+      ? normalized
+      : refreshControlHostOwnershipPollingPayload(normalized)
+  );
+}
+
+export function resolveControlHostSourceFreshnessPolicy(
+  payload: ControlHostOwnershipPollingPayload | null
+): ControlHostSourceFreshnessPolicy | null {
+  const freshness =
+    payload?.owner?.source_root_freshness ??
+    payload?.attempted_owner?.source_root_freshness ??
+    null;
+  if (!freshness || freshness.status === 'current') {
+    return null;
+  }
+  const restartSafe = isRestartSafeStaleSupervisedSourceRoot(freshness);
+  const sourceStatus = freshness.source_checkout?.status ?? null;
+  const intendedStatus = freshness.intended_checkout?.status ?? null;
+  const action: ControlHostSourceFreshnessAction = restartSafe ? 'restart' : 'fail_closed';
+  return {
+    action,
+    reason: restartSafe
+      ? 'stale_supervised_source_root'
+      : 'unsafe_stale_supervised_source_root',
+    updated_at: freshness.observed_at || null,
+    status: freshness.status,
+    source_checkout_status: sourceStatus,
+    intended_checkout_status: intendedStatus,
+    drift_classes: freshness.drift_classes,
+    detail:
+      action === 'restart'
+        ? `Supervised control-host source root is stale relative to origin/main (${freshness.detail || sourceStatus || freshness.status}); restart is bounded because the intended checkout is current and clean.`
+        : `Supervised control-host source freshness is ${freshness.status} (${freshness.detail || sourceStatus || 'unknown'}); provider-intake must fail closed until the checkout is safe to restart or the source signal returns current.`
+  };
+}
+
+function isRestartSafeStaleSupervisedSourceRoot(
+  freshness: SourceRootFreshnessInspection
+): boolean {
+  const sourceCheckout = freshness.source_checkout;
+  const intendedCheckout = freshness.intended_checkout;
+  return (
+    freshness.status === 'warning' &&
+    freshness.drift_classes.includes('supervised_source_root_drift') &&
+    sourceCheckout?.status === 'stale' &&
+    sourceCheckout.dirty.status === 'clean' &&
+    intendedCheckout?.status === 'current' &&
+    intendedCheckout.dirty.status === 'clean'
+  );
 }
 
 export async function readControlHostOwnershipDiagnosticSummary(

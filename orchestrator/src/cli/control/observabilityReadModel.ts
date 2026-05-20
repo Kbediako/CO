@@ -547,11 +547,14 @@ export interface ControlProviderIntakePayload {
 
 export type ControlProviderIntakeUnavailableReason =
   | 'raw_provider_intake_unavailable'
-  | 'raw_provider_intake_read_failed';
+  | 'raw_provider_intake_read_failed'
+  | 'stale_supervised_control_host_source';
 
 export interface ControlProviderIntakeUnavailablePayload {
   reason: ControlProviderIntakeUnavailableReason;
   updated_at: string | null;
+  action?: 'restart' | 'fail_closed' | null;
+  detail?: string | null;
 }
 
 export interface ControlStatePayload {

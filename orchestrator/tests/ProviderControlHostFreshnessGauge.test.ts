@@ -543,6 +543,73 @@ describe('provider/control-host freshness gauge', () => {
     expect(report.findings.map((finding) => finding.code)).not.toContain('claim_queue_stale');
   });
 
+  it('fails strict audit when stale supervised source still has active provider-intake claims', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'provider-freshness-stale-source-claims-'));
+    cleanupRoots.push(root);
+    const intakePath = join(root, 'provider-intake-state.json');
+    await writeFile(
+      intakePath,
+      JSON.stringify({
+        schema_version: 1,
+        updated_at: NOW,
+        polling: {
+          control_host_owner: {
+            status: 'owned',
+            updated_at: NOW,
+            owner: {
+              owner_token: 'owner-token',
+              status: 'owned',
+              pid: 123,
+              hostname: 'host.local',
+              acquired_at: NOW,
+              updated_at: NOW,
+              run_id: 'control-host',
+              run_dir: '/repo/.runs/local-mcp/cli/control-host',
+              lock_dir: '/repo/.runs/control-host-owner.lock',
+              owner_path: '/repo/.runs/control-host-owner.json',
+              source_root_freshness: {
+                schema_version: 1,
+                status: 'warning',
+                observed_at: NOW,
+                entrypoint_kind: 'bootstrap',
+                source_checkout: { status: 'stale', repo_root: '/repo', dirty: { status: 'clean' } },
+                intended_checkout: { status: 'current', repo_root: '/repo', dirty: { status: 'clean' } },
+                drift_classes: ['supervised_source_root_drift'],
+                provenance: {},
+                guidance: [],
+                detail: 'Detected source/root drift: supervised_source_root_drift.'
+              }
+            }
+          }
+        },
+        claims: [
+          {
+            state: 'resumable',
+            retry_queued: true,
+            issue_state: 'In Progress',
+            issue_state_type: 'started'
+          }
+        ]
+      })
+    );
+
+    const report = await evaluateProviderControlHostFreshnessGauge({
+      paths: { provider_intake_state: [intakePath] },
+      now: NOW,
+      strict: true
+    });
+
+    expect(report.strict_failed).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'stale_supervised_source_active_claims',
+          verdict: 'stale'
+        })
+      ])
+    );
+  });
+
   it('flags running intake claims that have no matching active worker proof', async () => {
     const report = await evaluateProviderControlHostFreshnessGauge({
       artifactRoot: join(FIXTURE_ROOT, 'missing-active-worker-proof'),

@@ -1,6 +1,8 @@
 import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 
+import { resolveControlHostSourceFreshnessPolicyFromPolling } from './controlHostOwnership.js';
+
 export const DEFAULT_CONTROL_HOST_SUPERVISION_LABEL =
   'com.kbediako.co.control-host';
 export const DEFAULT_CONTROL_HOST_SUPERVISION_TASK_ID = 'local-mcp';
@@ -147,6 +149,8 @@ export interface ControlHostSupervisionHealthEvaluation {
     | 'ok'
     | 'restart_required'
     | 'stale_restart_required'
+    | 'stale_supervised_source_root'
+    | 'stale_supervised_source_fail_closed'
     | 'active_worker_restart_quarantine'
     | 'active_worker_probe_timeout_quarantine'
     | 'invalid_payload';
@@ -438,6 +442,24 @@ export function evaluateControlHostSupervisionHealthPayload(
       healthy: true,
       reason: 'ok',
       message: 'co-status payload omitted polling state; treating it as healthy.'
+    };
+  }
+  const sourceFreshnessPolicy = resolveControlHostSourceFreshnessPolicyFromPolling(
+    polling.control_host_owner,
+    { refresh: false }
+  );
+  if (sourceFreshnessPolicy?.action === 'restart') {
+    return {
+      healthy: false,
+      reason: 'stale_supervised_source_root',
+      message: `${sourceFreshnessPolicy.detail} Supervision will request a bounded launchd restart before trusting provider-intake.`
+    };
+  }
+  if (sourceFreshnessPolicy?.action === 'fail_closed') {
+    return {
+      healthy: true,
+      reason: 'stale_supervised_source_fail_closed',
+      message: `${sourceFreshnessPolicy.detail} Restart is not attempted to avoid an unsafe restart loop.`
     };
   }
   if (polling.restart_required === true) {

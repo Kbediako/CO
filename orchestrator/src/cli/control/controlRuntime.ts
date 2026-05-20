@@ -14,7 +14,8 @@ import {
 } from './providerPollingHealth.js';
 import {
   normalizeControlHostOwnershipPollingPayload,
-  refreshControlHostOwnershipPollingPayload
+  refreshControlHostOwnershipPollingPayload,
+  resolveControlHostSourceFreshnessPolicyFromPolling
 } from './controlHostOwnership.js';
 import {
   buildProviderIntakeSummary,
@@ -544,6 +545,20 @@ function readProviderIntakeAuthorityState(
   if (context.readPersistedProviderIntakeState) {
     try {
       const state = context.readPersistedProviderIntakeState();
+      const sourceFreshnessPolicy = state
+        ? resolveProviderIntakeSourceFreshnessPolicy(state)
+        : null;
+      if (state && sourceFreshnessPolicy) {
+        return {
+          state: buildUnavailableProviderIntakeState(state),
+          unavailable: {
+            reason: 'stale_supervised_control_host_source',
+            updated_at: sourceFreshnessPolicy.updated_at,
+            action: sourceFreshnessPolicy.action,
+            detail: sourceFreshnessPolicy.detail
+          }
+        };
+      }
       if (state?.authority?.status === 'unavailable') {
         return {
           state: buildUnavailableProviderIntakeState(state),
@@ -576,6 +591,16 @@ function readProviderIntakeAuthorityState(
     state: context.providerIntakeState ?? null,
     unavailable: null
   };
+}
+
+function resolveProviderIntakeSourceFreshnessPolicy(state: ProviderIntakeState | null) {
+  if (!state?.polling || !isRecordLike(state.polling)) {
+    return null;
+  }
+  return resolveControlHostSourceFreshnessPolicyFromPolling(
+    state.polling.control_host_owner,
+    { refresh: false }
+  );
 }
 
 function buildUnavailableProviderIntakeState(state: ProviderIntakeState): ProviderIntakeState {

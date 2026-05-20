@@ -294,6 +294,47 @@ function createTerminalRetryClaim(
   };
 }
 
+function createReleasedTerminalClaim(
+  issueIdentifier: string,
+  issueId: string
+): ProviderIntakeState['claims'][number] {
+  return {
+    ...createTerminalRetryClaim(issueIdentifier, issueId),
+    state: 'released',
+    reason: 'provider_issue_released:not_active',
+    retry_queued: null,
+    retry_attempt: 0,
+    retry_due_at: null,
+    retry_error: null
+  };
+}
+
+function createControlHostOwnerPayload(repoRoot: string, sourceRootFreshness: unknown) {
+  const runDir = join(repoRoot, '.runs', 'local-mcp', 'cli', 'control-host');
+  return {
+    status: 'owned',
+    reason: null,
+    updated_at: '2026-05-18T23:08:00.000Z',
+    diagnostic_path: null,
+    lock_dir: join(repoRoot, '.runs', 'control-host-owner.lock'),
+    owner_path: join(repoRoot, '.runs', 'control-host-owner.json'),
+    owner: {
+      owner_token: 'owner-token',
+      status: 'owned',
+      pid: 123,
+      hostname: 'host.local',
+      acquired_at: '2026-05-18T22:55:00.000Z',
+      updated_at: '2026-05-18T23:08:00.000Z',
+      repo_root: repoRoot,
+      run_id: 'control-host',
+      run_dir: runDir,
+      source_root_freshness: sourceRootFreshness,
+      lock_dir: join(repoRoot, '.runs', 'control-host-owner.lock'),
+      owner_path: join(repoRoot, '.runs', 'control-host-owner.json')
+    }
+  };
+}
+
 function buildLiveLinearDispatchPilot(): Record<string, unknown> {
   return {
     dispatch_pilot: {
@@ -8286,6 +8327,83 @@ describe('ControlRuntime', () => {
       });
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it('blocks trusting persisted stale terminal retry claims before source recovery', async () => {
+    const repoRoot = await createSourceRootRepo('control-runtime-stale-authority-');
+    const startupFreshness = inspectSourceRootFreshness({
+      intendedRepoRoot: repoRoot,
+      packageRoot: repoRoot,
+      argv: ['node', join(repoRoot, 'bin', 'codex-orchestrator.ts')],
+      cwd: repoRoot,
+      now: () => '2026-05-18T22:55:00.000Z'
+    });
+    const residentHash = git(repoRoot, ['rev-parse', 'HEAD']).stdout.trim();
+    await writeFile(join(repoRoot, 'co-556-main-advance.txt'), 'main advanced\n', 'utf8');
+    git(repoRoot, ['add', '.']);
+    git(repoRoot, ['commit', '-m', 'CO-556 main advance']);
+    git(repoRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    git(repoRoot, ['reset', '--hard', residentHash]);
+    const staleOwner = refreshControlHostOwnershipPollingPayload(
+      createControlHostOwnerPayload(repoRoot, startupFreshness)
+    );
+    const providerIntakeState = createProviderIntakeState([
+      createTerminalRetryClaim('CO-512', 'lin-issue-512'),
+      createTerminalRetryClaim('CO-554', 'lin-issue-554'),
+      createTerminalRetryClaim('CO-555', 'lin-issue-555')
+    ]);
+    providerIntakeState.polling = {
+      updated_at: '2026-05-18T23:08:00.000Z',
+      restart_required: false,
+      control_host_owner: staleOwner
+    };
+    const fixture = await createFixture({
+      taskId: 'local-mcp',
+      readPersistedProviderIntakeState: () => providerIntakeState
+    });
+
+    const projection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+    expect(projection.providerIntake).toBeNull();
+    expect(projection.providerIntakeUnavailable).toMatchObject({
+      reason: 'stale_supervised_control_host_source',
+      action: 'fail_closed'
+    });
+    expect(projection.running).toEqual([]);
+    expect(projection.retrying).toEqual([]);
+  });
+
+  it('keeps post-recovery terminal claims released and out of active WIP', async () => {
+    const providerIntakeState = createProviderIntakeState([
+      createReleasedTerminalClaim('CO-512', 'lin-issue-512'),
+      createReleasedTerminalClaim('CO-554', 'lin-issue-554'),
+      createReleasedTerminalClaim('CO-555', 'lin-issue-555')
+    ]);
+    const fixture = await createFixture({
+      taskId: 'local-mcp',
+      readPersistedProviderIntakeState: () => providerIntakeState
+    });
+
+    const projection = await fixture.runtime.snapshot().readCompatibilityProjection();
+
+    expect(projection.providerIntakeUnavailable).toBeNull();
+    expect(projection.providerIntake).toMatchObject({
+      active_claim_count: 0,
+      running_claim_count: 0
+    });
+    expect(projection.running).toEqual([]);
+    expect(projection.retrying).toEqual([]);
+    for (const claim of providerIntakeState.claims) {
+      expect(claim).toMatchObject({
+        state: 'released',
+        reason: 'provider_issue_released:not_active',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        retry_queued: null,
+        retry_due_at: null,
+        retry_error: null
+      });
     }
   });
 
