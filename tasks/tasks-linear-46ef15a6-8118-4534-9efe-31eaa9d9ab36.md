@@ -69,8 +69,8 @@
 - [x] `npm run repo:stewardship`. Evidence: OK, 6662 tracked files, 0 action-required.
 - [x] `node scripts/diff-budget.mjs`. Evidence: passed with CO-552 override; current working-tree scope 2 files / 40 lines, advisory stacked branch aggregate 13 files / 2307 lines.
 - [x] `npm run pack:smoke`. Evidence: passed; downstream mock review retained expected smoke-only `semantic review verdict: unknown` inside the pack smoke fixture.
-- [ ] Manifest-backed standalone review with clean semantic verdict or explicit governed waiver.
-- [ ] Explicit elegance/minimality pass.
+- [x] Manifest-backed standalone review with clean semantic verdict or explicit governed waiver. Evidence: `.runs/linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36/cli/2026-05-20T10-16-29-473Z-490a82a3/review/telemetry.json` reported `review_verdict=clean`, `contract_validation.status=valid`, `contract_overall_verdict=clean`.
+- [x] Explicit elegance/minimality pass. Evidence: reviewed final branch scope against `origin/main`; retained one catalog, one checker script, one focused test file, docs-gate wiring, and task/registry mirrors, with no extra dependencies or retained temporary fallback.
 - [ ] PR attached and `codex-orchestrator pr ready-review --pr <number> --quiet-minutes <window>` clean before review-state handoff.
 
 ## Progress Log

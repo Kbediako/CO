@@ -26,24 +26,25 @@
         }
       },
       "validation": {
-        "status": "implementation_in_progress",
+        "status": "review_ready_pending_pr_drain",
         "passed": [
           "live issue-context",
           "Ready -> In Progress transition",
           "single workpad created",
           "parallelization decision recorded",
-          "packet-docs child lane launched",
+          "packet-docs child lane launched and accepted",
+          "docs-review findings addressed or routed to follow-up",
           "control-plane invariant catalog created",
           "control-plane invariant checker implemented",
-          "focused invariant checker tests passed"
+          "focused invariant checker tests passed",
+          "required provider-worker validation floor passed",
+          "manifest-backed standalone review returned clean semantic and contract verdicts",
+          "explicit elegance/minimality pass completed"
         ],
         "pending": [
-          "packet-docs child lane acceptance",
-          "docs-review",
-          "full validation floor",
-          "standalone review",
-          "elegance pass",
-          "PR attachment and ready-review drain"
+          "PR attachment",
+          "ready-review drain",
+          "Linear review-state handoff"
         ]
       },
       "evidence": [
