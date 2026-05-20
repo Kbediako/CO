@@ -1,0 +1,215 @@
+{
+  "schema_id": "codex.control-plane.operational-drift-invariants",
+  "schema_version": 1,
+  "owner": "CO-552",
+  "updated_at": "2026-05-20",
+  "canonical_owner_key": "co-control-plane:recurring-operational-drift:invariants:v1",
+  "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=co-control-plane:recurring-operational-drift:invariants:v1",
+  "task_packet": {
+    "task_registry_id": "20260520-linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36",
+    "expected_task_status": "in_progress",
+    "paths": [
+      "docs/PRD-linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md",
+      "docs/TECH_SPEC-linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md",
+      "docs/ACTION_PLAN-linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md",
+      "tasks/specs/linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md",
+      "tasks/tasks-linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md",
+      ".agent/task/linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md"
+    ]
+  },
+  "task_spec_lifecycle": {
+    "canonical_state_source": "tasks/index.json items[].status plus docs/docs-freshness-registry lifecycle_state",
+    "states": [
+      "active",
+      "blocked",
+      "terminal",
+      "archived",
+      "reopened"
+    ],
+    "terminal": {
+      "excluded_from": [
+        "active_freshness_cap",
+        "fallback_expiry",
+        "provider_worker_blocking"
+      ]
+    },
+    "reopen_requires": [
+      "live Linear transition or issue-context evidence",
+      "tasks/index.json status change to a nonterminal state",
+      "docs/docs-freshness-registry lifecycle_state reset to active",
+      "fresh review evidence before provider-worker handoff"
+    ]
+  },
+  "guard_contracts": [
+    {
+      "id": "spec_guard",
+      "dry_run": {
+        "selector_engine": "spec-guard-task-packet-lifecycle-v1",
+        "rule_engine": "spec-guard-rule-set-v1",
+        "validation_semantics": "full",
+        "writes": false
+      },
+      "non_dry": {
+        "selector_engine": "spec-guard-task-packet-lifecycle-v1",
+        "rule_engine": "spec-guard-rule-set-v1",
+        "validation_semantics": "full",
+        "writes": true
+      },
+      "tests": [
+        "tests/spec-guard.spec.ts",
+        "tests/docs-freshness.spec.ts",
+        "tests/docs-freshness-maintain.spec.ts"
+      ]
+    },
+    {
+      "id": "docs_freshness",
+      "dry_run": {
+        "selector_engine": "docs-freshness-registry-lifecycle-v1",
+        "rule_engine": "docs-freshness-rule-set-v1",
+        "validation_semantics": "full",
+        "writes": false
+      },
+      "non_dry": {
+        "selector_engine": "docs-freshness-registry-lifecycle-v1",
+        "rule_engine": "docs-freshness-rule-set-v1",
+        "validation_semantics": "full",
+        "writes": true
+      },
+      "tests": [
+        "tests/docs-freshness.spec.ts",
+        "tests/docs-freshness-maintain.spec.ts"
+      ]
+    }
+  ],
+  "fallback_refactor_metadata": {
+    "parser": "schema_validated",
+    "required_fields": [
+      "surface",
+      "fallback",
+      "decision",
+      "owner",
+      "trigger",
+      "introduced_date",
+      "review_date",
+      "maximum_lifetime",
+      "removal_condition",
+      "validation"
+    ],
+    "fail_closed_inputs": [
+      "prose_only",
+      "markdown_table_variant",
+      "missing_owner",
+      "expired_without_review"
+    ]
+  },
+  "desired_state_reconciler": {
+    "domains": [
+      {
+        "id": "wip_cap",
+        "authority": "live Linear state plus provider-intake claim state after terminal issue exclusion",
+        "drift_action": "report_or_repair"
+      },
+      {
+        "id": "process_lease",
+        "authority": "lease metadata keyed by Linear issue, run id, host, pid, and expiry",
+        "drift_action": "surface_or_reap_expired_owned"
+      },
+      {
+        "id": "goal_duplication",
+        "authority": "Linear issue lease with advisory goal evidence subordinate to the live issue",
+        "drift_action": "fail_closed"
+      },
+      {
+        "id": "shared_root_branch",
+        "authority": "git shared-root branch/status read",
+        "drift_action": "surface_before_done_or_merge"
+      },
+      {
+        "id": "stale_worker_branch",
+        "authority": "worker branch plus Linear issue lifecycle",
+        "drift_action": "surface_or_reap_after_terminal"
+      },
+      {
+        "id": "review",
+        "authority": "current PR head SHA and semantic review verdict",
+        "drift_action": "invalidate_stale_or_unknown"
+      },
+      {
+        "id": "linear_relation_label",
+        "authority": "live Linear labels and relations from GraphQL",
+        "drift_action": "repair_or_fail"
+      }
+    ]
+  },
+  "codex_review_automation": {
+    "keyed_by": "pr_head_sha",
+    "new_head_invalidates_approval": true,
+    "manual_trigger_idempotency": "once_per_head_sha",
+    "state_fields": [
+      "current_head_sha",
+      "approval_state",
+      "finding_state",
+      "manual_trigger_attempts"
+    ]
+  },
+  "linear_hygiene": {
+    "builds_on": [
+      "CO-509",
+      "CO-538"
+    ],
+    "creation_requires_live_label_ids": true,
+    "reconciler_verifies_live_relations": true
+  },
+  "review_workflow": {
+    "checks": [
+      "original_spec",
+      "coding_standards",
+      "required_code_changes",
+      "creating_agent_loop"
+    ],
+    "proposal_classes": [
+      "code_change_proposals",
+      "agent_loop_proposals"
+    ]
+  },
+  "status_monitor": {
+    "dimensions": [
+      "issue_state",
+      "goal_state",
+      "process_agent_state",
+      "branch_posture",
+      "review_state",
+      "gate_state"
+    ],
+    "goal_policy": {
+      "max_active_goals_per_linear_issue": 1,
+      "overlap_detection": "fail_closed"
+    }
+  },
+  "child_workstreams": [
+    {
+      "id": "canonical_task_spec_lifecycle",
+      "owner_surface": "docs freshness and spec guard"
+    },
+    {
+      "id": "guard_contract",
+      "owner_surface": "spec guard, docs freshness, and fallback metadata parsers"
+    },
+    {
+      "id": "desired_state_reconciler",
+      "owner_surface": "control host status, provider intake, process leases, goals, and branches"
+    },
+    {
+      "id": "sha_bound_review",
+      "owner_surface": "Codex review automation and ready-review"
+    },
+    {
+      "id": "linear_hygiene",
+      "owner_surface": "create-follow-up and live Linear reconciler, linked to CO-509 and CO-538"
+    },
+    {
+      "id": "review_quality",
+      "owner_surface": "standalone review contract and agent-loop proposal routing"
+    }
+  ]
+}
