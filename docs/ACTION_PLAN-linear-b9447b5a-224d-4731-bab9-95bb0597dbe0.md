@@ -2,7 +2,7 @@
 
 ## Summary
 - Goal: Replace terminal `CO-522` as the live `docs:freshness:maintain` owner and clear the May 19 freshness maintenance blockers with source-specific evidence.
-- Scope: Owner metadata, cohort guide, docs packet, registry/index mirrors, May 19 historical cohort routing, pre-expiry review metadata, validation, and review handoff.
+- Scope: Owner metadata, cohort guide, docs packet, registry/index mirrors, May 19 and May 20 historical cohort routing, pre-expiry review metadata, validation, and review handoff.
 - Assumptions: CO-558 is the intended same-project non-terminal owner for canonical owner key `docs:freshness:maintain`; CO-515 remains out of scope.
 
 ## Issue Readiness Gate
@@ -15,6 +15,7 @@
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `docs:freshness:maintain` | May 19 owner-routed historical docs freshness cohort | `expire fallback` | `CO-558` | Terminal `CO-522` plus May 19 stale `.agent/task`, task packet, and report-only rows | 2026-05-19 | 2026-05-19 | 2026-05-25 | Refresh, archive, or reclassify the cohort before expiry; re-home again if `CO-558` becomes terminal | `npm run docs:freshness`; `npm run docs:freshness:maintain`; `node scripts/spec-guard.mjs --dry-run`; `npm run docs:check` |
+| `docs:freshness:maintain` | May 20 owner-routed Apr 19 task/report cohort | `expire fallback` | `CO-558` | Apr 19 task mirror, task packet, and report-only rows entered the rolling maintenance window while `CO-558` remained live owner | 2026-05-20 | 2026-05-20 | 2026-05-26 | Refresh, archive, or reclassify the cohort before expiry; re-home again if `CO-558` becomes terminal | `npm run docs:freshness`; `npm run docs:freshness:maintain`; `node scripts/spec-guard.mjs --dry-run`; `npm run docs:check` |
 
 Large-refactor check: Existing owner verification and canonical owner action evidence are sufficient; this lane repairs live metadata and cohort evidence rather than adding another owner-resolution seam.
 Minor-seam decision: The retained cohort stays inside the existing owner-routed maintenance mechanism with a short expiry, so no additional seam is introduced.
@@ -28,8 +29,10 @@ Minor-seam decision: The retained cohort stays inside the existing owner-routed 
    - Update `docs/docs-catalog.json` live owner from terminal `CO-522` to `CO-558`.
    - Update `docs/guides/docs-freshness-cohorts.md` with May 19 evidence and CO-558 rolling disposition.
    - Re-home/declare or refresh the Apr 18 `.agent/task`, task packet, and report-only cohort without hiding stale evidence.
+   - Re-home/declare the May 20 Apr 19 task mirror, task packet, and report-only cohort without hiding stale evidence.
 3. Pre-expiry direct review
    - Review `.agent/task/templates/codex-cli-release-intake-template.md`, `skills/agent-first-adoption-steering/SKILL.md`, `skills/long-poll-wait/SKILL.md`, and spec pre-expiry rows.
+   - Review `docs/book/**`, `skills/README.md`, and the May 20 active spec pre-expiry rows before changing freshness metadata.
    - Update only backed review metadata and record evidence.
 4. Validation and handoff
    - Run `npm run docs:freshness`, `npm run docs:freshness:maintain`, `node scripts/spec-guard.mjs --dry-run`, `npm run docs:check`.
@@ -58,3 +61,4 @@ Minor-seam decision: The retained cohort stays inside the existing owner-routed 
 ## Approvals
 - Reviewer: Pending.
 - Date: 2026-05-19.
+- May 20 update: current-main verification added the Apr 19 rolling cohort and refreshed reviewed public/skill/spec pre-expiry metadata under the same CO-558 owner.

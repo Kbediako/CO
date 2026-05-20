@@ -7,7 +7,7 @@ owners:
   - Codex
 status: in_progress
 created: 2026-05-19
-last_review: 2026-05-19
+last_review: 2026-05-20
 review_cadence_days: 30
 canonical_owner_marker: codex-orchestrator:canonical-owner-key=docs:freshness:maintain
 ---
@@ -16,7 +16,7 @@ canonical_owner_marker: codex-orchestrator:canonical-owner-key=docs:freshness:ma
 
 ## Summary
 - Objective: Replace terminal `CO-522` with non-terminal same-project `CO-558` as the usable docs freshness maintenance owner and clear the May 19 maintenance blockers without weakening docs freshness gates.
-- Scope: Docs freshness owner metadata, cohort guide, CO-558 docs-first packet, task/index mirrors, freshness registry metadata for reviewed pre-expiry rows, and preserved evidence reports.
+- Scope: Docs freshness owner metadata, cohort guide, CO-558 docs-first packet, task/index mirrors, freshness registry metadata for reviewed pre-expiry rows, May 19/May 20 rolling cohorts, and preserved evidence reports.
 - Constraints: No CO-515 implementation changes; no blind `last_review` bumps; no stale-doc deletion; no cap/window expansion; no owner-verification code changes unless fresh evidence proves metadata-only repair cannot satisfy the issue.
 
 ## Issue-Shaping Contract
@@ -31,6 +31,7 @@ canonical_owner_marker: codex-orchestrator:canonical-owner-key=docs:freshness:ma
 | --- | --- | --- | --- | --- |
 | `rolling_freshness_cohorts.owner_issue` | `CO-522`, terminal `Done`. | Terminal owners fail closed. | `CO-558`, live same-project non-terminal. | Reopening `CO-522`. |
 | Apr 18 historical cohort | 131 stale rows, no changed-path blockers. | Historical rows can be owner-routed only with explicit rolling/lifecycle evidence. | May 19 cohort is declared or refreshed under CO-558 while remaining visible in reports. | Deleting packet files. |
+| Apr 19 historical cohort | 68 stale rows reached the rolling window on May 20 with `blocking_changed_paths=[]`. | The existing owner must route new date-boundary cohorts without creating duplicate owners. | May 20 cohort is declared under CO-558 while remaining visible in reports. | Broad cap/window changes or blind refreshes. |
 | Pre-expiry skills/templates/specs | Direct-action rows are inside the review window. | Current docs/specs require real review evidence. | Updated review metadata names CO-558 evidence and keeps content current. | Metadata-only churn. |
 | CO-515 source issue | Source of follow-up evidence. | CO-515 owns control-host source freshness only. | CO-558 owns repo-wide docs freshness maintenance. | CO-515 implementation edits. |
 
@@ -55,6 +56,7 @@ canonical_owner_marker: codex-orchestrator:canonical-owner-key=docs:freshness:ma
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `docs:freshness:maintain` | Retained rolling ownership for May 19 historical docs freshness cohort | expire fallback | CO-558 | Terminal `CO-522` plus May 19 stale historical cohort | 2026-05-19 | 2026-05-19 | 7 days after cadence expiry, expires 2026-05-25 | Refresh, archive, or reclassify cohort before expiry; re-home again if CO-558 becomes terminal | Before/after `docs:freshness:maintain`, `docs:freshness`, `spec-guard --dry-run`, `docs:check` |
+| `docs:freshness:maintain` | Retained rolling ownership for May 20 Apr 19 task/report cohort | expire fallback | CO-558 | Apr 19 task mirror, task packet, and report-only rows entered the rolling maintenance window while CO-558 remained live owner | 2026-05-20 | 2026-05-20 | 7 days after cadence expiry, expires 2026-05-26 | Refresh, archive, or reclassify cohort before expiry; re-home again if CO-558 becomes terminal | Before/after `docs:freshness:maintain`, `docs:freshness`, `spec-guard --dry-run`, `docs:check` |
 
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? Yes.
 - Large-refactor check: A larger refactor is not selected because existing owner verification already detects terminal owners and emits canonical owner actions; current failure is live owner metadata plus cohort disposition.
