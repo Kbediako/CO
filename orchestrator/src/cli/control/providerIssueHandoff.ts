@@ -61,7 +61,12 @@ import {
   readProviderPollingHealth,
   recordProviderPollingProgress
 } from './providerPollingHealth.js';
-import { resolveControlHostSourceFreshnessPolicyFromPolling } from './controlHostOwnership.js';
+import {
+  normalizeControlHostOwnershipPollingPayload,
+  refreshControlHostOwnershipPollingPayload,
+  resolveControlHostAuthoritativeSourceFreshness,
+  resolveControlHostSourceFreshnessPolicyFromPolling
+} from './controlHostOwnership.js';
 import type { ProviderWorkflowConfigStore } from './providerWorkflowConfigStore.js';
 import {
   cloneProviderWorkerHostConfigs,
@@ -578,10 +583,32 @@ export function createProviderIssueHandoffService(
     const lifecycleScope = refreshLifecycleScope.getStore();
     return Boolean(lifecycleScope && lifecycleScope.epoch !== refreshLifecycleEpoch);
   };
-  const resolveProviderHandoffSourceFreshnessPolicy = () =>
-    resolveControlHostSourceFreshnessPolicyFromPolling(
+  const resolveProviderHandoffSourceFreshnessPolicy = () => {
+    const liveControlHostOwner =
+      readProviderPollingHealth(providerIssueHandoffService)?.control_host_owner ??
+      null;
+    if (liveControlHostOwner) {
+      const refreshedLiveOwner = refreshControlHostOwnershipPollingPayload(
+        normalizeControlHostOwnershipPollingPayload(liveControlHostOwner)
+      );
+      const livePolicy = resolveControlHostSourceFreshnessPolicyFromPolling(
+        refreshedLiveOwner,
+        { refresh: false }
+      );
+      const liveFreshness = resolveControlHostAuthoritativeSourceFreshness(refreshedLiveOwner);
+      if (livePolicy || isAuthoritativeProviderHandoffLiveControlHostFreshness(liveFreshness)) {
+        return livePolicy;
+      }
+    }
+    return resolveControlHostSourceFreshnessPolicyFromPolling(
       options.state.polling?.control_host_owner
     );
+  };
+  const isAuthoritativeProviderHandoffLiveControlHostFreshness = (
+    freshness: ReturnType<typeof resolveControlHostAuthoritativeSourceFreshness>
+  ): boolean =>
+    freshness?.status === 'current' ||
+    (freshness?.status === 'warning' && freshness.drift_classes.length > 0);
   const resolveProviderHandoffSourceFreshnessAbortReason = (): string | null =>
     resolveProviderHandoffSourceFreshnessPolicy()
       ? PROVIDER_STALE_SUPERVISED_SOURCE_REASON
@@ -3971,26 +3998,6 @@ export function createProviderIssueHandoffService(
         accepted_at: existing?.accepted_at ?? null
       };
 
-      const sourceFreshnessPolicy = resolveProviderHandoffSourceFreshnessPolicy();
-      if (sourceFreshnessPolicy) {
-        const claim = await upsertProviderClaimAndPersist({
-          ...claimBase,
-          task_id: existing?.task_id ?? taskId,
-          mapping_source: existing?.mapping_source ?? mappingSource,
-          state: 'ignored',
-          reason: PROVIDER_STALE_SUPERVISED_SOURCE_REASON,
-          run_id: existing?.run_id ?? null,
-          run_manifest_path: existing?.run_manifest_path ?? null,
-          worker_host: existing?.worker_host ?? null,
-          launch_source: null,
-          launch_token: null,
-          review_promotion: null,
-          merge_closeout: null,
-          ...clearProviderRetryFields()
-        });
-        return { kind: 'ignored', reason: PROVIDER_STALE_SUPERVISED_SOURCE_REASON, claim };
-      }
-
       if (existing?.state === 'released') {
         const discoveredReleasedRuns = await discoverProviderIssueRunsForCurrentOperation({
           provider: 'linear',
@@ -4249,6 +4256,26 @@ export function createProviderIssueHandoffService(
           run_manifest_path: existing?.run_manifest_path ?? null,
         });
         return { kind: 'ignored', reason: eligibility.claimReason, claim };
+      }
+
+      const sourceFreshnessPolicy = resolveProviderHandoffSourceFreshnessPolicy();
+      if (sourceFreshnessPolicy) {
+        const claim = await upsertProviderClaimAndPersist({
+          ...claimBase,
+          task_id: existing?.task_id ?? taskId,
+          mapping_source: existing?.mapping_source ?? mappingSource,
+          state: 'ignored',
+          reason: PROVIDER_STALE_SUPERVISED_SOURCE_REASON,
+          run_id: existing?.run_id ?? null,
+          run_manifest_path: existing?.run_manifest_path ?? null,
+          worker_host: existing?.worker_host ?? null,
+          launch_source: null,
+          launch_token: null,
+          review_promotion: null,
+          merge_closeout: null,
+          ...clearProviderRetryFields()
+        });
+        return { kind: 'ignored', reason: PROVIDER_STALE_SUPERVISED_SOURCE_REASON, claim };
       }
 
       if (existing && eligibility.claimReason === 'provider_issue_handoff_owned') {

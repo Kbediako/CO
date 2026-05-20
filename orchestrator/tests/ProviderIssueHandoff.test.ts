@@ -32,6 +32,7 @@ import {
   type ProviderIntakeState
 } from '../src/cli/control/providerIntakeState.js';
 import {
+  initializeProviderPollingHealth,
   markProviderPollingCompleted,
   readProviderPollingHealth,
   markProviderPollingStarted,
@@ -915,6 +916,128 @@ describe('createProviderIssueHandoffService', () => {
       retry_error: null
     });
     expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps terminal release precedence while stale supervised source is authoritative', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.polling = { control_host_owner: createStaleSupervisedControlHostOwner() };
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-1',
+      task_id: 'linear-lin-issue-1',
+      state: 'running',
+      reason: 'provider_issue_run_already_active',
+      run_id: 'run-terminal-while-stale',
+      run_manifest_path: join(paths.runDir, 'run-terminal-while-stale.json'),
+      launch_source: 'control-host',
+      launch_token: 'terminal-while-stale-token',
+      retry_queued: true,
+      retry_attempt: 2,
+      retry_due_at: '2026-03-19T04:30:10.000Z',
+      retry_error: 'retryable failure pending terminal release'
+    }));
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-04-14T09:30:00.000Z'
+      }),
+      deliveryId: 'delivery-terminal-stale-source',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_361_800_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_released:not_active',
+      claim: {
+        provider_key: 'linear:lin-issue-1',
+        state: 'released',
+        reason: 'provider_issue_released:not_active',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        retry_queued: null,
+        retry_attempt: null,
+        retry_due_at: null,
+        retry_error: null
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses live recovered owner freshness before stale persisted polling for direct starts', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.polling = { control_host_owner: createStaleSupervisedControlHostOwner() };
+    const liveRepoRoot = await createSourceRootRepo('provider-handoff-live-current-authority-');
+    const liveOwner = createControlHostOwnerForRepo(
+      liveRepoRoot,
+      inspectSourceRootFreshness({
+        intendedRepoRoot: liveRepoRoot,
+        packageRoot: liveRepoRoot,
+        argv: ['node', join(liveRepoRoot, 'bin', 'codex-orchestrator.ts')],
+        cwd: liveRepoRoot,
+        now: () => '2026-05-18T23:20:00.000Z'
+      })
+    );
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+    initializeProviderPollingHealth(service, {
+      intervalMs: 15_000,
+      controlHostOwner: liveOwner,
+      skipInitialUpdate: true
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue(),
+      deliveryId: 'delivery-live-owner-recovered',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_000_000
+    });
+
+    expect(result.kind).toBe('start');
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-1',
+      issueId: 'lin-issue-1',
+      issueIdentifier: 'CO-2'
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      provider_key: 'linear:lin-issue-1',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    });
   });
 
   it('recovers a specific issue through the control-host handoff path with launch-token truth', async () => {
