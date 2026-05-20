@@ -1,6 +1,98 @@
 {
   "items": [
     {
+      "id": "20260520-linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36",
+      "title": "CO-552 enforce recurring operational drift invariants",
+      "relates_to": "tasks/tasks-linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-20",
+      "canonical_owner_key": "co-control-plane:recurring-operational-drift:invariants:v1",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-20",
+          "status": "confirmed_in_progress",
+          "summary": "Live issue-context verified CO-552 was Ready with no attached PR and no workpad; parent transitioned it to In Progress before active coding."
+        },
+        "parallelization": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-20",
+          "status": "parallelize_now_recorded",
+          "summary": "Pre-turn matrix identified a safe docs-only packet child lane while parent retained invariant catalog, checker, registry, tests, and validation ownership."
+        }
+      },
+      "validation": {
+        "status": "implementation_in_progress",
+        "passed": [
+          "live issue-context",
+          "Ready -> In Progress transition",
+          "single workpad created",
+          "parallelization decision recorded",
+          "packet-docs child lane launched",
+          "control-plane invariant catalog created",
+          "control-plane invariant checker implemented",
+          "focused invariant checker tests passed"
+        ],
+        "pending": [
+          "packet-docs child lane acceptance",
+          "docs-review",
+          "full validation floor",
+          "standalone review",
+          "elegance pass",
+          "PR attachment and ready-review drain"
+        ]
+      },
+      "evidence": [
+        "docs/PRD-linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md",
+        "docs/TECH_SPEC-linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md",
+        "docs/ACTION_PLAN-linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md",
+        "tasks/specs/linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md",
+        "tasks/tasks-linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md",
+        ".agent/task/linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md",
+        "docs/control-plane-invariants.json",
+        "scripts/control-plane-invariants.mjs",
+        "tests/control-plane-invariants.spec.ts",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "paths": {
+        "agent_task": ".agent/task/linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md",
+        "prd": "docs/PRD-linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md",
+        "docs": "docs/TECH_SPEC-linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md",
+        "action_plan": "docs/ACTION_PLAN-linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md",
+        "spec": "tasks/specs/linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md",
+        "task": "tasks/tasks-linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md"
+      },
+      "source_issue": {
+        "id": "46ef15a6-8118-4534-9efe-31eaa9d9ab36",
+        "identifier": "CO-552",
+        "url": "https://linear.app/asabeko/issue/CO-552/co-enforce-recurring-operational-drift-invariants"
+      },
+      "related_issues": [
+        {
+          "identifier": "CO-543",
+          "relation": "source recurrence owner"
+        },
+        {
+          "identifier": "CO-509",
+          "relation": "narrower Linear label/relation owner"
+        },
+        {
+          "identifier": "CO-538",
+          "relation": "narrower live post-mutation label verification owner"
+        },
+        {
+          "identifier": "CO-548",
+          "relation": "desired-state dispatch/recovery candidate"
+        }
+      ]
+    },
+    {
       "id": "20260513-linear-5417819d-738d-4e72-ab1a-4085149ed737",
       "title": "CO-518 Codex CLI 0.130.0 release-intake",
       "relates_to": "tasks/tasks-linear-5417819d-738d-4e72-ab1a-4085149ed737.md",
