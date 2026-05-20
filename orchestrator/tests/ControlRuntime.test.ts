@@ -8699,10 +8699,15 @@ describe('ControlRuntime', () => {
       createTerminalRetryClaim('CO-554', 'lin-issue-554'),
       createTerminalRetryClaim('CO-555', 'lin-issue-555')
     ]);
+    const persistedOwner = createControlHostOwnerPayload(repoRoot, startupFreshness);
+    if (!persistedOwner.owner) {
+      throw new Error('Expected persisted control-host owner test payload.');
+    }
+    persistedOwner.owner.owner_token = 'persisted-owner-token';
     providerIntakeState.polling = {
       updated_at: '2026-05-18T23:08:00.000Z',
       restart_required: false,
-      control_host_owner: createControlHostOwnerPayload(repoRoot, startupFreshness)
+      control_host_owner: persistedOwner
     };
     const runtime = createControlRuntime({
       controlStore: fixture.controlStore,
@@ -8718,7 +8723,17 @@ describe('ControlRuntime', () => {
     expect(compatibilityProjection.providerIntake).toBeNull();
     expect(compatibilityProjection.providerIntakeUnavailable).toMatchObject({
       reason: 'stale_supervised_control_host_source',
-      action: 'fail_closed'
+      updated_at: '2026-05-18T23:08:00.000Z',
+      action: 'fail_closed',
+      detail: expect.stringContaining('provider-intake must fail closed')
+    });
+    expect(providerIntakeState.polling.control_host_owner).toMatchObject({
+      owner: { owner_token: 'persisted-owner-token' }
+    });
+    expect(compatibilityProjection.polling).toMatchObject({
+      control_host_owner: {
+        owner: { owner_token: 'live-owner-missing-freshness-token' }
+      }
     });
     expect(compatibilityProjection.running).toEqual([]);
     expect(compatibilityProjection.retrying).toEqual([]);

@@ -317,6 +317,7 @@ export function resolveControlHostSourceFreshnessPolicy(
 ): ControlHostSourceFreshnessPolicy | null {
   const freshness = resolveControlHostAuthoritativeSourceFreshness(payload);
   if (
+    !payload ||
     !freshness ||
     freshness.status === 'current' ||
     !freshness.drift_classes.includes('supervised_source_root_drift')
@@ -327,12 +328,16 @@ export function resolveControlHostSourceFreshnessPolicy(
   const sourceStatus = freshness.source_checkout?.status ?? null;
   const intendedStatus = freshness.intended_checkout?.status ?? null;
   const action: ControlHostSourceFreshnessAction = restartSafe ? 'restart' : 'fail_closed';
+  const updatedAt =
+    payload.status === 'owned'
+      ? payload.updated_at || freshness.observed_at || null
+      : freshness.observed_at || payload.updated_at || null;
   return {
     action,
     reason: restartSafe
       ? 'stale_supervised_source_root'
       : 'unsafe_stale_supervised_source_root',
-    updated_at: freshness.observed_at || null,
+    updated_at: updatedAt,
     status: freshness.status,
     source_checkout_status: sourceStatus,
     intended_checkout_status: intendedStatus,
