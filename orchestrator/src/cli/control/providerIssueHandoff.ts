@@ -3855,6 +3855,22 @@ export function createProviderIssueHandoffService(
             if (isProviderIssuePollFailClosedReason(resolution.reason)) {
               return;
             }
+            if (isProviderStaleSupervisedSourceReason(resolution.reason)) {
+              const staleSourceSnapshot = captureProviderStateSnapshot();
+              upsertProviderIntakeClaim(options.state, {
+                ...claim,
+                state: 'ignored',
+                reason: PROVIDER_STALE_SUPERVISED_SOURCE_REASON,
+                launch_source: null,
+                launch_token: null,
+                review_promotion: null,
+                merge_closeout: null,
+                ...clearProviderRetryFields()
+              });
+              await persistStateOrRollback(staleSourceSnapshot, { rollbackOnPersistFailure: false });
+              options.publishRuntime?.('provider-intake.refresh');
+              return;
+            }
             const retrySkipSnapshot = captureProviderStateSnapshot();
             upsertProviderIntakeClaim(options.state, {
               ...claim,
@@ -9631,6 +9647,10 @@ function shouldReleaseCachedPendingRevalidationHandoffClaim(
 
 function isProviderIssuePollFailClosedReason(reason: string | null | undefined): boolean {
   return typeof reason === 'string' && reason.startsWith('provider_issue_poll_cached_');
+}
+
+function isProviderStaleSupervisedSourceReason(reason: string | null | undefined): boolean {
+  return reason === PROVIDER_STALE_SUPERVISED_SOURCE_REASON;
 }
 
 function shouldSuppressFreshDiscoveryForPollFailClosedReason(
