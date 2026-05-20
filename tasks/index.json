@@ -244,7 +244,7 @@
         "Codex"
       ],
       "status": "validation_green_review_rerun_pending",
-      "last_review": "2026-05-19",
+      "last_review": "2026-05-20",
       "canonical_owner_key": "docs:freshness:maintain",
       "approvals": {
         "issue_context": {
@@ -284,6 +284,23 @@
             "docs_freshness": "out/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/after-action-plan-fix/docs-freshness.json"
           },
           "summary": "docs:freshness, docs:freshness:maintain, spec-guard dry-run, and docs:check passed after resolving review findings CO558-REVIEW-002, CO558-REVIEW-003, and CO558-REVIEW-004."
+        },
+        "may20_owner_window_refresh": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-20",
+          "status": "validation_green_review_rerun_pending",
+          "reports": {
+            "docs_freshness": "out/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/2026-05-20-verification/docs-freshness-after-active-spec-disposition.json",
+            "docs_freshness_maintain": "out/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/2026-05-20-verification/docs-freshness-maintenance-after-active-spec-disposition.json"
+          },
+          "summary": "Current-main refresh keeps CO-558 as the live non-terminal docs:freshness:maintain owner, adds the Apr 19 task/report cohort as owner-backed rolling debt through 2026-05-26, refreshes reviewed public/skill pre-expiry rows, records terminal frontmatter plus active reviewed registry metadata for completed spec rows that are not archive-ready, and preserves stale/pre-expiry evidence without weakening freshness gates; spec-guard remains strict for active fallback/seam changes while inactive completed specs are excluded from live fallback evidence-source parsing."
+        },
+        "standalone_review_20260520": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-20",
+          "status": "findings_addressed_rerun_pending",
+          "telemetry": ".runs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/cli/2026-05-20T05-42-16-678Z-149a19d9/review/telemetry.json",
+          "summary": "May 20 reruns reported CO558-REVIEW-001 for stale task-index wording and CO558-REVIEW-REGISTRY-001 / CO558-CODE-001 for completed spec row disposition. The task-index wording is fixed; archive-stub audit proved archived registry status is invalid while linked historical checklists remain open, so the rows now retain active reviewed registry metadata plus explicit lifecycle notes and terminal spec frontmatter. A fresh clean review rerun remains required before handoff."
         }
       },
       "validation": {
@@ -299,14 +316,23 @@
           "May 19 stale cohort policy evidence documented",
           "21 reviewed active spec rows mirrored in docs/docs-freshness-registry.json",
           "CO-558 packet expiry mirrors aligned to 2026-05-25",
+          "May 20 Apr 19 task/report cohort registered as CO-558-owned rolling evidence",
+          "six strict public/skill pre-expiry rows reviewed and refreshed",
+          "twelve completed spec pre-expiry rows marked with terminal frontmatter and active reviewed registry metadata",
+          "inactive completed spec fallback evidence-source handling covered in tests/spec-guard.spec.ts",
           "npm run docs:freshness",
           "npm run docs:freshness:maintain",
           "node scripts/spec-guard.mjs --dry-run",
           "npm run docs:check",
-          "git diff --check and git diff --cached --check"
+          "npx vitest run --config vitest.config.core.ts tests/spec-guard.spec.ts",
+          "focused docs-freshness-maintain regression",
+          "diff-budget",
+          "git diff --check",
+          "docs:archive-stub-check via npm run docs:check",
+          "archive-stub audit rejected invalid archive disposition and active reviewed metadata was retained"
         ],
         "pending": [
-          "clean standalone review after review-finding fixes",
+          "clean standalone review rerun after CO558-REVIEW-001 fix",
           "elegance pass before PR handoff",
           "PR attachment and ready-review drain before review-state transition"
         ]
@@ -320,7 +346,9 @@
         "agent_task": ".agent/task/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
         "policy_doc": "docs/guides/docs-freshness-cohorts.md",
         "catalog": "docs/docs-catalog.json",
-        "registry": "docs/docs-freshness-registry.json"
+        "registry": "docs/docs-freshness-registry.json",
+        "spec_guard": "scripts/spec-guard.mjs",
+        "spec_guard_tests": "tests/spec-guard.spec.ts"
       },
       "source_issue": {
         "id": "b9447b5a-224d-4731-bab9-95bb0597dbe0",
@@ -5421,7 +5449,8 @@
         "task": "tasks/tasks-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
         "agent_task": ".agent/task/linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
         "docs": "docs/TECH_SPEC-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260427-linear-c8e3a464-ec50-4fa4-aff5-d8a780626600",
@@ -5447,7 +5476,8 @@
         "task": "tasks/tasks-linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",
         "agent_task": ".agent/task/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",
         "docs": "tasks/specs/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260427-linear-f04ab1c2-79e6-4a98-84e1-85efb6583116",
@@ -5471,7 +5501,8 @@
         "task": "tasks/tasks-linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md",
         "agent_task": ".agent/task/linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md",
         "docs": "docs/TECH_SPEC-linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260427-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba",
@@ -5496,7 +5527,8 @@
         "task": "tasks/tasks-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
         "agent_task": ".agent/task/linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
         "docs": "docs/TECH_SPEC-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260427-linear-5ef45396-4546-4699-9d4a-c69fb9179868",
@@ -5524,7 +5556,8 @@
           "TECH_SPEC": "docs/TECH_SPEC-linear-5ef45396-4546-4699-9d4a-c69fb9179868.md",
           "ACTION_PLAN": "docs/ACTION_PLAN-linear-5ef45396-4546-4699-9d4a-c69fb9179868.md"
         }
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260427-linear-e6039710-4596-45b2-a268-53bfa3cb2ac9",
@@ -5564,7 +5597,8 @@
         "task": "tasks/tasks-linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md",
         "agent_task": ".agent/task/linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md",
         "docs": "docs/TECH_SPEC-linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260427-linear-86da539a-e106-44d9-87ea-759281a00a81",
@@ -5591,7 +5625,8 @@
         "task": "tasks/tasks-linear-86da539a-e106-44d9-87ea-759281a00a81.md",
         "agent_task": ".agent/task/linear-86da539a-e106-44d9-87ea-759281a00a81.md",
         "docs": "docs/TECH_SPEC-linear-86da539a-e106-44d9-87ea-759281a00a81.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260426-linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f",
@@ -15477,7 +15512,8 @@
         "task": "tasks/tasks-linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md",
         "agent_task": ".agent/task/linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md",
         "docs": "docs/TECH_SPEC-linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260327-linear-da290822-55a2-4794-8caa-3a6f1d9c3eff",
@@ -15501,7 +15537,8 @@
         "task": "tasks/tasks-linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md",
         "agent_task": ".agent/task/linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md",
         "docs": "docs/TECH_SPEC-linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260327-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29",
@@ -15524,7 +15561,8 @@
         "task": "tasks/tasks-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md",
         "agent_task": ".agent/task/linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md",
         "docs": "docs/TECH_SPEC-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260327-linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8",
@@ -15547,7 +15585,8 @@
         "task": "tasks/tasks-linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md",
         "agent_task": ".agent/task/linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md",
         "docs": "docs/TECH_SPEC-linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260326-linear-df2bd49b-2dd6-413f-8d90-af40d033dace",
@@ -25878,7 +25917,8 @@
         "task": "tasks/tasks-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md",
         "agent_task": ".agent/task/linear-fd05f8a0-420a-4313-a462-690881c0a45c.md",
         "docs": "docs/TECH_SPEC-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md"
-      }
+      },
+      "notes": {}
     },
     {
       "id": "20260501-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc",
@@ -26149,6 +26189,54 @@
         "url": "https://linear.app/asabeko/issue/CO-565/co-codex-cli-01310-release-intake-and-posture-audit"
       },
       "canonical_owner_key": "codex-cli-release-intake:stable:0.131.0"
+    },
+    {
+      "id": "20260520-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5",
+      "title": "CO-566 recover Ready resumable provider claims without dispatch-pilot admission",
+      "relates_to": "tasks/tasks-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-20",
+      "evidence": [
+        "docs/PRD-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "docs/TECH_SPEC-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "docs/ACTION_PLAN-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "tasks/specs/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "tasks/tasks-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        ".agent/task/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5-docs-packet/cli/2026-05-20T03-01-24-615Z-49668b4b/manifest.json",
+        ".runs/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5-docs-packet/cli/2026-05-20T03-01-24-615Z-49668b4b/provider-linear-child-lane.patch"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet plus parent provider worker",
+          "date": "2026-05-20",
+          "status": "accepted_for_parent_integration",
+          "manifest": ".runs/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5-docs-packet/cli/2026-05-20T03-01-24-615Z-49668b4b/manifest.json",
+          "canonical_owner_key": "provider-intake:ready-resumable-recover-dispatch-source-disabled:v1",
+          "summary": "Docs-only child lane bootstrapped the six-file CO-566 Ready resumable recovery packet; parent verified and accepted the patch for integration before implementation."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "task": "tasks/tasks-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "agent_task": ".agent/task/linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "prd": "docs/PRD-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "docs": "docs/TECH_SPEC-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md",
+        "action_plan": "docs/ACTION_PLAN-linear-b30c4be7-d186-490e-863b-8ba57a6cb9a5.md"
+      },
+      "source_issue": {
+        "id": "b30c4be7-d186-490e-863b-8ba57a6cb9a5",
+        "identifier": "CO-566",
+        "url": "https://linear.app/asabeko/issue/CO-566/co-recover-ready-resumable-provider-claims-without-dispatch-pilot"
+      },
+      "canonical_owner_key": "provider-intake:ready-resumable-recover-dispatch-source-disabled:v1"
     }
   ]
 }
