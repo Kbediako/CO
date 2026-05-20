@@ -5346,13 +5346,6 @@
           "manifest": ".runs/linear-0354e9d0-84ee-4340-b098-a9c685c191b5-docs-packet/cli/2026-04-27T22-50-44-356Z-a52c0442/manifest.json",
           "source_anchor": "ctx:sha256:8a1f02bd0b920d84556735df068c45fe3589da12378e6e372eb5e56aa7ae2b12#chunk:c000001",
           "summary": "Docs-first packet created for CO-404 from parent-provided issue context only. The referenced source payload path was absent in this child checkout. The packet preserves timeout-after-launch and accepted-without-run variants, requires prompt acknowledged queued/starting metadata after accepted recover/relaunch/nudge actions, preserves retry idempotency, and requires accepted pending-revalidation rows without run or launch token to stay out of running/starting capacity."
-        },
-        "spec_lifecycle_audit_20260520": {
-          "reviewer": "CO-558 provider worker",
-          "date": "2026-05-20",
-          "status": "done",
-          "evidence": ".runs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/cli/2026-05-20T05-42-16-678Z-149a19d9/provider-linear-issue-context-cache-0354e9d0-84ee-4340-b098-a9c685c191b5.json",
-          "summary": "Cached live Linear issue-context recorded this issue in Done/completed. Reclassify the task packet docs as archived instead of refreshing legacy fallback/spec files, preserving lifecycle evidence without weakening docs freshness or spec-guard."
         }
       },
       "paths": {
@@ -5360,9 +5353,7 @@
         "task": "tasks/tasks-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
         "agent_task": ".agent/task/linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md",
         "docs": "docs/TECH_SPEC-linear-0354e9d0-84ee-4340-b098-a9c685c191b5.md"
-      },
-      "status": "done",
-      "completed_at": null
+      }
     },
     {
       "id": "20260427-linear-c8e3a464-ec50-4fa4-aff5-d8a780626600",
@@ -5381,13 +5372,6 @@
           "source_anchor": "ctx:sha256:2891fad4a006dbd008954246bf08d58e33dc4da0c33723f4e2d3006f7d4bbbc3#chunk:c000001",
           "summary": "Docs-first packet created for CO-403 from embedded issue text only. The packet preserves parallelize_now enforcement, shapes retry recovery for lineage-bound completed same-issue child lanes pending parent acceptance, requires stale orphaned provider-linear-worker-proof.json.lock recovery through explicit stale timeout and live-lock keepalive, and keeps proof/co-status recovered state truthful without folding in unrelated CO-400 current-state authority work.",
           "evidence": ".runs/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600-co403-docs-review-rerun/cli/2026-04-27T16-13-51-159Z-7639081b/manifest.json"
-        },
-        "spec_lifecycle_audit_20260520": {
-          "reviewer": "CO-558 provider worker",
-          "date": "2026-05-20",
-          "status": "done",
-          "evidence": ".runs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/cli/2026-05-20T05-42-16-678Z-149a19d9/provider-linear-issue-context-cache-c8e3a464-ec50-4fa4-aff5-d8a780626600.json",
-          "summary": "Cached live Linear issue-context recorded this issue in Done/completed. Reclassify the task packet docs as archived instead of refreshing legacy fallback/spec files, preserving lifecycle evidence without weakening docs freshness or spec-guard."
         }
       },
       "paths": {
@@ -5395,9 +5379,7 @@
         "task": "tasks/tasks-linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",
         "agent_task": ".agent/task/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md",
         "docs": "tasks/specs/linear-c8e3a464-ec50-4fa4-aff5-d8a780626600.md"
-      },
-      "status": "done",
-      "completed_at": null
+      }
     },
     {
       "id": "20260427-linear-f04ab1c2-79e6-4a98-84e1-85efb6583116",
@@ -5414,13 +5396,6 @@
           "date": "2026-04-27",
           "status": "produced",
           "summary": "Docs-first packet created for CO-398 while the issue remains in Backlog. The packet applies CO-382 fallback-expiry discipline to control-host status surfaces, requires the parent lane to inventory legacy proof fields, selected-run projection fallback, compatibility issue projection fallback, and CLI/API/UI status source authority, and forces each retained path to choose remove fallback, expire fallback, or justify retaining fallback before implementation."
-        },
-        "spec_lifecycle_audit_20260520": {
-          "reviewer": "CO-558 provider worker",
-          "date": "2026-05-20",
-          "status": "done",
-          "evidence": ".runs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/cli/2026-05-20T05-42-16-678Z-149a19d9/provider-linear-issue-context-cache-f04ab1c2-79e6-4a98-84e1-85efb6583116.json",
-          "summary": "Cached live Linear issue-context recorded this issue in Done/completed. Reclassify the task packet docs as archived instead of refreshing legacy fallback/spec files, preserving lifecycle evidence without weakening docs freshness or spec-guard."
         }
       },
       "paths": {
@@ -5428,9 +5403,7 @@
         "task": "tasks/tasks-linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md",
         "agent_task": ".agent/task/linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md",
         "docs": "docs/TECH_SPEC-linear-f04ab1c2-79e6-4a98-84e1-85efb6583116.md"
-      },
-      "status": "done",
-      "completed_at": null
+      }
     },
     {
       "id": "20260427-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba",
@@ -5448,13 +5421,6 @@
           "status": "produced",
           "summary": "Docs-first packet created for CO-397 while the issue remains in Backlog. The packet applies CO-382 fallback-expiry discipline to docs freshness ownership, requires rolling_freshness_cohorts.owner_issue to resolve to a live same-project non-terminal owner before owned rolling debt is usable, removes the unsafe configured-owner-only fallback, and preserves docs:freshness:maintain as the canonical owner recovery key for intentional docs/docs-catalog.json re-home guidance.",
           "evidence": ".runs/linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba-docs-review/cli/2026-04-27T05-57-23-653Z-e3863a70/manifest.json"
-        },
-        "spec_lifecycle_audit_20260520": {
-          "reviewer": "CO-558 provider worker",
-          "date": "2026-05-20",
-          "status": "done",
-          "evidence": ".runs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/cli/2026-05-20T05-42-16-678Z-149a19d9/provider-linear-issue-context-cache-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.json",
-          "summary": "Cached live Linear issue-context recorded this issue in Done/completed. Reclassify the task packet docs as archived instead of refreshing legacy fallback/spec files, preserving lifecycle evidence without weakening docs freshness or spec-guard."
         }
       },
       "paths": {
@@ -5462,9 +5428,7 @@
         "task": "tasks/tasks-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
         "agent_task": ".agent/task/linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md",
         "docs": "docs/TECH_SPEC-linear-3b516fb7-dd94-4ca6-abb9-81edf906a1ba.md"
-      },
-      "status": "done",
-      "completed_at": null
+      }
     },
     {
       "id": "20260427-linear-5ef45396-4546-4699-9d4a-c69fb9179868",
@@ -5481,13 +5445,6 @@
           "date": "2026-04-27",
           "status": "prepared",
           "summary": "Docs-first traceability packet created for CO-396 while the issue remains in Backlog. The packet preserves runtime-routing protected terms, classifies appserver auto reroute and implicit cloud/default appserver coercion as expiring runtime-routing fallbacks, justifies strict cloud/appserver blocked metadata, runtime fallback aliases, RuntimeFallbackMetadata, and runtime-mode canary scenarios as durable contracts, and keeps runtime_fallback distinct from cloud_fallback plus required cloud canary semantics."
-        },
-        "spec_lifecycle_audit_20260520": {
-          "reviewer": "CO-558 provider worker",
-          "date": "2026-05-20",
-          "status": "done",
-          "evidence": ".runs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/cli/2026-05-20T05-42-16-678Z-149a19d9/provider-linear-issue-context-cache-5ef45396-4546-4699-9d4a-c69fb9179868.json",
-          "summary": "Cached live Linear issue-context recorded this issue in Done/completed. Reclassify the task packet docs as archived instead of refreshing legacy fallback/spec files, preserving lifecycle evidence without weakening docs freshness or spec-guard."
         }
       },
       "paths": {
@@ -5499,9 +5456,7 @@
           "TECH_SPEC": "docs/TECH_SPEC-linear-5ef45396-4546-4699-9d4a-c69fb9179868.md",
           "ACTION_PLAN": "docs/ACTION_PLAN-linear-5ef45396-4546-4699-9d4a-c69fb9179868.md"
         }
-      },
-      "status": "done",
-      "completed_at": null
+      }
     },
     {
       "id": "20260427-linear-e6039710-4596-45b2-a268-53bfa3cb2ac9",
@@ -5534,13 +5489,6 @@
           "date": "2026-04-27",
           "status": "approved",
           "summary": "CO-401 remains a freshness baseline repair lane, not CO-390 release-detector work. Current-main reproduction shows 30 stale docs, blocking_changed_paths=[], and CO-343 owner verification failure; stale metadata updates are allowed only after reviewing the five affected Mar 27 packets."
-        },
-        "spec_lifecycle_audit_20260520": {
-          "reviewer": "CO-558 provider worker",
-          "date": "2026-05-20",
-          "status": "done",
-          "evidence": ".runs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/cli/2026-05-20T05-42-16-678Z-149a19d9/provider-linear-issue-context-cache-e6039710-4596-45b2-a268-53bfa3cb2ac9.json",
-          "summary": "Cached live Linear issue-context recorded this issue in Done/completed. Reclassify the task packet docs as archived instead of refreshing legacy fallback/spec files, preserving lifecycle evidence without weakening docs freshness or spec-guard."
         }
       },
       "paths": {
@@ -5548,9 +5496,7 @@
         "task": "tasks/tasks-linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md",
         "agent_task": ".agent/task/linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md",
         "docs": "docs/TECH_SPEC-linear-e6039710-4596-45b2-a268-53bfa3cb2ac9.md"
-      },
-      "status": "done",
-      "completed_at": null
+      }
     },
     {
       "id": "20260427-linear-86da539a-e106-44d9-87ea-759281a00a81",
@@ -5570,13 +5516,6 @@
           "source_anchor": "ctx:sha256:2ad735bd7603aa57616c6fa318ee89a796462b103bed9568d6fd16928618bd1e#chunk:c000001",
           "child_source_anchor": "ctx:sha256:77c98bad7ca4cfe8e5367dc6eb6e20c1d9eff50fc4338300073a8c74303bb730#chunk:c000001",
           "summary": "Docs-first packet accepted from same-issue child lane and reconciled by the parent after rebasing onto current origin/main. Current main contains docs/guides/fallback-expiry-and-refactor-policy.md from CO-382, so CO-395 treats that policy as authoritative and records concrete remove fallback / expire fallback / justify retaining fallback decisions for review-wrapper scoped prompt retry, synthesized title fallback, generated fallback notes, bounded-review contracts, and telemetry classification."
-        },
-        "spec_lifecycle_audit_20260520": {
-          "reviewer": "CO-558 provider worker",
-          "date": "2026-05-20",
-          "status": "done",
-          "evidence": ".runs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/cli/2026-05-20T05-42-16-678Z-149a19d9/provider-linear-issue-context-cache-86da539a-e106-44d9-87ea-759281a00a81.json",
-          "summary": "Cached live Linear issue-context recorded this issue in Done/completed. Reclassify the task packet docs as archived instead of refreshing legacy fallback/spec files, preserving lifecycle evidence without weakening docs freshness or spec-guard."
         }
       },
       "paths": {
@@ -5584,9 +5523,7 @@
         "task": "tasks/tasks-linear-86da539a-e106-44d9-87ea-759281a00a81.md",
         "agent_task": ".agent/task/linear-86da539a-e106-44d9-87ea-759281a00a81.md",
         "docs": "docs/TECH_SPEC-linear-86da539a-e106-44d9-87ea-759281a00a81.md"
-      },
-      "status": "done",
-      "completed_at": null
+      }
     },
     {
       "id": "20260426-linear-b7074b86-3d38-4dfe-baa9-73b2cc8d686f",
@@ -15465,13 +15402,6 @@
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-03-27",
           "manifest": ".runs/linear-e913b2ab-2be9-4891-bf54-0ac4642ba012/cli/2026-03-27T04-05-05-788Z-e1ccb243/manifest.json"
-        },
-        "spec_lifecycle_audit_20260520": {
-          "reviewer": "CO-558 provider worker",
-          "date": "2026-05-20",
-          "status": "done",
-          "evidence": ".runs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/cli/2026-05-20T05-42-16-678Z-149a19d9/provider-linear-issue-context-cache-e913b2ab-2be9-4891-bf54-0ac4642ba012.json",
-          "summary": "Cached live Linear issue-context recorded this issue in Done/completed. Reclassify the task packet docs as archived instead of refreshing legacy fallback/spec files, preserving lifecycle evidence without weakening docs freshness or spec-guard."
         }
       },
       "paths": {
@@ -15479,9 +15409,7 @@
         "task": "tasks/tasks-linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md",
         "agent_task": ".agent/task/linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md",
         "docs": "docs/TECH_SPEC-linear-e913b2ab-2be9-4891-bf54-0ac4642ba012.md"
-      },
-      "status": "done",
-      "completed_at": null
+      }
     },
     {
       "id": "20260327-linear-da290822-55a2-4794-8caa-3a6f1d9c3eff",
@@ -15498,13 +15426,6 @@
           "override_reason": "guard stages passed; review drift override",
           "date": "2026-03-27",
           "manifest": ".runs/linear-da290822-55a2-4794-8caa-3a6f1d9c3eff-docs-review/cli/2026-03-27T07-59-26-687Z-b3902cf6/manifest.json"
-        },
-        "spec_lifecycle_audit_20260520": {
-          "reviewer": "CO-558 provider worker",
-          "date": "2026-05-20",
-          "status": "done",
-          "evidence": ".runs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/cli/2026-05-20T05-42-16-678Z-149a19d9/provider-linear-issue-context-cache-da290822-55a2-4794-8caa-3a6f1d9c3eff.json",
-          "summary": "Cached live Linear issue-context recorded this issue in Done/completed. Reclassify the task packet docs as archived instead of refreshing legacy fallback/spec files, preserving lifecycle evidence without weakening docs freshness or spec-guard."
         }
       },
       "paths": {
@@ -15512,9 +15433,7 @@
         "task": "tasks/tasks-linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md",
         "agent_task": ".agent/task/linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md",
         "docs": "docs/TECH_SPEC-linear-da290822-55a2-4794-8caa-3a6f1d9c3eff.md"
-      },
-      "status": "done",
-      "completed_at": null
+      }
     },
     {
       "id": "20260327-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29",
@@ -15530,13 +15449,6 @@
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-03-26",
           "manifest": ".runs/linear-488135bf-954e-4bd9-be7a-ad09d75f5f29-docs-review/cli/2026-03-26T17-01-25-241Z-fdf9c459/manifest.json"
-        },
-        "spec_lifecycle_audit_20260520": {
-          "reviewer": "CO-558 provider worker",
-          "date": "2026-05-20",
-          "status": "done",
-          "evidence": ".runs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/cli/2026-05-20T05-42-16-678Z-149a19d9/provider-linear-issue-context-cache-488135bf-954e-4bd9-be7a-ad09d75f5f29.json",
-          "summary": "Cached live Linear issue-context recorded this issue in Done/completed. Reclassify the task packet docs as archived instead of refreshing legacy fallback/spec files, preserving lifecycle evidence without weakening docs freshness or spec-guard."
         }
       },
       "paths": {
@@ -15544,9 +15456,7 @@
         "task": "tasks/tasks-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md",
         "agent_task": ".agent/task/linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md",
         "docs": "docs/TECH_SPEC-linear-488135bf-954e-4bd9-be7a-ad09d75f5f29.md"
-      },
-      "status": "done",
-      "completed_at": null
+      }
     },
     {
       "id": "20260327-linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8",
@@ -15562,13 +15472,6 @@
           "reviewer": "codex-orchestrator docs-review",
           "date": "2026-03-26",
           "manifest": ".runs/linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8/cli/2026-03-26T14-48-08-884Z-c36eacd1/manifest.json"
-        },
-        "spec_lifecycle_audit_20260520": {
-          "reviewer": "CO-558 provider worker",
-          "date": "2026-05-20",
-          "status": "done",
-          "evidence": ".runs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/cli/2026-05-20T05-42-16-678Z-149a19d9/provider-linear-issue-context-cache-964ca955-cf9b-4d1b-887b-4d3bb49069d8.json",
-          "summary": "Cached live Linear issue-context recorded this issue in Done/completed. Reclassify the task packet docs as archived instead of refreshing legacy fallback/spec files, preserving lifecycle evidence without weakening docs freshness or spec-guard."
         }
       },
       "paths": {
@@ -15576,9 +15479,7 @@
         "task": "tasks/tasks-linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md",
         "agent_task": ".agent/task/linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md",
         "docs": "docs/TECH_SPEC-linear-964ca955-cf9b-4d1b-887b-4d3bb49069d8.md"
-      },
-      "status": "done",
-      "completed_at": null
+      }
     },
     {
       "id": "20260326-linear-df2bd49b-2dd6-413f-8d90-af40d033dace",
@@ -25902,13 +25803,6 @@
           "date": "2026-04-27",
           "status": "produced",
           "summary": "Docs-first packet created for CO-399 while the issue remains in Backlog. The packet applies CO-382 fallback-expiry and large-refactor policy to repo guards, defines a smallest parseable contract across PRD, TECH_SPEC, ACTION_PLAN, and task checklist, requires touched fallback/seam behavior to choose remove fallback, expire fallback, or justify retaining fallback, and preserves CO-394 through CO-398 as owner references instead of absorbing their cleanup scope."
-        },
-        "spec_lifecycle_audit_20260520": {
-          "reviewer": "CO-558 provider worker",
-          "date": "2026-05-20",
-          "status": "done",
-          "evidence": ".runs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/cli/2026-05-20T05-42-16-678Z-149a19d9/provider-linear-issue-context-cache-fd05f8a0-420a-4313-a462-690881c0a45c.json",
-          "summary": "Cached live Linear issue-context recorded this issue in Done/completed. Reclassify the task packet docs as archived instead of refreshing legacy fallback/spec files, preserving lifecycle evidence without weakening docs freshness or spec-guard."
         }
       },
       "paths": {
@@ -25916,9 +25810,7 @@
         "task": "tasks/tasks-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md",
         "agent_task": ".agent/task/linear-fd05f8a0-420a-4313-a462-690881c0a45c.md",
         "docs": "docs/TECH_SPEC-linear-fd05f8a0-420a-4313-a462-690881c0a45c.md"
-      },
-      "status": "done",
-      "completed_at": null
+      }
     },
     {
       "id": "20260501-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc",
