@@ -57,6 +57,48 @@ describe('control-plane operational drift invariants', () => {
     );
   });
 
+  it('fails closed when non-dry guard mode is not write-capable', async () => {
+    const repoRoot = await writeFixture({
+      mutateConfig(config) {
+        config.guard_contracts[0].non_dry.writes = false;
+      }
+    });
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'guard_non_dry_writes_disabled'
+        })
+      ])
+    );
+  });
+
+  it('fails closed when a required guard contract id is missing', async () => {
+    const repoRoot = await writeFixture({
+      mutateConfig(config) {
+        config.guard_contracts = config.guard_contracts.filter((contract) => contract.id !== 'docs_freshness');
+      }
+    });
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'guard_contract_id_missing'
+        })
+      ])
+    );
+  });
+
   it('rejects prose-only fallback metadata contracts', async () => {
     const repoRoot = await writeFixture({
       mutateConfig(config) {
@@ -117,6 +159,30 @@ describe('control-plane operational drift invariants', () => {
         expect.objectContaining({
           code: 'freshness_registry_entry_missing',
           message: expect.stringContaining(CONFIG_PATH)
+        })
+      ])
+    );
+  });
+
+  it('fails closed when a required child workstream id is missing', async () => {
+    const repoRoot = await writeFixture({
+      mutateConfig(config) {
+        const workstream = config.child_workstreams.find((entry) => entry.id === 'sha_bound_review');
+        if (workstream) {
+          workstream.id = 'review_cache_cleanup';
+        }
+      }
+    });
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'child_workstream_id_missing'
         })
       ])
     );
@@ -283,6 +349,22 @@ function buildValidConfig() {
           writes: true
         },
         tests: ['tests/spec-guard.spec.ts']
+      },
+      {
+        id: 'docs_freshness',
+        dry_run: {
+          selector_engine: 'docs-freshness-selector-v1',
+          rule_engine: 'docs-freshness-rules-v1',
+          validation_semantics: 'full',
+          writes: false
+        },
+        non_dry: {
+          selector_engine: 'docs-freshness-selector-v1',
+          rule_engine: 'docs-freshness-rules-v1',
+          validation_semantics: 'full',
+          writes: true
+        },
+        tests: ['tests/docs-freshness.spec.ts']
       }
     ],
     fallback_refactor_metadata: {

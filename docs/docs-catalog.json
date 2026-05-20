@@ -993,6 +993,25 @@
         "task archive automation changes"
       ],
       "truth_checks": []
+    },
+    {
+      "path": "docs/control-plane-invariants.json",
+      "status": "active",
+      "tier": 2,
+      "doc_class": "active_guide",
+      "audience": "contributors and maintainers",
+      "source_of_truth": [
+        "tasks/specs/linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md",
+        "scripts/control-plane-invariants.mjs"
+      ],
+      "owner": "Codex (top-level agent), Review agent",
+      "cadence_days": 30,
+      "update_triggers": [
+        "control-plane invariant contract changes",
+        "guard selector or rule changes",
+        "status monitor authority changes"
+      ],
+      "truth_checks": []
     }
   ],
   "patterns": [

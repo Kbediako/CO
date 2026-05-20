@@ -14,6 +14,7 @@ const REQUIRED_TERMINAL_EXCLUSIONS = [
   'fallback_expiry',
   'provider_worker_blocking'
 ];
+const REQUIRED_GUARD_CONTRACT_IDS = ['spec_guard', 'docs_freshness'];
 const REQUIRED_FALLBACK_FIELDS = [
   'surface',
   'fallback',
@@ -61,6 +62,14 @@ const REQUIRED_STATUS_DIMENSIONS = [
   'branch_posture',
   'review_state',
   'gate_state'
+];
+const REQUIRED_CHILD_WORKSTREAM_IDS = [
+  'canonical_task_spec_lifecycle',
+  'guard_contract',
+  'desired_state_reconciler',
+  'sha_bound_review',
+  'linear_hygiene',
+  'review_quality'
 ];
 const TASK_PACKET_INDEX_PATH_FIELDS = [
   ['prd', 0],
@@ -247,6 +256,13 @@ function validateGuardContracts(contracts, findings) {
     addFinding(findings, 'error', 'guard_contracts_missing', 'At least one guard contract is required.', path);
     return;
   }
+  requireIncludes({
+    findings,
+    path,
+    code: 'guard_contract_id_missing',
+    values: normalizeStringArray(contracts.map((contract) => contract?.id)),
+    required: REQUIRED_GUARD_CONTRACT_IDS
+  });
   for (const [index, contract] of contracts.entries()) {
     const contractPath = `${path}[${index}]`;
     if (!isRecord(contract)) {
@@ -283,6 +299,15 @@ function validateGuardContracts(contracts, findings) {
         'guard_dry_run_writes_enabled',
         'Guard dry-run mode must skip writes only.',
         `${contractPath}.dry_run.writes`
+      );
+    }
+    if (nonDry.writes !== true) {
+      addFinding(
+        findings,
+        'error',
+        'guard_non_dry_writes_disabled',
+        'Guard non-dry mode must be write-capable so dry-run skips writes only.',
+        `${contractPath}.non_dry.writes`
       );
     }
     if (!Array.isArray(contract.tests) || contract.tests.length === 0) {
@@ -450,6 +475,13 @@ function validateChildWorkstreams(workstreams, findings) {
     addFinding(findings, 'error', 'child_workstreams_missing', 'All six proposed child workstreams must be represented.', path);
     return;
   }
+  requireIncludes({
+    findings,
+    path,
+    code: 'child_workstream_id_missing',
+    values: normalizeStringArray(workstreams.map((workstream) => workstream?.id)),
+    required: REQUIRED_CHILD_WORKSTREAM_IDS
+  });
   for (const [index, workstream] of workstreams.entries()) {
     if (!isRecord(workstream) || !readNonEmptyString(workstream.id) || !readNonEmptyString(workstream.owner_surface)) {
       addFinding(findings, 'error', 'child_workstream_shape_invalid', 'Child workstream must name id and owner_surface.', `${path}[${index}]`);
