@@ -31054,6 +31054,500 @@ describe('createProviderIssueHandoffService', () => {
     expect(publishRuntime).toHaveBeenCalledWith('provider-intake.refresh');
   });
 
+  it.each([
+    {
+      issueIdentifier: 'CO-472',
+      issueId: '590e4e09-315a-4957-bb72-66b8322e86a6',
+      issueState: 'Done',
+      issueStateType: 'completed',
+      issueUpdatedAt: '2026-05-01T16:23:55.508Z',
+      runId: '2026-05-01T14-48-18-011Z-90e4d82c'
+    },
+    {
+      issueIdentifier: 'CO-461',
+      issueId: '8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc',
+      issueState: 'Done',
+      issueStateType: 'completed',
+      issueUpdatedAt: '2026-05-01T19:04:11.848Z',
+      runId: '2026-05-01T16-20-48-963Z-a1971f7c'
+    },
+    {
+      issueIdentifier: 'CO-469',
+      issueId: 'e1ecc66e-4733-4b89-8030-f626607e0284',
+      issueState: 'Duplicate',
+      issueStateType: 'canceled',
+      issueUpdatedAt: '2026-05-01T04:52:36.414Z',
+      runId: null
+    },
+    {
+      issueIdentifier: 'CO-471',
+      issueId: '93f80950-06e5-41f2-9186-f4877e69f563',
+      issueState: 'Done',
+      issueStateType: 'completed',
+      issueUpdatedAt: '2026-05-06T18:49:49.740Z',
+      runId: null
+    },
+    {
+      issueIdentifier: 'CO-476',
+      issueId: 'd7000137-f984-4275-85a0-dc5c14f09e64',
+      issueState: 'Duplicate',
+      issueStateType: 'canceled',
+      issueUpdatedAt: '2026-05-06T02:35:21.133Z',
+      runId: null
+    },
+    {
+      issueIdentifier: 'CO-451',
+      issueId: 'a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7',
+      issueState: 'Done',
+      issueStateType: 'completed',
+      issueUpdatedAt: '2026-05-01T22:43:20.878Z',
+      runId: '2026-05-01T16-41-57-405Z-39b1234f'
+    },
+    {
+      issueIdentifier: 'CO-468',
+      issueId: '6d7e842c-b10a-42f5-a7e0-8a30a8dd9442',
+      issueState: 'Done',
+      issueStateType: 'completed',
+      issueUpdatedAt: '2026-05-02T13:18:10.272Z',
+      runId: '2026-05-02T12-19-43-274Z-d95c88ea'
+    }
+  ])(
+    'keeps released terminal historical $issueIdentifier refresh metadata-only when a current poll snapshot exists',
+    async ({ issueIdentifier, issueId, issueState, issueStateType, issueUpdatedAt, runId }) => {
+      const { root, paths } = await createHostPaths();
+      const taskId = `linear-${issueId}`;
+      let runManifestPath: string | null = null;
+      if (runId) {
+        const runPaths = resolveRunPaths(
+          {
+            repoRoot: root,
+            runsRoot: join(root, '.runs'),
+            outRoot: join(root, 'out'),
+            taskId
+          },
+          runId
+        );
+        await mkdir(runPaths.runDir, { recursive: true });
+        await writeFile(
+          runPaths.manifestPath,
+          JSON.stringify({
+            run_id: runId,
+            task_id: taskId,
+            pipeline_id: 'provider-linear-worker',
+            status: 'succeeded',
+            issue_provider: 'linear',
+            issue_id: issueId,
+            issue_identifier: issueIdentifier,
+            issue_updated_at: issueUpdatedAt,
+            completed_at: '2026-05-01T17:10:00.000Z',
+            updated_at: '2026-05-01T17:10:00.000Z'
+          }),
+          'utf8'
+        );
+        runManifestPath = runPaths.manifestPath;
+      }
+      const state = createProviderIntakeState();
+      state.claims.push(createCo202ReleasedClaim({
+        issue_id: issueId,
+        issue_identifier: issueIdentifier,
+        issue_title: `${issueIdentifier} terminal released historical claim`,
+        issue_state: issueState,
+        issue_state_type: issueStateType,
+        issue_updated_at: issueUpdatedAt,
+        issue_blocked_by: [],
+        task_id: taskId,
+        run_id: runId,
+        run_manifest_path: runManifestPath,
+        retry_queued: null,
+        retry_attempt: null,
+        retry_due_at: null,
+        retry_error: null
+      }));
+
+      const persist = vi.fn(async () => undefined);
+      const launcher = createCo202Launcher(
+        `run-${issueIdentifier.toLowerCase()}-should-not-start`,
+        `/tmp/provider-run/${issueIdentifier.toLowerCase()}-should-not-start-manifest.json`
+      );
+      const resolveTrackedIssue = vi.fn(async () => {
+        throw new Error(`${issueIdentifier} terminal released claim should not use direct issue-by-id`);
+      });
+      const resolveTrackedIssues = vi.fn(async () => ({
+        kind: 'ready' as const,
+        trackedIssues: []
+      }));
+
+      const service = createProviderIssueHandoffService({
+        paths,
+        state,
+        persist,
+        launcher,
+        resolveTrackedIssues,
+        resolveTrackedIssue,
+        startPipelineId: 'diagnostics'
+      });
+
+      markProviderPollingStarted(service, { mode: 'refresh' });
+      await expect(service.refresh()).resolves.toBeUndefined();
+
+      expect(resolveTrackedIssues).toHaveBeenCalledTimes(1);
+      expect(resolveTrackedIssues).toHaveBeenCalledWith(undefined);
+      expect(resolveTrackedIssue).not.toHaveBeenCalled();
+      expect(launcher.resume).not.toHaveBeenCalled();
+      expect(launcher.start).not.toHaveBeenCalled();
+      const pollingHealth = readProviderPollingHealth(service);
+      expect(pollingHealth).toMatchObject({
+        checking: true,
+        stuck: false,
+        restart_required: false,
+        refresh_counts: expect.objectContaining({
+          claims_scanned: 1,
+          issue_by_id_reads: 0,
+          issue_by_id_deferred: 0,
+          occupied_slots: 0
+        })
+      });
+      expect(pollingHealth?.refresh_request_class).not.toBe('claim_issue_by_id:released');
+      expect(state.claims[0]).toMatchObject({
+        state: 'released',
+        reason: 'provider_issue_released:not_active',
+        issue_state: issueState,
+        issue_state_type: issueStateType,
+        run_id: runId,
+        run_manifest_path: runManifestPath,
+        retry_queued: null,
+        retry_attempt: null,
+        retry_due_at: null,
+        retry_error: null
+      });
+    }
+  );
+
+  it('revalidates released terminal historical claims when the current poll snapshot is unavailable', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-571-no-poll-snapshot',
+      issue_identifier: 'CO-571-NO-POLL-SNAPSHOT',
+      issue_title: 'No poll snapshot should revalidate',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-05-20T18:00:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-571-no-poll-snapshot',
+      run_id: null,
+      run_manifest_path: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-571-no-poll-snapshot-should-not-start',
+      '/tmp/provider-run/co-571-no-poll-snapshot-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssues = vi.fn(async () => ({
+      kind: 'skip' as const,
+      reason: 'dispatch_source_unavailable'
+    }));
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-co-571-no-poll-snapshot',
+        identifier: 'CO-571-NO-POLL-SNAPSHOT',
+        title: 'No poll snapshot should revalidate',
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-05-20T19:15:00.000Z',
+        blocked_by: []
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssues,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    markProviderPollingStarted(service, { mode: 'refresh' });
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(resolveTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssues).toHaveBeenCalledWith(undefined);
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-co-571-no-poll-snapshot'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false,
+      refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+      refresh_request_class: 'claim_issue_by_id:released',
+      refresh_provider_keys: ['linear:lin-co-571-no-poll-snapshot'],
+      refresh_counts: expect.objectContaining({
+        issue_by_id_reads: 1
+      })
+    });
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_updated_at: '2026-05-20T19:15:00.000Z'
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
+  it('reopens released terminal historical claims from direct issue-by-id when the poll snapshot is unavailable', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-571-no-poll-reopened',
+      issue_identifier: 'CO-571-NO-POLL-REOPENED',
+      issue_title: 'No poll snapshot should not hide reopened work',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-05-20T18:00:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-571-no-poll-reopened',
+      run_id: null,
+      run_manifest_path: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-571-no-poll-reopened',
+      '/tmp/provider-run/co-571-no-poll-reopened-manifest.json'
+    );
+    const resolveTrackedIssues = vi.fn(async () => ({
+      kind: 'skip' as const,
+      reason: 'dispatch_source_unavailable'
+    }));
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-co-571-no-poll-reopened',
+        identifier: 'CO-571-NO-POLL-REOPENED',
+        title: 'No poll snapshot should not hide reopened work',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-05-20T19:20:00.000Z',
+        blocked_by: []
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssues,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    markProviderPollingStarted(service, { mode: 'refresh' });
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(resolveTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-co-571-no-poll-reopened'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-co-571-no-poll-reopened',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-co-571-no-poll-reopened',
+      issueIdentifier: 'CO-571-NO-POLL-REOPENED',
+      issueUpdatedAt: '2026-05-20T19:20:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_refresh_start_launched',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-20T19:20:00.000Z',
+      task_id: 'linear-lin-co-571-no-poll-reopened',
+      run_id: 'run-co-571-no-poll-reopened',
+      run_manifest_path: '/tmp/provider-run/co-571-no-poll-reopened-manifest.json',
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
+    });
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false,
+      refresh_counts: expect.objectContaining({
+        issue_by_id_reads: 1
+      })
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
+  it('revalidates released terminal historical claims with missing cached issue_updated_at', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-571-missing-updated-at',
+      issue_identifier: 'CO-571-MISSING-UPDATED-AT',
+      issue_title: 'Missing cached updated_at should revalidate',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: null,
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-571-missing-updated-at',
+      run_id: null,
+      run_manifest_path: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-571-missing-updated-at-should-not-start',
+      '/tmp/provider-run/co-571-missing-updated-at-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-co-571-missing-updated-at',
+        identifier: 'CO-571-MISSING-UPDATED-AT',
+        title: 'Missing cached updated_at should revalidate',
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-05-20T19:00:00.000Z',
+        blocked_by: []
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    markProviderPollingStarted(service, { mode: 'refresh' });
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-co-571-missing-updated-at'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false,
+      refresh_counts: expect.objectContaining({
+        issue_by_id_reads: 1
+      })
+    });
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_updated_at: '2026-05-20T19:00:00.000Z'
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
+  it('still fails closed when active retained refresh work becomes stuck during direct issue-by-id', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-co-571-active',
+      issue_identifier: 'CO-571-ACTIVE',
+      issue_title: 'Active retained claim still fails closed',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-20T18:10:00.000Z',
+      task_id: 'linear-lin-co-571-active',
+      state: 'running',
+      reason: 'provider_issue_handoff_owned',
+      run_id: 'run-co-571-active',
+      run_manifest_path: '/tmp/provider-run/co-571-active-manifest.json'
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-571-active-should-not-start',
+      '/tmp/provider-run/co-571-active-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: []
+    }));
+    const resolveTrackedIssue = vi.fn<
+      NonNullable<Parameters<typeof createProviderIssueHandoffService>[0]['resolveTrackedIssue']>
+    >(async () => {
+      throw new Error('resolveTrackedIssue called before service initialization');
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssues,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+    resolveTrackedIssue.mockImplementation(async () => {
+      await markProviderPollingStuck(service);
+      return {
+        kind: 'ready' as const,
+        trackedIssue: createTrackedIssue({
+          id: 'lin-co-571-active',
+          identifier: 'CO-571-ACTIVE',
+          title: 'Active retained claim still fails closed',
+          state: 'In Progress',
+          state_type: 'started',
+          updated_at: '2026-05-20T18:11:00.000Z'
+        })
+      };
+    });
+
+    markProviderPollingStarted(service, { mode: 'refresh' });
+    await expect(service.refresh()).rejects.toThrow('provider_refresh_lifecycle_stuck');
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-co-571-active'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(resolveTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssues).toHaveBeenCalledWith(undefined);
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+      refresh_request_class: expect.stringMatching(/^claim_issue_by_id:(accepted|running)$/),
+      refresh_provider_keys: ['linear:lin-co-571-active']
+    });
+  });
+
   it('keeps fresh discovery running when a deferred retained blocker refresh fails', async () => {
     const { paths } = await createHostPaths();
     const co276BlockerSnapshot = {
