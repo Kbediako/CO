@@ -918,6 +918,19 @@ describe('spec-guard script', () => {
         '# Terminal fallback history',
         '',
         'This completed spec preserves historical fallback context without acting as live decision evidence.',
+        '',
+        '## Historical fallback expiry decision',
+        '',
+        fallbackDecisionTable([
+          completeExpireFallbackRow({
+            owner: 'terminal historical owner',
+            introducedDate: reviewDateDaysAgo(90),
+            reviewDate: reviewDateDaysAgo(60),
+            maximumLifetime: reviewDateDaysAgo(30),
+            removalCondition: 'Historical stale row must not be active decision evidence.',
+            validation: 'Historical stale validation must not be active decision evidence.'
+          })
+        ]),
         ''
       ].join('\n')
     );
