@@ -22,7 +22,7 @@
 - [x] Checklist mirrored to `.agent/task`. Evidence: `.agent/task/linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36.md`.
 - [x] Task registration updated in canonical `tasks/index.json` `items[]` shape. Evidence: `tasks/index.json`.
 - [x] Docs freshness registry updated for CO-552 packet and invariant catalog rows. Evidence: `docs/docs-freshness-registry.json`.
-- [ ] Pre-implementation docs-review child stream captured or governed fallback recorded.
+- [x] Pre-implementation docs-review child stream captured or governed fallback recorded. Evidence: docs-review child streams under `.runs/linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36/cli/2026-05-20T10-16-29-473Z-490a82a3/child-streams/docs-review-*`; later review findings were addressed in parent commits.
 
 ## Fallback / Refactor Decision
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? Yes.
@@ -54,20 +54,21 @@
 - [x] Add fail-closed invariant checker. Evidence: `scripts/control-plane-invariants.mjs`.
 - [x] Wire invariant checker into docs gate. Evidence: `package.json` `docs:check` runs `npm run control-plane:invariants`.
 - [x] Add focused invariant checker regression coverage. Evidence: `tests/control-plane-invariants.spec.ts`.
-- [ ] Accept/reject child docs patch and align docs packet with parent implementation.
+- [x] Accept/reject child docs patch and align docs packet with parent implementation. Evidence: same-issue child lane `packet-docs` completed, patch accepted, and parent implementation/checker now validates the linked packet paths.
 
 ## Validation
-- [x] Focused invariant checker tests. Evidence: `npm run test:core -- tests/control-plane-invariants.spec.ts` passed, 4 tests.
-- [ ] `node scripts/control-plane-invariants.mjs --check --task linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36`.
-- [ ] `node scripts/delegation-guard.mjs`.
-- [ ] `node scripts/spec-guard.mjs --dry-run`.
-- [ ] `npm run build`.
-- [ ] `npm run lint`.
-- [ ] `npm run test`.
-- [ ] `npm run docs:check`.
-- [ ] `npm run docs:freshness`.
-- [ ] `npm run repo:stewardship`.
-- [ ] `node scripts/diff-budget.mjs`.
+- [x] Focused invariant checker tests. Evidence: `npx vitest run tests/control-plane-invariants.spec.ts` passed, 13 tests, including duplicate packet-path regression coverage.
+- [x] `node scripts/control-plane-invariants.mjs --check --task linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36`. Evidence: passed with `status=passed`, `findings=0`.
+- [x] `node scripts/delegation-guard.mjs`. Evidence: OK, 6 subagent manifests found.
+- [x] `node scripts/spec-guard.mjs --dry-run`. Evidence: OK.
+- [x] `npm run build`. Evidence: TypeScript build passed.
+- [x] `npm run lint`. Evidence: passed with existing `DelegationMcpHealth.test.ts` `no-explicit-any` warnings only.
+- [x] `npm run test`. Evidence: 365 files passed, 6048 tests passed.
+- [x] `npm run docs:check`. Evidence: archive stub audit, `control-plane:invariants`, and docs hygiene passed.
+- [x] `npm run docs:freshness`. Evidence: OK, 5512 docs and 5516 registry entries; rolling CO-558 cohorts remain within owned rolling-debt window.
+- [x] `npm run repo:stewardship`. Evidence: OK, 6662 tracked files, 0 action-required.
+- [x] `node scripts/diff-budget.mjs`. Evidence: passed with CO-552 override; current working-tree scope 2 files / 40 lines, advisory stacked branch aggregate 13 files / 2307 lines.
+- [x] `npm run pack:smoke`. Evidence: passed; downstream mock review retained expected smoke-only `semantic review verdict: unknown` inside the pack smoke fixture.
 - [ ] Manifest-backed standalone review with clean semantic verdict or explicit governed waiver.
 - [ ] Explicit elegance/minimality pass.
 - [ ] PR attached and `codex-orchestrator pr ready-review --pr <number> --quiet-minutes <window>` clean before review-state handoff.
@@ -75,6 +76,7 @@
 ## Progress Log
 - 2026-05-20: Live issue-context read, issue moved `Ready` -> `In Progress`, branch created, workpad created, parallelization recorded, and same-issue child lane `packet-docs` launched.
 - 2026-05-20: Parent added invariant catalog, fail-closed checker, docs-gate script wiring, focused tests, task spec, checklist, and task mirror.
+- 2026-05-20: Standalone review findings were resolved for task-index path drift, invariant catalog freshness coverage, required guard IDs, non-dry write capability, required child workstream IDs, complete packet path slots, and duplicate packet path rejection.
 
 ## Notes
-- Advisory `/goal` evidence is not lifecycle authority. Final closeout must re-read the current manifest at `/Users/kbediako/Code/CO/.runs/linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36/cli/2026-05-20T01-09-36-701Z-1e187a0a/manifest.json` and render a concise advisory goal evidence line only if present.
+- Advisory `/goal` evidence is not lifecycle authority. Final closeout must re-read the current manifest at `/Users/kbediako/Code/CO/.runs/linear-46ef15a6-8118-4534-9efe-31eaa9d9ab36/cli/2026-05-20T10-16-29-473Z-490a82a3/manifest.json` and render a concise advisory goal evidence line only if present.

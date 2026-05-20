@@ -526,6 +526,24 @@ async function validateTaskPacket(config, input) {
       );
     }
   }
+  const packetPathIndexes = new Map();
+  for (const [index, packetPath] of packetPaths.entries()) {
+    if (!packetPath) {
+      continue;
+    }
+    const firstIndex = packetPathIndexes.get(packetPath);
+    if (firstIndex !== undefined) {
+      addFinding(
+        input.findings,
+        'error',
+        'task_packet_path_duplicate',
+        `Task packet path ${packetPath} is duplicated at indexes ${firstIndex} and ${index}.`,
+        `${path}.paths[${index}]`
+      );
+      continue;
+    }
+    packetPathIndexes.set(packetPath, index);
+  }
   const declaredPacketPaths = packetPaths.filter(Boolean);
   for (const packetPath of declaredPacketPaths) {
     await validateRepoPathExists(input.repoRoot, packetPath, input.findings, `${path}.paths`);

@@ -232,6 +232,28 @@ describe('control-plane operational drift invariants', () => {
     );
   });
 
+  it('fails closed when required task packet path slots are duplicated', async () => {
+    const repoRoot = await writeFixture({
+      mutateConfig(config) {
+        config.task_packet.paths[2] = config.task_packet.paths[1];
+      }
+    });
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'task_packet_path_duplicate',
+          path: '$.task_packet.paths[2]'
+        })
+      ])
+    );
+  });
+
   it('fails when task-index packet paths drift from the catalog', async () => {
     const repoRoot = await writeFixture({
       mutateTaskIndex(entry) {
