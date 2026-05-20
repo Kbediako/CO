@@ -595,11 +595,24 @@ async function validateTaskPacket(config, input) {
   const freshnessEntries = Array.isArray(input.freshnessRegistry?.entries)
     ? input.freshnessRegistry.entries
     : [];
-  const freshnessByPath = new Map(
-    freshnessEntries
-      .map((entry) => [normalizeRepoPath(entry?.path), entry])
-      .filter(([entryPath]) => entryPath)
-  );
+  const freshnessByPath = new Map();
+  for (const [index, entry] of freshnessEntries.entries()) {
+    const entryPath = normalizeRepoPath(entry?.path);
+    if (!entryPath) {
+      continue;
+    }
+    if (freshnessByPath.has(entryPath)) {
+      addFinding(
+        input.findings,
+        'error',
+        'freshness_registry_path_duplicate',
+        `docs/docs-freshness-registry.json has duplicate normalized path ${entryPath} at entry ${index}.`,
+        'docs/docs-freshness-registry.json'
+      );
+      continue;
+    }
+    freshnessByPath.set(entryPath, entry);
+  }
   for (const packetPath of uniqueStrings([input.configRepoPath, ...declaredPacketPaths])) {
     const entry = freshnessByPath.get(packetPath);
     if (!entry) {
@@ -695,7 +708,7 @@ async function validateRepoPathExists(repoRoot, repoPath, findings, sourcePath) 
   if (
     !normalized ||
     isAbsolute(normalized) ||
-    /^[A-Za-z]:(?:\/|$)/u.test(normalized) ||
+    /^[A-Za-z]:/u.test(normalized) ||
     normalized.startsWith('../') ||
     normalized === '..' ||
     escapesRepo

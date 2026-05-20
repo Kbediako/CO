@@ -247,6 +247,28 @@ describe('control-plane operational drift invariants', () => {
     );
   });
 
+  it('fails closed when normalized freshness registry paths collide', async () => {
+    const config = buildValidConfig();
+    const registryEntries = [CONFIG_PATH, ...config.task_packet.paths].map((path) => freshnessRegistryEntry(path));
+    registryEntries.push(freshnessRegistryEntry(config.task_packet.paths[0].replace(/\//gu, '\\')));
+    const repoRoot = await writeFixture({
+      registryEntries
+    });
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'freshness_registry_path_duplicate'
+        })
+      ])
+    );
+  });
+
   it('fails when the invariant catalog is missing registry truth', async () => {
     const config = buildValidConfig();
     const repoRoot = await writeFixture({
@@ -469,6 +491,26 @@ describe('control-plane operational drift invariants', () => {
     const repoRoot = await writeFixture();
     const config = buildValidConfig();
     config.task_packet.paths[0] = '/tmp/co552-absolute-packet.md';
+    await writeJson(join(repoRoot, CONFIG_PATH), config);
+
+    const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
+      outputPath: false
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'task_packet_path_invalid'
+        })
+      ])
+    );
+  });
+
+  it('rejects Windows drive-relative task packet paths', async () => {
+    const repoRoot = await writeFixture();
+    const config = buildValidConfig();
+    config.task_packet.paths[0] = 'C:packet.md';
     await writeJson(join(repoRoot, CONFIG_PATH), config);
 
     const { report, hasFailures } = await runControlPlaneInvariants(repoRoot, {
