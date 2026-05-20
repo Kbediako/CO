@@ -1015,7 +1015,8 @@ function evaluateStaleSupervisedSourceActiveClaims(
 ): void {
   const value = asRecord(intakeState?.value);
   const policy = resolveControlHostSourceFreshnessPolicyFromPolling(
-    asRecord(value?.polling)?.control_host_owner
+    asRecord(value?.polling)?.control_host_owner,
+    { refresh: false }
   );
   if (!policy) {
     return;

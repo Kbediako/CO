@@ -392,6 +392,73 @@ describe('control host ownership', () => {
     expect(resolveControlHostSourceFreshnessPolicy(staleReclaimedPayload)).toBeNull();
   });
 
+  it('ignores non-supervised source-root freshness warnings', () => {
+    const distOnlyPayload = {
+      status: 'owned',
+      updated_at: '2026-05-18T23:08:00.000Z',
+      diagnostic_path: null,
+      lock_dir: '/repo/.runs/control-host-owner.lock',
+      owner_path: '/repo/.runs/control-host-owner.json',
+      owner: {
+        owner_token: 'dist-owner-token',
+        status: 'owned',
+        pid: 123,
+        ppid: 1,
+        hostname: TEST_HOST,
+        acquired_at: '2026-05-18T22:55:00.000Z',
+        updated_at: '2026-05-18T23:00:00.000Z',
+        released_at: null,
+        repo_root: '/repo',
+        task_id: 'local-mcp',
+        run_id: 'control-host',
+        run_dir: '/repo/.runs/local-mcp/cli/control-host',
+        pipeline_id: 'provider-linear-worker',
+        source_root_freshness: {
+          schema_version: 1,
+          status: 'warning',
+          observed_at: '2026-05-18T23:00:00.000Z',
+          intended_repo_root: '/repo',
+          intended_repo_root_realpath: '/repo',
+          command_path: '/repo/dist/bin/codex-orchestrator.js',
+          command_path_realpath: '/repo/dist/bin/codex-orchestrator.js',
+          package_root: '/repo',
+          package_root_realpath: '/repo',
+          source_root: '/repo',
+          source_root_realpath: '/repo',
+          entrypoint_kind: 'dist',
+          base_ref: 'origin/main',
+          drift_classes: ['source_vs_dist_drift'],
+          source_checkout: {
+            status: 'current',
+            repo_root: '/repo',
+            dirty: { status: 'clean' }
+          },
+          intended_checkout: {
+            status: 'current',
+            repo_root: '/repo',
+            dirty: { status: 'clean' }
+          },
+          provenance: {
+            command_path_source: 'explicit',
+            package_root_source: 'explicit',
+            source_root_source: 'package_root',
+            command_path_inside_package: true,
+            package_root_matches_intended: true,
+            source_root_matches_intended: true,
+            source_entry_exists: true,
+            dist_entry_exists: true
+          },
+          guidance: ['Rebuild dist before relying on fresh TypeScript changes.'],
+          detail: 'Detected source/root drift: source_vs_dist_drift.'
+        },
+        lock_dir: '/repo/.runs/control-host-owner.lock',
+        owner_path: '/repo/.runs/control-host-owner.json'
+      }
+    } as ControlHostOwnershipPollingPayload;
+
+    expect(resolveControlHostSourceFreshnessPolicy(distOnlyPayload)).toBeNull();
+  });
+
   it('does not release a lock that changed owners after acquisition', async () => {
     const runDir = await createRunDir();
     const handle = await acquireControlHostOwnership({

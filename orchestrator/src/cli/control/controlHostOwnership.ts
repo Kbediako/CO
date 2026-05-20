@@ -321,7 +321,11 @@ export function resolveControlHostSourceFreshnessPolicy(
           payload?.owner?.source_root_freshness ??
           null
         );
-  if (!freshness || freshness.status === 'current') {
+  if (
+    !freshness ||
+    freshness.status === 'current' ||
+    !freshness.drift_classes.includes('supervised_source_root_drift')
+  ) {
     return null;
   }
   const restartSafe = isRestartSafeStaleSupervisedSourceRoot(freshness);
