@@ -58,6 +58,7 @@ import { runControlHostSupervisionCliShell } from '../orchestrator/src/cli/contr
 import { runCoStatusAttachCliShell } from '../orchestrator/src/cli/coStatusAttachCliShell.js';
 import { runCoStatusCliShell } from '../orchestrator/src/cli/coStatusCliShell.js';
 import { runCoStatusOperatorAutopilotCliShell } from '../orchestrator/src/cli/coStatusOperatorAutopilotCliShell.js';
+import { runHygieneCliShell } from '../orchestrator/src/cli/quotaHygieneCliShell.js';
 import {
   CONFIG_AUTHORITY_MODE_ENV_KEY,
   REPO_CONFIG_REQUIRED_ENV_KEY,
@@ -180,6 +181,9 @@ export async function runCodexOrchestratorCli(rawArgs: string[] = process.argv.s
         break;
       case 'co-status':
         await handleCoStatus(args);
+        break;
+      case 'hygiene':
+        await handleHygiene(args);
         break;
       case 'exec':
         await handleExec(args);
@@ -957,6 +961,15 @@ async function handleCoStatus(rawArgs: string[]): Promise<void> {
   });
 }
 
+async function handleHygiene(rawArgs: string[]): Promise<void> {
+  const { positionals, flags } = parseArgs(rawArgs);
+  await runHygieneCliShell({
+    positionals,
+    flags,
+    printHelp: printHygieneHelp
+  });
+}
+
 async function maybeStartHud(
   gate: ReturnType<typeof evaluateInteractiveGate>,
   emitter: RunEventEmitter
@@ -1645,6 +1658,9 @@ Commands:
   co-status attach [options]
     Attach a read-only CO STATUS viewer to an already-running local control-host.
 
+  hygiene quota [options]
+    Emit a deterministic zero-model quota hygiene audit for local process/provider state.
+
   status --run <id> [--watch] [--interval N] [--format json]
 
   self-check [--format json]
@@ -2119,6 +2135,23 @@ Options:
   --refresh-interval-ms <n> Viewer refresh interval in milliseconds (default: 1000).
   --format json             Emit machine-readable attach target output instead of launching the viewer.
   --help                    Show this message.
+`);
+}
+
+function printHygieneHelp(): void {
+  console.log(`Usage: codex-orchestrator hygiene quota [options]
+
+Emit a deterministic read-only quota hygiene audit without model-backed calls or default mutations.
+
+Options:
+  --artifact-root <path>          Control-host artifact root (default: .runs/local-mcp/cli/control-host).
+  --provider-intake-state <path>  Explicit provider-intake-state.json path.
+  --automations-dir <path>        Explicit Codex automations directory (default: $CODEX_HOME/automations).
+  --goal-manifest <path>          Manifest to inspect for advisory current-thread goal evidence.
+  --repo <path>                   Repo root for relative artifact paths (default: cwd).
+  --now <iso>                     Deterministic timestamp for the report.
+  --format json                   Emit machine-readable audit JSON.
+  --help                          Show this message.
 `);
 }
 
