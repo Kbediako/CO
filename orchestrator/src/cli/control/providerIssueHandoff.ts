@@ -5540,6 +5540,19 @@ export function createProviderIssueHandoffService(
             deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
             continue;
           }
+          const shouldKeepCachedReleasedTerminalHistoricalClaimPassiveBeforeReconcile =
+            canUseCachedReleasedTerminalHistoricalClaim &&
+            currentPollTrackedIssue === null &&
+            !shouldRevalidateCurrentReleasedReviewPromotion &&
+            !canFreshDiscoverReleasedLiveWorker &&
+            !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot;
+          if (shouldKeepCachedReleasedTerminalHistoricalClaimPassiveBeforeReconcile) {
+            consumedTrackedIssueKeys.add(claimProviderKey);
+            releasedFailClosedSkipCount += 1;
+            releasedFreshDiscoveryReplayBlockedProviderKeys.add(claimProviderKey);
+            deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
+            continue;
+          }
           if (
             pollInput?.deferFreshDiscovery === true &&
             trackedIssueRefetch &&
