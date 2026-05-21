@@ -24,6 +24,7 @@ const IGNORED_REVIEW_SCOPE_PREFIXES = ['.agent/task/', 'tasks/tasks-'];
 export interface ReviewScopeCliOptions {
   base?: string;
   commit?: string;
+  uncommitted?: boolean;
 }
 
 export interface ReviewScopeAssessment {
@@ -39,6 +40,27 @@ interface ReviewScopeLogger {
   log(message: string): void;
   warn(message: string): void;
 }
+
+export interface ReviewScopeResolution {
+  options: ReviewScopeCliOptions;
+  requestedOptions: ReviewScopeCliOptions;
+  requestedScopeMode: ReviewScopeMode;
+  scopeMode: ReviewScopeMode;
+  scopePathCollection: ReviewScopePathCollection;
+  promptLines: string[];
+  resolutionKind: ReviewScopeResolutionKind;
+  resolutionNote: string | null;
+}
+
+export type ReviewScopeResolutionKind =
+  | 'explicit'
+  | 'default-uncommitted'
+  | 'default-uncommitted-committed-branch-diff'
+  | 'default-uncommitted-empty-branch'
+  | 'default-uncommitted-base-unavailable'
+  | 'default-uncommitted-non-git';
+
+const DEFAULT_REVIEW_BASE_REFS = ['origin/main', 'origin/master', 'main', 'master'];
 
 export async function collectReviewScopePaths(
   options: ReviewScopeCliOptions,
@@ -66,6 +88,88 @@ export function resolveEffectiveScopeMode(options: ReviewScopeCliOptions): Revie
   return 'uncommitted';
 }
 
+export async function resolveReviewScope(
+  options: ReviewScopeCliOptions,
+  repoRoot: string
+): Promise<ReviewScopeResolution> {
+  const requestedScopePathCollection = await collectReviewScopePaths(options, repoRoot);
+  const requestedScopeMode = resolveEffectiveScopeMode(options);
+  const explicitScope = Boolean(options.base || options.commit || options.uncommitted);
+
+  if (
+    explicitScope ||
+    requestedScopeMode !== 'uncommitted' ||
+    requestedScopePathCollection.paths.length > 0
+  ) {
+    return {
+      options,
+      requestedOptions: options,
+      requestedScopeMode,
+      scopeMode: requestedScopeMode,
+      scopePathCollection: requestedScopePathCollection,
+      promptLines: [],
+      resolutionKind: explicitScope ? 'explicit' : 'default-uncommitted',
+      resolutionNote: null
+    };
+  }
+
+  if (!(await isGitWorkTree(repoRoot))) {
+    return {
+      options,
+      requestedOptions: options,
+      requestedScopeMode,
+      scopeMode: requestedScopeMode,
+      scopePathCollection: requestedScopePathCollection,
+      promptLines: [],
+      resolutionKind: 'default-uncommitted-non-git',
+      resolutionNote: null
+    };
+  }
+
+  const baseRef = await resolveDefaultReviewBaseRef(repoRoot);
+  if (!baseRef) {
+    const resolutionNote = `Review scope resolution: uncommitted working tree is empty and no default base ref (${DEFAULT_REVIEW_BASE_REFS.map((ref) => `\`${ref}\``).join(', ')}) resolved; committed branch diff evidence could not be prepared.`;
+    return {
+      options,
+      requestedOptions: options,
+      requestedScopeMode,
+      scopeMode: requestedScopeMode,
+      scopePathCollection: requestedScopePathCollection,
+      promptLines: [resolutionNote],
+      resolutionKind: 'default-uncommitted-base-unavailable',
+      resolutionNote
+    };
+  }
+
+  const baseOptions = { base: baseRef };
+  const baseScopePathCollection = await collectReviewScopePaths(baseOptions, repoRoot);
+  if (baseScopePathCollection.paths.length > 0) {
+    const resolutionNote = `Review scope resolution: uncommitted working tree is empty; using committed branch diff against base \`${baseRef}\` for governed review evidence.`;
+    return {
+      options: baseOptions,
+      requestedOptions: options,
+      requestedScopeMode,
+      scopeMode: 'base',
+      scopePathCollection: baseScopePathCollection,
+      promptLines: [resolutionNote],
+      resolutionKind: 'default-uncommitted-committed-branch-diff',
+      resolutionNote
+    };
+  }
+
+  const resolutionNote = `Review scope resolution: intentionally empty; uncommitted working tree is empty and committed branch diff against base \`${baseRef}\` is empty.`;
+  return {
+    options,
+    requestedOptions: options,
+    requestedScopeMode,
+    scopeMode: requestedScopeMode,
+    scopePathCollection: requestedScopePathCollection,
+    promptLines: [resolutionNote],
+    resolutionKind: 'default-uncommitted-empty-branch',
+    resolutionNote
+  };
+}
+
 export function buildScopeNotes(
   options: ReviewScopeCliOptions,
   scopePathCollection: ReviewScopePathCollection
@@ -89,6 +193,26 @@ export function buildScopeNotes(
   }
 
   return lines;
+}
+
+async function isGitWorkTree(repoRoot: string): Promise<boolean> {
+  const output = await tryGit(['rev-parse', '--is-inside-work-tree'], repoRoot);
+  return output === 'true';
+}
+
+async function resolveDefaultReviewBaseRef(repoRoot: string): Promise<string | null> {
+  const originHead = await tryGit(['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD'], repoRoot);
+  const candidates = [
+    ...(originHead ? [originHead] : []),
+    ...DEFAULT_REVIEW_BASE_REFS
+  ];
+  for (const candidate of candidates) {
+    const resolved = await tryGit(['rev-parse', '--verify', '--quiet', `${candidate}^{commit}`], repoRoot);
+    if (resolved) {
+      return candidate;
+    }
+  }
+  return null;
 }
 
 export async function assessReviewScope(

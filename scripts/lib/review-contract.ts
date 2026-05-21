@@ -18,6 +18,13 @@ export const REVIEW_CONTRACT_AUTHORITATIVE_GATE_ENV_KEY = 'CODEX_REVIEW_AUTHORIT
 
 export type ReviewContractMode = 'off' | 'shadow' | 'enforce';
 export type ReviewContractScopeMode = 'uncommitted' | 'base' | 'commit';
+export type ReviewContractScopeResolutionKind =
+  | 'explicit'
+  | 'default-uncommitted'
+  | 'default-uncommitted-committed-branch-diff'
+  | 'default-uncommitted-empty-branch'
+  | 'default-uncommitted-base-unavailable'
+  | 'default-uncommitted-non-git';
 export type ReviewContractTelemetrySource = 'output-log' | 'last-message-file';
 export type ReviewContractAxisName =
   | 'spec_conformance'
@@ -183,6 +190,11 @@ export async function prepareReviewContractInputBundles(options: {
   scopeMode?: ReviewContractScopeMode;
   scopeBase?: string | null;
   scopeCommit?: string | null;
+  requestedScopeMode?: ReviewContractScopeMode;
+  requestedScopeBase?: string | null;
+  requestedScopeCommit?: string | null;
+  scopeResolutionKind?: ReviewContractScopeResolutionKind;
+  scopeResolutionNote?: string | null;
   notes?: string | null;
   mode: ReviewContractMode;
 }): Promise<ReviewContractInputBundleResult | null> {
@@ -550,11 +562,21 @@ async function buildChangeBundle(options: {
   scopeMode?: ReviewContractScopeMode;
   scopeBase?: string | null;
   scopeCommit?: string | null;
+  requestedScopeMode?: ReviewContractScopeMode;
+  requestedScopeBase?: string | null;
+  requestedScopeCommit?: string | null;
+  scopeResolutionKind?: ReviewContractScopeResolutionKind;
+  scopeResolutionNote?: string | null;
 }): Promise<Record<string, unknown>> {
   const scopePaths = normalizeRepoRelativePaths(options.repoRoot, options.scopePaths);
   const scopeMode = options.scopeMode ?? 'uncommitted';
   const scopeBase = options.scopeBase ?? null;
   const scopeCommit = options.scopeCommit ?? null;
+  const requestedScopeMode = options.requestedScopeMode ?? scopeMode;
+  const requestedScopeBase = options.requestedScopeBase ?? null;
+  const requestedScopeCommit = options.requestedScopeCommit ?? null;
+  const scopeResolutionKind = options.scopeResolutionKind ?? 'explicit';
+  const scopeResolutionNote = options.scopeResolutionNote ?? null;
   const changeScope = {
     repoRoot: options.repoRoot,
     scopePaths,
@@ -576,6 +598,11 @@ async function buildChangeBundle(options: {
     scope_mode: scopeMode,
     scope_base: scopeBase,
     scope_commit: scopeCommit,
+    requested_scope_mode: requestedScopeMode,
+    requested_scope_base: requestedScopeBase,
+    requested_scope_commit: requestedScopeCommit,
+    scope_resolution_kind: scopeResolutionKind,
+    scope_resolution_note: scopeResolutionNote,
     scope_paths: scopePaths,
     git_diff_name_status: nameStatus,
     git_diff_stat: diffStat,
