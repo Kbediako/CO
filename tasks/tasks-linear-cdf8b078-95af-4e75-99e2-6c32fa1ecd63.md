@@ -51,7 +51,7 @@
 - [x] `retrying=1` projection mismatch
 - [x] no-current-poll-snapshot path
 - [x] current-poll terminal snapshot path
-- [x] map-missing current-poll terminal history
+- [x] map-missing current poll terminal history
 - [x] CO-529 Backlog/backlog released `not_active`
 - [x] stale `review_promotion`
 - [x] no fabricated coherent snapshot

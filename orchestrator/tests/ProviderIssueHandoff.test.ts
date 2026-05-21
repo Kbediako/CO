@@ -31350,6 +31350,8 @@ describe('createProviderIssueHandoffService', () => {
       checking: true,
       stuck: false,
       restart_required: false,
+      refresh_phase: 'refresh:fresh_dispatch',
+      refresh_request_class: 'fresh_dispatch',
       refresh_counts: expect.objectContaining({
         claims_scanned: 1,
         issue_by_id_reads: 0,
