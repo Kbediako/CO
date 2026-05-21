@@ -4968,6 +4968,7 @@ export function createProviderIssueHandoffService(
               launch_token: null,
               review_promotion: null,
               merge_closeout: null,
+              passive_release: null,
               ...(
                 lockedExisting?.retry_queued === true
                   ? buildQueuedProviderRetryFields({
@@ -5012,6 +5013,7 @@ export function createProviderIssueHandoffService(
               launch_token: null,
               review_promotion: null,
               merge_closeout: null,
+              passive_release: null,
               ...buildQueuedProviderRetryFields({
                 claim: lockedLatestRetryStateBase,
                 previousRun: lockedLatestRun,
@@ -5040,6 +5042,7 @@ export function createProviderIssueHandoffService(
             launch_token: launchToken,
             review_promotion: null,
             merge_closeout: null,
+            passive_release: null,
             ...buildProviderRetryLaunchFields({
               claim: lockedLatestRetryStateBase,
               previousRun: lockedLatestRun,
@@ -5115,6 +5118,7 @@ export function createProviderIssueHandoffService(
           launch_token: launchToken,
           review_promotion: null,
           merge_closeout: null,
+          passive_release: null,
           ...buildQueuedProviderRetryFields({
             claim: reservedLatestRetryStateBase,
             previousRun: reservedLatestRun,
@@ -5144,6 +5148,7 @@ export function createProviderIssueHandoffService(
               launch_token: launchToken,
               review_promotion: null,
               merge_closeout: null,
+              passive_release: null,
               ...buildProviderRetryLaunchFields({
                 claim: reservedLatestRetryStateBase,
                 previousRun: reservedLatestRun,
@@ -5848,6 +5853,7 @@ export function createProviderIssueHandoffService(
             (
               !boundPreDiscoveryIssueByIdReads ||
               activeRun !== null ||
+              shouldReadBacklogReleaseDirectProofThisRefresh ||
               preDiscoveryNonActiveIssueByIdReads < preDiscoveryIssueByIdReadLimit
             ) &&
             (
