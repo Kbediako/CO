@@ -342,6 +342,7 @@ interface ProviderLinearWorkerProofRecord {
 
 const PROVIDER_UNREADABLE_MANIFEST_LIVE_PROOF_TTL_MS =
   2 * PROVIDER_SEMANTIC_STALL_RECHECK_DELAY_MS;
+const PROVIDER_PASSIVE_BACKLOG_RELEASE_VERIFICATION_TTL_MS = 5 * 60 * 1000;
 
 function resolveRehydratedActiveRunWorkerHost(
   run: ProviderIssueRunRecord,
@@ -1679,6 +1680,27 @@ export function createProviderIssueHandoffService(
     issue_assignee_name: trackedIssue.assignee_name,
     ...(trackedIssue.blocked_by === undefined ? {} : { issue_blocked_by: trackedIssue.blocked_by })
   });
+
+  const markReleasedBacklogNotActiveClaimPassiveVerified = async (input: {
+    claim: ProviderIntakeClaimRecord;
+    trackedIssue: Parameters<typeof buildTrackedIssueClaimFields>[0];
+  }): Promise<ProviderIntakeClaimRecord> => {
+    const trackedIssueFields = buildTrackedIssueClaimFields(input.trackedIssue);
+    return await upsertProviderClaimAndPersist({
+      ...input.claim,
+      ...trackedIssueFields,
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      passive_release: {
+        reason: 'backlog_not_active_direct_issue_by_id',
+        source: 'direct_issue_by_id',
+        verified_at: isoTimestamp(),
+        issue_state: trackedIssueFields.issue_state,
+        issue_state_type: trackedIssueFields.issue_state_type,
+        issue_updated_at: trackedIssueFields.issue_updated_at
+      }
+    });
+  };
 
   const isTrackedIssueFreshEnoughForClaim = (
     claim: Pick<ProviderIntakeClaimRecord, 'issue_updated_at'>,
@@ -3586,6 +3608,7 @@ export function createProviderIssueHandoffService(
       return {
         kind: 'release',
         reason: stripProviderIssueReleasedPrefix(authority.releaseReason),
+        source: 'direct_issue_by_id',
         trackedIssue: resolution.trackedIssue,
         cleanupWorkspace: authority.cleanupWorkspace
       };
@@ -3594,6 +3617,7 @@ export function createProviderIssueHandoffService(
       return {
         kind: 'release',
         reason: resolution.reason,
+        source: 'direct_issue_by_id',
         trackedIssue: null,
         cleanupWorkspace: false
       };
@@ -5563,7 +5587,10 @@ export function createProviderIssueHandoffService(
           }
           const shouldKeepCachedReleasedBacklogNotActiveClaimPassiveBeforeReconcile =
             shouldUseCachedReleasedBacklogNotActiveClaim &&
-            trackedIssuesByKey !== null &&
+            (
+              trackedIssuesByKey !== null ||
+              hasRecentBacklogNotActiveDirectIssueByIdPassiveVerification(claim)
+            ) &&
             currentPollTrackedIssue === null &&
             !canFreshDiscoverReleasedLiveWorker &&
             !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot;
@@ -5728,6 +5755,30 @@ export function createProviderIssueHandoffService(
             continue;
           }
           if (resolution.kind === 'release') {
+            if (
+              resolution.reason === 'not_active' &&
+              resolution.source === 'direct_issue_by_id' &&
+              resolution.trackedIssue &&
+              shouldUseCachedReleasedBacklogNotActiveClaim &&
+              isReleasedBacklogNotActiveClaim({
+                ...claim,
+                issue_state: resolution.trackedIssue.state,
+                issue_state_type: resolution.trackedIssue.state_type
+              }) &&
+              !canFreshDiscoverReleasedLiveWorker &&
+              !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot
+            ) {
+              await markReleasedBacklogNotActiveClaimPassiveVerified({
+                claim,
+                trackedIssue: resolution.trackedIssue
+              });
+              if (!activeRun) {
+                releaseOccupiedPollDispatchSlot(
+                  resolveClaimPollDispatchSlotKey(claimProviderKey, claim, activeRun)
+                );
+              }
+              continue;
+            }
             if (
               resolution.reason === 'not_found' &&
               resolution.source !== 'direct_issue_by_id' &&
@@ -9893,6 +9944,30 @@ function isReleasedBacklogNotActiveClaim(
   return (
     workflowState.normalizedState === 'backlog' ||
     workflowState.normalizedStateType === 'backlog'
+  );
+}
+
+function hasRecentBacklogNotActiveDirectIssueByIdPassiveVerification(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'passive_release' | 'issue_state' | 'issue_state_type' | 'issue_updated_at'
+  >
+): boolean {
+  const verification = claim.passive_release ?? null;
+  if (
+    !verification ||
+    verification.reason !== 'backlog_not_active_direct_issue_by_id' ||
+    verification.source !== 'direct_issue_by_id' ||
+    verification.issue_state !== claim.issue_state ||
+    verification.issue_state_type !== claim.issue_state_type ||
+    verification.issue_updated_at !== claim.issue_updated_at
+  ) {
+    return false;
+  }
+  const verifiedAtMs = Date.parse(verification.verified_at);
+  return (
+    Number.isFinite(verifiedAtMs) &&
+    Date.now() - verifiedAtMs <= PROVIDER_PASSIVE_BACKLOG_RELEASE_VERIFICATION_TTL_MS
   );
 }
 

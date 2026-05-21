@@ -639,7 +639,7 @@
       "owners": [
         "Codex"
       ],
-      "status": "implementation_complete_pr_pending",
+      "status": "in_progress",
       "last_review": "2026-05-21",
       "canonical_owner_key": "control-host:released-claim-reconcile-restart-loop",
       "evidence": [
@@ -661,7 +661,7 @@
           "reviewer": "CO-571 provider worker",
           "date": "2026-05-21",
           "status": "approved_for_implementation",
-          "summary": "CO-571 is scoped to terminal released historical claim reconciliation, passive Backlog released not_active direct issue-by-id suppression, stale retained merged-closeout suppression after merged PR plus live Done truth, the retry projection mismatch for selected released claims with null retry metadata, no-current-poll-snapshot and map-missing fallback paths, accepted pending-revalidation rechecks, and stale/current review_promotion handling across no-map and deferred-poll fail-closed paths. It explicitly rejects timeout-only fixes, provider-intake manual edits, fabricated snapshots, blanket released-claim suppression, and hiding real active/reopened/retry/Blocked/current-promotion/merge-closeout refresh paths."
+          "summary": "CO-571 is scoped to terminal released historical claim reconciliation, passive Backlog released not_active verification before repeated direct issue-by-id suppression, stale retained merged-closeout suppression after merged PR plus live Done truth, the retry projection mismatch for selected released claims with null retry metadata, no-current-poll-snapshot and map-missing fallback paths, accepted pending-revalidation rechecks, and stale/current review_promotion handling across no-map and deferred-poll fail-closed paths. It explicitly rejects timeout-only fixes, provider-intake manual edits, fabricated snapshots, blanket released-claim suppression, and hiding real active/reopened/retry/Blocked/current-promotion/merge-closeout refresh paths."
         },
         "parallelization": {
           "decision": "stay_serial",
@@ -703,11 +703,17 @@
           "fifth-rework full ProviderIssueHandoff.test.ts passed",
           "fifth-rework full npm run test passed (366 files / 6136 tests)",
           "fifth-rework docs:check, repo:stewardship, git diff --check, diff-budget, and pack:smoke passed",
-          "fifth-rework enforced gpt-5.5/xhigh standalone review returned clean with valid enforce contract"
+          "fifth-rework enforced gpt-5.5/xhigh standalone review returned clean with valid enforce contract",
+          "sixth-rework CO-521 no-current-poll Backlog regression passed, including failing-before-patch proof",
+          "PR #861 Codex P1 rework focused passive-verification and active direct issue-by-id regressions passed",
+          "sixth-rework full ProviderIssueHandoff.test.ts passed",
+          "sixth-rework full npm run test passed (366 files / 6137 tests)",
+          "sixth-rework docs:check, repo:stewardship, git diff --check, diff-budget, pack:smoke, and delegation-guard passed",
+          "sixth-rework enforced gpt-5.5/xhigh standalone review returned clean with valid enforce contract"
         ],
         "pending": [
           "docs:freshness baseline blocker: unrelated CO-558 rolling cohort debt (257 stale docs, 199 rolling cohort entries)",
-          "parent-owned PR/lifecycle for the latest CO-522 stale retained merged-closeout rework",
+          "parent-owned PR/lifecycle for the latest CO-521/CO-524 no-current-poll Backlog rework",
           "live current-main proof after parent lands the patch"
         ]
       },

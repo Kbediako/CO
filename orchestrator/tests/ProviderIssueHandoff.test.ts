@@ -31495,6 +31495,199 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalledTimes(1);
   });
 
+  it('verifies released Backlog not-active claims before making no-poll snapshots passive', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: '9749edb3-51e3-45e3-935b-8333dafafca5',
+      issue_identifier: 'CO-521',
+      issue_title: 'Docs freshness owner traceability remains parked in Backlog',
+      issue_state: 'Backlog',
+      issue_state_type: 'backlog',
+      issue_updated_at: '2026-05-12T22:55:58.625Z',
+      issue_blocked_by: [],
+      task_id: 'linear-9749edb3-51e3-45e3-935b-8333dafafca5',
+      run_id: null,
+      run_manifest_path: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null,
+      review_promotion: null,
+      merge_closeout: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-521-backlog-no-poll-should-not-start',
+      '/tmp/provider-run/co-521-backlog-no-poll-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssues = vi.fn(async () => ({
+      kind: 'skip' as const,
+      reason: 'dispatch_source_unavailable'
+    }));
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: '9749edb3-51e3-45e3-935b-8333dafafca5',
+        identifier: 'CO-521',
+        title: 'Docs freshness owner traceability remains parked in Backlog',
+        state: 'Backlog',
+        state_type: 'backlog',
+        updated_at: '2026-05-12T22:55:58.625Z',
+        blocked_by: []
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssues,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    markProviderPollingStarted(service, { mode: 'refresh' });
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(resolveTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssues).toHaveBeenCalledWith(undefined);
+    expect(resolveTrackedIssue).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: '9749edb3-51e3-45e3-935b-8333dafafca5'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    const pollingHealth = readProviderPollingHealth(service);
+    expect(pollingHealth).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false,
+      refresh_counts: expect.objectContaining({
+        issue_by_id_reads: 1
+      })
+    });
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Backlog',
+      issue_state_type: 'backlog',
+      issue_updated_at: '2026-05-12T22:55:58.625Z',
+      run_id: null,
+      run_manifest_path: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    });
+    expect(state.claims[0]?.passive_release).toMatchObject({
+      reason: 'backlog_not_active_direct_issue_by_id',
+      source: 'direct_issue_by_id',
+      issue_state: 'Backlog',
+      issue_state_type: 'backlog',
+      issue_updated_at: '2026-05-12T22:55:58.625Z'
+    });
+    const persistCallsAfterPassiveVerification = persist.mock.calls.length;
+    expect(persistCallsAfterPassiveVerification).toBeGreaterThanOrEqual(1);
+
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(resolveTrackedIssues).toHaveBeenCalledTimes(2);
+    expect(resolveTrackedIssue).toHaveBeenCalledTimes(1);
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false
+    });
+  });
+
+  it('revalidates released Backlog not-active claims when no poll snapshot but issue-by-id is active', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-521-backlog-ready',
+      issue_identifier: 'CO-521-READY',
+      issue_title: 'Backlog claim became Ready without a poll snapshot',
+      issue_state: 'Backlog',
+      issue_state_type: 'backlog',
+      issue_updated_at: '2026-05-12T22:55:58.625Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-521-backlog-ready',
+      run_id: null,
+      run_manifest_path: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null,
+      review_promotion: null,
+      merge_closeout: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-521-backlog-ready',
+      '/tmp/provider-run/co-521-backlog-ready-manifest.json'
+    );
+    const resolveTrackedIssues = vi.fn(async () => ({
+      kind: 'skip' as const,
+      reason: 'dispatch_source_unavailable'
+    }));
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-co-521-backlog-ready',
+        identifier: 'CO-521-READY',
+        title: 'Backlog claim became Ready without a poll snapshot',
+        state: 'Ready',
+        state_type: 'unstarted',
+        updated_at: '2026-05-21T04:15:00.000Z',
+        blocked_by: []
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssues,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    markProviderPollingStarted(service, { mode: 'refresh' });
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(resolveTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssues).toHaveBeenCalledWith(undefined);
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-co-521-backlog-ready'
+    });
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'linear',
+      issueId: 'lin-co-521-backlog-ready',
+      issueIdentifier: 'CO-521-READY',
+      issueUpdatedAt: '2026-05-21T04:15:00.000Z'
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_refresh_start_launched',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-05-21T04:15:00.000Z',
+      run_id: 'run-co-521-backlog-ready',
+      run_manifest_path: '/tmp/provider-run/co-521-backlog-ready-manifest.json',
+      passive_release: null
+    });
+  });
+
   it('keeps released stale merged closeout claims passive when current polling omits them', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
