@@ -639,8 +639,8 @@
       "owners": [
         "Codex"
       ],
-      "status": "implementation_complete_in_review",
-      "last_review": "2026-05-20",
+      "status": "implementation_complete_pr_pending",
+      "last_review": "2026-05-21",
       "canonical_owner_key": "control-host:released-claim-reconcile-restart-loop",
       "evidence": [
         "docs/PRD-linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63.md",
@@ -661,7 +661,7 @@
           "reviewer": "CO-571 provider worker",
           "date": "2026-05-21",
           "status": "approved_for_implementation",
-          "summary": "CO-571 is scoped to terminal released historical claim reconciliation, passive Backlog released not_active direct issue-by-id suppression, the retry projection mismatch for selected released claims with null retry metadata, no-current-poll-snapshot and map-missing fallback paths, accepted pending-revalidation rechecks, and stale/current review_promotion handling across no-map and deferred-poll fail-closed paths. It explicitly rejects timeout-only fixes, provider-intake manual edits, fabricated snapshots, blanket released-claim suppression, and hiding real active/reopened/retry/Blocked/merge-closeout refresh paths."
+          "summary": "CO-571 is scoped to terminal released historical claim reconciliation, passive Backlog released not_active direct issue-by-id suppression, stale retained merged-closeout suppression after merged PR plus live Done truth, the retry projection mismatch for selected released claims with null retry metadata, no-current-poll-snapshot and map-missing fallback paths, accepted pending-revalidation rechecks, and stale/current review_promotion handling across no-map and deferred-poll fail-closed paths. It explicitly rejects timeout-only fixes, provider-intake manual edits, fabricated snapshots, blanket released-claim suppression, and hiding real active/reopened/retry/Blocked/current-promotion/merge-closeout refresh paths."
         },
         "parallelization": {
           "decision": "stay_serial",
@@ -671,7 +671,7 @@
         }
       },
       "validation": {
-        "status": "pr_open_validation_complete",
+        "status": "implementation_complete_pr_pending",
         "passed": [
           "live Linear issue-context read",
           "single workpad created",
@@ -687,7 +687,6 @@
           "lint",
           "test",
           "docs:check",
-          "docs:freshness",
           "diff-budget",
           "pack:smoke",
           "standalone review and elegance pass",
@@ -697,10 +696,18 @@
           "PR #856 focused no-current-poll-snapshot and stale/current review_promotion regressions, including deferred-poll stale suppression and current-promotion revalidation",
           "manual Codex review returned clean on PR #856 head 60055e3aabd8f69f5e916036204756da9bfac63e",
           "PR #858 merged, then latest-main proof hit CO-529 Backlog/backlog claim_issue_by_id:released",
-          "CO-529 Backlog released not_active focused regression added"
+          "CO-529 Backlog released not_active focused regression added",
+          "PR #859 merged, then latest-main proof hit CO-522 stale retained merged-closeout claim_issue_by_id:released",
+          "CO-522 stale retained merged-closeout focused regressions added",
+          "fifth-rework focused stale merged-closeout subset passed",
+          "fifth-rework full ProviderIssueHandoff.test.ts passed",
+          "fifth-rework full npm run test passed (366 files / 6136 tests)",
+          "fifth-rework docs:check, repo:stewardship, git diff --check, diff-budget, and pack:smoke passed",
+          "fifth-rework enforced gpt-5.5/xhigh standalone review returned clean with valid enforce contract"
         ],
         "pending": [
-          "parent-owned PR/lifecycle for the latest CO-529 Backlog rework",
+          "docs:freshness baseline blocker: unrelated CO-558 rolling cohort debt (257 stale docs, 199 rolling cohort entries)",
+          "parent-owned PR/lifecycle for the latest CO-522 stale retained merged-closeout rework",
           "live current-main proof after parent lands the patch"
         ]
       },
@@ -749,6 +756,10 @@
         {
           "identifier": "CO-529",
           "relation": "backlog_released_not_active_claim_issue_by_id_evidence"
+        },
+        {
+          "identifier": "CO-522",
+          "relation": "stale_retained_merged_closeout_released_claim_issue_by_id_evidence"
         }
       ]
     },

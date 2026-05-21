@@ -322,6 +322,123 @@ function createCo202ReleasedClaim(overrides: Partial<ProviderIntakeClaimRecord> 
   });
 }
 
+function createStalePromotedReviewRecord(
+  overrides: Partial<NonNullable<ProviderIntakeClaimRecord['review_promotion']>> = {}
+): NonNullable<ProviderIntakeClaimRecord['review_promotion']> {
+  return {
+    recorded_at: '2026-05-12T21:40:00.000Z',
+    issue_id: 'lin-co-522',
+    issue_identifier: 'CO-522',
+    issue_state: 'Merging',
+    issue_state_type: 'started',
+    issue_updated_at: '2026-05-12T21:40:00.000Z',
+    status: 'promoted',
+    reason: 'promoted_to_merging',
+    summary: 'Promoted attached PR from review handoff into Merging.',
+    attached_pr_urls: ['https://github.com/Kbediako/CO/pull/795'],
+    ignored_historical_pr_urls: [],
+    ignored_closed_unmerged_pr_urls: [],
+    ignored_cross_issue_pr_urls: [],
+    conflicting_attached_pr_urls: [],
+    pr: {
+      url: 'https://github.com/Kbediako/CO/pull/795',
+      owner: 'Kbediako',
+      repo: 'CO',
+      number: 795
+    },
+    snapshot: null,
+    branch_recovery: null,
+    linear_transition: null,
+    github_rate_limit: null,
+    ...overrides
+  };
+}
+
+function createMergedTransitionFailedCloseoutRecord(
+  overrides: Partial<NonNullable<ProviderIntakeClaimRecord['merge_closeout']>> = {}
+): NonNullable<ProviderIntakeClaimRecord['merge_closeout']> {
+  return {
+    recorded_at: '2026-05-12T21:52:20.000Z',
+    issue_id: 'lin-co-522',
+    issue_identifier: 'CO-522',
+    issue_state: 'Merging',
+    issue_state_type: 'started',
+    issue_updated_at: '2026-05-12T21:52:20.000Z',
+    status: 'transition_failed',
+    reason: 'linear_blocked_transition_failed_for_docs_freshness_owner_evidence_unavailable',
+    summary: 'The pull request merged, but Linear closeout could not complete.',
+    attached_pr_urls: ['https://github.com/Kbediako/CO/pull/795'],
+    ignored_historical_pr_urls: [],
+    ignored_closed_unmerged_pr_urls: [],
+    conflicting_attached_pr_urls: [],
+    pr: {
+      url: 'https://github.com/Kbediako/CO/pull/795',
+      owner: 'Kbediako',
+      repo: 'CO',
+      number: 795
+    },
+    snapshot: {
+      state: 'MERGED',
+      review_decision: 'APPROVED',
+      merge_state_status: 'UNKNOWN',
+      ready_to_merge: false,
+      gate_reasons: ['state=MERGED'],
+      action_required_reasons: [],
+      unresolved_thread_count: 0,
+      checks_pending: 0,
+      checks_failed: 0,
+      required_checks_pending: 0,
+      required_checks_failed: 0,
+      updated_at: '2026-05-12T21:52:08.000Z',
+      merged_at: '2026-05-12T21:52:08.000Z',
+      head_oid: 'abc123'
+    },
+    branch_recovery: null,
+    merge_attempt: null,
+    shared_root: {
+      status: 'reconciled',
+      attempted_at: '2026-05-12T21:52:12.000Z',
+      before_status: '## main...origin/main',
+      after_status: '## main...origin/main',
+      reason: 'shared_root_reconciled'
+    },
+    docs_freshness_owner: {
+      status: 'evidence_unavailable',
+      terminal_transition_blocked: true,
+      reason: 'docs_freshness_owner_evidence_unavailable',
+      policy_owner_issue: null,
+      policy_canonical_owner_key: 'docs:freshness:maintain',
+      freshness_decision: null,
+      owner_issue: null,
+      owner_issue_action: null,
+      owner_issue_verification: null,
+      repo_gate: null,
+      candidate_cohorts: [],
+      blocking_changed_paths: null,
+      command: null,
+      args: null,
+      exit_code: null,
+      ok: null,
+      stdout: null,
+      stderr: null,
+      parse_error: null,
+      report_path: null
+    },
+    linear_transition: {
+      status: 'failed',
+      attempted_at: '2026-05-12T21:52:16.000Z',
+      previous_state: 'Merging',
+      target_state: 'Blocked',
+      issue_state: 'Merging',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-12T21:52:20.000Z',
+      error: 'linear_transition_conflict: Issue was already updated'
+    },
+    github_rate_limit: null,
+    ...overrides
+  };
+}
+
 function createCo202ReadyIssue(overrides: Partial<LiveLinearTrackedIssue> = {}): LiveLinearTrackedIssue {
   return createTrackedIssue({
     id: 'lin-issue-1',
@@ -31376,6 +31493,370 @@ describe('createProviderIssueHandoffService', () => {
       retry_error: null
     });
     expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps released stale merged closeout claims passive when current polling omits them', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'b642e879-ba50-45ef-b0d9-b059afa9e932',
+      issue_identifier: 'CO-522',
+      issue_title: 'Docs freshness owner rehome already reached Done',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-17T03:20:59.411Z',
+      issue_blocked_by: [],
+      task_id: 'linear-b642e879-ba50-45ef-b0d9-b059afa9e932',
+      run_id: '2026-05-12T20-46-48-273Z-9932ec0c',
+      run_manifest_path:
+        '.runs/linear-b642e879-ba50-45ef-b0d9-b059afa9e932/cli/2026-05-12T20-46-48-273Z-9932ec0c/manifest.json',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null,
+      review_promotion: createStalePromotedReviewRecord({
+        issue_id: 'b642e879-ba50-45ef-b0d9-b059afa9e932'
+      }),
+      merge_closeout: createMergedTransitionFailedCloseoutRecord({
+        issue_id: 'b642e879-ba50-45ef-b0d9-b059afa9e932'
+      })
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-522-stale-closeout-should-not-start',
+      '/tmp/provider-run/co-522-stale-closeout-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: []
+    }));
+    const resolveTrackedIssue = vi.fn(async () => {
+      throw new Error('stale merged closeout history should not use direct issue-by-id');
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssues,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    markProviderPollingStarted(service, { mode: 'refresh' });
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(resolveTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    const pollingHealth = readProviderPollingHealth(service);
+    expect(pollingHealth).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false,
+      refresh_phase: 'refresh:fresh_dispatch',
+      refresh_request_class: 'fresh_dispatch',
+      refresh_counts: expect.objectContaining({
+        claims_scanned: 1,
+        issue_by_id_reads: 0,
+        issue_by_id_deferred: 0,
+        occupied_slots: 0
+      })
+    });
+    expect(pollingHealth?.refresh_phase).not.toBe('refresh:claim_issue_by_id_reconcile');
+    expect(pollingHealth?.refresh_request_class).not.toBe('claim_reconcile:released');
+    expect(pollingHealth?.refresh_request_class).not.toBe('claim_issue_by_id:released');
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-17T03:20:59.411Z',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null,
+      review_promotion: expect.objectContaining({
+        status: 'promoted'
+      }),
+      merge_closeout: expect.objectContaining({
+        status: 'transition_failed',
+        snapshot: expect.objectContaining({
+          state: 'MERGED'
+        })
+      })
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps released stale merged closeout claims revalidating when the current poll snapshot becomes active', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-522-reopened',
+      issue_identifier: 'CO-522-REOPENED',
+      issue_title: 'Stale merged closeout became active again',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-17T03:20:59.411Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-522-reopened',
+      run_id: null,
+      run_manifest_path: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null,
+      review_promotion: createStalePromotedReviewRecord({
+        issue_id: 'lin-co-522-reopened',
+        issue_identifier: 'CO-522-REOPENED'
+      }),
+      merge_closeout: createMergedTransitionFailedCloseoutRecord({
+        issue_id: 'lin-co-522-reopened',
+        issue_identifier: 'CO-522-REOPENED'
+      })
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-522-reopened',
+      '/tmp/provider-run/co-522-reopened-manifest.json'
+    );
+    const resolveTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-co-522-reopened',
+          identifier: 'CO-522-REOPENED',
+          title: 'Stale merged closeout became active again',
+          state: 'Ready',
+          state_type: 'unstarted',
+          updated_at: '2026-05-21T03:15:00.000Z',
+          blocked_by: []
+        })
+      ]
+    }));
+    const resolveTrackedIssue = vi.fn(async () => {
+      throw new Error('current poll snapshot should drive the reopened closeout issue');
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssues,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    markProviderPollingStarted(service, { mode: 'refresh' });
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason:
+        'provider_issue_released_pending_reopen:provider_issue_released:not_active',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-05-21T03:15:00.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      review_promotion: expect.objectContaining({
+        status: 'promoted'
+      }),
+      merge_closeout: expect.objectContaining({
+        status: 'transition_failed'
+      })
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
+  it('keeps current retained promotion metadata revalidating even when closeout history merged', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-522-current-promotion',
+      issue_identifier: 'CO-522-CURRENT-PROMOTION',
+      issue_title: 'Current promotion should not be hidden by merged closeout history',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-17T03:20:59.411Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-522-current-promotion',
+      run_id: null,
+      run_manifest_path: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null,
+      review_promotion: createStalePromotedReviewRecord({
+        issue_id: 'lin-co-522-current-promotion',
+        issue_identifier: 'CO-522-CURRENT-PROMOTION',
+        issue_updated_at: '2026-05-21T03:30:00.000Z'
+      }),
+      merge_closeout: createMergedTransitionFailedCloseoutRecord({
+        issue_id: 'lin-co-522-current-promotion',
+        issue_identifier: 'CO-522-CURRENT-PROMOTION'
+      })
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-522-current-promotion-should-not-start',
+      '/tmp/provider-run/co-522-current-promotion-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: []
+    }));
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-co-522-current-promotion',
+        identifier: 'CO-522-CURRENT-PROMOTION',
+        title: 'Current promotion should not be hidden by merged closeout history',
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-05-21T03:35:00.000Z',
+        blocked_by: []
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssues,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    markProviderPollingStarted(service, { mode: 'refresh' });
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-co-522-current-promotion'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false,
+      refresh_counts: expect.objectContaining({
+        issue_by_id_reads: 1
+      })
+    });
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-05-21T03:35:00.000Z'
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
+  it('clears stale merged closeout residue when direct issue-by-id returns live Done truth', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: 'lin-co-522-live-done',
+      issue_identifier: 'CO-522-LIVE-DONE',
+      issue_title: 'Live Done truth should supersede stale merged closeout residue',
+      issue_state: 'Blocked',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-17T03:20:59.411Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-co-522-live-done',
+      run_id: null,
+      run_manifest_path: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null,
+      review_promotion: createStalePromotedReviewRecord({
+        issue_id: 'lin-co-522-live-done',
+        issue_identifier: 'CO-522-LIVE-DONE'
+      }),
+      merge_closeout: createMergedTransitionFailedCloseoutRecord({
+        issue_id: 'lin-co-522-live-done',
+        issue_identifier: 'CO-522-LIVE-DONE'
+      })
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-522-live-done-should-not-start',
+      '/tmp/provider-run/co-522-live-done-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssues = vi.fn(async () => ({
+      kind: 'skip' as const,
+      reason: 'dispatch_source_unavailable'
+    }));
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-co-522-live-done',
+        identifier: 'CO-522-LIVE-DONE',
+        title: 'Live Done truth should supersede stale merged closeout residue',
+        state: 'Done',
+        state_type: 'completed',
+        updated_at: '2026-05-21T03:40:00.000Z',
+        blocked_by: []
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssues,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    markProviderPollingStarted(service, { mode: 'refresh' });
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: 'lin-co-522-live-done'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-05-21T03:40:00.000Z',
+      review_promotion: expect.objectContaining({
+        status: 'promoted'
+      }),
+      merge_closeout: null
+    });
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false,
+      refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+      refresh_request_class: 'claim_issue_by_id:released',
+      refresh_counts: expect.objectContaining({
+        issue_by_id_reads: 1
+      })
+    });
+    expect(persist).toHaveBeenCalled();
   });
 
   it('keeps map-missing terminal released history passive before claim reconcile progress', async () => {
