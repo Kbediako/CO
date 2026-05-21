@@ -5563,7 +5563,6 @@ export function createProviderIssueHandoffService(
           }
           const shouldKeepCachedReleasedBacklogNotActiveClaimPassiveBeforeReconcile =
             shouldUseCachedReleasedBacklogNotActiveClaim &&
-            trackedIssuesByKey !== null &&
             currentPollTrackedIssue === null &&
             !canFreshDiscoverReleasedLiveWorker &&
             !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot;
