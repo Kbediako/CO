@@ -5595,10 +5595,7 @@ export function createProviderIssueHandoffService(
             ) &&
             currentPollTrackedIssue === null &&
             !canFreshDiscoverReleasedLiveWorker &&
-            (
-              !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot ||
-              hasRecentBacklogNotActivePassiveVerification
-            );
+            !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot;
           if (shouldKeepCachedReleasedBacklogNotActiveClaimPassiveBeforeReconcile) {
             continue;
           }

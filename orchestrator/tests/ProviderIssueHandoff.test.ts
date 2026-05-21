@@ -31606,7 +31606,7 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
-  it('uses direct Backlog issue-by-id proof over stale blocker snapshots for passive released claims', async () => {
+  it('marks direct Backlog proof passive while revalidating stale blocker mismatches', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
     state.claims.push(createCo202ReleasedClaim({
@@ -31719,7 +31719,7 @@ describe('createProviderIssueHandoffService', () => {
     await expect(service.refresh()).resolves.toBeUndefined();
 
     expect(resolveTrackedIssues).toHaveBeenCalledTimes(2);
-    expect(resolveTrackedIssue).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssue).toHaveBeenCalledTimes(2);
     expect(launcher.resume).not.toHaveBeenCalled();
     expect(launcher.start).not.toHaveBeenCalled();
     expect(readProviderPollingHealth(service)).toMatchObject({
