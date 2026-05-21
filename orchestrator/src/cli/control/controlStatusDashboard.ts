@@ -999,13 +999,15 @@ function renderDashboardDegradedLines(
   if (!degraded) {
     return [];
   }
+  const reason = sanitizeDisplayValue(degraded.reason);
+  const message = sanitizeDisplayValue(degraded.message);
   return [
     renderSummaryLine(
       'Dashboard error',
       [
-        { text: degraded.reason, color: ANSI_RED },
+        { text: reason, color: ANSI_RED },
         { text: ' | ', color: ANSI_GRAY },
-        { text: degraded.message, color: ANSI_RED, truncateMode: 'end' }
+        { text: message, color: ANSI_RED, truncateMode: 'end' }
       ],
       terminalColumns
     )

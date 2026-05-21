@@ -162,7 +162,7 @@ export async function readCoStatusMachineStatusDataset(input: {
       setTarget: (nextTarget) => {
         target = nextTarget;
       },
-      requestTimeoutMs: Math.min(requestTimeoutMs, 1_000),
+      requestTimeoutMs,
       recoverSameEndpointTimeout: true
     });
   } catch (error) {
@@ -341,11 +341,14 @@ function isRecentMachineStatusTimestamp(value: unknown, maxAgeMs: number): boole
 }
 
 function hasActiveNoProgressRefresh(polling: Record<string, unknown> | null | undefined): boolean {
-  if (!polling || polling.checking !== true) {
+  if (!polling) {
     return false;
   }
   if (polling.stuck === true || polling.restart_required === true) {
     return true;
+  }
+  if (polling.checking !== true) {
+    return false;
   }
   const progressElapsedMs =
     typeof polling.progress_elapsed_ms === 'number' && Number.isFinite(polling.progress_elapsed_ms)

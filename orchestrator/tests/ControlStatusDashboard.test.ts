@@ -673,6 +673,32 @@ describe('control status dashboard', () => {
     expect(plainFrame).toContain('├─ Running');
   });
 
+  it('sanitizes degraded dashboard error fields before rendering', () => {
+    const frame = renderControlStatusFrame({
+      dataset: buildDataset({
+        dashboard_degraded: {
+          reason: 'read_timeout\nsecond_line',
+          source: 'ui_data_controller',
+          message: 'provider projection \u001b[31mfailed\u001b[0m\rwith control',
+          timeout_ms: 1000,
+          generated_at: '2026-05-21T12:30:00.000Z'
+        }
+      }),
+      baseUrl: 'http://127.0.0.1:4100',
+      taskId: 'local-mcp',
+      runId: 'control-host',
+      runDir: '/repo/.runs/local-mcp/cli/control-host',
+      startPipelineId: 'provider-linear-worker',
+      terminalColumns: 120,
+      throughputTps: 1842.7
+    });
+
+    const plainFrame = stripAnsi(frame);
+    expect(plainFrame).toContain(
+      '│ Dashboard error: read_timeout second_line | provider projection failed with control'
+    );
+  });
+
   it('keeps degraded dashboard errors visible in compact mode', () => {
     const frame = renderControlStatusFrame({
       dataset: buildDataset({

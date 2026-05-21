@@ -456,7 +456,7 @@ export async function readMachineStatusDatasetWithEndpointRecovery(input: {
           throw retryError;
         }
         throw new Error(
-          `control-host endpoint rotated from ${previousTarget.baseUrl.toString()} to ${resolvedTarget.baseUrl.toString()}, but the refreshed endpoint is not readable. ${formatAttachRequestFailure(retryError, resolvedTarget, { endpointAlreadyRotated: true })}`
+          `control-host endpoint rotated from ${previousTarget.baseUrl.toString()} to ${resolvedTarget.baseUrl.toString()}, but the refreshed endpoint is not readable. ${formatAttachRequestFailure(retryError, resolvedTarget, { endpointAlreadyRotated: true, endpointLabel: 'machine-status' })}`
         );
       }
     }
@@ -479,10 +479,10 @@ export async function readMachineStatusDatasetWithEndpointRecovery(input: {
             )
           );
         }
-        throw new Error(formatAttachRequestFailure(retryError, previousTarget));
+        throw new Error(formatAttachRequestFailure(retryError, previousTarget, { endpointLabel: 'machine-status' }));
       }
     }
-    throw new Error(formatAttachRequestFailure(error, previousTarget));
+    throw new Error(formatAttachRequestFailure(error, previousTarget, { endpointLabel: 'machine-status' }));
   }
 }
 
@@ -580,7 +580,7 @@ function formatSameEndpointTimeoutFailure(
 function formatAttachRequestFailure(
   error: unknown,
   target: CoStatusAttachTarget,
-  options: { endpointAlreadyRotated?: boolean } = {}
+  options: { endpointAlreadyRotated?: boolean; endpointLabel?: string } = {}
 ): string {
   if (error instanceof CoStatusAttachRequestError) {
     if (error.kind === 'network') {
@@ -594,7 +594,7 @@ function formatAttachRequestFailure(
     }
     return error.message;
   }
-  return `control-host ui request failed: ${(error as Error)?.message ?? String(error)}`;
+  return `control-host ${options.endpointLabel ?? 'ui'} request failed: ${(error as Error)?.message ?? String(error)}`;
 }
 
 function formatFetchNetworkError(error: unknown): string {

@@ -529,7 +529,7 @@ describe('runCoStatusCliShell', () => {
       /current resolved \/ui\/data\.json endpoint .* timed out again after endpoint re-resolution returned the same endpoint\/token/u
     );
     expect((thrown as Error)?.message ?? String(thrown)).not.toMatch(/control_endpoint\.json has not rotated/u);
-    expect(fetchSpy).toHaveBeenCalled();
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
   it('falls back to fresh supervisor truth after repeated direct json current-endpoint timeouts', async () => {
@@ -786,6 +786,48 @@ describe('runCoStatusCliShell', () => {
         retrying: 0,
         issues: 0
       }
+    });
+  });
+
+  it('honors caller timeout budgets for machine-status endpoint reads', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    await writeProviderIntakeState(runDir, {
+      claims: [],
+      updatedAtMsAgo: 1_000,
+      polling: buildFreshProviderPolling({
+        active_claims: [],
+        progress_elapsed_ms: 750
+      })
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(buildAbortError())
+      .mockRejectedValueOnce(buildAbortError());
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    const payload = await readCoStatusMachineStatusDataset({
+      flags: {
+        format: 'json',
+        'machine-status': true,
+        'run-dir': runDir
+      },
+      requestTimeoutMs: 1_500
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    const requestTimeouts = timeoutSpy.mock.calls
+      .map((call) => Number(call[1]))
+      .filter((delay) => Number.isFinite(delay));
+    expect(requestTimeouts.filter((delay) => delay === 1_500)).toHaveLength(2);
+    expect(requestTimeouts).not.toContain(1_000);
+    expect(payload.degraded_read).toMatchObject({
+      reason: 'ui_request_timeout',
+      source: 'local_machine_status'
     });
   });
 
@@ -1125,6 +1167,22 @@ describe('runCoStatusCliShell', () => {
       }
     },
     {
+      name: 'restart_required=true on an active worker even when checking=false',
+      buildState: async (_root: string, runDir: string) => {
+        await writeProviderIntakeState(runDir, {
+          claimState: 'running',
+          updatedAtMsAgo: 1_000,
+          polling: buildFreshProviderPolling({
+            active_claims: ['linear:lin-issue-1'],
+            checking: false,
+            stuck: false,
+            restart_required: true,
+            reason: 'provider_refresh_lifecycle_stuck'
+          })
+        });
+      }
+    },
+    {
       name: 'failed run evidence',
       buildState: async (root: string, runDir: string) => {
         const manifestPath = await writeProviderRunManifest(root, {
@@ -1173,9 +1231,9 @@ describe('runCoStatusCliShell', () => {
           'run-dir': runDir
         }
       })
-    ).rejects.toThrow();
+    ).rejects.toThrow(/same-endpoint current-endpoint timeout/u);
 
-    expect(fetchSpy).toHaveBeenCalled();
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
   it('fails closed on machine-status fallback when zero-WIP polling is actively stalled', async () => {
@@ -1212,7 +1270,7 @@ describe('runCoStatusCliShell', () => {
           'run-dir': runDir
         }
       })
-    ).rejects.toThrow();
+    ).rejects.toThrow(/same-endpoint current-endpoint timeout/u);
 
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });

@@ -840,6 +840,30 @@ async function probeControlHostHealth(
   }
   if (result.exitCode !== 0) {
     const detail = result.stderr.trim() || result.stdout.trim() || 'co-status command failed.';
+    if (isCoStatusProbeTimeoutFailure(detail)) {
+      const diagnostic = await readControlHostSupervisionProbeTimeoutDiagnostic(config, env);
+      const timeoutQuarantine = evaluateControlHostSupervisionProbeTimeoutDiagnostic(diagnostic, {
+        minPollingUpdatedAt: options.minPollingUpdatedAt ?? null,
+        restartHistory: options.restartHistory ?? null,
+        maxZeroWipPollingAgeMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000
+      });
+      if (timeoutQuarantine) {
+        return {
+          healthy: timeoutQuarantine.healthy,
+          reason: timeoutQuarantine.reason,
+          message: timeoutQuarantine.message,
+          probeDurationMs,
+          diagnostic
+        };
+      }
+      return {
+        healthy: false,
+        reason: 'probe_timeout',
+        message: `co-status probe timed out: ${detail}`,
+        probeDurationMs,
+        diagnostic
+      };
+    }
     return {
       healthy: false,
       reason: 'probe_failed',
@@ -875,6 +899,13 @@ async function probeControlHostHealth(
     probeDurationMs,
     diagnostic
   };
+}
+
+function isCoStatusProbeTimeoutFailure(detail: string): boolean {
+  return (
+    /\b(?:timed out|timeout)\b/iu.test(detail) &&
+    (/\bmachine-status\b/iu.test(detail) || /\bsame-endpoint current-endpoint timeout\b/iu.test(detail))
+  );
 }
 
 async function readControlHostSupervisionProbeTimeoutDiagnostic(

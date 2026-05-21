@@ -57,7 +57,7 @@
       "paths": {
         "agent_task": ".agent/task/linear-f7007d31-6a20-43e8-8f38-ca774a890683.md",
         "prd": "docs/PRD-linear-f7007d31-6a20-43e8-8f38-ca774a890683.md",
-        "docs": "tasks/specs/linear-f7007d31-6a20-43e8-8f38-ca774a890683.md",
+        "docs": "docs/TECH_SPEC-linear-f7007d31-6a20-43e8-8f38-ca774a890683.md",
         "action_plan": "docs/ACTION_PLAN-linear-f7007d31-6a20-43e8-8f38-ca774a890683.md",
         "tech_spec_mirror": "docs/TECH_SPEC-linear-f7007d31-6a20-43e8-8f38-ca774a890683.md",
         "spec": "tasks/specs/linear-f7007d31-6a20-43e8-8f38-ca774a890683.md",

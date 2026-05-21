@@ -2449,6 +2449,65 @@ describe('controlHostSupervision shell helpers', () => {
     }
   });
 
+  it('classifies machine-status same-endpoint timeout exits as probe timeouts', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-machine-status-exit-timeout-'));
+    try {
+      const config = buildControlHostSupervisionConfig({
+        homeDir: '/Users/tester',
+        cwd: tempRoot,
+        repoRoot: tempRoot,
+        nodePath: '/custom/node',
+        cliEntrypoint: '/opt/codex-orchestrator.js',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        healthIntervalSeconds: 5
+      });
+      await writeProviderIntakeStateFixture(config, {
+        polling: buildFreshZeroWipPollingFixture({
+          checking: true,
+          refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+          refresh_request_class: 'claim_issue_by_id:accepted',
+          progress_updated_at: '2026-04-21T07:00:59.000Z',
+          progress_elapsed_ms: 20 * 60 * 1_000,
+          operation_elapsed_ms: 20 * 60 * 1_000,
+          stalled_after_ms: 45_000
+        }),
+        claims: []
+      });
+
+      const result = await probeControlHostHealth(
+        config,
+        {},
+        {},
+        async () => ({
+          exitCode: 1,
+          stdout: '',
+          stderr:
+            'control-host machine-status request timeout after 5000ms. The current resolved /ui/machine-status.json endpoint timed out again after endpoint re-resolution returned the same endpoint/token; this is a same-endpoint current-endpoint timeout.',
+          timedOut: false
+        })
+      );
+
+      expect(result).toMatchObject({
+        healthy: false,
+        reason: 'probe_timeout',
+        diagnostic: {
+          counts: {
+            running: 0,
+            active: 0
+          },
+          polling: {
+            checking: true,
+            progress_elapsed_ms: 20 * 60 * 1_000,
+            stalled_after_ms: 45_000
+          }
+        }
+      });
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it('fails closed on probe timeout when provider-intake has active non-running WIP', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-active-accepted-timeout-'));
     try {
