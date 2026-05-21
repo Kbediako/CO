@@ -639,7 +639,7 @@
       "owners": [
         "Codex"
       ],
-      "status": "implementation_in_progress",
+      "status": "implementation_complete_pr_pending",
       "last_review": "2026-05-21",
       "canonical_owner_key": "control-host:released-claim-reconcile-restart-loop",
       "evidence": [
@@ -671,7 +671,7 @@
         }
       },
       "validation": {
-        "status": "implementation_in_progress_docs_freshness_baseline_blocked",
+        "status": "implementation_complete_pr_pending",
         "passed": [
           "live Linear issue-context read",
           "single workpad created",
