@@ -14,6 +14,7 @@ import {
 } from '../src/cli/coStatusCliShell.js';
 import { runCoStatusOperatorAutopilotCliShell } from '../src/cli/coStatusOperatorAutopilotCliShell.js';
 import { appendProviderOperatorAutopilotLifecycleRecord } from '../src/cli/control/providerOperatorAutopilotLifecycle.js';
+import type { SourceRootFreshnessInspection } from '../src/cli/utils/sourceRootFreshness.js';
 
 const tempDirs: string[] = [];
 const servers = new Set<http.Server>();
@@ -41,7 +42,74 @@ afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { force: true, recursive: true })));
 });
 
+function createStaleGeneratedRuntimeFreshness(): SourceRootFreshnessInspection {
+  return {
+    schema_version: 1,
+    status: 'warning',
+    observed_at: '2026-05-22T00:00:00.000Z',
+    intended_repo_root: '/repo',
+    intended_repo_root_realpath: '/repo',
+    command_path: '/repo/dist/bin/codex-orchestrator.js',
+    command_path_realpath: '/repo/dist/bin/codex-orchestrator.js',
+    package_root: '/repo',
+    package_root_realpath: '/repo',
+    source_root: '/repo',
+    source_root_realpath: '/repo',
+    entrypoint_kind: 'dist',
+    base_ref: 'origin/main',
+    source_checkout: null,
+    intended_checkout: null,
+    drift_classes: ['source_vs_dist_drift'],
+    provenance: {
+      command_path_source: 'argv',
+      package_root_source: 'command_path',
+      source_root_source: 'package_root',
+      command_path_inside_package: true,
+      package_root_matches_intended: true,
+      source_root_matches_intended: true,
+      source_entry_exists: true,
+      dist_entry_exists: true
+    },
+    guidance: ['Use the source-first bootstrap entrypoint before relying on fresh TypeScript changes.'],
+    detail: 'Detected source/root drift: source_vs_dist_drift.'
+  };
+}
+
 describe('runCoStatusCliShell', () => {
+  it('fails closed with runtime freshness JSON when co-status is running stale generated dist', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const setExitCode = vi.fn();
+
+    await runCoStatusCliShell(
+      {
+        flags: {
+          format: 'json'
+        },
+        printHelp: vi.fn()
+      },
+      {
+        inspectRuntimeFreshness: () => createStaleGeneratedRuntimeFreshness(),
+        setExitCode
+      }
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(log).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(String(log.mock.calls[0]?.[0])) as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      mode: 'co_status_runtime_freshness',
+      read_only: true,
+      status: 'blocked',
+      reason: 'stale_generated_runtime',
+      stale_generated_runtime: true,
+      source_root_freshness: {
+        status: 'warning',
+        entrypoint_kind: 'dist',
+        drift_classes: ['source_vs_dist_drift']
+      }
+    });
+  });
+
   it('emits the authenticated machine-status snapshot for plain --format json', async () => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
     tempDirs.push(root);

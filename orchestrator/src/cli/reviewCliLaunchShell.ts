@@ -73,17 +73,17 @@ function resolveReviewRunner(dependencies: ReviewCliLaunchShellDependencies): Ex
     };
   }
 
-  if (dependencies.fileExists(distRunner)) {
-    return {
-      command: dependencies.execPath,
-      args: [distRunner]
-    };
-  }
-
   if (dependencies.fileExists(sourceRunner)) {
     return {
       command: dependencies.execPath,
       args: ['--loader', 'ts-node/esm', sourceRunner]
+    };
+  }
+
+  if (dependencies.fileExists(distRunner)) {
+    return {
+      command: dependencies.execPath,
+      args: [distRunner]
     };
   }
 

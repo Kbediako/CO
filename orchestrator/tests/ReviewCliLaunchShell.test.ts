@@ -38,7 +38,7 @@ describe('runReviewCliLaunchShell', () => {
     expect(setExitCode).not.toHaveBeenCalled();
   });
 
-  it('prefers the dist review runner when available outside source runtime', async () => {
+  it('prefers the source review runner when source packet exists outside source runtime', async () => {
     const runPassthroughCommand = vi.fn().mockResolvedValue(0);
 
     await runReviewCliLaunchShell(
@@ -54,13 +54,17 @@ describe('runReviewCliLaunchShell', () => {
       }
     );
 
-    expect(runPassthroughCommand).toHaveBeenCalledWith('/node', ['/repo/dist/scripts/run-review.js'], {
-      cwd: process.cwd(),
-      env: process.env
-    });
+    expect(runPassthroughCommand).toHaveBeenCalledWith(
+      '/node',
+      ['--loader', 'ts-node/esm', '/repo/scripts/run-review.ts'],
+      {
+        cwd: process.cwd(),
+        env: process.env
+      }
+    );
   });
 
-  it('falls back to the source review runner when dist output is absent', async () => {
+  it('uses the source review runner when dist output is absent', async () => {
     const runPassthroughCommand = vi.fn().mockResolvedValue(0);
 
     await runReviewCliLaunchShell(
@@ -84,6 +88,28 @@ describe('runReviewCliLaunchShell', () => {
         env: process.env
       }
     );
+  });
+
+  it('falls back to the dist review runner for packaged installs without source runner', async () => {
+    const runPassthroughCommand = vi.fn().mockResolvedValue(0);
+
+    await runReviewCliLaunchShell(
+      {
+        rawArgs: []
+      },
+      {
+        runningFromSourceRuntime: () => false,
+        getPackageRoot: () => '/repo',
+        fileExists: (path) => path === '/repo/dist/scripts/run-review.js',
+        execPath: '/node',
+        runPassthroughCommand
+      }
+    );
+
+    expect(runPassthroughCommand).toHaveBeenCalledWith('/node', ['/repo/dist/scripts/run-review.js'], {
+      cwd: process.cwd(),
+      env: process.env
+    });
   });
 
   it('propagates a non-zero exit code via process.exitCode', async () => {
