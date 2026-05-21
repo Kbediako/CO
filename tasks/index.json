@@ -425,8 +425,8 @@
       "owners": [
         "Codex"
       ],
-      "status": "validation_green_review_rerun_pending",
-      "last_review": "2026-05-20",
+      "status": "done",
+      "last_review": "2026-05-21",
       "canonical_owner_key": "docs:freshness:maintain",
       "approvals": {
         "issue_context": {
@@ -483,10 +483,16 @@
           "status": "findings_addressed_rerun_pending",
           "telemetry": ".runs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0/cli/2026-05-20T05-42-16-678Z-149a19d9/review/telemetry.json",
           "summary": "May 20 reruns reported CO558-REVIEW-001 for stale task-index wording and CO558-REVIEW-REGISTRY-001 / CO558-CODE-001 for completed spec row disposition. The task-index wording is fixed; archive-stub audit proved archived registry status is invalid while linked historical checklists remain open, so the rows now retain active reviewed registry metadata plus explicit lifecycle notes and terminal spec frontmatter. A fresh clean review rerun remains required before handoff."
+        },
+        "terminal_replaced_by_co573": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-21",
+          "status": "historical_lineage_preserved_live_owner_rehomed",
+          "summary": "CO-558 is terminal Done and is retained only as historical docs:freshness:maintain lineage; live global owner metadata moved to CO-573 while exact-key CO-568/CO-569 retained cohort owners remain unchanged."
         }
       },
       "validation": {
-        "status": "validation_green_review_rerun_pending",
+        "status": "done_terminal_replaced_by_co573",
         "passed": [
           "live issue-context",
           "single workpad confirmed",
@@ -511,13 +517,11 @@
           "diff-budget",
           "git diff --check",
           "docs:archive-stub-check via npm run docs:check",
-          "archive-stub audit rejected invalid archive disposition and active reviewed metadata was retained"
+          "archive-stub audit rejected invalid archive disposition and active reviewed metadata was retained",
+          "CO-558 terminal Done lineage preserved in tasks/index.json",
+          "live global docs:freshness:maintain owner re-homed to CO-573 after CO-558 became terminal"
         ],
-        "pending": [
-          "clean standalone review rerun after CO558-REVIEW-001 fix",
-          "elegance pass before PR handoff",
-          "PR attachment and ready-review drain before review-state transition"
-        ]
+        "pending": []
       },
       "paths": {
         "prd": "docs/PRD-linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
@@ -545,6 +549,142 @@
         {
           "identifier": "CO-515",
           "relation": "source_follow_up_issue_that_exposed_unrelated_baseline_debt"
+        },
+        {
+          "identifier": "CO-573",
+          "relation": "live_replacement_docs_freshness_maintenance_owner_after_terminal_co558"
+        }
+      ],
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain"
+    },
+    {
+      "id": "20260521-linear-b02f8333-202c-49ed-9443-8daf921e297d",
+      "title": "CO-573 replace terminal CO-558 docs freshness pre-expiry owner",
+      "relates_to": "tasks/tasks-linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "review_clean_elegance_complete_pr_open",
+      "last_review": "2026-05-21",
+      "canonical_owner_key": "docs:freshness:maintain",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-21",
+          "status": "confirmed_in_progress",
+          "summary": "Live issue-context verified CO-573 was Ready with no attached PR and no workpad; parent moved it to In Progress before active coding."
+        },
+        "parallelization": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-21",
+          "status": "parallelize_now_recorded",
+          "summary": "Pre-turn matrix identified a safe registry/index owner-truth child lane while the parent retained catalog, cohort guide, packet, validation, PR, and Linear lifecycle ownership."
+        },
+        "registry_index_child_lane": {
+          "reviewer": "bounded same-issue child lane registry-index-owner-audit",
+          "date": "2026-05-21",
+          "status": "accepted_for_parent_import",
+          "manifest": ".runs/linear-b02f8333-202c-49ed-9443-8daf921e297d-registry-index-owner-audit/cli/2026-05-21T17-26-04-185Z-4cd65962/manifest.json",
+          "summary": "Child lane updated active index/registry owner truth; parent reconciled the patch with the new CO-573 packet rows and restored existing CO-558 packet rows to structured source_issue=CO-558 after standalone review finding CO573-REVIEW-001."
+        },
+        "owner_rehome": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-21",
+          "status": "owner_verified_live",
+          "report": "out/linear-b02f8333-202c-49ed-9443-8daf921e297d/docs-freshness-maintenance.json",
+          "summary": "docs:freshness:maintain now verifies CO-573 as the live same-project owner; remaining over-budget/pre-expiry action evidence remains visible under the live owner instead of terminal CO-558."
+        },
+        "required_validation": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-21",
+          "status": "completed_with_expected_freshness_baseline_blocks",
+          "reports": {
+            "docs_freshness": "out/linear-b02f8333-202c-49ed-9443-8daf921e297d/docs-freshness.json",
+            "docs_freshness_maintain": "out/linear-b02f8333-202c-49ed-9443-8daf921e297d/docs-freshness-maintenance.json"
+          },
+          "summary": "docs:freshness and docs:freshness:maintain were rerun after review remediation; both preserve the expected over-budget/pre-expiry baseline, while docs:freshness:maintain verifies live owner CO-573. spec-guard dry-run and docs:check passed."
+        },
+        "standalone_review_20260521": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-21",
+          "status": "clean_success",
+          "telemetry": ".runs/linear-b02f8333-202c-49ed-9443-8daf921e297d/cli/2026-05-21T17-22-52-510Z-2af7988c/review/telemetry.json",
+          "summary": "Initial review found CO573-REVIEW-001 and stable-evidence rerun found CO573-REVIEW-002. Parent addressed both by restoring CO-558 registry provenance and restoring CO-558 as a terminal tasks/index lineage row while keeping CO-573 as the separate live owner row. PR follow-up review found CO573-REVIEW-003; parent addressed it by setting the fallback Review date to 2026-06-04 while preserving maximum lifetime 2026-06-20. Final enforce-contract review succeeded with review_verdict=clean, contract_validation.status=valid, contract_overall_verdict=clean."
+        },
+        "elegance_review_20260521": {
+          "reviewer": "CO provider worker",
+          "date": "2026-05-21",
+          "status": "complete_no_simplification_applied",
+          "summary": "Explicit elegance/minimality pass found no avoidable abstraction or scope to remove: the staged diff is limited to the required docs-first packet, one catalog owner change, registry/index provenance repairs, and cohort-guide lineage wording."
+        }
+      },
+      "validation": {
+        "status": "review_clean_elegance_complete_pr_open",
+        "passed": [
+          "live issue-context",
+          "single workpad created",
+          "parallelization decision recorded",
+          "registry-index-owner-audit child lane completed and was accepted",
+          "docs-first packet created",
+          "global docs:freshness:maintain owner metadata re-homed from CO-558 to CO-573",
+          "CO-558 terminal lineage preserved in structured source_issue on historical CO-558 packet rows",
+          "CO-568 and CO-569 exact-key retained cohort owners preserved",
+          "CO-572 kept out of scope",
+          "npm run docs:freshness executed with expected preserved baseline nonzero output",
+          "npm run docs:freshness:maintain executed with expected block_spec_guard_pre_expiry under live CO-573 owner",
+          "node scripts/spec-guard.mjs --dry-run",
+          "npm run docs:check",
+          "npm run build",
+          "npm run lint",
+          "npm run test",
+          "npm run repo:stewardship",
+          "node scripts/diff-budget.mjs",
+          "git diff --check",
+          "CO573-REVIEW-001 addressed",
+          "CO573-REVIEW-002 addressed",
+          "CO573-REVIEW-003 addressed",
+          "manifest-backed standalone review clean",
+          "explicit elegance/minimality pass completed",
+          "PR #866 opened and attached to Linear"
+        ],
+        "pending": [
+          "ready-review drain before review-state transition"
+        ]
+      },
+      "paths": {
+        "prd": "docs/PRD-linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
+        "docs": "docs/TECH_SPEC-linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
+        "action_plan": "docs/ACTION_PLAN-linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
+        "spec": "tasks/specs/linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
+        "task": "tasks/tasks-linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
+        "agent_task": ".agent/task/linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
+        "policy_doc": "docs/guides/docs-freshness-cohorts.md",
+        "catalog": "docs/docs-catalog.json",
+        "registry": "docs/docs-freshness-registry.json"
+      },
+      "source_issue": {
+        "id": "b02f8333-202c-49ed-9443-8daf921e297d",
+        "identifier": "CO-573",
+        "url": "https://linear.app/asabeko/issue/CO-573/co-replace-terminal-co-558-docs-freshness-pre-expiry-owner"
+      },
+      "related_issues": [
+        {
+          "identifier": "CO-558",
+          "relation": "terminal_previous_docs_freshness_maintenance_owner"
+        },
+        {
+          "identifier": "CO-572",
+          "relation": "unrelated_status_machine_baseline_exposure_context"
+        },
+        {
+          "identifier": "CO-568",
+          "relation": "live_exact_key_owner_for_may19_retained_cohort"
+        },
+        {
+          "identifier": "CO-569",
+          "relation": "live_exact_key_owner_for_may20_retained_cohort"
         }
       ]
     },

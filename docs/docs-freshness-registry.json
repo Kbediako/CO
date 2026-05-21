@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-05-20",
+  "generated_at": "2026-05-21",
   "entries": [
     {
       "path": ".agent/task/linear-c093b71f-c6bd-423a-a6ec-3ee3436d6b53.md",
@@ -592,7 +592,8 @@
       "doc_class": "task_mirror",
       "lifecycle_state": "active",
       "created_at": "2026-05-19",
-      "next_review": "2026-06-19"
+      "next_review": "2026-06-19",
+      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558."
     },
     {
       "path": "docs/ACTION_PLAN-linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
@@ -608,7 +609,8 @@
       "doc_class": "task_packet",
       "lifecycle_state": "active",
       "created_at": "2026-05-19",
-      "next_review": "2026-06-19"
+      "next_review": "2026-06-19",
+      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558."
     },
     {
       "path": "docs/PRD-linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
@@ -624,7 +626,8 @@
       "doc_class": "task_packet",
       "lifecycle_state": "active",
       "created_at": "2026-05-19",
-      "next_review": "2026-06-19"
+      "next_review": "2026-06-19",
+      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558."
     },
     {
       "path": "docs/TECH_SPEC-linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
@@ -640,7 +643,8 @@
       "doc_class": "task_packet",
       "lifecycle_state": "active",
       "created_at": "2026-05-19",
-      "next_review": "2026-06-19"
+      "next_review": "2026-06-19",
+      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558."
     },
     {
       "path": "tasks/specs/linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
@@ -656,7 +660,8 @@
       "doc_class": "task_packet",
       "lifecycle_state": "active",
       "created_at": "2026-05-19",
-      "next_review": "2026-06-19"
+      "next_review": "2026-06-19",
+      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558."
     },
     {
       "path": "tasks/tasks-linear-b9447b5a-224d-4731-bab9-95bb0597dbe0.md",
@@ -672,7 +677,8 @@
       "doc_class": "task_packet",
       "lifecycle_state": "active",
       "created_at": "2026-05-19",
-      "next_review": "2026-06-19"
+      "next_review": "2026-06-19",
+      "notes": "CO-558 remains the historical packet source issue; CO-573 is only the live global docs:freshness:maintain owner after terminal CO-558."
     },
     {
       "path": ".agent/task/linear-2d28fad8-60e7-462d-9c70-dec1d421b55c.md",
@@ -43805,6 +43811,108 @@
       "lifecycle_state": "active",
       "created_at": "2026-05-20",
       "next_review": "2026-06-20"
+    },
+    {
+      "path": ".agent/task/linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "b02f8333-202c-49ed-9443-8daf921e297d",
+        "identifier": "CO-573",
+        "url": "https://linear.app/asabeko/issue/CO-573/co-replace-terminal-co-558-docs-freshness-pre-expiry-owner"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20",
+      "notes": "CO-573 docs-first packet for live docs:freshness:maintain owner re-home after terminal CO-558; CO-572 remains out of scope."
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "b02f8333-202c-49ed-9443-8daf921e297d",
+        "identifier": "CO-573",
+        "url": "https://linear.app/asabeko/issue/CO-573/co-replace-terminal-co-558-docs-freshness-pre-expiry-owner"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20",
+      "notes": "CO-573 docs-first packet for live docs:freshness:maintain owner re-home after terminal CO-558; CO-572 remains out of scope."
+    },
+    {
+      "path": "docs/PRD-linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "b02f8333-202c-49ed-9443-8daf921e297d",
+        "identifier": "CO-573",
+        "url": "https://linear.app/asabeko/issue/CO-573/co-replace-terminal-co-558-docs-freshness-pre-expiry-owner"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20",
+      "notes": "CO-573 docs-first packet for live docs:freshness:maintain owner re-home after terminal CO-558; CO-572 remains out of scope."
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "b02f8333-202c-49ed-9443-8daf921e297d",
+        "identifier": "CO-573",
+        "url": "https://linear.app/asabeko/issue/CO-573/co-replace-terminal-co-558-docs-freshness-pre-expiry-owner"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20",
+      "notes": "CO-573 docs-first packet for live docs:freshness:maintain owner re-home after terminal CO-558; CO-572 remains out of scope."
+    },
+    {
+      "path": "tasks/specs/linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "b02f8333-202c-49ed-9443-8daf921e297d",
+        "identifier": "CO-573",
+        "url": "https://linear.app/asabeko/issue/CO-573/co-replace-terminal-co-558-docs-freshness-pre-expiry-owner"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20",
+      "notes": "CO-573 docs-first packet for live docs:freshness:maintain owner re-home after terminal CO-558; CO-572 remains out of scope."
+    },
+    {
+      "path": "tasks/tasks-linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "b02f8333-202c-49ed-9443-8daf921e297d",
+        "identifier": "CO-573",
+        "url": "https://linear.app/asabeko/issue/CO-573/co-replace-terminal-co-558-docs-freshness-pre-expiry-owner"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20",
+      "notes": "CO-573 docs-first packet for live docs:freshness:maintain owner re-home after terminal CO-558; CO-572 remains out of scope."
     }
   ]
 }
