@@ -889,10 +889,11 @@ function resolveProviderIssueHandoffWatchdogDelayMs(
   providerIssueHandoff: ProviderIssueHandoffService
 ): number {
   const health = readProviderPollingHealth(providerIssueHandoff);
-  if (!health?.checking || health.operation_elapsed_ms === null) {
+  const progressElapsedMs = health?.progress_elapsed_ms ?? health?.operation_elapsed_ms ?? null;
+  if (!health?.checking || progressElapsedMs === null) {
     return PROVIDER_REFRESH_STUCK_AFTER_MS;
   }
-  return Math.max(0, PROVIDER_REFRESH_STUCK_AFTER_MS - health.operation_elapsed_ms);
+  return Math.max(0, PROVIDER_REFRESH_STUCK_AFTER_MS - progressElapsedMs);
 }
 
 function resolveProviderWorkerRecoverWatchdogDelayMs(
@@ -1361,18 +1362,43 @@ async function waitForProviderIssueHandoffPendingWithWatchdog(
   options: { forceStuckOnWatchdog?: boolean } = {}
 ): Promise<void> {
   let stuckWatchdog: NodeJS.Timeout | null = null;
+  let pendingSettled = false;
   try {
-    await Promise.race([
-      waitForProviderIssueHandoffPending(providerIssueHandoff, pending),
-      new Promise<void>((resolve) => {
+    const watchedPending = waitForProviderIssueHandoffPending(providerIssueHandoff, pending)
+      .finally(() => {
+        pendingSettled = true;
+      });
+    const watchdog = new Promise<void>((resolve, reject) => {
+      const arm = (): void => {
         const watchdogDelayMs = resolveWatchdogDelayMs();
         stuckWatchdog = setTimeout(() => {
-          void resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff, {
-            force: options.forceStuckOnWatchdog === true
-          }).finally(resolve);
+          stuckWatchdog = null;
+          void (async () => {
+            if (options.forceStuckOnWatchdog === true) {
+              await resolveProviderIssueHandoffStuckOutcome(providerIssueHandoff, {
+                force: true
+              });
+              resolve();
+              return;
+            }
+            const outcome = await resolveProviderIssueHandoffStuckOutcome(
+              providerIssueHandoff,
+              { force: false }
+            );
+            if (outcome || pendingSettled) {
+              resolve();
+              return;
+            }
+            arm();
+          })().catch(reject);
         }, watchdogDelayMs);
         stuckWatchdog.unref?.();
-      })
+      };
+      arm();
+    });
+    await Promise.race([
+      watchedPending,
+      watchdog
     ]);
   } finally {
     if (stuckWatchdog) {
