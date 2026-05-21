@@ -31664,6 +31664,7 @@ describe('createProviderIssueHandoffService', () => {
     await expect(service.refresh()).resolves.toBeUndefined();
 
     expect(resolveTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssues).toHaveBeenCalledWith(undefined);
     expect(resolveTrackedIssue).toHaveBeenCalledWith({
       provider: 'linear',
       issueId: 'lin-co-521-backlog-ready'

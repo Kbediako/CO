@@ -43,7 +43,8 @@ CO-571 fixes provider refresh lifecycle classification for retained released ter
 - Current-poll terminal `not_active` history still records `claim_reconcile:released`, churns the released claim, or drives restart-required health.
 - Map-missing terminal `not_active` history still records `claim_reconcile:released` only because completed/canceled issue filtering leaves no current poll entry.
 - Passive Backlog/backlog released `not_active` history still enters direct issue-by-id or drives restart-required health without active/retry/promotion/merge-closeout evidence.
-- Passive Backlog/backlog released `not_active` history is hidden during a no-current-poll refresh without a recent explicit `passive_release` direct issue-by-id verification for the same Backlog snapshot, or active direct issue-by-id truth fails to start work.
+- Passive Backlog/backlog released `not_active` history is hidden during a no-current-poll refresh without a recent explicit `passive_release` direct issue-by-id verification for the same Backlog snapshot.
+- Active direct issue-by-id truth for a Backlog/backlog released `not_active` row fails to start work.
 - Stale retained merged-closeout history still enters direct issue-by-id or drives restart-required health when current polling omits it and no active/retry/current-promotion/cancelable-run evidence exists.
 - Stale retained `review_promotion` keeps terminal released history active, or current promotion metadata is hidden.
 - Provider-intake audit history is deleted or manually edited to clear the loop.

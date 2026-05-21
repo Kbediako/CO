@@ -134,7 +134,8 @@ task_checklists:
   - status surfaces fabricate a coherent snapshot after timeout
   - the behavior is only repaired by restarting the host
   - a passive Backlog/backlog released `not_active` row with no active/retry/promotion/merge-closeout evidence still enters `claim_issue_by_id:released`
-  - a passive Backlog/backlog released `not_active` row with no active/retry/promotion/merge-closeout evidence is hidden during a no-current-poll refresh without a recent explicit `passive_release` direct issue-by-id verification for the same Backlog snapshot, or active direct issue-by-id truth fails to start work
+  - a passive Backlog/backlog released `not_active` row with no active/retry/promotion/merge-closeout evidence is hidden during a no-current-poll refresh without a recent explicit `passive_release` direct issue-by-id verification for the same Backlog snapshot
+  - active direct issue-by-id truth for a Backlog/backlog released `not_active` row fails to start work
   - a CO-522-style retained merged-closeout row with stale non-active metadata, PR #795 merged proof, and no active/retry/current-promotion/cancelable-run evidence still enters `claim_issue_by_id:released` when current polling omits it
 - Pre-implementation issue-quality review evidence:
   - 2026-05-20: live issue-context plus parent evidence show a narrow root-fix issue. The issue is not merely a timeout problem, not a provider-intake cleanup lane, and not a queue-capacity lane. The added CO-469 Duplicate/canceled case and CO-471 retry projection mismatch stay inside terminal released historical claim scope.
@@ -212,7 +213,7 @@ task_checklists:
 - Focused no-current-poll-snapshot regression.
 - Focused current-poll terminal snapshot passive/reopened regressions.
 - Focused map-missing terminal snapshot regression.
-- Focused no-current-poll Backlog passive-verification and active direct issue-by-id regressions.
+- No-current-poll Backlog passive-verification and active direct issue-by-id regressions.
 - Focused accepted pending-revalidation no-current-poll regression.
 - Focused stale/current `review_promotion` regressions, including deferred-poll stale suppression and current-promotion revalidation.
 - Spec guard, build, lint, test, docs checks, freshness, diff budget.

@@ -149,7 +149,8 @@
 - A current-poll terminal `not_active` snapshot can still record `claim_reconcile:released`, churn the released claim, or drive `restart_required`.
 - A map-missing terminal `not_active` row can still record `claim_reconcile:released` only because completed/canceled issues are absent from the current poll map.
 - A passive Backlog/backlog released `not_active` row with no active/retry/promotion/merge-closeout evidence can still enter `claim_issue_by_id:released` or set `restart_required`.
-- A passive Backlog/backlog released `not_active` row with no active/retry/promotion/merge-closeout evidence can be hidden during a no-current-poll refresh without a recent explicit `passive_release` direct issue-by-id verification for the same Backlog snapshot, or active direct issue-by-id truth fails to start work.
+- A passive Backlog/backlog released `not_active` row with no active/retry/promotion/merge-closeout evidence can be hidden during a no-current-poll refresh without a recent explicit `passive_release` direct issue-by-id verification for the same Backlog snapshot.
+- Active direct issue-by-id truth for a Backlog/backlog released `not_active` row can fail to start work.
 - A CO-522-style retained merged-closeout released row with stale non-active issue metadata, merged PR proof, live Linear Done/completed truth, null retry metadata, and no active/cancelable retained run can still enter `claim_issue_by_id:released` when current polling omits it.
 - Stale retained `review_promotion` metadata can still keep a newer terminal released row classified as active, or current promotion metadata is hidden.
 - The solution relies on provider-intake manual edits, timeout-only changes, or another one-off restart.

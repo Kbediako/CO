@@ -62,7 +62,8 @@
   - current-poll terminal `not_active` history still records `claim_reconcile:released` or churns the claim
   - map-missing terminal `not_active` history still records `claim_reconcile:released` only because completed/canceled issue filtering leaves no current poll entry
   - passive Backlog/backlog released `not_active` still records `claim_issue_by_id:released` or sets restart-required health without active/retry/promotion/merge-closeout evidence
-  - passive Backlog/backlog released `not_active` is hidden during a no-current-poll refresh without a recent explicit `passive_release` direct issue-by-id verification for the same Backlog snapshot, or active direct issue-by-id truth fails to start work
+  - passive Backlog/backlog released `not_active` is hidden during a no-current-poll refresh without a recent explicit `passive_release` direct issue-by-id verification for the same Backlog snapshot
+  - active direct issue-by-id truth for a Backlog/backlog released `not_active` row fails to start work
   - stale retained merged-closeout history still records `claim_issue_by_id:released` or sets restart-required health when current polling omits it and there is no active/retry/current-promotion/cancelable-run evidence
   - stale `review_promotion` keeps terminal history active, or current promotion truth is hidden
 - Pre-implementation issue-quality review:
