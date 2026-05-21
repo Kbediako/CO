@@ -7,6 +7,7 @@ import {
   cloneProviderWorkflowStatusPayload,
   type ProviderWorkflowConfigStore
 } from './providerWorkflowConfigStore.js';
+import type { ControlMachineStatusSnapshot } from './controlMachineStatusPresenter.js';
 import { readDocsFreshnessMaintainRepoGate } from './docsFreshnessRepoGate.js';
 import type { LinearBudgetStatus } from './linearBudgetState.js';
 import {
@@ -115,6 +116,7 @@ interface InternalControlCompatibilityRuntimeSnapshot extends ControlCompatibili
 
 export interface ControlRuntimeSnapshot {
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
+  readMachineStatus(): Promise<ControlMachineStatusSnapshot>;
   readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot>;
   readDispatchEvaluation(): Promise<{
     issueIdentifier: string | null;
@@ -395,6 +397,28 @@ function createControlRuntimeSnapshot(
     };
   }
 
+  async function readMachineStatus(): Promise<ControlMachineStatusSnapshot> {
+    const providerIntakeAuthority = readProviderIntakeAuthorityState(context);
+    const authorityContext = buildProviderIntakeAuthorityContext(context, providerIntakeAuthority);
+    const providerIntake = buildProviderIntakeSummary(providerIntakeAuthority.state);
+    const providerWorkflow = context.providerWorkflowConfigStore?.snapshot() ?? null;
+    return {
+      providerIntake,
+      runningClaims: (providerIntakeAuthority.state?.claims ?? []).filter(
+        (claim) => claim.state === 'running' && isActiveProviderIntakeClaim(claim)
+      ),
+      providerIntakeUnavailable: providerIntakeAuthority.unavailable,
+      providerWorkflow,
+      polling: readProviderPollingSnapshot(authorityContext),
+      maxConcurrentAgents: resolveProviderPollDispatchLimits(
+        context.controlStore.snapshot().feature_toggles,
+        {
+          localWorkerOnly: (providerWorkflow?.worker_hosts?.length ?? 0) === 0
+        }
+      ).maxConcurrentAgents
+    };
+  }
+
   async function readDispatchEvaluation(): Promise<{
     issueIdentifier: string | null;
     evaluation: DispatchPilotEvaluation;
@@ -429,6 +453,7 @@ function createControlRuntimeSnapshot(
 
   return {
     readSelectedRunSnapshot,
+    readMachineStatus,
     readCompatibilityProjection,
     readDispatchEvaluation,
     async prime(): Promise<void> {
@@ -789,6 +814,12 @@ function normalizePersistedProviderPollingSnapshot(
     operation_elapsed_ms:
       typeof polling.operation_elapsed_ms === 'number' && Number.isFinite(polling.operation_elapsed_ms)
         ? polling.operation_elapsed_ms
+        : null,
+    progress_updated_at:
+      typeof polling.progress_updated_at === 'string' ? polling.progress_updated_at : null,
+    progress_elapsed_ms:
+      typeof polling.progress_elapsed_ms === 'number' && Number.isFinite(polling.progress_elapsed_ms)
+        ? polling.progress_elapsed_ms
         : null,
     stalled_after_ms:
       typeof polling.stalled_after_ms === 'number' && Number.isFinite(polling.stalled_after_ms)

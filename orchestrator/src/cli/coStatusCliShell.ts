@@ -1,8 +1,10 @@
 /* eslint-disable patterns/prefer-logger-over-console */
 
+import { readFile } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
 
 import {
+  readMachineStatusDatasetWithEndpointRecovery,
   readUiDatasetWithEndpointRecovery,
   resolveAttachTarget,
   type CoStatusAttachTarget,
@@ -11,6 +13,10 @@ import {
 import { readControlServerSeeds } from './control/controlServerSeedLoading.js';
 import { ControlStateStore } from './control/controlState.js';
 import { createControlRuntime } from './control/controlRuntime.js';
+import {
+  buildMachineStatusDataset,
+  type ControlMachineStatusDataset
+} from './control/controlMachineStatusPresenter.js';
 import {
   markLinearAdvisoryStateStaleFromProviderIntake,
   normalizeLinearAdvisoryState
@@ -27,12 +33,16 @@ import {
   type ProviderControlHostFreshnessVerdict
 } from './control/providerControlHostFreshnessGauge.js';
 import {
+  buildProviderIntakeSummary,
+  isActiveProviderIntakeClaim,
   normalizeProviderIntakeState,
   type ProviderIntakeClaimRecord,
   type ProviderIntakeState
 } from './control/providerIntakeState.js';
 import {
   readProviderLinearWorkerWorkspacePath,
+  type ControlProviderIntakeUnavailablePayload,
+  type ControlPollingHealthPayload,
   type ControlLatestEventPayload,
   type ControlRunningPayload,
   type ControlSelectedRunPayload,
@@ -44,6 +54,7 @@ type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
 const CO_STATUS_ATTACH_UNSUPPORTED_FLAGS = ['pipeline'] as const;
 const DEFAULT_CO_STATUS_JSON_REQUEST_TIMEOUT_MS = 5_000;
+const DEFAULT_LOCAL_MACHINE_STATUS_MAX_AGE_MS = 90_000;
 const LOCAL_DEGRADED_FALLBACK_ALLOWED_VERDICTS = new Set<ProviderControlHostFreshnessVerdict>([
   'healthy',
   'degraded'
@@ -61,7 +72,15 @@ const COMPATIBILITY_ISSUE_PROJECTION_FALLBACK = 'compatibility issue projection 
 const SOURCE_AUTHORITY_LABELS_FALLBACK =
   'CLI/API/UI /ui/data.json source labels and authority/proof split';
 
-type CoStatusDegradedReadReason = 'ui_request_timeout' | 'current_host_unhealthy';
+type CoStatusDegradedReadReason =
+  | 'ui_request_timeout'
+  | 'current_host_unhealthy'
+  | 'dashboard_read_failed'
+  | 'dashboard_read_timeout';
+
+const LOCAL_MACHINE_STATUS_DEGRADED_ALLOWED_REASONS = new Set<CoStatusDegradedReadReason>([
+  'ui_request_timeout'
+]);
 
 type DegradedMetadataPayloadIdentity = {
   issue_identifier: string;
@@ -72,15 +91,35 @@ type DegradedMetadataPayloadIdentity = {
 
 export interface CoStatusDegradedReadPayload {
   reason: CoStatusDegradedReadReason;
-  source: 'local_seeded_runtime';
+  source: 'local_machine_status' | 'local_seeded_runtime' | 'operator_dashboard_degraded';
   freshness_verdict: ProviderControlHostFreshnessVerdict;
   artifact_root: string;
   finding_codes: string[];
 }
 
-export type CoStatusJsonDataset = OperatorDashboardDataset & {
+export type CoStatusOperatorDashboardDataset = OperatorDashboardDataset & {
   degraded_read?: CoStatusDegradedReadPayload;
 };
+
+type CoStatusMachineStatusCompatibilityFields = Partial<
+  Pick<
+    OperatorDashboardDataset,
+    | 'selected_issue_identifier'
+    | 'selected'
+    | 'totals'
+    | 'rate_limits'
+    | 'repo_gates'
+    | 'tracked'
+    | 'fallback_expiry'
+  >
+>;
+
+export type CoStatusMachineStatusJsonDataset = ControlMachineStatusDataset &
+  CoStatusMachineStatusCompatibilityFields & {
+    degraded_read?: CoStatusDegradedReadPayload;
+  };
+
+export type CoStatusJsonDataset = CoStatusOperatorDashboardDataset | CoStatusMachineStatusJsonDataset;
 
 export interface RunCoStatusCliShellParams {
   flags: ArgMap;
@@ -100,8 +139,44 @@ export async function runCoStatusCliShell(params: RunCoStatusCliShellParams): Pr
     return;
   }
 
-  const dataset = await readCoStatusJsonDataset({ flags: params.flags });
+  const dataset = readBooleanFlag(params.flags, 'machine-status')
+    ? await readCoStatusMachineStatusDataset({ flags: params.flags })
+    : await readCoStatusJsonDataset({ flags: params.flags });
   console.log(JSON.stringify(dataset, null, 2));
+}
+
+export async function readCoStatusMachineStatusDataset(input: {
+  flags: ArgMap;
+  requestTimeoutMs?: number;
+}): Promise<CoStatusJsonDataset> {
+  let target = await resolveAttachTarget(input.flags);
+  const requestTimeoutMs = input.requestTimeoutMs ?? DEFAULT_CO_STATUS_JSON_REQUEST_TIMEOUT_MS;
+  const maxMachineStatusAgeMs = readOptionalNonNegativeIntegerFlag(
+    input.flags,
+    'machine-status-max-age-ms'
+  ) ?? DEFAULT_LOCAL_MACHINE_STATUS_MAX_AGE_MS;
+  try {
+    return await readMachineStatusDatasetWithEndpointRecovery({
+      flags: input.flags,
+      getTarget: () => target,
+      setTarget: (nextTarget) => {
+        target = nextTarget;
+      },
+      requestTimeoutMs: Math.min(requestTimeoutMs, 1_000),
+      recoverSameEndpointTimeout: true
+    });
+  } catch (error) {
+    const degradedDataset = await tryReadDegradedMachineStatusDataset({
+      error,
+      target,
+      allowedReasons: LOCAL_MACHINE_STATUS_DEGRADED_ALLOWED_REASONS,
+      maxMachineStatusAgeMs
+    });
+    if (!degradedDataset) {
+      throw error;
+    }
+    return degradedDataset;
+  }
 }
 
 export async function readCoStatusJsonDataset(input: {
@@ -110,8 +185,12 @@ export async function readCoStatusJsonDataset(input: {
 }): Promise<CoStatusJsonDataset> {
   let target = await resolveAttachTarget(input.flags);
   const requestTimeoutMs = input.requestTimeoutMs ?? DEFAULT_CO_STATUS_JSON_REQUEST_TIMEOUT_MS;
+  const maxMachineStatusAgeMs = readOptionalNonNegativeIntegerFlag(
+    input.flags,
+    'machine-status-max-age-ms'
+  ) ?? DEFAULT_LOCAL_MACHINE_STATUS_MAX_AGE_MS;
   try {
-    return await readUiDatasetWithEndpointRecovery({
+    const dataset = await readUiDatasetWithEndpointRecovery({
       flags: input.flags,
       getTarget: () => target,
       setTarget: (nextTarget) => {
@@ -120,7 +199,17 @@ export async function readCoStatusJsonDataset(input: {
       requestTimeoutMs,
       recoverSameEndpointTimeout: true
     });
+    return await annotateDashboardDegradedRead(dataset, target, maxMachineStatusAgeMs);
   } catch (error) {
+    const degradedMachineStatus = await tryReadDegradedMachineStatusDataset({
+      error,
+      target,
+      allowedReasons: LOCAL_MACHINE_STATUS_DEGRADED_ALLOWED_REASONS,
+      maxMachineStatusAgeMs
+    });
+    if (degradedMachineStatus) {
+      return degradedMachineStatus;
+    }
     const degradedDataset = await tryReadLocalDegradedUiDataset({
       error,
       target
@@ -132,6 +221,170 @@ export async function readCoStatusJsonDataset(input: {
   }
 }
 
+async function annotateDashboardDegradedRead(
+  dataset: OperatorDashboardDataset,
+  target: CoStatusAttachTarget,
+  maxMachineStatusAgeMs: number
+): Promise<CoStatusJsonDataset> {
+  if (!dataset.dashboard_degraded) {
+    return dataset;
+  }
+  const freshnessReport = await evaluateProviderControlHostFreshnessGauge({
+    artifactRoot: target.runDir
+  });
+  const machineStatusDataset = await readLocalMachineStatusDataset(target);
+  if (
+    !isEligibleLocalDegradedFallbackFreshnessReport(freshnessReport) ||
+    !isEligibleDegradedMachineStatusDataset(
+      machineStatusDataset,
+      freshnessReport,
+      maxMachineStatusAgeMs
+    )
+  ) {
+    throw new Error(
+      'Operator dashboard returned degraded data but machine status is not eligible for a degraded read.'
+    );
+  }
+  return {
+    ...dataset,
+    degraded_read: buildDegradedReadPayload(
+      target,
+      freshnessReport,
+      dataset.dashboard_degraded.reason === 'read_timeout'
+        ? 'dashboard_read_timeout'
+        : 'dashboard_read_failed',
+      'operator_dashboard_degraded'
+    )
+  };
+}
+
+async function tryReadDegradedMachineStatusDataset(input: {
+  error: unknown;
+  target: CoStatusAttachTarget;
+  allowedReasons: ReadonlySet<CoStatusDegradedReadReason>;
+  maxMachineStatusAgeMs: number;
+}): Promise<CoStatusMachineStatusJsonDataset | null> {
+  const degradedReason = resolveLocalDegradedReadReason(input.error);
+  if (!degradedReason || !input.allowedReasons.has(degradedReason)) {
+    return null;
+  }
+
+  const freshnessReport = await evaluateProviderControlHostFreshnessGauge({
+    artifactRoot: input.target.runDir
+  });
+  if (!isEligibleLocalDegradedFallbackFreshnessReport(freshnessReport)) {
+    return null;
+  }
+
+  const localDataset = await readLocalMachineStatusDataset(input.target);
+  if (
+    isEligibleDegradedMachineStatusDataset(
+      localDataset,
+      freshnessReport,
+      input.maxMachineStatusAgeMs
+    )
+  ) {
+    return {
+      ...localDataset,
+      degraded_read: buildDegradedReadPayload(
+        input.target,
+        freshnessReport,
+        degradedReason,
+        'local_machine_status'
+      )
+    };
+  }
+
+  return null;
+}
+
+function isEligibleDegradedMachineStatusDataset(
+  dataset: ControlMachineStatusDataset,
+  freshnessReport: ProviderControlHostFreshnessGaugeReport,
+  maxMachineStatusAgeMs: number
+): boolean {
+  const refreshAgeVerdict = freshnessReport.metrics.last_successful_refresh_age_ms.verdict;
+  if (!LOCAL_DEGRADED_FALLBACK_ALLOWED_VERDICTS.has(refreshAgeVerdict)) {
+    return false;
+  }
+  const polling = dataset.polling as Record<string, unknown> | null;
+  if (!polling) {
+    return false;
+  }
+  if (dataset.provider_intake_unavailable) {
+    return false;
+  }
+  const providerIntake = dataset.provider_intake ?? null;
+  return (
+    (providerIntake?.active_claim_count ?? 0) === 0 &&
+    isRecentMachineStatusTimestamp(polling.updated_at, maxMachineStatusAgeMs) &&
+    isRecentMachineStatusTimestamp(polling.progress_updated_at, maxMachineStatusAgeMs) &&
+    polling.stuck !== true &&
+    polling.restart_required !== true &&
+    polling.reason == null &&
+    polling.last_error == null &&
+    !hasActiveNoProgressRefresh(polling) &&
+    !hasStaleControlHostOwnerFreshness(polling)
+  );
+}
+
+function isRecentMachineStatusTimestamp(value: unknown, maxAgeMs: number): boolean {
+  if (typeof value !== 'string') {
+    return false;
+  }
+  const timestampMs = Date.parse(value);
+  if (!Number.isFinite(timestampMs)) {
+    return false;
+  }
+  const nowMs = Date.now();
+  return timestampMs <= nowMs && nowMs - timestampMs <= maxAgeMs;
+}
+
+function hasActiveNoProgressRefresh(polling: Record<string, unknown> | null | undefined): boolean {
+  if (!polling || polling.checking !== true) {
+    return false;
+  }
+  if (polling.stuck === true || polling.restart_required === true) {
+    return true;
+  }
+  const progressElapsedMs =
+    typeof polling.progress_elapsed_ms === 'number' && Number.isFinite(polling.progress_elapsed_ms)
+      ? polling.progress_elapsed_ms
+      : null;
+  const stalledAfterMs =
+    typeof polling.stalled_after_ms === 'number' && Number.isFinite(polling.stalled_after_ms)
+      ? polling.stalled_after_ms
+      : null;
+  return (
+    progressElapsedMs !== null &&
+    stalledAfterMs !== null &&
+    progressElapsedMs > stalledAfterMs
+  );
+}
+
+function hasStaleControlHostOwnerFreshness(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  const freshness = record.source_root_freshness;
+  if (
+    typeof freshness === 'object' &&
+    freshness !== null &&
+    !Array.isArray(freshness)
+  ) {
+    const freshnessRecord = freshness as Record<string, unknown>;
+    if (
+      freshnessRecord.status === 'warning' ||
+      freshnessRecord.status === 'stale' ||
+      (Array.isArray(freshnessRecord.drift_classes) && freshnessRecord.drift_classes.length > 0)
+    ) {
+      return true;
+    }
+  }
+  return Object.values(record).some(hasStaleControlHostOwnerFreshness);
+}
+
 function readStringFlag(flags: ArgMap, key: string): string | undefined {
   const value = flags[key];
   if (typeof value !== 'string') {
@@ -139,6 +392,29 @@ function readStringFlag(flags: ArgMap, key: string): string | undefined {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function readBooleanFlag(flags: ArgMap, key: string): boolean {
+  return flags[key] === true || flags[key] === 'true';
+}
+
+function readOptionalNonNegativeIntegerFlag(flags: ArgMap, key: string): number | null {
+  const value = flags[key];
+  if (value === undefined) {
+    return null;
+  }
+  if (value === true || typeof value !== 'string') {
+    throw new Error(`Invalid --${key}: expected integer milliseconds >= 0`);
+  }
+  const raw = value.trim();
+  if (!/^\d+$/u.test(raw)) {
+    throw new Error(`Invalid --${key}: expected integer milliseconds >= 0`);
+  }
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    throw new Error(`Invalid --${key}: expected integer milliseconds >= 0`);
+  }
+  return parsed;
 }
 
 function assertAttachCompatibleFlags(flags: ArgMap): void {
@@ -173,6 +449,12 @@ async function tryReadLocalDegradedUiDataset(input: {
   }
 
   const localDataset = await readLocalUiDataset(input.target);
+  if (
+    await hasFailedActiveProviderIntakeRun(localDataset.providerIntakeState) ||
+    hasActiveNoProgressRefresh(localDataset.providerIntakeState.polling)
+  ) {
+    return null;
+  }
   const dataset = applyProviderIntakeTruthOverlay(
     localDataset.dataset,
     input.target,
@@ -189,6 +471,32 @@ async function tryReadLocalDegradedUiDataset(input: {
   };
 }
 
+async function hasFailedActiveProviderIntakeRun(state: ProviderIntakeState): Promise<boolean> {
+  const activeClaims = state.claims.filter(isDegradedActiveClaim);
+  for (const claim of activeClaims) {
+    if (!claim.run_manifest_path) {
+      continue;
+    }
+    const manifest = await readJsonRecordIfExists(claim.run_manifest_path);
+    const status = typeof manifest?.status === 'string' ? manifest.status : null;
+    if (status === 'failed' || status === 'cancelled' || status === 'canceled') {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function readJsonRecordIfExists(path: string): Promise<Record<string, unknown> | null> {
+  try {
+    const parsed = JSON.parse(await readFile(path, 'utf8')) as unknown;
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function resolveLocalDegradedReadReason(error: unknown): CoStatusDegradedReadReason | null {
   const message = (error as Error)?.message ?? String(error);
   if (message.includes('Re-resolving control_endpoint.json failed')) {
@@ -197,7 +505,11 @@ function resolveLocalDegradedReadReason(error: unknown): CoStatusDegradedReadRea
   if (isCurrentHostUnhealthyErrorMessage(message)) {
     return 'current_host_unhealthy';
   }
-  if (message.includes('control-host ui request timeout after')) {
+  const sameEndpointTimeout = message.includes('same-endpoint current-endpoint timeout');
+  if (sameEndpointTimeout && message.includes('control-host ui request timeout after')) {
+    return 'ui_request_timeout';
+  }
+  if (sameEndpointTimeout && message.includes('control-host machine-status request timeout after')) {
     return 'ui_request_timeout';
   }
   return null;
@@ -215,10 +527,10 @@ function isCurrentHostUnhealthyErrorMessage(message: string): boolean {
 function isEligibleLocalDegradedFallbackFreshnessReport(
   report: ProviderControlHostFreshnessGaugeReport
 ): boolean {
-  if (LOCAL_DEGRADED_FALLBACK_ALLOWED_VERDICTS.has(report.verdict)) {
+  if (report.verdict === 'healthy') {
     return true;
   }
-  if (report.verdict !== 'unknown') {
+  if (!LOCAL_DEGRADED_FALLBACK_ALLOWED_VERDICTS.has(report.verdict) && report.verdict !== 'unknown') {
     return false;
   }
   return (
@@ -230,11 +542,12 @@ function isEligibleLocalDegradedFallbackFreshnessReport(
 function buildDegradedReadPayload(
   target: CoStatusAttachTarget,
   report: ProviderControlHostFreshnessGaugeReport,
-  reason: CoStatusDegradedReadReason
+  reason: CoStatusDegradedReadReason,
+  source: CoStatusDegradedReadPayload['source'] = 'local_seeded_runtime'
 ): CoStatusDegradedReadPayload {
   return {
     reason,
-    source: 'local_seeded_runtime',
+    source,
     freshness_verdict: report.verdict,
     artifact_root: target.runDir,
     finding_codes: report.findings.map((finding) => finding.code)
@@ -785,6 +1098,37 @@ async function readLocalUiDataset(target: CoStatusAttachTarget): Promise<{
       readCompatibilityProjection: () => runtime.snapshot().readCompatibilityProjection()
     }),
     providerIntakeState
+  };
+}
+
+async function readLocalMachineStatusDataset(
+  target: CoStatusAttachTarget
+): Promise<ControlMachineStatusDataset> {
+  const paths = buildRunPathsFromTarget(target);
+  const { providerIntakeSeed } = await readControlServerSeeds(paths);
+  const providerIntakeState = normalizeProviderIntakeState(providerIntakeSeed);
+  const providerIntakeUnavailable = readProviderIntakeUnavailablePayload(providerIntakeState);
+  return buildMachineStatusDataset({
+    providerIntake: providerIntakeUnavailable ? null : buildProviderIntakeSummary(providerIntakeState),
+    runningClaims: providerIntakeUnavailable
+      ? []
+      : providerIntakeState.claims.filter(
+          (claim) => claim.state === 'running' && isActiveProviderIntakeClaim(claim)
+        ),
+    providerIntakeUnavailable,
+    polling: providerIntakeState.polling as ControlPollingHealthPayload | null
+  });
+}
+
+function readProviderIntakeUnavailablePayload(
+  state: ProviderIntakeState
+): ControlProviderIntakeUnavailablePayload | null {
+  if (state.authority?.status !== 'unavailable') {
+    return null;
+  }
+  return {
+    reason: state.authority.reason,
+    updated_at: state.authority.updated_at
   };
 }
 

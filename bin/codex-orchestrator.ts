@@ -260,6 +260,7 @@ function parseArgs(raw: string[]): { positionals: string[]; flags: ArgMap } {
     'help',
     'interactive',
     'issue-log',
+    'machine-status',
     'multi-agent',
     'no-interactive',
     'repo-config-required',
@@ -2081,11 +2082,16 @@ Viewer options:
   --task <id>           Artifact task id for the host state (default: local-mcp).
   --run <id>            Host run id for persisted state files (default: control-host).
   --format json         Emit the current CO STATUS snapshot from the local control-host and exit.
+  --machine-status      In JSON mode, emit the cheap machine-health snapshot instead of /ui/data.json.
+  --machine-status-max-age-ms <ms>
+                       Bound local degraded machine-status fallback freshness.
   --help                Show this message.
 
 JSON contract:
   co-status --format json reads the authenticated operator-dashboard snapshot from the
-  current local control-host and exits. Use \`control-host --format json\` for startup readiness output.
+  current local control-host and exits. Supervision probes use --machine-status so
+  health reads do not depend on the heavier dashboard projection.
+  Use \`control-host --format json\` for startup readiness output.
 
 Attach subcommand:
   attach                Attach to an already-running local JSON control-host.

@@ -876,6 +876,7 @@ export function renderControlStatusFrame(input: RenderControlStatusFrameInput): 
   const lines: string[] = [
     colorize('╭─ CO STATUS', ANSI_BOLD),
     renderAgentsLine(input.dataset, terminalColumns),
+    ...renderDashboardDegradedLines(input.dataset, terminalColumns),
     renderThroughputLine(input.throughputTps ?? 0, terminalColumns),
     renderRuntimeLine(input.dataset, referenceTime, liveReferenceTime, terminalColumns),
     renderTokensLine(input.dataset, terminalColumns),
@@ -920,6 +921,7 @@ function renderCompactControlStatusFrame(
   const lines: string[] = [
     colorize('╭─ CO STATUS', ANSI_BOLD),
     renderCompactStatusLine(input.dataset, referenceTime, liveReferenceTime, terminalColumns),
+    ...renderDashboardDegradedLines(input.dataset, terminalColumns),
     renderTokensLine(input.dataset, terminalColumns),
     renderRateLimitsLine(input.dataset, referenceTime, terminalColumns),
     renderCompactRunningLine(input.dataset.running, liveReferenceTime, terminalColumns),
@@ -987,6 +989,27 @@ function renderAgentsLine(dataset: OperatorDashboardDataset, terminalColumns: nu
     ],
     terminalColumns
   );
+}
+
+function renderDashboardDegradedLines(
+  dataset: OperatorDashboardDataset,
+  terminalColumns: number
+): string[] {
+  const degraded = dataset.dashboard_degraded;
+  if (!degraded) {
+    return [];
+  }
+  return [
+    renderSummaryLine(
+      'Dashboard error',
+      [
+        { text: degraded.reason, color: ANSI_RED },
+        { text: ' | ', color: ANSI_GRAY },
+        { text: degraded.message, color: ANSI_RED, truncateMode: 'end' }
+      ],
+      terminalColumns
+    )
+  ];
 }
 
 function renderThroughputLine(throughputTps: number, terminalColumns: number): string {

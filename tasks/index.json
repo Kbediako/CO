@@ -1,6 +1,92 @@
 {
   "items": [
     {
+      "id": "20260521-linear-f7007d31-6a20-43e8-8f38-ca774a890683",
+      "title": "CO-572 current-endpoint status timeout root-cause repair",
+      "relates_to": "tasks/tasks-linear-f7007d31-6a20-43e8-8f38-ca774a890683.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress_docs_packet_validated",
+      "last_review": "2026-05-21",
+      "canonical_owner_key": "co-status-current-endpoint-ui-data-timeout-probe-failed-recurrence",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "parent CO orchestration",
+          "date": "2026-05-21",
+          "status": "created_and_routed",
+          "summary": "CO-572 was created from the CO-407 recurrence, labeled as Lifecycle: Implementation, Area: Infra, Priority: P2, Bug, and related to CO-407, CO-571, CO-376, and CO-336."
+        },
+        "advisory_review": {
+          "reviewer": "local researcher and GPT Pro",
+          "date": "2026-05-21",
+          "status": "converged_on_status_machine_split",
+          "summary": "Both advisory passes recommended a cheap authenticated machine-status contract, zero-WIP degraded co-status behavior, supervisor decoupling from dashboard projection, progress-field propagation, dashboard degraded metadata, and fail-closed negative cases."
+        },
+        "docs_packet_validation": {
+          "reviewer": "parent CO orchestration",
+          "date": "2026-05-21",
+          "status": "spec_guard_and_docs_check_passed",
+          "summary": "CO-572 docs-first packet, task index, registry rows, and docs/TASKS snapshot validate through spec guard and docs:check. docs:freshness remains blocked by unrelated terminal CO-558 owner drift and was routed to CO-573."
+        }
+      },
+      "validation": {
+        "status": "docs_packet_validated_with_unrelated_freshness_blocker",
+        "passed": [
+          "live recurrence evidence captured",
+          "Linear labels verified",
+          "related issue links verified",
+          "local researcher completed",
+          "GPT Pro consultation completed",
+          "docs-first packet created",
+          "issue moved to In Progress",
+          "node scripts/spec-guard.mjs --dry-run",
+          "npm run docs:check",
+          "docs/TASKS archive reserve restored",
+          "unrelated CO-573 docs freshness owner created"
+        ],
+        "pending": [
+          "manifest-backed docs/implementation review",
+          "machine status implementation",
+          "focused status-machine tests",
+          "required provider-worker validation floor",
+          "PR review and merge closeout"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-f7007d31-6a20-43e8-8f38-ca774a890683.md",
+        "prd": "docs/PRD-linear-f7007d31-6a20-43e8-8f38-ca774a890683.md",
+        "docs": "tasks/specs/linear-f7007d31-6a20-43e8-8f38-ca774a890683.md",
+        "action_plan": "docs/ACTION_PLAN-linear-f7007d31-6a20-43e8-8f38-ca774a890683.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-f7007d31-6a20-43e8-8f38-ca774a890683.md",
+        "spec": "tasks/specs/linear-f7007d31-6a20-43e8-8f38-ca774a890683.md",
+        "task": "tasks/tasks-linear-f7007d31-6a20-43e8-8f38-ca774a890683.md"
+      },
+      "source_issue": {
+        "id": "f7007d31-6a20-43e8-8f38-ca774a890683",
+        "identifier": "CO-572"
+      },
+      "related_issues": [
+        {
+          "identifier": "CO-407",
+          "relation": "current_endpoint_timeout_history"
+        },
+        {
+          "identifier": "CO-571",
+          "relation": "progress_stall_fix_precedent"
+        },
+        {
+          "identifier": "CO-376",
+          "relation": "co_status_timeout_history"
+        },
+        {
+          "identifier": "CO-336",
+          "relation": "control_host_status_history"
+        }
+      ]
+    },
+    {
       "id": "linear-c093b71f-c6bd-423a-a6ec-3ee3436d6b53",
       "title": "CO-542 deterministic quota hygiene audit",
       "relates_to": "tasks/tasks-linear-c093b71f-c6bd-423a-a6ec-3ee3436d6b53.md",
@@ -4697,7 +4783,7 @@
         "Codex"
       ],
       "last_review": "2026-05-01",
-      "status": "in_progress",
+      "status": "completed",
       "evidence": [
         "docs/PRD-linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7.md",
         "docs/TECH_SPEC-linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7.md",
@@ -4734,6 +4820,12 @@
           "date": "2026-05-01",
           "status": "validation_green_review_complete",
           "summary": "Current turn recorded stay_serial/review_or_validation_only, fast-forwarded the branch to current origin/main, preserved the Agent Identity implementation diff, fixed standalone-review redaction findings, and passed targeted tests plus required repo gates, final manifest-backed standalone review, and explicit elegance review; PR attachment, PR checks, feedback sweep, and ready-review drain remain before In Review."
+        },
+        "live_terminal_metadata_refresh": {
+          "reviewer": "parent CO orchestration",
+          "date": "2026-05-21",
+          "status": "linear_done_verified",
+          "summary": "Live Linear fetch for CO-451 reported status Done/statusType completed, completedAt 2026-05-01T22:43:20.867Z, and attached PR #742, so stale task-index status=in_progress was corrected before tasks archive reserve restoration."
         }
       },
       "paths": {
@@ -4741,7 +4833,8 @@
         "task": "tasks/tasks-linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7.md",
         "agent_task": ".agent/task/linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7.md",
         "docs": "docs/TECH_SPEC-linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7.md"
-      }
+      },
+      "completed_at": "2026-05-01"
     },
     {
       "id": "20260501-linear-590e4e09-315a-4957-bb72-66b8322e86a6",
@@ -23311,7 +23404,7 @@
       "title": "Codex Delegation Autonomy Platform",
       "path": "tasks/tasks-0940-delegation-autonomy-platform.md",
       "kind": "prd",
-      "status": "done",
+      "status": "completed",
       "gate": {
         "phase": "delegation-autonomy-platform-planning",
         "status": "approved",
@@ -23319,7 +23412,7 @@
         "run_id": "2026-01-08T09-15-22-109Z-e577581a"
       },
       "created_at": "2026-01-06",
-      "completed_at": null,
+      "completed_at": "2026-01-12",
       "last_review": "2026-05-18",
       "paths": {
         "spec": "tasks/specs/0940-delegation-autonomy-platform.md",
@@ -23334,6 +23427,12 @@
           "unchecked_items": 0,
           "evidence": "out/linear-b642e879-ba50-45ef-b0d9-b059afa9e932-recovery/spec-preexpiry-local-classification.json",
           "summary": "Linked task checklist has zero unchecked items; mark terminal so spec-guard and implementation-docs archive no longer treat the packet as active work."
+        },
+        "archive_metadata_refresh_20260521": {
+          "reviewer": "parent CO orchestration",
+          "date": "2026-05-21",
+          "status": "terminal_status_normalized",
+          "summary": "Existing spec_lifecycle_audit_20260518 already recorded status=done with zero unchecked checklist items; normalize to completed/completed_at so tasks archive reserve restoration can use the supported archive path."
         }
       }
     },
@@ -23515,15 +23614,21 @@
       "title": "Delegation Guard Actionable Diagnostics",
       "path": "tasks/tasks-0951-delegation-rlm-quick-wins.md",
       "kind": "prd",
-      "status": "approved",
+      "status": "succeeded",
       "gate": {
         "phase": "delegation-rlm-quick-wins-planning",
-        "status": "approved",
+        "status": "succeeded",
         "log": ".runs/0951-delegation-rlm-quick-wins/cli/2026-01-14T08-58-56-755Z-012d15a6/manifest.json",
         "run_id": "2026-01-14T08-58-56-755Z-012d15a6"
       },
       "created_at": "2026-01-13",
-      "completed_at": null
+      "completed_at": "2026-01-14",
+      "archive_metadata_refresh": {
+        "reviewer": "parent CO orchestration",
+        "date": "2026-05-21",
+        "status": "completed_checklist_verified",
+        "summary": "The 0951 docs/TASKS snapshot and task checklist show implementation and validation complete with all checklist items checked by 2026-01-14; stale status=approved/null completion was corrected to allow supported tasks archive reserve restoration."
+      }
     },
     {
       "id": "0952",

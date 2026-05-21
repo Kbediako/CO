@@ -134,6 +134,14 @@ export interface OperatorDashboardIssuePayload {
   is_selected: boolean;
 }
 
+export interface OperatorDashboardDegradedPayload {
+  reason: 'read_failed' | 'read_timeout';
+  source: 'ui_data_controller';
+  message: string;
+  timeout_ms?: number | null;
+  generated_at: string;
+}
+
 export interface OperatorDashboardDataset {
   generated_at: string;
   mode: 'operator_dashboard';
@@ -160,6 +168,7 @@ export interface OperatorDashboardDataset {
   dispatch_pilot?: ControlDispatchPilotPayload;
   tracked?: ControlTrackedPayload | null;
   fallback_expiry?: ControlStatusFallbackExpiryMetadata[];
+  dashboard_degraded?: OperatorDashboardDegradedPayload;
 }
 
 export interface CompatibilityIssueRecordLookups {
@@ -213,6 +222,47 @@ export function buildUiDataset(input: {
       : {}),
     ...(input.projection.dispatchPilot ? { dispatch_pilot: input.projection.dispatchPilot } : {}),
     ...(input.projection.tracked ? { tracked: input.projection.tracked } : {})
+  };
+}
+
+export function buildDegradedUiDataset(input: {
+  reason: OperatorDashboardDegradedPayload['reason'];
+  message: string;
+  timeoutMs?: number | null;
+  generatedAt?: string;
+}): OperatorDashboardDataset {
+  const generatedAt = input.generatedAt ?? isoTimestamp();
+  return {
+    generated_at: generatedAt,
+    mode: 'operator_dashboard',
+    read_only: true,
+    host: LOCAL_HOSTNAME,
+    counts: {
+      running: 0,
+      retrying: 0,
+      issues: 0,
+      max_allowed: null
+    },
+    totals: {
+      input_tokens: 0,
+      output_tokens: 0,
+      total_tokens: 0,
+      seconds_running: 0
+    },
+    rate_limits: null,
+    polling: null,
+    selected_issue_identifier: null,
+    selected: null,
+    running: [],
+    retrying: [],
+    issues: [],
+    dashboard_degraded: {
+      reason: input.reason,
+      source: 'ui_data_controller',
+      message: input.message,
+      timeout_ms: input.timeoutMs ?? null,
+      generated_at: generatedAt
+    }
   };
 }
 
