@@ -45,7 +45,8 @@ describe('codex-orchestrator CLI monitor alias', () => {
     expect(stdout).toContain('codex-orchestrator co-status attach [options]');
     expect(stdout).toContain('Attach the CO STATUS terminal viewer to an already-running local JSON control-host,');
     expect(stdout).toContain('or emit the current CO STATUS snapshot from that host in JSON mode.');
-    expect(stdout).toContain('Emit the current CO STATUS snapshot from the local control-host and exit.');
+    expect(stdout).toContain('Emit the cheap machine-health snapshot from the local control-host and exit.');
+    expect(stdout).toContain('In JSON mode, emit the full /ui/data.json operator-dashboard snapshot.');
     expect(stdout).toContain('Use `control-host --format json` for startup readiness output.');
     expect(stdout).toContain('Attach subcommand:');
     expect(stdout).toContain('Run `codex-orchestrator co-status attach --help` for attach flags.');
