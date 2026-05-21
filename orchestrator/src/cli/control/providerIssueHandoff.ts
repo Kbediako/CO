@@ -562,6 +562,7 @@ export function createProviderIssueHandoffService(
   >();
   let refreshLifecycleChain: Promise<void> = Promise.resolve();
   let refreshLifecycleEpoch = 0;
+  let backlogReleaseStaleDirectProofRotationCursor = 0;
   let bestEffortRehydrateTimer: NodeJS.Timeout | null = null;
   const queuedRetryTrackedIssueRefetches = new Map<string, ProviderTrackedIssueRefetch>();
   const refreshLifecycleScope = new AsyncLocalStorage<{ epoch: number } | null>();
@@ -5468,15 +5469,39 @@ export function createProviderIssueHandoffService(
             : Math.max(1, refreshCounts.occupied_slots)
           : Number.POSITIVE_INFINITY;
         let preDiscoveryNonActiveIssueByIdReads = 0;
-        let backlogReleaseDirectProofReads = 0;
         let noRunPendingReopenLiveStartedProbeReads = 0;
-        const hasUnverifiedBacklogReleaseDirectProofCandidates =
-          trackedIssuesByKey === null &&
-          [...options.state.claims].some((candidateClaim) => {
+        type BacklogReleaseDirectProofCandidate = {
+          providerKey: string;
+          claimIndex: number;
+          kind: 'unverified' | 'stale_due';
+          verifiedAtMs: number | null;
+        };
+        const rotateBacklogReleaseDirectProofCandidates = <T>(
+          candidates: readonly T[],
+          cursor: number
+        ): T[] => {
+          if (candidates.length === 0) {
+            return [];
+          }
+          const offset = ((cursor % candidates.length) + candidates.length) % candidates.length;
+          return [
+            ...candidates.slice(offset),
+            ...candidates.slice(0, offset)
+          ];
+        };
+        const backlogReleaseDirectProofCandidates: BacklogReleaseDirectProofCandidate[] =
+          [...options.state.claims].flatMap((candidateClaim, claimIndex): BacklogReleaseDirectProofCandidate[] => {
             const candidateProviderKey = buildProviderIssueKey(
               candidateClaim.provider,
               candidateClaim.issue_id
             );
+            const candidateCurrentPollTrackedIssue =
+              trackedIssuesByKey?.get(candidateProviderKey) ?? null;
+            const candidateShouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot =
+              shouldUseTrackedIssueBlockerSnapshotForRetainedReleasedNotActiveMetadataRefresh({
+                claim: candidateClaim,
+                blocker: trackedIssueBlockersByKey?.get(candidateProviderKey) ?? null
+              });
             const candidateRuns =
               runsByProviderIssue.get(candidateProviderKey) ?? [];
             const candidateAttachableRuns = filterProviderIssueRunsForStartPipeline(
@@ -5490,24 +5515,141 @@ export function createProviderIssueHandoffService(
               candidateAttachableRuns
             );
             const candidateLatestRun = resolveLatestKnownProviderRun(candidateAttachableRuns);
-            return (
+            if (
+              candidateCurrentPollTrackedIssue === null &&
+              (
+                trackedIssuesByKey === null ||
+                candidateShouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot
+              ) &&
               shouldUseCachedReleasedBacklogNotActiveClaimResolution({
                 claim: candidateClaim,
                 activeRun: candidateActiveRun,
                 releaseRun: candidateReleaseRun,
                 latestRun: candidateLatestRun
               }) &&
-              !hasBacklogNotActiveDirectIssueByIdPassiveVerificationForCurrentSnapshot(
-                candidateClaim
-              ) &&
               !canFreshDiscoverReleasedLiveWorkerClaim(
                 candidateClaim,
                 candidateReleaseRun,
                 candidateActiveRun,
                 hasPendingReleaseCancel
               )
-            );
+            ) {
+              const verifiedAtMs =
+                resolveBacklogNotActiveDirectIssueByIdPassiveVerificationVerifiedAtMsForCurrentSnapshot(
+                  candidateClaim
+                );
+              if (verifiedAtMs === null) {
+                return [
+                  {
+                    providerKey: candidateProviderKey,
+                    claimIndex,
+                    kind: 'unverified' as const,
+                    verifiedAtMs: null
+                  }
+                ];
+              }
+              if (
+                isBacklogNotActiveDirectIssueByIdPassiveVerificationRevalidationDueForCurrentSnapshot(
+                  candidateClaim
+                )
+              ) {
+                return [
+                  {
+                    providerKey: candidateProviderKey,
+                    claimIndex,
+                    kind: 'stale_due' as const,
+                    verifiedAtMs
+                  }
+                ];
+              }
+            }
+            return [];
           });
+        const backlogReleaseDirectProofCandidateByProviderKey = new Map(
+          backlogReleaseDirectProofCandidates.map((candidate) => [
+            candidate.providerKey,
+            candidate
+          ])
+        );
+        const unverifiedBacklogReleaseDirectProofCandidates =
+          backlogReleaseDirectProofCandidates.filter(
+            (candidate) => candidate.kind === 'unverified'
+          );
+        const staleBacklogReleaseDirectProofCandidates =
+          rotateBacklogReleaseDirectProofCandidates(
+            backlogReleaseDirectProofCandidates
+              .filter((candidate) => candidate.kind === 'stale_due')
+              .sort((left, right) => {
+                const verifiedAtComparison =
+                  (left.verifiedAtMs ?? Number.POSITIVE_INFINITY) -
+                  (right.verifiedAtMs ?? Number.POSITIVE_INFINITY);
+                return verifiedAtComparison !== 0
+                  ? verifiedAtComparison
+                  : left.claimIndex - right.claimIndex;
+              }),
+            backlogReleaseStaleDirectProofRotationCursor
+          );
+        const selectedBacklogReleaseDirectProofProviderKeys = new Set<string>();
+        let selectedStaleBacklogReleaseDirectProofCount = 0;
+        const selectBacklogReleaseDirectProofCandidates = (
+          candidates: readonly BacklogReleaseDirectProofCandidate[],
+          count: number
+        ): number => {
+          let selectedCount = 0;
+          for (const candidate of candidates) {
+            if (
+              selectedCount >= count ||
+              selectedBacklogReleaseDirectProofProviderKeys.size >=
+                PROVIDER_BACKLOG_RELEASE_DIRECT_PROOF_READS_PER_REFRESH
+            ) {
+              break;
+            }
+            if (selectedBacklogReleaseDirectProofProviderKeys.has(candidate.providerKey)) {
+              continue;
+            }
+            selectedBacklogReleaseDirectProofProviderKeys.add(candidate.providerKey);
+            selectedCount += 1;
+          }
+          return selectedCount;
+        };
+        if (
+          unverifiedBacklogReleaseDirectProofCandidates.length > 0 &&
+          staleBacklogReleaseDirectProofCandidates.length > 0
+        ) {
+          selectBacklogReleaseDirectProofCandidates(
+            unverifiedBacklogReleaseDirectProofCandidates,
+            PROVIDER_BACKLOG_RELEASE_DIRECT_PROOF_READS_PER_REFRESH - 1
+          );
+          selectedStaleBacklogReleaseDirectProofCount +=
+            selectBacklogReleaseDirectProofCandidates(
+              staleBacklogReleaseDirectProofCandidates,
+              PROVIDER_BACKLOG_RELEASE_DIRECT_PROOF_READS_PER_REFRESH -
+                selectedBacklogReleaseDirectProofProviderKeys.size
+            );
+          selectBacklogReleaseDirectProofCandidates(
+            unverifiedBacklogReleaseDirectProofCandidates,
+            PROVIDER_BACKLOG_RELEASE_DIRECT_PROOF_READS_PER_REFRESH -
+              selectedBacklogReleaseDirectProofProviderKeys.size
+          );
+        } else {
+          selectBacklogReleaseDirectProofCandidates(
+            unverifiedBacklogReleaseDirectProofCandidates,
+            PROVIDER_BACKLOG_RELEASE_DIRECT_PROOF_READS_PER_REFRESH
+          );
+          selectedStaleBacklogReleaseDirectProofCount +=
+            selectBacklogReleaseDirectProofCandidates(
+              staleBacklogReleaseDirectProofCandidates,
+              PROVIDER_BACKLOG_RELEASE_DIRECT_PROOF_READS_PER_REFRESH -
+                selectedBacklogReleaseDirectProofProviderKeys.size
+            );
+        }
+        if (staleBacklogReleaseDirectProofCandidates.length > 0) {
+          backlogReleaseStaleDirectProofRotationCursor =
+            (
+              backlogReleaseStaleDirectProofRotationCursor +
+              selectedStaleBacklogReleaseDirectProofCount
+            ) % staleBacklogReleaseDirectProofCandidates.length;
+        }
 
         for (const claim of [...options.state.claims]) {
           assertRefreshCycleNotStuck();
@@ -5620,29 +5762,30 @@ export function createProviderIssueHandoffService(
           const currentPollTrackedIssue = trackedIssuesByKey?.get(claimProviderKey) ?? null;
           const hasBacklogNotActivePassiveVerificationForCurrentSnapshot =
             hasBacklogNotActiveDirectIssueByIdPassiveVerificationForCurrentSnapshot(claim);
-          const shouldRevalidateBacklogNotActivePassiveVerification =
-            trackedIssuesByKey === null &&
-            hasBacklogNotActivePassiveVerificationForCurrentSnapshot &&
-            isBacklogNotActiveDirectIssueByIdPassiveVerificationRevalidationDueForCurrentSnapshot(
-              claim
-            );
+          const backlogReleaseDirectProofCandidate =
+            backlogReleaseDirectProofCandidateByProviderKey.get(claimProviderKey) ?? null;
+          const shouldUseBacklogReleaseDirectProofBudget =
+            backlogReleaseDirectProofCandidate !== null;
+          const shouldReadBacklogReleaseDirectProofThisRefresh =
+            shouldUseBacklogReleaseDirectProofBudget &&
+            selectedBacklogReleaseDirectProofProviderKeys.has(claimProviderKey);
+          if (
+            shouldUseBacklogReleaseDirectProofBudget &&
+            !shouldReadBacklogReleaseDirectProofThisRefresh
+          ) {
+            refreshCounts.issue_by_id_deferred += 1;
+            recordRefreshProgress('refresh:claim_issue_by_id_reconcile', {
+              requestClass: 'claim_issue_by_id:released_deferred',
+              providerKeys: [claimProviderKey]
+            });
+            continue;
+          }
           const canUseBacklogNotActivePassiveVerificationForThisRefresh =
             hasBacklogNotActivePassiveVerificationForCurrentSnapshot &&
-            (
-              !shouldRevalidateBacklogNotActivePassiveVerification ||
-              hasUnverifiedBacklogReleaseDirectProofCandidates
+            !(
+              backlogReleaseDirectProofCandidate?.kind === 'stale_due' &&
+              shouldReadBacklogReleaseDirectProofThisRefresh
             );
-          const shouldUseBacklogReleaseDirectProofBudget =
-            shouldUseCachedReleasedBacklogNotActiveClaim &&
-            currentPollTrackedIssue === null &&
-            (
-              !hasBacklogNotActivePassiveVerificationForCurrentSnapshot ||
-              (
-                shouldRevalidateBacklogNotActivePassiveVerification &&
-                !hasUnverifiedBacklogReleaseDirectProofCandidates
-              )
-            ) &&
-            !canFreshDiscoverReleasedLiveWorker;
           if (
             shouldKeepCurrentPollReleasedTerminalHistoricalClaimPassive({
               claim,
@@ -5669,19 +5812,6 @@ export function createProviderIssueHandoffService(
               !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot
             );
           if (shouldKeepCachedReleasedBacklogNotActiveClaimPassiveBeforeReconcile) {
-            continue;
-          }
-          if (
-            shouldUseBacklogReleaseDirectProofBudget &&
-            backlogReleaseDirectProofReads >=
-              PROVIDER_BACKLOG_RELEASE_DIRECT_PROOF_READS_PER_REFRESH
-          ) {
-            refreshCounts.issue_by_id_deferred += 1;
-            deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
-            recordRefreshProgress('refresh:claim_issue_by_id_reconcile', {
-              requestClass: 'claim_issue_by_id:released_deferred',
-              providerKeys: [claimProviderKey]
-            });
             continue;
           }
           const shouldKeepCachedReleasedMergedCloseoutNotActiveClaimPassiveBeforeReconcile =
@@ -5754,9 +5884,6 @@ export function createProviderIssueHandoffService(
             releaseOnlyCachedPendingRevalidation: pollInput?.deferFreshDiscovery === true,
             onDirectIssueById: () => {
               refreshCounts.issue_by_id_reads += 1;
-              if (shouldUseBacklogReleaseDirectProofBudget) {
-                backlogReleaseDirectProofReads += 1;
-              }
               if (boundPreDiscoveryIssueByIdReads && activeRun === null) {
                 preDiscoveryNonActiveIssueByIdReads += 1;
               }
