@@ -1013,6 +1013,7 @@ describe('createControlServerSeededRuntimeAssembly', () => {
         await runCoStatusCliShell({
           flags: {
             format: 'json',
+            'operator-dashboard': true,
             'run-dir': paths.runDir
           },
           printHelp: vi.fn()

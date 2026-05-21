@@ -42,7 +42,7 @@ afterEach(async () => {
 });
 
 describe('runCoStatusCliShell', () => {
-  it('emits the authenticated operator-dashboard snapshot for --format json', async () => {
+  it('emits the authenticated machine-status snapshot for plain --format json', async () => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
     tempDirs.push(root);
     process.env.CODEX_ORCHESTRATOR_ROOT = root;
@@ -50,7 +50,7 @@ describe('runCoStatusCliShell', () => {
     const runDir = join(root, '.runs', 'local-mcp', 'cli', 'control-host');
     await mkdir(runDir, { recursive: true });
 
-    const server = await startUiServer();
+    const server = await startMachineStatusServer();
     servers.add(server.instance);
 
     await writeFile(
@@ -90,10 +90,68 @@ describe('runCoStatusCliShell', () => {
     ]);
     expect(log).toHaveBeenCalledTimes(1);
     const payload = JSON.parse(String(log.mock.calls[0]?.[0])) as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      mode: 'control_machine_status',
+      read_only: true
+    });
+  });
+
+  it.each([
+    ['--operator-dashboard', { 'operator-dashboard': true }],
+    ['--dashboard', { dashboard: true }]
+  ])('emits the authenticated operator-dashboard snapshot for explicit %s json', async (_flagName, dashboardFlag) => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = join(root, '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(runDir, { recursive: true });
+
+    const server = await startUiServer();
+    servers.add(server.instance);
+
+    await writeFile(
+      join(runDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+    await writeFile(join(runDir, 'control_auth.json'), JSON.stringify({ token: 'snapshot-token' }), 'utf8');
+    await writeFile(
+      join(runDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: server.baseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await runCoStatusCliShell({
+      flags: {
+        format: 'json',
+        ...dashboardFlag,
+        'run-dir': runDir
+      },
+      printHelp: vi.fn()
+    });
+
+    expect(server.requests).toEqual([
+      {
+        authorization: 'Bearer snapshot-token',
+        csrfToken: 'snapshot-token'
+      }
+    ]);
+    expect(log).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(String(log.mock.calls[0]?.[0])) as Record<string, unknown>;
     expect(payload).toEqual(buildUiPayload());
   });
 
-  it('re-resolves endpoint artifacts for direct json mode when the current endpoint is stale', async () => {
+  it('re-resolves endpoint artifacts for explicit operator-dashboard json when the current endpoint is stale', async () => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
     tempDirs.push(root);
     process.env.CODEX_ORCHESTRATOR_ROOT = root;
@@ -113,6 +171,7 @@ describe('runCoStatusCliShell', () => {
     await runCoStatusCliShell({
       flags: {
         format: 'json',
+        'operator-dashboard': true,
         'run-dir': runDir
       },
       printHelp: vi.fn()
@@ -133,6 +192,60 @@ describe('runCoStatusCliShell', () => {
     expect(log).toHaveBeenCalledTimes(1);
     const payload = JSON.parse(String(log.mock.calls[0]?.[0])) as Record<string, unknown>;
     expect(payload).toEqual(buildUiPayload());
+  });
+
+  it('prints degraded machine-status json for plain --format json during fresh zero-WIP rehydrate', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    const progressUpdatedAt = new Date(Date.now() - 1_000).toISOString();
+    await writeProviderIntakeState(runDir, {
+      claims: [],
+      updatedAtMsAgo: 1_000,
+      polling: buildFreshProviderPolling({
+        active_claims: [],
+        checking: true,
+        last_success_at: null,
+        progress_updated_at: progressUpdatedAt,
+        progress_elapsed_ms: 1_250
+      })
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(buildAbortError())
+      .mockRejectedValueOnce(buildAbortError());
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await runCoStatusCliShell({
+      flags: {
+        format: 'json',
+        'run-dir': runDir
+      },
+      printHelp: vi.fn()
+    });
+
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy.mock.calls.map((call) => call[0])).toEqual([
+      'http://127.0.0.1:65535/ui/machine-status.json',
+      'http://127.0.0.1:65535/ui/machine-status.json'
+    ]);
+    const payload = JSON.parse(String(log.mock.calls[0]?.[0])) as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      mode: 'control_machine_status',
+      degraded_read: {
+        reason: 'ui_request_timeout',
+        source: 'local_machine_status',
+        freshness_verdict: 'unknown',
+        finding_codes: ['refresh_timestamp_missing']
+      },
+      polling: {
+        progress_updated_at: progressUpdatedAt
+      }
+    });
   });
 
   it('marks degraded dashboard payloads as degraded for machine consumers', async () => {
@@ -178,6 +291,57 @@ describe('runCoStatusCliShell', () => {
       degraded_read: {
         reason: 'dashboard_read_timeout',
         source: 'operator_dashboard_degraded'
+      }
+    });
+  });
+
+  it('accepts degraded dashboard payloads during fresh zero-WIP rehydrate before last_success_at exists', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    const progressUpdatedAt = new Date(Date.now() - 1_000).toISOString();
+    await writeProviderIntakeState(runDir, {
+      claims: [],
+      updatedAtMsAgo: 1_000,
+      polling: buildFreshProviderPolling({
+        active_claims: [],
+        checking: true,
+        last_success_at: null,
+        progress_updated_at: progressUpdatedAt,
+        progress_elapsed_ms: 900
+      })
+    });
+    const server = await startUiServer(
+      buildUiPayload({
+        polling: null,
+        dashboard_degraded: {
+          reason: 'read_timeout',
+          source: 'ui_data_controller',
+          message: 'operator dashboard read timed out after 1000ms',
+          timeout_ms: 1000,
+          generated_at: '2026-05-21T12:30:00.000Z'
+        }
+      })
+    );
+    servers.add(server.instance);
+    await writeControlEndpointArtifacts(runDir, server.baseUrl);
+
+    const payload = await readCoStatusJsonDataset({
+      flags: {
+        format: 'json',
+        'run-dir': runDir
+      }
+    });
+
+    expect(payload).toMatchObject({
+      mode: 'operator_dashboard',
+      degraded_read: {
+        reason: 'dashboard_read_timeout',
+        source: 'operator_dashboard_degraded',
+        freshness_verdict: 'unknown',
+        finding_codes: ['refresh_timestamp_missing']
       }
     });
   });
@@ -327,6 +491,7 @@ describe('runCoStatusCliShell', () => {
       runCoStatusCliShell({
         flags: {
           format: 'json',
+          'operator-dashboard': true,
           'run-dir': runDir
         },
         printHelp: vi.fn()
@@ -438,6 +603,7 @@ describe('runCoStatusCliShell', () => {
       runCoStatusCliShell({
         flags: {
           format: 'json',
+          'operator-dashboard': true,
           'run-dir': runDir
         },
         printHelp: vi.fn()
@@ -485,6 +651,7 @@ describe('runCoStatusCliShell', () => {
     await runCoStatusCliShell({
       flags: {
         format: 'json',
+        'operator-dashboard': true,
         'run-dir': runDir
       },
       printHelp: vi.fn()
@@ -517,6 +684,7 @@ describe('runCoStatusCliShell', () => {
       await runCoStatusCliShell({
         flags: {
           format: 'json',
+          'operator-dashboard': true,
           'run-dir': runDir
         },
         printHelp: vi.fn()
@@ -553,6 +721,7 @@ describe('runCoStatusCliShell', () => {
     await runCoStatusCliShell({
       flags: {
         format: 'json',
+        'operator-dashboard': true,
         'run-dir': runDir
       },
       printHelp: vi.fn()
@@ -703,6 +872,8 @@ describe('runCoStatusCliShell', () => {
       updatedAtMsAgo: 1_000,
       polling: buildFreshProviderPolling({
         active_claims: [],
+        checking: true,
+        last_success_at: null,
         progress_updated_at: progressUpdatedAt,
         progress_elapsed_ms: 1_250
       })
@@ -728,7 +899,9 @@ describe('runCoStatusCliShell', () => {
       mode: 'control_machine_status',
       degraded_read: {
         reason: 'ui_request_timeout',
-        source: 'local_machine_status'
+        source: 'local_machine_status',
+        freshness_verdict: 'unknown',
+        finding_codes: ['refresh_timestamp_missing']
       },
       counts: {
         running: 0,
@@ -1337,6 +1510,7 @@ describe('runCoStatusCliShell', () => {
     await runCoStatusCliShell({
       flags: {
         format: 'json',
+        'operator-dashboard': true,
         'run-dir': runDir
       },
       printHelp: vi.fn()
@@ -1381,6 +1555,7 @@ describe('runCoStatusCliShell', () => {
     await runCoStatusCliShell({
       flags: {
         format: 'json',
+        'operator-dashboard': true,
         'run-dir': runDir
       },
       printHelp: vi.fn()
@@ -1555,6 +1730,7 @@ describe('runCoStatusCliShell', () => {
     await runCoStatusCliShell({
       flags: {
         format: 'json',
+        'operator-dashboard': true,
         'run-dir': runDir
       },
       printHelp: vi.fn()
@@ -1720,6 +1896,7 @@ describe('runCoStatusCliShell', () => {
     await runCoStatusCliShell({
       flags: {
         format: 'json',
+        'operator-dashboard': true,
         'run-dir': runDir
       },
       printHelp: vi.fn()
@@ -1777,6 +1954,7 @@ describe('runCoStatusCliShell', () => {
       await runWithMockedAttach({
         flags: {
           format: 'json',
+          'operator-dashboard': true,
           'run-dir': runDir
         },
         printHelp: vi.fn()
@@ -1873,6 +2051,7 @@ describe('runCoStatusCliShell', () => {
     await runCoStatusCliShell({
       flags: {
         format: 'json',
+        'operator-dashboard': true,
         'run-dir': runDir
       },
       printHelp: vi.fn()
@@ -1977,6 +2156,7 @@ describe('runCoStatusCliShell', () => {
     await runCoStatusCliShell({
       flags: {
         format: 'json',
+        'operator-dashboard': true,
         'run-dir': runDir
       },
       printHelp: vi.fn()
@@ -2274,6 +2454,7 @@ describe('runCoStatusCliShell', () => {
     await runCoStatusCliShell({
       flags: {
         format: 'json',
+        'operator-dashboard': true,
         'run-dir': runDir
       },
       printHelp: vi.fn()
@@ -2369,6 +2550,7 @@ describe('runCoStatusCliShell', () => {
       await runCoStatusCliShell({
         flags: {
           format: 'json',
+          'operator-dashboard': true,
           'run-dir': runDir
         },
         printHelp: vi.fn()

@@ -60,6 +60,10 @@ const LOCAL_DEGRADED_FALLBACK_ALLOWED_VERDICTS = new Set<ProviderControlHostFres
   'degraded'
 ]);
 const LOCAL_DEGRADED_FALLBACK_ALLOWED_FINDING_CODES = new Set(['active_worker_proof_missing']);
+const LOCAL_MACHINE_STATUS_DEGRADED_ALLOWED_FINDING_CODES = new Set([
+  ...LOCAL_DEGRADED_FALLBACK_ALLOWED_FINDING_CODES,
+  'refresh_timestamp_missing'
+]);
 const CURRENT_HOST_UNHEALTHY_MARKER = 'current-host-unhealthy';
 const CURRENT_HOST_UNHEALTHY_STALE_ENDPOINT_FALLBACK =
   'control-host unavailable; stale endpoint after control-host restart';
@@ -139,9 +143,10 @@ export async function runCoStatusCliShell(params: RunCoStatusCliShellParams): Pr
     return;
   }
 
-  const dataset = readBooleanFlag(params.flags, 'machine-status')
-    ? await readCoStatusMachineStatusDataset({ flags: params.flags })
-    : await readCoStatusJsonDataset({ flags: params.flags });
+  const dataset =
+    readBooleanFlag(params.flags, 'dashboard') || readBooleanFlag(params.flags, 'operator-dashboard')
+      ? await readCoStatusJsonDataset({ flags: params.flags })
+      : await readCoStatusMachineStatusDataset({ flags: params.flags });
   console.log(JSON.stringify(dataset, null, 2));
 }
 
@@ -234,8 +239,7 @@ async function annotateDashboardDegradedRead(
   });
   const machineStatusDataset = await readLocalMachineStatusDataset(target);
   if (
-    !isEligibleLocalDegradedFallbackFreshnessReport(freshnessReport) ||
-    !isEligibleDegradedMachineStatusDataset(
+    !isEligibleMachineStatusDegradedRead(
       machineStatusDataset,
       freshnessReport,
       maxMachineStatusAgeMs
@@ -272,13 +276,9 @@ async function tryReadDegradedMachineStatusDataset(input: {
   const freshnessReport = await evaluateProviderControlHostFreshnessGauge({
     artifactRoot: input.target.runDir
   });
-  if (!isEligibleLocalDegradedFallbackFreshnessReport(freshnessReport)) {
-    return null;
-  }
-
   const localDataset = await readLocalMachineStatusDataset(input.target);
   if (
-    isEligibleDegradedMachineStatusDataset(
+    isEligibleMachineStatusDegradedRead(
       localDataset,
       freshnessReport,
       input.maxMachineStatusAgeMs
@@ -298,13 +298,27 @@ async function tryReadDegradedMachineStatusDataset(input: {
   return null;
 }
 
+function isEligibleMachineStatusDegradedRead(
+  dataset: ControlMachineStatusDataset,
+  freshnessReport: ProviderControlHostFreshnessGaugeReport,
+  maxMachineStatusAgeMs: number
+): boolean {
+  return (
+    isEligibleMachineStatusFreshnessReport(freshnessReport) &&
+    isEligibleDegradedMachineStatusDataset(dataset, freshnessReport, maxMachineStatusAgeMs)
+  );
+}
+
 function isEligibleDegradedMachineStatusDataset(
   dataset: ControlMachineStatusDataset,
   freshnessReport: ProviderControlHostFreshnessGaugeReport,
   maxMachineStatusAgeMs: number
 ): boolean {
   const refreshAgeVerdict = freshnessReport.metrics.last_successful_refresh_age_ms.verdict;
-  if (!LOCAL_DEGRADED_FALLBACK_ALLOWED_VERDICTS.has(refreshAgeVerdict)) {
+  if (
+    !LOCAL_DEGRADED_FALLBACK_ALLOWED_VERDICTS.has(refreshAgeVerdict) &&
+    !hasOnlyAllowedMachineStatusFreshnessFindings(freshnessReport)
+  ) {
     return false;
   }
   const polling = dataset.polling as Record<string, unknown> | null;
@@ -542,6 +556,27 @@ function isEligibleLocalDegradedFallbackFreshnessReport(
   return (
     report.findings.length > 0 &&
     report.findings.every((finding) => LOCAL_DEGRADED_FALLBACK_ALLOWED_FINDING_CODES.has(finding.code))
+  );
+}
+
+function isEligibleMachineStatusFreshnessReport(
+  report: ProviderControlHostFreshnessGaugeReport
+): boolean {
+  return (
+    isEligibleLocalDegradedFallbackFreshnessReport(report) ||
+    hasOnlyAllowedMachineStatusFreshnessFindings(report)
+  );
+}
+
+function hasOnlyAllowedMachineStatusFreshnessFindings(
+  report: ProviderControlHostFreshnessGaugeReport
+): boolean {
+  return (
+    report.verdict === 'unknown' &&
+    report.findings.length > 0 &&
+    report.findings.every((finding) =>
+      LOCAL_MACHINE_STATUS_DEGRADED_ALLOWED_FINDING_CODES.has(finding.code)
+    )
   );
 }
 

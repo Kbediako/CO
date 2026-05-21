@@ -254,6 +254,7 @@ function parseArgs(raw: string[]): { positionals: string[]; flags: ArgMap } {
     'codex-cli',
     'codex-force',
     'collab',
+    'dashboard',
     'devtools',
     'dry-run',
     'force',
@@ -263,6 +264,7 @@ function parseArgs(raw: string[]): { positionals: string[]; flags: ArgMap } {
     'machine-status',
     'multi-agent',
     'no-interactive',
+    'operator-dashboard',
     'repo-config-required',
     'refresh-skills',
     'ui',
@@ -2081,16 +2083,18 @@ or emit the current CO STATUS snapshot from that host in JSON mode.
 Viewer options:
   --task <id>           Artifact task id for the host state (default: local-mcp).
   --run <id>            Host run id for persisted state files (default: control-host).
-  --format json         Emit the current CO STATUS snapshot from the local control-host and exit.
-  --machine-status      In JSON mode, emit the cheap machine-health snapshot instead of /ui/data.json.
+  --format json         Emit the cheap machine-health snapshot from the local control-host and exit.
+  --machine-status      Compatibility alias for the default JSON machine-health snapshot.
+  --dashboard           In JSON mode, emit the full /ui/data.json operator-dashboard snapshot.
+  --operator-dashboard  Alias for --dashboard.
   --machine-status-max-age-ms <ms>
                        Bound local degraded machine-status fallback freshness.
   --help                Show this message.
 
 JSON contract:
-  co-status --format json reads the authenticated operator-dashboard snapshot from the
-  current local control-host and exits. Supervision probes use --machine-status so
-  health reads do not depend on the heavier dashboard projection.
+  co-status --format json reads the authenticated /ui/machine-status.json snapshot from
+  the current local control-host and exits. Use --dashboard or --operator-dashboard
+  only when the full operator-dashboard /ui/data.json projection is required.
   Use \`control-host --format json\` for startup readiness output.
 
 Attach subcommand:
