@@ -5572,6 +5572,8 @@ export function createProviderIssueHandoffService(
             isTerminalProviderIntakeIssueState(claim) &&
             !canTreatReviewPromotionAsStaleForReleasedTerminalHistoricalClaim(claim);
           const currentPollTrackedIssue = trackedIssuesByKey?.get(claimProviderKey) ?? null;
+          const hasRecentBacklogNotActivePassiveVerification =
+            hasRecentBacklogNotActiveDirectIssueByIdPassiveVerification(claim);
           if (
             shouldKeepCurrentPollReleasedTerminalHistoricalClaimPassive({
               claim,
@@ -5589,11 +5591,14 @@ export function createProviderIssueHandoffService(
             shouldUseCachedReleasedBacklogNotActiveClaim &&
             (
               trackedIssuesByKey !== null ||
-              hasRecentBacklogNotActiveDirectIssueByIdPassiveVerification(claim)
+              hasRecentBacklogNotActivePassiveVerification
             ) &&
             currentPollTrackedIssue === null &&
             !canFreshDiscoverReleasedLiveWorker &&
-            !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot;
+            (
+              !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot ||
+              hasRecentBacklogNotActivePassiveVerification
+            );
           if (shouldKeepCachedReleasedBacklogNotActiveClaimPassiveBeforeReconcile) {
             continue;
           }
@@ -5765,8 +5770,7 @@ export function createProviderIssueHandoffService(
                 issue_state: resolution.trackedIssue.state,
                 issue_state_type: resolution.trackedIssue.state_type
               }) &&
-              !canFreshDiscoverReleasedLiveWorker &&
-              !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot
+              !canFreshDiscoverReleasedLiveWorker
             ) {
               await markReleasedBacklogNotActiveClaimPassiveVerified({
                 claim,

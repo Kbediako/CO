@@ -31606,6 +31606,129 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('uses direct Backlog issue-by-id proof over stale blocker snapshots for passive released claims', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: '617541e3-39f0-4926-8105-9b2a5c053a5b',
+      issue_identifier: 'CO-520',
+      issue_title: 'Goals mode adoption remains parked in Backlog',
+      issue_state: 'Backlog',
+      issue_state_type: 'backlog',
+      issue_updated_at: '2026-05-16T06:45:57.870Z',
+      issue_blocked_by: [
+        {
+          id: 'lin-co-514',
+          identifier: 'CO-514',
+          state: 'Blocked',
+          state_type: 'started'
+        }
+      ],
+      task_id: 'linear-617541e3-39f0-4926-8105-9b2a5c053a5b',
+      run_id: null,
+      run_manifest_path: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null,
+      review_promotion: null,
+      merge_closeout: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-520-stale-blocker-snapshot-should-not-start',
+      '/tmp/provider-run/co-520-stale-blocker-snapshot-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: [
+        createTrackedIssue({
+          id: 'lin-co-999-passive-snapshot-carrier',
+          identifier: 'CO-999',
+          title: 'Snapshot carrier that still references CO-520 as active',
+          state: 'Backlog',
+          state_type: 'backlog',
+          updated_at: '2026-05-21T05:10:00.000Z',
+          blocked_by: [
+            {
+              id: '617541e3-39f0-4926-8105-9b2a5c053a5b',
+              identifier: 'CO-520',
+              state: 'Blocked',
+              state_type: 'started'
+            }
+          ]
+        })
+      ]
+    }));
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: '617541e3-39f0-4926-8105-9b2a5c053a5b',
+        identifier: 'CO-520',
+        title: 'Goals mode adoption remains parked in Backlog',
+        state: 'Backlog',
+        state_type: 'backlog',
+        updated_at: '2026-05-16T06:45:57.870Z',
+        blocked_by: [
+          {
+            id: 'lin-co-514',
+            identifier: 'CO-514',
+            state: 'Blocked',
+            state_type: 'started'
+          }
+        ]
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssues,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    markProviderPollingStarted(service, { mode: 'refresh' });
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(resolveTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssues).toHaveBeenCalledWith(undefined);
+    expect(resolveTrackedIssue).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssue).toHaveBeenCalledWith({
+      provider: 'linear',
+      issueId: '617541e3-39f0-4926-8105-9b2a5c053a5b'
+    });
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false
+    });
+    expect(state.claims[0]?.passive_release).toMatchObject({
+      reason: 'backlog_not_active_direct_issue_by_id',
+      source: 'direct_issue_by_id',
+      issue_state: 'Backlog',
+      issue_state_type: 'backlog',
+      issue_updated_at: '2026-05-16T06:45:57.870Z'
+    });
+
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(resolveTrackedIssues).toHaveBeenCalledTimes(2);
+    expect(resolveTrackedIssue).toHaveBeenCalledTimes(1);
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false
+    });
+  });
+
   it('revalidates released Backlog not-active claims when no poll snapshot but issue-by-id is active', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
