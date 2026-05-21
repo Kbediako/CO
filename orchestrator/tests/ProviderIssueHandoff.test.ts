@@ -31291,6 +31291,91 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('keeps released Backlog not-active claims passive before direct issue-by-id', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: '2807d702-edce-4847-84d3-ca8628ab77fc',
+      issue_identifier: 'CO-529',
+      issue_title: 'Archive-stub validation remains parked in Backlog',
+      issue_state: 'Backlog',
+      issue_state_type: 'backlog',
+      issue_updated_at: '2026-05-21T02:00:00.000Z',
+      issue_blocked_by: [],
+      task_id: 'linear-2807d702-edce-4847-84d3-ca8628ab77fc',
+      run_id: null,
+      run_manifest_path: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null,
+      review_promotion: null,
+      merge_closeout: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-529-backlog-should-not-start',
+      '/tmp/provider-run/co-529-backlog-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: []
+    }));
+    const resolveTrackedIssue = vi.fn<
+      NonNullable<Parameters<typeof createProviderIssueHandoffService>[0]['resolveTrackedIssue']>
+    >(async () => {
+      throw new Error('released Backlog not-active claim should not use direct issue-by-id');
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssues,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    markProviderPollingStarted(service, { mode: 'refresh' });
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(resolveTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    const pollingHealth = readProviderPollingHealth(service);
+    expect(pollingHealth).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false,
+      refresh_counts: expect.objectContaining({
+        claims_scanned: 1,
+        issue_by_id_reads: 0,
+        issue_by_id_deferred: 0,
+        occupied_slots: 0
+      })
+    });
+    expect(pollingHealth?.refresh_phase).not.toBe('refresh:claim_issue_by_id_reconcile');
+    expect(pollingHealth?.refresh_request_class).not.toBe('claim_reconcile:released');
+    expect(pollingHealth?.refresh_request_class).not.toBe('claim_issue_by_id:released');
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Backlog',
+      issue_state_type: 'backlog',
+      issue_updated_at: '2026-05-21T02:00:00.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps map-missing terminal released history passive before claim reconcile progress', async () => {
     const { paths } = await createHostPaths();
     const state = createProviderIntakeState();
