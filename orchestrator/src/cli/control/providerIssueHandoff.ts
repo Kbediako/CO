@@ -343,6 +343,8 @@ interface ProviderLinearWorkerProofRecord {
 const PROVIDER_UNREADABLE_MANIFEST_LIVE_PROOF_TTL_MS =
   2 * PROVIDER_SEMANTIC_STALL_RECHECK_DELAY_MS;
 const PROVIDER_BACKLOG_RELEASE_DIRECT_PROOF_READS_PER_REFRESH = 3;
+const PROVIDER_BACKLOG_RELEASE_PASSIVE_PROOF_REVALIDATION_MS =
+  PROVIDER_SEMANTIC_STALL_RECHECK_DELAY_MS;
 
 function resolveRehydratedActiveRunWorkerHost(
   run: ProviderIssueRunRecord,
@@ -2224,6 +2226,7 @@ export function createProviderIssueHandoffService(
           launch_token: null,
           review_promotion: null,
           merge_closeout: null,
+          passive_release: null,
           ...(
             input.preserveRetryAttempt === true || input.claim.retry_queued === true
               ? buildQueuedProviderRetryFields({
@@ -2267,6 +2270,7 @@ export function createProviderIssueHandoffService(
           launch_token: null,
           review_promotion: null,
           merge_closeout: null,
+          passive_release: null,
           ...buildQueuedProviderRetryFields({
             claim: input.claim,
             previousRun: input.previousRun ?? null,
@@ -2295,6 +2299,7 @@ export function createProviderIssueHandoffService(
         launch_token: launchToken,
         review_promotion: null,
         merge_closeout: null,
+        passive_release: null,
         ...buildProviderRetryLaunchFields({
           claim: input.claim,
           previousRun: input.previousRun ?? null,
@@ -2338,6 +2343,7 @@ export function createProviderIssueHandoffService(
           launch_token: launchToken,
           review_promotion: null,
           merge_closeout: null,
+          passive_release: null,
           ...buildQueuedProviderRetryFields({
             claim: input.claim,
             previousRun: input.previousRun ?? null,
@@ -2372,6 +2378,7 @@ export function createProviderIssueHandoffService(
               launch_token: launchToken,
               review_promotion: null,
               merge_closeout: null,
+              passive_release: null,
               ...buildProviderRetryLaunchFields({
                 claim: input.claim,
                 previousRun: input.previousRun ?? null,
@@ -5463,6 +5470,44 @@ export function createProviderIssueHandoffService(
         let preDiscoveryNonActiveIssueByIdReads = 0;
         let backlogReleaseDirectProofReads = 0;
         let noRunPendingReopenLiveStartedProbeReads = 0;
+        const hasUnverifiedBacklogReleaseDirectProofCandidates =
+          trackedIssuesByKey === null &&
+          [...options.state.claims].some((candidateClaim) => {
+            const candidateProviderKey = buildProviderIssueKey(
+              candidateClaim.provider,
+              candidateClaim.issue_id
+            );
+            const candidateRuns =
+              runsByProviderIssue.get(candidateProviderKey) ?? [];
+            const candidateAttachableRuns = filterProviderIssueRunsForStartPipeline(
+              candidateRuns,
+              startPipelineId
+            );
+            const candidateActiveRun =
+              candidateAttachableRuns.find((run) => run.status === 'in_progress') ?? null;
+            const candidateReleaseRun = resolveProviderReleaseRun(
+              candidateClaim,
+              candidateAttachableRuns
+            );
+            const candidateLatestRun = resolveLatestKnownProviderRun(candidateAttachableRuns);
+            return (
+              shouldUseCachedReleasedBacklogNotActiveClaimResolution({
+                claim: candidateClaim,
+                activeRun: candidateActiveRun,
+                releaseRun: candidateReleaseRun,
+                latestRun: candidateLatestRun
+              }) &&
+              !hasBacklogNotActiveDirectIssueByIdPassiveVerificationForCurrentSnapshot(
+                candidateClaim
+              ) &&
+              !canFreshDiscoverReleasedLiveWorkerClaim(
+                candidateClaim,
+                candidateReleaseRun,
+                candidateActiveRun,
+                hasPendingReleaseCancel
+              )
+            );
+          });
 
         for (const claim of [...options.state.claims]) {
           assertRefreshCycleNotStuck();
@@ -5575,10 +5620,28 @@ export function createProviderIssueHandoffService(
           const currentPollTrackedIssue = trackedIssuesByKey?.get(claimProviderKey) ?? null;
           const hasBacklogNotActivePassiveVerificationForCurrentSnapshot =
             hasBacklogNotActiveDirectIssueByIdPassiveVerificationForCurrentSnapshot(claim);
+          const shouldRevalidateBacklogNotActivePassiveVerification =
+            trackedIssuesByKey === null &&
+            hasBacklogNotActivePassiveVerificationForCurrentSnapshot &&
+            isBacklogNotActiveDirectIssueByIdPassiveVerificationRevalidationDueForCurrentSnapshot(
+              claim
+            );
+          const canUseBacklogNotActivePassiveVerificationForThisRefresh =
+            hasBacklogNotActivePassiveVerificationForCurrentSnapshot &&
+            (
+              !shouldRevalidateBacklogNotActivePassiveVerification ||
+              hasUnverifiedBacklogReleaseDirectProofCandidates
+            );
           const shouldUseBacklogReleaseDirectProofBudget =
             shouldUseCachedReleasedBacklogNotActiveClaim &&
             currentPollTrackedIssue === null &&
-            !hasBacklogNotActivePassiveVerificationForCurrentSnapshot &&
+            (
+              !hasBacklogNotActivePassiveVerificationForCurrentSnapshot ||
+              (
+                shouldRevalidateBacklogNotActivePassiveVerification &&
+                !hasUnverifiedBacklogReleaseDirectProofCandidates
+              )
+            ) &&
             !canFreshDiscoverReleasedLiveWorker;
           if (
             shouldKeepCurrentPollReleasedTerminalHistoricalClaimPassive({
@@ -5597,12 +5660,12 @@ export function createProviderIssueHandoffService(
             shouldUseCachedReleasedBacklogNotActiveClaim &&
             (
               trackedIssuesByKey !== null ||
-              hasBacklogNotActivePassiveVerificationForCurrentSnapshot
+              canUseBacklogNotActivePassiveVerificationForThisRefresh
             ) &&
             currentPollTrackedIssue === null &&
             !canFreshDiscoverReleasedLiveWorker &&
             (
-              hasBacklogNotActivePassiveVerificationForCurrentSnapshot ||
+              canUseBacklogNotActivePassiveVerificationForThisRefresh ||
               !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot
             );
           if (shouldKeepCachedReleasedBacklogNotActiveClaimPassiveBeforeReconcile) {
@@ -9973,12 +10036,12 @@ function isReleasedBacklogNotActiveClaim(
   );
 }
 
-function hasBacklogNotActiveDirectIssueByIdPassiveVerificationForCurrentSnapshot(
+function resolveBacklogNotActiveDirectIssueByIdPassiveVerificationVerifiedAtMsForCurrentSnapshot(
   claim: Pick<
     ProviderIntakeClaimRecord,
     'passive_release' | 'issue_state' | 'issue_state_type' | 'issue_updated_at'
   >
-): boolean {
+): number | null {
   const verification = claim.passive_release ?? null;
   if (
     !verification ||
@@ -9990,9 +10053,41 @@ function hasBacklogNotActiveDirectIssueByIdPassiveVerificationForCurrentSnapshot
     verification.issue_state_type !== claim.issue_state_type ||
     verification.issue_updated_at !== claim.issue_updated_at
   ) {
-    return false;
+    return null;
   }
-  return true;
+  const verifiedAtMs = Date.parse(verification.verified_at);
+  return Number.isFinite(verifiedAtMs) ? verifiedAtMs : null;
+}
+
+function hasBacklogNotActiveDirectIssueByIdPassiveVerificationForCurrentSnapshot(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'passive_release' | 'issue_state' | 'issue_state_type' | 'issue_updated_at'
+  >
+): boolean {
+  return (
+    resolveBacklogNotActiveDirectIssueByIdPassiveVerificationVerifiedAtMsForCurrentSnapshot(
+      claim
+    ) !== null
+  );
+}
+
+function isBacklogNotActiveDirectIssueByIdPassiveVerificationRevalidationDueForCurrentSnapshot(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'passive_release' | 'issue_state' | 'issue_state_type' | 'issue_updated_at'
+  >,
+  observedAtMs = Date.now()
+): boolean {
+  const verifiedAtMs =
+    resolveBacklogNotActiveDirectIssueByIdPassiveVerificationVerifiedAtMsForCurrentSnapshot(
+      claim
+    );
+  return (
+    verifiedAtMs !== null &&
+    observedAtMs >= verifiedAtMs &&
+    observedAtMs - verifiedAtMs >= PROVIDER_BACKLOG_RELEASE_PASSIVE_PROOF_REVALIDATION_MS
+  );
 }
 
 function shouldKeepCurrentPollReleasedTerminalHistoricalClaimPassive(input: {
