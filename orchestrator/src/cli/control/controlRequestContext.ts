@@ -129,7 +129,7 @@ export function buildControlPresenterRuntimeContext(
       paths: input.paths,
       readSelectedRunSnapshot: () => runtimeSnapshot.readSelectedRunSnapshot(),
       readMachineStatus: () => runtimeSnapshot.readMachineStatus(),
-      readCompatibilityProjection: () => runtimeSnapshot.readCompatibilityProjection()
+      readCompatibilityProjection: (signal?: AbortSignal) => runtimeSnapshot.readCompatibilityProjection(signal)
     }
   };
 }

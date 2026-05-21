@@ -117,7 +117,7 @@ interface InternalControlCompatibilityRuntimeSnapshot extends ControlCompatibili
 export interface ControlRuntimeSnapshot {
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
   readMachineStatus(): Promise<ControlMachineStatusSnapshot>;
-  readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot>;
+  readCompatibilityProjection(signal?: AbortSignal): Promise<ControlCompatibilityProjectionSnapshot>;
   readDispatchEvaluation(): Promise<{
     issueIdentifier: string | null;
     evaluation: DispatchPilotEvaluation;
@@ -367,9 +367,12 @@ function createControlRuntimeSnapshot(
     );
   }
 
-  async function readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot> {
+  async function readCompatibilityProjection(signal?: AbortSignal): Promise<ControlCompatibilityProjectionSnapshot> {
+    throwIfAborted(signal);
     const providerIntakeAuthority = readProviderIntakeAuthorityState(context);
+    throwIfAborted(signal);
     const runtimeSnapshot = await readCompatibilityRuntimeSnapshot(providerIntakeAuthority);
+    throwIfAborted(signal);
     // Cache the stable projection shape once, but re-derive polling-backed rate limits on every
     // read so current Linear budget data is reflected without invalidating the rest of the snapshot.
     compatibilityProjectionPromise ??= Promise.resolve(buildCompatibilityProjectionSnapshot(runtimeSnapshot));
@@ -381,8 +384,10 @@ function createControlRuntimeSnapshot(
       retrying: runtimeSnapshot.retrying
     });
     const { rateLimits } = buildCompatibilityTelemetrySnapshot(telemetrySources, polling);
+    const projection = await compatibilityProjectionPromise;
+    throwIfAborted(signal);
     return {
-      ...(await compatibilityProjectionPromise),
+      ...projection,
       rateLimits,
       polling,
       providerIntake: buildProviderIntakeSummary(providerIntakeAuthority.state),
@@ -460,6 +465,13 @@ function createControlRuntimeSnapshot(
       await readSelectedRunSnapshot();
     }
   };
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) {
+    return;
+  }
+  throw signal.reason instanceof Error ? signal.reason : new Error('control runtime read aborted');
 }
 
 function readRuntimeDocsFreshnessRepoGate(

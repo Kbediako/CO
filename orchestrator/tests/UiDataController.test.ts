@@ -264,6 +264,54 @@ describe('UiDataController', () => {
     }
   });
 
+  it('aborts the pending dashboard read after a controller timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      const { res, state } = createResponseRecorder();
+      let observedSignal: AbortSignal | undefined;
+      let abortReason: unknown;
+      const handledPromise = handleUiDataRequest({
+        req: {
+          method: 'GET',
+          url: '/ui/data.json'
+        } as Pick<http.IncomingMessage, 'method' | 'url'>,
+        res,
+        presenterContext: {
+          readCompatibilityProjection: async (signal?: AbortSignal) => {
+            observedSignal = signal;
+            return await new Promise<ControlCompatibilityProjectionSnapshot>((_resolve, reject) => {
+              signal?.addEventListener(
+                'abort',
+                () => {
+                  abortReason = signal.reason;
+                  reject(signal.reason);
+                },
+                { once: true }
+              );
+            });
+          }
+        }
+      });
+
+      await vi.advanceTimersByTimeAsync(uiDataControllerTest.DEFAULT_UI_DATA_READ_TIMEOUT_MS);
+
+      await expect(handledPromise).resolves.toBe(true);
+      expect(state.statusCode).toBe(200);
+      expect(state.body).toMatchObject({
+        dashboard_degraded: {
+          reason: 'read_timeout'
+        }
+      });
+      expect(observedSignal?.aborted).toBe(true);
+      expect(abortReason).toBeInstanceOf(Error);
+      expect((abortReason as Error).message).toBe(
+        `operator dashboard read timed out after ${uiDataControllerTest.DEFAULT_UI_DATA_READ_TIMEOUT_MS}ms`
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('builds the operator-dashboard dataset directly from the compatibility projection', () => {
     const dataset = buildUiDataset({
       projection: buildProjection({

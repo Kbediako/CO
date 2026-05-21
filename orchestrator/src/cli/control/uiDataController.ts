@@ -72,13 +72,18 @@ async function readUiDatasetWithControllerTimeout(
   presenterContext: OperatorDashboardPresenterContext,
   timeoutMs: number
 ): Promise<OperatorDashboardDataset> {
+  const abortController = new AbortController();
   let timer: ReturnType<typeof setTimeout> | null = null;
   try {
+    const timeoutError = new UiDataReadTimeoutError(timeoutMs);
     return await Promise.race([
-      readUiDataset(presenterContext),
+      readUiDataset(presenterContext, { signal: abortController.signal }),
       new Promise<never>((_, reject) => {
         timer = setTimeout(
-          () => reject(new UiDataReadTimeoutError(timeoutMs)),
+          () => {
+            abortController.abort(timeoutError);
+            reject(timeoutError);
+          },
           timeoutMs
         );
       })

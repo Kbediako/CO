@@ -453,7 +453,7 @@ async function tryReadLocalDegradedUiDataset(input: {
 
   const localDataset = await readLocalUiDataset(input.target);
   if (
-    await hasFailedActiveProviderIntakeRun(localDataset.providerIntakeState) ||
+    await hasUnsafeActiveProviderIntakeRun(localDataset.providerIntakeState) ||
     hasActiveNoProgressRefresh(localDataset.providerIntakeState.polling)
   ) {
     return null;
@@ -474,13 +474,16 @@ async function tryReadLocalDegradedUiDataset(input: {
   };
 }
 
-async function hasFailedActiveProviderIntakeRun(state: ProviderIntakeState): Promise<boolean> {
+async function hasUnsafeActiveProviderIntakeRun(state: ProviderIntakeState): Promise<boolean> {
   const activeClaims = state.claims.filter(isDegradedActiveClaim);
   for (const claim of activeClaims) {
     if (!claim.run_manifest_path) {
       continue;
     }
-    const manifest = await readJsonRecordIfExists(claim.run_manifest_path);
+    const manifest = await readJsonRecord(claim.run_manifest_path);
+    if (!manifest) {
+      return true;
+    }
     const status = typeof manifest?.status === 'string' ? manifest.status : null;
     if (status === 'failed' || status === 'cancelled' || status === 'canceled') {
       return true;
@@ -489,7 +492,7 @@ async function hasFailedActiveProviderIntakeRun(state: ProviderIntakeState): Pro
   return false;
 }
 
-async function readJsonRecordIfExists(path: string): Promise<Record<string, unknown> | null> {
+async function readJsonRecord(path: string): Promise<Record<string, unknown> | null> {
   try {
     const parsed = JSON.parse(await readFile(path, 'utf8')) as unknown;
     return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)

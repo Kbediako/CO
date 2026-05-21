@@ -2508,6 +2508,45 @@ describe('controlHostSupervision shell helpers', () => {
     }
   });
 
+  it('treats rotated-endpoint machine-status timeout exits as probe failures', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-rotated-machine-status-timeout-'));
+    try {
+      const config = buildControlHostSupervisionConfig({
+        homeDir: '/Users/tester',
+        cwd: tempRoot,
+        repoRoot: tempRoot,
+        nodePath: '/custom/node',
+        cliEntrypoint: '/opt/codex-orchestrator.js',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        healthIntervalSeconds: 5
+      });
+
+      const result = await probeControlHostHealth(
+        config,
+        {},
+        {},
+        async () => ({
+          exitCode: 1,
+          stdout: '',
+          stderr:
+            'Re-resolving control_endpoint.json succeeded, but the refreshed endpoint is not readable: control-host machine-status request timeout after 5000ms.',
+          timedOut: false
+        })
+      );
+
+      expect(result).toMatchObject({
+        healthy: false,
+        reason: 'probe_failed',
+        diagnostic: null
+      });
+      expect(result.message).toContain('co-status probe failed:');
+      expect(result.message).toContain('refreshed endpoint is not readable');
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it('fails closed on probe timeout when provider-intake has active non-running WIP', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-active-accepted-timeout-'));
     try {

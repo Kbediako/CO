@@ -1210,6 +1210,36 @@ describe('runCoStatusCliShell', () => {
           })
         });
       }
+    },
+    {
+      name: 'unreadable active run manifest',
+      buildState: async (root: string, runDir: string) => {
+        const manifestPath = join(
+          root,
+          '.runs',
+          'linear-missing-run',
+          'cli',
+          'provider-run-missing',
+          'manifest.json'
+        );
+        await writeProviderIntakeState(runDir, {
+          claims: [
+            {
+              issueIdentifier: 'CO-572',
+              issueId: 'lin-issue-missing',
+              issueTitle: 'Missing provider run evidence',
+              taskId: 'linear-missing-run',
+              runId: 'provider-run-missing',
+              runManifestPath: manifestPath,
+              claimState: 'running',
+              updatedAtMsAgo: 1_000
+            }
+          ],
+          polling: buildFreshProviderPolling({
+            active_claims: ['linear:lin-issue-missing']
+          })
+        });
+      }
     }
   ])('fails closed on $name after repeated same-endpoint timeouts', async ({ buildState }) => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-shell-fail-closed-'));

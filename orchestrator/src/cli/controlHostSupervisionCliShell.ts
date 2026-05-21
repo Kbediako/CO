@@ -904,7 +904,8 @@ async function probeControlHostHealth(
 function isCoStatusProbeTimeoutFailure(detail: string): boolean {
   return (
     /\b(?:timed out|timeout)\b/iu.test(detail) &&
-    (/\bmachine-status\b/iu.test(detail) || /\bsame-endpoint current-endpoint timeout\b/iu.test(detail))
+    /\bmachine-status\b/iu.test(detail) &&
+    /\bsame-endpoint current-endpoint timeout\b/iu.test(detail)
   );
 }
 

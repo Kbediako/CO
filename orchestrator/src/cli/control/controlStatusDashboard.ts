@@ -23,7 +23,7 @@ type DashboardInput = Pick<NodeJS.ReadStream, 'isTTY' | 'on' | 'off' | 'pause' |
 };
 
 interface ControlStatusDashboardDependencies {
-  readDataset: (runtime: ControlRuntime) => Promise<OperatorDashboardDataset>;
+  readDataset: (runtime: ControlRuntime, signal?: AbortSignal) => Promise<OperatorDashboardDataset>;
   setTimeout: typeof setTimeout;
   clearTimeout: typeof clearTimeout;
   now: () => Date;
@@ -187,10 +187,13 @@ const NUMBER_FORMAT = new Intl.NumberFormat('en-US');
 const DASHBOARD_SNAPSHOT_DIRNAME = 'co-status-snapshots';
 
 const DEFAULT_DEPENDENCIES: ControlStatusDashboardDependencies = {
-  readDataset: async (runtime) =>
-    await readUiDataset({
-      readCompatibilityProjection: async () => await runtime.snapshot().readCompatibilityProjection()
-    }),
+  readDataset: async (runtime, signal) =>
+    await readUiDataset(
+      {
+        readCompatibilityProjection: async () => await runtime.snapshot().readCompatibilityProjection(signal)
+      },
+      { signal }
+    ),
   setTimeout,
   clearTimeout,
   now: () => new Date()
@@ -225,7 +228,7 @@ export function startControlStatusDashboard(
   const liveOutput = options.output ?? DEFAULT_OUTPUT;
   return startControlStatusViewer(
     {
-      readDataset: async () => await deps.readDataset(options.runtime),
+      readDataset: async (signal) => await deps.readDataset(options.runtime, signal),
       requestRefresh: async () => {
         await options.runtime.requestRefresh();
       },

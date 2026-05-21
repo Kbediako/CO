@@ -27,7 +27,7 @@ import { isoTimestamp } from '../utils/time.js';
 const LOCAL_HOSTNAME = hostname();
 
 export interface OperatorDashboardPresenterContext {
-  readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot>;
+  readCompatibilityProjection(signal?: AbortSignal): Promise<ControlCompatibilityProjectionSnapshot>;
 }
 
 export interface OperatorDashboardSessionPayload {
@@ -288,9 +288,10 @@ export function buildCompatibilityIssueRecordLookups(
 }
 
 export async function readUiDataset(
-  context: OperatorDashboardPresenterContext
+  context: OperatorDashboardPresenterContext,
+  options: { signal?: AbortSignal } = {}
 ): Promise<OperatorDashboardDataset> {
-  const projection = await context.readCompatibilityProjection();
+  const projection = await context.readCompatibilityProjection(options.signal);
   return buildUiDataset({
     projection
   });
