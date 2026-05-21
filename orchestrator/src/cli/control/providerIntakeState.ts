@@ -45,6 +45,15 @@ export type ProviderIntakeSummaryState =
   | ProviderIntakeClaimState
   | 'handoff_owned';
 
+export interface ProviderPassiveReleaseVerificationRecord {
+  reason: 'backlog_not_active_direct_issue_by_id';
+  source: 'direct_issue_by_id';
+  verified_at: string;
+  issue_state: string | null;
+  issue_state_type: string | null;
+  issue_updated_at: string | null;
+}
+
 export interface ProviderIntakeClaimRecord {
   provider: 'linear';
   provider_key: string;
@@ -83,6 +92,7 @@ export interface ProviderIntakeClaimRecord {
   retry_error?: string | null;
   review_promotion?: ProviderReviewHandoffPromotionRecord | null;
   merge_closeout?: ProviderMergeCloseoutRecord | null;
+  passive_release?: ProviderPassiveReleaseVerificationRecord | null;
 }
 
 export interface ProviderIntakeState {
@@ -313,15 +323,18 @@ export function upsertProviderIntakeClaim(
             retryDueAt: existing?.retry_due_at ?? null,
             retryError: existing?.retry_error ?? null
           };
+  const nextIssueState = input.issue_state ?? null;
+  const nextIssueStateType = input.issue_state_type ?? null;
+  const nextIssueUpdatedAt = input.issue_updated_at ?? null;
   const next: ProviderIntakeClaimRecord = {
     provider: 'linear',
     provider_key: input.provider_key,
     issue_id: input.issue_id,
     issue_identifier: input.issue_identifier,
     issue_title: input.issue_title,
-    issue_state: input.issue_state ?? null,
-    issue_state_type: input.issue_state_type ?? null,
-    issue_updated_at: input.issue_updated_at ?? null,
+    issue_state: nextIssueState,
+    issue_state_type: nextIssueStateType,
+    issue_updated_at: nextIssueUpdatedAt,
     issue_archived_at:
       input.issue_archived_at === undefined
         ? existing?.issue_archived_at ?? null
@@ -398,7 +411,15 @@ export function upsertProviderIntakeClaim(
     merge_closeout:
       input.merge_closeout === undefined
         ? cloneProviderMergeCloseoutRecord(existing?.merge_closeout)
-        : cloneProviderMergeCloseoutRecord(input.merge_closeout)
+        : cloneProviderMergeCloseoutRecord(input.merge_closeout),
+    passive_release:
+      input.passive_release === undefined
+        ? cloneMatchingPassiveReleaseVerificationRecord(existing?.passive_release, {
+            issue_state: nextIssueState,
+            issue_state_type: nextIssueStateType,
+            issue_updated_at: nextIssueUpdatedAt
+          })
+        : cloneProviderPassiveReleaseVerificationRecord(input.passive_release)
   };
 
   if (existingIndex >= 0) {
@@ -646,7 +667,8 @@ function normalizeProviderIntakeClaim(
     launch_token: typeof input.launch_token === 'string' ? input.launch_token : null,
     launch_started_at: launchStartedAt,
     review_promotion: cloneProviderReviewHandoffPromotionRecord(input.review_promotion),
-    merge_closeout: cloneProviderMergeCloseoutRecord(input.merge_closeout)
+    merge_closeout: cloneProviderMergeCloseoutRecord(input.merge_closeout),
+    passive_release: cloneProviderPassiveReleaseVerificationRecord(input.passive_release)
   };
   if (hasOwnField(input, 'retry_queued')) {
     normalized.retry_queued = normalizeRetryQueued(input.retry_queued);
@@ -703,6 +725,50 @@ function normalizeRetryTimestamp(value: unknown): string | null {
 
 function normalizeRetryError(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+function cloneMatchingPassiveReleaseVerificationRecord(
+  value: ProviderPassiveReleaseVerificationRecord | null | undefined,
+  claim: Pick<
+    ProviderPassiveReleaseVerificationRecord,
+    'issue_state' | 'issue_state_type' | 'issue_updated_at'
+  >
+): ProviderPassiveReleaseVerificationRecord | null {
+  const record = cloneProviderPassiveReleaseVerificationRecord(value);
+  if (
+    !record ||
+    record.issue_state !== claim.issue_state ||
+    record.issue_state_type !== claim.issue_state_type ||
+    record.issue_updated_at !== claim.issue_updated_at
+  ) {
+    return null;
+  }
+  return record;
+}
+
+function cloneProviderPassiveReleaseVerificationRecord(
+  value: ProviderPassiveReleaseVerificationRecord | null | undefined
+): ProviderPassiveReleaseVerificationRecord | null {
+  if (!isRecordLike(value)) {
+    return null;
+  }
+  if (
+    value.reason !== 'backlog_not_active_direct_issue_by_id' ||
+    value.source !== 'direct_issue_by_id'
+  ) {
+    return null;
+  }
+  return {
+    reason: value.reason,
+    source: value.source,
+    verified_at:
+      typeof value.verified_at === 'string' && value.verified_at.trim().length > 0
+        ? value.verified_at
+        : new Date(0).toISOString(),
+    issue_state: typeof value.issue_state === 'string' ? value.issue_state : null,
+    issue_state_type: typeof value.issue_state_type === 'string' ? value.issue_state_type : null,
+    issue_updated_at: typeof value.issue_updated_at === 'string' ? value.issue_updated_at : null
+  };
 }
 
 function cloneProviderMergeCloseoutRecord(
