@@ -15,6 +15,7 @@ import type { ProviderIntakeState } from './providerIntakeState.js';
 import type {
   ObservabilityPresenterContext
 } from './observabilitySurface.js';
+import type { ControlMachineStatusPresenterContext } from './controlMachineStatusPresenter.js';
 import type { QuestionQueue } from './questions.js';
 
 export interface ControlRequestPersist {
@@ -64,7 +65,10 @@ export interface ControlSelectedRunSnapshotContext {
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
 }
 
-export type ControlPresenterContext = ObservabilityPresenterContext & ControlSelectedRunSnapshotContext;
+export type ControlPresenterContext =
+  ObservabilityPresenterContext &
+  ControlSelectedRunSnapshotContext &
+  ControlMachineStatusPresenterContext;
 
 export interface ControlPresenterRuntimeContext {
   runtimeSnapshot: ControlRuntimeSnapshot;
@@ -124,7 +128,8 @@ export function buildControlPresenterRuntimeContext(
       controlStore: input.controlStore,
       paths: input.paths,
       readSelectedRunSnapshot: () => runtimeSnapshot.readSelectedRunSnapshot(),
-      readCompatibilityProjection: () => runtimeSnapshot.readCompatibilityProjection()
+      readMachineStatus: () => runtimeSnapshot.readMachineStatus(),
+      readCompatibilityProjection: (signal?: AbortSignal) => runtimeSnapshot.readCompatibilityProjection(signal)
     }
   };
 }

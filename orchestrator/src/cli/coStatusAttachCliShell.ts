@@ -15,6 +15,10 @@ import {
   startAttachedControlStatusDashboard,
   type ControlStatusDashboardHandle
 } from './control/controlStatusDashboard.js';
+import {
+  MACHINE_STATUS_PATH
+} from './control/machineStatusController.js';
+import type { ControlMachineStatusDataset } from './control/controlMachineStatusPresenter.js';
 import type { OperatorDashboardDataset } from './control/operatorDashboardPresenter.js';
 import { normalizeEnvironmentPaths, normalizeTaskId } from './run/environment.js';
 import { resolveRunPaths } from './run/runPaths.js';
@@ -338,6 +342,150 @@ export async function fetchUiDataset(
   return payload;
 }
 
+export async function fetchMachineStatusDataset(
+  baseUrl: URL,
+  token: string,
+  options: { signal?: AbortSignal; requestTimeoutMs?: number } = {}
+): Promise<ControlMachineStatusDataset> {
+  const url = new URL(MACHINE_STATUS_PATH, baseUrl);
+  const controller = new AbortController();
+  const linkedSignal = options.signal;
+  const onAbort = () => controller.abort();
+  if (linkedSignal) {
+    if (linkedSignal.aborted) {
+      controller.abort();
+    } else {
+      linkedSignal.addEventListener('abort', onAbort, { once: true });
+    }
+  }
+  const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_ATTACH_REQUEST_TIMEOUT_MS;
+  const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
+  let response: Response;
+  try {
+    response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        [CSRF_HEADER]: token
+      },
+      signal: controller.signal
+    });
+  } catch (error) {
+    if ((error as Error)?.name === 'AbortError') {
+      if (linkedSignal?.aborted) {
+        throw new CoStatusAttachRequestError(
+          'cancelled',
+          'control-host machine-status request cancelled',
+          { cause: error }
+        );
+      }
+      throw new CoStatusAttachRequestError(
+        'timeout',
+        `control-host machine-status request timeout after ${requestTimeoutMs}ms`,
+        { cause: error }
+      );
+    }
+    throw new CoStatusAttachRequestError(
+      'network',
+      `control-host unavailable at ${url.toString()}: ${formatFetchNetworkError(error)}`,
+      { cause: error }
+    );
+  } finally {
+    clearTimeout(timer);
+    linkedSignal?.removeEventListener('abort', onAbort);
+  }
+  if (!response.ok) {
+    const statusText = response.statusText.trim() || 'HTTP error';
+    if (response.status === 401 || response.status === 403) {
+      throw new CoStatusAttachRequestError(
+        'auth',
+        `control-host machine-status auth failed: ${response.status} ${statusText}; refresh control_auth.json or restart co-status attach against the current control-host.`,
+        { statusCode: response.status }
+      );
+    }
+    throw new CoStatusAttachRequestError(
+      'http',
+      `control-host machine-status request failed: ${response.status} ${statusText}`,
+      { statusCode: response.status }
+    );
+  }
+  const payload = (await response.json()) as unknown;
+  if (!isControlMachineStatusDataset(payload)) {
+    throw new Error('control-host machine-status dataset invalid');
+  }
+  return payload;
+}
+
+export async function readMachineStatusDatasetWithEndpointRecovery(input: {
+  flags: ArgMap;
+  getTarget: () => CoStatusAttachTarget;
+  setTarget: (target: CoStatusAttachTarget) => void;
+  signal?: AbortSignal;
+  requestTimeoutMs?: number;
+  recoverSameEndpointTimeout?: boolean;
+}): Promise<ControlMachineStatusDataset> {
+  const previousTarget = input.getTarget();
+  try {
+    return await fetchMachineStatusDataset(previousTarget.baseUrl, previousTarget.token, {
+      signal: input.signal,
+      requestTimeoutMs: input.requestTimeoutMs
+    });
+  } catch (error) {
+    if (isCancelledAttachRequestError(error)) {
+      throw error;
+    }
+    let resolvedTarget: CoStatusAttachTarget;
+    try {
+      resolvedTarget = await resolveAttachTarget(input.flags);
+    } catch (resolveError) {
+      throw new Error(
+        `${formatAttachRequestFailure(error, previousTarget)} Re-resolving control_endpoint.json failed: ${
+          (resolveError as Error)?.message ?? String(resolveError)
+        }.`
+      );
+    }
+    if (!isAttachTargetEndpointEquivalent(previousTarget, resolvedTarget)) {
+      input.setTarget(resolvedTarget);
+      try {
+        return await fetchMachineStatusDataset(resolvedTarget.baseUrl, resolvedTarget.token, {
+          signal: input.signal,
+          requestTimeoutMs: input.requestTimeoutMs
+        });
+      } catch (retryError) {
+        if (isCancelledAttachRequestError(retryError)) {
+          throw retryError;
+        }
+        throw new Error(
+          `control-host endpoint rotated from ${previousTarget.baseUrl.toString()} to ${resolvedTarget.baseUrl.toString()}, but the refreshed endpoint is not readable. ${formatAttachRequestFailure(retryError, resolvedTarget, { endpointAlreadyRotated: true, endpointLabel: 'machine-status' })}`
+        );
+      }
+    }
+    if (input.recoverSameEndpointTimeout === true && isTimeoutAttachRequestError(error)) {
+      try {
+        return await fetchMachineStatusDataset(previousTarget.baseUrl, previousTarget.token, {
+          signal: input.signal,
+          requestTimeoutMs: input.requestTimeoutMs
+        });
+      } catch (retryError) {
+        if (isCancelledAttachRequestError(retryError)) {
+          throw retryError;
+        }
+        if (isTimeoutAttachRequestError(retryError)) {
+          throw new Error(
+            formatSameEndpointTimeoutFailure(
+              retryError,
+              previousTarget,
+              '/ui/machine-status.json'
+            )
+          );
+        }
+        throw new Error(formatAttachRequestFailure(retryError, previousTarget, { endpointLabel: 'machine-status' }));
+      }
+    }
+    throw new Error(formatAttachRequestFailure(error, previousTarget, { endpointLabel: 'machine-status' }));
+  }
+}
+
 export async function readUiDatasetWithEndpointRecovery(input: {
   flags: ArgMap;
   getTarget: () => CoStatusAttachTarget;
@@ -419,11 +567,12 @@ function isTimeoutAttachRequestError(error: unknown): error is CoStatusAttachReq
 
 function formatSameEndpointTimeoutFailure(
   error: CoStatusAttachRequestError,
-  target: CoStatusAttachTarget
+  target: CoStatusAttachTarget,
+  endpointPath = '/ui/data.json'
 ): string {
   return [
     `${error.message}.`,
-    `The current resolved /ui/data.json endpoint at ${target.baseUrl.toString()} timed out again after endpoint re-resolution returned the same endpoint/token; this is a same-endpoint current-endpoint timeout, not stale/dead endpoint ECONNREFUSED recovery or attach restart/rotation.`,
+    `The current resolved ${endpointPath} endpoint at ${target.baseUrl.toString()} timed out again after endpoint re-resolution returned the same endpoint/token; this is a same-endpoint current-endpoint timeout, not stale/dead endpoint ECONNREFUSED recovery or attach restart/rotation.`,
     'Inspect local control-host polling.stuck, polling.restart_required, and running claim evidence before treating the host as unhealthy.'
   ].join(' ');
 }
@@ -431,7 +580,7 @@ function formatSameEndpointTimeoutFailure(
 function formatAttachRequestFailure(
   error: unknown,
   target: CoStatusAttachTarget,
-  options: { endpointAlreadyRotated?: boolean } = {}
+  options: { endpointAlreadyRotated?: boolean; endpointLabel?: string } = {}
 ): string {
   if (error instanceof CoStatusAttachRequestError) {
     if (error.kind === 'network') {
@@ -445,7 +594,7 @@ function formatAttachRequestFailure(
     }
     return error.message;
   }
-  return `control-host ui request failed: ${(error as Error)?.message ?? String(error)}`;
+  return `control-host ${options.endpointLabel ?? 'ui'} request failed: ${(error as Error)?.message ?? String(error)}`;
 }
 
 function formatFetchNetworkError(error: unknown): string {
@@ -530,6 +679,36 @@ function isOperatorDashboardDataset(value: unknown): value is OperatorDashboardD
     !isNumberOrNull(value.totals.total_tokens) ||
     !isFiniteNumber(value.totals.seconds_running)
   ) {
+    return false;
+  }
+  return Array.isArray(value.running) && Array.isArray(value.retrying) && Array.isArray(value.issues);
+}
+
+function isControlMachineStatusDataset(value: unknown): value is ControlMachineStatusDataset {
+  if (!isRecord(value)) {
+    return false;
+  }
+  if (value.mode !== 'control_machine_status' || value.read_only !== true) {
+    return false;
+  }
+  if (typeof value.generated_at !== 'string' || typeof value.host !== 'string') {
+    return false;
+  }
+  if (
+    !isRecord(value.counts) ||
+    !isFiniteNumber(value.counts.running) ||
+    !isFiniteNumber(value.counts.retrying) ||
+    !isFiniteNumber(value.counts.issues)
+  ) {
+    return false;
+  }
+  if (
+    'max_allowed' in value.counts &&
+    !isNumberOrNull(value.counts.max_allowed)
+  ) {
+    return false;
+  }
+  if (!('polling' in value) || (value.polling !== null && !isRecord(value.polling))) {
     return false;
   }
   return Array.isArray(value.running) && Array.isArray(value.retrying) && Array.isArray(value.issues);

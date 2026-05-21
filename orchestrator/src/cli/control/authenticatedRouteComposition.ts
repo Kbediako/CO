@@ -6,6 +6,7 @@ import {
   handleObservabilityApiRequest,
   type ProviderWorkerRecoverAcceptedState
 } from './observabilityApiController.js';
+import { handleMachineStatusRequest } from './machineStatusController.js';
 import { handleUiDataRequest } from './uiDataController.js';
 import { handleEventsSseRequest } from './eventsSseController.js';
 import { handleQuestionQueueRequest } from './questionQueueController.js';
@@ -32,6 +33,7 @@ import type {
 
 type PresenterContext =
   Parameters<typeof handleUiDataRequest>[0]['presenterContext'] &
+  Parameters<typeof handleMachineStatusRequest>[0]['presenterContext'] &
   Parameters<typeof handleObservabilityApiRequest>[0]['presenterContext'];
 type QuestionQueueContext = Parameters<typeof handleQuestionQueueRequest>[0]['questionQueue'];
 type DelegationAuth = { token: string; childRunId: string };
@@ -122,6 +124,12 @@ export function createAuthenticatedRouteDispatcherContext(
         req: context.req,
         res: context.res,
         clients: context.clients
+      }),
+    handleMachineStatus: () =>
+      handleMachineStatusRequest({
+        req: context.req,
+        res: context.res,
+        presenterContext: context.presenterContext
       }),
     handleUiData: () =>
       handleUiDataRequest({

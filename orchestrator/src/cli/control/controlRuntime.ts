@@ -7,6 +7,7 @@ import {
   cloneProviderWorkflowStatusPayload,
   type ProviderWorkflowConfigStore
 } from './providerWorkflowConfigStore.js';
+import type { ControlMachineStatusSnapshot } from './controlMachineStatusPresenter.js';
 import { readDocsFreshnessMaintainRepoGate } from './docsFreshnessRepoGate.js';
 import type { LinearBudgetStatus } from './linearBudgetState.js';
 import {
@@ -115,7 +116,8 @@ interface InternalControlCompatibilityRuntimeSnapshot extends ControlCompatibili
 
 export interface ControlRuntimeSnapshot {
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
-  readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot>;
+  readMachineStatus(): Promise<ControlMachineStatusSnapshot>;
+  readCompatibilityProjection(signal?: AbortSignal): Promise<ControlCompatibilityProjectionSnapshot>;
   readDispatchEvaluation(): Promise<{
     issueIdentifier: string | null;
     evaluation: DispatchPilotEvaluation;
@@ -365,9 +367,12 @@ function createControlRuntimeSnapshot(
     );
   }
 
-  async function readCompatibilityProjection(): Promise<ControlCompatibilityProjectionSnapshot> {
+  async function readCompatibilityProjection(signal?: AbortSignal): Promise<ControlCompatibilityProjectionSnapshot> {
+    throwIfAborted(signal);
     const providerIntakeAuthority = readProviderIntakeAuthorityState(context);
+    throwIfAborted(signal);
     const runtimeSnapshot = await readCompatibilityRuntimeSnapshot(providerIntakeAuthority);
+    throwIfAborted(signal);
     // Cache the stable projection shape once, but re-derive polling-backed rate limits on every
     // read so current Linear budget data is reflected without invalidating the rest of the snapshot.
     compatibilityProjectionPromise ??= Promise.resolve(buildCompatibilityProjectionSnapshot(runtimeSnapshot));
@@ -379,8 +384,10 @@ function createControlRuntimeSnapshot(
       retrying: runtimeSnapshot.retrying
     });
     const { rateLimits } = buildCompatibilityTelemetrySnapshot(telemetrySources, polling);
+    const projection = await compatibilityProjectionPromise;
+    throwIfAborted(signal);
     return {
-      ...(await compatibilityProjectionPromise),
+      ...projection,
       rateLimits,
       polling,
       providerIntake: buildProviderIntakeSummary(providerIntakeAuthority.state),
@@ -392,6 +399,28 @@ function createControlRuntimeSnapshot(
           collectCompatibilityRepoGateTaskIds(runtimeSnapshot)
         )
       }
+    };
+  }
+
+  async function readMachineStatus(): Promise<ControlMachineStatusSnapshot> {
+    const providerIntakeAuthority = readProviderIntakeAuthorityState(context);
+    const authorityContext = buildProviderIntakeAuthorityContext(context, providerIntakeAuthority);
+    const providerIntake = buildProviderIntakeSummary(providerIntakeAuthority.state);
+    const providerWorkflow = context.providerWorkflowConfigStore?.snapshot() ?? null;
+    return {
+      providerIntake,
+      runningClaims: (providerIntakeAuthority.state?.claims ?? []).filter(
+        (claim) => claim.state === 'running' && isActiveProviderIntakeClaim(claim)
+      ),
+      providerIntakeUnavailable: providerIntakeAuthority.unavailable,
+      providerWorkflow,
+      polling: readProviderPollingSnapshot(authorityContext),
+      maxConcurrentAgents: resolveProviderPollDispatchLimits(
+        context.controlStore.snapshot().feature_toggles,
+        {
+          localWorkerOnly: (providerWorkflow?.worker_hosts?.length ?? 0) === 0
+        }
+      ).maxConcurrentAgents
     };
   }
 
@@ -429,12 +458,20 @@ function createControlRuntimeSnapshot(
 
   return {
     readSelectedRunSnapshot,
+    readMachineStatus,
     readCompatibilityProjection,
     readDispatchEvaluation,
     async prime(): Promise<void> {
       await readSelectedRunSnapshot();
     }
   };
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) {
+    return;
+  }
+  throw signal.reason instanceof Error ? signal.reason : new Error('control runtime read aborted');
 }
 
 function readRuntimeDocsFreshnessRepoGate(
@@ -789,6 +826,12 @@ function normalizePersistedProviderPollingSnapshot(
     operation_elapsed_ms:
       typeof polling.operation_elapsed_ms === 'number' && Number.isFinite(polling.operation_elapsed_ms)
         ? polling.operation_elapsed_ms
+        : null,
+    progress_updated_at:
+      typeof polling.progress_updated_at === 'string' ? polling.progress_updated_at : null,
+    progress_elapsed_ms:
+      typeof polling.progress_elapsed_ms === 'number' && Number.isFinite(polling.progress_elapsed_ms)
+        ? polling.progress_elapsed_ms
         : null,
     stalled_after_ms:
       typeof polling.stalled_after_ms === 'number' && Number.isFinite(polling.stalled_after_ms)

@@ -3,6 +3,7 @@ export interface AuthenticatedRouteDispatcherContext {
   method: string | undefined;
   authKind: 'control' | 'session';
   handleEventsSse(): void;
+  handleMachineStatus?(): Promise<boolean>;
   handleUiData(): Promise<boolean>;
   handleObservabilityApi(): Promise<boolean>;
   handleControlAction(authKind: 'control' | 'session'): Promise<void>;
@@ -21,6 +22,10 @@ export async function handleAuthenticatedRouteDispatcher(
 ): Promise<boolean> {
   if (context.pathname === '/events' && context.method === 'GET') {
     context.handleEventsSse();
+    return true;
+  }
+
+  if (context.handleMachineStatus && await context.handleMachineStatus()) {
     return true;
   }
 

@@ -23,7 +23,7 @@ type DashboardInput = Pick<NodeJS.ReadStream, 'isTTY' | 'on' | 'off' | 'pause' |
 };
 
 interface ControlStatusDashboardDependencies {
-  readDataset: (runtime: ControlRuntime) => Promise<OperatorDashboardDataset>;
+  readDataset: (runtime: ControlRuntime, signal?: AbortSignal) => Promise<OperatorDashboardDataset>;
   setTimeout: typeof setTimeout;
   clearTimeout: typeof clearTimeout;
   now: () => Date;
@@ -187,10 +187,13 @@ const NUMBER_FORMAT = new Intl.NumberFormat('en-US');
 const DASHBOARD_SNAPSHOT_DIRNAME = 'co-status-snapshots';
 
 const DEFAULT_DEPENDENCIES: ControlStatusDashboardDependencies = {
-  readDataset: async (runtime) =>
-    await readUiDataset({
-      readCompatibilityProjection: async () => await runtime.snapshot().readCompatibilityProjection()
-    }),
+  readDataset: async (runtime, signal) =>
+    await readUiDataset(
+      {
+        readCompatibilityProjection: async () => await runtime.snapshot().readCompatibilityProjection(signal)
+      },
+      { signal }
+    ),
   setTimeout,
   clearTimeout,
   now: () => new Date()
@@ -225,7 +228,7 @@ export function startControlStatusDashboard(
   const liveOutput = options.output ?? DEFAULT_OUTPUT;
   return startControlStatusViewer(
     {
-      readDataset: async () => await deps.readDataset(options.runtime),
+      readDataset: async (signal) => await deps.readDataset(options.runtime, signal),
       requestRefresh: async () => {
         await options.runtime.requestRefresh();
       },
@@ -876,6 +879,7 @@ export function renderControlStatusFrame(input: RenderControlStatusFrameInput): 
   const lines: string[] = [
     colorize('╭─ CO STATUS', ANSI_BOLD),
     renderAgentsLine(input.dataset, terminalColumns),
+    ...renderDashboardDegradedLines(input.dataset, terminalColumns),
     renderThroughputLine(input.throughputTps ?? 0, terminalColumns),
     renderRuntimeLine(input.dataset, referenceTime, liveReferenceTime, terminalColumns),
     renderTokensLine(input.dataset, terminalColumns),
@@ -920,6 +924,7 @@ function renderCompactControlStatusFrame(
   const lines: string[] = [
     colorize('╭─ CO STATUS', ANSI_BOLD),
     renderCompactStatusLine(input.dataset, referenceTime, liveReferenceTime, terminalColumns),
+    ...renderDashboardDegradedLines(input.dataset, terminalColumns),
     renderTokensLine(input.dataset, terminalColumns),
     renderRateLimitsLine(input.dataset, referenceTime, terminalColumns),
     renderCompactRunningLine(input.dataset.running, liveReferenceTime, terminalColumns),
@@ -987,6 +992,29 @@ function renderAgentsLine(dataset: OperatorDashboardDataset, terminalColumns: nu
     ],
     terminalColumns
   );
+}
+
+function renderDashboardDegradedLines(
+  dataset: OperatorDashboardDataset,
+  terminalColumns: number
+): string[] {
+  const degraded = dataset.dashboard_degraded;
+  if (!degraded) {
+    return [];
+  }
+  const reason = sanitizeDisplayValue(degraded.reason);
+  const message = sanitizeDisplayValue(degraded.message);
+  return [
+    renderSummaryLine(
+      'Dashboard error',
+      [
+        { text: reason, color: ANSI_RED },
+        { text: ' | ', color: ANSI_GRAY },
+        { text: message, color: ANSI_RED, truncateMode: 'end' }
+      ],
+      terminalColumns
+    )
+  ];
 }
 
 function renderThroughputLine(throughputTps: number, terminalColumns: number): string {

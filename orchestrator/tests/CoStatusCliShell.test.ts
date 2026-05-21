@@ -9,6 +9,7 @@ import { DEFAULT_ATTACH_REQUEST_TIMEOUT_MS } from '../src/cli/coStatusAttachCliS
 import {
   __test__ as coStatusCliShellTest,
   readCoStatusJsonDataset,
+  readCoStatusMachineStatusDataset,
   runCoStatusCliShell
 } from '../src/cli/coStatusCliShell.js';
 import { runCoStatusOperatorAutopilotCliShell } from '../src/cli/coStatusOperatorAutopilotCliShell.js';
@@ -134,6 +135,173 @@ describe('runCoStatusCliShell', () => {
     expect(payload).toEqual(buildUiPayload());
   });
 
+  it('marks degraded dashboard payloads as degraded for machine consumers', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeProviderIntakeState(runDir, {
+      claims: [],
+      updatedAtMsAgo: 1_000,
+      polling: buildFreshProviderPolling({
+        active_claims: []
+      })
+    });
+    const server = await startUiServer(
+      buildUiPayload({
+        polling: null,
+        dashboard_degraded: {
+          reason: 'read_timeout',
+          source: 'ui_data_controller',
+          message: 'operator dashboard read timed out after 1000ms',
+          timeout_ms: 1000,
+          generated_at: '2026-05-21T12:30:00.000Z'
+        }
+      })
+    );
+    servers.add(server.instance);
+    await writeControlEndpointArtifacts(runDir, server.baseUrl);
+
+    const payload = await readCoStatusJsonDataset({
+      flags: {
+        format: 'json',
+        'run-dir': runDir
+      }
+    });
+
+    expect(payload).toMatchObject({
+      mode: 'operator_dashboard',
+      dashboard_degraded: {
+        reason: 'read_timeout'
+      },
+      degraded_read: {
+        reason: 'dashboard_read_timeout',
+        source: 'operator_dashboard_degraded'
+      }
+    });
+  });
+
+  it('fails closed on degraded dashboard payloads when overall freshness is stale', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeProviderIntakeState(runDir, {
+      claims: [],
+      updatedAtMsAgo: 1_000,
+      polling: buildFreshProviderPolling({
+        active_claims: [],
+        last_success_at: new Date(Date.now() - 10 * 60 * 1_000).toISOString()
+      })
+    });
+    const server = await startUiServer(
+      buildUiPayload({
+        polling: null,
+        dashboard_degraded: {
+          reason: 'read_timeout',
+          source: 'ui_data_controller',
+          message: 'operator dashboard read timed out after 1000ms',
+          timeout_ms: 1000,
+          generated_at: '2026-05-21T12:30:00.000Z'
+        }
+      })
+    );
+    servers.add(server.instance);
+    await writeControlEndpointArtifacts(runDir, server.baseUrl);
+
+    await expect(
+      readCoStatusJsonDataset({
+        flags: {
+          format: 'json',
+          'run-dir': runDir
+        }
+      })
+    ).rejects.toThrow(/machine status is not eligible for a degraded read/u);
+  });
+
+  it('fails closed on degraded dashboard payloads when machine status is restart-required', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeProviderIntakeState(runDir, {
+      claims: [],
+      updatedAtMsAgo: 1_000,
+      polling: buildFreshProviderPolling({
+        active_claims: [],
+        restart_required: true,
+        reason: 'provider_refresh_lifecycle_stuck'
+      })
+    });
+    const server = await startUiServer(
+      buildUiPayload({
+        polling: null,
+        dashboard_degraded: {
+          reason: 'read_timeout',
+          source: 'ui_data_controller',
+          message: 'operator dashboard read timed out after 1000ms',
+          timeout_ms: 1000,
+          generated_at: '2026-05-21T12:30:00.000Z'
+        }
+      })
+    );
+    servers.add(server.instance);
+    await writeControlEndpointArtifacts(runDir, server.baseUrl);
+
+    await expect(
+      readCoStatusJsonDataset({
+        flags: {
+          format: 'json',
+          'run-dir': runDir
+        }
+      })
+    ).rejects.toThrow(/machine status is not eligible for a degraded read/u);
+  });
+
+  it('re-resolves endpoint artifacts for machine-status mode when the current endpoint is stale', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+
+    const currentServer = await startMachineStatusServer();
+    servers.add(currentServer.instance);
+    const staleServer = await startFailingMachineStatusServer(async () => {
+      await writeControlEndpointArtifacts(runDir, currentServer.baseUrl);
+    });
+    servers.add(staleServer.instance);
+    await writeControlEndpointArtifacts(runDir, staleServer.baseUrl);
+
+    const payload = await readCoStatusMachineStatusDataset({
+      flags: {
+        format: 'json',
+        'machine-status': true,
+        'run-dir': runDir
+      }
+    });
+
+    expect(staleServer.requests).toEqual([
+      {
+        authorization: 'Bearer snapshot-token',
+        csrfToken: 'snapshot-token'
+      }
+    ]);
+    expect(currentServer.requests).toEqual([
+      {
+        authorization: 'Bearer snapshot-token',
+        csrfToken: 'snapshot-token'
+      }
+    ]);
+    expect(payload).toMatchObject({
+      mode: 'control_machine_status',
+      read_only: true
+    });
+  });
+
   it('does not use degraded local fallback for rotated endpoint auth failures', async () => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
     tempDirs.push(root);
@@ -175,7 +343,7 @@ describe('runCoStatusCliShell', () => {
     ]);
   });
 
-  it('falls back truthfully when a rotated endpoint times out but provider evidence advances', async () => {
+  it('fails closed when a rotated ui endpoint times out even if provider evidence advances', async () => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
     tempDirs.push(root);
     process.env.CODEX_ORCHESTRATOR_ROOT = root;
@@ -216,46 +384,18 @@ describe('runCoStatusCliShell', () => {
     servers.add(staleServer.instance);
     await writeControlEndpointArtifacts(runDir, staleServer.baseUrl);
 
-    const payload = (await readCoStatusJsonDataset({
-      flags: {
-        format: 'json',
-        'run-dir': runDir
-      },
-      requestTimeoutMs: 250
-    })) as {
-      degraded_read?: {
-        reason?: unknown;
-        source?: unknown;
-        finding_codes?: unknown[];
-      };
-      selected_issue_identifier?: unknown;
-      selected?: {
-        issue_identifier?: unknown;
-        task_id?: unknown;
-        run_id?: unknown;
-        raw_status?: unknown;
-        status_reason?: unknown;
-      };
-      provider_intake?: {
-        active_claim_count?: unknown;
-        selected_claim?: {
-          issue_identifier?: unknown;
-          freshness?: unknown;
-        };
-      };
-      running?: Array<{
-        issue_identifier?: unknown;
-      }>;
-      issues?: Array<{
-        issue_identifier?: unknown;
-        provider_linear_worker_proof?: {
-          issue_identifier?: unknown;
-          task_id?: unknown;
-          run_id?: unknown;
-          workspace_path?: unknown;
-        } | null;
-      }>;
-    };
+    let thrown: unknown;
+    try {
+      await readCoStatusJsonDataset({
+        flags: {
+          format: 'json',
+          'run-dir': runDir
+        },
+        requestTimeoutMs: 250
+      });
+    } catch (error) {
+      thrown = error;
+    }
 
     expect(staleServer.requests).toEqual([
       {
@@ -269,38 +409,10 @@ describe('runCoStatusCliShell', () => {
         csrfToken: 'snapshot-token'
       }
     ]);
-    expect(payload.degraded_read).toMatchObject({
-      reason: 'ui_request_timeout',
-      source: 'local_seeded_runtime'
-    });
-    expect(payload.selected_issue_identifier).toBe('CO-455');
-    expect(payload.selected).toMatchObject({
-      issue_identifier: 'CO-455',
-      task_id: taskId,
-      run_id: runId,
-      raw_status: 'in_progress',
-      status_reason: 'provider-intake-state.json and worker manifest heartbeats advanced during ui timeout'
-    });
-    expect(payload.provider_intake).toMatchObject({
-      active_claim_count: 1,
-      selected_claim: {
-        issue_identifier: 'CO-455',
-        freshness: 'fresh'
-      }
-    });
-    expect(payload.degraded_read?.finding_codes ?? []).not.toContain('active_worker_proof_missing');
-    expect(payload.running?.map((entry) => entry.issue_identifier)).toEqual(['CO-455']);
-    expect(payload.issues?.map((entry) => entry.issue_identifier)).toEqual(['CO-455']);
-    expect(payload.issues?.[0]?.provider_linear_worker_proof).toMatchObject({
-      issue_identifier: 'CO-455',
-      task_id: taskId,
-      run_id: runId,
-      workspace_path: workspacePath
-    });
-    const renderedPayload = JSON.stringify(payload);
-    expect(renderedPayload).not.toMatch(/control_endpoint\.json has not rotated/u);
-    expect(renderedPayload).not.toMatch(/stale endpoint after control-host restart/u);
-    expect(renderedPayload).not.toMatch(/stale control-host owner reclamation/u);
+    const message = (thrown as Error)?.message ?? String(thrown);
+    expect(message).toMatch(/refreshed endpoint is not readable/u);
+    expect(message).toMatch(/control-host ui request timeout/u);
+    expect(message).not.toMatch(/same-endpoint current-endpoint timeout/u);
   });
 
   it('does not use degraded local fallback when endpoint re-resolution fails', async () => {
@@ -576,6 +688,621 @@ describe('runCoStatusCliShell', () => {
     expect(payload.issues?.[0]?.fallback_expiry?.map((entry) => entry.fallback)).not.toContain(
       syntheticIdentityFallback
     );
+  });
+
+  it('returns explicit degraded partial status for fresh zero-WIP polling after repeated same-endpoint timeouts', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    const progressUpdatedAt = new Date(Date.now() - 1_000).toISOString();
+    await writeProviderIntakeState(runDir, {
+      claims: [],
+      updatedAtMsAgo: 1_000,
+      polling: buildFreshProviderPolling({
+        active_claims: [],
+        progress_updated_at: progressUpdatedAt,
+        progress_elapsed_ms: 1_250
+      })
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(buildAbortError())
+      .mockRejectedValueOnce(buildAbortError());
+
+    const payload = await readCoStatusJsonDataset({
+      flags: {
+        format: 'json',
+        'run-dir': runDir
+      }
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy.mock.calls.map((call) => call[0])).toEqual([
+      'http://127.0.0.1:65535/ui/data.json',
+      'http://127.0.0.1:65535/ui/data.json'
+    ]);
+    expect(payload).toMatchObject({
+      mode: 'control_machine_status',
+      degraded_read: {
+        reason: 'ui_request_timeout',
+        source: 'local_machine_status'
+      },
+      counts: {
+        running: 0,
+        retrying: 0,
+        issues: 0
+      },
+      running: [],
+      retrying: [],
+      issues: [],
+      polling: {
+        stuck: false,
+        restart_required: false,
+        progress_updated_at: progressUpdatedAt,
+        progress_elapsed_ms: 1_250
+      }
+    });
+    expect('provider_intake' in payload).toBe(false);
+    expect(JSON.stringify(payload)).toMatch(/degraded_read|control_machine_status/u);
+  });
+
+  it('uses local machine-status fallback only for direct endpoint timeout failures', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    await writeProviderIntakeState(runDir, {
+      claims: [],
+      updatedAtMsAgo: 1_000,
+      polling: buildFreshProviderPolling({
+        active_claims: [],
+        progress_elapsed_ms: 750
+      })
+    });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(buildAbortError());
+
+    const payload = await readCoStatusMachineStatusDataset({
+      flags: {
+        format: 'json',
+        'machine-status': true,
+        'run-dir': runDir
+      }
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(payload).toMatchObject({
+      mode: 'control_machine_status',
+      degraded_read: {
+        reason: 'ui_request_timeout',
+        source: 'local_machine_status'
+      },
+      counts: {
+        running: 0,
+        retrying: 0,
+        issues: 0
+      }
+    });
+  });
+
+  it('honors caller timeout budgets for machine-status endpoint reads', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    await writeProviderIntakeState(runDir, {
+      claims: [],
+      updatedAtMsAgo: 1_000,
+      polling: buildFreshProviderPolling({
+        active_claims: [],
+        progress_elapsed_ms: 750
+      })
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(buildAbortError())
+      .mockRejectedValueOnce(buildAbortError());
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    const payload = await readCoStatusMachineStatusDataset({
+      flags: {
+        format: 'json',
+        'machine-status': true,
+        'run-dir': runDir
+      },
+      requestTimeoutMs: 1_500
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    const requestTimeouts = timeoutSpy.mock.calls
+      .map((call) => Number(call[1]))
+      .filter((delay) => Number.isFinite(delay));
+    expect(requestTimeouts.filter((delay) => delay === 1_500)).toHaveLength(2);
+    expect(requestTimeouts).not.toContain(1_000);
+    expect(payload.degraded_read).toMatchObject({
+      reason: 'ui_request_timeout',
+      source: 'local_machine_status'
+    });
+  });
+
+  it('fails closed on machine-status fallback when local polling timestamps are stale', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    await writeProviderIntakeState(runDir, {
+      claims: [],
+      updatedAtMsAgo: 1_000,
+      polling: buildFreshProviderPolling({
+        active_claims: [],
+        updated_at: '2026-05-21T12:00:00.000Z',
+        progress_updated_at: '2026-05-21T12:00:00.000Z',
+        progress_elapsed_ms: 1_000
+      })
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(buildAbortError())
+      .mockRejectedValueOnce(buildAbortError());
+
+    await expect(
+      readCoStatusMachineStatusDataset({
+        flags: {
+          format: 'json',
+          'machine-status': true,
+          'run-dir': runDir
+        }
+      })
+    ).rejects.toThrow(/same-endpoint current-endpoint timeout/u);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails closed on machine-status fallback when local polling reports an error', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    await writeProviderIntakeState(runDir, {
+      claims: [],
+      updatedAtMsAgo: 1_000,
+      polling: buildFreshProviderPolling({
+        active_claims: [],
+        reason: 'provider_refresh_failed',
+        last_error: 'linear api unavailable'
+      })
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(buildAbortError())
+      .mockRejectedValueOnce(buildAbortError());
+
+    await expect(
+      readCoStatusMachineStatusDataset({
+        flags: {
+          format: 'json',
+          'machine-status': true,
+          'run-dir': runDir
+        }
+      })
+    ).rejects.toThrow(/same-endpoint current-endpoint timeout/u);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails closed on machine-status fallback when provider-intake authority is unavailable', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    await writeProviderIntakeState(runDir, {
+      authority: {
+        status: 'unavailable',
+        reason: 'raw_provider_intake_unavailable',
+        updated_at: '2026-05-21T12:31:00.000Z'
+      },
+      claims: [],
+      updatedAtMsAgo: 1_000,
+      polling: buildFreshProviderPolling({
+        active_claims: []
+      })
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(buildAbortError())
+      .mockRejectedValueOnce(buildAbortError());
+
+    await expect(
+      readCoStatusMachineStatusDataset({
+        flags: {
+          format: 'json',
+          'machine-status': true,
+          'run-dir': runDir
+        }
+      })
+    ).rejects.toThrow(/same-endpoint current-endpoint timeout/u);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails closed when a rotated machine-status endpoint times out after stale endpoint recovery', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    await writeProviderIntakeState(runDir, {
+      claims: [],
+      updatedAtMsAgo: 1_000,
+      polling: buildFreshProviderPolling({
+        active_claims: [],
+        progress_elapsed_ms: 750
+      })
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(async () => {
+        await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65534');
+        throw buildAbortError();
+      })
+      .mockRejectedValueOnce(buildAbortError());
+
+    await expect(
+      readCoStatusMachineStatusDataset({
+        flags: {
+          format: 'json',
+          'machine-status': true,
+          'run-dir': runDir
+        }
+      })
+    ).rejects.toThrow(/refreshed endpoint is not readable/u);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy.mock.calls.map((call) => call[0])).toEqual([
+      'http://127.0.0.1:65535/ui/machine-status.json',
+      'http://127.0.0.1:65534/ui/machine-status.json'
+    ]);
+  });
+
+  it('fails closed for dead machine-status endpoints even with fresh local zero-WIP evidence', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    await writeProviderIntakeState(runDir, {
+      claims: [],
+      updatedAtMsAgo: 1_000,
+      polling: buildFreshProviderPolling({
+        active_claims: [],
+        progress_elapsed_ms: 750
+      })
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:65535'));
+
+    await expect(
+      readCoStatusMachineStatusDataset({
+        flags: {
+          format: 'json',
+          'machine-status': true,
+          'run-dir': runDir
+        }
+      })
+    ).rejects.toThrow(/current-host-unhealthy/u);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed for direct machine-status auth failures even with fresh local zero-WIP evidence', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeProviderIntakeState(runDir, {
+      claims: [],
+      updatedAtMsAgo: 1_000,
+      polling: buildFreshProviderPolling({
+        active_claims: []
+      })
+    });
+    const server = await startMachineStatusServer({ status: 401 });
+    servers.add(server.instance);
+    await writeControlEndpointArtifacts(runDir, server.baseUrl);
+
+    await expect(
+      readCoStatusMachineStatusDataset({
+        flags: {
+          format: 'json',
+          'machine-status': true,
+          'run-dir': runDir
+        }
+      })
+    ).rejects.toThrow(/control-host machine-status auth failed: 401/u);
+
+    expect(server.requests).toEqual([
+      {
+        authorization: 'Bearer snapshot-token',
+        csrfToken: 'snapshot-token'
+      }
+    ]);
+  });
+
+  it('fails closed for invalid direct machine-status payloads', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeProviderIntakeState(runDir, {
+      claims: [],
+      updatedAtMsAgo: 1_000,
+      polling: buildFreshProviderPolling({
+        active_claims: []
+      })
+    });
+    const server = await startMachineStatusServer({
+      payload: {
+        mode: 'operator_dashboard',
+        read_only: true
+      }
+    });
+    servers.add(server.instance);
+    await writeControlEndpointArtifacts(runDir, server.baseUrl);
+
+    await expect(
+      readCoStatusMachineStatusDataset({
+        flags: {
+          format: 'json',
+          'machine-status': true,
+          'run-dir': runDir
+        }
+      })
+    ).rejects.toThrow(/control-host machine-status dataset invalid/u);
+  });
+
+  it('fails closed for incomplete direct machine-status payloads', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeProviderIntakeState(runDir, {
+      claims: [],
+      updatedAtMsAgo: 1_000,
+      polling: buildFreshProviderPolling({
+        active_claims: []
+      })
+    });
+    const server = await startMachineStatusServer({
+      payload: {
+        generated_at: '2026-05-21T12:30:00.000Z',
+        mode: 'control_machine_status',
+        read_only: true,
+        host: 'test-host',
+        counts: {
+          running: 0,
+          retrying: 0,
+          issues: 0
+        }
+      }
+    });
+    servers.add(server.instance);
+    await writeControlEndpointArtifacts(runDir, server.baseUrl);
+
+    await expect(
+      readCoStatusMachineStatusDataset({
+        flags: {
+          format: 'json',
+          'machine-status': true,
+          'run-dir': runDir
+        }
+      })
+    ).rejects.toThrow(/control-host machine-status dataset invalid/u);
+  });
+
+  it.each([
+    {
+      name: 'restart_required=true',
+      buildState: async (_root: string, runDir: string) => {
+        await writeProviderIntakeState(runDir, {
+          claims: [],
+          updatedAtMsAgo: 1_000,
+          polling: buildFreshProviderPolling({
+            active_claims: [],
+            stuck: false,
+            restart_required: true,
+            reason: 'provider_refresh_lifecycle_stuck',
+            last_error: 'provider_refresh_lifecycle_stuck'
+          })
+        });
+      }
+    },
+    {
+      name: 'stale supervised source',
+      buildState: async (root: string, runDir: string) => {
+        await writeProviderIntakeState(runDir, {
+          claims: [],
+          updatedAtMsAgo: 1_000,
+          polling: buildFreshProviderPolling({
+            active_claims: [],
+            control_host_owner: buildStaleSupervisedControlHostOwner(root)
+          })
+        });
+      }
+    },
+    {
+      name: 'active no-progress refresh',
+      buildState: async (_root: string, runDir: string) => {
+        await writeProviderIntakeState(runDir, {
+          claimState: 'running',
+          updatedAtMsAgo: 1_000,
+          polling: buildFreshProviderPolling({
+            active_claims: ['linear:lin-issue-1'],
+            checking: true,
+            refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+            refresh_request_class: 'claim_issue_by_id:running',
+            progress_updated_at: new Date(Date.now() - 20 * 60 * 1_000).toISOString(),
+            progress_elapsed_ms: 20 * 60 * 1_000,
+            operation_elapsed_ms: 20 * 60 * 1_000,
+            stalled_after_ms: 45_000
+          })
+        });
+      }
+    },
+    {
+      name: 'restart_required=true on an active worker even when checking=false',
+      buildState: async (_root: string, runDir: string) => {
+        await writeProviderIntakeState(runDir, {
+          claimState: 'running',
+          updatedAtMsAgo: 1_000,
+          polling: buildFreshProviderPolling({
+            active_claims: ['linear:lin-issue-1'],
+            checking: false,
+            stuck: false,
+            restart_required: true,
+            reason: 'provider_refresh_lifecycle_stuck'
+          })
+        });
+      }
+    },
+    {
+      name: 'failed run evidence',
+      buildState: async (root: string, runDir: string) => {
+        const manifestPath = await writeProviderRunManifest(root, {
+          taskId: 'linear-failed-run',
+          runId: 'provider-run-failed',
+          issueId: 'lin-issue-failed',
+          issueIdentifier: 'CO-572',
+          status: 'failed'
+        });
+        await writeProviderIntakeState(runDir, {
+          claims: [
+            {
+              issueIdentifier: 'CO-572',
+              issueId: 'lin-issue-failed',
+              issueTitle: 'Failed provider run evidence',
+              taskId: 'linear-failed-run',
+              runId: 'provider-run-failed',
+              runManifestPath: manifestPath,
+              claimState: 'running',
+              updatedAtMsAgo: 1_000
+            }
+          ],
+          polling: buildFreshProviderPolling({
+            active_claims: ['linear:lin-issue-failed']
+          })
+        });
+      }
+    },
+    {
+      name: 'unreadable active run manifest',
+      buildState: async (root: string, runDir: string) => {
+        const manifestPath = join(
+          root,
+          '.runs',
+          'linear-missing-run',
+          'cli',
+          'provider-run-missing',
+          'manifest.json'
+        );
+        await writeProviderIntakeState(runDir, {
+          claims: [
+            {
+              issueIdentifier: 'CO-572',
+              issueId: 'lin-issue-missing',
+              issueTitle: 'Missing provider run evidence',
+              taskId: 'linear-missing-run',
+              runId: 'provider-run-missing',
+              runManifestPath: manifestPath,
+              claimState: 'running',
+              updatedAtMsAgo: 1_000
+            }
+          ],
+          polling: buildFreshProviderPolling({
+            active_claims: ['linear:lin-issue-missing']
+          })
+        });
+      }
+    }
+  ])('fails closed on $name after repeated same-endpoint timeouts', async ({ buildState }) => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-fail-closed-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    await buildState(root, runDir);
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(buildAbortError())
+      .mockRejectedValueOnce(buildAbortError());
+
+    await expect(
+      readCoStatusJsonDataset({
+        flags: {
+          format: 'json',
+          'run-dir': runDir
+        }
+      })
+    ).rejects.toThrow(/same-endpoint current-endpoint timeout/u);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails closed on machine-status fallback when zero-WIP polling is actively stalled', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-machine-fail-closed-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = await writeCoStatusRunDir(root);
+    await writeControlEndpointArtifacts(runDir, 'http://127.0.0.1:65535');
+    await writeProviderIntakeState(runDir, {
+      claims: [],
+      updatedAtMsAgo: 1_000,
+      polling: buildFreshProviderPolling({
+        active_claims: [],
+        checking: true,
+        refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+        refresh_request_class: 'claim_issue_by_id:accepted',
+        progress_updated_at: new Date(Date.now() - 20 * 60 * 1_000).toISOString(),
+        progress_elapsed_ms: 20 * 60 * 1_000,
+        operation_elapsed_ms: 20 * 60 * 1_000,
+        stalled_after_ms: 45_000
+      })
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(buildAbortError())
+      .mockRejectedValueOnce(buildAbortError());
+
+    await expect(
+      readCoStatusMachineStatusDataset({
+        flags: {
+          format: 'json',
+          'machine-status': true,
+          'run-dir': runDir
+        }
+      })
+    ).rejects.toThrow(/same-endpoint current-endpoint timeout/u);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
   it('does not project stale retained tracked.linear advisory in local degraded json fallback', async () => {
@@ -2045,6 +2772,67 @@ async function startUiServer(
   };
 }
 
+async function startMachineStatusServer(options: {
+  payload?: Record<string, unknown>;
+  responseDelayMs?: number;
+  status?: number;
+} = {}): Promise<{
+  instance: http.Server;
+  baseUrl: string;
+  requests: Array<{ authorization: string | null; csrfToken: string | null }>;
+}> {
+  const requests: Array<{ authorization: string | null; csrfToken: string | null }> = [];
+  const server = http.createServer(async (req, res) => {
+    if (req.url === '/ui/machine-status.json') {
+      requests.push({
+        authorization: typeof req.headers.authorization === 'string' ? req.headers.authorization : null,
+        csrfToken: typeof req.headers['x-csrf-token'] === 'string' ? req.headers['x-csrf-token'] : null
+      });
+      if (options.status && options.status >= 400) {
+        res.writeHead(options.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'machine-status failure' }));
+        return;
+      }
+      if (req.headers.authorization !== 'Bearer snapshot-token') {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'unauthorised' }));
+        return;
+      }
+      if (req.headers['x-csrf-token'] !== 'snapshot-token') {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'csrf required' }));
+        return;
+      }
+      if (options.responseDelayMs && options.responseDelayMs > 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, options.responseDelayMs));
+      }
+      if (res.destroyed) {
+        return;
+      }
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store'
+      });
+      res.end(JSON.stringify(options.payload ?? buildMachineStatusPayload()));
+      return;
+    }
+    res.writeHead(404).end();
+  });
+
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('expected loopback http server address');
+  }
+  return {
+    instance: server,
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    requests
+  };
+}
+
 async function startFailingUiServer(
   beforeNetworkFailure?: () => Promise<void> | void
 ): Promise<{
@@ -2055,6 +2843,40 @@ async function startFailingUiServer(
   const requests: Array<{ authorization: string | null; csrfToken: string | null }> = [];
   const server = http.createServer(async (req) => {
     if (req.url === '/ui/data.json') {
+      requests.push({
+        authorization: typeof req.headers.authorization === 'string' ? req.headers.authorization : null,
+        csrfToken: typeof req.headers['x-csrf-token'] === 'string' ? req.headers['x-csrf-token'] : null
+      });
+      await beforeNetworkFailure?.();
+      req.socket.destroy();
+      return;
+    }
+  });
+
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve());
+  });
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('expected loopback http server address');
+  }
+  return {
+    instance: server,
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    requests
+  };
+}
+
+async function startFailingMachineStatusServer(
+  beforeNetworkFailure?: () => Promise<void> | void
+): Promise<{
+  instance: http.Server;
+  baseUrl: string;
+  requests: Array<{ authorization: string | null; csrfToken: string | null }>;
+}> {
+  const requests: Array<{ authorization: string | null; csrfToken: string | null }> = [];
+  const server = http.createServer(async (req) => {
+    if (req.url === '/ui/machine-status.json') {
       requests.push({
         authorization: typeof req.headers.authorization === 'string' ? req.headers.authorization : null,
         csrfToken: typeof req.headers['x-csrf-token'] === 'string' ? req.headers['x-csrf-token'] : null
@@ -2334,6 +3156,28 @@ function buildUiPayload(overrides: Record<string, unknown> = {}): Record<string,
   };
 }
 
+function buildMachineStatusPayload(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    generated_at: '2026-05-21T12:30:00.000Z',
+    mode: 'control_machine_status',
+    read_only: true,
+    host: 'test-host',
+    counts: {
+      running: 0,
+      retrying: 0,
+      issues: 0,
+      max_allowed: null
+    },
+    polling: buildFreshProviderPolling({
+      active_claims: []
+    }),
+    running: [],
+    retrying: [],
+    issues: [],
+    ...overrides
+  };
+}
+
 function buildSelectedStatusPayload(input: {
   issueIdentifier: string;
   issueId: string;
@@ -2429,9 +3273,11 @@ function buildIssueStatusPayload(input: {
 }
 
 function buildProviderIntakeState(options: {
+  authority?: Record<string, unknown>;
   claimState?: 'running' | 'stale' | 'completed';
   updatedAtMsAgo?: number;
   rehydratedAt?: string | null;
+  polling?: Record<string, unknown>;
   claims?: Array<{
     issueIdentifier: string;
     issueId: string;
@@ -2476,9 +3322,10 @@ function buildProviderIntakeState(options: {
     schema_version: 1,
     updated_at: updatedAt,
     rehydrated_at: options.rehydratedAt ?? null,
+    ...(options.authority ? { authority: options.authority } : {}),
     latest_provider_key: `linear:${freshestClaim?.issueId ?? 'lin-issue-1'}`,
     latest_reason: freshestReason,
-    polling: {
+    polling: options.polling ?? {
       source: 'provider-intake-state.json',
       last_requested_at: updatedAt,
       last_completed_at: updatedAt,
@@ -2522,6 +3369,98 @@ function buildProviderIntakeState(options: {
       };
     })
   };
+}
+
+function buildFreshProviderPolling(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  const updatedAt = new Date(Date.now() - 1_000).toISOString();
+  return {
+    source: 'provider-intake-state.json',
+    updated_at: updatedAt,
+    last_requested_at: updatedAt,
+    last_completed_at: updatedAt,
+    last_success_at: updatedAt,
+    last_error_at: null,
+    last_error: null,
+    checking: false,
+    queued: false,
+    stuck: false,
+    restart_required: false,
+    active_claims: [],
+    progress_updated_at: updatedAt,
+    progress_elapsed_ms: 1_000,
+    operation_elapsed_ms: 1_000,
+    stalled_after_ms: 45_000,
+    ...overrides
+  };
+}
+
+function buildStaleSupervisedControlHostOwner(repoRoot: string): Record<string, unknown> {
+  const observedAt = new Date(Date.now() - 1_000).toISOString();
+  return {
+    status: 'owned',
+    updated_at: observedAt,
+    owner: {
+      owner_token: 'owner-token',
+      status: 'owned',
+      pid: 12345,
+      hostname: 'host.local',
+      acquired_at: observedAt,
+      updated_at: observedAt,
+      repo_root: repoRoot,
+      run_id: 'control-host',
+      run_dir: join(repoRoot, '.runs', 'local-mcp', 'cli', 'control-host'),
+      lock_dir: join(repoRoot, '.runs', 'control-host-owner.lock'),
+      owner_path: join(repoRoot, '.runs', 'control-host-owner.json'),
+      source_root_freshness: {
+        schema_version: 1,
+        status: 'warning',
+        observed_at: observedAt,
+        entrypoint_kind: 'bootstrap',
+        source_checkout: { status: 'stale', repo_root: repoRoot, dirty: { status: 'clean' } },
+        intended_checkout: { status: 'current', repo_root: repoRoot, dirty: { status: 'clean' } },
+        drift_classes: ['supervised_source_root_drift'],
+        provenance: {},
+        guidance: [],
+        detail: 'Detected source/root drift: supervised_source_root_drift.'
+      }
+    }
+  };
+}
+
+async function writeProviderRunManifest(
+  root: string,
+  input: {
+    taskId: string;
+    runId: string;
+    issueId: string;
+    issueIdentifier: string;
+    status: string;
+  }
+): Promise<string> {
+  const runDir = join(root, '.runs', input.taskId, 'cli', input.runId);
+  await mkdir(runDir, { recursive: true });
+  const manifestPath = join(runDir, 'manifest.json');
+  const updatedAt = new Date(Date.now() - 1_000).toISOString();
+  await writeFile(
+    manifestPath,
+    JSON.stringify({
+      run_id: input.runId,
+      task_id: input.taskId,
+      status: input.status,
+      pipeline_id: 'provider-linear-worker',
+      issue_provider: 'linear',
+      issue_id: input.issueId,
+      issue_identifier: input.issueIdentifier,
+      started_at: new Date(Date.now() - 120_000).toISOString(),
+      updated_at: updatedAt,
+      completed_at: updatedAt,
+      summary: `${input.issueIdentifier} provider worker failed`,
+      last_error: 'provider worker failed before status degraded read',
+      commands: []
+    }),
+    'utf8'
+  );
+  return manifestPath;
 }
 
 function buildAbortError(): Error {

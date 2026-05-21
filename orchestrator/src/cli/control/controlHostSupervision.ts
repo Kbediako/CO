@@ -119,6 +119,8 @@ export interface ControlHostSupervisionPollingDiagnostic {
   refresh_request_class: string | null;
   refresh_provider_keys: string[] | null;
   operation_elapsed_ms: number | null;
+  progress_updated_at: string | null;
+  progress_elapsed_ms: number | null;
   stalled_after_ms: number | null;
   control_host_owner: Record<string, unknown> | null;
 }
@@ -127,6 +129,7 @@ export interface ControlHostSupervisionHealthDiagnostic {
   counts: {
     running: number | null;
     retrying: number | null;
+    active?: number | null;
     max_allowed?: number | null;
   };
   polling: ControlHostSupervisionPollingDiagnostic | null;
@@ -153,6 +156,7 @@ export interface ControlHostSupervisionHealthEvaluation {
     | 'stale_supervised_source_fail_closed'
     | 'active_worker_restart_quarantine'
     | 'active_worker_probe_timeout_quarantine'
+    | 'fresh_zero_wip_probe_timeout'
     | 'invalid_payload';
   message: string;
 }
@@ -387,6 +391,7 @@ export function readControlHostSupervisionHealthDiagnostic(
     counts: {
       running: readFiniteNumber(counts?.running),
       retrying: readFiniteNumber(counts?.retrying),
+      active: readFiniteNumber(counts?.active) ?? readFiniteNumber(counts?.issues),
       max_allowed: readFiniteNumber(counts?.max_allowed)
     },
     polling: polling ? buildControlHostSupervisionPollingDiagnostic(polling) : null,
@@ -409,6 +414,7 @@ function normalizeStoredControlHostSupervisionHealthDiagnostic(
     counts: {
       running: readFiniteNumber(counts?.running),
       retrying: readFiniteNumber(counts?.retrying),
+      active: readFiniteNumber(counts?.active) ?? readFiniteNumber(counts?.issues),
       max_allowed: readFiniteNumber(counts?.max_allowed)
     },
     polling: polling ? buildControlHostSupervisionPollingDiagnostic(polling) : null,
@@ -647,13 +653,25 @@ export function evaluateControlHostSupervisionProbeTimeoutDiagnostic(
     minPollingUpdatedAt?: string | null;
     restartHistory?: ControlHostSupervisionRestartRecord[] | null;
     activeWorkerRestartQuarantineMs?: number | null;
+    maxZeroWipPollingAgeMs?: number | null;
     now?: string | null;
   } = {}
 ): ControlHostSupervisionHealthEvaluation | null {
-  if (!diagnostic || diagnostic.running_workers.length === 0) {
+  if (!diagnostic) {
     return null;
   }
   if (!isCurrentControlHostSupervisionPollingDiagnostic(diagnostic.polling, options.minPollingUpdatedAt)) {
+    return null;
+  }
+  if (isFreshZeroWipProbeTimeoutDiagnostic(diagnostic, options)) {
+    return {
+      healthy: true,
+      reason: 'fresh_zero_wip_probe_timeout',
+      message:
+        'co-status dashboard probe timed out, but local provider polling is fresh, non-stuck, and has zero active workers; treating the host as healthy.'
+    };
+  }
+  if (diagnostic.running_workers.length === 0) {
     return null;
   }
   const restartRequired = isProviderRefreshLifecycleRestartRequiredDiagnostic(diagnostic.polling);
@@ -731,6 +749,90 @@ function isActiveProviderRefreshProbeTimeoutDiagnostic(
   return polling.refresh_phase?.startsWith('refresh:') === true;
 }
 
+function isFreshZeroWipProbeTimeoutDiagnostic(
+  diagnostic: ControlHostSupervisionHealthDiagnostic,
+  options: {
+    maxZeroWipPollingAgeMs?: number | null;
+    now?: string | null;
+  } = {}
+): boolean {
+  const polling = diagnostic.polling;
+  if (!polling || diagnostic.running_workers.length > 0) {
+    return false;
+  }
+  if (diagnostic.counts.running !== null && diagnostic.counts.running > 0) {
+    return false;
+  }
+  if (diagnostic.counts.active !== 0) {
+    return false;
+  }
+  const maxAgeMs =
+    typeof options.maxZeroWipPollingAgeMs === 'number' &&
+    Number.isFinite(options.maxZeroWipPollingAgeMs)
+      ? Math.max(0, options.maxZeroWipPollingAgeMs)
+      : DEFAULT_CONTROL_HOST_SUPERVISION_HEALTH_INTERVAL_SECONDS *
+        DEFAULT_CONTROL_HOST_SUPERVISION_UNHEALTHY_THRESHOLD *
+        1_000;
+  if (
+    !isRecentControlHostSupervisionTimestamp(polling.updated_at, maxAgeMs, options.now) ||
+    !isRecentControlHostSupervisionTimestamp(polling.progress_updated_at, maxAgeMs, options.now)
+  ) {
+    return false;
+  }
+  return (
+    polling.stuck !== true &&
+    polling.restart_required !== true &&
+    !isActiveNoProgressPollingDiagnostic(polling) &&
+    polling.reason === null &&
+    polling.last_error === null &&
+    !hasStaleControlHostOwnerFreshness(polling.control_host_owner)
+  );
+}
+
+function isRecentControlHostSupervisionTimestamp(
+  value: string | null,
+  maxAgeMs: number,
+  now: string | null | undefined
+): boolean {
+  const timestampMs = parseIsoTimestampToMs(value);
+  const nowMs = parseIsoTimestampToMs(now ?? new Date().toISOString());
+  return (
+    timestampMs !== null &&
+    nowMs !== null &&
+    timestampMs <= nowMs &&
+    nowMs - timestampMs <= maxAgeMs
+  );
+}
+
+function isActiveNoProgressPollingDiagnostic(
+  polling: ControlHostSupervisionPollingDiagnostic
+): boolean {
+  return (
+    polling.checking === true &&
+    polling.progress_elapsed_ms !== null &&
+    polling.stalled_after_ms !== null &&
+    polling.progress_elapsed_ms > polling.stalled_after_ms
+  );
+}
+
+function hasStaleControlHostOwnerFreshness(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const freshness = value.source_root_freshness;
+  if (
+    isRecord(freshness) &&
+    (
+      freshness.status === 'warning' ||
+      freshness.status === 'stale' ||
+      (Array.isArray(freshness.drift_classes) && freshness.drift_classes.length > 0)
+    )
+  ) {
+    return true;
+  }
+  return Object.values(value).some(hasStaleControlHostOwnerFreshness);
+}
+
 function isCurrentControlHostSupervisionPollingDiagnostic(
   polling: ControlHostSupervisionPollingDiagnostic | null,
   minPollingUpdatedAt: string | null | undefined
@@ -770,6 +872,8 @@ function buildControlHostSupervisionPollingDiagnostic(
     refresh_request_class: readNonEmptyString(polling.refresh_request_class),
     refresh_provider_keys: readStringArray(polling.refresh_provider_keys),
     operation_elapsed_ms: readFiniteNumber(polling.operation_elapsed_ms),
+    progress_updated_at: readIsoString(polling.progress_updated_at),
+    progress_elapsed_ms: readFiniteNumber(polling.progress_elapsed_ms),
     stalled_after_ms: readFiniteNumber(polling.stalled_after_ms),
     control_host_owner: isRecord(polling.control_host_owner) ? { ...polling.control_host_owner } : null
   };

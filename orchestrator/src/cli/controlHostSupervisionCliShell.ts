@@ -31,6 +31,7 @@ import {
 } from './control/controlHostSupervision.js';
 import { PROVIDER_INTAKE_STATE_FILE } from './control/controlPersistenceFiles.js';
 import {
+  isActiveProviderIntakeClaim,
   normalizeProviderIntakeState,
   type ProviderIntakeClaimRecord,
   type ProviderIntakeState
@@ -801,7 +802,10 @@ async function probeControlHostHealth(
       '--run',
       config.runId,
       '--format',
-      'json'
+      'json',
+      '--machine-status',
+      '--machine-status-max-age-ms',
+      String(config.healthIntervalSeconds * config.unhealthyThreshold * 1_000)
     ],
     {
       cwd: config.repoRoot,
@@ -814,7 +818,8 @@ async function probeControlHostHealth(
     const diagnostic = await readControlHostSupervisionProbeTimeoutDiagnostic(config, env);
     const timeoutQuarantine = evaluateControlHostSupervisionProbeTimeoutDiagnostic(diagnostic, {
       minPollingUpdatedAt: options.minPollingUpdatedAt ?? null,
-      restartHistory: options.restartHistory ?? null
+      restartHistory: options.restartHistory ?? null,
+      maxZeroWipPollingAgeMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000
     });
     if (timeoutQuarantine) {
       return {
@@ -835,6 +840,30 @@ async function probeControlHostHealth(
   }
   if (result.exitCode !== 0) {
     const detail = result.stderr.trim() || result.stdout.trim() || 'co-status command failed.';
+    if (isCoStatusProbeTimeoutFailure(detail)) {
+      const diagnostic = await readControlHostSupervisionProbeTimeoutDiagnostic(config, env);
+      const timeoutQuarantine = evaluateControlHostSupervisionProbeTimeoutDiagnostic(diagnostic, {
+        minPollingUpdatedAt: options.minPollingUpdatedAt ?? null,
+        restartHistory: options.restartHistory ?? null,
+        maxZeroWipPollingAgeMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000
+      });
+      if (timeoutQuarantine) {
+        return {
+          healthy: timeoutQuarantine.healthy,
+          reason: timeoutQuarantine.reason,
+          message: timeoutQuarantine.message,
+          probeDurationMs,
+          diagnostic
+        };
+      }
+      return {
+        healthy: false,
+        reason: 'probe_timeout',
+        message: `co-status probe timed out: ${detail}`,
+        probeDurationMs,
+        diagnostic
+      };
+    }
     return {
       healthy: false,
       reason: 'probe_failed',
@@ -872,6 +901,14 @@ async function probeControlHostHealth(
   };
 }
 
+function isCoStatusProbeTimeoutFailure(detail: string): boolean {
+  return (
+    /\b(?:timed out|timeout)\b/iu.test(detail) &&
+    /\bmachine-status\b/iu.test(detail) &&
+    /\bsame-endpoint current-endpoint timeout\b/iu.test(detail)
+  );
+}
+
 async function readControlHostSupervisionProbeTimeoutDiagnostic(
   config: ControlHostSupervisionConfig,
   env: NodeJS.ProcessEnv
@@ -884,10 +921,12 @@ async function readControlHostSupervisionProbeTimeoutDiagnostic(
     }
     const state = normalizeProviderIntakeState(persistedState);
     const runningClaims = state.claims.filter(isRunningProviderIntakeClaim);
+    const activeClaims = state.claims.filter(isActiveProviderIntakeClaim);
     return readControlHostSupervisionHealthDiagnostic({
       counts: {
         running: runningClaims.length,
         retrying: null,
+        active: activeClaims.length,
         max_allowed: null
       },
       polling: state.polling ?? null,
@@ -930,7 +969,7 @@ function resolveControlHostSupervisionEffectiveRepoRoot(
 function isRunningProviderIntakeClaim(
   claim: ProviderIntakeClaimRecord
 ): boolean {
-  return claim.state === 'running';
+  return claim.state === 'running' && isActiveProviderIntakeClaim(claim);
 }
 
 function buildControlHostSupervisionRunningClaimSnapshot(
