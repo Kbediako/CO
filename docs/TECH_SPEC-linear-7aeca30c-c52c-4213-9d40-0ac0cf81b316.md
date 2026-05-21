@@ -75,12 +75,12 @@ task_checklists:
 
 ## Fallback Expiry / Refactor Decision
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `Yes`.
+- Large-refactor check: keep this as a bounded metadata repair because the change has one authority path, the existing review wrapper scope resolver plus change-bundle producer, and does not add a new lifecycle phase or second active fallback.
+- Minor-seam behavior: acceptable only because CO-570 expires implicit review-scope inference immediately by writing explicit requested/effective scope metadata into governed review evidence.
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Review scope metadata | `docs-review` / bounded review scope can be inferred from caller state instead of encoded in `change-bundle.json`. | `expire fallback` | CO-570 | Review bundle handoff cannot distinguish committed branch diff, uncommitted working tree, or base diff. | 2026-05-21 | 2026-05-21 | This issue | `change-bundle.json` carries explicit review scope and `docs-review` evidence surfaces it. | Parent-owned focused change-bundle/docs-review regressions plus docs checks. |
-
-- Large-refactor check: keep a bounded metadata repair unless implementation discovery shows scope authority is split across multiple lifecycle phases.
+| Review scope metadata | `docs-review` / bounded review scope can be inferred from caller state instead of encoded in `change-bundle.json`. | expire fallback | CO-570 | Review bundle handoff cannot distinguish committed branch diff, uncommitted working tree, or base diff. | 2026-05-21 | 2026-05-22 | 2026-05-22 | `change-bundle.json` carries explicit requested/effective review scope and `docs-review` evidence surfaces it. | Parent-owned focused change-bundle/docs-review regressions plus docs checks, standalone review, and pack smoke. |
 
 ## Architecture & Data
 - Architecture / design adjustments:

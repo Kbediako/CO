@@ -32,6 +32,14 @@
 - [x] Parity matrix is present. Evidence: PRD and specs include current/reference/target/out-of-scope alignment.
 - [x] Fallback/refactor decision is present. Evidence: specs record `expire fallback` for implicit review-scope inference.
 
+## CO-382 Fallback Decision Table
+- Large-refactor check: keep this as a bounded metadata repair because review-scope authority remains in the existing review wrapper scope resolver and change-bundle producer.
+- Minor-seam behavior: acceptable only as an immediate expiry of implicit checkout-state scope inference; no retained temporary runtime fallback remains.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Review scope metadata | Review scope is inferred from caller convention or working tree state instead of explicit bundle metadata. | expire fallback | CO-570 | `docs-review` / bounded review consumes `change-bundle.json` without clear scope. | 2026-05-21 | 2026-05-22 | 2026-05-22 | `change-bundle.json` carries explicit requested/effective review scope and the prompt states the selected base or intentional-empty reason. | Focused run-review regressions, docs checks, standalone review, and pack smoke. |
+
 ## Child-Lane Validation
 - [x] Protected-term scan over declared files. Evidence: `rg -n "docs-review|change-bundle\\.json|committed branch diff|explicit review scope|bounded review|uncommitted working tree|base diff" <declared files>` returned matches across the CO-570 packet and mirrors.
 - [x] Scoped markdown trailing-whitespace check over declared files. Evidence: `rg -n "[[:blank:]]+$" <declared markdown files>` returned no matches.

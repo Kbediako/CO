@@ -26,6 +26,14 @@
 - Pre-implementation issue-quality review:
   - 2026-05-21: approved as a docs-first packet for a review metadata contract. The issue is not a micro-task because correctness depends on exact protected artifact names, explicit non-goals, Not Done If, and parity between three review surfaces.
 
+## CO-382 Fallback Decision Table
+- Large-refactor check: keep this as a bounded metadata repair because the change stays in the existing review wrapper scope resolver and change-bundle producer, not a broader PR lifecycle or provider-worker refactor.
+- Minor-seam behavior: acceptable only as an immediate expiry of implicit dirty-tree or caller-convention scope inference; CO-570 replaces it with explicit requested/effective scope metadata.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Review scope metadata | `docs-review` / bounded review scope can be inferred from caller convention or working-tree dirtiness instead of encoded in `change-bundle.json`. | expire fallback | CO-570 | Review bundle handoff cannot distinguish committed branch diff, uncommitted working tree, or base diff. | 2026-05-21 | 2026-05-22 | 2026-05-22 | `change-bundle.json` carries explicit requested/effective scope metadata and the prompt states the selected base or intentional-empty reason. | Focused run-review regressions, `docs:check`, manifest-backed standalone review, and pack smoke. |
+
 ## Milestones & Sequencing
 1. [x] Create PRD, TECH_SPEC mirror, ACTION_PLAN, canonical task spec, task checklist, and `.agent` mirror.
 2. [x] Preserve source anchor, source object id, parent manifest pointer, and source payload pointer.

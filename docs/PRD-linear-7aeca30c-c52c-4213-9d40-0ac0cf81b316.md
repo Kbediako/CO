@@ -96,15 +96,12 @@
 
 ## Fallback / Refactor Decision
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `Yes`.
-- Decision: `expire fallback` for implicit review-scope inference from checkout state or caller convention.
-- Owner: `CO-570`.
-- Trigger: `docs-review` or bounded review handoff depends on `change-bundle.json` without explicit review scope.
-- Introduced date: observed by CO-570 on 2026-05-21.
-- Review date: 2026-05-21.
-- Maximum lifetime: this issue.
-- Removal condition: parent implementation writes/propagates explicit review scope metadata that distinguishes committed branch diff, uncommitted working tree, and base diff review.
-- Validation: parent-owned focused change-bundle/docs-review tests plus scoped docs checks.
-- Large-refactor check: no large refactor is warranted unless source inspection shows review scope authority is split across unrelated review wrapper, provider-worker, and PR lifecycle phases.
+- Large-refactor check: no large refactor is warranted because the repair keeps authority in the existing review wrapper scope resolver and change-bundle producer instead of splitting it across unrelated provider-worker or PR lifecycle phases.
+- Minor-seam behavior: acceptable only as an immediate expiry of implicit review-scope inference; no retained temporary runtime fallback remains after CO-570 records explicit requested/effective scope metadata.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Review scope metadata | `docs-review` / bounded review scope can be inferred from caller state or checkout dirtiness instead of encoded in `change-bundle.json`. | expire fallback | CO-570 | Review bundle handoff cannot distinguish committed branch diff, uncommitted working tree, or base diff. | 2026-05-21 | 2026-05-22 | 2026-05-22 | Parent implementation writes explicit requested/effective review scope metadata that distinguishes committed branch diff, uncommitted working tree, and base diff review. | Focused change-bundle/docs-review regressions, scoped docs checks, manifest-backed standalone review, and pack smoke. |
 
 ## Technical Considerations
 - `change-bundle.json` should remain the stable handoff artifact for review metadata.
