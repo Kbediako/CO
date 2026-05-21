@@ -31282,11 +31282,94 @@ describe('createProviderIssueHandoffService', () => {
         issue_by_id_reads: 0
       })
     });
+    expect(readProviderPollingHealth(service)?.refresh_request_class).not.toBe('claim_reconcile:released');
     expect(readProviderPollingHealth(service)?.refresh_request_class).not.toBe('claim_issue_by_id:released');
     expect(state.claims[0]).toMatchObject({
       state: 'released',
       reason: 'provider_issue_released:not_active',
       issue_updated_at: '2026-05-20T18:00:00.000Z'
+    });
+  });
+
+  it('keeps map-missing terminal released history passive before claim reconcile progress', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.claims.push(createCo202ReleasedClaim({
+      issue_id: '3abba033-52f0-45f3-af58-cce4939f087f',
+      issue_identifier: 'CO-480',
+      issue_title: 'CO: audit MultiAgentV2 0.128 feature-specific thread cap support',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-05-13T15:07:39.669Z',
+      issue_blocked_by: [],
+      task_id: 'linear-3abba033-52f0-45f3-af58-cce4939f087f',
+      run_id: null,
+      run_manifest_path: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null,
+      review_promotion: null,
+      merge_closeout: null
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = createCo202Launcher(
+      'run-co-480-map-missing-should-not-start',
+      '/tmp/provider-run/co-480-map-missing-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssues = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssues: []
+    }));
+    const resolveTrackedIssue = vi.fn(async () => {
+      throw new Error('CO-480 passive terminal history should not use direct issue-by-id');
+    });
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssues,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    markProviderPollingStarted(service, { mode: 'refresh' });
+    await expect(service.refresh()).resolves.toBeUndefined();
+
+    expect(resolveTrackedIssues).toHaveBeenCalledTimes(1);
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    const pollingHealth = readProviderPollingHealth(service);
+    expect(pollingHealth).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false,
+      refresh_counts: expect.objectContaining({
+        claims_scanned: 1,
+        issue_by_id_reads: 0,
+        issue_by_id_deferred: 0
+      })
+    });
+    expect(pollingHealth?.refresh_request_class).not.toBe('claim_reconcile:released');
+    expect(pollingHealth?.refresh_request_class).not.toBe('claim_issue_by_id:released');
+    expect(state.claims[0]).toMatchObject({
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-05-13T15:07:39.669Z',
+      run_id: null,
+      run_manifest_path: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null,
+      review_promotion: null,
+      merge_closeout: null
     });
   });
 
@@ -31677,6 +31760,7 @@ describe('createProviderIssueHandoffService', () => {
         issue_by_id_reads: 0
       })
     });
+    expect(readProviderPollingHealth(service)?.refresh_request_class).not.toBe('claim_reconcile:released');
     expect(readProviderPollingHealth(service)?.refresh_request_class).not.toBe('claim_issue_by_id:released');
     expect(state.claims[0]).toMatchObject({
       state: 'released',
