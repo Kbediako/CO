@@ -5519,6 +5519,13 @@ export function createProviderIssueHandoffService(
               refreshFromBlockerSnapshot:
                 shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot
             });
+          const shouldUseCachedReleasedBacklogNotActiveClaim =
+            shouldUseCachedReleasedBacklogNotActiveClaimResolution({
+              claim,
+              activeRun,
+              releaseRun,
+              latestRun
+            });
           const canUseCachedReleasedTerminalHistoricalClaim =
             shouldUseCachedReleasedTerminalHistoricalClaim;
           const shouldRevalidateCurrentReleasedReviewPromotion =
@@ -5538,6 +5545,15 @@ export function createProviderIssueHandoffService(
             releasedFailClosedSkipCount += 1;
             releasedFreshDiscoveryReplayBlockedProviderKeys.add(claimProviderKey);
             deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
+            continue;
+          }
+          const shouldKeepCachedReleasedBacklogNotActiveClaimPassiveBeforeReconcile =
+            shouldUseCachedReleasedBacklogNotActiveClaim &&
+            trackedIssuesByKey !== null &&
+            currentPollTrackedIssue === null &&
+            !canFreshDiscoverReleasedLiveWorker &&
+            !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot;
+          if (shouldKeepCachedReleasedBacklogNotActiveClaimPassiveBeforeReconcile) {
             continue;
           }
           const shouldKeepCachedReleasedTerminalHistoricalClaimPassiveBeforeReconcile =
@@ -9732,6 +9748,66 @@ function shouldUseCachedReleasedTerminalHistoricalClaimResolution(input: {
     (input.claim.retry_attempt ?? null) === null &&
     (input.claim.retry_due_at ?? null) === null &&
     (input.claim.retry_error ?? null) === null
+  );
+}
+
+function shouldUseCachedReleasedBacklogNotActiveClaimResolution(input: {
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    | 'state'
+    | 'reason'
+    | 'issue_state'
+    | 'issue_state_type'
+    | 'retry_queued'
+    | 'retry_attempt'
+    | 'retry_due_at'
+    | 'retry_error'
+    | 'merge_closeout'
+    | 'review_promotion'
+  >;
+  activeRun: ProviderIssueRunRecord | null;
+  releaseRun: ProviderIssueRunRecord | null;
+  latestRun: ProviderIssueRunRecord | null;
+}): boolean {
+  if (!isReleasedBacklogNotActiveClaim(input.claim)) {
+    return false;
+  }
+  if (input.activeRun) {
+    return false;
+  }
+  const retainedRuns = [input.releaseRun, input.latestRun].filter(
+    (run): run is ProviderIssueRunRecord => run !== null
+  );
+  if (retainedRuns.some((run) => shouldAttemptReleaseCancel(run))) {
+    return false;
+  }
+  if (input.claim.merge_closeout || input.claim.review_promotion) {
+    return false;
+  }
+  return (
+    input.claim.retry_queued !== true &&
+    (input.claim.retry_attempt ?? null) === null &&
+    (input.claim.retry_due_at ?? null) === null &&
+    (input.claim.retry_error ?? null) === null
+  );
+}
+
+function isReleasedBacklogNotActiveClaim(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'state' | 'reason' | 'issue_state' | 'issue_state_type'
+  >
+): boolean {
+  if (claim.state !== 'released' || claim.reason !== 'provider_issue_released:not_active') {
+    return false;
+  }
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: claim.issue_state,
+    state_type: claim.issue_state_type
+  });
+  return (
+    workflowState.normalizedState === 'backlog' ||
+    workflowState.normalizedStateType === 'backlog'
   );
 }
 
