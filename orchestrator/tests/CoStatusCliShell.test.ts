@@ -96,7 +96,10 @@ describe('runCoStatusCliShell', () => {
     });
   });
 
-  it('emits the authenticated operator-dashboard snapshot for explicit --operator-dashboard json', async () => {
+  it.each([
+    ['--operator-dashboard', { 'operator-dashboard': true }],
+    ['--dashboard', { dashboard: true }]
+  ])('emits the authenticated operator-dashboard snapshot for explicit %s json', async (_flagName, dashboardFlag) => {
     const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
     tempDirs.push(root);
     process.env.CODEX_ORCHESTRATOR_ROOT = root;
@@ -131,7 +134,7 @@ describe('runCoStatusCliShell', () => {
     await runCoStatusCliShell({
       flags: {
         format: 'json',
-        'operator-dashboard': true,
+        ...dashboardFlag,
         'run-dir': runDir
       },
       printHelp: vi.fn()
