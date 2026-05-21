@@ -64,6 +64,7 @@
 - [x] broadening into quota hygiene or unrelated capacity work
 - [x] relying on retry-field normalization only
 - [x] treating the no-current-poll fix as sufficient when the current poll map reconfirms terminal history
+- [x] treating the current-poll-present fix as sufficient when completed/canceled issue filtering leaves terminal history map-missing
 
 ## Acceptance Criteria
 - [x] CO-472 Done `claim_issue_by_id:released` terminal path does not drive restart-required health without active corroboration. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
@@ -75,6 +76,7 @@
 - [x] CO-468 Done `claim_issue_by_id:released` terminal path does not drive restart-required health without active corroboration. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] No-current-poll-snapshot terminal released path skips direct issue-by-id for strong terminal history. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] Current-poll terminal released path remains passive before `claim_reconcile:released` progress or claim churn when the poll map reconfirms terminal `not_active` truth. Evidence: `npm run test -- ProviderIssueHandoff.test.ts -t "keeps current-poll terminal released history passive|reopens terminal released history when the current poll snapshot becomes active"`.
+- [x] Map-missing terminal released path remains passive before `claim_reconcile:released` progress or claim churn when completed/canceled filtering leaves no current poll entry. Evidence: `npm run test -- ProviderIssueHandoff.test.ts -t "map-missing terminal released"`.
 - [x] Current-poll active/reopened snapshot still relaunches. Evidence: `npm run test -- ProviderIssueHandoff.test.ts -t "reopens terminal released history when the current poll snapshot becomes active"`.
 - [x] Accepted `provider_issue_rehydration_pending_revalidation` claims still revalidate through direct issue-by-id when current polling is unavailable. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] Stale retained `review_promotion` metadata is treated as historical only when newer terminal issue truth supersedes it, while current promotion metadata revalidates in no-map and deferred-poll fail-closed paths. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
@@ -91,6 +93,7 @@
 - [x] Focused retry projection consistency regression for released terminal claims with null retry fields. Evidence: `npm run test -- ControlRuntime.test.ts`.
 - [x] Focused no-current-poll-snapshot regression. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] Focused current-poll terminal passive/reopened regression. Evidence: focused pair and full `ProviderIssueHandoff.test.ts` passed in post-merge rework worktree.
+- [x] Focused map-missing terminal passive regression. Evidence: `npm run test -- ProviderIssueHandoff.test.ts -t "map-missing terminal released"` passed in third-rework worktree.
 - [x] Focused accepted pending-revalidation no-current-poll regression. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] Focused stale/current `review_promotion` regressions, including deferred-poll stale suppression and current-promotion revalidation. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] Focused active stuck refresh regression. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
@@ -117,13 +120,13 @@
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Provider refresh lifecycle classification | Terminal released historical claims can escalate to active stuck refresh health. | remove fallback | CO-571 | Released terminal claim with no active run/retry/worker corroboration, including no-current-poll-snapshot direct issue-by-id fallback and current-poll terminal `not_active` snapshots. | Observed 2026-05-20 | 2026-05-20 | This issue | Terminal released claims stop driving `restart_required`. | Focused released-claim, no-snapshot, current-poll terminal, stale-promotion, and active-stall regressions. |
+| Provider refresh lifecycle classification | Terminal released historical claims can escalate to active stuck refresh health. | remove fallback | CO-571 | Released terminal claim with no active run/retry/worker corroboration, including no-current-poll-snapshot direct issue-by-id fallback, current-poll terminal `not_active` snapshots, and map-missing terminal `not_active` rows filtered out of the current poll map. | Observed 2026-05-20 | 2026-05-20 | This issue | Terminal released claims stop driving `restart_required`. | Focused released-claim, no-snapshot, current-poll terminal, map-missing terminal, stale-promotion, and active-stall regressions. |
 | Provider-intake history | Released historical claims stay retained for traceability. | justify retaining fallback | Provider-intake audit contract / CO-571 | Terminal issue release records historical claim state. | Existing behavior before CO-571 | 2026-05-20 | Non-expiring durable retention only with rationale | Separate approved audit-history redesign replaces retained claim history with equivalent source-labeled evidence. | Tests keep claims inactive without deleting evidence. |
 
 - Contract name: provider-intake released historical claim audit retention.
 - Owning surface: provider-intake state and control-host status/read models.
 - Steady-state proof: raw released claim rows remain source-labeled audit evidence, while terminal released `not_active` claims with complete cached metadata, null retry fields, and no active or cancelable retained run do not drive `restart_required` or retrying WIP.
-- Tests/docs: `ProviderIssueHandoff.test.ts` terminal released metadata-only table, no-current-poll-snapshot regression, current-poll terminal snapshot regression, accepted pending-revalidation no-current-poll regression, stale/current `review_promotion` regressions, active-stuck regression, `ControlRuntime.test.ts` retry projection regression, and this CO-571 packet.
+- Tests/docs: `ProviderIssueHandoff.test.ts` terminal released metadata-only table, no-current-poll-snapshot regression, current-poll terminal snapshot regression, map-missing terminal snapshot regression, accepted pending-revalidation no-current-poll regression, stale/current `review_promotion` regressions, active-stuck regression, `ControlRuntime.test.ts` retry projection regression, and this CO-571 packet.
 - Non-expiring rationale: retained released claim history is durable operator/audit evidence, not temporary compatibility debt; removal requires an approved archival redesign that preserves equivalent source-labeled claim/run evidence.
 
 ## Progress Log
@@ -133,3 +136,4 @@
 - 2026-05-20: PR #856 merged, but live current-main evidence still looped on current-poll `claim_reconcile:released` for terminal `not_active` history such as CO-482/CO-478. CO-571 reopened to Rework again; this branch updates the current-poll classifier before per-claim reconcile progress and adds passive/reopened regressions.
 - 2026-05-20: Full-suite validation twice hit the same unrelated `ControlRuntime.test.ts` default-timeout case after focused tests passed. GPT Pro classified it as P2 test-harness / suite-performance flake, not CO-571 product correctness; the branch split the duplicate/ambiguous git-heavy cases into separate parameterized tests, then the focused subset, containing file, and full `npm run test` all passed.
 - 2026-05-20: Manifest-backed `gpt-5.5/xhigh` standalone review completed clean in enforce mode for the second-rework branch; next step is commit, PR, and current-head GitHub review/check monitoring.
+- 2026-05-21 UTC: PR #858 Core Lane failed only at strict CI spec guard because the third-rework branch did not carry base-bound fallback/seam docs evidence. Rework adds the CO-480 map-missing current-poll evidence across PRD, TECH_SPEC, ACTION_PLAN, checklist, and agent mirror; local validation must run spec guard with `BASE_SHA=e37f55b434f1bca59daacf38a1b2c2aa9ad9890f`.

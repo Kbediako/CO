@@ -16,6 +16,7 @@
 - Problem Statement: after CO-556 landed on `origin/main` `da785a065d79d9680e189368ce24aafe2cd96178`, and again after the supervised control-host restarted onto current main `2c0d4667f03f1890a4c9aa3197ddfba2c8fb9657` to clear stale_supervised_source_root, the managed control-host can repeatedly report `provider_refresh_lifecycle_stuck` / `restart_required` while WIP is zero or inconsistent with the selected released claim. The stuck phase advances across retained released terminal historical claims, including CO-472 Done at `refresh:claim_issue_by_id_reconcile` / `claim_issue_by_id:released`, CO-461 Done at `refresh:claim_reconcile` / `claim_reconcile:released`, CO-469 Duplicate/canceled at `refresh:claim_issue_by_id_reconcile` / `claim_issue_by_id:released`, CO-471 Done at `refresh:claim_reconcile` / `claim_reconcile:released`, CO-476 Duplicate/canceled at `refresh:claim_issue_by_id_reconcile` / `claim_issue_by_id:released`, and retained-run Done/completed claims CO-451 and CO-468 at `claim_issue_by_id:released`.
 - PR #855 reduced the original false-positive class, but the normalization-only fix was partial: after it merged, current main still reproduced a `claim_issue_by_id:released` loop when `resolveTrackedIssues` skipped or was unavailable, leaving no current poll map and falling through to direct issue-by-id reads. CO-468 also showed stale retained `review_promotion` metadata that must be distinguished from current promotion evidence.
 - PR #856 fixed the no-current-poll-snapshot path, but live current-main proof after merge `a3deda2d7fd24e61e0c50ca4433a421306172a7e` still reproduced `claim_reconcile:released` when the current poll map reconfirmed a terminal `provider_issue_released:not_active` row such as CO-482 or CO-478. This rework must keep those current-poll terminal snapshots passive before per-claim reconcile progress, while reopened/active snapshots still relaunch.
+- PR #857 fixed terminal claims present in the current poll map, but live current-main proof after merge `e37f55b434f1bca59daacf38a1b2c2aa9ad9890f` still reproduced `claim_reconcile:released` for CO-480 / `linear:3abba033-52f0-45f3-af58-cce4939f087f` because Linear polling filters completed/canceled issues out of the current issue map. This rework must keep strong map-missing terminal `not_active` history passive before `claim_reconcile:released` progress, without hiding current review-promotion, live-worker, blocker-metadata-refresh, or active/reopened revalidation paths.
 - Desired Outcome: terminal released historical claims remain truthful audit evidence, but they do not manufacture a control-host restart loop when there are no active workers, no active run, no retry fields, and live issue truth is terminal. Real active refresh stalls must still fail closed with debuggable `provider_refresh_lifecycle_stuck` and `restart_required` evidence.
 
 ## User Request Translation
@@ -28,6 +29,7 @@
   - account for the observed `retrying=1` projection mismatch when the selected CO-471 released claim has `run_id=null` and all retry fields null
   - handle the no-current-poll-snapshot path without relying on direct issue-by-id sweeps for strong terminal released history, while preserving accepted pending-revalidation rechecks
   - handle the current-poll terminal snapshot path without recording `claim_reconcile:released` progress or claim churn when the poll map reconfirms terminal `not_active` truth
+  - handle the map-missing current-poll path caused by completed/canceled issue filtering without recording `claim_reconcile:released` progress for strong terminal `not_active` history
   - distinguish stale retained `review_promotion` metadata from current promotion metadata
 - Success criteria / acceptance:
   - `claim_issue_by_id:released` terminal claims for CO-472 and CO-469 do not cause `provider_refresh_lifecycle_stuck` / `restart_required` without active worker/live issue corroboration
@@ -86,6 +88,9 @@
   - current-poll terminal snapshot
   - CO-482
   - CO-478
+  - CO-480
+  - `linear:3abba033-52f0-45f3-af58-cce4939f087f`
+  - map-missing current poll terminal history
 - Nearby wrong interpretations to reject:
   - treating every `/ui/data.json` timeout as healthy
   - clearing `restart_required` for genuine active refresh stalls
@@ -94,6 +99,7 @@
   - ignoring retained released claim audit records entirely
   - requiring an operator one-off restart as the fix
   - broadening into unrelated quota hygiene, provider admission capacity, or freshness-gauge redesign
+  - assuming current-poll terminal handling is complete when terminal issues filtered from the poll map can still fall through as map-missing claims
 
 ## Parity / Alignment Matrix
 
@@ -107,6 +113,7 @@
 | Provider-intake evidence | `provider-intake-state.json` retains released historical claims and audit history. | Intake history is audit evidence, not a manual repair target. | Code-level classification ignores terminal released claims only for active restart decisions. | Manual state-file edits or cleanup. |
 | No current poll snapshot | A skipped/unavailable tracked-issue poll can leave no bulk issue map, after which the no-map resolver re-enters direct issue-by-id for terminal released history. | Strong cached terminal released issue truth is sufficient to avoid a direct issue-by-id sweep, but cached pending-revalidation claims still need a live issue read. | Strong terminal released rows skip direct issue-by-id even without a current poll map; weak, pending-reopen, accepted pending-revalidation, or current-promotion rows still revalidate. | Treating every missing poll snapshot as healthy. |
 | Current poll terminal snapshot | After PR #856 merged, the current poll map could include the same terminal Done/completed issue as a released `not_active` claim, and the per-claim reconcile path still recorded `claim_reconcile:released` before treating it as passive. | A current poll snapshot that reconfirms equal-or-newer terminal `not_active` truth is stronger evidence that the historical row is passive, not active WIP. | Strong released terminal rows are consumed and fresh-discovery-blocked before `claim_reconcile:released` progress when the current poll map reconfirms terminal `not_active`; active/newer reopened snapshots still relaunch. | Hiding active reopened issues or stale older poll evidence. |
+| Map-missing current poll terminal history | After PR #857 merged, CO-480 was terminal Done/completed and released `not_active`, but completed/canceled filtering omitted it from the current poll map, so the per-claim path still recorded `claim_reconcile:released`. | A complete current poll that intentionally omits completed/canceled issues is not evidence of active work for a strong cached terminal released row. | Strong map-missing released terminal rows are consumed and fresh-discovery-blocked before `claim_reconcile:released` progress when no live worker, current promotion, or blocker-refresh reason exists. | Hiding live workers, current review promotion, blocker metadata refresh, or active/reopened issue truth. |
 | Retained review promotion | CO-468 can retain a promoted `Merging` review-promotion snapshot older than newer terminal Done issue truth. | Promotion metadata is active only when it is current relative to terminal issue truth. | Stale promotion metadata is ignored for terminal history; current promotion metadata forces revalidation, including deferred-poll fail-closed paths. | Dropping review/merge promotion routing globally. |
 
 ## Not Done If
@@ -117,6 +124,7 @@
 - The control-host only looks healthy because stale lower-authority artifacts were ignored without binding to current child/run identity.
 - The no-current-poll-snapshot path can still enter `claim_issue_by_id:released` direct issue-by-id reads for strong terminal released history.
 - A current-poll terminal `not_active` snapshot can still record `claim_reconcile:released`, churn the released claim, or drive `restart_required`.
+- A map-missing terminal `not_active` row can still record `claim_reconcile:released` only because completed/canceled issues are absent from the current poll map.
 - Stale retained `review_promotion` metadata can still keep a newer terminal released row classified as active, or current promotion metadata is hidden.
 - The solution relies on provider-intake manual edits, timeout-only changes, or another one-off restart.
 
@@ -126,6 +134,7 @@
 - Preserve genuine active stuck refresh failure behavior.
 - Stop no-current-poll-snapshot terminal released rows before direct issue-by-id.
 - Stop current-poll terminal released rows before per-claim `claim_reconcile:released` progress when the poll snapshot reconfirms terminal `not_active`.
+- Stop map-missing terminal released rows before per-claim `claim_reconcile:released` progress when completed/canceled filtering leaves no current poll entry but cached terminal truth is strong.
 - Treat stale retained `review_promotion` as historical evidence while preserving current promotion revalidation.
 - Preserve truthful status and audit visibility.
 
@@ -146,6 +155,7 @@
 - CO-468 Done retained-run `claim_issue_by_id:released` is covered by a regression that no longer drives restart-required health without active corroboration.
 - A no-current-poll-snapshot terminal released row is covered by a regression that does not enter direct issue-by-id.
 - A current-poll terminal released row is covered by a regression that keeps the claim passive without direct issue-by-id, start/resume, `claim_reconcile:released` progress, or claim `updated_at` churn.
+- A map-missing terminal released row is covered by a regression that keeps the claim passive without direct issue-by-id, start/resume, `claim_reconcile:released` progress, or claim `updated_at` churn.
 - A current-poll active/reopened snapshot is covered by a regression that still relaunches the issue.
 - An accepted `provider_issue_rehydration_pending_revalidation` row is covered by a no-current-poll regression that still enters direct issue-by-id and releases terminal truth.
 - Stale retained `review_promotion` is covered by regressions, including deferred-poll suppression, with current-promotion negative regressions that still revalidate in no-map and deferred-poll fail-closed paths.
@@ -159,6 +169,7 @@
 - Focused projection coverage for terminal released claims with null retry fields so they do not count as retrying work.
 - Focused no-current-poll-snapshot coverage for terminal released history before direct issue-by-id.
 - Focused current-poll terminal snapshot coverage for passive terminal truth and active/reopened relaunch.
+- Focused map-missing current-poll coverage for filtered completed/canceled terminal truth before per-claim reconcile progress.
 - Focused no-current-poll accepted pending-revalidation coverage.
 - Focused stale/current `review_promotion` coverage, including deferred-poll stale suppression and current-promotion revalidation.
 - Focused negative test for real active stuck refresh behavior.
@@ -175,13 +186,13 @@
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Provider refresh lifecycle classification | Terminal released historical claims can still be interpreted as active stuck refresh evidence. | remove fallback | CO-571 | `claim_issue_by_id:released` or `claim_reconcile:released` with terminal issue truth and no active run/retry/worker corroboration, including no-current-poll-snapshot direct issue-by-id fallback and current-poll terminal `not_active` snapshots. | Observed 2026-05-20 | 2026-05-20 | This issue | Terminal released claims stop driving `restart_required` while active stalls still fail closed. | Focused released-claim, no-snapshot, current-poll terminal, stale-promotion, and active-stall regressions. |
+| Provider refresh lifecycle classification | Terminal released historical claims can still be interpreted as active stuck refresh evidence. | remove fallback | CO-571 | `claim_issue_by_id:released` or `claim_reconcile:released` with terminal issue truth and no active run/retry/worker corroboration, including no-current-poll-snapshot direct issue-by-id fallback, current-poll terminal `not_active` snapshots, and map-missing terminal `not_active` rows filtered out of the current poll map. | Observed 2026-05-20 | 2026-05-20 | This issue | Terminal released claims stop driving `restart_required` while active stalls still fail closed. | Focused released-claim, no-snapshot, current-poll terminal, map-missing terminal, stale-promotion, and active-stall regressions. |
 | Retained released claim audit history | Released historical claims remain in `provider-intake-state.json`. | justify retaining fallback | Provider-intake audit contract / CO-571 | Terminal issue release leaves historical claim evidence for operator traceability. | Existing behavior before CO-571 | 2026-05-20 | Non-expiring durable retention only with rationale | Separate approved audit-history redesign replaces provider-intake history with equivalent source-labeled evidence. | Tests keep terminal claims inactive without deleting evidence. |
 
 - Contract name: provider-intake released historical claim audit retention.
 - Owning surface: provider-intake state and control-host status/read models.
 - Steady-state proof: raw released claim rows remain source-labeled audit evidence, while terminal released `not_active` claims with complete cached metadata, null retry fields, and no active or cancelable retained run do not drive `restart_required` or retrying WIP.
-- Tests/docs: `ProviderIssueHandoff.test.ts` terminal released metadata-only table, no-current-poll-snapshot regression, current-poll terminal snapshot regression, stale/current `review_promotion` regressions, active-stuck regression, `ControlRuntime.test.ts` retry projection regression, and this CO-571 packet.
+- Tests/docs: `ProviderIssueHandoff.test.ts` terminal released metadata-only table, no-current-poll-snapshot regression, current-poll terminal snapshot regression, map-missing terminal snapshot regression, stale/current `review_promotion` regressions, active-stuck regression, `ControlRuntime.test.ts` retry projection regression, and this CO-571 packet.
 - Non-expiring rationale: retained released claim history is durable operator/audit evidence, not temporary compatibility debt; removal requires an approved archival redesign that preserves equivalent source-labeled claim/run evidence.
 
 ## Open Questions
