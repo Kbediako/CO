@@ -671,7 +671,7 @@
         }
       },
       "validation": {
-        "status": "implementation_validation_complete_docs_freshness_baseline_blocked",
+        "status": "implementation_in_progress_docs_freshness_baseline_blocked",
         "passed": [
           "live Linear issue-context read",
           "single workpad created",
