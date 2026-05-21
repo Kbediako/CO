@@ -21,7 +21,7 @@ canonical_owner_marker: codex-orchestrator:canonical-owner-key=docs:freshness:ma
 
 ## Issue-Shaping Contract
 - User-request translation carried forward: current main/worktree evidence shows `docs:freshness:maintain` action-required/pre-expiry blockers route through terminal `CO-558`; the owner must be non-terminal before the baseline is governed.
-- Protected terms / exact artifact and surface names: `docs:freshness`, `docs:freshness:maintain`, `block_spec_guard_pre_expiry`, `owner_issue=CO-558`, `owner_action_evidence=action_required`, `blocking_changed_paths=0`, `policy capacity=over_budget`, `pre_expiry_entries`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+- Protected terms / exact artifact and surface names: `docs:freshness`, `docs:freshness:maintain`, `block_spec_guard_pre_expiry`, `owner_issue=CO-558`, `owner_action_evidence=action_required`, `blocking_changed_paths=[]`, `policy capacity=over_budget`, `pre_expiry_entries`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
 - Nearby wrong interpretations to reject: weakening docs freshness/spec guards, blind date bumps, deleting historical docs, hiding terminal owner evidence, or assigning CO-572 unrelated docs freshness debt.
 - Explicit non-goals carried forward: no CO-572 status-machine docs or implementation changes, no provider-intake or WIP policy changes.
 
@@ -36,10 +36,11 @@ canonical_owner_marker: codex-orchestrator:canonical-owner-key=docs:freshness:ma
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `docs:freshness:maintain` | Current owner-routed stale/pre-expiry docs freshness debt | expire fallback | CO-573 | Terminal `CO-558` with `block_spec_guard_pre_expiry`, `owner_action_evidence=action_required`, and `blocking_changed_paths=[]` | 2026-05-21 | 2026-05-21 | 7 days after normal cadence expiry for each emitted cohort | Refresh, archive, reclassify, or re-home the emitted cohorts before expiry; re-home again if CO-573 becomes terminal while debt remains | Before/after `docs:freshness:maintain`, `docs:freshness`, `spec-guard --dry-run`, `docs:check` |
+| `docs:freshness:maintain` | Current owner-routed stale/pre-expiry docs freshness debt | expire fallback | CO-573 | Terminal `CO-558` with `block_spec_guard_pre_expiry`, `owner_action_evidence=action_required`, and `blocking_changed_paths=[]` | 2026-05-21 | 2026-06-04 | 2026-06-20 | Refresh, archive, reclassify, or re-home the emitted cohorts before expiry; re-home again if CO-573 becomes terminal while debt remains | Before/after `docs:freshness:maintain`, `docs:freshness`, `spec-guard --dry-run`, `docs:check` |
 
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? Yes.
 - Large-refactor check: The existing terminal-owner verification contract is sufficient; current work changes live metadata and traceability only.
+- Minor-seam check: the owner-routing seam is bounded to a live-owner metadata re-home; the over-budget/pre-expiry baseline remains visible and expires under CO-573 by 2026-06-20.
 
 ## Validation Plan
 - `npm run docs:freshness`

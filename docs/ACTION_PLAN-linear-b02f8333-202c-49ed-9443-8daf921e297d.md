@@ -6,16 +6,17 @@
 - Assumptions: CO-573 is the intended same-project live owner for canonical key `docs:freshness:maintain`; CO-572 remains unrelated baseline-exposure context.
 
 ## Issue Readiness Gate
-- Intent checksum / protected terms carried forward: `docs:freshness`, `docs:freshness:maintain`, `block_spec_guard_pre_expiry`, `owner_issue=CO-558`, `owner_action_evidence=action_required`, `blocking_changed_paths=0`, `policy capacity=over_budget`, `pre_expiry_entries`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
+- Intent checksum / protected terms carried forward: `docs:freshness`, `docs:freshness:maintain`, `block_spec_guard_pre_expiry`, `owner_issue=CO-558`, `owner_action_evidence=action_required`, `blocking_changed_paths=[]`, `policy capacity=over_budget`, `pre_expiry_entries`, `tasks/index.json`, `docs/docs-freshness-registry.json`.
 - Not done if: action-required owner truth still points at terminal CO-558, changed-path-free lanes remain blocked without a live owner, or the fix uses blind date bumps/gate weakening/deletion.
 - Pre-implementation issue-quality review: CO-573 issue text includes protected terms, non-goals, `Not Done If`, acceptance criteria, validation commands, and a clear CO-572 non-goal.
 - Fallback / refactor decision: This touches stale/rolling docs freshness ownership, so the required expiring fallback decision is recorded below.
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `docs:freshness:maintain` | Current owner-routed stale/pre-expiry docs freshness debt | `expire fallback` | `CO-573` | Terminal `CO-558` plus `block_spec_guard_pre_expiry` and over-budget action evidence with `blocking_changed_paths=[]` | 2026-05-21 | 2026-05-21 | 7 days after normal cadence expiry for each emitted cohort | Refresh, archive, or reclassify the cohort before expiry; re-home again if `CO-573` becomes terminal | `npm run docs:freshness`; `npm run docs:freshness:maintain`; `node scripts/spec-guard.mjs --dry-run`; `npm run docs:check` |
+| `docs:freshness:maintain` | Current owner-routed stale/pre-expiry docs freshness debt | `expire fallback` | `CO-573` | Terminal `CO-558` plus `block_spec_guard_pre_expiry` and over-budget action evidence with `blocking_changed_paths=[]` | 2026-05-21 | 2026-06-04 | 2026-06-20 | Refresh, archive, or reclassify the cohort before expiry; re-home again if `CO-573` becomes terminal | `npm run docs:freshness`; `npm run docs:freshness:maintain`; `node scripts/spec-guard.mjs --dry-run`; `npm run docs:check` |
 
 Large-refactor check: Existing owner verification and canonical-owner action evidence already fail closed on terminal owners; a narrow live-owner metadata repair is enough for this lane.
+Minor-seam check: the owner-routing seam is bounded to a live-owner metadata re-home; the over-budget/pre-expiry baseline remains visible and expires under CO-573 by 2026-06-20.
 
 ## Milestones & Sequencing
 1. Baseline and setup

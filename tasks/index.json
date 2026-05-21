@@ -565,7 +565,7 @@
       "owners": [
         "Codex"
       ],
-      "status": "review_clean_elegance_complete_pr_pending",
+      "status": "review_clean_elegance_complete_pr_open",
       "last_review": "2026-05-21",
       "canonical_owner_key": "docs:freshness:maintain",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
@@ -611,7 +611,7 @@
           "date": "2026-05-21",
           "status": "clean_success",
           "telemetry": ".runs/linear-b02f8333-202c-49ed-9443-8daf921e297d/cli/2026-05-21T17-22-52-510Z-2af7988c/review/telemetry.json",
-          "summary": "Initial review found CO573-REVIEW-001 and stable-evidence rerun found CO573-REVIEW-002. Parent addressed both by restoring CO-558 registry provenance and restoring CO-558 as a terminal tasks/index lineage row while keeping CO-573 as the separate live owner row. Final enforce-contract review succeeded with review_verdict=clean, contract_validation.status=valid, contract_overall_verdict=clean."
+          "summary": "Initial review found CO573-REVIEW-001 and stable-evidence rerun found CO573-REVIEW-002. Parent addressed both by restoring CO-558 registry provenance and restoring CO-558 as a terminal tasks/index lineage row while keeping CO-573 as the separate live owner row. PR follow-up review found CO573-REVIEW-003; parent addressed it by setting the fallback Review date to 2026-06-04 while preserving maximum lifetime 2026-06-20. Final enforce-contract review succeeded with review_verdict=clean, contract_validation.status=valid, contract_overall_verdict=clean."
         },
         "elegance_review_20260521": {
           "reviewer": "CO provider worker",
@@ -621,7 +621,7 @@
         }
       },
       "validation": {
-        "status": "review_clean_elegance_complete_pr_pending",
+        "status": "review_clean_elegance_complete_pr_open",
         "passed": [
           "live issue-context",
           "single workpad created",
@@ -644,11 +644,13 @@
           "git diff --check",
           "CO573-REVIEW-001 addressed",
           "CO573-REVIEW-002 addressed",
+          "CO573-REVIEW-003 addressed",
           "manifest-backed standalone review clean",
-          "explicit elegance/minimality pass completed"
+          "explicit elegance/minimality pass completed",
+          "PR #866 opened and attached to Linear"
         ],
         "pending": [
-          "PR attachment and ready-review drain before review-state transition"
+          "ready-review drain before review-state transition"
         ]
       },
       "paths": {
