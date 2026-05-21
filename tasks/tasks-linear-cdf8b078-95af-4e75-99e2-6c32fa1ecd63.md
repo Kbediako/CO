@@ -13,6 +13,7 @@
 - Rework workpad comment: `f1814ce7-2a75-480b-ac58-de341c820504`
 - Post-merge rework workpad comment: `0a8af160-7715-499f-a6cc-4ac6249d711b`
 - Latest-main Backlog rework: parent-owned Linear/GitHub lifecycle; worker branch only.
+- Latest-main retained merged-closeout rework: parent-owned Linear/GitHub lifecycle; worker branch only.
 
 ## Workflow Setup
 - [x] Live `linear issue-context` read for CO-571. Evidence: helper output on 2026-05-20 confirmed `In Progress`, no current PR, and no existing workpad.
@@ -53,6 +54,9 @@
 - [x] current-poll terminal snapshot path
 - [x] map-missing current poll terminal history
 - [x] CO-529 Backlog/backlog released `not_active`
+- [x] CO-522 retained merged-closeout released `not_active`
+- [x] PR #795 merged
+- [x] live Linear Done/completed
 - [x] stale `review_promotion`
 - [x] no fabricated coherent snapshot
 - [x] no provider-intake manual edits
@@ -69,6 +73,7 @@
 - [x] treating the no-current-poll fix as sufficient when the current poll map reconfirms terminal history
 - [x] treating the current-poll-present fix as sufficient when completed/canceled issue filtering leaves terminal history map-missing
 - [x] treating passive Backlog/not_active as the same as Blocked, retry, pending-review, merge-closeout, or reopened work
+- [x] treating stale retained merged-closeout history as active authority after current poll omission, merged PR proof, and live Linear Done/completed truth
 
 ## Acceptance Criteria
 - [x] CO-472 Done `claim_issue_by_id:released` terminal path does not drive restart-required health without active corroboration. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
@@ -83,6 +88,7 @@
 - [x] Map-missing terminal released path remains passive before `claim_reconcile:released` progress or claim churn when completed/canceled filtering leaves no current poll entry. Evidence: `npm run test -- ProviderIssueHandoff.test.ts -t "map-missing terminal released"`.
 - [x] Current-poll active/reopened snapshot still relaunches. Evidence: `npm run test -- ProviderIssueHandoff.test.ts -t "reopens terminal released history when the current poll snapshot becomes active"`.
 - [x] CO-529-style Backlog/backlog released `not_active` path skips direct issue-by-id and does not set restart-required health. Evidence: `npx vitest run --config vitest.config.core.ts orchestrator/tests/ProviderIssueHandoff.test.ts -t "keeps released Backlog not-active claims passive before direct issue-by-id"`.
+- [x] CO-522-style stale retained merged-closeout released path stays passive when current polling omits it, current promotion/reopened evidence still revalidates, and direct live Done truth clears stale `merge_closeout` residue. Evidence: `npx vitest run --config vitest.config.core.ts orchestrator/tests/ProviderIssueHandoff.test.ts -t "stale merged closeout|current retained promotion|live Done truth"`.
 - [x] Accepted `provider_issue_rehydration_pending_revalidation` claims still revalidate through direct issue-by-id when current polling is unavailable. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] Stale retained `review_promotion` metadata is treated as historical only when newer terminal issue truth supersedes it, while current promotion metadata revalidates in no-map and deferred-poll fail-closed paths. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
 - [x] Real active/stuck refresh path still fails closed with `provider_refresh_lifecycle_stuck` / `restart_required`. Evidence: `npm run test -- ProviderIssueHandoff.test.ts`.
@@ -109,13 +115,15 @@
 - [x] `npm run test`. Evidence: diagnostics child run `.runs/linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63-guard/cli/2026-05-20T18-34-04-472Z-7b15b709/manifest.json` succeeded.
 - [x] Second-rework `npm run test`. Evidence: full suite passed after current-poll classifier and `ControlRuntime.test.ts` test-harness split: 366 files, 6130 tests.
 - [x] `npm run docs:check`.
-- [x] `npm run docs:freshness`.
+- [ ] `npm run docs:freshness`. Evidence: current fifth-rework run failed on unrelated CO-558 rolling cohort baseline debt (`257` stale docs, `199` rolling cohort entries); this is not caused by the CO-571 diff.
 - [x] `npm run repo:stewardship`.
 - [x] `git diff --check`.
 - [x] `node scripts/diff-budget.mjs`.
 - [x] `npm run pack:smoke`.
 - [x] Standalone review and elegance pass, or exact blocker recorded. Evidence: enforced `gpt-5.5/xhigh` review at `.runs/linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63/cli/2026-05-20T18-03-32-648Z-cec26c42/review/output.log` returned `overall_verdict=clean`; post-review minimality pass kept the scoped predicate/test shape unchanged.
 - [x] Second-rework standalone review. Evidence: enforced `gpt-5.5/xhigh` review at `.runs/linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63/cli/2026-05-20T23-08-01-403Z-bf3480a0/review/output.log` returned `overall_verdict=clean` and `review contract: mode=enforce, validation=valid, overall=clean`.
+- [x] Fifth-rework full validation. Evidence: focused stale merged-closeout subset, full `ProviderIssueHandoff.test.ts`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, full `npm run test` (366 files / 6136 tests), `npm run docs:check`, `npm run repo:stewardship`, `git diff --check`, `node scripts/diff-budget.mjs`, and `npm run pack:smoke` passed.
+- [x] Fifth-rework enforced standalone review. Evidence: `gpt-5.5/xhigh` review at `.runs/linear-cdf8b078-95af-4e75-99e2-6c32fa1ecd63/cli/2026-05-21T01-29-57-573Z-6c459571/review/output.log` returned `overall_verdict=clean`, `review contract: mode=enforce, validation=valid, overall=clean`.
 - [x] Draft PR opened and linked to CO-571. Evidence: PR #855, `https://github.com/Kbediako/CO/pull/855`.
 
 ## CO-382 Fallback Decision Table
@@ -127,12 +135,13 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Provider refresh lifecycle classification | Terminal released historical claims can escalate to active stuck refresh health. | remove fallback | CO-571 | Released terminal claim with no active run/retry/worker corroboration, including no-current-poll-snapshot direct issue-by-id fallback, current-poll terminal `not_active` snapshots, and map-missing terminal `not_active` rows filtered out of the current poll map. | Observed 2026-05-20 | 2026-05-20 | This issue | Terminal released claims stop driving `restart_required`. | Focused released-claim, no-snapshot, current-poll terminal, map-missing terminal, stale-promotion, and active-stall regressions. |
 | Passive Backlog released not_active classification | Parked Backlog released claims can escalate to direct issue-by-id stuck refresh health. | remove fallback | CO-571 | CO-529-style released `provider_issue_released:not_active` Backlog/backlog row with no active run, retry, promotion, merge-closeout, or cancelable retained-run evidence. | Observed 2026-05-21 | 2026-05-21 | This issue | Passive Backlog/not_active rows skip direct issue-by-id while active/reopened/pending-review/retry/Blocked/merge-closeout paths still revalidate. | Focused CO-529 Backlog regression plus existing active/reopened/current-promotion/active-stall regressions. |
+| Stale retained merged-closeout classification | Retained merged closeout metadata can escalate stale released history to direct issue-by-id stuck refresh health. | remove fallback | CO-571 | CO-522-style released `provider_issue_released:not_active` row with stale non-active issue metadata, merged PR proof, stale promotion metadata, null retry fields, and no active/cancelable run. | Observed 2026-05-21 | 2026-05-21 | This issue | Stale retained merged-closeout rows skip direct issue-by-id when current polling omits them, while current promotion/reopened/direct-live-Done normalization paths remain active. | Focused CO-522 stale merged-closeout regressions. |
 | Provider-intake history | Released historical claims stay retained for traceability. | justify retaining fallback | Provider-intake audit contract / CO-571 | Terminal issue release records historical claim state. | Existing behavior before CO-571 | 2026-05-20 | Non-expiring durable retention only with rationale | Separate approved audit-history redesign replaces retained claim history with equivalent source-labeled evidence. | Tests keep claims inactive without deleting evidence. |
 
 - Contract name: provider-intake released historical claim audit retention.
 - Owning surface: provider-intake state and control-host status/read models.
 - Steady-state proof: raw released claim rows remain source-labeled audit evidence, while terminal released `not_active` claims and passive Backlog released `not_active` claims with complete cached metadata, null retry fields, and no active or cancelable retained run do not drive `restart_required` or retrying WIP.
-- Tests/docs: `ProviderIssueHandoff.test.ts` terminal released metadata-only table, no-current-poll-snapshot regression, current-poll terminal snapshot regression, map-missing terminal snapshot regression, CO-529 Backlog regression, accepted pending-revalidation no-current-poll regression, stale/current `review_promotion` regressions, active-stuck regression, `ControlRuntime.test.ts` retry projection regression, and this CO-571 packet.
+- Tests/docs: `ProviderIssueHandoff.test.ts` terminal released metadata-only table, no-current-poll-snapshot regression, current-poll terminal snapshot regression, map-missing terminal snapshot regression, CO-529 Backlog regression, CO-522 stale retained merged-closeout regressions, accepted pending-revalidation no-current-poll regression, stale/current `review_promotion` regressions, active-stuck regression, `ControlRuntime.test.ts` retry projection regression, and this CO-571 packet.
 - Non-expiring rationale: retained released claim history is durable operator/audit evidence, not temporary compatibility debt; removal requires an approved archival redesign that preserves equivalent source-labeled claim/run evidence.
 
 ## Progress Log
@@ -144,3 +153,5 @@
 - 2026-05-20: Manifest-backed `gpt-5.5/xhigh` standalone review completed clean in enforce mode for the second-rework branch; next step is commit, PR, and current-head GitHub review/check monitoring.
 - 2026-05-21 UTC: PR #858 Core Lane failed only at strict CI spec guard because the third-rework branch did not carry base-bound fallback/seam docs evidence. Rework adds the CO-480 map-missing current-poll evidence across PRD, TECH_SPEC, ACTION_PLAN, checklist, and agent mirror; local validation must run spec guard with `BASE_SHA=e37f55b434f1bca59daacf38a1b2c2aa9ad9890f`.
 - 2026-05-21: After PR #858 merged, latest main `ae1847156fbae3a3bdd3fe7177a41045c3fd8447` still hit `claim_issue_by_id:released` for CO-529 Backlog/backlog released `not_active`. This worker branch adds the focused passive Backlog guard and regression; parent owns PR, Linear transition, and live proof.
+- 2026-05-21: After PR #859 merged, latest main `e27ade20732c2a9ad859a30242309473cc263db0` still hit `claim_issue_by_id:released` for CO-522 retained merged-closeout history even though live Linear truth is Done/completed and PR #795 is merged. This rework adds focused stale merged-closeout passive/current-promotion/reopened/live-Done cleanup regressions.
+- 2026-05-21: Fifth-rework implementation validation passed through focused tests, full `ProviderIssueHandoff.test.ts`, spec guard, build, lint, full `npm run test`, `docs:check`, repo stewardship, diff budget, pack smoke, and enforced `gpt-5.5/xhigh` review. `docs:freshness` remains blocked by unrelated CO-558 rolling cohort debt and is recorded as a baseline blocker, not a CO-571 regression.

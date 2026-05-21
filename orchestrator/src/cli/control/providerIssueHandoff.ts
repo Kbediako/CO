@@ -2398,6 +2398,9 @@ export function createProviderIssueHandoffService(
     const trackedIssueFields = input.trackedIssue
       ? buildTrackedIssueClaimFields(input.trackedIssue)
       : null;
+    const mergeCloseoutResetFields = input.trackedIssue
+      ? buildTrackedIssueMergeCloseoutResetFields(input.claim, input.trackedIssue)
+      : {};
     const retainedRunIdentity = resolveReleasedClaimRetainedRunIdentity({
       claim: input.claim,
       run: input.releaseRun,
@@ -2406,6 +2409,7 @@ export function createProviderIssueHandoffService(
     });
     const transitioned = hasProviderClaimTransitioned(input.claim, {
       ...(trackedIssueFields ?? {}),
+      ...mergeCloseoutResetFields,
       state: 'released',
       reason: input.nextReason,
       ...retainedRunIdentity,
@@ -2439,6 +2443,7 @@ export function createProviderIssueHandoffService(
           ? input.trackedIssue.assignee_name
           : (input.claim.issue_assignee_name ?? null),
       issue_blocked_by: input.trackedIssue?.blocked_by ?? input.claim.issue_blocked_by ?? null,
+      ...mergeCloseoutResetFields,
       ...retainedRunIdentity,
       state: 'released',
       reason: input.nextReason,
@@ -5526,6 +5531,15 @@ export function createProviderIssueHandoffService(
               releaseRun,
               latestRun
             });
+          const shouldUseCachedReleasedMergedCloseoutNotActiveClaim =
+            shouldUseCachedReleasedMergedCloseoutNotActiveClaimResolution({
+              claim,
+              activeRun,
+              releaseRun,
+              latestRun,
+              refreshFromBlockerSnapshot:
+                shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot
+            });
           const canUseCachedReleasedTerminalHistoricalClaim =
             shouldUseCachedReleasedTerminalHistoricalClaim;
           const shouldRevalidateCurrentReleasedReviewPromotion =
@@ -5554,6 +5568,15 @@ export function createProviderIssueHandoffService(
             !canFreshDiscoverReleasedLiveWorker &&
             !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot;
           if (shouldKeepCachedReleasedBacklogNotActiveClaimPassiveBeforeReconcile) {
+            continue;
+          }
+          const shouldKeepCachedReleasedMergedCloseoutNotActiveClaimPassiveBeforeReconcile =
+            shouldUseCachedReleasedMergedCloseoutNotActiveClaim &&
+            trackedIssuesByKey !== null &&
+            currentPollTrackedIssue === null &&
+            !canFreshDiscoverReleasedLiveWorker &&
+            !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot;
+          if (shouldKeepCachedReleasedMergedCloseoutNotActiveClaimPassiveBeforeReconcile) {
             continue;
           }
           const shouldKeepCachedReleasedTerminalHistoricalClaimPassiveBeforeReconcile =
@@ -9782,6 +9805,68 @@ function shouldUseCachedReleasedBacklogNotActiveClaimResolution(input: {
     return false;
   }
   if (input.claim.merge_closeout || input.claim.review_promotion) {
+    return false;
+  }
+  return (
+    input.claim.retry_queued !== true &&
+    (input.claim.retry_attempt ?? null) === null &&
+    (input.claim.retry_due_at ?? null) === null &&
+    (input.claim.retry_error ?? null) === null
+  );
+}
+
+function shouldUseCachedReleasedMergedCloseoutNotActiveClaimResolution(input: {
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    | 'state'
+    | 'reason'
+    | 'issue_state'
+    | 'issue_state_type'
+    | 'issue_updated_at'
+    | 'retry_queued'
+    | 'retry_attempt'
+    | 'retry_due_at'
+    | 'retry_error'
+    | 'merge_closeout'
+    | 'review_promotion'
+  >;
+  activeRun: ProviderIssueRunRecord | null;
+  releaseRun: ProviderIssueRunRecord | null;
+  latestRun: ProviderIssueRunRecord | null;
+  refreshFromBlockerSnapshot: boolean;
+}): boolean {
+  if (
+    input.claim.state !== 'released' ||
+    input.claim.reason !== 'provider_issue_released:not_active'
+  ) {
+    return false;
+  }
+  if (input.activeRun || input.refreshFromBlockerSnapshot) {
+    return false;
+  }
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: input.claim.issue_state,
+    state_type: input.claim.issue_state_type
+  });
+  if (workflowState.isActive || workflowState.isHandoff) {
+    return false;
+  }
+  const mergeCloseout = input.claim.merge_closeout ?? null;
+  if (
+    !mergeCloseout ||
+    mergeCloseout.status === 'watching' ||
+    normalizeProviderLinearWorkflowState(mergeCloseout.issue_state) !== 'merging' ||
+    !mergeCloseoutSnapshotShowsMerged(mergeCloseout)
+  ) {
+    return false;
+  }
+  const retainedRuns = [input.releaseRun, input.latestRun].filter(
+    (run): run is ProviderIssueRunRecord => run !== null
+  );
+  if (retainedRuns.some((run) => shouldAttemptReleaseCancel(run))) {
+    return false;
+  }
+  if (!canTreatReviewPromotionAsStaleForReleasedTerminalHistoricalClaim(input.claim)) {
     return false;
   }
   return (
