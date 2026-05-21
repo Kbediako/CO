@@ -342,7 +342,7 @@ interface ProviderLinearWorkerProofRecord {
 
 const PROVIDER_UNREADABLE_MANIFEST_LIVE_PROOF_TTL_MS =
   2 * PROVIDER_SEMANTIC_STALL_RECHECK_DELAY_MS;
-const PROVIDER_PASSIVE_BACKLOG_RELEASE_VERIFICATION_TTL_MS = 5 * 60 * 1000;
+const PROVIDER_BACKLOG_RELEASE_DIRECT_PROOF_READS_PER_REFRESH = 3;
 
 function resolveRehydratedActiveRunWorkerHost(
   run: ProviderIssueRunRecord,
@@ -5461,6 +5461,7 @@ export function createProviderIssueHandoffService(
             : Math.max(1, refreshCounts.occupied_slots)
           : Number.POSITIVE_INFINITY;
         let preDiscoveryNonActiveIssueByIdReads = 0;
+        let backlogReleaseDirectProofReads = 0;
         let noRunPendingReopenLiveStartedProbeReads = 0;
 
         for (const claim of [...options.state.claims]) {
@@ -5572,8 +5573,13 @@ export function createProviderIssueHandoffService(
             isTerminalProviderIntakeIssueState(claim) &&
             !canTreatReviewPromotionAsStaleForReleasedTerminalHistoricalClaim(claim);
           const currentPollTrackedIssue = trackedIssuesByKey?.get(claimProviderKey) ?? null;
-          const hasRecentBacklogNotActivePassiveVerification =
-            hasRecentBacklogNotActiveDirectIssueByIdPassiveVerification(claim);
+          const hasBacklogNotActivePassiveVerificationForCurrentSnapshot =
+            hasBacklogNotActiveDirectIssueByIdPassiveVerificationForCurrentSnapshot(claim);
+          const shouldUseBacklogReleaseDirectProofBudget =
+            shouldUseCachedReleasedBacklogNotActiveClaim &&
+            currentPollTrackedIssue === null &&
+            !hasBacklogNotActivePassiveVerificationForCurrentSnapshot &&
+            !canFreshDiscoverReleasedLiveWorker;
           if (
             shouldKeepCurrentPollReleasedTerminalHistoricalClaimPassive({
               claim,
@@ -5591,12 +5597,28 @@ export function createProviderIssueHandoffService(
             shouldUseCachedReleasedBacklogNotActiveClaim &&
             (
               trackedIssuesByKey !== null ||
-              hasRecentBacklogNotActivePassiveVerification
+              hasBacklogNotActivePassiveVerificationForCurrentSnapshot
             ) &&
             currentPollTrackedIssue === null &&
             !canFreshDiscoverReleasedLiveWorker &&
-            !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot;
+            (
+              hasBacklogNotActivePassiveVerificationForCurrentSnapshot ||
+              !shouldRefreshReleasedNotActiveMetadataFromBlockerSnapshot
+            );
           if (shouldKeepCachedReleasedBacklogNotActiveClaimPassiveBeforeReconcile) {
+            continue;
+          }
+          if (
+            shouldUseBacklogReleaseDirectProofBudget &&
+            backlogReleaseDirectProofReads >=
+              PROVIDER_BACKLOG_RELEASE_DIRECT_PROOF_READS_PER_REFRESH
+          ) {
+            refreshCounts.issue_by_id_deferred += 1;
+            deferredClaimFreshDiscoveryBlockedProviderKeys.add(claimProviderKey);
+            recordRefreshProgress('refresh:claim_issue_by_id_reconcile', {
+              requestClass: 'claim_issue_by_id:released_deferred',
+              providerKeys: [claimProviderKey]
+            });
             continue;
           }
           const shouldKeepCachedReleasedMergedCloseoutNotActiveClaimPassiveBeforeReconcile =
@@ -5669,6 +5691,9 @@ export function createProviderIssueHandoffService(
             releaseOnlyCachedPendingRevalidation: pollInput?.deferFreshDiscovery === true,
             onDirectIssueById: () => {
               refreshCounts.issue_by_id_reads += 1;
+              if (shouldUseBacklogReleaseDirectProofBudget) {
+                backlogReleaseDirectProofReads += 1;
+              }
               if (boundPreDiscoveryIssueByIdReads && activeRun === null) {
                 preDiscoveryNonActiveIssueByIdReads += 1;
               }
@@ -9948,7 +9973,7 @@ function isReleasedBacklogNotActiveClaim(
   );
 }
 
-function hasRecentBacklogNotActiveDirectIssueByIdPassiveVerification(
+function hasBacklogNotActiveDirectIssueByIdPassiveVerificationForCurrentSnapshot(
   claim: Pick<
     ProviderIntakeClaimRecord,
     'passive_release' | 'issue_state' | 'issue_state_type' | 'issue_updated_at'
@@ -9959,17 +9984,15 @@ function hasRecentBacklogNotActiveDirectIssueByIdPassiveVerification(
     !verification ||
     verification.reason !== 'backlog_not_active_direct_issue_by_id' ||
     verification.source !== 'direct_issue_by_id' ||
+    typeof verification.verified_at !== 'string' ||
+    verification.verified_at.trim().length === 0 ||
     verification.issue_state !== claim.issue_state ||
     verification.issue_state_type !== claim.issue_state_type ||
     verification.issue_updated_at !== claim.issue_updated_at
   ) {
     return false;
   }
-  const verifiedAtMs = Date.parse(verification.verified_at);
-  return (
-    Number.isFinite(verifiedAtMs) &&
-    Date.now() - verifiedAtMs <= PROVIDER_PASSIVE_BACKLOG_RELEASE_VERIFICATION_TTL_MS
-  );
+  return true;
 }
 
 function shouldKeepCurrentPollReleasedTerminalHistoricalClaimPassive(input: {

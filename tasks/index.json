@@ -661,7 +661,7 @@
           "reviewer": "CO-571 provider worker",
           "date": "2026-05-21",
           "status": "approved_for_implementation",
-          "summary": "CO-571 is scoped to terminal released historical claim reconciliation, passive Backlog released not_active verification before repeated direct issue-by-id suppression, stale retained merged-closeout suppression after merged PR plus live Done truth, the retry projection mismatch for selected released claims with null retry metadata, no-current-poll-snapshot and map-missing fallback paths, accepted pending-revalidation rechecks, and stale/current review_promotion handling across no-map and deferred-poll fail-closed paths. It explicitly rejects timeout-only fixes, provider-intake manual edits, fabricated snapshots, blanket released-claim suppression, and hiding real active/reopened/retry/Blocked/current-promotion/merge-closeout refresh paths."
+          "summary": "CO-571 is scoped to terminal released historical claim reconciliation, passive Backlog released not_active verification before repeated direct issue-by-id suppression, stale blocker metadata yielding to matching direct own-issue passive_release proof, large no-poll Backlog direct-read budgeting with claim_issue_by_id:released_deferred progress that cannot be starved by time-only expiry of earlier exact-snapshot proofs, stale retained merged-closeout suppression after merged PR plus live Done truth, the retry projection mismatch for selected released claims with null retry metadata, no-current-poll-snapshot and map-missing fallback paths, accepted pending-revalidation rechecks, and stale/current review_promotion handling across no-map and deferred-poll fail-closed paths. It explicitly rejects timeout-only fixes, provider-intake manual edits, fabricated snapshots, blanket released-claim suppression, and hiding real active/reopened/retry/Blocked/current-promotion/merge-closeout refresh paths."
         },
         "parallelization": {
           "decision": "stay_serial",
@@ -671,7 +671,7 @@
         }
       },
       "validation": {
-        "status": "implementation_complete_pr_pending",
+        "status": "eighth_rework_validation_complete",
         "passed": [
           "live Linear issue-context read",
           "single workpad created",
@@ -709,11 +709,17 @@
           "sixth-rework full ProviderIssueHandoff.test.ts passed",
           "sixth-rework full npm run test passed (366 files / 6137 tests)",
           "sixth-rework docs:check, repo:stewardship, git diff --check, diff-budget, pack:smoke, and delegation-guard passed",
-          "sixth-rework enforced gpt-5.5/xhigh standalone review returned clean with valid enforce contract"
+          "sixth-rework enforced gpt-5.5/xhigh standalone review returned clean with valid enforce contract",
+          "PR #862 merged, then current-source proof hit CO-521/CO-524 released Backlog no-poll claim reconciliation again",
+          "eighth-rework focused large no-poll Backlog direct-read budget, stale blocker passive-proof reuse, and active direct issue-by-id regressions passed",
+          "eighth-rework full ProviderIssueHandoff.test.ts passed",
+          "eighth-rework spec guard, build, lint, docs:check, repo:stewardship, git diff --check, diff-budget, pack:smoke, delegation-guard, and JSON parse passed",
+          "eighth-rework full npm run test passed (366 files / 6140 tests)",
+          "eighth-rework enforced gpt-5.5/xhigh standalone review returned clean with valid enforce contract after first-review P2 starvation finding was fixed"
         ],
         "pending": [
           "docs:freshness baseline blocker: unrelated CO-558 rolling cohort debt (257 stale docs, 199 rolling cohort entries)",
-          "parent-owned PR/lifecycle for the latest CO-521/CO-524 no-current-poll Backlog rework",
+          "parent-owned PR/lifecycle for the latest passive-proof budget rework",
           "live current-main proof after parent lands the patch"
         ]
       },
