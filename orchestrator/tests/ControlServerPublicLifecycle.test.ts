@@ -35,6 +35,7 @@ import {
   markProviderPollingStarted,
   markProviderPollingStuck,
   readProviderPollingHealth,
+  recordProviderPollingProgress,
   scheduleProviderPolling
 } from '../src/cli/control/providerPollingHealth.js';
 import {
@@ -2846,6 +2847,106 @@ describe('startControlServerPublicLifecycle', () => {
     expect(persistProviderIntake).not.toHaveBeenCalled();
 
     resolveRefresh?.();
+    await closeControlServerPublicLifecycle(started);
+  });
+
+  it('extends the refresh watchdog from progress instead of total operation age', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-21T10:09:15.000Z'));
+
+    let resolveRefresh: (() => void) | null = null;
+    const firstRefresh = new Promise<void>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    const providerIssueHandoff = {
+      handleAcceptedTrackedIssue: vi.fn(),
+      rehydrate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => {
+        await firstRefresh;
+      })
+    };
+    const persistProviderIntake = vi.fn(async () => undefined);
+    const persistProviderIntakePolling = vi.fn(async () => undefined);
+    const providerIntakeState = {
+      schema_version: 1,
+      updated_at: new Date(0).toISOString(),
+      rehydrated_at: null,
+      latest_provider_key: null,
+      latest_reason: null,
+      polling: null,
+      claims: []
+    };
+    const requestContextShared = {
+      clients: new Set(),
+      eventTransport: { broadcast: vi.fn() },
+      providerIssueHandoff,
+      providerIntakeState,
+      persist: {
+        providerIntake: persistProviderIntake,
+        providerIntakePolling: persistProviderIntakePolling
+      }
+    } as unknown as ControlRequestSharedContext;
+    const lifecycleState = {
+      expiryLifecycle: { close: vi.fn() },
+      bootstrapLifecycle: { close: vi.fn(async () => undefined) }
+    } as unknown as ControlServerOwnedLifecycleState;
+    const server = { kind: 'server' } as unknown as http.Server;
+
+    vi.mocked(prepareControlServerStartupInputs).mockResolvedValue({
+      requestContextShared,
+      host: '127.0.0.1',
+      controlToken: 'token-123'
+    } satisfies PreparedControlServerStartupInputs);
+    vi.mocked(startControlServerReadyInstanceLifecycle).mockResolvedValue({
+      server,
+      baseUrl: 'http://127.0.0.1:4545',
+      lifecycleState
+    });
+
+    const started = await startControlServerPublicLifecycle({
+      paths: { repoRoot: '/tmp/repo' } as RunPaths,
+      config: { ui: { bindHost: '127.0.0.1' } } as unknown as EffectiveDelegationConfig,
+      runId: 'run-1'
+    });
+
+    await flushStartupProviderRefresh();
+    expect(providerIssueHandoff.refresh).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(40_000);
+    recordProviderPollingProgress(providerIssueHandoff, {
+      phase: 'refresh:claim_issue_by_id_reconcile',
+      requestClass: 'claim_issue_by_id:released_deferred',
+      providerKeys: ['linear:7cedb707-d338-4e86-af14-02ed4d5070d6'],
+      counts: {
+        claims_scanned: 731,
+        issue_by_id_deferred: 728
+      },
+      atMs: Date.now()
+    });
+    await vi.advanceTimersByTimeAsync(6_000);
+
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false,
+      operation_elapsed_ms: 46_000,
+      progress_elapsed_ms: 6_000,
+      refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+      refresh_request_class: 'claim_issue_by_id:released_deferred'
+    });
+    expect(providerIntakeState.polling).not.toMatchObject({
+      restart_required: true
+    });
+
+    resolveRefresh?.();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(readProviderPollingHealth(providerIssueHandoff)).toMatchObject({
+      checking: false,
+      stuck: false,
+      restart_required: false,
+      last_error: null
+    });
+
     await closeControlServerPublicLifecycle(started);
   });
 

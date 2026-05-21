@@ -192,6 +192,90 @@ describe('providerPollingHealth next-refresh projection', () => {
     });
   });
 
+  it('uses the latest refresh progress time when deciding whether polling is stuck', () => {
+    const service = {} as ProviderIssueHandoffService;
+
+    initializeProviderPollingHealth(service, {
+      intervalMs: null,
+      stuckAfterMs: 45_000,
+      skipInitialUpdate: true
+    });
+    markProviderPollingStarted(service, {
+      mode: 'refresh',
+      atMs: Date.parse('2026-05-21T10:09:15.000Z')
+    });
+    recordProviderPollingProgress(service, {
+      phase: 'refresh:claim_issue_by_id_reconcile',
+      requestClass: 'claim_issue_by_id:released_deferred',
+      providerKeys: ['linear:co-531'],
+      counts: {
+        claims_scanned: 731,
+        issue_by_id_deferred: 728
+      },
+      atMs: Date.parse('2026-05-21T10:10:40.000Z')
+    });
+
+    expect(
+      readProviderPollingHealth(service, Date.parse('2026-05-21T10:10:56.000Z'))
+    ).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false,
+      refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+      refresh_request_class: 'claim_issue_by_id:released_deferred',
+      refresh_provider_keys: ['linear:co-531']
+    });
+    expect(
+      readProviderPollingHealth(service, Date.parse('2026-05-21T10:11:26.000Z'))
+    ).toMatchObject({
+      checking: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      stuck_since_at: '2026-05-21T10:11:25.000Z',
+      refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+      refresh_request_class: 'claim_issue_by_id:released_deferred',
+      refresh_provider_keys: ['linear:co-531']
+    });
+  });
+
+  it('still marks an active refresh stuck when no progress follows the last request', () => {
+    const service = {} as ProviderIssueHandoffService;
+
+    initializeProviderPollingHealth(service, {
+      intervalMs: null,
+      stuckAfterMs: 45_000,
+      skipInitialUpdate: true
+    });
+    markProviderPollingStarted(service, {
+      mode: 'refresh',
+      atMs: Date.parse('2026-05-21T10:09:15.000Z')
+    });
+    recordProviderPollingProgress(service, {
+      phase: 'refresh:claim_issue_by_id_reconcile',
+      requestClass: 'claim_issue_by_id:running',
+      providerKeys: ['linear:active-worker'],
+      counts: {
+        claims_scanned: 1,
+        issue_by_id_reads: 1
+      },
+      atMs: Date.parse('2026-05-21T10:09:20.000Z')
+    });
+
+    expect(
+      readProviderPollingHealth(service, Date.parse('2026-05-21T10:10:06.000Z'))
+    ).toMatchObject({
+      checking: true,
+      stuck: true,
+      restart_required: true,
+      reason: 'provider_refresh_lifecycle_stuck',
+      stuck_since_at: '2026-05-21T10:10:05.000Z',
+      refresh_phase: 'refresh:claim_issue_by_id_reconcile',
+      refresh_request_class: 'claim_issue_by_id:running',
+      refresh_provider_keys: ['linear:active-worker']
+    });
+  });
+
   it('retains request class and provider keys when progress omits optional diagnostics', () => {
     const service = {} as ProviderIssueHandoffService;
 

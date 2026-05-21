@@ -26,6 +26,8 @@ export interface ControlPollingHealthPayload {
   updated_at: string | null;
   operation_started_at: string | null;
   operation_elapsed_ms: number | null;
+  progress_updated_at?: string | null;
+  progress_elapsed_ms?: number | null;
   stalled_after_ms: number | null;
   refresh_phase: string | null;
   refresh_request_class?: string | null;
@@ -53,6 +55,7 @@ interface MutableProviderPollingHealthState {
   nextPollAtMs: number | null;
   updatedAtMs: number | null;
   operationStartedAtMs: number | null;
+  lastProgressAtMs: number | null;
   refreshPhase: string | null;
   refreshRequestClass: string | null;
   refreshProviderKeys: string[] | null;
@@ -140,6 +143,7 @@ export function markProviderPollingStarted(
   state.nextPollAtMs = null;
   state.updatedAtMs = atMs;
   state.operationStartedAtMs = atMs;
+  state.lastProgressAtMs = atMs;
   state.refreshPhase = `${input.mode}:started`;
   state.refreshRequestClass = null;
   state.refreshProviderKeys = null;
@@ -179,6 +183,7 @@ export function recordProviderPollingProgress(
   }
   state.refreshCounts = copyFiniteRefreshCounts(input.counts ?? null);
   state.updatedAtMs = atMs;
+  state.lastProgressAtMs = atMs;
   queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);
 }
 
@@ -208,9 +213,10 @@ export function markProviderPollingCompleted(
   state.operationStartedAtMs = null;
   if (preserveStuckState) {
     if (state.stuckAtMs === null) {
+      const stuckAnchorMs = state.lastProgressAtMs ?? state.lastRequestedAtMs;
       state.stuckAtMs =
-        state.stuckAfterMs !== null && state.lastRequestedAtMs !== null
-          ? state.lastRequestedAtMs + state.stuckAfterMs
+        state.stuckAfterMs !== null && stuckAnchorMs !== null
+          ? stuckAnchorMs + state.stuckAfterMs
           : atMs;
     }
     state.reason = state.reason ?? buildProviderPollingStuckReason(state);
@@ -221,6 +227,7 @@ export function markProviderPollingCompleted(
     state.refreshCounts = null;
     state.stuckAtMs = null;
     state.reason = null;
+    state.lastProgressAtMs = null;
   }
   queueProviderPollingHealthUpdate(providerIssueHandoff, state, atMs);
 }
@@ -272,7 +279,9 @@ export function markProviderPollingStuck(
     return state.updateChain;
   }
   state.stuckAtMs =
-    state.stuckAfterMs !== null ? state.operationStartedAtMs + state.stuckAfterMs : atMs;
+    state.stuckAfterMs !== null
+      ? (state.lastProgressAtMs ?? state.operationStartedAtMs) + state.stuckAfterMs
+      : atMs;
   state.lastErrorAtMs = atMs;
   state.lastError = buildProviderPollingStuckMessage(state);
   state.reason = buildProviderPollingStuckReason(state);
@@ -352,6 +361,10 @@ function buildProviderPollingHealthPayload(
     state.checking && state.operationStartedAtMs !== null
       ? Math.max(0, nowMs - state.operationStartedAtMs)
       : null;
+  const progressElapsedMs =
+    state.checking && state.lastProgressAtMs !== null
+      ? Math.max(0, nowMs - state.lastProgressAtMs)
+      : null;
   const stuck = state.stuckAtMs !== null;
   const reason = state.reason ?? (stuck ? buildProviderPollingStuckReason(state) : null);
   const nextRefresh = resolveControlPollingNextRefreshProjectionFromMs({
@@ -382,6 +395,8 @@ function buildProviderPollingHealthPayload(
     updated_at: toIsoTimestamp(state.updatedAtMs),
     operation_started_at: toIsoTimestamp(state.operationStartedAtMs),
     operation_elapsed_ms: operationElapsedMs,
+    progress_updated_at: toIsoTimestamp(state.lastProgressAtMs),
+    progress_elapsed_ms: progressElapsedMs,
     stalled_after_ms: state.stuckAfterMs,
     refresh_phase: state.refreshPhase,
     refresh_request_class: state.refreshRequestClass,
@@ -491,6 +506,7 @@ function getOrCreateProviderPollingHealthState(
     nextPollAtMs: intervalMs !== null ? Date.now() : null,
     updatedAtMs: null,
     operationStartedAtMs: null,
+    lastProgressAtMs: null,
     refreshPhase: null,
     refreshRequestClass: null,
     refreshProviderKeys: null,
@@ -515,7 +531,7 @@ function maybeMarkProviderPollingStuck(
     !state.checking ||
     state.operationStartedAtMs === null ||
     state.stuckAfterMs === null ||
-    nowMs - state.operationStartedAtMs < state.stuckAfterMs
+    nowMs - (state.lastProgressAtMs ?? state.operationStartedAtMs) < state.stuckAfterMs
   ) {
     return;
   }
