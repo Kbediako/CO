@@ -27406,6 +27406,53 @@
         "url": "https://linear.app/asabeko/issue/CO-566/co-recover-ready-resumable-provider-claims-without-dispatch-pilot"
       },
       "canonical_owner_key": "provider-intake:ready-resumable-recover-dispatch-source-disabled:v1"
+    },
+    {
+      "id": "20260521-linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316",
+      "title": "CO-570 docs-review change bundle explicit scope",
+      "relates_to": "tasks/tasks-linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-21",
+      "evidence": [
+        "docs/PRD-linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
+        "docs/TECH_SPEC-linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
+        "docs/ACTION_PLAN-linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
+        "tasks/specs/linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
+        "tasks/tasks-linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
+        ".agent/task/linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316-docs-packet-r2/cli/2026-05-21T22-29-44-832Z-e1af18db/manifest.json",
+        ".runs/linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316-docs-packet-r2/cli/2026-05-21T22-29-44-832Z-e1af18db/memory/source-0/source.txt"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet-r2",
+          "date": "2026-05-21",
+          "status": "produced_for_parent_integration",
+          "manifest": ".runs/linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316-docs-packet-r2/cli/2026-05-21T22-29-44-832Z-e1af18db/manifest.json",
+          "source_anchor": "ctx:sha256:d9c322b93b1673e1fcb654e148e78489e74df51b03ab890768e710d3ad9e5bcc#chunk:c000001",
+          "summary": "Docs-only child lane bootstrapped the CO-570 docs-review change bundle explicit scope packet and registry mirrors. The packet requires change-bundle.json to carry explicit review scope for committed branch diff, uncommitted working tree, and base diff bounded review."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
+        "task": "tasks/tasks-linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
+        "agent_task": ".agent/task/linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
+        "prd": "docs/PRD-linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
+        "docs": "docs/TECH_SPEC-linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
+        "action_plan": "docs/ACTION_PLAN-linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md"
+      },
+      "source_issue": {
+        "id": "7aeca30c-c52c-4213-9d40-0ac0cf81b316",
+        "identifier": "CO-570",
+        "url": "https://linear.app/asabeko/issue/CO-570"
+      }
     }
   ]
 }
