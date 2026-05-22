@@ -2211,8 +2211,41 @@ function isSuccessfulProviderLinearWorkerHandoffFailedWrapper(
     context.rawStatus === 'failed' &&
     providerLinearWorkerClaimRunIdentityMatchesContext(claim, context) &&
     hasSucceededProviderLinearWorkerIssueReviewHandoffProof(context.providerLinearWorkerProof) &&
-    isTerminalProviderLinearIssueState(claim.issue_state, claim.issue_state_type) &&
+    isSuccessfulProviderLinearWorkerHandoffClaimState(claim) &&
+    isCompletedProviderLinearIssueState(claim.issue_state, claim.issue_state_type) &&
+    hasMergedProviderLinearWorkerCloseout(claim) &&
     hasNoActiveProviderLinearWorkerRetryMetadata(claim)
+  );
+}
+
+function isSuccessfulProviderLinearWorkerHandoffClaimState(
+  claim: Pick<ProviderIntakeClaimRecord, 'state'>
+): boolean {
+  return claim.state === 'released' || claim.state === 'completed';
+}
+
+function isCompletedProviderLinearIssueState(
+  issueState: string | null | undefined,
+  issueStateType: string | null | undefined
+): boolean {
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: issueState,
+    state_type: issueStateType
+  });
+  if (workflowState.normalizedState && workflowState.normalizedState !== 'done') {
+    return false;
+  }
+  return workflowState.normalizedState === 'done' || workflowState.normalizedStateType === 'completed';
+}
+
+function hasMergedProviderLinearWorkerCloseout(
+  claim: Pick<ProviderIntakeClaimRecord, 'merge_closeout'>
+): boolean {
+  const mergeCloseout = claim.merge_closeout ?? null;
+  return Boolean(
+    mergeCloseout?.status === 'merged' &&
+      mergeCloseout.pr &&
+      (mergeCloseout.snapshot?.state === 'MERGED' || mergeCloseout.snapshot?.merged_at)
   );
 }
 

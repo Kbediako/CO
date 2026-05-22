@@ -49,6 +49,38 @@ async function writeProviderLinearWorkerProof(
   await writeJsonFile(join(dirname(manifestPath), 'provider-linear-worker-proof.json'), proof);
 }
 
+function buildIssueReviewHandoffProof(
+  issueId: string,
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> {
+  return {
+    issue_id: issueId,
+    issue_identifier: 'CO-562',
+    owner_phase: 'ended',
+    owner_status: 'succeeded',
+    end_reason: 'issue_review_handoff',
+    attempt_started_at: '2026-05-19T04:04:52.083Z',
+    updated_at: '2026-05-19T07:10:46.377Z',
+    ...overrides
+  };
+}
+
+function buildMergedPrCloseout(): ProviderIntakeClaimRecord['merge_closeout'] {
+  return {
+    status: 'merged',
+    pr: {
+      url: 'https://github.com/asabeko/CO/pull/840',
+      owner: 'asabeko',
+      repo: 'CO',
+      number: 840
+    },
+    snapshot: {
+      state: 'MERGED',
+      merged_at: '2026-05-19T07:30:01.000Z'
+    }
+  } as ProviderIntakeClaimRecord['merge_closeout'];
+}
+
 function buildProviderWorkerManifest(
   taskId: string,
   runId: string,
@@ -783,28 +815,7 @@ describe('createSelectedRunProjectionReader', () => {
         ]
       })
     );
-    await writeProviderLinearWorkerProof(manifestPath, {
-      issue_id: issueId,
-      issue_identifier: 'CO-562',
-      owner_phase: 'ended',
-      owner_status: 'succeeded',
-      end_reason: 'issue_review_handoff',
-      attempt_started_at: '2026-05-19T04:04:52.083Z',
-      updated_at: '2026-05-19T07:10:46.377Z',
-      workspace_path: '/Users/kbediako/Code/CO/.workspaces/linear-aa075f78-940e-423b-a886-6f0f8012ae18',
-      turn_count: 1,
-      pid: null,
-      thread_id: null,
-      latest_turn_id: null,
-      latest_session_id: null,
-      latest_session_id_source: null,
-      last_event: null,
-      last_message: null,
-      last_event_at: null,
-      tokens: {},
-      rate_limits: null,
-      linear_audit: null
-    });
+    await writeProviderLinearWorkerProof(manifestPath, buildIssueReviewHandoffProof(issueId));
     const controlManifestPath = await writeRunManifest(sandbox, 'local-mcp', controlRunId, {
       task_id: 'local-mcp',
       run_id: controlRunId,
@@ -829,19 +840,7 @@ describe('createSelectedRunProjectionReader', () => {
           retry_attempt: null,
           retry_due_at: null,
           retry_error: null,
-          merge_closeout: {
-            status: 'merged',
-            pr: {
-              url: 'https://github.com/asabeko/CO/pull/840',
-              owner: 'asabeko',
-              repo: 'CO',
-              number: 840
-            },
-            snapshot: {
-              state: 'MERGED',
-              merged_at: '2026-05-19T07:30:01.000Z'
-            }
-          } as ProviderIntakeClaimRecord['merge_closeout']
+          merge_closeout: buildMergedPrCloseout()
         })
       ],
       { updated_at: '2026-05-19T07:33:21.789Z' }
@@ -939,27 +938,11 @@ describe('createSelectedRunProjectionReader', () => {
           "Configuration mode: repo-authoritative.\nStage 'Run provider linear worker' failed with exit code 1."
       })
     );
-    await writeProviderLinearWorkerProof(manifestPath, {
-      issue_id: issueId,
-      issue_identifier: 'CO-562',
+    await writeProviderLinearWorkerProof(manifestPath, buildIssueReviewHandoffProof(issueId, {
       owner_phase: 'ended',
       owner_status: 'failed',
-      end_reason: 'implementation_failed',
-      attempt_started_at: '2026-05-19T04:04:52.083Z',
-      updated_at: '2026-05-19T07:10:46.377Z',
-      turn_count: 1,
-      pid: null,
-      thread_id: null,
-      latest_turn_id: null,
-      latest_session_id: null,
-      latest_session_id_source: null,
-      last_event: null,
-      last_message: null,
-      last_event_at: null,
-      tokens: {},
-      rate_limits: null,
-      linear_audit: null
-    });
+      end_reason: 'implementation_failed'
+    }));
     const controlManifestPath = await writeRunManifest(sandbox, 'local-mcp', controlRunId, {
       task_id: 'local-mcp',
       run_id: controlRunId,
@@ -1030,27 +1013,7 @@ describe('createSelectedRunProjectionReader', () => {
           "Configuration mode: repo-authoritative.\nStage 'Run provider linear worker' failed with exit code 1."
       })
     );
-    await writeProviderLinearWorkerProof(manifestPath, {
-      issue_id: issueId,
-      issue_identifier: 'CO-562',
-      owner_phase: 'ended',
-      owner_status: 'succeeded',
-      end_reason: 'issue_review_handoff',
-      attempt_started_at: '2026-05-19T04:04:52.083Z',
-      updated_at: '2026-05-19T07:10:46.377Z',
-      turn_count: 1,
-      pid: null,
-      thread_id: null,
-      latest_turn_id: null,
-      latest_session_id: null,
-      latest_session_id_source: null,
-      last_event: null,
-      last_message: null,
-      last_event_at: null,
-      tokens: {},
-      rate_limits: null,
-      linear_audit: null
-    });
+    await writeProviderLinearWorkerProof(manifestPath, buildIssueReviewHandoffProof(issueId));
     const controlManifestPath = await writeRunManifest(sandbox, 'local-mcp', controlRunId, {
       task_id: 'local-mcp',
       run_id: controlRunId,
@@ -1098,6 +1061,96 @@ describe('createSelectedRunProjectionReader', () => {
         error: 'old failure'
       }
     });
+  });
+
+  it('keeps successful handoff proof failed until claim completion authority is present', async () => {
+    const cases = [
+      {
+        name: 'cancelled terminal issue',
+        claim: {
+          issue_state: 'Canceled',
+          issue_state_type: 'canceled',
+          state: 'released',
+          merge_closeout: buildMergedPrCloseout()
+        }
+      },
+      {
+        name: 'missing merged closeout',
+        claim: {
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          state: 'released',
+          merge_closeout: null
+        }
+      },
+      {
+        name: 'handoff failed claim',
+        claim: {
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          state: 'handoff_failed',
+          reason: 'provider_issue_merge_closeout_action_required',
+          merge_closeout: buildMergedPrCloseout()
+        }
+      }
+    ];
+
+    for (const testCase of cases) {
+      const sandbox = await makeSandbox();
+      const taskId = `linear-aa075f78-940e-423b-a886-6f0f8012ae18-${testCase.name.replaceAll(' ', '-')}`;
+      const runId = '2026-05-19T04-04-49-244Z-incomplete-authority';
+      const issueId = `aa075f78-940e-423b-a886-6f0f8012ae18-${testCase.name.replaceAll(' ', '-')}`;
+      const manifestPath = await writeRunManifest(
+        sandbox,
+        taskId,
+        runId,
+        buildProviderWorkerManifest(taskId, runId, {
+          issue_id: issueId,
+          issue_identifier: 'CO-562',
+          status: 'failed',
+          completed_at: '2026-05-19T07:10:47.354Z',
+          updated_at: '2026-05-19T07:10:47.389Z',
+          summary: "Stage 'Run provider linear worker' failed with exit code 1."
+        })
+      );
+      await writeProviderLinearWorkerProof(manifestPath, buildIssueReviewHandoffProof(issueId));
+      const controlManifestPath = await writeRunManifest(sandbox, 'local-mcp', 'control-host', {
+        task_id: 'local-mcp',
+        run_id: 'control-host',
+        status: 'in_progress',
+        started_at: '2026-05-19T07:30:00.000Z',
+        updated_at: '2026-05-19T07:35:00.000Z'
+      });
+      const providerIntakeState = buildProviderIntakeState([
+        buildProviderIntakeClaim(taskId, runId, manifestPath, {
+          provider_key: `linear:${issueId}`,
+          issue_id: issueId,
+          issue_identifier: 'CO-562',
+          reason: 'provider_issue_released:not_active',
+          updated_at: '2026-05-19T07:33:21.789Z',
+          retry_queued: null,
+          retry_attempt: null,
+          retry_due_at: null,
+          retry_error: null,
+          ...testCase.claim
+        })
+      ]);
+
+      const collection = await discoverCompatibilityCollectionContexts(
+        buildProjectionContext({
+          manifestPath: controlManifestPath,
+          runId: 'control-host',
+          providerIntakeState
+        })
+      );
+
+      expect(collection.all[0], testCase.name).toMatchObject({
+        issueIdentifier: 'CO-562',
+        rawStatus: 'failed',
+        displayStatus: 'failed',
+        statusReason: null
+      });
+    }
   });
 
   it('keeps terminal retry claims out of authoritative retry collection', async () => {
