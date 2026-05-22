@@ -173,10 +173,11 @@ export async function runCoStatusCliShell(
 
   assertAttachCompatibleFlags(params.flags);
   const format: OutputFormat = readStringFlag(params.flags, 'format') === 'json' ? 'json' : 'text';
+  const explicitMachineStatus = readBooleanFlag(params.flags, 'machine-status');
   const runtimeFreshnessBlock = resolveCoStatusRuntimeFreshnessBlock(
     dependencies.inspectRuntimeFreshness()
   );
-  if (runtimeFreshnessBlock) {
+  if (runtimeFreshnessBlock && !explicitMachineStatus) {
     emitCoStatusRuntimeFreshnessBlock(runtimeFreshnessBlock, format, dependencies);
     return;
   }
