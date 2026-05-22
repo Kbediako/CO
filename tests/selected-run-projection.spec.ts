@@ -1153,6 +1153,66 @@ describe('createSelectedRunProjectionReader', () => {
     }
   });
 
+  it('allows completed workflow type to authorize successful handoff even when the state label is not Done', async () => {
+    const sandbox = await makeSandbox();
+    const taskId = 'linear-aa075f78-940e-423b-a886-6f0f8012ae18-completed-label';
+    const runId = '2026-05-19T04-04-49-244Z-completed-label';
+    const issueId = 'aa075f78-940e-423b-a886-6f0f8012ae18-completed-label';
+    const manifestPath = await writeRunManifest(
+      sandbox,
+      taskId,
+      runId,
+      buildProviderWorkerManifest(taskId, runId, {
+        issue_id: issueId,
+        issue_identifier: 'CO-562',
+        status: 'failed',
+        completed_at: '2026-05-19T07:10:47.354Z',
+        updated_at: '2026-05-19T07:10:47.389Z',
+        summary: "Stage 'Run provider linear worker' failed with exit code 1."
+      })
+    );
+    await writeProviderLinearWorkerProof(manifestPath, buildIssueReviewHandoffProof(issueId));
+    const controlManifestPath = await writeRunManifest(sandbox, 'local-mcp', 'control-host', {
+      task_id: 'local-mcp',
+      run_id: 'control-host',
+      status: 'in_progress',
+      started_at: '2026-05-19T07:30:00.000Z',
+      updated_at: '2026-05-19T07:35:00.000Z'
+    });
+    const providerIntakeState = buildProviderIntakeState([
+      buildProviderIntakeClaim(taskId, runId, manifestPath, {
+        provider_key: `linear:${issueId}`,
+        issue_id: issueId,
+        issue_identifier: 'CO-562',
+        issue_state: 'Complete',
+        issue_state_type: 'completed',
+        state: 'released',
+        reason: 'provider_issue_released:not_active',
+        updated_at: '2026-05-19T07:10:46.377Z',
+        retry_queued: null,
+        retry_attempt: null,
+        retry_due_at: null,
+        retry_error: null,
+        merge_closeout: buildMergedPrCloseout()
+      })
+    ]);
+
+    const collection = await discoverCompatibilityCollectionContexts(
+      buildProjectionContext({
+        manifestPath: controlManifestPath,
+        runId: 'control-host',
+        providerIntakeState
+      })
+    );
+
+    expect(collection.all[0]).toMatchObject({
+      issueIdentifier: 'CO-562',
+      rawStatus: 'succeeded',
+      displayStatus: 'succeeded',
+      statusReason: 'provider_worker_successful_handoff'
+    });
+  });
+
   it('keeps terminal retry claims out of authoritative retry collection', async () => {
     const sandbox = await makeSandbox();
     const taskId = 'linear-b9447b5a-224d-4731-bab9-95bb0597dbe0';

@@ -2234,7 +2234,11 @@ function isCompletedProviderLinearIssueState(
     state: issueState,
     state_type: issueStateType
   });
-  if (workflowState.normalizedState && workflowState.normalizedState !== 'done') {
+  if (
+    workflowState.normalizedState &&
+    workflowState.normalizedState !== 'done' &&
+    workflowState.normalizedStateType !== 'completed'
+  ) {
     return false;
   }
   return workflowState.normalizedState === 'done' || workflowState.normalizedStateType === 'completed';
