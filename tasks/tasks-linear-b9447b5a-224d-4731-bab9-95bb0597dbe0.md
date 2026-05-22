@@ -14,7 +14,7 @@
 - [x] Keep this child lane docs-only and patch-only.
 - [x] Preserve the CO-558 protected terms and owner-maintenance boundary for parent import.
 - [x] Parent reconciles this checklist against live CO-558 Linear issue context before updating issue state.
-- [ ] Parent updates any required packet mirrors, registry entries, owner metadata, workpad, PR, and Linear lifecycle surfaces.
+- [x] Parent updates any required packet mirrors, registry entries, owner metadata, workpad, PR, and Linear lifecycle surfaces. Evidence: CO-558 reached terminal `Done`, later owner truth was re-homed through CO-573 and CO-575, and CO-575 current maintenance recorded CO-558 as terminal lineage rather than live owner metadata.
 - [x] Parent keeps inactive completed specs out of active fallback decision evidence-source parsing without weakening `spec-guard` for active fallback/seam changes.
 
 ## Protected Terms
@@ -40,8 +40,8 @@
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `docs:freshness:maintain` | May 19 owner-routed historical docs freshness cohort | `expire fallback` | `CO-558` | Terminal `CO-522` plus May 19 stale `.agent/task`, task packet, and report-only rows | 2026-05-19 | 2026-05-20 | 2026-05-25 | Refresh, archive, or reclassify the cohort before expiry; re-home again if `CO-558` becomes terminal | `npm run docs:freshness`; `npm run docs:freshness:maintain`; `node scripts/spec-guard.mjs --dry-run`; `npm run docs:check` |
-| `docs:freshness:maintain` | May 20 owner-routed Apr 19 task/report cohort | `expire fallback` | `CO-558` | Apr 19 task mirror, task packet, and report-only rows entered the rolling maintenance window while `CO-558` remained live owner | 2026-05-20 | 2026-05-20 | 2026-05-26 | Refresh, archive, or reclassify the cohort before expiry; re-home again if `CO-558` becomes terminal | `npm run docs:freshness`; `npm run docs:freshness:maintain`; `node scripts/spec-guard.mjs --dry-run`; `npm run docs:check` |
+| `docs:freshness:maintain` | May 19 owner-routed historical docs freshness cohort | `expire fallback` | `CO-558` | Terminal `CO-522` plus May 19 stale `.agent/task`, task packet, and report-only rows | 2026-05-19 | 2026-05-22 | 2026-05-25 | Refresh, archive, or reclassify the cohort before expiry; re-home again if `CO-558` becomes terminal | `npm run docs:freshness`; `npm run docs:freshness:maintain`; `node scripts/spec-guard.mjs --dry-run`; `npm run docs:check` |
+| `docs:freshness:maintain` | May 20 owner-routed Apr 19 task/report cohort | `expire fallback` | `CO-558` | Apr 19 task mirror, task packet, and report-only rows entered the rolling maintenance window while `CO-558` remained live owner | 2026-05-20 | 2026-05-22 | 2026-05-26 | Refresh, archive, or reclassify the cohort before expiry; re-home again if `CO-558` becomes terminal | `npm run docs:freshness`; `npm run docs:freshness:maintain`; `node scripts/spec-guard.mjs --dry-run`; `npm run docs:check` |
 
 Large-refactor check: Existing owner verification already detects terminal owners and emits canonical owner action evidence, so this lane repairs live owner metadata plus cohort evidence instead of adding another owner-resolution path.
 Minor-seam decision: The retained cohort is bounded owner-routed debt under the existing `docs:freshness:maintain` contract, not a new compatibility seam.
@@ -71,7 +71,7 @@ Minor-seam decision: The retained cohort is bounded owner-routed debt under the 
 - [x] Parent focused `npx vitest run --config vitest.config.core.ts tests/spec-guard.spec.ts`.
 - [x] Parent `npm run docs:check`.
 - [x] Parent protected-term scan across imported packet surfaces includes every CO-558 protected term listed above.
-- [ ] Parent records final PR and Linear handoff evidence after checks and review feedback drain cleanly.
+- [x] Parent records final PR and Linear handoff evidence after checks and review feedback drain cleanly. Evidence: CO-558 is terminal `Done`; CO-575 maintenance verified the prior owner lineage is historical and no longer the live `docs:freshness:maintain` owner.
 
 ## Progress Log
 - 2026-05-19: Bounded same-issue child lane created the CO-558 task checklist file only. The supplied source payload path was unavailable in this checkout, so the checklist falls back to the child-lane instructions and keeps registry, owner metadata, Linear, workpad, PR, and validation work parent-owned.

@@ -39,9 +39,9 @@
 - [x] Final manifest-backed standalone review rerun passes under `FORCE_CODEX_REVIEW=1`. Evidence: `.runs/linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7/cli/2026-05-01T16-41-57-405Z-39b1234f/review/telemetry.json` recorded `review_outcome=bounded-success` via command-intent retry with no actionable findings.
 - [x] Standalone review NOTES metadata recorded for the authoritative gate. NOTES: `Goal: recognize Agent Identity auth provenance in cloud preflight and provider-worker runtime. | Summary: refreshed CO-451 diff onto origin/main; added CODEX_AGENT_IDENTITY env provenance, agent_identity event parsing/redaction, balanced nested/pretty Agent Identity assignment redaction, focused tests, and task packet evidence. | Risks: auth provenance redaction safety, env-source ordering, and current-main docs registry merge.` Evidence: same final review telemetry.
 - [x] Elegance/minimality review completed. Evidence: `out/linear-a58a6ed6-7310-4e9b-9e2d-df9fb5ea3cc7/manual/elegance-review.md`.
-- [ ] PR attached and `pr ready-review` drain clean before In Review. Evidence: pending PR creation, checks, feedback sweep, and drain.
+- [x] PR attached and `pr ready-review` drain clean before In Review. Evidence: tasks/index.json records live Linear fetch for CO-451 as `Done`/completed with attached PR #742 and final validation/review evidence.
 
 ## Handoff Status
 - [x] Parent integrates child-lane provider-runner test patch. Evidence: accepted child lane `agent-identity-provider-tests`, run `2026-05-01T00-55-15-765Z-ec13a34d`.
-- [ ] Parent opens and attaches PR. Evidence: pending after final standalone review and elegance completion.
-- [ ] Parent refreshes Linear workpad and transitions to In Review only after clean validation and feedback drain. Evidence: pending PR checks and `pr ready-review` clean drain.
+- [x] Parent opens and attaches PR. Evidence: tasks/index.json records attached PR #742 for terminal CO-451.
+- [x] Parent refreshes Linear workpad and transitions to In Review only after clean validation and feedback drain. Evidence: tasks/index.json records CO-451 as `Done`/completed after final validation and review evidence.

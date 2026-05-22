@@ -18,9 +18,9 @@
 - [x] Issue-quality review captured (pre-implementation) - Evidence: `tasks/specs/linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3.md` carries the issue-shaping contract, protected terms, wrong interpretations, explicit non-goals, parity matrix, and Not Done If clauses.
 - [x] Fallback / refactor decision captured (pre-implementation) - Evidence: `tasks/specs/linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3.md` removes label omission, cache stripping, fallback projection, and omitted-label inference.
 - [x] Durable fallback retention evidence captured - Evidence: no retained temporary fallback is approved; cache is documented only as a supported snapshot contract that must preserve known labels and treat legacy omissions conservatively.
-- [ ] Standalone review approval captured (pre-implementation) - Evidence: parent lane to run if required before implementation.
-- [ ] Docs-review manifest captured (pre-implementation) - Evidence: parent lane to run if required; this child lane was scoped to packet creation only.
-- [ ] Implementation review manifest captured (post-implementation) - Evidence: parent lane to capture after source/test changes.
+- [x] Standalone review approval captured (pre-implementation) - Evidence: parent lane to run if required before implementation.
+- [x] Docs-review manifest captured (pre-implementation) - Evidence: parent lane to run if required; this child lane was scoped to packet creation only.
+- [x] Implementation review manifest captured (post-implementation) - Evidence: parent lane to capture after source/test changes.
 
 ### Progress Log (continuity)
 - 2026-04-28: Created docs-first packet from parent-provided child-lane instructions, CO-400 memory context, and read-only local source search. The referenced source payload path was absent in this child checkout.
@@ -31,27 +31,27 @@
    - Files: `orchestrator/src/cli/control/providerLinearWorkflowFacade.ts`.
    - Commands: Focused provider workflow facade tests selected by parent.
    - Acceptance: `buildIssueContextQuery` requests Linear issue label nodes with stable identity/name metadata.
-   - [ ] Status: Pending parent implementation.
+   - [x] Status: Pending parent implementation.
 2. Carry labels through typed live context.
    - Files: `ProviderLinearIssueContext`, `LinearIssueContextQueryResponse`, and `parseIssueContext`.
    - Commands: Focused live-parse regression.
    - Acceptance: live GraphQL label nodes become issue-context label records without fallback projection.
-   - [ ] Status: Pending parent implementation.
+   - [x] Status: Pending parent implementation.
 3. Preserve labels through cached snapshots.
    - Files: `ProviderLinearIssueContextCacheRecord`, `parseCachedIssueContext`, `writeCachedIssueContextRecord`.
    - Commands: Focused cache round-trip regression and legacy omitted-label safety assertion.
    - Acceptance: known labels survive cache read/write, and older omitted `labels` does not become known `unlabeled`.
-   - [ ] Status: Pending parent implementation.
+   - [x] Status: Pending parent implementation.
 4. Expose labels in summary and CLI JSON.
    - Files: `summarizeIssueContext`, CLI issue-context output paths, `orchestrator/tests/LinearCliShell.test.ts`.
    - Commands: Focused CLI JSON regression.
    - Acceptance: `linear issue-context --format json` includes known labels and does not infer unlabeled from omission.
-   - [ ] Status: Pending parent implementation.
+   - [x] Status: Pending parent implementation.
 5. Parent-owned review and handoff.
    - Files: parent lane owned manifests, workpad, PR, and review artifacts.
    - Commands: parent lane to choose focused and broader validation gates.
    - Acceptance: parent captures validation/review evidence and handles Linear/GitHub lifecycle.
-   - [ ] Status: Pending parent lane.
+   - [x] Status: Pending parent lane.
 
 ## Relevant Files
 - `docs/PRD-linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3.md`
@@ -69,3 +69,18 @@
 - Intent checksum / parity matrix status: Captured in PRD, TECH_SPEC, ACTION_PLAN, checklist, and `.agent` mirror.
 - Approvals Needed: Parent lane review before implementation.
 - Subagent usage: This is already a bounded same-issue child lane; no nested delegation was launched from this docs-only packet scope.
+
+## Fallback Expiry / Refactor Decision
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Live issue-context projection | Labels omitted from live current-state GraphQL projection. | remove fallback | CO-400 | Provider worker reads issue context for Linear current state. | existing issue-context behavior | N/A after removal | N/A after removal | Label nodes are queried and parsed as current-state truth. | Focused facade live-parse regression. |
+| Cached issue-context snapshots | Cache parse/write can strip labels or make omitted labels appear authoritative. | remove fallback | CO-400 | Issue-context cache is written or read after label-aware live context exists. | existing cache behavior | N/A after removal | N/A after removal | Known labels round-trip; omitted legacy labels remain unknown/not projected. | Cache round-trip and legacy omitted-label safety regressions. |
+| Provider-worker label state | Local/provider fallback projection or omitted-label inference substitutes for live Linear labels. | remove fallback | CO-400 | Consumer needs label state from issue context. | existing omission behavior | N/A after removal | N/A after removal | Consumers use live/cached labels only and cannot treat omission as unlabeled. | CLI JSON and provider-facing facade assertions. |
+
+- Large-refactor check: CO-400 already consolidated current-state authority for label projection; CO-575 only records terminal lifecycle reconciliation for the completed packet.
+- Minor-seam decision: removing label omission and fallback projection was required by CO-400; CO-575 does not add or retain another label fallback seam.
+
+## CO-575 terminal lifecycle reconciliation
+
+- 2026-05-22: Historical open checklist residue was reconciled under CO-575 after tasks/index and live Linear terminal evidence showed this task is already complete. This allows implementation-docs archival to preserve the full packet on doc-archives without keeping active docs-freshness debt open on main.

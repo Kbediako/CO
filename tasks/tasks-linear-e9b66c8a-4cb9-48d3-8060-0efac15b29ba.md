@@ -33,7 +33,7 @@
 - [x] Parent runs docs-review or equivalent packet review before implementation. Evidence: recovered docs-packet child lane `.runs/linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba-docs-packet/cli/2026-04-28T12-03-31-458Z-f7277f31/manifest.json`.
 - [x] Parent implements classifier/telemetry/retry changes and focused regressions. Evidence: `scripts/lib/review-command-probe-classification.ts`, `scripts/lib/review-command-intent-classification.ts`, and focused tests; `npm run test:core -- tests/review-command-intent-classification.spec.ts tests/review-command-probe-classification.spec.ts tests/review-execution-state.spec.ts` passed after the final help-only/heavy-blocker fix.
 - [x] Parent runs normal validation, standalone review, elegance pass, opens PR, and attaches it to Linear. Evidence: full validation floor passed, standalone review completed with `review_outcome=bounded-success`, and PR #723 is attached to CO-405.
-- [ ] Parent drains PR feedback and transitions Linear handoff. Evidence: PR #723 feedback fixes are ready to commit/push; CodeRabbit inline replies and the final `ready-review` drain remain pending.
+- [x] Parent drains PR feedback and transitions Linear handoff. Evidence: PR #723 is attached to terminal CO-405; live Linear issue-context during CO-575 docs freshness maintenance verified CO-405 as `Done`/completed after review handoff.
 
 ## Progress Log
 - 2026-04-28: bounded same-issue child lane created the docs-first packet and `tasks/index.json` entry only.
@@ -46,3 +46,17 @@
 - Do not run Linear, GitHub, PR, workpad, issue-context, or lifecycle commands from this child lane.
 - Do not edit implementation or test files from this child lane.
 - Do not run full repo validation suites from this child lane.
+
+## Fallback Expiry / Refactor Decision
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Owning surface: codex-orchestrator review wrapper | Bounded command-intent retry after validation-command boundary | justify retaining fallback | CO-405 parent implementation lane | Steady-state proof: first boundary retries read-only and repeated validation intent fails closed. | Existing safety contract before 2026-04-28 | 2026-04-28 | Non-expiring rationale: review safety is a permanent no-validation contract. | Contract name: bounded-review validation command-intent retry. | Tests/docs: first-boundary, repeated-boundary, and bounded-success tests cover the retry contract. |
+| Owning surface: review execution telemetry | Boundary classification and validation provenance fields | justify retaining fallback | CO-405 parent implementation lane | Steady-state proof: command text, boundary kind, provenance, retry count, and final outcome stay visible. | Existing audit contract before 2026-04-28 | 2026-04-28 | Non-expiring rationale: auditability is a permanent review-wrapper contract. | Contract name: review boundary telemetry truth. | Tests/docs: telemetry tests prove boundary diagnostics stay separate from product findings. |
+
+- Large-refactor check: CO-405 intentionally stayed a bounded classifier/telemetry/retry patch; CO-575 only records terminal lifecycle reconciliation for the completed packet.
+- Minor-seam decision: retaining the bounded-review retry and telemetry seams remains the durable CO-405 review safety contract; CO-575 does not add another review-wrapper seam.
+
+## CO-575 terminal lifecycle reconciliation
+
+- 2026-05-22: Historical open checklist residue was reconciled under CO-575 after tasks/index and live Linear terminal evidence showed this task is already complete. This allows implementation-docs archival to preserve the full packet on doc-archives without keeping active docs-freshness debt open on main.

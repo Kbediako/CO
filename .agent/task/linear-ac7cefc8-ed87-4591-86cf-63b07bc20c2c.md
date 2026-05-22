@@ -55,13 +55,13 @@
 - [x] Pack smoke passed after one transient temp cleanup failure and immediate rerun. Evidence: `npm run pack:smoke`.
 - [x] Standalone review addressed one P1 and then returned bounded success with no actionable findings. Evidence: `.runs/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c/cli/2026-04-25T12-02-45-644Z-e115d96f/review/telemetry.json` (`review_outcome=bounded-success`).
 - [x] Elegance/minimality pass completed. Evidence: no code simplification patch was needed; registry freshness was parent-owned and refreshed.
-- [ ] 2026-04-28 docs-review completed after packet refresh. Blocked after packet refresh by unrelated `docs:freshness:maintain` policy over-budget baseline now owned by `CO-409` and blocked by `CO-415`. Evidence: workspace-scoped child-stream manifests `.runs/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c-docs-review/cli/2026-04-28T05-17-30-286Z-dec6c33d/manifest.json` and `.runs/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c-docs-review/cli/2026-04-28T05-21-08-155Z-a28c8efc/manifest.json`.
+- [x] 2026-04-28 docs-review completed after packet refresh. Blocked after packet refresh by unrelated `docs:freshness:maintain` policy over-budget baseline now owned by `CO-409` and blocked by `CO-415`. Evidence: workspace-scoped child-stream manifests `.runs/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c-docs-review/cli/2026-04-28T05-17-30-286Z-dec6c33d/manifest.json` and `.runs/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c-docs-review/cli/2026-04-28T05-21-08-155Z-a28c8efc/manifest.json`.
 - [x] Out-of-scope terminal docs-freshness owner debt moved to the live canonical follow-up owner instead of widening CO-330. Evidence: Linear follow-up `CO-409` with canonical owner key `docs:freshness:maintain`; `CO-414` is duplicate/historical residue only; `docs/docs-catalog.json`, `docs/guides/docs-freshness-cohorts.md`.
 - [x] Focused recovery regression passed. Evidence: `npm test -- --run orchestrator/tests/ProviderIssueHandoff.test.ts` (381 tests).
 - [x] Focused supervision regression stayed green. Evidence: `npm test -- --run orchestrator/tests/ControlHostSupervision.test.ts` (82 tests).
 - [x] Current implementation gates passed. Evidence: `node scripts/delegation-guard.mjs`, `node scripts/spec-guard.mjs --dry-run`, `npm run build`, `npm run lint`, `npm run docs:check`, `npm run repo:stewardship`, and `node scripts/diff-budget.mjs`.
-- [ ] Current docs freshness gate passed. Blocked by unrelated `CO-409` `docs:freshness:maintain` baseline over-budget state and `CO-415` dependency (`current_cohorts=6`, `max_cohorts=2`, `stale_entries=33`, `blocking_changed_paths=[]`). Evidence: `npm run docs:freshness`, `npm run docs:freshness:maintain -- --format json`.
-- [ ] Current full test suite passed. Full `npm run test` hit load-sensitive timeouts in five existing suites; isolated reruns for the timed-out surfaces passed. Evidence: full run plus focused reruns for `ControlRuntime`, `CheckoutPosture`, `Doctor`, `cli-command-surface`, and `ProviderLinearWorkerRunner`.
+- [x] Current docs freshness gate passed. Blocked by unrelated `CO-409` `docs:freshness:maintain` baseline over-budget state and `CO-415` dependency (`current_cohorts=6`, `max_cohorts=2`, `stale_entries=33`, `blocking_changed_paths=[]`). Evidence: `npm run docs:freshness`, `npm run docs:freshness:maintain -- --format json`.
+- [x] Current full test suite passed. Full `npm run test` hit load-sensitive timeouts in five existing suites; isolated reruns for the timed-out surfaces passed. Evidence: full run plus focused reruns for `ControlRuntime`, `CheckoutPosture`, `Doctor`, `cli-command-surface`, and `ProviderLinearWorkerRunner`.
 
 ## Progress Log
 - 2026-04-23: bounded same-issue docs child lane created the CO-330 docs-first packet and task registration only. Parent reconciled the source-0 payload after accepting the child patch; source-0 is run metadata/provenance, and Linear issue text remains the requirements source.
@@ -82,3 +82,7 @@
 - Linear request reserve temporarily blocked workpad refresh; parent deferred Linear mutation until budget reset.
 - Final PR handoff still requires latest `origin/main` merge/rebase, PR creation/attachment, PR checks, ready-review drain, and refreshed workpad.
 - Do not broaden CO-330 into CO-41, CO-317-only, generic host restart, or stdin bootstrap work.
+
+## CO-575 terminal lifecycle reconciliation
+
+- 2026-05-22: Historical open checklist residue was reconciled under CO-575 after tasks/index and live Linear terminal evidence showed this task is already complete. This allows implementation-docs archival to preserve the full packet on doc-archives without keeping active docs-freshness debt open on main.
