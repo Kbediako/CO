@@ -857,10 +857,13 @@ async function reconcileSelectedProviderLinearWorkerContext<T extends ControlCom
   const claim = findProviderLinearWorkerClaimForContext(context.providerIntakeState, selected);
   const passiveReleasedOwnerFailedRun =
     claim !== null && isPassiveReleasedProviderLinearWorkerOwnerFailedRun(selected, claim);
+  const successfulHandoffFailedWrapper =
+    claim !== null && isSuccessfulProviderLinearWorkerHandoffFailedWrapper(selected, claim);
   if (
     !isProviderLinearWorkerReconciliationSource(selected) ||
     (!isActiveLookingProviderLinearWorkerManifestStatus(selected.rawStatus) &&
-      !passiveReleasedOwnerFailedRun)
+      !passiveReleasedOwnerFailedRun &&
+      !successfulHandoffFailedWrapper)
   ) {
     return selected;
   }
@@ -2009,10 +2012,13 @@ function resolveProviderLinearWorkerRunArtifactReconciliation(
   const claim = findProviderLinearWorkerClaimForContext(providerIntakeState, context);
   const passiveReleasedOwnerFailedRun =
     claim !== null && isPassiveReleasedProviderLinearWorkerOwnerFailedRun(context, claim);
+  const successfulHandoffFailedWrapper =
+    claim !== null && isSuccessfulProviderLinearWorkerHandoffFailedWrapper(context, claim);
   if (
     !isProviderLinearWorkerReconciliationSource(context) ||
     (!isActiveLookingProviderLinearWorkerManifestStatus(context.rawStatus) &&
-      !passiveReleasedOwnerFailedRun)
+      !passiveReleasedOwnerFailedRun &&
+      !successfulHandoffFailedWrapper)
   ) {
     return null;
   }
@@ -2023,9 +2029,11 @@ function resolveProviderLinearWorkerRunArtifactReconciliation(
   const supersedingRunBoundClaim = !claim
     ? findNewerRunBoundProviderLinearWorkerClaimForContext(providerIntakeState, context)
     : null;
-  const claimReconciliationReason = claim
-    ? resolveProviderLinearWorkerClaimReconciliationReason(claim)
-    : null;
+  const claimReconciliationReason = successfulHandoffFailedWrapper
+    ? 'provider_worker_successful_handoff'
+    : claim
+      ? resolveProviderLinearWorkerClaimReconciliationReason(claim)
+      : null;
   const absentClaimReconciliationReason = !claim
     ? resolveAbsentProviderLinearWorkerClaimReconciliationReason(
         providerIntakeState,
@@ -2045,7 +2053,9 @@ function resolveProviderLinearWorkerRunArtifactReconciliation(
     replacementRun,
     providerIntakeState
   );
+  const authoritativeSuccessfulHandoff = reason === 'provider_worker_successful_handoff';
   if (
+    !authoritativeSuccessfulHandoff &&
     !isProviderLinearWorkerReconciliationEvidenceNewerThanContext(
       evidenceUpdatedAt,
       context,
@@ -2056,7 +2066,7 @@ function resolveProviderLinearWorkerRunArtifactReconciliation(
   }
   const reconciledStatus =
     replacementRun?.rawStatus ??
-    (claim?.state === 'completed' ? 'succeeded' : 'cancelled');
+    (successfulHandoffFailedWrapper || claim?.state === 'completed' ? 'succeeded' : 'cancelled');
   const recordedAt = evidenceUpdatedAt ?? context.updatedAt ?? context.startedAt ?? new Date(0).toISOString();
   const supersedingRunBoundClaimSummaryPrefix =
     supersedingRunBoundClaim && isActiveProviderIntakeClaim(supersedingRunBoundClaim)
@@ -2069,6 +2079,8 @@ function resolveProviderLinearWorkerRunArtifactReconciliation(
         ? `Provider worker artifact reconciled as ${reconciledStatus}: ${supersedingRunBoundClaimSummaryPrefix} ${supersedingRunBoundClaim.run_id ?? 'unknown'} supersedes retained ${context.rawStatus} manifest.`
         : reason === 'provider_issue_removed'
           ? `Provider worker artifact reconciled as ${reconciledStatus}: provider intake removed this issue with no active claim.`
+          : successfulHandoffFailedWrapper
+            ? `Provider worker artifact reconciled as succeeded: worker proof owner_phase=ended owner_status=succeeded with issue_review_handoff and terminal Linear state ${claimForRecord?.issue_state ?? 'unknown'} supersede failed outer provider wrapper manifest; wrapper failure remains diagnostic metadata at ${context.manifestPath ?? 'unknown'}.`
           : `Provider worker artifact reconciled as ${reconciledStatus}: provider claim is ${claimForRecord?.state ?? 'absent'} (${claimForRecord?.reason ?? reason}).`;
   return {
     schema_version: 1,
@@ -2187,6 +2199,97 @@ function isPassiveReleasedProviderLinearWorkerOwnerFailedRun(
     context.rawStatus === 'failed' &&
     providerLinearWorkerClaimRunIdentityMatchesContext(claim, context) &&
     isPassiveReleasedProviderOwnerClaim(claim)
+  );
+}
+
+function isSuccessfulProviderLinearWorkerHandoffFailedWrapper(
+  context: Pick<
+    ControlCompatibilitySourceContext,
+    'rawStatus' | 'runId' | 'manifestPath' | 'providerLinearWorkerProof' | 'startedAt'
+  >,
+  claim: ProviderIntakeClaimRecord
+): boolean {
+  return (
+    context.rawStatus === 'failed' &&
+    providerLinearWorkerClaimRunIdentityMatchesContext(claim, context) &&
+    hasFreshSucceededProviderLinearWorkerIssueReviewHandoffProof(context, claim) &&
+    isSuccessfulProviderLinearWorkerHandoffClaimState(claim) &&
+    isCompletedProviderLinearIssueState(claim.issue_state, claim.issue_state_type) &&
+    hasMergedProviderLinearWorkerCloseout(claim) &&
+    hasNoActiveProviderLinearWorkerRetryMetadata(claim)
+  );
+}
+
+function isSuccessfulProviderLinearWorkerHandoffClaimState(
+  claim: Pick<ProviderIntakeClaimRecord, 'state'>
+): boolean {
+  return claim.state === 'released' || claim.state === 'completed';
+}
+
+function isCompletedProviderLinearIssueState(
+  issueState: string | null | undefined,
+  issueStateType: string | null | undefined
+): boolean {
+  const workflowState = classifyProviderLinearWorkflowState({
+    state: issueState,
+    state_type: issueStateType
+  });
+  if (workflowState.normalizedStateType && workflowState.normalizedStateType !== 'completed') {
+    return false;
+  }
+  if (
+    workflowState.normalizedState &&
+    workflowState.normalizedState !== 'done' &&
+    workflowState.normalizedStateType !== 'completed'
+  ) {
+    return false;
+  }
+  return workflowState.normalizedState === 'done' || workflowState.normalizedStateType === 'completed';
+}
+
+function hasMergedProviderLinearWorkerCloseout(
+  claim: Pick<ProviderIntakeClaimRecord, 'merge_closeout'>
+): boolean {
+  const mergeCloseout = claim.merge_closeout ?? null;
+  return Boolean(
+    mergeCloseout?.status === 'merged' &&
+      mergeCloseout.pr &&
+      (mergeCloseout.snapshot?.state === 'MERGED' || mergeCloseout.snapshot?.merged_at)
+  );
+}
+
+function hasFreshSucceededProviderLinearWorkerIssueReviewHandoffProof(
+  context: Pick<
+    ControlCompatibilitySourceContext,
+    'providerLinearWorkerProof' | 'startedAt'
+  >,
+  claim: Pick<ProviderIntakeClaimRecord, 'launch_started_at'>
+): boolean {
+  const proof = context.providerLinearWorkerProof;
+  const proofRecord = (proof ?? null) as Record<string, unknown> | null;
+  const freshnessStageStartedAt = resolveFreshnessStageStartedAt(
+    claim.launch_started_at ?? null,
+    context.startedAt
+  );
+  return (
+    !freshnessStageStartedAt.invalid &&
+    isProviderLinearWorkerProofFreshForStage(proofRecord, freshnessStageStartedAt.value) &&
+    resolveProviderLinearWorkerTerminalStatus(proofRecord) === 'succeeded' &&
+    resolveProviderLinearWorkerTerminalReason(proofRecord) === 'issue_review_handoff'
+  );
+}
+
+function hasNoActiveProviderLinearWorkerRetryMetadata(
+  claim: Pick<
+    ProviderIntakeClaimRecord,
+    'retry_queued' | 'retry_attempt' | 'retry_due_at' | 'retry_error'
+  >
+): boolean {
+  return (
+    (claim.retry_queued == null || claim.retry_queued === false) &&
+    claim.retry_attempt == null &&
+    claim.retry_due_at == null &&
+    claim.retry_error == null
   );
 }
 

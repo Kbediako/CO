@@ -1,6 +1,75 @@
 {
   "items": [
     {
+      "id": "20260523-linear-7847b2be-ae34-4256-977f-f2c291f31938",
+      "title": "CO-563 co-status terminal worker proof reconciliation",
+      "relates_to": "tasks/tasks-linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-23",
+      "canonical_owner_key": "co-status:terminal-worker-proof-reconciliation:v1",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=co-status:terminal-worker-proof-reconciliation:v1",
+      "evidence": [
+        "docs/PRD-linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
+        "docs/TECH_SPEC-linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
+        "docs/ACTION_PLAN-linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
+        "tasks/specs/linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
+        "tasks/tasks-linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
+        ".agent/task/linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-05-23",
+          "status": "created_child_validation_passed",
+          "manifest": ".runs/linear-7847b2be-ae34-4256-977f-f2c291f31938-docs-spec-packet/cli/2026-05-22T18-47-10-870Z-5f1e1807/manifest.json",
+          "source_anchor": "ctx:sha256:2ffaef00b6fc6b80a7385f652721e23337078b369b67cb0688c5bdc2b89b645d#chunk:c000001",
+          "summary": "Docs-first packet preserves the CO-563 protected terminal worker-success shape, authority order, wrapper diagnostic preservation, and active failed-worker negative cases while keeping implementation and lifecycle parent-owned."
+        }
+      },
+      "validation": {
+        "status": "implementation_complete_pr_lifecycle_pending",
+        "passed": [
+          "docs-first packet drafted",
+          "task registry and freshness mirrors updated",
+          "source payload located from authoritative issue workspace",
+          "git diff --check scoped to owned files passed",
+          "tasks/index.json and docs/docs-freshness-registry.json parsed with jq",
+          "protected-term scan passed for all CO-563 protected terms",
+          "changed-file scope check listed only declared file-scope paths",
+          "parent implementation",
+          "parent validation",
+          "selectedRunProjection.ts implementation",
+          "regression tests"
+        ],
+        "pending": [
+          "PR lifecycle",
+          "ready-review drain",
+          "Linear review handoff"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
+        "prd": "docs/PRD-linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
+        "docs": "docs/TECH_SPEC-linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
+        "action_plan": "docs/ACTION_PLAN-linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
+        "spec": "tasks/specs/linear-7847b2be-ae34-4256-977f-f2c291f31938.md",
+        "task": "tasks/tasks-linear-7847b2be-ae34-4256-977f-f2c291f31938.md"
+      },
+      "source_issue": {
+        "id": "7847b2be-ae34-4256-977f-f2c291f31938",
+        "identifier": "CO-563",
+        "url": "https://linear.app/asabeko/issue/CO-563"
+      }
+    },
+    {
       "id": "20260522-linear-91f04f3e-5a43-491a-915e-bf6229760676",
       "title": "CO-549 retained released provider-intake claim refresh-churn",
       "relates_to": "tasks/tasks-linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
