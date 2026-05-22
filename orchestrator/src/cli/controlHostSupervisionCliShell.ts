@@ -790,6 +790,7 @@ async function probeControlHostHealth(
   options: {
     minPollingUpdatedAt?: string | null;
     restartHistory?: ControlHostSupervisionRestartRecord[] | null;
+    now?: string | null;
   } = {},
   commandRunner: typeof runCommand = runCommand
 ): Promise<{
@@ -828,7 +829,8 @@ async function probeControlHostHealth(
     const timeoutQuarantine = evaluateControlHostSupervisionProbeTimeoutDiagnostic(diagnostic, {
       minPollingUpdatedAt: options.minPollingUpdatedAt ?? null,
       restartHistory: options.restartHistory ?? null,
-      maxZeroWipPollingAgeMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000
+      maxZeroWipPollingAgeMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000,
+      now: options.now ?? null
     });
     if (timeoutQuarantine) {
       return {
@@ -854,7 +856,8 @@ async function probeControlHostHealth(
       const timeoutQuarantine = evaluateControlHostSupervisionProbeTimeoutDiagnostic(diagnostic, {
         minPollingUpdatedAt: options.minPollingUpdatedAt ?? null,
         restartHistory: options.restartHistory ?? null,
-        maxZeroWipPollingAgeMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000
+        maxZeroWipPollingAgeMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000,
+        now: options.now ?? null
       });
       if (timeoutQuarantine) {
         return {
@@ -903,7 +906,8 @@ async function probeControlHostHealth(
         ? evaluateControlHostSupervisionProbeTimeoutDiagnostic(persistedDiagnostic, {
             minPollingUpdatedAt: options.minPollingUpdatedAt ?? null,
             restartHistory: options.restartHistory ?? null,
-            maxZeroWipPollingAgeMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000
+            maxZeroWipPollingAgeMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000,
+            now: options.now ?? null
           })
         : null;
     if (timeoutQuarantine?.reason === 'active_worker_probe_timeout_quarantine') {
@@ -928,7 +932,8 @@ async function probeControlHostHealth(
   const evaluation = evaluateControlHostSupervisionHealthPayload(payload, {
     minPollingUpdatedAt: options.minPollingUpdatedAt ?? null,
     staleRestartRequiredGraceMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000,
-    restartHistory: options.restartHistory ?? null
+    restartHistory: options.restartHistory ?? null,
+    now: options.now ?? null
   });
   return {
     healthy: evaluation.healthy,

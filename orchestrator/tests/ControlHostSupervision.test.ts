@@ -2752,7 +2752,7 @@ describe('controlHostSupervision shell helpers', () => {
         healthIntervalSeconds: 5
       });
       await writeProviderIntakeStateFixture(config, {});
-      const restartedAt = new Date().toISOString();
+      const restartedAt = '2026-04-21T07:22:30.000Z';
 
       const result = await probeControlHostHealth(
         config,
@@ -2767,7 +2767,8 @@ describe('controlHostSupervision shell helpers', () => {
               child_pid: 4321,
               diagnostic: buildProbeTimeoutDiagnosticFixture()
             }
-          ]
+          ],
+          now: '2026-04-21T07:23:00.000Z'
         },
         async () => ({
           exitCode: 0,
@@ -2845,7 +2846,7 @@ describe('controlHostSupervision shell helpers', () => {
         healthIntervalSeconds: 5
       });
       await writeProviderIntakeStateFixture(config, {});
-      const restartedAt = new Date().toISOString();
+      const restartedAt = '2026-04-21T07:22:30.000Z';
 
       const result = await probeControlHostHealth(
         config,
@@ -2860,7 +2861,8 @@ describe('controlHostSupervision shell helpers', () => {
               child_pid: 4321,
               diagnostic: buildProbeTimeoutDiagnosticFixture()
             }
-          ]
+          ],
+          now: '2026-04-21T07:23:00.000Z'
         },
         async () => ({
           exitCode: 1,
@@ -2897,7 +2899,7 @@ describe('controlHostSupervision shell helpers', () => {
         healthIntervalSeconds: 5
       });
       await writeProviderIntakeStateFixture(config, {});
-      const restartedAt = new Date().toISOString();
+      const restartedAt = '2026-04-21T07:22:30.000Z';
 
       const result = await probeControlHostHealth(
         config,
@@ -2912,7 +2914,8 @@ describe('controlHostSupervision shell helpers', () => {
               child_pid: 4321,
               diagnostic: buildProbeTimeoutDiagnosticFixture()
             }
-          ]
+          ],
+          now: '2026-04-21T07:23:00.000Z'
         },
         async () => ({
           exitCode: 1,
@@ -2992,7 +2995,7 @@ describe('controlHostSupervision shell helpers', () => {
           })
         )
       });
-      const restartedAt = new Date().toISOString();
+      const restartedAt = '2026-04-21T07:22:30.000Z';
 
       const result = await probeControlHostHealth(
         config,
@@ -3016,7 +3019,8 @@ describe('controlHostSupervision shell helpers', () => {
                 running_workers: recurrenceWorkers
               }
             }
-          ]
+          ],
+          now: '2026-04-21T07:23:00.000Z'
         },
         async () => ({
           exitCode: 1,
@@ -3063,14 +3067,15 @@ describe('controlHostSupervision shell helpers', () => {
           minPollingUpdatedAt: '2026-04-21T07:22:00.000Z',
           restartHistory: [
             {
-              requested_at: new Date().toISOString(),
+              requested_at: '2026-04-21T07:22:30.000Z',
               reason: 'probe_timeout',
               message: 'co-status probe timed out after 5s.',
               consecutive_unhealthy_samples: 3,
               child_pid: 4321,
               diagnostic: buildProbeTimeoutDiagnosticFixture()
             }
-          ]
+          ],
+          now: '2026-04-21T07:23:00.000Z'
         },
         async () => ({
           exitCode: 1,
@@ -3116,7 +3121,7 @@ describe('controlHostSupervision shell helpers', () => {
         {
           restartHistory: [
             {
-              requested_at: new Date().toISOString(),
+              requested_at: '2026-04-21T07:22:30.000Z',
               reason: 'probe_timeout',
               message: 'co-status probe timed out after 5s.',
               consecutive_unhealthy_samples: 3,
@@ -3132,7 +3137,8 @@ describe('controlHostSupervision shell helpers', () => {
                 }
               }
             }
-          ]
+          ],
+          now: '2026-04-21T07:23:00.000Z'
         },
         async () => ({
           exitCode: 1,
@@ -3171,14 +3177,15 @@ describe('controlHostSupervision shell helpers', () => {
         {
           restartHistory: [
             {
-              requested_at: new Date().toISOString(),
+              requested_at: '2026-04-21T07:22:30.000Z',
               reason: 'probe_timeout',
               message: 'co-status probe timed out after 5s.',
               consecutive_unhealthy_samples: 3,
               child_pid: 4321,
               diagnostic: buildProbeTimeoutDiagnosticFixture()
             }
-          ]
+          ],
+          now: '2026-04-21T07:23:00.000Z'
         },
         async () => ({
           exitCode: 1,
