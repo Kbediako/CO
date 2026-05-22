@@ -5595,6 +5595,7 @@ export function createProviderIssueHandoffService(
             backlogReleaseStaleDirectProofRotationCursor
           );
         const selectedBacklogReleaseDirectProofProviderKeys = new Set<string>();
+        const deferredBacklogReleaseDirectProofProviderKeys: string[] = [];
         let selectedStaleBacklogReleaseDirectProofCount = 0;
         const selectBacklogReleaseDirectProofCandidates = (
           candidates: readonly BacklogReleaseDirectProofCandidate[],
@@ -5779,10 +5780,7 @@ export function createProviderIssueHandoffService(
             !shouldReadBacklogReleaseDirectProofThisRefresh
           ) {
             refreshCounts.issue_by_id_deferred += 1;
-            recordRefreshProgress('refresh:claim_issue_by_id_reconcile', {
-              requestClass: 'claim_issue_by_id:released_deferred',
-              providerKeys: [claimProviderKey]
-            });
+            deferredBacklogReleaseDirectProofProviderKeys.push(claimProviderKey);
             continue;
           }
           const canUseBacklogNotActivePassiveVerificationForThisRefresh =
@@ -6738,6 +6736,13 @@ export function createProviderIssueHandoffService(
             );
             continue;
           }
+        }
+
+        if (deferredBacklogReleaseDirectProofProviderKeys.length > 0) {
+          recordRefreshProgress('refresh:claim_issue_by_id_reconcile', {
+            requestClass: 'claim_issue_by_id:released_deferred',
+            providerKeys: deferredBacklogReleaseDirectProofProviderKeys
+          });
         }
 
         if (

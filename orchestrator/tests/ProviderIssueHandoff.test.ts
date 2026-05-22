@@ -32,6 +32,7 @@ import {
   type ProviderIntakeState
 } from '../src/cli/control/providerIntakeState.js';
 import {
+  flushProviderPollingHealthUpdates,
   initializeProviderPollingHealth,
   markProviderPollingCompleted,
   readProviderPollingHealth,
@@ -31987,6 +31988,201 @@ describe('createProviderIssueHandoffService', () => {
     });
     expect(state.claims.filter((claim) => claim.passive_release !== null)).toHaveLength(8);
     expect(persist.mock.calls.length).toBeGreaterThanOrEqual(8);
+    vi.useRealTimers();
+  });
+
+  it('summarizes retained released backlog deferrals without per-claim progress writes while active claims revalidate', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-21T08:00:00.000Z'));
+    const { root, paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    for (let index = 0; index < 125; index += 1) {
+      const issueNumber = 700 + index;
+      state.claims.push(createCo202ReleasedClaim({
+        issue_id: `lin-co-${issueNumber}`,
+        issue_identifier: `CO-${issueNumber}`,
+        issue_title: `Retained released backlog claim ${issueNumber}`,
+        issue_state: 'Backlog',
+        issue_state_type: 'backlog',
+        issue_updated_at: `2026-05-12T22:${String(index % 60).padStart(2, '0')}:00.000Z`,
+        issue_blocked_by: [],
+        task_id: `linear-lin-co-${issueNumber}`,
+        run_id: null,
+        run_manifest_path: null,
+        retry_queued: null,
+        retry_attempt: null,
+        retry_due_at: null,
+        retry_error: null,
+        review_promotion: null,
+        merge_closeout: null
+      }));
+    }
+
+    const runningTaskId = 'linear-lin-active-running';
+    const runningRunPaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: runningTaskId
+      },
+      'run-active-running'
+    );
+    await mkdir(runningRunPaths.runDir, { recursive: true });
+    await writeFile(
+      runningRunPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-active-running',
+        task_id: runningTaskId,
+        pipeline_id: 'diagnostics',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-active-running',
+        issue_identifier: 'CO-ACTIVE-RUNNING',
+        issue_updated_at: '2026-05-21T07:50:00.000Z',
+        started_at: '2026-05-21T07:45:00.000Z',
+        updated_at: '2026-05-21T07:55:00.000Z'
+      }),
+      'utf8'
+    );
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-active-running',
+      issue_identifier: 'CO-ACTIVE-RUNNING',
+      issue_title: 'Running claim before refresh',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-21T07:50:00.000Z',
+      task_id: runningTaskId,
+      state: 'running',
+      reason: 'provider_issue_rehydrated_active_run',
+      run_id: 'run-active-running',
+      run_manifest_path: runningRunPaths.manifestPath,
+      launch_source: 'control-host',
+      launch_token: 'running-launch-token'
+    }));
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-active-accepted',
+      issue_identifier: 'CO-ACTIVE-ACCEPTED',
+      issue_title: 'Accepted claim before refresh',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-21T07:51:00.000Z',
+      task_id: 'linear-lin-active-accepted',
+      state: 'accepted',
+      reason: 'provider_issue_handoff_owned'
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const pollingUpdates: Array<NonNullable<ReturnType<typeof readProviderPollingHealth>>> = [];
+    const launcher = createCo202Launcher(
+      'run-retained-released-cohort-should-not-start',
+      '/tmp/provider-run/retained-released-cohort-should-not-start-manifest.json'
+    );
+    const resolveTrackedIssues = vi.fn(async () => ({
+      kind: 'skip' as const,
+      reason: 'dispatch_source_unavailable'
+    }));
+    const resolveTrackedIssue = vi.fn<
+      NonNullable<Parameters<typeof createProviderIssueHandoffService>[0]['resolveTrackedIssue']>
+    >(async ({ issueId }) => ({
+      kind: 'ready' as const,
+      trackedIssue: issueId === 'lin-active-running'
+        ? createTrackedIssue({
+            id: 'lin-active-running',
+            identifier: 'CO-ACTIVE-RUNNING',
+            title: 'Running claim after refresh',
+            state: 'In Progress',
+            state_type: 'started',
+            updated_at: '2026-05-21T08:00:00.000Z'
+          })
+        : issueId === 'lin-active-accepted'
+          ? createTrackedIssue({
+              id: 'lin-active-accepted',
+              identifier: 'CO-ACTIVE-ACCEPTED',
+              title: 'Accepted claim after refresh',
+              state: 'In Progress',
+              state_type: 'started',
+              updated_at: '2026-05-21T08:01:00.000Z'
+            })
+          : createTrackedIssue({
+              id: issueId,
+              identifier: `CO-${String(issueId).replace('lin-co-', '')}`,
+              title: `Retained released backlog claim ${String(issueId).replace('lin-co-', '')}`,
+              state: 'Backlog',
+              state_type: 'backlog',
+              updated_at: state.claims.find((claim) => claim.issue_id === issueId)?.issue_updated_at ??
+                '2026-05-12T22:00:00.000Z',
+              blocked_by: []
+            })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssues,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+    initializeProviderPollingHealth(service, {
+      intervalMs: 15_000,
+      onUpdate: (payload) => {
+        pollingUpdates.push(payload);
+      },
+      skipInitialUpdate: true
+    });
+
+    markProviderPollingStarted(service, { mode: 'refresh' });
+    await expect(service.refresh()).resolves.toBeUndefined();
+    await flushProviderPollingHealthUpdates(service);
+
+    expect(resolveTrackedIssue).toHaveBeenCalledTimes(5);
+    expect(resolveTrackedIssue.mock.calls.map(([request]) => request.issueId)).toEqual([
+      'lin-co-700',
+      'lin-co-701',
+      'lin-co-702',
+      'lin-active-running',
+      'lin-active-accepted'
+    ]);
+    expect(launcher.start).toHaveBeenCalledTimes(1);
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'lin-active-accepted',
+      issueIdentifier: 'CO-ACTIVE-ACCEPTED'
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(readProviderPollingHealth(service)).toMatchObject({
+      checking: true,
+      stuck: false,
+      restart_required: false,
+      refresh_counts: expect.objectContaining({
+        claims_total: 127,
+        claims_scanned: 127,
+        issue_by_id_reads: 5,
+        issue_by_id_deferred: 122
+      })
+    });
+    expect(
+      pollingUpdates.filter(
+        (payload) => payload.refresh_request_class === 'claim_issue_by_id:released_deferred'
+      )
+    ).toHaveLength(1);
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-active-running')).toMatchObject({
+      issue_title: 'Running claim after refresh',
+      issue_updated_at: '2026-05-21T08:00:00.000Z',
+      state: 'running'
+    });
+    expect(state.claims.find((claim) => claim.issue_id === 'lin-active-accepted')).toMatchObject({
+      issue_title: 'Accepted claim after refresh',
+      issue_updated_at: '2026-05-21T08:01:00.000Z',
+      state: 'starting'
+    });
+    expect(state.claims.filter((claim) => claim.passive_release !== null)).toHaveLength(3);
     vi.useRealTimers();
   });
 
