@@ -360,7 +360,8 @@ export function logReviewScopeAssessment(
   logger: ReviewScopeLogger = console,
   overrideReason: string | null = null
 ): void {
-  if (!scope.largeScopeGate) {
+  const largeScopeGate = resolveEffectiveLargeScopeGate(scope);
+  if (!largeScopeGate) {
     return;
   }
   if (scopeMetrics) {
@@ -382,7 +383,7 @@ export function logReviewScopeAssessment(
     return;
   }
   logger.warn(
-    `[run-review] ${formatLargeScopeLabel(scope)} now requires explicit --base/--commit or ${REVIEW_LARGE_SCOPE_OVERRIDE_REASON_ENV_KEY} for an auditable override.`
+    `[run-review] ${formatLargeScopeLabel(scope)} ${formatLargeScopeRequirement(scope)}.`
   );
 }
 
@@ -391,7 +392,8 @@ export function buildLargeScopeAdvisoryPromptLines(
   scopeMetrics: string | null,
   overrideReason: string | null = null
 ): string[] {
-  if (!scope.largeScopeGate || !scope.largeScope) {
+  const largeScopeGate = resolveEffectiveLargeScopeGate(scope);
+  if (!largeScopeGate || !scope.largeScope) {
     return [];
   }
   const detail = scopeMetrics ?? 'metrics unavailable';
@@ -420,7 +422,8 @@ export function getLargeScopeGateError(
   scopeMetrics: string | null,
   overrideReason: string | null
 ): string | null {
-  if (!scope.largeScopeGate || !scope.largeScope || overrideReason) {
+  const largeScopeGate = resolveEffectiveLargeScopeGate(scope);
+  if (!largeScopeGate || !scope.largeScope || overrideReason) {
     return null;
   }
   const detail = scopeMetrics ?? 'metrics unavailable';
@@ -428,15 +431,30 @@ export function getLargeScopeGateError(
 }
 
 function formatLargeScopeLabel(scope: ReviewScopeAssessment): string {
-  return scope.largeScopeGate === 'default-branch-diff'
+  return resolveEffectiveLargeScopeGate(scope) === 'default-branch-diff'
     ? 'large default committed branch diff review scope'
     : 'large uncommitted review scope';
 }
 
 function formatLargeScopePromptLabel(scope: ReviewScopeAssessment): string {
-  return scope.largeScopeGate === 'default-branch-diff'
+  return resolveEffectiveLargeScopeGate(scope) === 'default-branch-diff'
     ? 'large default committed branch diff'
     : 'large uncommitted diff';
+}
+
+function formatLargeScopeRequirement(scope: ReviewScopeAssessment): string {
+  return resolveEffectiveLargeScopeGate(scope) === 'default-branch-diff'
+    ? `now requires explicit --base/--commit or ${REVIEW_LARGE_SCOPE_OVERRIDE_REASON_ENV_KEY} for an auditable override`
+    : `now requires --base/--commit or ${REVIEW_LARGE_SCOPE_OVERRIDE_REASON_ENV_KEY} for an auditable override`;
+}
+
+function resolveEffectiveLargeScopeGate(scope: ReviewScopeAssessment): ReviewScopeLargeScopeGate {
+  const runtimeGate = (scope as ReviewScopeAssessment & { largeScopeGate?: ReviewScopeLargeScopeGate })
+    .largeScopeGate;
+  if (runtimeGate !== undefined) {
+    return runtimeGate;
+  }
+  return scope.mode === 'uncommitted' ? 'uncommitted' : null;
 }
 
 function resolveLargeScopeFileThreshold(env: NodeJS.ProcessEnv): number {
