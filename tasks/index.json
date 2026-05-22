@@ -34,7 +34,7 @@
         }
       },
       "validation": {
-        "status": "docs_packet_complete_parent_implementation_pending",
+        "status": "implementation_complete_pr_lifecycle_pending",
         "passed": [
           "docs-first packet drafted",
           "task registry and freshness mirrors updated",
@@ -42,11 +42,13 @@
           "git diff --check scoped to owned files passed",
           "tasks/index.json and docs/docs-freshness-registry.json parsed with jq",
           "protected-term scan passed for all CO-563 protected terms",
-          "changed-file scope check listed only declared file-scope paths"
-        ],
-        "pending": [
+          "changed-file scope check listed only declared file-scope paths",
           "parent implementation",
           "parent validation",
+          "selectedRunProjection.ts implementation",
+          "regression tests"
+        ],
+        "pending": [
           "PR lifecycle",
           "ready-review drain",
           "Linear review handoff"
