@@ -1,7 +1,7 @@
 {
   "items": [
     {
-      "id": "linear-f42d51e8-18ab-469a-9155-a272e8eaee70",
+      "id": "20260522-linear-f42d51e8-18ab-469a-9155-a272e8eaee70",
       "title": "CO-577 quota hygiene degraded machine-status classification",
       "relates_to": "tasks/tasks-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
       "risk": "high",
@@ -9,7 +9,7 @@
         "Codex"
       ],
       "status": "in_progress",
-      "last_review": "2026-05-23",
+      "last_review": "2026-05-22",
       "canonical_owner_key": "quota-hygiene:co-status-degraded-machine-status-classification:v1",
       "evidence": [
         "docs/PRD-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
@@ -25,12 +25,12 @@
         ".runs/linear-f42d51e8-18ab-469a-9155-a272e8eaee70-docs-packet/cli/2026-05-22T14-05-10-104Z-df776689/manifest.json",
         ".runs/linear-f42d51e8-18ab-469a-9155-a272e8eaee70/cli/2026-05-22T14-01-49-517Z-0fcf6516/review/telemetry.json",
         ".runs/linear-f42d51e8-18ab-469a-9155-a272e8eaee70/cli/2026-05-22T14-01-49-517Z-0fcf6516/review/contract.json",
-        "out/linear-f42d51e8-18ab-469a-9155-a272e8eaee70/manual/20260523T002821-elegance-review.md"
+        "out/linear-f42d51e8-18ab-469a-9155-a272e8eaee70/manual/20260522T142821Z-elegance-review.md"
       ],
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
-          "date": "2026-05-23",
+          "date": "2026-05-22",
           "status": "rejected_out_of_scope_patch",
           "manifest": ".runs/linear-f42d51e8-18ab-469a-9155-a272e8eaee70-docs-packet/cli/2026-05-22T14-05-10-104Z-df776689/manifest.json",
           "patch": ".runs/linear-f42d51e8-18ab-469a-9155-a272e8eaee70-docs-packet/cli/2026-05-22T14-05-10-104Z-df776689/provider-linear-child-lane.patch",
@@ -38,7 +38,7 @@
         },
         "parent_docs_packet": {
           "reviewer": "parent provider-worker lane",
-          "date": "2026-05-23",
+          "date": "2026-05-22",
           "status": "created_after_child_patch_rejection",
           "summary": "Parent authored corrected docs packet preserving degraded_read.reason/source/freshness_verdict and the unavailable-vs-available-degraded machine-status distinction."
         }
@@ -80,7 +80,7 @@
           "contract_validation": "valid"
         },
         "elegance": {
-          "evidence": "out/linear-f42d51e8-18ab-469a-9155-a272e8eaee70/manual/20260523T002821-elegance-review.md",
+          "evidence": "out/linear-f42d51e8-18ab-469a-9155-a272e8eaee70/manual/20260522T142821Z-elegance-review.md",
           "result": "clean"
         }
       },

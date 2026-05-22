@@ -313,6 +313,7 @@ describe('quota hygiene audit', () => {
     expect(audit.verdict).toBe('degraded');
     expect(audit.process_inventory.quota_burning_count).toBe(0);
     expect(audit.process_inventory.unowned_quota_burning_count).toBe(0);
+    expect(audit.control_host.status).toBe('healthy_live_host');
     expect(audit.co_status).toMatchObject({
       status: 'available',
       classification: 'degraded_machine_status',

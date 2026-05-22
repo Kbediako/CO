@@ -3,7 +3,8 @@
 ## Immediate Traceability
 - Linear issue: `CO-577` / `f42d51e8-18ab-469a-9155-a272e8eaee70`
 - Linear URL: https://linear.app/asabeko/issue/CO-577/co-fix-quota-hygiene-degraded-machine-status-classification
-- Task id: `linear-f42d51e8-18ab-469a-9155-a272e8eaee70`
+- MCP task id: `linear-f42d51e8-18ab-469a-9155-a272e8eaee70`
+- Registry task id: `20260522-linear-f42d51e8-18ab-469a-9155-a272e8eaee70`
 - Canonical task spec: `tasks/specs/linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md`
 - TECH_SPEC mirror: `docs/TECH_SPEC-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md`
 - ACTION_PLAN: `docs/ACTION_PLAN-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md`
@@ -85,15 +86,15 @@
 - Owner: `CO-577`.
 - Trigger: quota hygiene consumes a bounded degraded `co-status` machine-status payload.
 - Introduced date: observed after CO-551 shared-root fast-forward on 2026-05-22.
-- Review date: 2026-05-23.
+- Review date: 2026-05-22.
 - Maximum lifetime: this issue.
 - Removal condition: quota hygiene emits available degraded machine-status evidence with preserved reason/source/freshness instead of `co_status_unavailable`.
 - Validation: focused quota-hygiene regression plus full validation gate.
 
 | Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Quota hygiene co-status classification | Unknown `degraded_read.reason` values collapse to `unavailable`. | `remove fallback` | CO-577 | `degraded_read.reason=ui_request_timeout` from `source=local_machine_status`. | 2026-05-22 | 2026-05-23 | This issue | Unknown bounded degraded reads are preserved as available degraded machine status unless they are explicitly stale/unhealthy/unavailable/auth failures. | Focused quota hygiene regression. |
-| Live worker corroboration | Partial degraded status could be misread as live WIP proof. | `remove fallback` | CO-577 | Degraded read includes running/count fields. | Existing quota hygiene live-token path | 2026-05-23 | This issue | `collectCoStatusLiveTokens` returns empty for degraded reads. | Existing and new provider-intake corroboration tests. |
+| Quota hygiene co-status classification | Unknown `degraded_read.reason` values collapse to `unavailable`. | `remove fallback` | CO-577 | `degraded_read.reason=ui_request_timeout` from `source=local_machine_status`. | 2026-05-22 | 2026-05-22 | This issue | Unknown bounded degraded reads are preserved as available degraded machine status unless they are explicitly stale/unhealthy/unavailable/auth failures. | Focused quota hygiene regression. |
+| Live worker corroboration | Partial degraded status could be misread as live WIP proof. | `remove fallback` | CO-577 | Degraded read includes running/count fields. | Existing quota hygiene live-token path | 2026-05-22 | This issue | `collectCoStatusLiveTokens` returns empty for degraded reads. | Existing and new provider-intake corroboration tests. |
 
 ## Consumer Contract Invariant
 Every downstream status consumer must preserve `degraded_read.reason`, `degraded_read.source`, and `degraded_read.freshness_verdict` instead of flattening unknown bounded degraded reads into `unavailable`. Stale endpoint, unhealthy host, auth failure, dead endpoint, and true unavailable evidence remain stronger fail-closed classifications.
@@ -110,4 +111,4 @@ Every downstream status consumer must preserve `degraded_read.reason`, `degraded
 ## Approvals
 - Product: Linear issue CO-577.
 - Engineering: parent provider-worker lane.
-- Date: 2026-05-23.
+- Date: 2026-05-22.

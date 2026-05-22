@@ -55,4 +55,4 @@ Every downstream status consumer must preserve `degraded_read.reason`, `degraded
 
 ## Approvals
 - Reviewer: parent provider-worker lane.
-- Date: 2026-05-23.
+- Date: 2026-05-22.
