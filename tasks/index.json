@@ -1,6 +1,105 @@
 {
   "items": [
     {
+      "id": "20260522-linear-f42d51e8-18ab-469a-9155-a272e8eaee70",
+      "title": "CO-577 quota hygiene degraded machine-status classification",
+      "relates_to": "tasks/tasks-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-22",
+      "canonical_owner_key": "quota-hygiene:co-status-degraded-machine-status-classification:v1",
+      "evidence": [
+        "docs/PRD-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
+        "docs/TECH_SPEC-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
+        "docs/ACTION_PLAN-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
+        "tasks/specs/linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
+        "tasks/tasks-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
+        ".agent/task/linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
+        "tasks/index.json",
+        "docs/docs-freshness-registry.json",
+        "orchestrator/src/cli/quotaHygieneCliShell.ts",
+        "orchestrator/tests/QuotaHygieneCliShell.test.ts",
+        ".runs/linear-f42d51e8-18ab-469a-9155-a272e8eaee70-docs-packet/cli/2026-05-22T14-05-10-104Z-df776689/manifest.json",
+        ".runs/linear-f42d51e8-18ab-469a-9155-a272e8eaee70/cli/2026-05-22T14-01-49-517Z-0fcf6516/review/telemetry.json",
+        ".runs/linear-f42d51e8-18ab-469a-9155-a272e8eaee70/cli/2026-05-22T14-01-49-517Z-0fcf6516/review/contract.json",
+        "out/linear-f42d51e8-18ab-469a-9155-a272e8eaee70/manual/20260522T142821Z-elegance-review.md"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-05-22",
+          "status": "rejected_out_of_scope_patch",
+          "manifest": ".runs/linear-f42d51e8-18ab-469a-9155-a272e8eaee70-docs-packet/cli/2026-05-22T14-05-10-104Z-df776689/manifest.json",
+          "patch": ".runs/linear-f42d51e8-18ab-469a-9155-a272e8eaee70-docs-packet/cli/2026-05-22T14-05-10-104Z-df776689/provider-linear-child-lane.patch",
+          "summary": "Child lane completed but patch was rejected because it reframed CO-577 around machine_status_degraded instead of the protected degraded_read.reason=ui_request_timeout / source=local_machine_status consumer contract."
+        },
+        "parent_docs_packet": {
+          "reviewer": "parent provider-worker lane",
+          "date": "2026-05-22",
+          "status": "created_after_child_patch_rejection",
+          "summary": "Parent authored corrected docs packet preserving degraded_read.reason/source/freshness_verdict and the unavailable-vs-available-degraded machine-status distinction."
+        }
+      },
+      "validation": {
+        "status": "implementation_validated_pending_pr_lifecycle",
+        "passed": [
+          "live Linear context read",
+          "issue transitioned Ready to In Progress",
+          "workpad created and refreshed",
+          "parallelization decision recorded",
+          "docs child lane reached terminal succeeded",
+          "out-of-scope child patch rejected",
+          "parent docs packet created",
+          "focused quota hygiene red test failed on unavailable classification",
+          "focused quota hygiene test passed after implementation",
+          "node scripts/delegation-guard.mjs passed",
+          "node scripts/spec-guard.mjs --dry-run passed",
+          "npm run build passed",
+          "npm run lint passed with existing unrelated warnings",
+          "npm run test passed",
+          "npm run docs:check passed",
+          "npm run docs:freshness passed",
+          "npm run repo:stewardship passed",
+          "node scripts/diff-budget.mjs passed",
+          "manifest-backed standalone review clean",
+          "explicit elegance review clean",
+          "npm run pack:smoke passed"
+        ],
+        "pending": [
+          "PR lifecycle",
+          "ready-review drain",
+          "Linear review handoff"
+        ],
+        "review": {
+          "telemetry": ".runs/linear-f42d51e8-18ab-469a-9155-a272e8eaee70/cli/2026-05-22T14-01-49-517Z-0fcf6516/review/telemetry.json",
+          "contract": ".runs/linear-f42d51e8-18ab-469a-9155-a272e8eaee70/cli/2026-05-22T14-01-49-517Z-0fcf6516/review/contract.json",
+          "verdict": "clean",
+          "contract_validation": "valid"
+        },
+        "elegance": {
+          "evidence": "out/linear-f42d51e8-18ab-469a-9155-a272e8eaee70/manual/20260522T142821Z-elegance-review.md",
+          "result": "clean"
+        }
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
+        "prd": "docs/PRD-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
+        "docs": "docs/TECH_SPEC-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
+        "action_plan": "docs/ACTION_PLAN-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
+        "spec": "tasks/specs/linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",
+        "task": "tasks/tasks-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md"
+      },
+      "source_issue": {
+        "id": "f42d51e8-18ab-469a-9155-a272e8eaee70",
+        "identifier": "CO-577",
+        "url": "https://linear.app/asabeko/issue/CO-577/co-fix-quota-hygiene-degraded-machine-status-classification"
+      }
+    },
+    {
       "id": "20260522-linear-aacc40b3-4f99-49af-8386-996f693e2642",
       "title": "CO-575 replace terminal CO-573 docs freshness maintenance owner",
       "relates_to": "tasks/tasks-linear-aacc40b3-4f99-49af-8386-996f693e2642.md",
