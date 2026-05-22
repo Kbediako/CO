@@ -101,7 +101,16 @@ function formatMachineStatusReadError(error: unknown): string {
   if (error instanceof MachineStatusReadTimeoutError) {
     return `control-host machine-status read timed out after ${error.timeoutMs}ms`;
   }
-  const message = (error as Error)?.message ?? String(error);
+  const maybeMessage =
+    typeof error === 'object' && error !== null && 'message' in error
+      ? (error as { message?: unknown }).message
+      : undefined;
+  const message =
+    typeof maybeMessage === 'string'
+      ? maybeMessage
+      : maybeMessage === null || maybeMessage === undefined
+        ? String(error)
+        : String(maybeMessage);
   return message.trim().length > 0 ? message : 'control-host machine-status read failed';
 }
 

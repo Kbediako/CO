@@ -344,6 +344,35 @@ describe('control machine status contract', () => {
       vi.useRealTimers();
     }
   });
+
+  it('returns degraded fail-closed machine-status json for non-string read error messages', async () => {
+    const { res, state } = createResponseRecorder();
+
+    await expect(handleMachineStatusRequest({
+      req: {
+        method: 'GET',
+        url: '/ui/machine-status.json'
+      } as Pick<http.IncomingMessage, 'method' | 'url'>,
+      res,
+      presenterContext: {
+        readMachineStatus: async () => {
+          throw { message: 123 };
+        }
+      }
+    })).resolves.toBe(true);
+
+    expect(state.statusCode).toBe(200);
+    expect(state.body).toMatchObject({
+      mode: 'control_machine_status',
+      read_only: true,
+      machine_status_degraded: {
+        reason: 'read_failed',
+        source: 'machine_status_controller',
+        message: '123',
+        timeout_ms: null
+      }
+    });
+  });
 });
 
 function buildProviderWorkflowPayload(): ControlProviderWorkflowPayload {
