@@ -643,7 +643,7 @@ function buildSourceRootGuidance(
     guidance.push('Restart or relaunch the supervised control-host from the intended current source root before trusting provider-worker posture.');
   }
   if (driftClasses.includes('source_vs_dist_drift')) {
-    guidance.push('The process is using dist while a source entrypoint exists; rebuild dist or restore the source loader before relying on fresh TypeScript changes.');
+    guidance.push('The process is using dist while a source entrypoint exists; use the source-first bootstrap entrypoint before relying on fresh TypeScript changes.');
   }
   if (driftClasses.includes('global_binary_package_provenance_drift')) {
     guidance.push('Check the global package/binary link target against the intended repository root before starting long-running control-host work.');

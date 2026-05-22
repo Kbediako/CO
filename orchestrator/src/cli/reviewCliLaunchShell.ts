@@ -2,6 +2,7 @@
 
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -21,6 +22,7 @@ interface ReviewCliLaunchShellDependencies {
   runningFromSourceRuntime: () => boolean;
   getPackageRoot: () => string;
   fileExists: (path: string) => boolean;
+  resolveModule: (specifier: string, fromPath: string) => string | null;
   execPath: string;
   getCwd: () => string;
   getEnv: () => NodeJS.ProcessEnv;
@@ -36,6 +38,13 @@ const DEFAULT_DEPENDENCIES: ReviewCliLaunchShellDependencies = {
   runningFromSourceRuntime: () => fileURLToPath(import.meta.url).endsWith('.ts'),
   getPackageRoot: () => findPackageRoot(import.meta.url),
   fileExists: existsSync,
+  resolveModule: (specifier: string, fromPath: string) => {
+    try {
+      return createRequire(fromPath).resolve(specifier);
+    } catch {
+      return null;
+    }
+  },
   execPath: process.execPath,
   getCwd: () => process.cwd(),
   getEnv: () => process.env,
@@ -65,25 +74,32 @@ function resolveReviewRunner(dependencies: ReviewCliLaunchShellDependencies): Ex
   const packageRoot = dependencies.getPackageRoot();
   const sourceRunner = join(packageRoot, 'scripts', 'run-review.ts');
   const distRunner = join(packageRoot, 'dist', 'scripts', 'run-review.js');
+  const sourceRunnerExists = dependencies.fileExists(sourceRunner);
+  const distRunnerExists = dependencies.fileExists(distRunner);
 
-  if (dependencies.runningFromSourceRuntime() && dependencies.fileExists(sourceRunner)) {
+  if (dependencies.runningFromSourceRuntime() && sourceRunnerExists) {
     return {
       command: dependencies.execPath,
       args: ['--loader', 'ts-node/esm', sourceRunner]
     };
   }
 
-  if (dependencies.fileExists(distRunner)) {
+  if (sourceRunnerExists) {
+    if (dependencies.resolveModule('ts-node/esm', join(packageRoot, 'package.json')) !== null) {
+      return {
+        command: dependencies.execPath,
+        args: ['--loader', 'ts-node/esm', sourceRunner]
+      };
+    }
+    throw new Error(
+      'Unable to launch source review runner because ts-node/esm is unavailable; refusing to run dist/scripts/run-review.js while scripts/run-review.ts is present because generated runtime freshness is unproven.'
+    );
+  }
+
+  if (distRunnerExists) {
     return {
       command: dependencies.execPath,
       args: [distRunner]
-    };
-  }
-
-  if (dependencies.fileExists(sourceRunner)) {
-    return {
-      command: dependencies.execPath,
-      args: ['--loader', 'ts-node/esm', sourceRunner]
     };
   }
 

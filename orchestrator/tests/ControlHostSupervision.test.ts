@@ -280,6 +280,17 @@ describe('controlHostSupervision helpers', () => {
     ).toBe('/package/root/bin/codex-orchestrator.js');
   });
 
+  it('defaults managed supervision configs to the source-first bootstrap entrypoint', () => {
+    const config = buildControlHostSupervisionConfig({
+      homeDir: '/Users/tester',
+      cwd: '/repo/workspace',
+      repoRoot: '/repo/CO',
+      nodePath: '/custom/node'
+    });
+
+    expect(config.cliEntrypoint).toBe('/repo/CO/bin/codex-orchestrator.js');
+  });
+
   it('treats restart_required health payloads as unhealthy', () => {
     expect(
       evaluateControlHostSupervisionHealthPayload({
@@ -1341,6 +1352,7 @@ describe('controlHostSupervision shell helpers', () => {
     expect(rendered).toContain('Rollout: managed_supervision');
     expect(rendered).toContain(`Service target: ${serviceTarget}`);
     expect(rendered).toContain(`CLI entrypoint: ${config.cliEntrypoint}`);
+    expect(rendered).toContain('Configured runtime freshness:');
     expect(rendered).toContain('Supervised child pid: none recorded');
     expect(rendered).toContain('Last restart reason: restart_required');
     expect(rendered).toContain(`launchctl: ${serviceTarget} = {`);

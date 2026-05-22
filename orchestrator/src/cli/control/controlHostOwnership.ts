@@ -101,7 +101,8 @@ export type ControlHostSourceFreshnessAction = 'restart' | 'fail_closed';
 
 export type ControlHostSourceFreshnessPolicyReason =
   | 'stale_supervised_source_root'
-  | 'unsafe_stale_supervised_source_root';
+  | 'unsafe_stale_supervised_source_root'
+  | 'stale_generated_runtime';
 
 export interface ControlHostSourceFreshnessPolicy {
   action: ControlHostSourceFreshnessAction;
@@ -319,19 +320,34 @@ export function resolveControlHostSourceFreshnessPolicy(
   if (
     !payload ||
     !freshness ||
-    freshness.status === 'current' ||
-    !freshness.drift_classes.includes('supervised_source_root_drift')
+    freshness.status === 'current'
   ) {
+    return null;
+  }
+  const updatedAt =
+    payload.status === 'owned'
+      ? payload.updated_at || freshness.observed_at || null
+      : freshness.observed_at || payload.updated_at || null;
+  if (freshness.drift_classes.includes('source_vs_dist_drift')) {
+    return {
+      action: 'fail_closed',
+      reason: 'stale_generated_runtime',
+      updated_at: updatedAt,
+      status: freshness.status,
+      source_checkout_status: freshness.source_checkout?.status ?? null,
+      intended_checkout_status: freshness.intended_checkout?.status ?? null,
+      drift_classes: freshness.drift_classes,
+      detail:
+        `Supervised control-host runtime is using generated dist while a source entrypoint exists (${freshness.detail || freshness.entrypoint_kind}); provider-intake must fail closed until supervision uses the source-first bootstrap entrypoint.`
+    };
+  }
+  if (!freshness.drift_classes.includes('supervised_source_root_drift')) {
     return null;
   }
   const restartSafe = isRestartSafeStaleSupervisedSourceRoot(freshness);
   const sourceStatus = freshness.source_checkout?.status ?? null;
   const intendedStatus = freshness.intended_checkout?.status ?? null;
   const action: ControlHostSourceFreshnessAction = restartSafe ? 'restart' : 'fail_closed';
-  const updatedAt =
-    payload.status === 'owned'
-      ? payload.updated_at || freshness.observed_at || null
-      : freshness.observed_at || payload.updated_at || null;
   return {
     action,
     reason: restartSafe
