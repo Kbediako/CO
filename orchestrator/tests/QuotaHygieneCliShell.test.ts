@@ -275,6 +275,73 @@ describe('quota hygiene audit', () => {
     );
   });
 
+  it('preserves ui request timeout degraded machine status as available partial status', async () => {
+    const audit = await buildQuotaHygieneAudit({
+      flags: {},
+      dependencies: baseDependencies({
+        readCoStatus: async () => ({
+          generated_at: '2026-05-17T00:00:00.000Z',
+          mode: 'control_machine_status',
+          read_only: true,
+          host: 'localhost',
+          counts: {
+            running: 0,
+            retrying: 0,
+            issues: 0,
+            max_allowed: null
+          },
+          selected_issue_identifier: null,
+          selected: null,
+          running: [],
+          retrying: [],
+          issues: [],
+          provider_intake: {
+            active_claim_count: 0,
+            running_claim_count: 0
+          },
+          degraded_read: {
+            reason: 'ui_request_timeout',
+            source: 'local_machine_status',
+            freshness_verdict: 'healthy',
+            artifact_root: '/repo/.runs/local-mcp/cli/control-host',
+            finding_codes: []
+          }
+        }) as never
+      })
+    });
+
+    expect(audit.verdict).toBe('degraded');
+    expect(audit.process_inventory.quota_burning_count).toBe(0);
+    expect(audit.process_inventory.unowned_quota_burning_count).toBe(0);
+    expect(audit.co_status).toMatchObject({
+      status: 'available',
+      classification: 'degraded_machine_status',
+      risk: 'degraded',
+      degraded_read_reason: 'ui_request_timeout',
+      degraded_read_source: 'local_machine_status',
+      degraded_read_freshness_verdict: 'healthy',
+      running_count: 0,
+      retrying_count: 0,
+      active_provider_claim_count: 0,
+      live_tokens: []
+    });
+    expect(audit.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'co_status_degraded_machine_status',
+          summary:
+            'co-status returned available degraded machine status from local_machine_status (reason: ui_request_timeout, freshness: healthy).',
+          evidence: expect.objectContaining({
+            degraded_read_reason: 'ui_request_timeout',
+            degraded_read_source: 'local_machine_status',
+            degraded_read_freshness_verdict: 'healthy'
+          })
+        })
+      ])
+    );
+    expect(audit.findings.map((finding) => finding.code)).not.toContain('co_status_unavailable');
+  });
+
   it('reports unavailable process inventory instead of aborting the audit', async () => {
     const audit = await buildQuotaHygieneAudit({
       flags: {},

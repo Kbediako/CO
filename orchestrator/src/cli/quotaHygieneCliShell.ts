@@ -265,9 +265,11 @@ interface QuotaHygieneFreshnessSummary {
 
 interface QuotaHygieneCoStatusSummary {
   status: 'available' | 'unavailable';
-  classification: 'healthy' | 'stale_endpoint' | 'unhealthy_live_host' | 'unavailable';
+  classification: 'healthy' | 'degraded_machine_status' | 'stale_endpoint' | 'unhealthy_live_host' | 'unavailable';
   risk: RiskLevel;
   degraded_read_reason: string | null;
+  degraded_read_source: string | null;
+  degraded_read_freshness_verdict: string | null;
   running_count: number | null;
   retrying_count: number | null;
   active_provider_claim_count: number | null;
@@ -789,13 +791,23 @@ async function summarizeCoStatus(
     const classification = classifyCoStatusDataset(dataset);
     const liveTokens = collectCoStatusLiveTokens(dataset);
     const risk: RiskLevel = classification === 'healthy' ? 'green' : 'degraded';
+    const degradedReadReason = dataset.degraded_read?.reason ?? null;
+    const degradedReadSource = dataset.degraded_read?.source ?? null;
+    const degradedReadFreshnessVerdict = dataset.degraded_read?.freshness_verdict ?? null;
     if (classification !== 'healthy') {
       findings.push({
         code: `co_status_${classification}`,
         severity: 'degraded',
-        summary: `co-status classified the live host as ${classification}.`,
+        summary: formatCoStatusFindingSummary(
+          classification,
+          degradedReadReason,
+          degradedReadSource,
+          degradedReadFreshnessVerdict
+        ),
         evidence: {
-          degraded_read_reason: dataset.degraded_read?.reason ?? null
+          degraded_read_reason: degradedReadReason,
+          degraded_read_source: degradedReadSource,
+          degraded_read_freshness_verdict: degradedReadFreshnessVerdict
         }
       });
     }
@@ -803,7 +815,9 @@ async function summarizeCoStatus(
       status: 'available',
       classification,
       risk,
-      degraded_read_reason: dataset.degraded_read?.reason ?? null,
+      degraded_read_reason: degradedReadReason,
+      degraded_read_source: degradedReadSource,
+      degraded_read_freshness_verdict: degradedReadFreshnessVerdict,
       running_count: Array.isArray(dataset.running) ? dataset.running.length : null,
       retrying_count: Array.isArray(dataset.retrying) ? dataset.retrying.length : null,
       active_provider_claim_count: readNumber(dataset.provider_intake?.active_claim_count),
@@ -825,6 +839,8 @@ async function summarizeCoStatus(
       classification,
       risk: classification === 'unavailable' ? 'unknown' : 'degraded',
       degraded_read_reason: null,
+      degraded_read_source: null,
+      degraded_read_freshness_verdict: null,
       running_count: null,
       retrying_count: null,
       active_provider_claim_count: null,
@@ -1914,6 +1930,21 @@ function classifyCoStatusError(message: string): QuotaHygieneCoStatusSummary['cl
   return 'unavailable';
 }
 
+function formatCoStatusFindingSummary(
+  classification: QuotaHygieneCoStatusSummary['classification'],
+  degradedReadReason: string | null,
+  degradedReadSource: string | null,
+  degradedReadFreshnessVerdict: string | null
+): string {
+  if (classification === 'degraded_machine_status') {
+    const source = degradedReadSource ?? 'unknown_source';
+    const reason = degradedReadReason ?? 'unknown_reason';
+    const freshness = degradedReadFreshnessVerdict ?? 'unknown_freshness';
+    return `co-status returned available degraded machine status from ${source} (reason: ${reason}, freshness: ${freshness}).`;
+  }
+  return `co-status classified the live host as ${classification}.`;
+}
+
 function classifyCoStatusDataset(dataset: CoStatusJsonDataset): QuotaHygieneCoStatusSummary['classification'] {
   const reason = normalizeOptionalString(dataset.degraded_read?.reason);
   if (reason === null) {
@@ -1936,7 +1967,16 @@ function classifyCoStatusDataset(dataset: CoStatusJsonDataset): QuotaHygieneCoSt
   ) {
     return 'unhealthy_live_host';
   }
-  return 'unavailable';
+  if (
+    normalizedReason.includes('auth') ||
+    normalizedReason.includes('unauthorized') ||
+    normalizedReason.includes('forbidden') ||
+    normalizedReason.includes('permission') ||
+    normalizedReason.includes('unavailable')
+  ) {
+    return 'unavailable';
+  }
+  return 'degraded_machine_status';
 }
 
 function collectCoStatusLiveTokens(dataset: CoStatusJsonDataset): string[] {
