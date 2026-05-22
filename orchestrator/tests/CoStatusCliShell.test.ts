@@ -227,6 +227,68 @@ describe('runCoStatusCliShell', () => {
     });
   });
 
+  it('preserves explicit machine-status json when runtime freshness inspection fails', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = join(root, '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(runDir, { recursive: true });
+
+    const server = await startMachineStatusServer();
+    servers.add(server.instance);
+
+    await writeFile(
+      join(runDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+    await writeFile(join(runDir, 'control_auth.json'), JSON.stringify({ token: 'snapshot-token' }), 'utf8');
+    await writeFile(
+      join(runDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: server.baseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await runCoStatusCliShell(
+      {
+        flags: {
+          format: 'json',
+          'machine-status': true,
+          'run-dir': runDir
+        },
+        printHelp: vi.fn()
+      },
+      {
+        inspectRuntimeFreshness: () => {
+          throw new Error('freshness unavailable');
+        }
+      }
+    );
+
+    expect(server.requests).toEqual([
+      {
+        authorization: 'Bearer snapshot-token',
+        csrfToken: 'snapshot-token'
+      }
+    ]);
+    expect(log).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(String(log.mock.calls[0]?.[0])) as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      mode: 'control_machine_status',
+      read_only: true
+    });
+  });
+
   it('blocks text machine-status mode when generated runtime freshness is stale', async () => {
     const error = vi.fn();
     const setExitCode = vi.fn();

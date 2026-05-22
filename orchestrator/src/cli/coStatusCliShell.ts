@@ -178,9 +178,16 @@ export async function runCoStatusCliShell(
     readBooleanFlag(params.flags, 'dashboard') || readBooleanFlag(params.flags, 'operator-dashboard');
   const explicitMachineStatusJsonSnapshot =
     format === 'json' && explicitMachineStatus && !requestedDashboardJson;
-  const runtimeFreshnessBlock = resolveCoStatusRuntimeFreshnessBlock(
-    dependencies.inspectRuntimeFreshness()
-  );
+  let runtimeFreshnessBlock: CoStatusRuntimeFreshnessBlockPayload | null = null;
+  try {
+    runtimeFreshnessBlock = resolveCoStatusRuntimeFreshnessBlock(
+      dependencies.inspectRuntimeFreshness()
+    );
+  } catch (error) {
+    if (!explicitMachineStatusJsonSnapshot) {
+      throw error;
+    }
+  }
   if (runtimeFreshnessBlock && !explicitMachineStatusJsonSnapshot) {
     emitCoStatusRuntimeFreshnessBlock(runtimeFreshnessBlock, format, dependencies);
     return;
