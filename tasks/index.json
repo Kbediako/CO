@@ -260,6 +260,122 @@
       ]
     },
     {
+      "id": "linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b",
+      "title": "CO-551 operator-confirmed quota-hygiene stale-process remediation",
+      "relates_to": "tasks/tasks-linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "review_handoff_ready",
+      "last_review": "2026-05-22",
+      "canonical_owner_key": "quota-hygiene:operator-confirmed-stale-process-remediation:v1",
+      "evidence": [
+        "docs/PRD-linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
+        "docs/TECH_SPEC-linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
+        "docs/ACTION_PLAN-linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
+        "tasks/specs/linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
+        "tasks/tasks-linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
+        ".agent/task/linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        ".runs/linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b-docs-packet/cli/2026-05-21T22-26-14-450Z-12568c4c/manifest.json",
+        ".runs/linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b/cli/2026-05-22T11-03-36-941Z-cf33ae48/review/output.log",
+        ".runs/linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b/cli/2026-05-22T11-03-36-941Z-cf33ae48/review/telemetry.json",
+        ".runs/linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b/cli/2026-05-22T11-03-36-941Z-cf33ae48/review/contract.json",
+        "out/linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b/manual/20260522T121445Z-elegance-review.md"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-05-21",
+          "status": "created_for_parent_integration",
+          "manifest": ".runs/linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b-docs-packet/cli/2026-05-21T22-26-14-450Z-12568c4c/manifest.json",
+          "canonical_owner_key": "quota-hygiene:operator-confirmed-stale-process-remediation:v1",
+          "summary": "Docs-only child lane created the CO-551 packet for remediation only: CO-542 remains detection/reporting only, operator confirmation is explicit, targets are scoped by current-audit PID eligibility, durable per-PID audit output is required, and automatic kill/restart, app-server/control-host restarts, provider-intake mutation, model calls, and kill-by-name behavior are rejected."
+        },
+        "final_standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-22",
+          "status": "clean_success",
+          "model": "gpt-5.5",
+          "reasoning_effort": "xhigh",
+          "output": ".runs/linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b/cli/2026-05-22T11-03-36-941Z-cf33ae48/review/output.log",
+          "telemetry": ".runs/linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b/cli/2026-05-22T11-03-36-941Z-cf33ae48/review/telemetry.json",
+          "contract": ".runs/linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b/cli/2026-05-22T11-03-36-941Z-cf33ae48/review/contract.json",
+          "summary": "Final bounded review passed after relative remediation-output path handling was fixed and regression-covered."
+        },
+        "elegance_review": {
+          "reviewer": "codex review prompt-only elegance pass",
+          "date": "2026-05-22",
+          "status": "no_actionable_simplification",
+          "model": "gpt-5.5",
+          "reasoning_effort": "xhigh",
+          "evidence": "out/linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b/manual/20260522T121445Z-elegance-review.md",
+          "summary": "The apparent complexity is tied to explicit apply/yes/only/PID gating, dry-run veto, fail-closed revalidation, protected false positives, and durable audit evidence."
+        }
+      },
+      "validation": {
+        "status": "review_clean_pr_pending",
+        "passed": [
+          "docs-first packet created",
+          "task mirrors created",
+          "canonical owner key preserved",
+          "CO-542 detector boundary preserved",
+          "explicit operator confirmation requirement recorded",
+          "current-audit PID eligibility requirement recorded",
+          "durable per-PID audit output requirement recorded",
+          "no automatic kill/restart non-goal recorded",
+          "no app-server/control-host restarts non-goal recorded",
+          "no provider-intake mutation non-goal recorded",
+          "no model calls non-goal recorded",
+          "no kill-by-name behavior non-goal recorded",
+          "parent implementation imported",
+          "review-safety rework prevents signaling before artifact preparation",
+          "review-safety rework strengthens PID identity and stale-age revalidation",
+          "review-safety rework binds stale delegate-server remediation to fresh delegate inspection current-audit eligibility",
+          "review-safety rework requires explicit PID selection before signaling",
+          "review-safety rework makes --dry-run a mutation veto",
+          "review-safety rework requires GitHub polling executable argv match and rejects prompt-text false positives",
+          "review-safety rework avoids default artifact writes for unconfirmed apply",
+          "review-safety rework separates signal delivery from verified termination",
+          "review rework exposes text-mode remediation status and artifact path",
+          "review rework syncs hygiene help with --dry-run and required PID selection",
+          "review rework reports delegate inspection unavailable instead of absent for selected present delegate PIDs",
+          "review rework resolves relative remediation-output paths against the configured repo root",
+          "focused quota hygiene tests passed after GitHub-classifier rework",
+          "full core test suite passed after GitHub-classifier rework",
+          "focused quota hygiene tests passed after text-output/help rework",
+          "full core test suite passed after text-output/help rework",
+          "focused quota hygiene tests passed after delegate-inspection-unavailable rework",
+          "full core test suite passed after delegate-inspection-unavailable rework",
+          "focused quota hygiene tests passed after relative-remediation-output rework",
+          "full core test suite passed after relative-remediation-output rework",
+          "docs:check, docs:freshness, repo:stewardship, and pack:smoke passed after rework",
+          "final manifest-backed standalone review passed clean",
+          "explicit elegance review found no actionable simplification"
+        ],
+        "pending": [
+          "PR lifecycle and Linear closeout"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
+        "prd": "docs/PRD-linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
+        "docs": "docs/TECH_SPEC-linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
+        "action_plan": "docs/ACTION_PLAN-linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
+        "spec": "tasks/specs/linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md",
+        "task": "tasks/tasks-linear-2fe8fdb4-928d-4861-9f73-44021e1a4d0b.md"
+      },
+      "source_issue": {
+        "id": "2fe8fdb4-928d-4861-9f73-44021e1a4d0b",
+        "identifier": "CO-551",
+        "url": "https://linear.app/asabeko/issue/CO-551"
+      }
+    },
+    {
       "id": "linear-c093b71f-c6bd-423a-a6ec-3ee3436d6b53",
       "title": "CO-542 deterministic quota hygiene audit",
       "relates_to": "tasks/tasks-linear-c093b71f-c6bd-423a-a6ec-3ee3436d6b53.md",
