@@ -900,7 +900,10 @@ async function probeControlHostHealth(
 
   const machineStatusDegraded = readControlHostSupervisionMachineStatusDegraded(payload);
   if (machineStatusDegraded) {
-    const persistedDiagnostic = await readControlHostSupervisionProbeTimeoutDiagnostic(config, env);
+    const persistedDiagnostic =
+      machineStatusDegraded.reason === 'read_timeout'
+        ? await readControlHostSupervisionProbeTimeoutDiagnostic(config, env)
+        : null;
     const timeoutQuarantine =
       machineStatusDegraded.reason === 'read_timeout'
         ? evaluateControlHostSupervisionProbeTimeoutDiagnostic(persistedDiagnostic, {

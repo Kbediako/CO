@@ -2738,6 +2738,64 @@ describe('controlHostSupervision shell helpers', () => {
     }
   });
 
+  it('does not attach stale timeout diagnostics to non-timeout machine-status degradation', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-degraded-read-failed-'));
+    try {
+      const config = buildControlHostSupervisionConfig({
+        homeDir: '/Users/tester',
+        cwd: tempRoot,
+        repoRoot: tempRoot,
+        nodePath: '/custom/node',
+        cliEntrypoint: '/opt/codex-orchestrator.js',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        healthIntervalSeconds: 5
+      });
+      await writeProviderIntakeStateFixture(config, {});
+
+      const result = await probeControlHostHealth(
+        config,
+        {},
+        {},
+        async () => ({
+          exitCode: 0,
+          stdout: JSON.stringify(
+            buildMachineStatusDegradedPayload({
+              machine_status_degraded: {
+                reason: 'read_failed',
+                source: 'machine_status_controller',
+                message: 'control-host machine-status read failed.',
+                timeout_ms: null
+              }
+            })
+          ),
+          stderr: '',
+          timedOut: false
+        })
+      );
+
+      expect(result).toMatchObject({
+        healthy: false,
+        reason: 'machine_status_degraded',
+        diagnostic: {
+          counts: {
+            running: 0,
+            active: 0
+          },
+          running_workers: []
+        }
+      });
+      expect(result.message).toContain(
+        'co-status machine-status degraded (read_failed): control-host machine-status read failed.'
+      );
+      expect(result.diagnostic?.running_workers.map((worker) => worker.issue_identifier)).not.toContain(
+        'CO-225'
+      );
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it('quarantines repeated degraded machine-status timeouts for the same active worker series', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-degraded-active-worker-'));
     try {
