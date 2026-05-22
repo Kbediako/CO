@@ -2668,6 +2668,48 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(changeBundle.touched_refs?.map((ref) => ref.path)).toContain('file-1.txt');
   });
 
+  it('gates large committed branch diffs discovered from default clean working-tree review scope', async () => {
+    const sandbox = await makeSandbox();
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 3);
+    await writeFile(join(sandbox, '.gitignore'), ['.runs/', 'codex-mock.sh', 'review-*.log', ''].join('\n'), 'utf8');
+    await makeFakeDiffBudgetScript(sandbox);
+    await runGit(['add', '.gitignore', 'scripts/diff-budget.mjs'], sandbox);
+    await runGit(['commit', '-m', 'ignore review harness artifacts and add diff budget'], sandbox);
+    await runGit(['update-ref', 'refs/remotes/origin/main', 'HEAD'], sandbox);
+    for (const file of files) {
+      await writeFile(join(sandbox, file), `committed branch update for ${file}\n`, 'utf8');
+    }
+    await runGit(['add', ...files], sandbox);
+    await runGit(['commit', '-m', 'large committed branch update'], sandbox);
+    const { stdout: statusBeforeReview } = await execFileAsync(
+      'git',
+      ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+      { cwd: sandbox }
+    );
+    expect(statusBeforeReview).toBe('');
+
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const argsLogPath = join(sandbox, 'review-args.log');
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_ARGS_LOG: argsLogPath,
+      CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD: '2',
+      CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD: '2'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stdout).toContain('review scope metrics: 3 files, 6 lines.');
+    expect(result.stderr).toContain('large default committed branch diff review scope detected');
+    expect(result.stderr).toContain(
+      'large default committed branch diff review scope requires explicit scoping or override'
+    );
+    const reviewInvocations = parseArgsLogInvocations(
+      await readFile(argsLogPath, 'utf8').catch(() => '')
+    ).filter((entry) => entry.includes('argv=review'));
+    expect(reviewInvocations).toHaveLength(0);
+  });
+
   it('records an intentionally empty scope when the clean worker branch matches the default base', async () => {
     const sandbox = await makeSandbox();
     await initGitRepoWithCommittedFiles(sandbox, 1);

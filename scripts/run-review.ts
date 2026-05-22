@@ -754,7 +754,12 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
     if (activeCloseoutProvenanceLines.length > 0) {
       promptLines.push('', ...activeCloseoutProvenanceLines);
     }
-    const scopeAssessment = await assessReviewScope(scopeResolution.options, repoRoot);
+    const scopeAssessment = await assessReviewScope(scopeResolution.options, repoRoot, process.env, {
+      largeScopeGate:
+        scopeResolution.resolutionKind === 'default-uncommitted-committed-branch-diff'
+          ? 'default-branch-diff'
+          : undefined
+    });
     const scopeMetrics = formatScopeMetrics(scopeAssessment);
     const largeScopeOverrideReason = resolveLargeScopeOverrideReason(process.env);
     const stdinIsTTY = process.stdin?.isTTY === true;

@@ -32,9 +32,12 @@ export interface ReviewScopeAssessment {
   changedFiles: number | null;
   changedLines: number | null;
   largeScope: boolean;
+  largeScopeGate: ReviewScopeLargeScopeGate;
   fileThreshold: number;
   lineThreshold: number;
 }
+
+export type ReviewScopeLargeScopeGate = 'uncommitted' | 'default-branch-diff' | null;
 
 interface ReviewScopeLogger {
   log(message: string): void;
@@ -218,18 +221,36 @@ async function resolveDefaultReviewBaseRef(repoRoot: string): Promise<string | n
 export async function assessReviewScope(
   options: ReviewScopeCliOptions,
   repoRoot: string,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  assessmentOptions: { largeScopeGate?: ReviewScopeLargeScopeGate } = {}
 ): Promise<ReviewScopeAssessment> {
   const mode = resolveEffectiveScopeMode(options);
   const fileThreshold = resolveLargeScopeFileThreshold(env);
   const lineThreshold = resolveLargeScopeLineThreshold(env);
+  const largeScopeGate =
+    assessmentOptions.largeScopeGate === undefined
+      ? mode === 'uncommitted'
+        ? 'uncommitted'
+        : null
+      : assessmentOptions.largeScopeGate;
 
   if (mode !== 'uncommitted') {
+    if (largeScopeGate) {
+      return assessScopedDiffReviewScope({
+        mode,
+        options,
+        repoRoot,
+        fileThreshold,
+        lineThreshold,
+        largeScopeGate
+      });
+    }
     return {
       mode,
       changedFiles: null,
       changedLines: null,
       largeScope: false,
+      largeScopeGate,
       fileThreshold,
       lineThreshold
     };
@@ -269,8 +290,53 @@ export async function assessReviewScope(
     changedFiles,
     changedLines,
     largeScope: exceedsFileThreshold || exceedsLineThreshold,
+    largeScopeGate,
     fileThreshold,
     lineThreshold
+  };
+}
+
+async function assessScopedDiffReviewScope(input: {
+  mode: ReviewScopeMode;
+  options: ReviewScopeCliOptions;
+  repoRoot: string;
+  fileThreshold: number;
+  lineThreshold: number;
+  largeScopeGate: ReviewScopeLargeScopeGate;
+}): Promise<ReviewScopeAssessment> {
+  const fileList =
+    input.mode === 'base' && input.options.base
+      ? await tryGit(
+          ['diff', '--name-only', '-z', '--no-renames', `${input.options.base}...HEAD`],
+          input.repoRoot
+        )
+      : input.mode === 'commit' && input.options.commit
+        ? await tryGit(
+            ['show', '--no-color', '--name-only', '--format=', '-z', '--no-renames', input.options.commit],
+            input.repoRoot
+          )
+        : null;
+  const diff =
+    input.mode === 'base' && input.options.base
+      ? await tryGit(['diff', '--numstat', '--no-renames', `${input.options.base}...HEAD`], input.repoRoot)
+      : input.mode === 'commit' && input.options.commit
+        ? await tryGit(['show', '--no-color', '--numstat', '--format=', '--no-renames', input.options.commit], input.repoRoot)
+        : null;
+  const changedFiles = fileList
+    ? parseNullDelimitedPaths(fileList).filter((filePath) => !isIgnoredReviewScopePath(filePath)).length
+    : null;
+  const changedLines = diff ? parseNumstatLineDelta(diff) : null;
+  const exceedsFileThreshold = changedFiles !== null && changedFiles >= input.fileThreshold;
+  const exceedsLineThreshold = changedLines !== null && changedLines >= input.lineThreshold;
+
+  return {
+    mode: input.mode,
+    changedFiles,
+    changedLines,
+    largeScope: exceedsFileThreshold || exceedsLineThreshold,
+    largeScopeGate: input.largeScopeGate,
+    fileThreshold: input.fileThreshold,
+    lineThreshold: input.lineThreshold
   };
 }
 
@@ -294,7 +360,7 @@ export function logReviewScopeAssessment(
   logger: ReviewScopeLogger = console,
   overrideReason: string | null = null
 ): void {
-  if (scope.mode !== 'uncommitted') {
+  if (!scope.largeScopeGate) {
     return;
   }
   if (scopeMetrics) {
@@ -307,16 +373,16 @@ export function logReviewScopeAssessment(
   }
   const detail = scopeMetrics ?? 'metrics unavailable';
   logger.warn(
-    `[run-review] large uncommitted review scope detected (${detail}; thresholds: ${scope.fileThreshold} files / ${scope.lineThreshold} lines).`
+    `[run-review] ${formatLargeScopeLabel(scope)} detected (${detail}; thresholds: ${scope.fileThreshold} files / ${scope.lineThreshold} lines).`
   );
   if (overrideReason) {
     logger.warn(
-      `[run-review] large uncommitted review scope override accepted via ${REVIEW_LARGE_SCOPE_OVERRIDE_REASON_ENV_KEY}: ${overrideReason}`
+      `[run-review] ${formatLargeScopeLabel(scope)} override accepted via ${REVIEW_LARGE_SCOPE_OVERRIDE_REASON_ENV_KEY}: ${overrideReason}`
     );
     return;
   }
   logger.warn(
-    `[run-review] large uncommitted review scope now requires --base/--commit or ${REVIEW_LARGE_SCOPE_OVERRIDE_REASON_ENV_KEY} for an auditable override.`
+    `[run-review] ${formatLargeScopeLabel(scope)} now requires explicit --base/--commit or ${REVIEW_LARGE_SCOPE_OVERRIDE_REASON_ENV_KEY} for an auditable override.`
   );
 }
 
@@ -325,12 +391,12 @@ export function buildLargeScopeAdvisoryPromptLines(
   scopeMetrics: string | null,
   overrideReason: string | null = null
 ): string[] {
-  if (scope.mode !== 'uncommitted' || !scope.largeScope) {
+  if (!scope.largeScopeGate || !scope.largeScope) {
     return [];
   }
   const detail = scopeMetrics ?? 'metrics unavailable';
   const lines = [
-    `Scope advisory: large uncommitted diff detected (${detail}; thresholds: ${scope.fileThreshold} files / ${scope.lineThreshold} lines).`,
+    `Scope advisory: ${formatLargeScopePromptLabel(scope)} detected (${detail}; thresholds: ${scope.fileThreshold} files / ${scope.lineThreshold} lines).`,
   ];
   if (overrideReason) {
     lines.push(`Large-scope override recorded: ${overrideReason}`);
@@ -354,11 +420,23 @@ export function getLargeScopeGateError(
   scopeMetrics: string | null,
   overrideReason: string | null
 ): string | null {
-  if (scope.mode !== 'uncommitted' || !scope.largeScope || overrideReason) {
+  if (!scope.largeScopeGate || !scope.largeScope || overrideReason) {
     return null;
   }
   const detail = scopeMetrics ?? 'metrics unavailable';
-  return `large uncommitted review scope requires explicit scoping or override (${detail}; thresholds: ${scope.fileThreshold} files / ${scope.lineThreshold} lines). Rerun with --base <ref> or --commit <sha>, or set ${REVIEW_LARGE_SCOPE_OVERRIDE_REASON_ENV_KEY}=\"<reason>\" to record an auditable override.`;
+  return `${formatLargeScopeLabel(scope)} requires explicit scoping or override (${detail}; thresholds: ${scope.fileThreshold} files / ${scope.lineThreshold} lines). Rerun with --base <ref> or --commit <sha>, or set ${REVIEW_LARGE_SCOPE_OVERRIDE_REASON_ENV_KEY}=\"<reason>\" to record an auditable override.`;
+}
+
+function formatLargeScopeLabel(scope: ReviewScopeAssessment): string {
+  return scope.largeScopeGate === 'default-branch-diff'
+    ? 'large default committed branch diff review scope'
+    : 'large uncommitted review scope';
+}
+
+function formatLargeScopePromptLabel(scope: ReviewScopeAssessment): string {
+  return scope.largeScopeGate === 'default-branch-diff'
+    ? 'large default committed branch diff'
+    : 'large uncommitted diff';
 }
 
 function resolveLargeScopeFileThreshold(env: NodeJS.ProcessEnv): number {
