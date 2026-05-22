@@ -2205,14 +2205,14 @@ function isPassiveReleasedProviderLinearWorkerOwnerFailedRun(
 function isSuccessfulProviderLinearWorkerHandoffFailedWrapper(
   context: Pick<
     ControlCompatibilitySourceContext,
-    'rawStatus' | 'runId' | 'manifestPath' | 'providerLinearWorkerProof'
+    'rawStatus' | 'runId' | 'manifestPath' | 'providerLinearWorkerProof' | 'startedAt'
   >,
   claim: ProviderIntakeClaimRecord
 ): boolean {
   return (
     context.rawStatus === 'failed' &&
     providerLinearWorkerClaimRunIdentityMatchesContext(claim, context) &&
-    hasSucceededProviderLinearWorkerIssueReviewHandoffProof(context.providerLinearWorkerProof) &&
+    hasFreshSucceededProviderLinearWorkerIssueReviewHandoffProof(context, claim) &&
     isSuccessfulProviderLinearWorkerHandoffClaimState(claim) &&
     isCompletedProviderLinearIssueState(claim.issue_state, claim.issue_state_type) &&
     hasMergedProviderLinearWorkerCloseout(claim) &&
@@ -2234,6 +2234,9 @@ function isCompletedProviderLinearIssueState(
     state: issueState,
     state_type: issueStateType
   });
+  if (workflowState.normalizedStateType && workflowState.normalizedStateType !== 'completed') {
+    return false;
+  }
   if (
     workflowState.normalizedState &&
     workflowState.normalizedState !== 'done' &&
@@ -2255,11 +2258,22 @@ function hasMergedProviderLinearWorkerCloseout(
   );
 }
 
-function hasSucceededProviderLinearWorkerIssueReviewHandoffProof(
-  proof: ProviderLinearWorkerProof | null | undefined
+function hasFreshSucceededProviderLinearWorkerIssueReviewHandoffProof(
+  context: Pick<
+    ControlCompatibilitySourceContext,
+    'providerLinearWorkerProof' | 'startedAt'
+  >,
+  claim: Pick<ProviderIntakeClaimRecord, 'launch_started_at'>
 ): boolean {
+  const proof = context.providerLinearWorkerProof;
   const proofRecord = (proof ?? null) as Record<string, unknown> | null;
+  const freshnessStageStartedAt = resolveFreshnessStageStartedAt(
+    claim.launch_started_at ?? null,
+    context.startedAt
+  );
   return (
+    !freshnessStageStartedAt.invalid &&
+    isProviderLinearWorkerProofFreshForStage(proofRecord, freshnessStageStartedAt.value) &&
     resolveProviderLinearWorkerTerminalStatus(proofRecord) === 'succeeded' &&
     resolveProviderLinearWorkerTerminalReason(proofRecord) === 'issue_review_handoff'
   );
