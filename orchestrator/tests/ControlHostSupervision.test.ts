@@ -2819,8 +2819,9 @@ describe('controlHostSupervision shell helpers', () => {
           restartHistory: [
             {
               requested_at: restartedAt,
-              reason: 'probe_timeout',
-              message: 'co-status probe timed out after 5s.',
+              reason: 'machine_status_degraded',
+              message:
+                'co-status machine-status degraded (read_timeout after 5000ms): control-host machine-status read timed out after 5000ms. launchd restart requested after 3 consecutive unhealthy samples.',
               consecutive_unhealthy_samples: 3,
               child_pid: 4321,
               diagnostic: buildProbeTimeoutDiagnosticFixture()

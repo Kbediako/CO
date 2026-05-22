@@ -746,7 +746,7 @@ export function evaluateControlHostSupervisionProbeTimeoutDiagnostic(
     ) {
       break;
     }
-    if (record.reason !== 'probe_timeout') {
+    if (!isControlHostSupervisionProbeTimeoutRestartRecord(record)) {
       return null;
     }
     const recordSignature = buildControlHostSupervisionRestartSignature(record.diagnostic);
@@ -760,6 +760,18 @@ export function evaluateControlHostSupervisionProbeTimeoutDiagnostic(
     };
   }
   return null;
+}
+
+function isControlHostSupervisionProbeTimeoutRestartRecord(
+  record: ControlHostSupervisionRestartRecord
+): boolean {
+  if (record.reason === 'probe_timeout') {
+    return true;
+  }
+  return (
+    record.reason === 'machine_status_degraded' &&
+    /\bmachine-status degraded \(read_timeout(?: after \d+ms)?\)/u.test(record.message)
+  );
 }
 
 function isProviderRefreshLifecycleRestartRequiredDiagnostic(
