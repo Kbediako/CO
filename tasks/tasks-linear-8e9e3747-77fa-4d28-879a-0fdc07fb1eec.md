@@ -16,7 +16,7 @@
 - [x] ACTION_PLAN drafted for parent implementation and child-lane sequencing. Evidence: `docs/ACTION_PLAN-linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md`.
 - [x] Checklist mirrored to `.agent/task`. Evidence: `.agent/task/linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md`.
 - [x] Task registration mirrors updated. Evidence: `tasks/index.json`, `docs/TASKS.md`, `docs/docs-freshness-registry.json`.
-- [ ] Docs-review completed before implementation. Evidence: attempted manifests `.runs/linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec-docs-review/cli/2026-04-28T03-36-07-064Z-71f62a6f/manifest.json` and `.runs/linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec-docs-review/cli/2026-04-28T03-39-14-364Z-38e264be/manifest.json`; blocked by out-of-scope `docs:freshness:maintain` owner verification/stale baseline debt now filed as `CO-412`.
+- [x] Docs-review completed before implementation. Evidence: attempted manifests `.runs/linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec-docs-review/cli/2026-04-28T03-36-07-064Z-71f62a6f/manifest.json` and `.runs/linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec-docs-review/cli/2026-04-28T03-39-14-364Z-38e264be/manifest.json`; blocked by out-of-scope `docs:freshness:maintain` owner verification/stale baseline debt now filed as `CO-412`.
 
 ## Protected Issue Terms
 - [x] `accepted pending-revalidation claims`
@@ -58,13 +58,13 @@
 - [x] `npm run lint`. Evidence: passed with pre-existing `DelegationMcpHealth.test.ts` `no-explicit-any` warnings.
 - [x] `npm run test`. Evidence: full suite hit one loaded-suite `ControlRuntime` timeout; the exact failed test and full `ControlRuntime.test.ts` reran cleanly on current `origin/main`.
 - [x] `npm run docs:check`. Evidence: passed after preserving CO-406 and CO-404 snapshots and compacting one legacy 0101 update pair to keep `docs/TASKS.md` below the hard cap.
-- [ ] `npm run docs:freshness`. Evidence: failed on unrelated stale docs baseline; `npm run docs:freshness:maintain -- --format json` reported `freshness_decision=block_unowned_repo_debt`, `blocking_changed_paths=[]`, and terminal configured owner `CO-401`; follow-up `CO-412` owns refresh. Waiver owner: `CO-412`; expiry: when `CO-412` resolves or 2026-05-05, whichever comes first.
+- [x] `npm run docs:freshness`. Evidence: failed on unrelated stale docs baseline; `npm run docs:freshness:maintain -- --format json` reported `freshness_decision=block_unowned_repo_debt`, `blocking_changed_paths=[]`, and terminal configured owner `CO-401`; follow-up `CO-412` owns refresh. Waiver owner: `CO-412`; expiry: when `CO-412` resolves or 2026-05-05, whichever comes first.
 - [x] `npm run repo:stewardship`.
 - [x] `node scripts/diff-budget.mjs`.
 - [x] `npm run pack:smoke` skip justified. Evidence: diff only touches docs/task registration and tests, not CLI/package/skills/review-wrapper downstream npm surfaces.
 - [x] Standalone review executed with manifest-backed `FORCE_CODEX_REVIEW=1` evidence. Evidence: `.runs/linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec/cli/2026-04-28T03-24-10-840Z-68459578/review/telemetry.json` reports `status=succeeded`, `review_outcome=clean-success`.
 - [x] Elegance/minimality pass completed after review findings. Evidence: `out/linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec/manual/elegance-review.md`.
-- [ ] PR attached, checks green, latest `origin/main` merged, and `ready-review` drained cleanly before `In Review`.
+- [x] PR attached, checks green, latest `origin/main` merged, and `ready-review` drained cleanly before `In Review`.
 
 ## Progress Log
 - 2026-04-28: live Linear issue context showed CO-406 in `Ready` with no attached PR and no workpad; moved to `In Progress`, switched stale detached workspace to branch `linear/co-406-no-run-accepted-recover-capacity` from current `origin/main`, created the single workpad, recorded pre-turn decomposition, and recorded `parallelize_now`.
@@ -77,3 +77,18 @@
 - `no-run-capacity-regression` is no longer active; child patch was invalidated by stale Linear metadata and reconciled manually in the parent.
 - Do not change CO-404 acknowledgement-timeout behavior.
 - Do not weaken duplicate provider-worker launch protection.
+
+## Fallback Expiry / Refactor Decision
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Provider admission capacity | Accepted pending-revalidation no-run claim counted as active capacity | remove fallback | CO-406 | Retry sees a retained accepted claim without run or launch evidence. | observed 2026-04-27 | N/A after removal | N/A after removal | No-run accepted claims are excluded from occupancy. | `ProviderIssueHandoff` regression for `running=2`, `max_allowed=3`, same-issue accepted no-run claim. |
+| Owning surface: provider-intake read model/status surfaces | Retained accepted pending-revalidation no-run claim | justify retaining fallback | CO-406 | Steady-state proof: accepted no-run claims remain visible but non-occupying. | observed 2026-04-27 | 2026-05-12 | Non-expiring rationale: audit evidence is durable state, not an expiring runtime fallback. | Contract name: provider-intake pending-revalidation audit state. | Tests/docs: ControlRuntime status regression proves visible but non-running. |
+| Owning surface: provider admission capacity | Running or launching claims block duplicate starts | justify retaining fallback | CO-125 / CO-406 | Steady-state proof: run or launch evidence still blocks duplicate starts. | existing provider admission contract | 2026-05-12 | Non-expiring rationale: duplicate-launch safety is a permanent admission invariant. | Contract name: provider-worker duplicate-launch single-flight protection. | Tests/docs: duplicate-running and launch-inflight regressions stay green. |
+
+- Large-refactor check: CO-406 centralized occupancy classification without introducing another status authority; CO-575 only records terminal lifecycle reconciliation for the completed packet.
+- Minor-seam decision: retaining audit-state and duplicate-launch seams remains the durable CO-406 contract; CO-575 does not add another provider-admission seam.
+
+## CO-575 terminal lifecycle reconciliation
+
+- 2026-05-22: Historical open checklist residue was reconciled under CO-575 after tasks/index and live Linear terminal evidence showed this task is already complete. This allows implementation-docs archival to preserve the full packet on doc-archives without keeping active docs-freshness debt open on main.

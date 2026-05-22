@@ -131,6 +131,27 @@ function addPath(paths, value) {
   }
 }
 
+function addPathValue(paths, value) {
+  if (!value) {
+    return;
+  }
+  if (typeof value === 'string') {
+    addPath(paths, value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      addPathValue(paths, entry);
+    }
+    return;
+  }
+  if (typeof value === 'object') {
+    for (const entry of Object.values(value)) {
+      addPathValue(paths, entry);
+    }
+  }
+}
+
 function slugOnlyTaskKey(taskKey, item) {
   if (typeof taskKey !== 'string') {
     return null;
@@ -165,7 +186,7 @@ export function collectIndexedTaskPacketPaths(item, options = {}) {
   if (item.paths && typeof item.paths === 'object') {
     const pathRecord = item.paths;
     for (const key of ['docs', 'task', 'spec', 'agent_task', 'prd', 'action_plan', 'findings']) {
-      addPath(paths, pathRecord[key]);
+      addPathValue(paths, pathRecord[key]);
     }
   }
 
