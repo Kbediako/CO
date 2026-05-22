@@ -49,6 +49,11 @@ import {
   type ControlStatusFallbackExpiryMetadata
 } from './control/observabilityReadModel.js';
 import type { RunPaths } from './run/runPaths.js';
+import { findPackageRoot } from './utils/packageInfo.js';
+import {
+  inspectSourceRootFreshness,
+  type SourceRootFreshnessInspection
+} from './utils/sourceRootFreshness.js';
 
 type ArgMap = Record<string, string | boolean>;
 type OutputFormat = 'json' | 'text';
@@ -130,7 +135,37 @@ export interface RunCoStatusCliShellParams {
   printHelp: () => void;
 }
 
-export async function runCoStatusCliShell(params: RunCoStatusCliShellParams): Promise<void> {
+interface CoStatusRuntimeFreshnessBlockPayload {
+  mode: 'co_status_runtime_freshness';
+  read_only: true;
+  status: 'blocked';
+  reason: 'stale_generated_runtime';
+  stale_generated_runtime: true;
+  source_root_freshness: SourceRootFreshnessInspection;
+  detail: string;
+}
+
+interface CoStatusCliShellDependencies {
+  inspectRuntimeFreshness: () => SourceRootFreshnessInspection;
+  setExitCode: (code: number) => void;
+  log: (message: string) => void;
+  error: (message: string) => void;
+}
+
+const DEFAULT_CO_STATUS_CLI_SHELL_DEPENDENCIES: CoStatusCliShellDependencies = {
+  inspectRuntimeFreshness: inspectCurrentCoStatusRuntimeFreshness,
+  setExitCode: (code: number) => {
+    process.exitCode = code;
+  },
+  log: (message: string) => console.log(message),
+  error: (message: string) => console.error(message)
+};
+
+export async function runCoStatusCliShell(
+  params: RunCoStatusCliShellParams,
+  overrides: Partial<CoStatusCliShellDependencies> = {}
+): Promise<void> {
+  const dependencies = { ...DEFAULT_CO_STATUS_CLI_SHELL_DEPENDENCIES, ...overrides };
   if (params.flags.help !== undefined) {
     params.printHelp();
     return;
@@ -138,16 +173,78 @@ export async function runCoStatusCliShell(params: RunCoStatusCliShellParams): Pr
 
   assertAttachCompatibleFlags(params.flags);
   const format: OutputFormat = readStringFlag(params.flags, 'format') === 'json' ? 'json' : 'text';
+  const explicitMachineStatus = readBooleanFlag(params.flags, 'machine-status');
+  const requestedDashboardJson =
+    readBooleanFlag(params.flags, 'dashboard') || readBooleanFlag(params.flags, 'operator-dashboard');
+  const explicitMachineStatusJsonSnapshot =
+    format === 'json' && explicitMachineStatus && !requestedDashboardJson;
+  let runtimeFreshnessBlock: CoStatusRuntimeFreshnessBlockPayload | null = null;
+  try {
+    runtimeFreshnessBlock = resolveCoStatusRuntimeFreshnessBlock(
+      dependencies.inspectRuntimeFreshness()
+    );
+  } catch (error) {
+    if (!explicitMachineStatusJsonSnapshot) {
+      throw error;
+    }
+  }
+  if (runtimeFreshnessBlock && !explicitMachineStatusJsonSnapshot) {
+    emitCoStatusRuntimeFreshnessBlock(runtimeFreshnessBlock, format, dependencies);
+    return;
+  }
   if (format !== 'json') {
     await runCoStatusAttachCliShell(params);
     return;
   }
 
-  const dataset =
-    readBooleanFlag(params.flags, 'dashboard') || readBooleanFlag(params.flags, 'operator-dashboard')
-      ? await readCoStatusJsonDataset({ flags: params.flags })
-      : await readCoStatusMachineStatusDataset({ flags: params.flags });
-  console.log(JSON.stringify(dataset, null, 2));
+  const dataset = requestedDashboardJson
+    ? await readCoStatusJsonDataset({ flags: params.flags })
+    : await readCoStatusMachineStatusDataset({ flags: params.flags });
+  dependencies.log(JSON.stringify(dataset, null, 2));
+}
+
+function inspectCurrentCoStatusRuntimeFreshness(): SourceRootFreshnessInspection {
+  const packageRoot = findPackageRoot();
+  const envRepoRoot = process.env.CODEX_ORCHESTRATOR_ROOT?.trim();
+  return inspectSourceRootFreshness({
+    intendedRepoRoot: envRepoRoot || packageRoot,
+    argv: process.argv,
+    packageRoot
+  });
+}
+
+function resolveCoStatusRuntimeFreshnessBlock(
+  freshness: SourceRootFreshnessInspection
+): CoStatusRuntimeFreshnessBlockPayload | null {
+  if (!freshness.drift_classes.includes('source_vs_dist_drift')) {
+    return null;
+  }
+  return {
+    mode: 'co_status_runtime_freshness',
+    read_only: true,
+    status: 'blocked',
+    reason: 'stale_generated_runtime',
+    stale_generated_runtime: true,
+    source_root_freshness: freshness,
+    detail:
+      `co-status is running generated dist while a source entrypoint exists (${freshness.detail || freshness.entrypoint_kind}); run co-status through the source-first bootstrap entrypoint before trusting current provider or control-host status.`
+  };
+}
+
+function emitCoStatusRuntimeFreshnessBlock(
+  payload: CoStatusRuntimeFreshnessBlockPayload,
+  format: OutputFormat,
+  dependencies: CoStatusCliShellDependencies
+): void {
+  if (format === 'json') {
+    dependencies.log(JSON.stringify(payload, null, 2));
+  } else {
+    dependencies.error(`co-status blocked: ${payload.detail}`);
+    dependencies.error(
+      `Runtime freshness: ${payload.source_root_freshness.status}; drift=${payload.source_root_freshness.drift_classes.join(', ')}`
+    );
+  }
+  dependencies.setExitCode(1);
 }
 
 export async function readCoStatusMachineStatusDataset(input: {
@@ -1213,5 +1310,6 @@ function findRunsRoot(runDir: string): string {
 export const __test__ = {
   DEFAULT_CO_STATUS_JSON_REQUEST_TIMEOUT_MS,
   applyProviderIntakeTruthOverlay,
-  isDegradedMetadataPayloadMatchingClaim
+  isDegradedMetadataPayloadMatchingClaim,
+  resolveCoStatusRuntimeFreshnessBlock
 };

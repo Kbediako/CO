@@ -225,7 +225,7 @@ export function buildControlHostSupervisionConfig(
   const repoRoot = resolve(input.repoRoot ?? cwd);
   const nodePath = resolveRequiredPath(input.nodePath ?? process.execPath, cwd, 'node path');
   const cliEntrypoint = resolveRequiredPath(
-    input.cliEntrypoint ?? join(repoRoot, 'dist', 'bin', 'codex-orchestrator.js'),
+    input.cliEntrypoint ?? join(repoRoot, 'bin', 'codex-orchestrator.js'),
     cwd,
     'CLI entrypoint'
   );

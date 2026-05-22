@@ -496,7 +496,7 @@ describe('control host ownership', () => {
     }
   });
 
-  it('ignores non-supervised source-root freshness warnings', () => {
+  it('fails closed when supervised runtime uses generated dist while source exists', () => {
     const distOnlyPayload = {
       status: 'owned',
       updated_at: '2026-05-18T23:08:00.000Z',
@@ -560,7 +560,15 @@ describe('control host ownership', () => {
       }
     } as ControlHostOwnershipPollingPayload;
 
-    expect(resolveControlHostSourceFreshnessPolicy(distOnlyPayload)).toBeNull();
+    expect(resolveControlHostSourceFreshnessPolicy(distOnlyPayload)).toMatchObject({
+      action: 'fail_closed',
+      reason: 'stale_generated_runtime',
+      status: 'warning',
+      source_checkout_status: 'current',
+      intended_checkout_status: 'current',
+      drift_classes: ['source_vs_dist_drift'],
+      detail: expect.stringContaining('generated dist while a source entrypoint exists')
+    });
   });
 
   it('does not release a lock that changed owners after acquisition', async () => {
