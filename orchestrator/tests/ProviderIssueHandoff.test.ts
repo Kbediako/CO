@@ -2032,6 +2032,123 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalled();
   });
 
+  it('uses accepted_at as the stale anchor for accepted pending-revalidation no-run recovery', async () => {
+    const { root, paths } = await createHostPaths();
+    const queuedRunPaths = resolveRunPaths(
+      {
+        repoRoot: root,
+        runsRoot: join(root, '.runs'),
+        outRoot: join(root, 'out'),
+        taskId: 'linear-lin-issue-574'
+      },
+      'run-co-574-queued-existing'
+    );
+    await mkdir(queuedRunPaths.runDir, { recursive: true });
+    await writeFile(
+      queuedRunPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-574-queued-existing',
+        task_id: 'linear-lin-issue-574',
+        pipeline_id: 'provider-linear-worker',
+        status: 'queued',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-574',
+        issue_identifier: 'CO-574',
+        issue_updated_at: '2026-05-21T23:30:24.534Z',
+        updated_at: '2026-05-21T23:31:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      issue_id: 'lin-issue-574',
+      issue_identifier: 'CO-574',
+      issue_title: 'Control-host machine-status endpoint stalls',
+      issue_state: 'In Progress',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-21T23:30:24.534Z',
+      issue_blocked_by: [],
+      task_id: 'linear-lin-issue-574',
+      state: 'accepted',
+      reason: 'provider_issue_rehydration_pending_revalidation',
+      accepted_at: '2026-05-21T23:30:00.000Z',
+      updated_at: '2026-05-21T23:30:59.000Z',
+      run_id: null,
+      run_manifest_path: null,
+      launch_started_at: null,
+      launch_source: null,
+      launch_token: null,
+      retry_error: null
+    }));
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-574-duplicate-recovery',
+        manifestPath: join(paths.runDir, 'provider-run-co-574-duplicate-recovery.json')
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async ({ issueId }: { provider: 'linear'; issueId: string }) => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: issueId,
+        identifier: 'CO-574',
+        title: 'Control-host machine-status endpoint stalls',
+        state: 'In Progress',
+        state_type: 'started',
+        updated_at: '2026-05-21T23:30:24.534Z',
+        blocked_by: []
+      })
+    }));
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-05-21T23:31:00.000Z'));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'provider-linear-worker',
+      resolveTrackedIssue,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 2
+        }
+      })
+    });
+
+    const result = await service.recoverIssue({
+      provider: 'linear',
+      issueId: 'lin-issue-574',
+      action: 'nudge'
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'provider_issue_rehydrated_queued_run',
+      claim: {
+        state: 'accepted',
+        reason: 'provider_issue_rehydrated_queued_run',
+        run_id: 'run-co-574-queued-existing',
+        run_manifest_path: queuedRunPaths.manifestPath,
+        launch_token_present: false
+      }
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'accepted',
+      reason: 'provider_issue_rehydrated_queued_run',
+      accepted_at: '2026-05-21T23:30:00.000Z',
+      run_id: 'run-co-574-queued-existing',
+      run_manifest_path: queuedRunPaths.manifestPath,
+      launch_token: null,
+      updated_at: '2026-05-21T23:31:00.000Z',
+      last_event: 'control_host_provider_worker_recover',
+      last_action: 'nudge'
+    });
+    expect(persist).toHaveBeenCalled();
+  });
+
   it.each(['recover', 'relaunch', 'nudge'] as const)(
     'relaunches through explicit %s when a completed duplicate claim already consumed active live issue truth',
     async (action) => {

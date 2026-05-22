@@ -45,16 +45,25 @@ export interface ControlMachineStatusDataset {
   provider_intake?: ProviderIntakeSummaryPayload | null;
   provider_intake_unavailable?: ControlProviderIntakeUnavailablePayload;
   provider_workflow?: ControlProviderWorkflowPayload;
+  machine_status_degraded?: ControlMachineStatusDegradedPayload;
+}
+
+export interface ControlMachineStatusDegradedPayload {
+  reason: 'read_failed' | 'read_timeout';
+  source: 'machine_status_controller';
+  message: string;
+  timeout_ms: number | null;
 }
 
 export interface ControlMachineStatusPresenterContext {
-  readMachineStatus(): Promise<ControlMachineStatusSnapshot>;
+  readMachineStatus(signal?: AbortSignal): Promise<ControlMachineStatusSnapshot>;
 }
 
 export async function readMachineStatusDataset(
-  context: ControlMachineStatusPresenterContext
+  context: ControlMachineStatusPresenterContext,
+  options: { signal?: AbortSignal } = {}
 ): Promise<ControlMachineStatusDataset> {
-  return buildMachineStatusDataset(await context.readMachineStatus());
+  return buildMachineStatusDataset(await context.readMachineStatus(options.signal));
 }
 
 export function buildMachineStatusDataset(
@@ -85,6 +94,36 @@ export function buildMachineStatusDataset(
       ? { provider_intake_unavailable: input.providerIntakeUnavailable }
       : {}),
     ...(input.providerWorkflow ? { provider_workflow: input.providerWorkflow } : {})
+  };
+}
+
+export function buildDegradedMachineStatusDataset(input: {
+  reason: ControlMachineStatusDegradedPayload['reason'];
+  message: string;
+  timeoutMs?: number | null;
+  generatedAt?: string;
+}): ControlMachineStatusDataset {
+  return {
+    generated_at: input.generatedAt ?? isoTimestamp(),
+    mode: 'control_machine_status',
+    read_only: true,
+    host: LOCAL_HOSTNAME,
+    counts: {
+      running: 0,
+      retrying: 0,
+      issues: 0,
+      max_allowed: null
+    },
+    polling: null,
+    running: [],
+    retrying: [],
+    issues: [],
+    machine_status_degraded: {
+      reason: input.reason,
+      source: 'machine_status_controller',
+      message: input.message,
+      timeout_ms: input.timeoutMs ?? null
+    }
   };
 }
 

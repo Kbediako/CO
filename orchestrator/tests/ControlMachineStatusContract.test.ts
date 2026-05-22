@@ -1,14 +1,48 @@
+import http from 'node:http';
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { buildMachineStatusDataset } from '../src/cli/control/controlMachineStatusPresenter.js';
+import {
+  buildMachineStatusDataset,
+  type ControlMachineStatusSnapshot
+} from '../src/cli/control/controlMachineStatusPresenter.js';
 import { createControlRuntime } from '../src/cli/control/controlRuntime.js';
+import {
+  __test__ as machineStatusControllerTest,
+  handleMachineStatusRequest
+} from '../src/cli/control/machineStatusController.js';
 import type { ControlProviderWorkflowPayload } from '../src/cli/control/observabilityReadModel.js';
 import type { ProviderIntakeClaimRecord } from '../src/cli/control/providerIntakeState.js';
 import type { ProviderWorkflowConfigStore } from '../src/cli/control/providerWorkflowConfigStore.js';
+
+function createResponseRecorder() {
+  const state: {
+    statusCode: number | null;
+    headers: Record<string, string> | null;
+    body: unknown;
+  } = {
+    statusCode: null,
+    headers: null,
+    body: null
+  };
+
+  const res = {
+    writeHead(statusCode: number, headers: Record<string, string>) {
+      state.statusCode = statusCode;
+      state.headers = headers;
+      return this;
+    },
+    end(payload?: string) {
+      state.body = payload ? JSON.parse(payload) : null;
+      return this;
+    }
+  } as unknown as http.ServerResponse;
+
+  return { res, state };
+}
 
 describe('control machine status contract', () => {
   it('keeps the machine-status endpoint/read model independent from compatibility projection', async () => {
@@ -245,6 +279,70 @@ describe('control machine status contract', () => {
 
     expect(refreshCalled).toBe(false);
     expect(machineStatus.providerWorkflow).toEqual(providerWorkflow);
+  });
+
+  it('returns degraded fail-closed machine-status json when the read path times out', async () => {
+    vi.useFakeTimers();
+    try {
+      const { res, state } = createResponseRecorder();
+      let observedSignal: AbortSignal | undefined;
+      let abortReason: unknown;
+      const handledPromise = handleMachineStatusRequest({
+        req: {
+          method: 'GET',
+          url: '/ui/machine-status.json'
+        } as Pick<http.IncomingMessage, 'method' | 'url'>,
+        res,
+        presenterContext: {
+          readMachineStatus: async (signal?: AbortSignal) => {
+            observedSignal = signal;
+            return await new Promise<ControlMachineStatusSnapshot>((_resolve, reject) => {
+              signal?.addEventListener(
+                'abort',
+                () => {
+                  abortReason = signal.reason;
+                  reject(signal.reason);
+                },
+                { once: true }
+              );
+            });
+          }
+        }
+      });
+
+      await vi.advanceTimersByTimeAsync(machineStatusControllerTest.DEFAULT_MACHINE_STATUS_READ_TIMEOUT_MS);
+
+      await expect(handledPromise).resolves.toBe(true);
+      expect(state.statusCode).toBe(200);
+      expect(state.headers).toMatchObject({
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store'
+      });
+      expect(state.body).toMatchObject({
+        mode: 'control_machine_status',
+        read_only: true,
+        counts: {
+          running: 0,
+          retrying: 0,
+          issues: 0,
+          max_allowed: null
+        },
+        polling: null,
+        running: [],
+        retrying: [],
+        issues: [],
+        machine_status_degraded: {
+          reason: 'read_timeout',
+          source: 'machine_status_controller',
+          message: `control-host machine-status read timed out after ${machineStatusControllerTest.DEFAULT_MACHINE_STATUS_READ_TIMEOUT_MS}ms`,
+          timeout_ms: machineStatusControllerTest.DEFAULT_MACHINE_STATUS_READ_TIMEOUT_MS
+        }
+      });
+      expect(observedSignal?.aborted).toBe(true);
+      expect(abortReason).toBeInstanceOf(Error);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

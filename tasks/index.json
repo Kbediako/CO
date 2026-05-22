@@ -26824,6 +26824,42 @@
         "url": "https://linear.app/asabeko/issue/CO-566/co-recover-ready-resumable-provider-claims-without-dispatch-pilot"
       },
       "canonical_owner_key": "provider-intake:ready-resumable-recover-dispatch-source-disabled:v1"
+    },
+    {
+      "id": "20260521-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f",
+      "title": "CO-574 stop control-host machine-status endpoint stalls under active workers",
+      "relates_to": "tasks/tasks-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-21",
+      "evidence": [
+        "docs/PRD-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+        "docs/TECH_SPEC-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+        "docs/ACTION_PLAN-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+        "tasks/specs/linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+        "tasks/tasks-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+        ".agent/task/linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "paths": {
+        "spec": "tasks/specs/linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+        "task": "tasks/tasks-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+        "agent_task": ".agent/task/linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+        "prd": "docs/PRD-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+        "docs": "docs/TECH_SPEC-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+        "action_plan": "docs/ACTION_PLAN-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md"
+      },
+      "source_issue": {
+        "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
+        "identifier": "CO-574",
+        "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
+      },
+      "canonical_owner_key": "control-host:machine-status-active-worker-timeout-quarantine:v1"
     }
   ]
 }

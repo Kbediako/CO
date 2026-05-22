@@ -44009,6 +44009,108 @@
       "created_at": "2026-05-21",
       "next_review": "2026-06-20",
       "notes": "CO-573 docs-first packet for live docs:freshness:maintain owner re-home after terminal CO-558; CO-572 remains out of scope."
+    },
+    {
+      "path": "docs/PRD-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
+        "identifier": "CO-574",
+        "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20",
+      "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
+        "identifier": "CO-574",
+        "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20",
+      "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
+        "identifier": "CO-574",
+        "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20",
+      "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
+    },
+    {
+      "path": "tasks/specs/linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
+        "identifier": "CO-574",
+        "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20",
+      "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
+    },
+    {
+      "path": "tasks/tasks-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
+        "identifier": "CO-574",
+        "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20",
+      "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
+    },
+    {
+      "path": ".agent/task/linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-21",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
+        "identifier": "CO-574",
+        "url": "https://linear.app/asabeko/issue/CO-574/co-stop-control-host-machine-status-endpoint-stalls-under-active"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-21",
+      "next_review": "2026-06-20",
+      "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
     }
   ]
 }

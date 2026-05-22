@@ -2737,6 +2737,60 @@ describe('controlHostSupervision shell helpers', () => {
     }
   });
 
+  it('quarantines repeated same-endpoint machine-status timeout churn after one fail-closed timeout restart', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-same-endpoint-timeout-quarantine-'));
+    try {
+      const config = buildControlHostSupervisionConfig({
+        homeDir: '/Users/tester',
+        cwd: tempRoot,
+        repoRoot: tempRoot,
+        nodePath: '/custom/node',
+        cliEntrypoint: '/opt/codex-orchestrator.js',
+        taskId: 'local-mcp',
+        runId: 'control-host',
+        healthIntervalSeconds: 5
+      });
+      await writeProviderIntakeStateFixture(config, {});
+      const restartedAt = new Date().toISOString();
+
+      const result = await probeControlHostHealth(
+        config,
+        {},
+        {
+          restartHistory: [
+            {
+              requested_at: restartedAt,
+              reason: 'probe_timeout',
+              message: 'control-host machine-status request timeout after 5000ms.',
+              consecutive_unhealthy_samples: 3,
+              child_pid: 4321,
+              diagnostic: buildProbeTimeoutDiagnosticFixture()
+            }
+          ]
+        },
+        async () => ({
+          exitCode: 1,
+          stdout: '',
+          stderr:
+            'control-host machine-status request timeout after 5000ms. The current resolved /ui/machine-status.json endpoint timed out again after endpoint re-resolution returned the same endpoint/token; this is a same-endpoint current-endpoint timeout.',
+          timedOut: false
+        })
+      );
+
+      expect(result.healthy).toBe(true);
+      expect(result.reason).toBe('active_worker_probe_timeout_quarantine');
+      expect(result.message).toContain(
+        `same active provider worker series already restarted at ${restartedAt}`
+      );
+      expect(result.diagnostic?.polling?.reason).toBe('provider_refresh_lifecycle_stuck');
+      expect(result.diagnostic?.running_workers.map((worker) => worker.issue_identifier)).toEqual([
+        'CO-225'
+      ]);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it('quarantines repeated probe timeout churn while provider refresh is active before restart_required', async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), 'co-supervision-timeout-active-refresh-'));
     try {

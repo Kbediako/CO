@@ -7498,16 +7498,22 @@ function isProviderIssueRecoveryAction(value: string | null): value is ProviderI
 function isProviderStaleManifestlessHandoffClaim(
   claim: Pick<
     ProviderIntakeClaimRecord,
-    'state' | 'reason' | 'run_id' | 'run_manifest_path' | 'launch_started_at' | 'updated_at'
+    | 'state'
+    | 'reason'
+    | 'run_id'
+    | 'run_manifest_path'
+    | 'accepted_at'
+    | 'launch_started_at'
+    | 'updated_at'
   >
 ): boolean {
+  const acceptedPendingRevalidation =
+    claim.state === 'accepted' &&
+    claim.reason === 'provider_issue_rehydration_pending_revalidation';
   const manifestlessCandidateState =
     claim.state === 'starting' ||
     claim.state === 'resuming' ||
-    (
-      claim.state === 'accepted' &&
-      claim.reason === 'provider_issue_rehydration_pending_revalidation'
-    );
+    acceptedPendingRevalidation;
   if (
     !manifestlessCandidateState ||
     normalizeOptionalString(claim.run_id) !== null ||
@@ -7515,11 +7521,17 @@ function isProviderStaleManifestlessHandoffClaim(
   ) {
     return false;
   }
-  const startedAtMs = Date.parse(
-    normalizeOptionalString(claim.launch_started_at) ??
-      normalizeOptionalString(claim.updated_at) ??
-      ''
-  );
+  const staleAnchor = acceptedPendingRevalidation
+    ? (
+        normalizeOptionalString(claim.launch_started_at) ??
+        normalizeOptionalString(claim.accepted_at) ??
+        normalizeOptionalString(claim.updated_at)
+      )
+    : (
+        normalizeOptionalString(claim.launch_started_at) ??
+        normalizeOptionalString(claim.updated_at)
+      );
+  const startedAtMs = Date.parse(staleAnchor ?? '');
   return Number.isFinite(startedAtMs) &&
     Date.now() - startedAtMs >= PROVIDER_MANIFESTLESS_HANDOFF_RECOVERY_STALE_MS;
 }
