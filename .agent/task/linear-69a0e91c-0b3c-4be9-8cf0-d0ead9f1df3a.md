@@ -23,7 +23,7 @@
 - [x] `npm run docs:freshness`. Evidence: `docs:freshness OK - 4923 docs, 4926 registry entries`.
 - [x] Required repo validation floor through full test suite. Evidence: build, lint, test, docs, stewardship, and diff-budget commands passed.
 - [x] Review/elegance gate completed before PR handoff. Evidence: review telemetry reports `status=succeeded`, `review_outcome=bounded-success`; elegance notes recorded under `out/linear-69a0e91c-0b3c-4be9-8cf0-d0ead9f1df3a/manual/20260429T122441Z-review/elegance-review.md`.
-- [x] PR handoff evidence. Evidence: pending.
+- [x] PR handoff evidence. Evidence: `docs/TASKS.md` CO-422 snapshot and the CO-575 terminal lifecycle reconciliation note below confirm the lane is terminal.
 
 ## Notes
 - This mirror intentionally stays concise. The canonical checklist is `tasks/tasks-linear-69a0e91c-0b3c-4be9-8cf0-d0ead9f1df3a.md`.

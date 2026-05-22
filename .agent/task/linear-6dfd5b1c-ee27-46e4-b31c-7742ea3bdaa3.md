@@ -35,6 +35,17 @@
 - No Linear/GitHub/PR lifecycle commands were run or mutated.
 - No source code or tests were changed.
 
+## Fallback Expiry / Refactor Decision
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Live issue-context projection | Labels omitted from live current-state GraphQL projection. | remove fallback | CO-400 | Provider worker reads issue context for Linear current state. | existing issue-context behavior | N/A after removal | N/A after removal | Label nodes are queried and parsed as current-state truth. | Focused facade live-parse regression. |
+| Cached issue-context snapshots | Cache parse/write can strip labels or make omitted labels appear authoritative. | remove fallback | CO-400 | Issue-context cache is written or read after label-aware live context exists. | existing cache behavior | N/A after removal | N/A after removal | Known labels round-trip; omitted legacy labels remain unknown/not projected. | Cache round-trip and legacy omitted-label safety regressions. |
+| Provider-worker label state | Local/provider fallback projection or omitted-label inference substitutes for live Linear labels. | remove fallback | CO-400 | Consumer needs label state from issue context. | existing omission behavior | N/A after removal | N/A after removal | Consumers use live/cached labels only and cannot treat omission as unlabeled. | CLI JSON and provider-facing facade assertions. |
+
+- Large-refactor check: CO-400 already consolidated current-state authority for label projection; CO-575 only records terminal lifecycle reconciliation for the completed packet.
+- Minor-seam decision: removing label omission and fallback projection was required by CO-400; CO-575 does not add or retain another label fallback seam.
+
 ## CO-575 terminal lifecycle reconciliation
 
 - 2026-05-22: Historical open checklist residue was reconciled under CO-575 after tasks/index and live Linear terminal evidence showed this task is already complete. This allows implementation-docs archival to preserve the full packet on doc-archives without keeping active docs-freshness debt open on main.

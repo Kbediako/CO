@@ -40,7 +40,7 @@
    - Files: PR attachment and workpad.
    - Commands: push/open PR, attach PR, merge latest `origin/main`, PR checks, `ready-review`, Linear transition.
    - Acceptance: workpad refreshed and issue moved to `In Review` only after handoff prerequisites.
-   - [x] Status: Pending.
+   - [x] Status: Completed; live Linear issue-context during CO-575 docs freshness maintenance verified CO-406 as `Done`/completed.
 
 ## Relevant Files
 - `docs/PRD-linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md`
@@ -55,6 +55,17 @@
 - Child lane `no-run-capacity-regression` is no longer active; parent owns reconciled tests after stale-metadata invalidation.
 - Preserve `provider_issue_rehydration_pending_revalidation`, `provider_issue_start_blocked:max_concurrency`, `running=2`, and `max_allowed=3` terminology.
 - CO-404 acknowledgement-timeout behavior is explicitly out of scope.
+
+## Fallback Expiry / Refactor Decision
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Provider admission capacity | Accepted pending-revalidation no-run claim counted as active capacity | remove fallback | CO-406 | Retry sees a retained accepted claim without run or launch evidence. | observed 2026-04-27 | N/A after removal | N/A after removal | No-run accepted claims are excluded from occupancy. | `ProviderIssueHandoff` regression for `running=2`, `max_allowed=3`, same-issue accepted no-run claim. |
+| Owning surface: provider-intake read model/status surfaces | Retained accepted pending-revalidation no-run claim | justify retaining fallback | CO-406 | Steady-state proof: accepted no-run claims remain visible but non-occupying. | observed 2026-04-27 | 2026-05-12 | Non-expiring rationale: audit evidence is durable state, not an expiring runtime fallback. | Contract name: provider-intake pending-revalidation audit state. | Tests/docs: ControlRuntime status regression proves visible but non-running. |
+| Owning surface: provider admission capacity | Running or launching claims block duplicate starts | justify retaining fallback | CO-125 / CO-406 | Steady-state proof: run or launch evidence still blocks duplicate starts. | existing provider admission contract | 2026-05-12 | Non-expiring rationale: duplicate-launch safety is a permanent admission invariant. | Contract name: provider-worker duplicate-launch single-flight protection. | Tests/docs: duplicate-running and launch-inflight regressions stay green. |
+
+- Large-refactor check: CO-406 centralized occupancy classification without introducing another status authority; CO-575 only records terminal lifecycle reconciliation for the completed packet.
+- Minor-seam decision: retaining audit-state and duplicate-launch seams remains the durable CO-406 contract; CO-575 does not add another provider-admission seam.
 
 ## CO-575 terminal lifecycle reconciliation
 

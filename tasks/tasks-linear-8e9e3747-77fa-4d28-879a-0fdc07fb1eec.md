@@ -78,6 +78,17 @@
 - Do not change CO-404 acknowledgement-timeout behavior.
 - Do not weaken duplicate provider-worker launch protection.
 
+## Fallback Expiry / Refactor Decision
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Provider admission capacity | Accepted pending-revalidation no-run claim counted as active capacity | remove fallback | CO-406 | Retry sees a retained accepted claim without run or launch evidence. | observed 2026-04-27 | N/A after removal | N/A after removal | No-run accepted claims are excluded from occupancy. | `ProviderIssueHandoff` regression for `running=2`, `max_allowed=3`, same-issue accepted no-run claim. |
+| Owning surface: provider-intake read model/status surfaces | Retained accepted pending-revalidation no-run claim | justify retaining fallback | CO-406 | Steady-state proof: accepted no-run claims remain visible but non-occupying. | observed 2026-04-27 | 2026-05-12 | Non-expiring rationale: audit evidence is durable state, not an expiring runtime fallback. | Contract name: provider-intake pending-revalidation audit state. | Tests/docs: ControlRuntime status regression proves visible but non-running. |
+| Owning surface: provider admission capacity | Running or launching claims block duplicate starts | justify retaining fallback | CO-125 / CO-406 | Steady-state proof: run or launch evidence still blocks duplicate starts. | existing provider admission contract | 2026-05-12 | Non-expiring rationale: duplicate-launch safety is a permanent admission invariant. | Contract name: provider-worker duplicate-launch single-flight protection. | Tests/docs: duplicate-running and launch-inflight regressions stay green. |
+
+- Large-refactor check: CO-406 centralized occupancy classification without introducing another status authority; CO-575 only records terminal lifecycle reconciliation for the completed packet.
+- Minor-seam decision: retaining audit-state and duplicate-launch seams remains the durable CO-406 contract; CO-575 does not add another provider-admission seam.
+
 ## CO-575 terminal lifecycle reconciliation
 
 - 2026-05-22: Historical open checklist residue was reconciled under CO-575 after tasks/index and live Linear terminal evidence showed this task is already complete. This allows implementation-docs archival to preserve the full packet on doc-archives without keeping active docs-freshness debt open on main.
