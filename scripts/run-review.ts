@@ -72,11 +72,10 @@ import {
   getLargeScopeGateError,
   buildLargeScopeAdvisoryPromptLines,
   buildScopeNotes,
-  collectReviewScopePaths,
   formatScopeMetrics,
   logReviewScopeAssessment,
   resolveLargeScopeOverrideReason,
-  resolveEffectiveScopeMode
+  resolveReviewScope
 } from './lib/review-scope-advisory.js';
 import { collectManifests, resolveEnvironmentPaths } from './lib/run-manifests.js';
 
@@ -662,8 +661,16 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
     if (explicitScopeSurfaceGateError) {
       throw new Error(explicitScopeSurfaceGateError);
     }
+    const scopeResolution = await resolveReviewScope(options, repoRoot);
     if (shouldRunDiffBudget()) {
-      await runDiffBudget(options, repoRoot);
+      await runDiffBudget(
+        {
+          ...options,
+          base: scopeResolution.options.base,
+          commit: scopeResolution.options.commit
+        },
+        repoRoot
+      );
     } else {
       console.log('[run-review] skipping diff budget (already executed by pipeline).');
     }
@@ -678,7 +685,7 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
     const taskKey = options.task ?? envTask ?? manifestTask;
     const taskLabel = taskKey ?? 'unknown-task';
     const diffBudgetOverride = process.env.DIFF_BUDGET_OVERRIDE_REASON?.trim();
-    const scopeMode = resolveEffectiveScopeMode(options);
+    const { scopeMode, scopePathCollection } = scopeResolution;
     const allowHeavyCommands = allowHeavyReviewCommands();
     const contractMode = resolveReviewContractMode(process.env);
     const {
@@ -733,10 +740,12 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
       }
     }
 
-    const scopePathCollection = await collectReviewScopePaths(options, repoRoot);
-    const scopeNotes = buildScopeNotes(options, scopePathCollection);
+    const scopeNotes = buildScopeNotes(scopeResolution.options, scopePathCollection);
     if (scopeNotes.length > 0) {
       promptLines.push('', ...scopeNotes);
+    }
+    if (scopeResolution.promptLines.length > 0) {
+      promptLines.push('', ...scopeResolution.promptLines);
     }
     const activeCloseoutProvenanceLines = buildActiveCloseoutProvenanceLines(
       repoRoot,
@@ -745,7 +754,12 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
     if (activeCloseoutProvenanceLines.length > 0) {
       promptLines.push('', ...activeCloseoutProvenanceLines);
     }
-    const scopeAssessment = await assessReviewScope(options, repoRoot);
+    const scopeAssessment = await assessReviewScope(scopeResolution.options, repoRoot, process.env, {
+      largeScopeGate:
+        scopeResolution.resolutionKind === 'default-uncommitted-committed-branch-diff'
+          ? 'default-branch-diff'
+          : undefined
+    });
     const scopeMetrics = formatScopeMetrics(scopeAssessment);
     const largeScopeOverrideReason = resolveLargeScopeOverrideReason(process.env);
     const stdinIsTTY = process.stdin?.isTTY === true;
@@ -772,7 +786,7 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
     );
     const explicitScopeRetryGateError = buildExplicitScopeRetryGateError(options);
     const retryWithoutScopeFlagsAssessment =
-      explicitScopeRetryGateError !== null || resolveEffectiveScopeMode(options) === 'uncommitted'
+      explicitScopeRetryGateError !== null || scopeMode === 'uncommitted'
         ? null
         : await assessReviewScope({}, repoRoot);
     const retryWithoutScopeFlagsGateError =
@@ -811,8 +825,13 @@ export async function runReviewCli(argv: string[] = process.argv.slice(2)): Prom
       reviewSurface,
       scopePaths: scopePathCollection.paths,
       scopeMode,
-      scopeBase: options.base ?? null,
-      scopeCommit: options.commit ?? null,
+      scopeBase: scopeResolution.options.base ?? null,
+      scopeCommit: scopeResolution.options.commit ?? null,
+      requestedScopeMode: scopeResolution.requestedScopeMode,
+      requestedScopeBase: scopeResolution.requestedOptions.base ?? null,
+      requestedScopeCommit: scopeResolution.requestedOptions.commit ?? null,
+      scopeResolutionKind: scopeResolution.resolutionKind,
+      scopeResolutionNote: scopeResolution.resolutionNote,
       notes: resolvedNotes,
       mode: contractMode
     });
