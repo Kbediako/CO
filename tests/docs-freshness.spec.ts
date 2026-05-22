@@ -701,6 +701,137 @@ describe('docs freshness reporting', () => {
     expect(renderDocsFreshnessMarkdown(report)).toContain('- Terminal lifecycle entries: 7');
   });
 
+  it('routes terminal packet paths stored in nested docs objects to lifecycle action', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-terminal-docs-object-'));
+    createdDirs.push(repoRoot);
+    const packetPaths = [
+      'docs/PRD-coordinator-symphony-aligned-orchestrator-with-control-plane-lifecycle-shell-extraction.md',
+      'docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-with-control-plane-lifecycle-shell-extraction.md',
+      'docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-with-control-plane-lifecycle-shell-extraction.md'
+    ];
+
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
+    for (const packetPath of packetPaths) {
+      await writeFile(join(repoRoot, packetPath), '# Terminal Object Packet\n', 'utf8');
+    }
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260314-1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction',
+              status: 'done',
+              completed_at: reviewDateDaysAgo(1),
+              paths: {
+                docs: {
+                  PRD: packetPaths[0],
+                  TECH_SPEC: packetPaths[1],
+                  ACTION_PLAN: packetPaths[2]
+                }
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: packetPaths.map((packetPath) => ({
+        path: packetPath,
+        owner: 'Codex',
+        status: 'active',
+        last_review: reviewDateDaysAgo(45),
+        cadence_days: 30
+      })),
+      catalogPatterns: [{ glob: 'docs/*.md', doc_class: 'task_packet' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.stale_entries).toBe(0);
+    expect(report.totals.terminal_lifecycle_entries).toBe(3);
+    expect(report.terminal_lifecycle_entries).toEqual(
+      expect.arrayContaining(
+        packetPaths.map((packetPath) =>
+          expect.objectContaining({
+            path: packetPath,
+            lifecycle_state: 'terminal_pending_archive',
+            task_id:
+              '20260314-1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction'
+          })
+        )
+      )
+    );
+  });
+
+  it('honors explicit non-terminal registry task status for open-checklist packet docs', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-open-checklist-override-'));
+    createdDirs.push(repoRoot);
+    const packetPath = 'docs/PRD-open-checklist-terminal-packet.md';
+
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
+    await writeFile(
+      join(repoRoot, packetPath),
+      '# Terminal Packet With Open Checklist\n\n- [ ] Preserve visible follow-up evidence.\n',
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260522-open-checklist-terminal-packet',
+              status: 'done',
+              completed_at: reviewDateDaysAgo(1),
+              paths: {
+                docs: packetPath
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: packetPath,
+          owner: 'Codex',
+          status: 'active',
+          task_status: 'open_checklist',
+          last_review: reviewDateDaysAgo(0),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [{ glob: 'docs/*.md', doc_class: 'task_packet' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(false);
+    expect(report.totals.stale_entries).toBe(0);
+    expect(report.totals.terminal_lifecycle_entries).toBe(0);
+  });
+
   it('routes legacy tasks[] terminal task packet rows to lifecycle action', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-legacy-tasks-terminal-lifecycle-'));
     createdDirs.push(repoRoot);

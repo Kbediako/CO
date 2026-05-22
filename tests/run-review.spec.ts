@@ -2571,11 +2571,17 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     ) as {
       scope_mode?: string;
       scope_base?: string;
+      requested_scope_mode?: string;
+      requested_scope_base?: string | null;
+      scope_resolution_kind?: string;
       git_diff_name_status?: string;
       git_diff_patch?: string;
     };
     expect(changeBundle.scope_mode).toBe('base');
     expect(changeBundle.scope_base).toBe('HEAD~1');
+    expect(changeBundle.requested_scope_mode).toBe('base');
+    expect(changeBundle.requested_scope_base).toBe('HEAD~1');
+    expect(changeBundle.scope_resolution_kind).toBe('explicit');
     expect(changeBundle.git_diff_name_status).toContain('file-1.txt');
     expect(changeBundle.git_diff_patch).toContain('updated');
     const telemetry = JSON.parse(
@@ -2594,6 +2600,215 @@ describe('scripts/run-review regression', { timeout: LONG_WAIT_TEST_TIMEOUT_MS }
     expect(telemetry.launch_context?.scope_flag_mode).toBeNull();
     expect(telemetry.launch_context?.prompt_delivery).toBe('stdin');
     expect(telemetry.launch_context?.reviewer_visible_context_transport).toBe('stdin-prompt');
+  });
+
+  it('bundles committed branch diffs for default clean working-tree review scope', async () => {
+    const sandbox = await makeSandbox();
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    await writeFile(join(sandbox, '.gitignore'), ['.runs/', 'codex-mock.sh', 'review-*.log', ''].join('\n'), 'utf8');
+    await makeFakeDiffBudgetScript(sandbox);
+    await runGit(['add', '.gitignore', 'scripts/diff-budget.mjs'], sandbox);
+    await runGit(['commit', '-m', 'ignore review harness artifacts and add diff budget'], sandbox);
+    await runGit(['update-ref', 'refs/remotes/origin/main', 'HEAD'], sandbox);
+    await writeFile(join(sandbox, 'file-1.txt'), 'committed branch update\n', 'utf8');
+    await runGit(['add', 'file-1.txt'], sandbox);
+    await runGit(['commit', '-m', 'committed branch update'], sandbox);
+    const { stdout: statusBeforeReview } = await execFileAsync(
+      'git',
+      ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+      { cwd: sandbox }
+    );
+    expect(statusBeforeReview).toBe('');
+
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'contract-clean-output',
+      NOTES: 'Goal: default committed branch scope test | Summary: clean worker tree should still bundle branch/base changes | Risks: empty change bundle would hide committed implementation',
+      CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+      CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('fake diff-budget base=origin/main');
+    const prompt = await readFile(join(dirname(manifestPath), 'review', 'prompt.txt'), 'utf8');
+    expect(prompt).toContain('Review scope hint: diff vs base `origin/main`');
+    expect(prompt).toContain(
+      'Review scope resolution: uncommitted working tree is empty; using committed branch diff against base `origin/main`'
+    );
+    expect(prompt).toContain('file-1.txt');
+    const changeBundle = JSON.parse(
+      await readFile(join(dirname(manifestPath), 'review', 'inputs', 'change-bundle.json'), 'utf8')
+    ) as {
+      scope_mode?: string;
+      scope_base?: string | null;
+      requested_scope_mode?: string;
+      requested_scope_base?: string | null;
+      scope_resolution_kind?: string;
+      scope_resolution_note?: string | null;
+      scope_paths?: string[];
+      git_diff_name_status?: string;
+      git_diff_patch?: string;
+      touched_refs?: Array<{ path?: string }>;
+    };
+    expect(changeBundle.scope_mode).toBe('base');
+    expect(changeBundle.scope_base).toBe('origin/main');
+    expect(changeBundle.requested_scope_mode).toBe('uncommitted');
+    expect(changeBundle.requested_scope_base).toBeNull();
+    expect(changeBundle.scope_resolution_kind).toBe(
+      'default-uncommitted-committed-branch-diff'
+    );
+    expect(changeBundle.scope_resolution_note).toContain(
+      'using committed branch diff against base `origin/main`'
+    );
+    expect(changeBundle.scope_paths).toEqual(['file-1.txt']);
+    expect(changeBundle.git_diff_name_status).toContain('M\tfile-1.txt');
+    expect(changeBundle.git_diff_patch).toContain('+committed branch update');
+    expect(changeBundle.touched_refs?.map((ref) => ref.path)).toContain('file-1.txt');
+  });
+
+  it('gates large committed branch diffs discovered from default clean working-tree review scope', async () => {
+    const sandbox = await makeSandbox();
+    const { files } = await initGitRepoWithCommittedFiles(sandbox, 3);
+    await writeFile(join(sandbox, '.gitignore'), ['.runs/', 'codex-mock.sh', 'review-*.log', ''].join('\n'), 'utf8');
+    await makeFakeDiffBudgetScript(sandbox);
+    await runGit(['add', '.gitignore', 'scripts/diff-budget.mjs'], sandbox);
+    await runGit(['commit', '-m', 'ignore review harness artifacts and add diff budget'], sandbox);
+    await runGit(['update-ref', 'refs/remotes/origin/main', 'HEAD'], sandbox);
+    for (const file of files) {
+      await writeFile(join(sandbox, file), `committed branch update for ${file}\n`, 'utf8');
+    }
+    await runGit(['add', ...files], sandbox);
+    await runGit(['commit', '-m', 'large committed branch update'], sandbox);
+    const { stdout: statusBeforeReview } = await execFileAsync(
+      'git',
+      ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+      { cwd: sandbox }
+    );
+    expect(statusBeforeReview).toBe('');
+
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const argsLogPath = join(sandbox, 'review-args.log');
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_ARGS_LOG: argsLogPath,
+      CODEX_REVIEW_LARGE_SCOPE_FILE_THRESHOLD: '2',
+      CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD: '2'
+    });
+
+    expect(result.exitCode).toBeGreaterThan(0);
+    expect(result.stdout).toContain('review scope metrics: 3 files, 6 lines.');
+    expect(result.stderr).toContain('large default committed branch diff review scope detected');
+    expect(result.stderr).toContain(
+      'large default committed branch diff review scope requires explicit scoping or override'
+    );
+    const reviewInvocations = parseArgsLogInvocations(
+      await readFile(argsLogPath, 'utf8').catch(() => '')
+    ).filter((entry) => entry.includes('argv=review'));
+    expect(reviewInvocations).toHaveLength(0);
+  });
+
+  it('records an intentionally empty scope when the clean worker branch matches the default base', async () => {
+    const sandbox = await makeSandbox();
+    await initGitRepoWithCommittedFiles(sandbox, 1);
+    await writeFile(join(sandbox, '.gitignore'), ['.runs/', 'codex-mock.sh', ''].join('\n'), 'utf8');
+    await runGit(['add', '.gitignore'], sandbox);
+    await runGit(['commit', '-m', 'ignore review harness artifacts'], sandbox);
+    await runGit(['update-ref', 'refs/remotes/origin/main', 'HEAD'], sandbox);
+    const { stdout: statusBeforeReview } = await execFileAsync(
+      'git',
+      ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+      { cwd: sandbox }
+    );
+    expect(statusBeforeReview).toBe('');
+
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'contract-clean-output',
+      NOTES: 'Goal: intentionally empty scope test | Summary: clean worker branch matching base may keep an empty bundle | Risks: reviewer must see why the scope is empty',
+      CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+      CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+    });
+
+    expect(result.exitCode).toBe(0);
+    const prompt = await readFile(join(dirname(manifestPath), 'review', 'prompt.txt'), 'utf8');
+    expect(prompt).toContain('Review scope hint: uncommitted working tree changes (default).');
+    expect(prompt).toContain(
+      'Review scope resolution: intentionally empty; uncommitted working tree is empty and committed branch diff against base `origin/main` is empty.'
+    );
+    const changeBundle = JSON.parse(
+      await readFile(join(dirname(manifestPath), 'review', 'inputs', 'change-bundle.json'), 'utf8')
+    ) as {
+      scope_mode?: string;
+      requested_scope_mode?: string;
+      scope_resolution_kind?: string;
+      scope_resolution_note?: string | null;
+      scope_paths?: string[];
+      git_diff_name_status?: string;
+      touched_refs?: unknown[];
+    };
+    expect(changeBundle.scope_mode).toBe('uncommitted');
+    expect(changeBundle.requested_scope_mode).toBe('uncommitted');
+    expect(changeBundle.scope_resolution_kind).toBe('default-uncommitted-empty-branch');
+    expect(changeBundle.scope_resolution_note).toContain(
+      'intentionally empty; uncommitted working tree is empty'
+    );
+    expect(changeBundle.scope_paths).toEqual([]);
+    expect(changeBundle.git_diff_name_status).toBe('');
+    expect(changeBundle.touched_refs).toEqual([]);
+  });
+
+  it('records a scope diagnostic when a clean default review has no resolvable base ref', async () => {
+    const sandbox = await makeSandbox();
+    await runGit(['init'], sandbox);
+    await writeFile(
+      join(sandbox, '.git', 'info', 'exclude'),
+      ['.runs/', 'codex-mock.sh', 'review-*.log', ''].join('\n'),
+      'utf8'
+    );
+    const manifestPath = await makeManifest(sandbox);
+    const codexBin = await makeFakeCodex(sandbox);
+    const { stdout: statusBeforeReview } = await execFileAsync(
+      'git',
+      ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+      { cwd: sandbox }
+    );
+    expect(statusBeforeReview).toBe('');
+
+    const result = await runReviewCommand(manifestPath, {
+      ...baseEnv(sandbox, codexBin),
+      RUN_REVIEW_MODE: 'contract-clean-output',
+      NOTES: 'Goal: base-unavailable diagnostic test | Summary: clean default review should explain why committed branch evidence is unavailable | Risks: silent empty scope would hide branch changes',
+      CODEX_REVIEW_AUTHORITATIVE_GATE: '1',
+      CODEX_REVIEW_CONTRACT_MODE: 'enforce'
+    });
+
+    expect(result.exitCode).toBe(0);
+    const prompt = await readFile(join(dirname(manifestPath), 'review', 'prompt.txt'), 'utf8');
+    expect(prompt).toContain('Review scope hint: uncommitted working tree changes (default).');
+    expect(prompt).toContain(
+      'Review scope resolution: uncommitted working tree is empty and no default base ref'
+    );
+    const changeBundle = JSON.parse(
+      await readFile(join(dirname(manifestPath), 'review', 'inputs', 'change-bundle.json'), 'utf8')
+    ) as {
+      scope_mode?: string;
+      requested_scope_mode?: string;
+      scope_resolution_kind?: string;
+      scope_resolution_note?: string | null;
+      scope_paths?: string[];
+      touched_refs?: unknown[];
+    };
+    expect(changeBundle.scope_mode).toBe('uncommitted');
+    expect(changeBundle.requested_scope_mode).toBe('uncommitted');
+    expect(changeBundle.scope_resolution_kind).toBe('default-uncommitted-base-unavailable');
+    expect(changeBundle.scope_resolution_note).toContain('no default base ref');
+    expect(changeBundle.scope_paths).toEqual([]);
+    expect(changeBundle.touched_refs).toEqual([]);
   });
 
   it('ignores ambient fake-codex harness env in baseEnv', async () => {

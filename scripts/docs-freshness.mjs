@@ -785,10 +785,11 @@ export async function runDocsFreshness(
       if (isStaleEligibleRegistryEntry(status, entry)) {
         const ageDays = computeAgeInDays(reviewDate, today);
         const daysUntilExpiry = cadenceDays - ageDays;
-        const terminalLifecycle =
-          lifecycleIndex.byPath.get(entryPath) ??
-          explicitTerminalPendingLifecycle(status, entryPath) ??
-          explicitTerminalTaskStatusLifecycle(taskStatus, entryPath);
+        const terminalLifecycle = explicitNonTerminalTaskStatus
+          ? null
+          : lifecycleIndex.byPath.get(entryPath) ??
+            explicitTerminalPendingLifecycle(status, entryPath) ??
+            explicitTerminalTaskStatusLifecycle(taskStatus, entryPath);
         const registryLifecycleMetadata = {
           ...(STALE_ELIGIBLE_STATUSES.has(status) ? {} : { registry_status: status }),
           ...(taskStatus ? { task_status: taskStatus } : {}),

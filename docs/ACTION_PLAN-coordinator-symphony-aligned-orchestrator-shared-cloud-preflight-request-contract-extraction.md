@@ -1,7 +1,7 @@
 # ACTION PLAN: Coordinator Symphony-Aligned Orchestrator Shared Cloud-Preflight Request Contract Extraction
 
-1. Register `1172` docs-first and sync task mirrors/index/registry.
-2. Identify the minimal shareable cloud-preflight request contract between router and doctor without changing caller-owned policy.
-3. Extract or align that contract in the smallest viable shared seam.
-4. Add focused coverage only where the new shared contract becomes directly observable.
-5. Run the required validation bundle and record explicit overrides only if the known full-test quiet-tail or review drift recur.
+<!-- docs-archive:stub -->
+> Archived on 2026-05-22. Full content: https://github.com/Kbediako/CO/blob/doc-archives/docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-shared-cloud-preflight-request-contract-extraction.md
+
+- Archive branch: doc-archives
+- Archive path: docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-shared-cloud-preflight-request-contract-extraction.md

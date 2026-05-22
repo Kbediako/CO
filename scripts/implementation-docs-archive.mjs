@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
@@ -15,6 +16,7 @@ import {
 } from './lib/docs-helpers.js';
 import {
   collectIndexedTaskPacketPaths,
+  isTerminalTaskStatus,
   isTerminalTaskItem,
   TERMINAL_PENDING_ARCHIVE_STATUS
 } from './lib/docs-freshness-lifecycle.js';
@@ -39,6 +41,7 @@ const TERMINAL_TASK_LIFECYCLE_REASON = 'terminal_task_lifecycle';
 const ALREADY_ARCHIVED_PRESERVED_FINDINGS_REASON = 'already_archived_preserved_findings';
 const PRESERVED_HISTORICAL_STUB_PATH_PATTERNS = [/^tasks\/tasks-[^/]+\.md$/, /^\.agent\/task\/[^/]+\.md$/];
 const PRESERVED_HISTORICAL_STUB_HEADING_PATTERN = /^\s*#\s+Historical stub\b/i;
+const REGISTRY_TASK_STATUS_FIELDS = ['task_status', 'task_lifecycle_status', 'lifecycle_status'];
 
 function showUsage() {
   console.log(`Usage: node scripts/implementation-docs-archive.mjs [options]
@@ -62,6 +65,22 @@ function normalizeStringList(value) {
     .filter((entry) => typeof entry === 'string')
     .map((entry) => entry.trim())
     .filter(Boolean);
+}
+
+function clearArchivedRegistryTaskStatus(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return false;
+  }
+
+  let changed = false;
+  for (const field of REGISTRY_TASK_STATUS_FIELDS) {
+    const value = entry[field];
+    if (typeof value === 'string' && value.trim() && !isTerminalTaskStatus(value)) {
+      delete entry[field];
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 function formatDate(date) {
@@ -98,6 +117,26 @@ function taskKeyAliases(taskKey) {
     aliases.add(withoutNumericPrefix);
   }
   return [...aliases];
+}
+
+function slugOnlyTaskKeyAlias(taskKey, item) {
+  if (typeof taskKey !== 'string') {
+    return null;
+  }
+  const id = typeof item?.id === 'string' ? item.id.trim() : String(item?.id ?? '').trim();
+  if (!id || !/^\d+$/u.test(id) || !taskKey.startsWith(`${id}-`)) {
+    return null;
+  }
+  const alias = taskKey.slice(id.length + 1);
+  return /^[A-Za-z0-9][A-Za-z0-9-]*$/u.test(alias) ? alias : null;
+}
+
+function normalizeIndexedTaskPacketPath(candidate) {
+  let normalized = String(candidate).trim().replace(/\\/gu, '/');
+  while (normalized.startsWith('./')) {
+    normalized = normalized.slice(2);
+  }
+  return toPosixPath(normalized);
 }
 
 function isTaskPacketDocReference(relativePath, taskKey) {
@@ -142,10 +181,32 @@ function collectExplicitIndexedDocPaths(item) {
   if (!item || typeof item !== 'object') {
     return [];
   }
-  const values = [item.path, item.relates_to];
+  const values = [];
+  const collectValue = (value) => {
+    if (!value) {
+      return;
+    }
+    if (typeof value === 'string') {
+      values.push(value);
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        collectValue(entry);
+      }
+      return;
+    }
+    if (typeof value === 'object') {
+      for (const entry of Object.values(value)) {
+        collectValue(entry);
+      }
+    }
+  };
+  collectValue(item.path);
+  collectValue(item.relates_to);
   if (item.paths && typeof item.paths === 'object') {
     for (const key of ['docs', 'task', 'spec', 'agent_task', 'prd', 'action_plan', 'findings']) {
-      values.push(item.paths[key]);
+      collectValue(item.paths[key]);
     }
   }
   return values.filter((entry) => typeof entry === 'string' && entry.trim().length > 0);
@@ -160,25 +221,39 @@ function isTaskChecklistPath(relativePath) {
 }
 
 function collectSiblingTaskChecklistPaths(item, taskKey) {
-  const paths = new Set();
-  for (const candidate of collectIndexedTaskPacketPaths(item)) {
-    if (isTaskChecklistPath(candidate)) {
-      paths.add(candidate);
+  const paths = new Map();
+  const addPath = (candidate, source) => {
+    const normalizedCandidate = normalizeIndexedTaskPacketPath(candidate);
+    if (!isTaskChecklistPath(normalizedCandidate)) {
+      return;
     }
+    const existing = paths.get(normalizedCandidate);
+    paths.set(normalizedCandidate, {
+      path: normalizedCandidate,
+      synthesized: existing?.synthesized === false ? false : source === 'synthesized'
+    });
+  };
+  for (const candidate of collectExplicitIndexedDocPaths(item)) {
+    addPath(candidate, 'indexed');
   }
   if (item?.paths && typeof item.paths === 'object') {
     for (const key of ['task', 'agent_task']) {
       const value = item.paths[key];
-      if (typeof value === 'string' && isTaskChecklistPath(value)) {
-        paths.add(value);
+      if (typeof value === 'string') {
+        addPath(value, 'indexed');
       }
     }
   }
   if (typeof taskKey === 'string' && taskKey.length > 0) {
-    paths.add(`tasks/tasks-${taskKey}.md`);
-    paths.add(`.agent/task/${taskKey}.md`);
+    addPath(`tasks/tasks-${taskKey}.md`, 'synthesized');
+    addPath(`.agent/task/${taskKey}.md`, 'synthesized');
+    const slugAlias = slugOnlyTaskKeyAlias(taskKey, item);
+    if (slugAlias) {
+      addPath(`tasks/tasks-${slugAlias}.md`, 'synthesized');
+      addPath(`.agent/task/${slugAlias}.md`, 'synthesized');
+    }
   }
-  return [...paths];
+  return [...paths.values()];
 }
 
 function toContainedRepoRelativePath(repoRoot, absolutePath) {
@@ -374,6 +449,52 @@ function extractOpenChecklistItems(content) {
   return Array.from(content.matchAll(OPEN_CHECKLIST_ITEM_PATTERN), (match) => match[0].trim());
 }
 
+function runGitOrNull(repoRoot, args) {
+  try {
+    return execFileSync('git', args, {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      maxBuffer: 100 * 1024 * 1024
+    });
+  } catch {
+    return null;
+  }
+}
+
+function selectArchivePolicyBaseRef() {
+  const explicitBase = process.env.IMPLEMENTATION_DOCS_ARCHIVE_BASE_REF?.trim();
+  const githubBase = process.env.GITHUB_BASE_REF?.trim();
+  return explicitBase || (githubBase ? `origin/${githubBase}` : 'origin/main');
+}
+
+function resolveArchivePolicyBaseRef(repoRoot, baseRef = selectArchivePolicyBaseRef()) {
+  if (!baseRef) {
+    return null;
+  }
+  // Checklist safety compares against the selected base tip, not the fork point,
+  // so long-lived branches do not inherit checklist debt already resolved on base.
+  return runGitOrNull(repoRoot, ['rev-parse', '--verify', `${baseRef}^{commit}`])?.trim() || null;
+}
+
+function requireArchivePolicyBaseRef(repoRoot) {
+  const selectedBaseRef = selectArchivePolicyBaseRef();
+  const policyBaseRef = resolveArchivePolicyBaseRef(repoRoot, selectedBaseRef);
+  if (!policyBaseRef) {
+    throw new Error(
+      `Unable to resolve archive policy base ref ${selectedBaseRef || '(empty)'}. Set IMPLEMENTATION_DOCS_ARCHIVE_BASE_REF or ensure origin/<base> is available.`
+    );
+  }
+  return policyBaseRef;
+}
+
+function readGitPathOrNull(repoRoot, ref, relativePath) {
+  if (!ref || !relativePath) {
+    return null;
+  }
+  return runGitOrNull(repoRoot, ['show', `${ref}:${relativePath}`]);
+}
+
 function ensureRegistryEntry(registryMap, relativePath, defaults) {
   if (registryMap.has(relativePath)) {
     return registryMap.get(relativePath);
@@ -444,6 +565,7 @@ async function main() {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
   const todayString = formatDate(today);
+  const archivePolicyBaseRef = requireArchivePolicyBaseRef(repoRoot);
 
   const taskLinkedDocs = new Set();
   const taskCandidates = [];
@@ -511,8 +633,9 @@ async function main() {
             resolvedRepoRoot
           });
           if (normalizedRef) {
-            docPaths.add(normalizedRef);
+            taskLinkedDocs.add(normalizedRef);
             if (isTaskPacketDocReference(normalizedRef, taskKey)) {
+              docPaths.add(normalizedRef);
               indexedDocPaths.add(normalizedRef);
             }
           }
@@ -532,28 +655,45 @@ async function main() {
 
     const linkedOpenChecklistSources = [];
     for (const checklistPath of collectSiblingTaskChecklistPaths(item, taskKey)) {
-      const containedChecklistPath = await resolveContainedPath(repoRoot, checklistPath, {
+      const containedChecklistPath = await resolveContainedPath(repoRoot, checklistPath.path, {
         allowMissing: true,
         resolvedRepoRoot
       });
-      if (
-        !containedChecklistPath ||
-        !containedChecklistPath.exists ||
-        !(await pathExists(containedChecklistPath.absolutePath))
-      ) {
+      if (!containedChecklistPath) {
         continue;
       }
-      const checklistContent = await readFile(containedChecklistPath.absolutePath, 'utf8');
-      if (hasArchiveStubMarker(checklistContent)) {
+      const currentChecklistExists =
+        containedChecklistPath.exists && (await pathExists(containedChecklistPath.absolutePath));
+      if (!currentChecklistExists && checklistPath.synthesized) {
         continue;
       }
-      const openChecklistItems = extractOpenChecklistItems(checklistContent);
-      if (openChecklistItems.length > 0) {
+
+      if (currentChecklistExists) {
+        const checklistContent = await readFile(containedChecklistPath.absolutePath, 'utf8');
+        if (!hasArchiveStubMarker(checklistContent)) {
+          const openChecklistItems = extractOpenChecklistItems(checklistContent);
+          if (openChecklistItems.length > 0) {
+            linkedOpenChecklistSources.push({
+              path: containedChecklistPath.relativePath,
+              taskKey,
+              unchecked_checklist_items: openChecklistItems.length,
+              unchecked_checklist_samples: openChecklistItems.slice(0, 5)
+            });
+          }
+        }
+      }
+
+      const baseChecklistItems = extractOpenChecklistItems(
+        readGitPathOrNull(repoRoot, archivePolicyBaseRef, containedChecklistPath.relativePath)
+      );
+      if (baseChecklistItems.length > 0) {
         linkedOpenChecklistSources.push({
           path: containedChecklistPath.relativePath,
           taskKey,
-          unchecked_checklist_items: openChecklistItems.length,
-          unchecked_checklist_samples: openChecklistItems.slice(0, 5)
+          source: 'base',
+          base_ref: archivePolicyBaseRef,
+          unchecked_checklist_items: baseChecklistItems.length,
+          unchecked_checklist_samples: baseChecklistItems.slice(0, 5)
         });
       }
     }
@@ -761,7 +901,12 @@ async function main() {
   function markArchivedRegistryEntry(relativePath, { reason, context, archiveUrl, recordRepair = false }) {
     const existingEntry = registryMap.get(relativePath);
     if (existingEntry?.status === 'archived') {
-      return false;
+      const taskStatusCleared = clearArchivedRegistryTaskStatus(existingEntry);
+      if (taskStatusCleared && recordRepair) {
+        report.registry_repairs.push({ path: relativePath, reason, context, archive_url: archiveUrl });
+        report.totals.registry_repairs += 1;
+      }
+      return taskStatusCleared;
     }
     const entry = ensureRegistryEntry(registryMap, relativePath, {
       owner: DEFAULT_OWNER,
@@ -772,6 +917,7 @@ async function main() {
     entry.status = 'archived';
     entry.last_review = todayString;
     entry.cadence_days = policy.archivedCadenceDays;
+    clearArchivedRegistryTaskStatus(entry);
     if (!entry.owner || typeof entry.owner !== 'string') {
       entry.owner = DEFAULT_OWNER;
     }
@@ -791,6 +937,54 @@ async function main() {
     const { containedPath, content } = loaded;
     const archiveRelativePath = containedPath.relativePath;
     const archiveUrl = `${policy.repoUrl}/blob/${policy.archiveBranch}/${archiveRelativePath}`;
+
+    const openChecklistItems = extractOpenChecklistItems(content);
+    if (openChecklistItems.length > 0) {
+      report.skipped.push({
+        path: relativePath,
+        reason: 'unchecked_checklist_items',
+        context: {
+          ...context,
+          unchecked_checklist_items: openChecklistItems.length,
+          unchecked_checklist_samples: openChecklistItems.slice(0, 5)
+        }
+      });
+      report.totals.skipped += 1;
+      return;
+    }
+
+    const baseOpenChecklistItems = extractOpenChecklistItems(
+      readGitPathOrNull(repoRoot, archivePolicyBaseRef, relativePath)
+    );
+    if (baseOpenChecklistItems.length > 0) {
+      report.skipped.push({
+        path: relativePath,
+        reason: 'base_unchecked_checklist_items',
+        context: {
+          ...context,
+          base_ref: archivePolicyBaseRef,
+          unchecked_checklist_items: baseOpenChecklistItems.length,
+          unchecked_checklist_samples: baseOpenChecklistItems.slice(0, 5)
+        }
+      });
+      report.totals.skipped += 1;
+      return;
+    }
+
+    const linkedOpenChecklistItems = linkedOpenChecklistByPath.get(relativePath) ?? [];
+    if (linkedOpenChecklistItems.length > 0) {
+      report.skipped.push({
+        path: relativePath,
+        reason: 'linked_unchecked_checklist_items',
+        context: {
+          ...context,
+          linked_unchecked_checklists: linkedOpenChecklistItems
+        }
+      });
+      report.totals.skipped += 1;
+      return;
+    }
+
     if (hasArchiveStubMarker(content)) {
       const parsedStub = parseArchiveStubMetadata(archiveRelativePath, content);
       if (!parsedStub.isValid) {
@@ -812,35 +1006,6 @@ async function main() {
         recordRepair: true
       });
       report.skipped.push({ path: relativePath, reason: 'already_stubbed', context, registry_repaired: registryRepaired });
-      report.totals.skipped += 1;
-      return;
-    }
-
-    const openChecklistItems = extractOpenChecklistItems(content);
-    if (openChecklistItems.length > 0) {
-      report.skipped.push({
-        path: relativePath,
-        reason: 'unchecked_checklist_items',
-        context: {
-          ...context,
-          unchecked_checklist_items: openChecklistItems.length,
-          unchecked_checklist_samples: openChecklistItems.slice(0, 5)
-        }
-      });
-      report.totals.skipped += 1;
-      return;
-    }
-
-    const linkedOpenChecklistItems = linkedOpenChecklistByPath.get(relativePath) ?? [];
-    if (linkedOpenChecklistItems.length > 0) {
-      report.skipped.push({
-        path: relativePath,
-        reason: 'linked_unchecked_checklist_items',
-        context: {
-          ...context,
-          linked_unchecked_checklists: linkedOpenChecklistItems
-        }
-      });
       report.totals.skipped += 1;
       return;
     }

@@ -11,9 +11,22 @@
 - Intent checksum / protected terms carried forward: `control-host`, `provider_issue_rehydration_pending_revalidation`, `provider_worker_recover_no_launch_evidence`, `provider_issue_start_blocked:max_concurrency`, `launch_token`, `run_id`, `run_manifest_path`.
 - Not done if: the operator still needs Backlog/In Progress cycling to recover CO-574/CO-575, or a no-run accepted claim can be mistaken for a terminal clean skip.
 - Pre-implementation issue-quality review: live CO-574/CO-575 evidence plus GPT Pro advisory identify acknowledgement semantics, stable stale anchor, and active-worker probe churn as the root seams.
-- Fallback / refactor decision: this task touches fallback/stale recovery behavior. Remove the no-launch observation fallback, remove refreshed stale-clock behavior, and keep only a tested fail-closed supervision restart path for true dead-host cases.
-- Durable retention evidence: any retained degraded supervision path must name the active-worker protection contract and have tests.
-- Large-refactor check: a bounded cross-surface fix is warranted because another one-line timeout or state-cycle patch would leave authority split.
+- Fallback / refactor decision: this task touches fallback/stale recovery behavior. Remove the no-launch observation fallback, remove refreshed stale-clock behavior, and keep only expiring, tested control-host safety seams for bounded degraded status and true dead-host handling.
+- Durable retention evidence: no durable `justify retaining fallback` decision is made in this lane; every retained control-host safety seam has expiry metadata and tests.
+- Large-refactor: required within this lane because recovery truth was split across API acknowledgement, provider-intake rehydrate, machine-status reads, and supervision probes; another one-line timeout or state-cycle patch would leave the root cause alive.
+- Minor-seam: rejected for the provider recovery and rehydrate paths; the only temporary seam retained is the bounded machine-status/control-host safety path with expiry metadata and focused regression coverage.
+
+## Fallback Expiry / Refactor Decision
+
+- Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? Yes.
+- Required CO-382 decision table:
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| provider recovery | accepted/no-run pending-revalidation observation | remove fallback | CO-574 | explicit recover/nudge sees accepted claim without launch evidence | 2026-05-22 | 2026-05-22 | 2026-05-22 | recovery returns queued pending or terminal handoff result, never terminal no-launch observation | Observability API regression |
+| provider rehydrate | manifestless accepted stale clock based on refreshed `updated_at` | remove fallback | CO-574 | repeated rehydrate of accepted pending-revalidation | 2026-05-22 | 2026-05-22 | 2026-05-22 | stable launch/recovery anchor survives rehydrate | ProviderIssueHandoff regression |
+| machine-status endpoint | unbounded controller read | expire fallback | CO-574 | presenter/read-model stall under active workers | 2026-05-22 | 2026-05-22 | 2026-06-21 | endpoint returns current or `machine_status_degraded` JSON within the controller timeout; remove when the read path is proven non-blocking by construction | ControlMachineStatusContract regression |
+| control-host supervision | active-worker probe timeout restart safety path | expire fallback | CO-574 | probe timeout while active workers exist | 2026-05-22 | 2026-05-22 | 2026-06-21 | degraded active-worker classification has tests and true dead-host restart no longer depends on same-endpoint probe fallback behavior | ControlHostSupervision regression |
 
 ## Milestones & Sequencing
 
