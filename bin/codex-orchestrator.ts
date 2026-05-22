@@ -58,7 +58,10 @@ import { runControlHostSupervisionCliShell } from '../orchestrator/src/cli/contr
 import { runCoStatusAttachCliShell } from '../orchestrator/src/cli/coStatusAttachCliShell.js';
 import { runCoStatusCliShell } from '../orchestrator/src/cli/coStatusCliShell.js';
 import { runCoStatusOperatorAutopilotCliShell } from '../orchestrator/src/cli/coStatusOperatorAutopilotCliShell.js';
-import { runHygieneCliShell } from '../orchestrator/src/cli/quotaHygieneCliShell.js';
+import {
+  printQuotaHygieneHelp,
+  runHygieneCliShell
+} from '../orchestrator/src/cli/quotaHygieneCliShell.js';
 import {
   CONFIG_AUTHORITY_MODE_ENV_KEY,
   REPO_CONFIG_REQUIRED_ENV_KEY,
@@ -2149,20 +2152,7 @@ Options:
 }
 
 function printHygieneHelp(): void {
-  console.log(`Usage: codex-orchestrator hygiene quota [options]
-
-Emit a deterministic read-only quota hygiene audit without model-backed calls or default mutations.
-
-Options:
-  --artifact-root <path>          Control-host artifact root (default: .runs/local-mcp/cli/control-host).
-  --provider-intake-state <path>  Explicit provider-intake-state.json path.
-  --automations-dir <path>        Explicit Codex automations directory (default: $CODEX_HOME/automations).
-  --goal-manifest <path>          Manifest to inspect for advisory current-thread goal evidence.
-  --repo <path>                   Repo root for relative artifact paths (default: cwd).
-  --now <iso>                     Deterministic timestamp for the report.
-  --format json                   Emit machine-readable audit JSON.
-  --help                          Show this message.
-`);
+  printQuotaHygieneHelp();
 }
 
 function printResumeHelp(): void {

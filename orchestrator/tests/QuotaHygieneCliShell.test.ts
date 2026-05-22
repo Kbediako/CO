@@ -3,11 +3,13 @@ import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildQuotaHygieneAudit,
+  formatQuotaHygieneHelp,
   parseProcessInventory,
+  runHygieneCliShell,
   type QuotaHygieneProcessRecord
 } from '../src/cli/quotaHygieneCliShell.js';
 
@@ -895,6 +897,1168 @@ describe('quota hygiene audit', () => {
     });
   });
 
+  it('plans stale GitHub polling remediation without default mutation', async () => {
+    const audit = await buildQuotaHygieneAudit({
+      flags: { only: 'stale-github-polling' },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => [
+          {
+            pid: 824,
+            ppid: 100,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:20:00',
+            stat: 'S',
+            command: 'gh pr view 824 --json mergeStateStatus'
+          }
+        ]
+      })
+    });
+
+    expect(audit.read_only).toBe(true);
+    expect(audit.mutation_mode).toBe('disabled');
+    expect(audit.process_inventory.processes[0]).toMatchObject({
+      pid: 824,
+      quota_burning: false
+    });
+    expect(audit.process_inventory.unowned_quota_burning_count).toBe(0);
+    expect(audit.findings.map((finding) => finding.code)).not.toContain(
+      'unowned_quota_burning_process'
+    );
+    expect(audit.model_calls.observed).toBe(0);
+    expect(audit.remediation).toMatchObject({
+      requested: true,
+      apply_requested: false,
+      only: 'stale-github-polling',
+      mode: 'dry_run',
+      status_counts: {
+        remediation_eligible: 1
+      }
+    });
+    expect(audit.remediation.actions[0]).toMatchObject({
+      pid: 824,
+      target_kind: 'stale-github-polling',
+      status: 'remediation_eligible',
+      outcome: 'dry_run',
+      evidence: {
+        command: 'gh pr view 824 --json mergeStateStatus',
+        parent_pid: 100,
+        age_seconds: 1200,
+        stale_threshold_seconds: 600
+      }
+    });
+  });
+
+  it('does not classify command text that only mentions gh pr view as GitHub polling remediation', async () => {
+    const audit = await buildQuotaHygieneAudit({
+      flags: { only: 'stale-github-polling' },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => [
+          {
+            pid: 824,
+            ppid: 100,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:20:00',
+            stat: 'S',
+            command: 'node /repo/worker.js --prompt "please inspect gh pr view 824 --json mergeStateStatus"'
+          }
+        ]
+      })
+    });
+
+    expect(audit.process_inventory.processes[0]).toMatchObject({
+      pid: 824,
+      quota_burning: false
+    });
+    expect(audit.remediation).toMatchObject({
+      requested: true,
+      mode: 'dry_run',
+      status_counts: {
+        detectable_only: 1
+      }
+    });
+    expect(audit.remediation.actions[0]).toMatchObject({
+      pid: 824,
+      target_kind: 'detectable-only',
+      status: 'detectable_only',
+      outcome: 'not_requested',
+      evidence: {
+        classification: 'process_inventory'
+      }
+    });
+  });
+
+  it('requires --yes and scoped --only before applying remediation', async () => {
+    const signaled: number[] = [];
+    const artifactWrites: string[] = [];
+    const audit = await buildQuotaHygieneAudit({
+      flags: { apply: true },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => [
+          {
+            pid: 824,
+            ppid: 100,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:20:00',
+            stat: 'S',
+            command: 'gh pr view 824 --json mergeStateStatus'
+          }
+        ],
+        signalProcess: (pid) => {
+          signaled.push(pid);
+          return { status: 'signaled', error: null };
+        },
+        writeTextFile: (path) => {
+          artifactWrites.push(path);
+          return Promise.resolve();
+        }
+      })
+    });
+
+    expect(signaled).toEqual([]);
+    expect(artifactWrites).toEqual([]);
+    expect(audit.read_only).toBe(true);
+    expect(audit.mutation_mode).toBe('disabled');
+    expect(audit.remediation).toMatchObject({
+      apply_requested: true,
+      operator_confirmed: false,
+      only: null,
+      mode: 'operator_confirm_required',
+      audit_artifact_path: null,
+      status_counts: {
+        operator_confirm_required: 1
+      }
+    });
+    expect(audit.remediation.actions[0]).toMatchObject({
+      status: 'operator_confirm_required',
+      outcome: 'confirmation_required'
+    });
+  });
+
+  it('requires explicit PID selection before applying remediation', async () => {
+    const signaled: number[] = [];
+    const audit = await buildQuotaHygieneAudit({
+      flags: {
+        apply: true,
+        yes: true,
+        only: 'stale-github-polling'
+      },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => [
+          {
+            pid: 824,
+            ppid: 100,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:20:00',
+            stat: 'S',
+            command: 'gh pr view 824 --json mergeStateStatus'
+          }
+        ],
+        signalProcess: (pid) => {
+          signaled.push(pid);
+          return { status: 'signaled', error: null };
+        }
+      })
+    });
+
+    expect(signaled).toEqual([]);
+    expect(audit.read_only).toBe(true);
+    expect(audit.mutation_mode).toBe('disabled');
+    expect(audit.remediation).toMatchObject({
+      apply_requested: true,
+      operator_confirmed: true,
+      only: 'stale-github-polling',
+      mode: 'operator_confirm_required',
+      audit_artifact_path: null,
+      status_counts: {
+        operator_confirm_required: 1
+      }
+    });
+    expect(audit.remediation.actions[0]).toMatchObject({
+      pid: 824,
+      status: 'operator_confirm_required',
+      outcome: 'confirmation_required',
+      reason: 'remediation requires explicit --pid/--pids target selection'
+    });
+  });
+
+  it('treats --dry-run as a mutation veto when combined with --apply', async () => {
+    const signaled: number[] = [];
+    const audit = await buildQuotaHygieneAudit({
+      flags: {
+        apply: true,
+        yes: true,
+        only: 'stale-github-polling',
+        pids: '824',
+        'dry-run': true
+      },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => [
+          {
+            pid: 824,
+            ppid: 100,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:20:00',
+            stat: 'S',
+            command: 'gh pr view 824 --json mergeStateStatus'
+          }
+        ],
+        signalProcess: (pid) => {
+          signaled.push(pid);
+          return { status: 'signaled', error: null };
+        }
+      })
+    });
+
+    expect(signaled).toEqual([]);
+    expect(audit.read_only).toBe(true);
+    expect(audit.mutation_mode).toBe('disabled');
+    expect(audit.remediation).toMatchObject({
+      apply_requested: true,
+      operator_confirmed: true,
+      only: 'stale-github-polling',
+      mode: 'dry_run',
+      audit_artifact_path: null
+    });
+    expect(audit.remediation.actions[0]).toMatchObject({
+      pid: 824,
+      status: 'remediation_eligible',
+      outcome: 'dry_run',
+      reason: 'current audit classifies this PID as stale GitHub PR polling; dry-run only because --dry-run was provided'
+    });
+  });
+
+  it('writes explicit remediation output for confirmation-required preflight without process mutation', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'quota-hygiene-remediation-preflight-'));
+    tempDirs.push(root);
+    const artifactPath = join(root, 'preflight.json');
+
+    const audit = await buildQuotaHygieneAudit({
+      flags: {
+        apply: true,
+        yes: true,
+        only: 'stale-github-polling',
+        'remediation-output': artifactPath
+      },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => [
+          {
+            pid: 824,
+            ppid: 100,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:20:00',
+            stat: 'S',
+            command: 'gh pr view 824 --json mergeStateStatus'
+          }
+        ],
+        writeTextFile: (path, contents) => writeFile(path, contents, 'utf8'),
+        makeDirectory: (path) => mkdir(path, { recursive: true })
+      })
+    });
+
+    expect(audit.read_only).toBe(false);
+    expect(audit.mutation_mode).toBe('audit_artifact_write');
+    expect(audit.remediation).toMatchObject({
+      mode: 'operator_confirm_required',
+      artifact_written: true,
+      audit_artifact_path: artifactPath,
+      status_counts: {
+        operator_confirm_required: 1
+      }
+    });
+    const artifact = JSON.parse(await readFile(artifactPath, 'utf8')) as {
+      phase: string;
+      actions: Array<Record<string, unknown>>;
+    };
+    expect(artifact.phase).toBe('final');
+    expect(artifact.actions[0]).toMatchObject({
+      pid: 824,
+      status: 'operator_confirm_required'
+    });
+  });
+
+  it('prints remediation dry-run status in text output', async () => {
+    const log = vi.fn();
+
+    await runHygieneCliShell(
+      {
+        positionals: ['quota'],
+        flags: {
+          only: 'stale-github-polling'
+        },
+        printHelp: vi.fn()
+      },
+      baseDependencies({
+        log,
+        readProcessInventory: async () => [
+          {
+            pid: 824,
+            ppid: 100,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:20:00',
+            stat: 'S',
+            command: 'gh pr view 824 --json mergeStateStatus'
+          }
+        ]
+      })
+    );
+
+    const lines = log.mock.calls.map(([line]) => line);
+    expect(lines).toEqual(
+      expect.arrayContaining([
+        '- Remediation: dry_run (eligible=1, terminated=0, signal_sent=0, skipped=0, unsafe_to_kill=0, confirmation_required=0)',
+        '  - PID 824 stale-github-polling: remediation_eligible (dry_run) - current audit classifies this PID as stale GitHub PR polling; dry-run only because --apply was not provided'
+      ])
+    );
+  });
+
+  it('applies confirmed stale GitHub polling remediation and writes per-PID artifact JSON', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'quota-hygiene-remediation-'));
+    tempDirs.push(root);
+    const artifactPath = join(root, 'remediation.json');
+    const signaled: Array<{ pid: number; signal: NodeJS.Signals }> = [];
+    const inventory = [
+      {
+        pid: 824,
+        ppid: 100,
+        lstart: 'Sun May 17 14:01:17 2026',
+        etime: '00:20:00',
+        stat: 'S',
+        command: 'gh pr view 824 --json mergeStateStatus'
+      }
+    ] satisfies QuotaHygieneProcessRecord[];
+
+    const audit = await buildQuotaHygieneAudit({
+      flags: {
+        apply: true,
+        yes: true,
+        only: 'stale-github-polling',
+        pids: '824',
+        'remediation-output': artifactPath
+      },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => inventory,
+        signalProcess: (pid, signal) => {
+          signaled.push({ pid, signal });
+          return { status: 'signaled', error: null };
+        },
+        writeTextFile: (path, contents) => writeFile(path, contents, 'utf8'),
+        makeDirectory: (path) => mkdir(path, { recursive: true })
+      })
+    });
+
+    expect(signaled).toEqual([{ pid: 824, signal: 'SIGTERM' }]);
+    expect(audit.read_only).toBe(false);
+    expect(audit.mutation_mode).toBe('operator_confirmed_remediation');
+    expect(audit.remediation).toMatchObject({
+      mode: 'applied',
+      terminated_count: 1,
+      audit_artifact_path: artifactPath
+    });
+    expect(audit.remediation.actions[0]).toMatchObject({
+      pid: 824,
+      status: 'terminated',
+      outcome: 'sigterm_sent',
+      signal: 'SIGTERM'
+    });
+
+    const artifact = JSON.parse(await readFile(artifactPath, 'utf8')) as {
+      actions: Array<Record<string, unknown>>;
+    };
+    expect(artifact.actions[0]).toMatchObject({
+      pid: 824,
+      status: 'terminated',
+      outcome: 'sigterm_sent'
+    });
+  });
+
+  it('resolves relative remediation output paths against the configured repo root', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'quota-hygiene-repo-root-'));
+    const outsideCwd = await mkdtemp(join(tmpdir(), 'quota-hygiene-outside-cwd-'));
+    tempDirs.push(repoRoot, outsideCwd);
+    const artifactPath = join(repoRoot, 'out', 'remediation.json');
+
+    const audit = await buildQuotaHygieneAudit({
+      flags: {
+        repo: repoRoot,
+        apply: true,
+        yes: true,
+        only: 'stale-github-polling',
+        pids: '824',
+        'remediation-output': 'out/remediation.json'
+      },
+      dependencies: baseDependencies({
+        getCwd: () => outsideCwd,
+        readProcessInventory: async () => [
+          {
+            pid: 824,
+            ppid: 100,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:20:00',
+            stat: 'S',
+            command: 'gh pr view 824 --json mergeStateStatus'
+          }
+        ],
+        signalProcess: () => ({ status: 'signaled', error: null }),
+        writeTextFile: (path, contents) => writeFile(path, contents, 'utf8'),
+        makeDirectory: (path) => mkdir(path, { recursive: true })
+      })
+    });
+
+    expect(audit.remediation.audit_artifact_path).toBe(artifactPath);
+    await expect(readFile(artifactPath, 'utf8')).resolves.toContain('"pid": 824');
+  });
+
+  it('prints confirmed remediation result and artifact path in text output', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'quota-hygiene-remediation-text-'));
+    tempDirs.push(root);
+    const artifactPath = join(root, 'remediation.json');
+    const log = vi.fn();
+
+    await runHygieneCliShell(
+      {
+        positionals: ['quota'],
+        flags: {
+          apply: true,
+          yes: true,
+          only: 'stale-github-polling',
+          pids: '824',
+          'remediation-output': artifactPath
+        },
+        printHelp: vi.fn()
+      },
+      baseDependencies({
+        log,
+        readProcessInventory: async () => [
+          {
+            pid: 824,
+            ppid: 100,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:20:00',
+            stat: 'S',
+            command: 'gh pr view 824 --json mergeStateStatus'
+          }
+        ],
+        signalProcess: () => ({ status: 'signaled', error: null }),
+        writeTextFile: (path, contents) => writeFile(path, contents, 'utf8'),
+        makeDirectory: (path) => mkdir(path, { recursive: true })
+      })
+    );
+
+    const lines = log.mock.calls.map(([line]) => line);
+    expect(lines).toEqual(
+      expect.arrayContaining([
+        '- Remediation: applied (eligible=0, terminated=1, signal_sent=0, skipped=0, unsafe_to_kill=0, confirmation_required=0)',
+        `- Remediation artifact: ${artifactPath}`,
+        '  - PID 824 stale-github-polling: terminated (sigterm_sent, signal=SIGTERM) - operator-confirmed remediation delivered SIGTERM and verified the PID exited'
+      ])
+    );
+  });
+
+  it('documents required PID selection and dry-run in hygiene help', () => {
+    const help = formatQuotaHygieneHelp();
+
+    expect(help).toContain('--apply                         Apply operator-confirmed remediation (requires --yes, --only, and --pid/--pids).');
+    expect(help).toContain('--dry-run                       Never mutate even when --apply is present; report eligible remediation only.');
+    expect(help).toContain('--pid, --pids <csv>             Required PID selection within the scoped current audit when --apply is used.');
+  });
+
+  it('fails closed before signaling when remediation artifact output cannot be prepared', async () => {
+    const signaled: number[] = [];
+    const audit = await buildQuotaHygieneAudit({
+      flags: {
+        apply: true,
+        yes: true,
+        only: 'stale-github-polling',
+        pids: '824'
+      },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => [
+          {
+            pid: 824,
+            ppid: 100,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:20:00',
+            stat: 'S',
+            command: 'gh pr view 824 --json mergeStateStatus'
+          }
+        ],
+        signalProcess: (pid) => {
+          signaled.push(pid);
+          return { status: 'signaled', error: null };
+        },
+        writeTextFile: async () => {
+          throw new Error('remediation artifact unwritable');
+        }
+      })
+    });
+
+    expect(signaled).toEqual([]);
+    expect(audit.read_only).toBe(true);
+    expect(audit.mutation_mode).toBe('disabled');
+    expect(audit.remediation).toMatchObject({
+      mode: 'artifact_unavailable',
+      artifact_error: 'remediation artifact unwritable',
+      status_counts: {
+        unsafe_to_kill: 1
+      }
+    });
+    expect(audit.remediation.actions[0]).toMatchObject({
+      pid: 824,
+      status: 'unsafe_to_kill',
+      outcome: 'unsafe_to_kill'
+    });
+  });
+
+  it('clears the final artifact pointer when post-signal artifact writing fails', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'quota-hygiene-remediation-final-fail-'));
+    tempDirs.push(root);
+    const artifactPath = join(root, 'remediation.json');
+    const writes: string[] = [];
+    const signaled: number[] = [];
+
+    const audit = await buildQuotaHygieneAudit({
+      flags: {
+        apply: true,
+        yes: true,
+        only: 'stale-github-polling',
+        pids: '824',
+        'remediation-output': artifactPath
+      },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => [
+          {
+            pid: 824,
+            ppid: 100,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:20:00',
+            stat: 'S',
+            command: 'gh pr view 824 --json mergeStateStatus'
+          }
+        ],
+        signalProcess: (pid) => {
+          signaled.push(pid);
+          return { status: 'signaled', error: null };
+        },
+        writeTextFile: async (path, contents) => {
+          writes.push(path);
+          if (writes.length > 1) {
+            throw new Error('final artifact unwritable');
+          }
+          await writeFile(path, contents, 'utf8');
+        },
+        makeDirectory: (path) => mkdir(path, { recursive: true })
+      })
+    });
+
+    expect(signaled).toEqual([824]);
+    expect(writes).toEqual([artifactPath, artifactPath]);
+    expect(audit.remediation).toMatchObject({
+      mode: 'applied',
+      artifact_written: true,
+      audit_artifact_path: null,
+      artifact_error: 'final artifact unwritable',
+      terminated_count: 1
+    });
+  });
+
+  it('refuses requested PIDs that are absent from the current audit', async () => {
+    const signaled: number[] = [];
+    const audit = await buildQuotaHygieneAudit({
+      flags: {
+        apply: true,
+        yes: true,
+        only: 'stale-github-polling',
+        pids: '999'
+      },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => [],
+        signalProcess: (pid) => {
+          signaled.push(pid);
+          return { status: 'signaled', error: null };
+        }
+      })
+    });
+
+    expect(signaled).toEqual([]);
+    expect(audit.remediation.actions).toEqual([
+      expect.objectContaining({
+        pid: 999,
+        status: 'unsafe_to_kill',
+        outcome: 'unsafe_to_kill',
+        reason: 'requested PID is not present in the current quota hygiene audit output'
+      })
+    ]);
+  });
+
+  it('refuses process identity changes before signaling a current-audit PID', async () => {
+    let readCount = 0;
+    const signaled: number[] = [];
+    const audit = await buildQuotaHygieneAudit({
+      flags: {
+        apply: true,
+        yes: true,
+        only: 'stale-github-polling',
+        pids: '824'
+      },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => {
+          readCount += 1;
+          return [
+            {
+              pid: 824,
+              ppid: 100,
+              lstart: 'Sun May 17 14:01:17 2026',
+              etime: '00:20:00',
+              stat: 'S',
+              command:
+                readCount === 1
+                  ? 'gh pr view 824 --json mergeStateStatus'
+                  : 'gh pr view 825 --json mergeStateStatus'
+            }
+          ];
+        },
+        signalProcess: (pid) => {
+          signaled.push(pid);
+          return { status: 'signaled', error: null };
+        }
+      })
+    });
+
+    expect(signaled).toEqual([]);
+    expect(audit.read_only).toBe(false);
+    expect(audit.mutation_mode).toBe('audit_artifact_write');
+    expect(audit.remediation.mode).toBe('no_action');
+    expect(audit.remediation.actions[0]).toMatchObject({
+      pid: 824,
+      status: 'unsafe_to_kill',
+      outcome: 'identity_changed'
+    });
+  });
+
+  it('refuses same-command PID reuse when start time changes before signaling', async () => {
+    let readCount = 0;
+    const signaled: number[] = [];
+    const audit = await buildQuotaHygieneAudit({
+      flags: {
+        apply: true,
+        yes: true,
+        only: 'stale-github-polling',
+        pids: '824'
+      },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => {
+          readCount += 1;
+          return [
+            {
+              pid: 824,
+              ppid: 100,
+              lstart:
+                readCount === 1
+                  ? 'Sun May 17 14:01:17 2026'
+                  : 'Sun May 17 14:15:17 2026',
+              etime: '00:20:00',
+              stat: 'S',
+              command: 'gh pr view 824 --json mergeStateStatus'
+            }
+          ];
+        },
+        signalProcess: (pid) => {
+          signaled.push(pid);
+          return { status: 'signaled', error: null };
+        }
+      })
+    });
+
+    expect(signaled).toEqual([]);
+    expect(audit.remediation.mode).toBe('no_action');
+    expect(audit.remediation.actions[0]).toMatchObject({
+      pid: 824,
+      status: 'unsafe_to_kill',
+      outcome: 'identity_changed',
+      reason: 'PID start time changed after the current audit, so remediation refused'
+    });
+  });
+
+  it('refuses a current-audit PID that is no longer stale before signaling', async () => {
+    let readCount = 0;
+    const signaled: number[] = [];
+    const audit = await buildQuotaHygieneAudit({
+      flags: {
+        apply: true,
+        yes: true,
+        only: 'stale-github-polling',
+        pids: '824'
+      },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => {
+          readCount += 1;
+          return [
+            {
+              pid: 824,
+              ppid: 100,
+              lstart: 'Sun May 17 14:01:17 2026',
+              etime: readCount === 1 ? '00:20:00' : '00:01:00',
+              stat: 'S',
+              command: 'gh pr view 824 --json mergeStateStatus'
+            }
+          ];
+        },
+        signalProcess: (pid) => {
+          signaled.push(pid);
+          return { status: 'signaled', error: null };
+        }
+      })
+    });
+
+    expect(signaled).toEqual([]);
+    expect(audit.remediation.mode).toBe('no_action');
+    expect(audit.remediation.actions[0]).toMatchObject({
+      pid: 824,
+      status: 'unsafe_to_kill',
+      outcome: 'identity_changed',
+      reason: 'PID is no longer stale in the current audit, so remediation refused'
+    });
+  });
+
+  it('reports signal delivery separately when the PID remains alive after SIGTERM', async () => {
+    const signaled: number[] = [];
+    const audit = await buildQuotaHygieneAudit({
+      flags: {
+        apply: true,
+        yes: true,
+        only: 'stale-github-polling',
+        pids: '824'
+      },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => [
+          {
+            pid: 824,
+            ppid: 100,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:20:00',
+            stat: 'S',
+            command: 'gh pr view 824 --json mergeStateStatus'
+          }
+        ],
+        signalProcess: (pid) => {
+          signaled.push(pid);
+          return { status: 'signaled', error: null };
+        },
+        isProcessAlive: () => true
+      })
+    });
+
+    expect(signaled).toEqual([824]);
+    expect(audit.remediation).toMatchObject({
+      terminated_count: 0,
+      signal_sent_count: 1
+    });
+    expect(audit.remediation.actions[0]).toMatchObject({
+      pid: 824,
+      status: 'signal_sent',
+      outcome: 'sigterm_sent'
+    });
+  });
+
+  it('supports stale delegate-server remediation while protecting active app-managed delegates', async () => {
+    const signaled: number[] = [];
+    const delegateRecords = [
+      {
+        pid: 700,
+        ppid: 100,
+        lstart: 'Sun May 17 14:01:17 2026',
+        etime: '00:20:00',
+        stat: 'S',
+        command: 'node /repo/dist/bin/codex-orchestrator.js delegate-server'
+      },
+      {
+        pid: 701,
+        ppid: 100,
+        lstart: 'Sun May 17 14:01:17 2026',
+        etime: '00:01:00',
+        stat: 'S',
+        command: 'node /repo/dist/bin/codex-orchestrator.js delegate-server'
+      }
+    ] satisfies QuotaHygieneProcessRecord[];
+    const audit = await buildQuotaHygieneAudit({
+      flags: {
+        apply: true,
+        yes: true,
+        only: 'stale-delegate-server',
+        pids: '700'
+      },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => delegateRecords,
+        inspectDelegateServerProcesses: () => ({
+          status: 'stale',
+          activeCount: 1,
+          staleCount: 1,
+          activePids: [701],
+          stalePids: [700],
+          staleRssKb: 4096,
+          thresholdSeconds: 600,
+          detail: 'one stale delegate-server process',
+          details: [
+            {
+              pid: 700,
+              ppid: 100,
+              elapsedSeconds: 1200,
+              rssKb: 4096,
+              command: 'node /repo/dist/bin/codex-orchestrator.js delegate-server',
+              cwd: '/repo',
+              parentPid: 100,
+              parentCommand: 'node /opt/homebrew/bin/codex exec',
+              parentCwd: '/repo',
+              rootCodexParentPid: 100,
+              rootCodexParentCommand: 'node /opt/homebrew/bin/codex exec',
+              rootCodexParentCwd: '/repo',
+              manifestAssociation: {
+                manifestPath: '/repo/.runs/linear-co551/run/manifest.json',
+                workspacePath: '/repo',
+                status: 'succeeded',
+                pipelineId: 'provider-linear-worker',
+                taskId: 'linear-co551',
+                runId: 'run-1',
+                issueId: 'issue-1',
+                issueIdentifier: 'CO-551',
+                proofPid: 700
+              },
+              classification: 'stale-parent-session',
+              classificationDetail: 'parent session is terminal'
+            },
+            {
+              pid: 701,
+              ppid: 100,
+              elapsedSeconds: 60,
+              rssKb: 4096,
+              command: 'node /repo/dist/bin/codex-orchestrator.js delegate-server',
+              cwd: '/repo',
+              parentPid: 100,
+              parentCommand: 'Codex app-server',
+              parentCwd: '/repo',
+              rootCodexParentPid: 100,
+              rootCodexParentCommand: 'Codex app-server',
+              rootCodexParentCwd: '/repo',
+              manifestAssociation: null,
+              classification: 'active-unassociated',
+              classificationDetail: 'delegate-server is app-managed infrastructure'
+            }
+          ]
+        }),
+        signalProcess: (pid) => {
+          signaled.push(pid);
+          return { status: 'signaled', error: null };
+        }
+      })
+    });
+
+    expect(signaled).toEqual([700]);
+    expect(audit.remediation.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          pid: 700,
+          target_kind: 'stale-delegate-server',
+          status: 'terminated'
+        }),
+        expect.objectContaining({
+          pid: 701,
+          target_kind: 'stale-delegate-server',
+          status: 'unsafe_to_kill',
+          outcome: 'unsafe_to_kill'
+        })
+      ])
+    );
+  });
+
+  it('truthfully refuses selected delegate-server PIDs when delegate inspection is unavailable', async () => {
+    const signaled: number[] = [];
+    const audit = await buildQuotaHygieneAudit({
+      flags: {
+        apply: true,
+        yes: true,
+        only: 'stale-delegate-server',
+        pids: '700'
+      },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => [
+          {
+            pid: 700,
+            ppid: 100,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:20:00',
+            stat: 'S',
+            command: 'node /repo/dist/bin/codex-orchestrator.js delegate-server'
+          }
+        ],
+        inspectDelegateServerProcesses: () => ({
+          status: 'unavailable',
+          activeCount: 0,
+          staleCount: 0,
+          activePids: [],
+          stalePids: [],
+          staleRssKb: 0,
+          thresholdSeconds: 600,
+          detail: 'delegate inspection failed',
+          details: []
+        }),
+        signalProcess: (pid) => {
+          signaled.push(pid);
+          return { status: 'signaled', error: null };
+        }
+      })
+    });
+
+    expect(signaled).toEqual([]);
+    expect(audit.remediation.actions[0]).toMatchObject({
+      pid: 700,
+      target_kind: 'stale-delegate-server',
+      status: 'unsafe_to_kill',
+      outcome: 'identity_revalidation_unavailable',
+      reason:
+        'delegate-server PID is present in process inventory, but current delegate-server inspection is unavailable, so remediation refused',
+      evidence: {
+        source: 'process_inventory',
+        command: 'node /repo/dist/bin/codex-orchestrator.js delegate-server',
+        classification: 'delegate_inspection_unavailable'
+      }
+    });
+  });
+
+  it('refuses stale delegate-server remediation when the current process is no longer stale', async () => {
+    let readCount = 0;
+    const signaled: number[] = [];
+    const audit = await buildQuotaHygieneAudit({
+      flags: {
+        apply: true,
+        yes: true,
+        only: 'stale-delegate-server',
+        pids: '700'
+      },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => {
+          readCount += 1;
+          return [
+            {
+              pid: 700,
+              ppid: 100,
+              lstart: 'Sun May 17 14:01:17 2026',
+              etime: readCount >= 3 ? '00:01:00' : '00:20:00',
+              stat: 'S',
+              command: 'node /repo/dist/bin/codex-orchestrator.js delegate-server'
+            }
+          ];
+        },
+        inspectDelegateServerProcesses: () => ({
+          status: 'stale',
+          activeCount: 0,
+          staleCount: 1,
+          activePids: [],
+          stalePids: [700],
+          staleRssKb: 4096,
+          thresholdSeconds: 600,
+          detail: 'one stale delegate-server process',
+          details: [
+            {
+              pid: 700,
+              ppid: 100,
+              elapsedSeconds: 1200,
+              rssKb: 4096,
+              command: 'node /repo/dist/bin/codex-orchestrator.js delegate-server',
+              cwd: '/repo',
+              parentPid: 100,
+              parentCommand: 'node /opt/homebrew/bin/codex exec',
+              parentCwd: '/repo',
+              rootCodexParentPid: 100,
+              rootCodexParentCommand: 'node /opt/homebrew/bin/codex exec',
+              rootCodexParentCwd: '/repo',
+              manifestAssociation: null,
+              classification: 'stale-parent-session',
+              classificationDetail: 'parent session is terminal'
+            }
+          ]
+        }),
+        signalProcess: (pid) => {
+          signaled.push(pid);
+          return { status: 'signaled', error: null };
+        }
+      })
+    });
+
+    expect(signaled).toEqual([]);
+    expect(audit.remediation.actions[0]).toMatchObject({
+      pid: 700,
+      target_kind: 'stale-delegate-server',
+      status: 'unsafe_to_kill',
+      outcome: 'identity_changed',
+      reason: 'PID is no longer stale in the current audit, so remediation refused'
+    });
+  });
+
+  it('refuses stale delegate-server remediation when current delegate inspection no longer marks it stale', async () => {
+    let inspectCount = 0;
+    const signaled: number[] = [];
+    const audit = await buildQuotaHygieneAudit({
+      flags: {
+        apply: true,
+        yes: true,
+        only: 'stale-delegate-server',
+        pids: '700'
+      },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => [
+          {
+            pid: 700,
+            ppid: 100,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:20:00',
+            stat: 'S',
+            command: 'node /repo/dist/bin/codex-orchestrator.js delegate-server'
+          }
+        ],
+        inspectDelegateServerProcesses: () => {
+          inspectCount += 1;
+          const classification = inspectCount >= 3 ? 'active-associated' : 'stale-parent-session';
+          return {
+            status: inspectCount >= 3 ? 'ok' : 'stale',
+            activeCount: inspectCount >= 3 ? 1 : 0,
+            staleCount: inspectCount >= 3 ? 0 : 1,
+            activePids: inspectCount >= 3 ? [700] : [],
+            stalePids: inspectCount >= 3 ? [] : [700],
+            staleRssKb: inspectCount >= 3 ? 0 : 4096,
+            thresholdSeconds: 600,
+            detail: inspectCount >= 3
+              ? 'delegate-server process is now associated with a live session'
+              : 'one stale delegate-server process',
+            details: [
+              {
+                pid: 700,
+                ppid: 100,
+                elapsedSeconds: 1200,
+                rssKb: 4096,
+                command: 'node /repo/dist/bin/codex-orchestrator.js delegate-server',
+                cwd: '/repo',
+                parentPid: 100,
+                parentCommand: 'node /opt/homebrew/bin/codex exec',
+                parentCwd: '/repo',
+                rootCodexParentPid: 100,
+                rootCodexParentCommand: 'node /opt/homebrew/bin/codex exec',
+                rootCodexParentCwd: '/repo',
+                manifestAssociation: {
+                  manifestPath: '/repo/.runs/linear-co551/run/manifest.json',
+                  workspacePath: '/repo',
+                  status: inspectCount >= 3 ? 'running' : 'succeeded',
+                  pipelineId: 'provider-linear-worker',
+                  taskId: 'linear-co551',
+                  runId: 'run-1',
+                  issueId: 'issue-1',
+                  issueIdentifier: 'CO-551',
+                  proofPid: 700
+                },
+                classification,
+                classificationDetail: inspectCount >= 3
+                  ? 'delegate-server is rooted in a live manifest'
+                  : 'parent session is terminal'
+              }
+            ]
+          };
+        },
+        signalProcess: (pid) => {
+          signaled.push(pid);
+          return { status: 'signaled', error: null };
+        }
+      })
+    });
+
+    expect(signaled).toEqual([]);
+    expect(audit.remediation.actions[0]).toMatchObject({
+      pid: 700,
+      target_kind: 'stale-delegate-server',
+      status: 'unsafe_to_kill',
+      outcome: 'identity_changed',
+      reason: 'PID is no longer stale in the current delegate-server inspection, so remediation refused'
+    });
+  });
+
+  it('keeps app-server, control-host, active review, and provider-worker processes out of remediation', async () => {
+    const signaled: number[] = [];
+    const audit = await buildQuotaHygieneAudit({
+      flags: {
+        apply: true,
+        yes: true,
+        only: 'stale-github-polling'
+      },
+      dependencies: baseDependencies({
+        readProcessInventory: async () => [
+          {
+            pid: 123,
+            ppid: 1,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:20:00',
+            stat: 'S',
+            command: '/Applications/Codex.app/Contents/MacOS/Codex app-server'
+          },
+          {
+            pid: 124,
+            ppid: 1,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:20:00',
+            stat: 'S',
+            command: 'node /repo/bin/codex-orchestrator.js control-host --task local-mcp'
+          },
+          {
+            pid: 125,
+            ppid: 1,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:20:00',
+            stat: 'S',
+            command: 'codex review --task linear-co125 CO-125'
+          },
+          {
+            pid: 126,
+            ppid: 1,
+            lstart: 'Sun May 17 14:01:17 2026',
+            etime: '00:20:00',
+            stat: 'S',
+            command:
+              'node /repo/dist/cli/providerLinearWorkerRunner.js --task linear-co126 --issue CO-126'
+          }
+        ],
+        signalProcess: (pid) => {
+          signaled.push(pid);
+          return { status: 'signaled', error: null };
+        }
+      })
+    });
+
+    expect(signaled).toEqual([]);
+    expect(audit.remediation.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ pid: 123, status: 'unsafe_to_kill' }),
+        expect.objectContaining({ pid: 124, status: 'unsafe_to_kill' }),
+        expect.objectContaining({ pid: 125, status: 'detectable_only' }),
+        expect.objectContaining({ pid: 126, status: 'detectable_only' })
+      ])
+    );
+  });
+
+  it('rejects kill-by-name style hygiene quota flags', async () => {
+    await expect(
+      runHygieneCliShell(
+        {
+          positionals: ['quota'],
+          flags: {
+            apply: true,
+            yes: true,
+            only: 'stale-github-polling',
+            name: 'gh'
+          },
+          printHelp: () => undefined
+        },
+        baseDependencies()
+      )
+    ).rejects.toThrow('Unknown hygiene quota flag(s): --name');
+  });
+
   it('parses ps inventory lines with lstart and command text', () => {
     const records = parseProcessInventory(
       '123 1 Sun May 17 14:01:17 2026 00:10 S+ codex exec --task linear-abc "work"'
@@ -971,8 +2135,14 @@ function baseDependencies(
       metrics: {}
     }) as never,
     readTextFile: async () => defaultProviderState(),
+    writeTextFile: async () => undefined,
+    makeDirectory: async () => undefined,
     readDirectory: async () => [],
     fileExists: existsSync,
+    signalProcess: () => ({ status: 'blocked', error: 'unexpected signalProcess call' }),
+    isProcessAlive: () => false,
+    waitForMs: async () => undefined,
+    getCurrentProcessPid: () => 999_999,
     resolveCodexHome: () => '/codex-home',
     ...overrides
   };
