@@ -1,6 +1,140 @@
 {
   "items": [
     {
+      "id": "20260522-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce",
+      "title": "CO-578 snapshot mutable review manifest evidence before contract validation",
+      "relates_to": "tasks/tasks-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-22",
+      "canonical_owner_key": "review-wrapper:contract-evidence-active-manifest-snapshot:v1",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=review-wrapper:contract-evidence-active-manifest-snapshot:v1",
+      "evidence": [
+        "docs/PRD-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
+        "docs/TECH_SPEC-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
+        "docs/ACTION_PLAN-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
+        "tasks/specs/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
+        "tasks/tasks-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
+        ".agent/task/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
+        "tasks/index.json",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO-578 provider worker",
+          "date": "2026-05-22",
+          "status": "confirmed_ready_to_in_progress",
+          "summary": "Live issue-context verified Ready state, no attached PR, and no active workpad; worker created the single workpad and transitioned to In Progress."
+        },
+        "parallelization": {
+          "reviewer": "CO-578 provider worker",
+          "date": "2026-05-22",
+          "status": "parallelize_now_recorded",
+          "summary": "Pre-turn matrix found an independent tests child lane for focused review-contract regressions; parent owns implementation and docs packet."
+        },
+        "docs_packet": {
+          "reviewer": "CO-578 provider worker",
+          "date": "2026-05-22",
+          "status": "created_pending_docs_review",
+          "summary": "Docs-first packet records immutable review-owned active manifest snapshots, strict evidence validation, no tolerance fallback, and no active-manifest citation as protected contract terms."
+        },
+        "child_lane_tests": {
+          "reviewer": "bounded same-issue tests child lane",
+          "date": "2026-05-22",
+          "status": "accepted",
+          "manifest": ".runs/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce-contract-regression-tests/cli/2026-05-22T15-33-36-671Z-71db1d83/manifest.json",
+          "patch": ".runs/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce-contract-regression-tests/cli/2026-05-22T15-33-36-671Z-71db1d83/provider-linear-child-lane.patch",
+          "summary": "Accepted scoped regression patch; parent added byte-fidelity assertion before implementation."
+        },
+        "docs_review_preimplementation": {
+          "reviewer": "codex-orchestrator docs-review child stream",
+          "date": "2026-05-22",
+          "status": "failed_expected_preimplementation_findings",
+          "manifest": ".runs/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce-docs-review/cli/2026-05-22T15-39-36-699Z-2263dc45/manifest.json",
+          "telemetry": ".runs/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce-docs-review/cli/2026-05-22T15-39-36-699Z-2263dc45/review/telemetry.json",
+          "summary": "Delegation/spec/docs gates passed; forced review reported the intentional missing implementation behind the red test and a test byte-fidelity strengthening that parent addressed."
+        },
+        "docs_review_postimplementation": {
+          "reviewer": "codex-orchestrator docs-review child stream",
+          "date": "2026-05-22",
+          "status": "succeeded_clean",
+          "manifest": ".runs/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce-docs-review-r2/cli/2026-05-22T15-47-48-596Z-44a2c0d4/manifest.json",
+          "telemetry": ".runs/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce-docs-review-r2/cli/2026-05-22T15-47-48-596Z-44a2c0d4/review/telemetry.json",
+          "contract": ".runs/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce-docs-review-r2/cli/2026-05-22T15-47-48-596Z-44a2c0d4/review/contract.json",
+          "summary": "Post-implementation docs-review passed with review_outcome=clean-success, review_verdict=clean, contract_validation=valid, and all axes clean."
+        },
+        "final_standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-22",
+          "status": "succeeded_clean",
+          "output": ".runs/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce/cli/2026-05-22T15-30-57-133Z-4e238242/review/output.log",
+          "telemetry": ".runs/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce/cli/2026-05-22T15-30-57-133Z-4e238242/review/telemetry.json",
+          "contract": ".runs/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce/cli/2026-05-22T15-30-57-133Z-4e238242/review/contract.json",
+          "summary": "Manifest-backed standalone review ran under FORCE_CODEX_REVIEW=1 and reports review_outcome=clean-success, review_verdict=clean, contract_validation=valid, and contract_overall_verdict=clean."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-05-23",
+          "status": "clean",
+          "evidence": "out/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce/manual/20260523T020500Z-elegance-review.md",
+          "summary": "Explicit minimality pass found no avoidable abstraction or scope expansion; the diff remains limited to snapshot construction, focused regression coverage, fixture metadata, and one guidance line."
+        }
+      },
+      "validation": {
+        "status": "review_clean_pr_pending",
+        "passed": [
+          "live Linear context read",
+          "issue transitioned Ready to In Progress",
+          "workpad created",
+          "parallelization decision recorded",
+          "tests child lane launched",
+          "docs-first packet created",
+          "tests child lane accepted",
+          "pre-implementation docs-review deterministic gates passed",
+          "focused red regression failed on live manifest source ref before implementation",
+          "snapshot implementation added",
+          "byte-fidelity assertion added",
+          "standalone review guide updated",
+          "npx vitest run tests/review-contract.spec.ts passed 23 tests",
+          "post-implementation docs-review clean valid enforced contract",
+          "node scripts/delegation-guard.mjs passed",
+          "node scripts/spec-guard.mjs --dry-run passed",
+          "npm run build passed",
+          "npm run lint passed",
+          "npm run test passed",
+          "npm run docs:check passed",
+          "npm run docs:freshness passed",
+          "npm run repo:stewardship passed",
+          "node scripts/diff-budget.mjs passed",
+          "manifest-backed standalone review clean",
+          "explicit elegance/minimality pass complete",
+          "npm run pack:smoke passed"
+        ],
+        "pending": [
+          "PR lifecycle",
+          "ready-review drain",
+          "Linear review handoff"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
+        "prd": "docs/PRD-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
+        "docs": "docs/TECH_SPEC-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
+        "action_plan": "docs/ACTION_PLAN-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
+        "spec": "tasks/specs/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
+        "task": "tasks/tasks-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md"
+      },
+      "source_issue": {
+        "id": "795a9aa4-02fd-4f2f-8942-7df40ae865ce",
+        "identifier": "CO-578",
+        "url": "https://linear.app/asabeko/issue/CO-578/co-snapshot-mutable-review-manifest-evidence-before-contract"
+      }
+    },
+    {
       "id": "20260522-linear-f42d51e8-18ab-469a-9155-a272e8eaee70",
       "title": "CO-577 quota hygiene degraded machine-status classification",
       "relates_to": "tasks/tasks-linear-f42d51e8-18ab-469a-9155-a272e8eaee70.md",

@@ -1,0 +1,74 @@
+---
+id: 20260522-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce
+title: CO-578 snapshot mutable review manifest evidence before contract validation
+relates_to: docs/PRD-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md
+risk: high
+owners:
+  - Codex
+last_review: 2026-05-22
+---
+
+# Technical Specification
+
+## Summary
+- Objective: Make agent-loop governed review input cite immutable review-owned snapshots for active run manifest and runner-log evidence.
+- Scope: `scripts/lib/review-contract.ts`, focused review contract tests, `docs/standalone-review-guide.md`, and CO-578 task packet mirrors.
+- Constraints: Do not weaken strict evidence SHA validation or add active-manifest hash tolerance.
+
+## Issue-Shaping Contract
+- User-request translation carried forward: Fix the self-invalidating live-manifest race by snapshotting mutable active run evidence before review contract validation.
+- Protected terms / exact artifact and surface names: governed review contract, active run manifest, immutable review input snapshot, agent-loop-bundle, evidence_refs, sha256 validation, fail-closed review gate, `review/inputs/**`.
+- Nearby wrong interpretations to reject: hash-optional evidence, prompt-only prohibition, review retry as fix, empty findings as clean without valid contract.
+- Explicit non-goals carried forward: No global validation weakening, no contract disablement, no CO-549 implementation behavior change.
+
+## Parity / Alignment Matrix
+- Current truth: `buildAgentLoopBundle(...)` uses live `options.manifestPath` and optional `runnerLogPath` in nested source refs.
+- Reference truth: Contract validation rehashes cited files at validation time and rejects stale SHA evidence.
+- Target truth / intended delta: Bundle source refs for active run evidence refer to review-owned snapshot files, while embedded manifest/log content remains available.
+- Explicitly out-of-scope differences: Ordinary repo and artifact evidence refs keep existing strict path and SHA enforcement.
+
+## Readiness Gate
+- Not done if: A clean review can still cite `.runs/**/manifest.json` from the generated agent-loop bundle and fail after wrapper finalization mutates that manifest.
+- Pre-implementation issue-quality review evidence: Linear issue packet has protected terms, non-goals, acceptance criteria, current evidence, and a concrete root-cause pointer to `buildAgentLoopBundle(...)`; no clarifying question is required.
+- Safeguard ownership split: Child lane owns focused regression test files until parent acceptance/rejection; parent owns implementation, docs packet, validation, review handoff, and PR lifecycle.
+
+## Technical Requirements
+- Functional requirements:
+  - Create immutable snapshot files under `review/inputs/` for the active manifest and runner log when present.
+  - Build agent-loop `source_refs` from those snapshots rather than live active artifacts.
+  - Preserve embedded `manifest` JSON and `runner_log_tail` payloads for reviewer usability.
+  - Keep `validateEvidenceRefs(...)` unchanged in strict stale-hash behavior.
+- Non-functional requirements (performance, reliability, security):
+  - Snapshot writes must be deterministic and local to the review artifact directory.
+  - Missing runner logs remain nullable rather than failing bundle creation.
+  - Paths must remain repository-relative or within trusted run artifact roots.
+- Interfaces / contracts:
+  - `prepareReviewContractInputBundles(...)` still returns bundle refs for the four governed bundles.
+  - `agent-loop-bundle.json` remains `co.review.input-bundle.v1` with stable nested `source_refs`.
+
+## Fallback Expiry / Refactor Decision
+- Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `Yes`.
+- Required decision table:
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| review contract agent-loop input | Mutable active manifest/runner-log citation seam | remove fallback | CO-578 | Generated nested refs point at live active artifacts | before 2026-05-22 | 2026-05-22 | Removed in CO-578 | Snapshot refs replace live refs | Focused mutation regression and full gates |
+
+- Large-refactor check: Larger review-contract redesign is not preferred for this issue because the validator contract remains correct and the mutable source-ref seam is localized to bundle construction.
+
+## Architecture & Data
+- Architecture / design adjustments: Add a snapshot step in agent-loop bundle construction that copies active manifest/log bytes into `review/inputs/` before calculating evidence refs.
+- Data model changes / migrations: None; generated review input artifacts gain snapshot files.
+- External dependencies / integrations: No new dependencies.
+
+## Validation Plan
+- Tests / checks: Focused red/green review-contract regression, full `npm run test`, docs gates, repo stewardship, diff budget, manifest-backed standalone review, and elegance pass.
+- Rollout verification: Dogfood governed review on this branch and inspect `review/telemetry.json` for clean/valid contract evidence.
+- Monitoring / alerts: Existing review telemetry remains authoritative.
+
+## Open Questions
+- None.
+
+## Approvals
+- Reviewer: Provider worker self-review from Linear issue packet.
+- Date: 2026-05-22

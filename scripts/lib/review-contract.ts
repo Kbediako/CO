@@ -613,13 +613,26 @@ async function buildChangeBundle(options: {
 
 async function buildAgentLoopBundle(options: {
   repoRoot: string;
+  reviewDir: string;
   manifestPath: string;
   runnerLogPath?: string | null;
   runnerLogExists?: boolean;
 }): Promise<Record<string, unknown>> {
-  const paths = [options.manifestPath];
+  const inputDir = join(options.reviewDir, 'inputs');
+  const manifestSnapshotPath = await snapshotReviewInputFile(
+    inputDir,
+    options.manifestPath,
+    'agent-loop-active-manifest.snapshot.json'
+  );
+  const paths = [manifestSnapshotPath];
+  let runnerLogSnapshotPath: string | null = null;
   if (options.runnerLogExists && options.runnerLogPath) {
-    paths.push(options.runnerLogPath);
+    runnerLogSnapshotPath = await snapshotReviewInputFile(
+      inputDir,
+      options.runnerLogPath,
+      'agent-loop-runner-log.snapshot.ndjson'
+    );
+    paths.push(runnerLogSnapshotPath);
   }
   const sourceRefs = await buildEvidenceRefsForPaths(options.repoRoot, paths);
   return {
@@ -627,11 +640,22 @@ async function buildAgentLoopBundle(options: {
     bundle: 'agent_loop',
     generated_at: new Date().toISOString(),
     source_refs: sourceRefs,
-    manifest: await readJson(options.manifestPath),
-    runner_log_tail: options.runnerLogExists && options.runnerLogPath
-      ? await readTailText(options.runnerLogPath, TEXT_SNIPPET_LIMIT)
+    manifest: await readJson(manifestSnapshotPath),
+    runner_log_tail: runnerLogSnapshotPath
+      ? await readTailText(runnerLogSnapshotPath, TEXT_SNIPPET_LIMIT)
       : null
   };
+}
+
+async function snapshotReviewInputFile(
+  inputDir: string,
+  sourcePath: string,
+  snapshotName: string
+): Promise<string> {
+  const snapshotPath = join(inputDir, snapshotName);
+  await mkdir(inputDir, { recursive: true });
+  await writeFile(snapshotPath, await readFile(sourcePath));
+  return snapshotPath;
 }
 
 async function buildEvidenceRefsForPaths(

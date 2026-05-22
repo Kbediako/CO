@@ -51,6 +51,27 @@
       }
     },
     {
+      "id": "agent-loop-snapshot-evidence",
+      "description": "Active manifest and runner-log source refs cite review-owned immutable snapshots instead of mutable live run files.",
+      "source_ref_expectations": {
+        "bundle": "agent_loop",
+        "required_path_fragment": "/review/inputs/",
+        "forbidden_live_paths": [
+          ".runs/<task>/cli/<run>/manifest.json",
+          ".runs/<task>/cli/<run>/runner.log"
+        ],
+        "live_mutation_outcome": "deterministically-invalid"
+      },
+      "expected_contract": {
+        "overall_verdict": "findings",
+        "axis": "agent_loop",
+        "proposal_counts": {
+          "code_change": 0,
+          "agent_loop": 1
+        }
+      }
+    },
+    {
       "id": "legacy-prose-clean-output",
       "description": "Prose-only clean output must fail closed in governed enforce mode.",
       "legacy_output": "I found no actionable issues in the uncommitted diff.",
