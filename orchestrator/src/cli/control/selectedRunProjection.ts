@@ -2053,7 +2053,9 @@ function resolveProviderLinearWorkerRunArtifactReconciliation(
     replacementRun,
     providerIntakeState
   );
+  const authoritativeSuccessfulHandoff = reason === 'provider_worker_successful_handoff';
   if (
+    !authoritativeSuccessfulHandoff &&
     !isProviderLinearWorkerReconciliationEvidenceNewerThanContext(
       evidenceUpdatedAt,
       context,
