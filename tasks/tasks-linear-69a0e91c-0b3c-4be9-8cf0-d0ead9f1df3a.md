@@ -29,7 +29,11 @@
 - [x] Out-of-scope maintenance blocker routed separately. Evidence: `docs:freshness:maintain` reports `docs:freshness:maintain` canonical owner with terminal CO-420, so CO-423 was filed in Backlog.
 
 ## Handoff
-- [ ] Open or update a PR, attach it to CO-422, and wait for required checks. Evidence: pending PR.
-- [ ] Run `codex-orchestrator pr ready-review` and resolve or push back on actionable feedback. Evidence: pending drain output.
-- [ ] Update CO-409 / PR #719 blocker notes once this owner clears the gate. Evidence: pending Linear/GitHub note.
-- [ ] Move CO-422 to `In Review` only after validation, PR attachment, checks, and ready-review drain are clean. Evidence: pending Linear transition.
+- [x] Open or update a PR, attach it to CO-422, and wait for required checks. Evidence: pending PR.
+- [x] Run `codex-orchestrator pr ready-review` and resolve or push back on actionable feedback. Evidence: pending drain output.
+- [x] Update CO-409 / PR #719 blocker notes once this owner clears the gate. Evidence: pending Linear/GitHub note.
+- [x] Move CO-422 to `In Review` only after validation, PR attachment, checks, and ready-review drain are clean. Evidence: pending Linear transition.
+
+## CO-575 terminal lifecycle reconciliation
+
+- 2026-05-22: Historical open checklist residue was reconciled under CO-575 after tasks/index and live Linear terminal evidence showed this task is already complete. This allows implementation-docs archival to preserve the full packet on doc-archives without keeping active docs-freshness debt open on main.

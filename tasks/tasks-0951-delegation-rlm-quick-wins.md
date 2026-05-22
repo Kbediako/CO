@@ -12,7 +12,7 @@
 
 ### Implementation
 - [x] Delegation guard emits actionable diagnostics — Evidence: `scripts/delegation-guard.mjs`, `tests/delegation-guard.spec.ts`, `.runs/0951-delegation-rlm-quick-wins-guard/cli/2026-01-14T15-58-07-762Z-a73202dc/manifest.json`.
-- [ ] Troubleshooting note added to review-loop SOP (optional) — Evidence: `.agent/SOPs/review-loop.md`.
+- [x] Troubleshooting note added to review-loop SOP (optional) — Evidence: optional SOP follow-up is superseded by the shipped standalone-review and delegation guidance; no live CO owner keeps this historical packet open.
 - [x] Async/start-only `delegate.spawn` supports long-running runs without tool-call timeout — Evidence: `orchestrator/src/cli/delegationServer.ts`, `orchestrator/tests/DelegationServer.test.ts`, `.runs/0951-delegation-rlm-quick-wins-spawn/cli/2026-01-14T16-03-07-761Z-79208415/manifest.json`.
 - [x] True RLM behavior implemented (context object + symbolic recursion) — Evidence: `orchestrator/src/cli/rlmRunner.ts`, `orchestrator/src/cli/rlm/context.ts`, `orchestrator/src/cli/rlm/symbolic.ts`, `orchestrator/tests/RlmSymbolic.test.ts`, `orchestrator/tests/RlmRunnerMode.test.ts`, `.runs/0951-delegation-rlm-quick-wins/cli/2026-01-14T17-34-02-271Z-3ba18482/rlm/state.json`.
 - [x] Implementation-docs archive automation fixes for PR #165 (doc-archives payloads + diff budget strategy) — Evidence: `.github/workflows/archive-automation-base.yml`, `.github/workflows/implementation-docs-archive-automation.yml`, `scripts/implementation-docs-archive.mjs`, `tests/implementation-docs-archive.spec.ts`, `docs/implementation-docs-archive-policy.json`.
