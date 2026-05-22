@@ -195,6 +195,57 @@ describe('implementation-docs-archive script', () => {
     expect(payloadContent).toContain('# PRD Archive Test');
   });
 
+  it('clears nonterminal registry task status fields when archiving docs', async () => {
+    const repo = await initRepository({
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'docs/PRD-archive-test.md',
+            owner: 'Codex',
+            status: 'active',
+            task_status: 'open_checklist',
+            task_lifecycle_status: 'in-progress',
+            lifecycle_status: 'queued',
+            last_review: '2025-01-01',
+            cadence_days: 30
+          }
+        ]
+      },
+      taskOverrides: {
+        status: 'completed',
+        completed_at: '2025-01-01'
+      }
+    });
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const registry = JSON.parse(
+      await readFile(join(repo, 'docs', 'docs-freshness-registry.json'), 'utf8')
+    );
+    const entry = registry.entries.find(
+      (candidate: { path?: string }) => candidate.path === 'docs/PRD-archive-test.md'
+    );
+
+    expect(entry).toMatchObject({
+      path: 'docs/PRD-archive-test.md',
+      owner: 'Codex',
+      status: 'archived',
+      cadence_days: 365
+    });
+    expect(entry).not.toHaveProperty('task_status');
+    expect(entry).not.toHaveProperty('task_lifecycle_status');
+    expect(entry).not.toHaveProperty('lifecycle_status');
+  });
+
   it('fails closed when archive comparison base cannot be resolved', async () => {
     const repo = await initRepository();
     const sourcePath = join(repo, 'docs', 'PRD-archive-test.md');

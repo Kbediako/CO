@@ -16,6 +16,7 @@ import {
 } from './lib/docs-helpers.js';
 import {
   collectIndexedTaskPacketPaths,
+  isTerminalTaskStatus,
   isTerminalTaskItem,
   TERMINAL_PENDING_ARCHIVE_STATUS
 } from './lib/docs-freshness-lifecycle.js';
@@ -40,6 +41,7 @@ const TERMINAL_TASK_LIFECYCLE_REASON = 'terminal_task_lifecycle';
 const ALREADY_ARCHIVED_PRESERVED_FINDINGS_REASON = 'already_archived_preserved_findings';
 const PRESERVED_HISTORICAL_STUB_PATH_PATTERNS = [/^tasks\/tasks-[^/]+\.md$/, /^\.agent\/task\/[^/]+\.md$/];
 const PRESERVED_HISTORICAL_STUB_HEADING_PATTERN = /^\s*#\s+Historical stub\b/i;
+const REGISTRY_TASK_STATUS_FIELDS = ['task_status', 'task_lifecycle_status', 'lifecycle_status'];
 
 function showUsage() {
   console.log(`Usage: node scripts/implementation-docs-archive.mjs [options]
@@ -63,6 +65,22 @@ function normalizeStringList(value) {
     .filter((entry) => typeof entry === 'string')
     .map((entry) => entry.trim())
     .filter(Boolean);
+}
+
+function clearArchivedRegistryTaskStatus(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return false;
+  }
+
+  let changed = false;
+  for (const field of REGISTRY_TASK_STATUS_FIELDS) {
+    const value = entry[field];
+    if (typeof value === 'string' && value.trim() && !isTerminalTaskStatus(value)) {
+      delete entry[field];
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 function formatDate(date) {
@@ -883,7 +901,12 @@ async function main() {
   function markArchivedRegistryEntry(relativePath, { reason, context, archiveUrl, recordRepair = false }) {
     const existingEntry = registryMap.get(relativePath);
     if (existingEntry?.status === 'archived') {
-      return false;
+      const taskStatusCleared = clearArchivedRegistryTaskStatus(existingEntry);
+      if (taskStatusCleared && recordRepair) {
+        report.registry_repairs.push({ path: relativePath, reason, context, archive_url: archiveUrl });
+        report.totals.registry_repairs += 1;
+      }
+      return taskStatusCleared;
     }
     const entry = ensureRegistryEntry(registryMap, relativePath, {
       owner: DEFAULT_OWNER,
@@ -894,6 +917,7 @@ async function main() {
     entry.status = 'archived';
     entry.last_review = todayString;
     entry.cadence_days = policy.archivedCadenceDays;
+    clearArchivedRegistryTaskStatus(entry);
     if (!entry.owner || typeof entry.owner !== 'string') {
       entry.owner = DEFAULT_OWNER;
     }
