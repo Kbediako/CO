@@ -613,13 +613,19 @@ async function buildChangeBundle(options: {
 
 async function buildAgentLoopBundle(options: {
   repoRoot: string;
+  reviewDir: string;
   manifestPath: string;
   runnerLogPath?: string | null;
   runnerLogExists?: boolean;
 }): Promise<Record<string, unknown>> {
-  const paths = [options.manifestPath];
+  const inputDir = join(options.reviewDir, 'inputs');
+  const paths = [
+    await snapshotReviewInputFile(inputDir, options.manifestPath, 'agent-loop-active-manifest.snapshot.json')
+  ];
   if (options.runnerLogExists && options.runnerLogPath) {
-    paths.push(options.runnerLogPath);
+    paths.push(
+      await snapshotReviewInputFile(inputDir, options.runnerLogPath, 'agent-loop-runner-log.snapshot.ndjson')
+    );
   }
   const sourceRefs = await buildEvidenceRefsForPaths(options.repoRoot, paths);
   return {
@@ -632,6 +638,17 @@ async function buildAgentLoopBundle(options: {
       ? await readTailText(options.runnerLogPath, TEXT_SNIPPET_LIMIT)
       : null
   };
+}
+
+async function snapshotReviewInputFile(
+  inputDir: string,
+  sourcePath: string,
+  snapshotName: string
+): Promise<string> {
+  const snapshotPath = join(inputDir, snapshotName);
+  await mkdir(inputDir, { recursive: true });
+  await writeFile(snapshotPath, await readFile(sourcePath));
+  return snapshotPath;
 }
 
 async function buildEvidenceRefsForPaths(

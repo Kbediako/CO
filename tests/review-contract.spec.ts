@@ -826,6 +826,77 @@ describe('review contract v1', () => {
     ).resolves.toContain('docs/TECH_SPEC-linear-abc.md');
   });
 
+  it('uses review-owned immutable snapshots for active agent-loop manifest and runner-log refs', async () => {
+    const sandbox = await makeSandbox();
+    await mkdir(join(sandbox, 'tasks'), { recursive: true });
+    await writeFile(join(sandbox, 'tasks', 'index.json'), JSON.stringify({ items: [] }), 'utf8');
+    const runRoot = join(sandbox, '.runs', 'linear-abc', 'cli', 'run-1');
+    const reviewDir = join(runRoot, 'review');
+    const manifestPath = join(runRoot, 'manifest.json');
+    const runnerLogPath = join(runRoot, 'runner.log');
+    const manifestContent = '{"status":"in_progress","run_id":"run-1"}\n';
+    const runnerLogContent = 'runner started\nreview in progress\n';
+    await mkdir(runRoot, { recursive: true });
+    await writeFile(manifestPath, manifestContent, 'utf8');
+    await writeFile(runnerLogPath, runnerLogContent, 'utf8');
+
+    await prepareReviewContractInputBundles({
+      repoRoot: sandbox,
+      reviewDir,
+      manifestPath,
+      runnerLogPath,
+      runnerLogExists: true,
+      taskKey: 'linear-abc',
+      taskLabel: 'linear-abc',
+      reviewSurface: 'diff',
+      scopePaths: [],
+      notes: 'Goal: snapshot active agent-loop evidence',
+      mode: 'shadow'
+    });
+
+    const agentLoopBundle = JSON.parse(
+      await readFile(join(reviewDir, 'inputs', 'agent-loop-bundle.json'), 'utf8')
+    ) as { source_refs?: ReviewContractEvidenceRef[] };
+    const sourceRefs = agentLoopBundle.source_refs ?? [];
+    const sourcePaths = sourceRefs.map((ref) => ref.path);
+    const liveManifestRef = {
+      path: relative(sandbox, manifestPath).split(sep).join('/'),
+      sha256: createHash('sha256').update(manifestContent).digest('hex')
+    };
+    const liveRunnerLogRef = {
+      path: relative(sandbox, runnerLogPath).split(sep).join('/'),
+      sha256: createHash('sha256').update(runnerLogContent).digest('hex')
+    };
+
+    expect(sourceRefs).toHaveLength(2);
+    expect(sourcePaths).not.toContain(liveManifestRef.path);
+    expect(sourcePaths).not.toContain(liveRunnerLogRef.path);
+    expect(sourcePaths.every((entry) => entry.startsWith('.runs/linear-abc/cli/run-1/review/inputs/'))).toBe(true);
+    expect(new Set(sourceRefs.map((ref) => ref.sha256))).toEqual(
+      new Set([liveManifestRef.sha256, liveRunnerLogRef.sha256])
+    );
+
+    await writeFile(manifestPath, '{"status":"complete","run_id":"run-1"}\n', 'utf8');
+    await writeFile(runnerLogPath, 'runner completed\n', 'utf8');
+
+    const snapshotContract = buildCleanContract(sourceRefs[0] as ReviewContractEvidenceRef);
+    for (const axis of Object.values(snapshotContract.axes)) {
+      axis.evidence_refs = sourceRefs;
+    }
+    await expect(validateReviewContract(snapshotContract, { repoRoot: sandbox })).resolves.toEqual({
+      valid: true,
+      errors: []
+    });
+
+    const liveContract = buildCleanContract(liveManifestRef);
+    for (const axis of Object.values(liveContract.axes)) {
+      axis.evidence_refs = [liveManifestRef, liveRunnerLogRef];
+    }
+    const liveValidation = await validateReviewContract(liveContract, { repoRoot: sandbox });
+    expect(liveValidation.valid).toBe(false);
+    expect(liveValidation.errors.join('\n')).toMatch(/evidence sha256 is stale or mismatched|trusted run artifact roots/u);
+  });
+
   it('skips task bundle document paths that escape the repository root', async () => {
     const sandbox = await makeSandbox();
     const repoRoot = join(sandbox, 'repo');
@@ -1021,6 +1092,7 @@ describe('review contract v1', () => {
       'coding-standard-fallback-violation',
       'real-code-bug-with-patch-proposal',
       'skipped-agent-loop-step',
+      'agent-loop-snapshot-evidence',
       'legacy-prose-clean-output'
     ]);
     expect(fixtures).toEqual(
@@ -1035,6 +1107,13 @@ describe('review contract v1', () => {
           id: 'skipped-agent-loop-step',
           expected_contract: expect.objectContaining({
             proposal_counts: { code_change: 0, agent_loop: 1 }
+          })
+        }),
+        expect.objectContaining({
+          id: 'agent-loop-snapshot-evidence',
+          source_ref_expectations: expect.objectContaining({
+            bundle: 'agent_loop',
+            live_mutation_outcome: 'deterministically-invalid'
           })
         }),
         expect.objectContaining({

@@ -118,6 +118,7 @@ Use `codex-orchestrator review` as the default path so runs inherit CO guardrail
   - `CODEX_REVIEW_LARGE_SCOPE_LINE_THRESHOLD=<count>` (default `1200`)
   - `CODEX_REVIEW_LARGE_SCOPE_OVERRIDE_REASON="<reason>"` (required when large uncommitted scope is intentional and you are not using `--base` / `--commit`)
 - `codex-orchestrator review` writes artifacts under `<runDir>/review/`, where `<runDir>` tracks the resolved manifest lineage: it uses `CODEX_ORCHESTRATOR_RUN_DIR` only when that directory contains the resolved manifest, otherwise it falls back to `dirname(manifestPath)`.
+- Governed agent-loop inputs copy active run manifest and runner-log bytes into immutable `review/inputs/` snapshots before reviewer handoff. Review contracts must cite the agent-loop bundle or those review-owned snapshot refs for active run state, not mutable live `.runs/**/manifest.json` or runner-log artifacts.
 - Prompt artifact: `<runDir>/review/prompt.txt` (always).
 - Review transcript: `<runDir>/review/output.log` (when `codex review` runs, for example with `FORCE_CODEX_REVIEW=1`).
 - Runtime telemetry artifact: `<runDir>/review/telemetry.json` (best-effort summary of observed command activity, startup events, output tail, explicit `review_outcome` and semantic `review_verdict` fields, plus a first-class `termination_boundary` record when the current timeout, stall, bounded command-intent, shell-probe, active-closeout-bundle-reread, startup-anchor, startup-loop, meta-surface expansion, verdict-stability, or relevant-reinspection dwell guard fires).
