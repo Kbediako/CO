@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -9,6 +9,7 @@ const execFileAsync = promisify(execFile);
 const scriptPath = join(process.cwd(), 'scripts', 'implementation-docs-archive.mjs');
 
 const createdDirs: string[] = [];
+const originalArchiveBaseRef = process.env.IMPLEMENTATION_DOCS_ARCHIVE_BASE_REF;
 
 type InitOptions = {
   policyOverrides?: Record<string, unknown>;
@@ -22,13 +23,13 @@ type InitOptions = {
     path: string;
     relates_to: string;
     paths: {
-      docs?: string;
+      docs?: string | Record<string, string>;
       task?: string;
       spec?: string;
       agent_task?: string;
       prd?: string;
       action_plan?: string;
-      findings?: string;
+      findings?: string | string[];
       docs_review_manifest?: string;
     };
   }>;
@@ -97,10 +98,26 @@ async function initRepository(options: InitOptions = {}): Promise<string> {
     '# PRD Archive Test\n\nSome content.\n'
   );
 
+  await execFileAsync('git', ['init'], { cwd: dir });
+  await execFileAsync('git', ['config', 'user.email', 'codex@example.com'], { cwd: dir });
+  await execFileAsync('git', ['config', 'user.name', 'Codex'], { cwd: dir });
+  await execFileAsync('git', ['add', '.'], { cwd: dir });
+  await execFileAsync('git', ['commit', '-m', 'initial'], { cwd: dir });
+
   return dir;
 }
 
+beforeEach(() => {
+  process.env.IMPLEMENTATION_DOCS_ARCHIVE_BASE_REF = 'HEAD';
+});
+
 afterEach(async () => {
+  if (originalArchiveBaseRef === undefined) {
+    delete process.env.IMPLEMENTATION_DOCS_ARCHIVE_BASE_REF;
+  } else {
+    process.env.IMPLEMENTATION_DOCS_ARCHIVE_BASE_REF = originalArchiveBaseRef;
+  }
+
   while (createdDirs.length > 0) {
     const dir = createdDirs.pop();
     if (dir) {
@@ -178,8 +195,48 @@ describe('implementation-docs-archive script', () => {
     expect(payloadContent).toContain('# PRD Archive Test');
   });
 
-  it('does not replace source docs that still have open checklist items', async () => {
+  it('fails closed when archive comparison base cannot be resolved', async () => {
     const repo = await initRepository();
+    const sourcePath = join(repo, 'docs', 'PRD-archive-test.md');
+
+    await expect(
+      execFileAsync('node', [scriptPath], {
+        cwd: repo,
+        env: {
+          ...process.env,
+          MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+          CODEX_ORCHESTRATOR_ROOT: repo,
+          CODEX_ORCHESTRATOR_OUT_DIR: 'out',
+          IMPLEMENTATION_DOCS_ARCHIVE_BASE_REF: 'refs/heads/missing-archive-base'
+        }
+      })
+    ).rejects.toMatchObject({ code: 1 });
+
+    const sourceAfter = await readFile(sourcePath, 'utf8');
+    expect(sourceAfter).not.toContain('<!-- docs-archive:stub -->');
+    await expect(
+      readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('does not replace terminal packet docs that still have open checklist items', async () => {
+    const repo = await initRepository({
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'docs/PRD-archive-test.md',
+            owner: 'Codex (top-level agent), Review agent',
+            status: 'active',
+            last_review: '2025-01-01',
+            cadence_days: 30
+          }
+        ]
+      }
+    });
     const sourcePath = join(repo, 'docs', 'PRD-archive-test.md');
     const sourceBefore = '# PRD Archive Test\n\n1. [ ] Finish review handoff before archiving.\n';
     await writeFile(sourcePath, sourceBefore);
@@ -235,6 +292,890 @@ describe('implementation-docs-archive script', () => {
         'utf8'
       )
     ).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('does not replace docs whose base revision still had open checklist items', async () => {
+    const repo = await initRepository({
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'docs/PRD-archive-test.md',
+            owner: 'Codex (top-level agent), Review agent',
+            status: 'active',
+            last_review: '2025-01-01',
+            cadence_days: 30
+          }
+        ]
+      }
+    });
+    const sourcePath = join(repo, 'docs', 'PRD-archive-test.md');
+    const baseSource = '# PRD Archive Test\n\n1. [ ] Finish review handoff before archiving.\n';
+    const currentSource = '# PRD Archive Test\n\n1. [x] Finish review handoff before archiving.\n';
+    await writeFile(sourcePath, baseSource);
+    await execFileAsync('git', ['init'], { cwd: repo });
+    await execFileAsync('git', ['config', 'user.email', 'codex@example.com'], { cwd: repo });
+    await execFileAsync('git', ['config', 'user.name', 'Codex'], { cwd: repo });
+    await execFileAsync('git', ['add', '.'], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'base'], { cwd: repo });
+    await writeFile(sourcePath, currentSource);
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out',
+        IMPLEMENTATION_DOCS_ARCHIVE_BASE_REF: 'HEAD'
+      }
+    });
+
+    const sourceAfter = await readFile(sourcePath, 'utf8');
+    const report = JSON.parse(
+      await readFile(
+        join(
+          repo,
+          'out',
+          'implementation-docs-archive-automation',
+          'docs-archive-report.json'
+        ),
+        'utf8'
+      )
+    );
+
+    expect(sourceAfter).toBe(currentSource);
+    expect(sourceAfter).not.toContain('<!-- docs-archive:stub -->');
+    expect(report.totals.archived).toBe(0);
+    expect(report.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'docs/PRD-archive-test.md',
+          reason: 'base_unchecked_checklist_items',
+          context: expect.objectContaining({
+            unchecked_checklist_items: 1,
+            unchecked_checklist_samples: ['1. [ ] Finish review handoff before archiving.']
+          })
+        })
+      ])
+    );
+  });
+
+  it('compares base checklist state against the selected base ref tip', async () => {
+    const repo = await initRepository({
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'docs/PRD-archive-test.md',
+            owner: 'Codex (top-level agent), Review agent',
+            status: 'active',
+            last_review: '2025-01-01',
+            cadence_days: 30
+          }
+        ]
+      }
+    });
+    const sourcePath = join(repo, 'docs', 'PRD-archive-test.md');
+    const forkSource = '# PRD Archive Test\n\n1. [ ] Finish review handoff before archiving.\n';
+    const currentSource = '# PRD Archive Test\n\n1. [x] Finish review handoff before archiving.\n';
+
+    await writeFile(sourcePath, forkSource);
+    await execFileAsync('git', ['add', '.'], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'fork point with open checklist'], { cwd: repo });
+    await execFileAsync('git', ['branch', 'archive-base'], { cwd: repo });
+    await execFileAsync('git', ['checkout', '-b', 'feature-archive'], { cwd: repo });
+    await execFileAsync('git', ['checkout', 'archive-base'], { cwd: repo });
+    await writeFile(sourcePath, currentSource);
+    await execFileAsync('git', ['add', '.'], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'base branch closes checklist'], { cwd: repo });
+    await execFileAsync('git', ['checkout', 'feature-archive'], { cwd: repo });
+    await writeFile(sourcePath, currentSource);
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out',
+        IMPLEMENTATION_DOCS_ARCHIVE_BASE_REF: 'archive-base'
+      }
+    });
+
+    const sourceAfter = await readFile(sourcePath, 'utf8');
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+
+    expect(sourceAfter).toContain('<!-- docs-archive:stub -->');
+    expect(report.archived).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'docs/PRD-archive-test.md'
+        })
+      ])
+    );
+    expect(report.skipped).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'docs/PRD-archive-test.md',
+          reason: 'base_unchecked_checklist_items'
+        })
+      ])
+    );
+  });
+
+  it('blocks archival when the selected base ref tip still has open checklist items', async () => {
+    const repo = await initRepository({
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'docs/PRD-archive-test.md',
+            owner: 'Codex (top-level agent), Review agent',
+            status: 'active',
+            last_review: '2025-01-01',
+            cadence_days: 30
+          }
+        ]
+      }
+    });
+    const sourcePath = join(repo, 'docs', 'PRD-archive-test.md');
+    const cleanSource = '# PRD Archive Test\n\n1. [x] Finish review handoff before archiving.\n';
+    const baseSource = '# PRD Archive Test\n\n1. [ ] Finish review handoff before archiving.\n';
+
+    await writeFile(sourcePath, cleanSource);
+    await execFileAsync('git', ['add', '.'], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'fork point with closed checklist'], { cwd: repo });
+    await execFileAsync('git', ['branch', 'archive-base'], { cwd: repo });
+    await execFileAsync('git', ['checkout', '-b', 'feature-archive'], { cwd: repo });
+    await execFileAsync('git', ['checkout', 'archive-base'], { cwd: repo });
+    await writeFile(sourcePath, baseSource);
+    await execFileAsync('git', ['add', '.'], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'base branch opens checklist'], { cwd: repo });
+    await execFileAsync('git', ['checkout', 'feature-archive'], { cwd: repo });
+    await writeFile(sourcePath, cleanSource);
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out',
+        IMPLEMENTATION_DOCS_ARCHIVE_BASE_REF: 'archive-base'
+      }
+    });
+
+    const sourceAfter = await readFile(sourcePath, 'utf8');
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+
+    expect(sourceAfter).toBe(cleanSource);
+    expect(sourceAfter).not.toContain('<!-- docs-archive:stub -->');
+    expect(report.archived).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'docs/PRD-archive-test.md'
+        })
+      ])
+    );
+    expect(report.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'docs/PRD-archive-test.md',
+          reason: 'base_unchecked_checklist_items',
+          context: expect.objectContaining({
+            unchecked_checklist_items: 1,
+            unchecked_checklist_samples: ['1. [ ] Finish review handoff before archiving.']
+          })
+        })
+      ])
+    );
+  });
+
+  it('does not replace packet docs when a linked base checklist still had open items', async () => {
+    const repo = await initRepository({
+      taskOverrides: {
+        paths: {
+          docs: 'docs/PRD-archive-test.md',
+          task: 'tasks/tasks-9999-archive-test.md'
+        }
+      }
+    });
+    const sourcePath = join(repo, 'docs', 'PRD-archive-test.md');
+    const checklistPath = join(repo, 'tasks', 'tasks-9999-archive-test.md');
+    const sourceBefore = '# PRD Archive Test\n\nSome content ready to archive.\n';
+    await writeFile(sourcePath, sourceBefore);
+    await writeFile(checklistPath, '# Task Checklist\n\n- [ ] PR ready-review drain completed.\n');
+    await execFileAsync('git', ['init'], { cwd: repo });
+    await execFileAsync('git', ['config', 'user.email', 'codex@example.com'], { cwd: repo });
+    await execFileAsync('git', ['config', 'user.name', 'Codex'], { cwd: repo });
+    await execFileAsync('git', ['add', '.'], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'base'], { cwd: repo });
+    await writeFile(checklistPath, '# Task Checklist\n\n- [x] PR ready-review drain completed.\n');
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out',
+        IMPLEMENTATION_DOCS_ARCHIVE_BASE_REF: 'HEAD'
+      }
+    });
+
+    const sourceAfter = await readFile(sourcePath, 'utf8');
+    const report = JSON.parse(
+      await readFile(
+        join(
+          repo,
+          'out',
+          'implementation-docs-archive-automation',
+          'docs-archive-report.json'
+        ),
+        'utf8'
+      )
+    );
+
+    expect(sourceAfter).toBe(sourceBefore);
+    expect(sourceAfter).not.toContain('<!-- docs-archive:stub -->');
+    expect(report.totals.archived).toBe(0);
+    expect(report.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'docs/PRD-archive-test.md',
+          reason: 'linked_unchecked_checklist_items',
+          context: expect.objectContaining({
+            linked_unchecked_checklists: [
+              expect.objectContaining({
+                path: 'tasks/tasks-9999-archive-test.md',
+                source: 'base',
+                unchecked_checklist_items: 1,
+                unchecked_checklist_samples: ['- [ ] PR ready-review drain completed.']
+              })
+            ]
+          })
+        })
+      ])
+    );
+  });
+
+  it('does not repair already-stubbed rows when the base revision still had open checklist items', async () => {
+    const repo = await initRepository({
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'docs/PRD-archive-test.md',
+            owner: 'Codex (top-level agent), Review agent',
+            status: 'active',
+            last_review: '2025-01-01',
+            cadence_days: 30
+          }
+        ]
+      }
+    });
+    const sourcePath = join(repo, 'docs', 'PRD-archive-test.md');
+    const baseSource = '# PRD Archive Test\n\n1. [ ] Finish review handoff before archiving.\n';
+    const alreadyStubbed = [
+      '# Archived PRD',
+      '',
+      '<!-- docs-archive:stub -->',
+      '> Archived on 2026-05-01. Full content: https://github.com/example/repo/blob/doc-archives/docs/PRD-archive-test.md',
+      '',
+      '- Archive branch: doc-archives',
+      '- Archive path: docs/PRD-archive-test.md',
+      ''
+    ].join('\n');
+    await writeFile(sourcePath, baseSource);
+    await execFileAsync('git', ['init'], { cwd: repo });
+    await execFileAsync('git', ['config', 'user.email', 'codex@example.com'], { cwd: repo });
+    await execFileAsync('git', ['config', 'user.name', 'Codex'], { cwd: repo });
+    await execFileAsync('git', ['add', '.'], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'base'], { cwd: repo });
+    await writeFile(sourcePath, alreadyStubbed);
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out',
+        IMPLEMENTATION_DOCS_ARCHIVE_BASE_REF: 'HEAD'
+      }
+    });
+
+    const sourceAfter = await readFile(sourcePath, 'utf8');
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+    const registry = JSON.parse(await readFile(join(repo, 'docs', 'docs-freshness-registry.json'), 'utf8'));
+    const registryEntry = registry.entries.find(
+      (entry: { path?: string }) => entry.path === 'docs/PRD-archive-test.md'
+    );
+
+    expect(sourceAfter).toBe(alreadyStubbed);
+    expect(report.totals.archived).toBe(0);
+    expect(report.totals.registry_repairs).toBe(0);
+    expect(report.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'docs/PRD-archive-test.md',
+          reason: 'base_unchecked_checklist_items',
+          context: expect.objectContaining({
+            unchecked_checklist_items: 1,
+            unchecked_checklist_samples: ['1. [ ] Finish review handoff before archiving.']
+          })
+        })
+      ])
+    );
+    expect(registryEntry).toMatchObject({
+      path: 'docs/PRD-archive-test.md',
+      status: 'active'
+    });
+  });
+
+  it('does not repair already-stubbed packet docs when a linked base checklist still had open items', async () => {
+    const repo = await initRepository({
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'docs/PRD-archive-test.md',
+            owner: 'Codex (top-level agent), Review agent',
+            status: 'active',
+            last_review: '2025-01-01',
+            cadence_days: 30
+          }
+        ]
+      },
+      taskOverrides: {
+        paths: {
+          docs: 'docs/PRD-archive-test.md',
+          task: 'tasks/tasks-9999-archive-test.md'
+        }
+      }
+    });
+    const sourcePath = join(repo, 'docs', 'PRD-archive-test.md');
+    const checklistPath = join(repo, 'tasks', 'tasks-9999-archive-test.md');
+    const sourceBefore = '# PRD Archive Test\n\nSome content ready to archive.\n';
+    const alreadyStubbed = [
+      '# Archived PRD',
+      '',
+      '<!-- docs-archive:stub -->',
+      '> Archived on 2026-05-01. Full content: https://github.com/example/repo/blob/doc-archives/docs/PRD-archive-test.md',
+      '',
+      '- Archive branch: doc-archives',
+      '- Archive path: docs/PRD-archive-test.md',
+      ''
+    ].join('\n');
+    await writeFile(sourcePath, sourceBefore);
+    await writeFile(checklistPath, '# Task Checklist\n\n- [ ] PR ready-review drain completed.\n');
+    await execFileAsync('git', ['init'], { cwd: repo });
+    await execFileAsync('git', ['config', 'user.email', 'codex@example.com'], { cwd: repo });
+    await execFileAsync('git', ['config', 'user.name', 'Codex'], { cwd: repo });
+    await execFileAsync('git', ['add', '.'], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'base'], { cwd: repo });
+    await writeFile(sourcePath, alreadyStubbed);
+    await writeFile(checklistPath, '# Task Checklist\n\n- [x] PR ready-review drain completed.\n');
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out',
+        IMPLEMENTATION_DOCS_ARCHIVE_BASE_REF: 'HEAD'
+      }
+    });
+
+    const sourceAfter = await readFile(sourcePath, 'utf8');
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+    const registry = JSON.parse(await readFile(join(repo, 'docs', 'docs-freshness-registry.json'), 'utf8'));
+    const registryEntry = registry.entries.find(
+      (entry: { path?: string }) => entry.path === 'docs/PRD-archive-test.md'
+    );
+
+    expect(sourceAfter).toBe(alreadyStubbed);
+    expect(report.totals.archived).toBe(0);
+    expect(report.totals.registry_repairs).toBe(0);
+    expect(report.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'docs/PRD-archive-test.md',
+          reason: 'linked_unchecked_checklist_items',
+          context: expect.objectContaining({
+            linked_unchecked_checklists: [
+              expect.objectContaining({
+                path: 'tasks/tasks-9999-archive-test.md',
+                source: 'base',
+                unchecked_checklist_items: 1,
+                unchecked_checklist_samples: ['- [ ] PR ready-review drain completed.']
+              })
+            ]
+          })
+        })
+      ])
+    );
+    expect(registryEntry).toMatchObject({
+      path: 'docs/PRD-archive-test.md',
+      status: 'active'
+    });
+  });
+
+  it('ignores base open checklist items for synthesized sibling checklist aliases missing from the current checkout', async () => {
+    const repo = await initRepository({
+      taskOverrides: {
+        relates_to: ''
+      }
+    });
+    const sourcePath = join(repo, 'docs', 'PRD-archive-test.md');
+    const synthesizedChecklistPath = join(repo, 'tasks', 'tasks-9999-archive-test.md');
+    await writeFile(
+      synthesizedChecklistPath,
+      '# Task Checklist\n\n- [ ] Base-only alias should not block archival.\n'
+    );
+    await execFileAsync('git', ['add', '.'], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'base open synthesized alias'], { cwd: repo });
+    await rm(synthesizedChecklistPath);
+    await writeFile(sourcePath, '# PRD Archive Test\n\nSome content ready to archive.\n');
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out',
+        IMPLEMENTATION_DOCS_ARCHIVE_BASE_REF: 'HEAD'
+      }
+    });
+
+    const sourceAfter = await readFile(sourcePath, 'utf8');
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+
+    expect(sourceAfter).toContain('<!-- docs-archive:stub -->');
+    expect(report.totals.archived).toBe(1);
+    expect(report.skipped).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'docs/PRD-archive-test.md',
+          reason: 'linked_unchecked_checklist_items'
+        })
+      ])
+    );
+  });
+
+  it('keeps base open checklist evidence for explicit sibling checklist paths missing from the current checkout', async () => {
+    const repo = await initRepository({
+      taskOverrides: {
+        paths: {
+          docs: 'docs/PRD-archive-test.md',
+          task: 'tasks/tasks-9999-archive-test.md'
+        }
+      }
+    });
+    const sourcePath = join(repo, 'docs', 'PRD-archive-test.md');
+    const explicitChecklistPath = join(repo, 'tasks', 'tasks-9999-archive-test.md');
+    const sourceBefore = '# PRD Archive Test\n\nSome content ready to archive.\n';
+    await writeFile(sourcePath, sourceBefore);
+    await writeFile(
+      explicitChecklistPath,
+      '# Task Checklist\n\n- [ ] Explicit base checklist should block archival.\n'
+    );
+    await execFileAsync('git', ['add', '.'], { cwd: repo });
+    await execFileAsync('git', ['commit', '-m', 'base open explicit checklist'], { cwd: repo });
+    await rm(explicitChecklistPath);
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out',
+        IMPLEMENTATION_DOCS_ARCHIVE_BASE_REF: 'HEAD'
+      }
+    });
+
+    const sourceAfter = await readFile(sourcePath, 'utf8');
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+
+    expect(sourceAfter).toBe(sourceBefore);
+    expect(report.totals.archived).toBe(0);
+    expect(report.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'docs/PRD-archive-test.md',
+          reason: 'linked_unchecked_checklist_items',
+          context: expect.objectContaining({
+            linked_unchecked_checklists: [
+              expect.objectContaining({
+                path: 'tasks/tasks-9999-archive-test.md',
+                source: 'base',
+                unchecked_checklist_items: 1,
+                unchecked_checklist_samples: ['- [ ] Explicit base checklist should block archival.']
+              })
+            ]
+          })
+        })
+      ])
+    );
+  });
+
+  it('keeps current open checklist evidence for slug-only sibling checklist aliases', async () => {
+    const repo = await initRepository({
+      taskOverrides: {
+        relates_to: ''
+      }
+    });
+    const sourcePath = join(repo, 'docs', 'PRD-archive-test.md');
+    const slugChecklistPath = join(repo, 'tasks', 'tasks-archive-test.md');
+    const sourceBefore = '# PRD Archive Test\n\nSome content ready to archive.\n';
+    await writeFile(sourcePath, sourceBefore);
+    await writeFile(
+      slugChecklistPath,
+      '# Task Checklist\n\n- [ ] Slug-only checklist should block archival.\n'
+    );
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out',
+        IMPLEMENTATION_DOCS_ARCHIVE_BASE_REF: 'HEAD'
+      }
+    });
+
+    const sourceAfter = await readFile(sourcePath, 'utf8');
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+
+    expect(sourceAfter).toBe(sourceBefore);
+    expect(report.totals.archived).toBe(0);
+    expect(report.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'docs/PRD-archive-test.md',
+          reason: 'linked_unchecked_checklist_items',
+          context: expect.objectContaining({
+            linked_unchecked_checklists: [
+              expect.objectContaining({
+                path: 'tasks/tasks-archive-test.md',
+                unchecked_checklist_items: 1,
+                unchecked_checklist_samples: ['- [ ] Slug-only checklist should block archival.']
+              })
+            ]
+          })
+        })
+      ])
+    );
+  });
+
+  it('normalizes padded explicit Windows-style checklist paths before linking open checklist blockers', async () => {
+    const repo = await initRepository({
+      taskOverrides: {
+        relates_to: '',
+        paths: {
+          docs: 'docs/PRD-archive-test.md',
+          task: ' ./tasks\\tasks-archive-test.md '
+        }
+      }
+    });
+    const sourcePath = join(repo, 'docs', 'PRD-archive-test.md');
+    const checklistPath = join(repo, 'tasks', 'tasks-archive-test.md');
+    const sourceBefore = '# PRD Archive Test\n\nSome content ready to archive.\n';
+    await writeFile(sourcePath, sourceBefore);
+    await writeFile(
+      checklistPath,
+      '# Task Checklist\n\n- [ ] Windows-style explicit path should block archival.\n'
+    );
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out',
+        IMPLEMENTATION_DOCS_ARCHIVE_BASE_REF: 'HEAD'
+      }
+    });
+
+    const sourceAfter = await readFile(sourcePath, 'utf8');
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+
+    expect(sourceAfter).toBe(sourceBefore);
+    expect(report.totals.archived).toBe(0);
+    expect(report.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'docs/PRD-archive-test.md',
+          reason: 'linked_unchecked_checklist_items',
+          context: expect.objectContaining({
+            linked_unchecked_checklists: [
+              expect.objectContaining({
+                path: 'tasks/tasks-archive-test.md',
+                unchecked_checklist_items: 1,
+                unchecked_checklist_samples: [
+                  '- [ ] Windows-style explicit path should block archival.'
+                ]
+              })
+            ]
+          })
+        })
+      ])
+    );
+  });
+
+  it('archives terminal packet docs listed inside a nested docs object', async () => {
+    const repo = await initRepository({
+      policyOverrides: {
+        doc_patterns: ['docs/PRD-*.md', 'docs/ACTION_PLAN-*.md']
+      },
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'docs/PRD-object-packet.md',
+            owner: 'Codex (top-level agent), Review agent',
+            status: 'active',
+            last_review: '2025-01-01',
+            cadence_days: 30
+          },
+          {
+            path: 'docs/ACTION_PLAN-object-packet.md',
+            owner: 'Codex (top-level agent), Review agent',
+            status: 'active',
+            last_review: '2025-01-01',
+            cadence_days: 30
+          }
+        ]
+      },
+      taskOverrides: {
+        paths: {
+          docs: {
+            PRD: 'docs/PRD-object-packet.md',
+            ACTION_PLAN: 'docs/ACTION_PLAN-object-packet.md'
+          }
+        }
+      }
+    });
+    await writeFile(join(repo, 'docs', 'PRD-object-packet.md'), '# Object PRD\n');
+    await writeFile(join(repo, 'docs', 'ACTION_PLAN-object-packet.md'), '# Object Action Plan\n');
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const report = JSON.parse(
+      await readFile(
+        join(
+          repo,
+          'out',
+          'implementation-docs-archive-automation',
+          'docs-archive-report.json'
+        ),
+        'utf8'
+      )
+    );
+
+    expect(report.archived.map((entry: { path: string }) => entry.path)).toEqual(
+      expect.arrayContaining(['docs/PRD-object-packet.md', 'docs/ACTION_PLAN-object-packet.md'])
+    );
+  });
+
+  it('does not let an active report reference block an unrelated terminal packet archive', async () => {
+    const repo = await initRepository({
+      policyOverrides: {
+        doc_patterns: ['docs/PRD-*.md']
+      },
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'docs/PRD-archive-test.md',
+            owner: 'Codex (top-level agent), Review agent',
+            status: 'active',
+            last_review: '2025-01-01',
+            cadence_days: 30
+          }
+        ]
+      }
+    });
+    await mkdir(join(repo, 'docs', 'findings'), { recursive: true });
+    await writeFile(
+      join(repo, 'docs', 'findings', 'active-report.md'),
+      '# Active Report\n\nReferences historical packet `docs/PRD-archive-test.md`.\n'
+    );
+    await writeFile(
+      join(repo, 'tasks', 'tasks-active.md'),
+      '# Active Task\n\n- [ ] Keep this active.\n'
+    );
+    await writeFile(
+      join(repo, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '9999',
+              slug: 'archive-test',
+              status: 'done',
+              completed_at: '2025-01-01',
+              paths: {
+                docs: 'docs/PRD-archive-test.md'
+              }
+            },
+            {
+              id: 'active',
+              status: 'in_progress',
+              paths: {
+                task: 'tasks/tasks-active.md',
+                findings: 'docs/findings/active-report.md'
+              }
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const report = JSON.parse(
+      await readFile(
+        join(
+          repo,
+          'out',
+          'implementation-docs-archive-automation',
+          'docs-archive-report.json'
+        ),
+        'utf8'
+      )
+    );
+
+    expect(report.archived).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'docs/PRD-archive-test.md'
+        })
+      ])
+    );
+    expect(report.skipped).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'docs/PRD-archive-test.md',
+          reason: 'linked_unchecked_checklist_items'
+        })
+      ])
+    );
+  });
+
+  it('does not replace task checklist surfaces that still have open checklist items', async () => {
+    const repo = await initRepository({
+      taskOverrides: {
+        paths: {
+          task: 'tasks/tasks-9999-archive-test.md'
+        }
+      }
+    });
+    const sourcePath = join(repo, 'tasks', 'tasks-9999-archive-test.md');
+    const sourceBefore = '# Task Checklist\n\n1. [ ] Finish review handoff before archiving.\n';
+    await writeFile(sourcePath, sourceBefore);
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const sourceAfter = await readFile(sourcePath, 'utf8');
+    const report = JSON.parse(
+      await readFile(
+        join(
+          repo,
+          'out',
+          'implementation-docs-archive-automation',
+          'docs-archive-report.json'
+        ),
+        'utf8'
+      )
+    );
+
+    expect(sourceAfter).toBe(sourceBefore);
+    expect(sourceAfter).not.toContain('<!-- docs-archive:stub -->');
+    expect(report.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-9999-archive-test.md',
+          reason: 'unchecked_checklist_items',
+          context: expect.objectContaining({
+            unchecked_checklist_items: 1,
+            unchecked_checklist_samples: ['1. [ ] Finish review handoff before archiving.']
+          })
+        })
+      ])
+    );
   });
 
   it('does not replace packet docs when a linked task checklist still has open items', async () => {

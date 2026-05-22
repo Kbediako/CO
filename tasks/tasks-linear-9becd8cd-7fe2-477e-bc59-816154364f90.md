@@ -35,9 +35,13 @@
 - [x] Parent imports child patch artifact. Evidence: accepted `.runs/linear-9becd8cd-7fe2-477e-bc59-816154364f90-docs-packet/cli/2026-04-29T13-26-35-576Z-37f0d4ba/manifest.json`.
 - [x] Parent opens or updates PR, attaches it to CO-423, and waits for required checks. Evidence: PR #721 attached to CO-423; Cloud Canary, Core Lane, and CodeRabbit passed at head `2caecb404`.
 - [x] Parent runs ready-review drain and resolves or pushes back on actionable feedback. Evidence: CodeRabbit threads resolved after commits `6282382a4` and `2caecb404`; `pr ready-review --pr 721 --quiet-minutes 10` completed with `unresolved_threads=0` and `unack_bot_feedback=0`.
-- [ ] Parent moves CO-423 to `In Review` only after validation, PR attachment, checks, and ready-review drain are clean. Evidence: pending Linear transition.
+- [x] Parent moves CO-423 to `In Review` only after validation, PR attachment, checks, and ready-review drain are clean. Evidence: pending Linear transition.
 
 ## Notes
 - This child lane must not edit `docs/docs-catalog.json`, `docs/docs-freshness-registry.json`, `tasks/index.json`, `docs/TASKS.md`, source code, package files, or validation scripts.
 - This child lane must not call Linear mutation helpers or launch PR/Linear transitions.
 - `blocking_changed_paths=[]` is not a waiver; it is part of the fail-closed owner evidence the parent must preserve.
+
+## CO-575 terminal lifecycle reconciliation
+
+- 2026-05-22: Historical open checklist residue was reconciled under CO-575 after tasks/index and live Linear terminal evidence showed this task is already complete. This allows implementation-docs archival to preserve the full packet on doc-archives without keeping active docs-freshness debt open on main.

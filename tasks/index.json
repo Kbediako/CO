@@ -1,6 +1,111 @@
 {
   "items": [
     {
+      "id": "20260522-linear-aacc40b3-4f99-49af-8386-996f693e2642",
+      "title": "CO-575 replace terminal CO-573 docs freshness maintenance owner",
+      "relates_to": "tasks/tasks-linear-aacc40b3-4f99-49af-8386-996f693e2642.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-22",
+      "canonical_owner_key": "docs:freshness:maintain",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
+      "approvals": {
+        "issue_context": {
+          "reviewer": "CO-575 manual recovery worker",
+          "date": "2026-05-22",
+          "status": "confirmed_in_progress",
+          "summary": "Live issue-context verified CO-575 was In Progress with no attached PR and no prior workpad; parent created the single workpad before edits."
+        },
+        "parallelization": {
+          "reviewer": "CO-575 manual recovery worker",
+          "date": "2026-05-22",
+          "status": "forbid_parallel_recorded",
+          "summary": "Pre-turn matrix found no safe same-issue child slice because owner metadata, packet, index, registry, and guide wording share terminal-owner evidence; recorded forbid_parallel/parent_only_mutation."
+        },
+        "before_owner_truth": {
+          "reviewer": "docs:freshness:maintain",
+          "date": "2026-05-22",
+          "status": "terminal_owner_reproduced",
+          "report": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/docs-freshness-maintenance.json",
+          "summary": "Before-state maintenance report shows owner_issue=CO-573, owner_issue_action.reason=configured_owner_terminal, Linear state Done/completed, blocks_handoff=true, and blocking_changed_paths=[]."
+        }
+      },
+      "validation": {
+        "status": "pr_review_clean_checks_green",
+        "passed": [
+          "live issue-context",
+          "single workpad created",
+          "parallelization decision recorded",
+          "before docs:freshness:maintain terminal-owner reproduction captured",
+          "docs-first packet created",
+          "global docs:freshness:maintain owner metadata re-homed from CO-573 to CO-575",
+          "CO-573 terminal lineage preserved",
+          "CO-568 and CO-569 exact-key retained cohort owners preserved",
+          "CO-567/CO-570/CO-574 kept out of scope",
+          "docs:freshness:maintain after-review-fix proof reports owner_issue=CO-575, pass_with_owned_rolling_debt, within-policy capacity, and zero terminal lifecycle entries",
+          "node scripts/spec-guard.mjs --dry-run",
+          "npm run build",
+          "npm run lint",
+          "npm run test",
+          "npm run docs:check",
+          "npm run docs:freshness",
+          "npm run repo:stewardship",
+          "archive-stub unchecked audit reports zero findings after current/base/linked open-checklist overlap fix",
+          "diff-budget override accepted with CO-575 large historical cohort rationale",
+          "standalone review contract clean on 2026-05-22",
+          "elegance/minimality pass found no smaller correct change after review-fix diff inspection",
+          "PR #871 attached for review handoff; latest PR lifecycle evidence must show required checks green, Codex approval signal, CodeRabbit success, and zero active unresolved review threads before merge"
+        ],
+        "pending": []
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-aacc40b3-4f99-49af-8386-996f693e2642.md",
+        "prd": "docs/PRD-linear-aacc40b3-4f99-49af-8386-996f693e2642.md",
+        "docs": "docs/TECH_SPEC-linear-aacc40b3-4f99-49af-8386-996f693e2642.md",
+        "action_plan": "docs/ACTION_PLAN-linear-aacc40b3-4f99-49af-8386-996f693e2642.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-aacc40b3-4f99-49af-8386-996f693e2642.md",
+        "spec": "tasks/specs/linear-aacc40b3-4f99-49af-8386-996f693e2642.md",
+        "task": "tasks/tasks-linear-aacc40b3-4f99-49af-8386-996f693e2642.md",
+        "policy_doc": "docs/guides/docs-freshness-cohorts.md",
+        "catalog": "docs/docs-catalog.json",
+        "registry": "docs/docs-freshness-registry.json"
+      },
+      "source_issue": {
+        "id": "aacc40b3-4f99-49af-8386-996f693e2642",
+        "identifier": "CO-575",
+        "url": "https://linear.app/asabeko/issue/CO-575/co-replace-terminal-co-573-docs-freshness-maintenance-owner-after-may"
+      },
+      "related_issues": [
+        {
+          "identifier": "CO-573",
+          "relation": "terminal_previous_docs_freshness_maintenance_owner"
+        },
+        {
+          "identifier": "CO-558",
+          "relation": "earlier_terminal_docs_freshness_maintenance_owner"
+        },
+        {
+          "identifier": "CO-568",
+          "relation": "live_exact_key_owner_for_may19_retained_cohort"
+        },
+        {
+          "identifier": "CO-569",
+          "relation": "live_exact_key_owner_for_may20_retained_cohort"
+        },
+        {
+          "identifier": "CO-567",
+          "relation": "blocked_feature_lane_context_only"
+        },
+        {
+          "identifier": "CO-574",
+          "relation": "control_host_admission_context_only"
+        }
+      ]
+    },
+    {
       "id": "20260522-linear-813d1f69-7777-4dd4-8709-90d9121339d4",
       "title": "CO-567 generated runtime freshness after shared-root fast-forward",
       "relates_to": "tasks/tasks-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
@@ -719,8 +824,8 @@
       "owners": [
         "Codex"
       ],
-      "status": "review_clean_elegance_complete_pr_open",
-      "last_review": "2026-05-21",
+      "status": "done",
+      "last_review": "2026-05-22",
       "canonical_owner_key": "docs:freshness:maintain",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
       "approvals": {
@@ -772,10 +877,17 @@
           "date": "2026-05-21",
           "status": "complete_no_simplification_applied",
           "summary": "Explicit elegance/minimality pass found no avoidable abstraction or scope to remove: the staged diff is limited to the required docs-first packet, one catalog owner change, registry/index provenance repairs, and cohort-guide lineage wording."
+        },
+        "owner_replaced_by_co575": {
+          "reviewer": "CO-575 manual recovery worker",
+          "date": "2026-05-22",
+          "status": "terminal_owner_replaced",
+          "report": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/docs-freshness-maintenance.json",
+          "summary": "Live issue-context and docs:freshness:maintain verified CO-573 is Done/completed; CO-575 re-homes only the global docs:freshness:maintain owner while preserving CO-573 as terminal lineage."
         }
       },
       "validation": {
-        "status": "review_clean_elegance_complete_pr_open",
+        "status": "done_terminal_replaced_by_co575",
         "passed": [
           "live issue-context",
           "single workpad created",
@@ -801,11 +913,12 @@
           "CO573-REVIEW-003 addressed",
           "manifest-backed standalone review clean",
           "explicit elegance/minimality pass completed",
-          "PR #866 opened and attached to Linear"
+          "PR #866 opened and attached to Linear",
+          "PR #866 merged",
+          "Linear CO-573 verified Done/completed",
+          "live global docs:freshness:maintain owner re-homed to CO-575 after CO-573 became terminal"
         ],
-        "pending": [
-          "ready-review drain before review-state transition"
-        ]
+        "pending": []
       },
       "paths": {
         "prd": "docs/PRD-linear-b02f8333-202c-49ed-9443-8daf921e297d.md",
@@ -839,6 +952,10 @@
         {
           "identifier": "CO-569",
           "relation": "live_exact_key_owner_for_may20_retained_cohort"
+        },
+        {
+          "identifier": "CO-575",
+          "relation": "live_successor_docs_freshness_maintenance_owner"
         }
       ]
     },
@@ -4975,11 +5092,9 @@
       "paths": {
         "spec": "tasks/specs/linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
         "task": "tasks/tasks-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
+        "prd": "docs/PRD-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md",
+        "action_plan": "docs/ACTION_PLAN-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md"
       }
     },
     {
@@ -5178,11 +5293,9 @@
         "spec": "tasks/specs/linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
         "task": "tasks/tasks-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
         "agent_task": ".agent/task/linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
+        "prd": "docs/PRD-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md",
+        "action_plan": "docs/ACTION_PLAN-linear-f57f28e8-e876-4bff-9217-fc5e17ee030f.md"
       }
     },
     {
@@ -5259,11 +5372,9 @@
         "spec": "tasks/specs/linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
         "task": "tasks/tasks-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
         "agent_task": ".agent/task/linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        "prd": "docs/PRD-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md",
+        "action_plan": "docs/ACTION_PLAN-linear-552f2825-b9e0-4f14-afe0-21b072aa9bb5.md"
       }
     },
     {
@@ -5368,11 +5479,9 @@
         "spec": "tasks/specs/linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
         "task": "tasks/tasks-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
         "agent_task": ".agent/task/linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-345cd50c-4962-4376-a7ca-1982ba311699.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        "prd": "docs/PRD-linear-345cd50c-4962-4376-a7ca-1982ba311699.md",
+        "action_plan": "docs/ACTION_PLAN-linear-345cd50c-4962-4376-a7ca-1982ba311699.md"
       }
     },
     {
@@ -5805,7 +5914,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-29",
+      "last_review": "2026-05-22",
       "evidence": [
         "docs/PRD-linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md",
         "docs/TECH_SPEC-linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md",
@@ -5845,6 +5954,12 @@
           "status": "clean",
           "evidence": "out/linear-9c70572b-31a3-4789-a73c-d18c28d59d72/manual/elegance-review.md",
           "summary": "Explicit minimality pass kept the repair scoped to owner metadata, cohort-guide evidence, and required task mirrors; no simplification patch was warranted."
+        },
+        "docs_freshness_lifecycle_sync": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-425 Done/completed during CO-575 docs freshness maintenance."
         }
       },
       "paths": {
@@ -5852,7 +5967,9 @@
         "task": "tasks/tasks-linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md",
         "agent_task": ".agent/task/linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md",
         "docs": "docs/TECH_SPEC-linear-9c70572b-31a3-4789-a73c-d18c28d59d72.md"
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-04-30"
     },
     {
       "id": "20260429-linear-9becd8cd-7fe2-477e-bc59-816154364f90",
@@ -5862,7 +5979,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-29",
+      "last_review": "2026-05-22",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
       "approvals": {
         "docs_packet_child_lane": {
@@ -5893,6 +6010,12 @@
           "status": "clean",
           "evidence": ".runs/linear-9becd8cd-7fe2-477e-bc59-816154364f90/cli/2026-04-29T13-11-39-282Z-352d6793/evidence/elegance-review.md",
           "summary": "Explicit minimality pass found no extra abstraction, fallback seam, source-code change, or broad registry churn beyond the required docs freshness owner re-home."
+        },
+        "docs_freshness_lifecycle_sync": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-423 Done/completed during CO-575 docs freshness maintenance."
         }
       },
       "paths": {
@@ -5901,7 +6024,9 @@
         "agent_task": ".agent/task/linear-9becd8cd-7fe2-477e-bc59-816154364f90.md",
         "docs": "docs/TECH_SPEC-linear-9becd8cd-7fe2-477e-bc59-816154364f90.md",
         "docs_review_manifest": ".runs/linear-9becd8cd-7fe2-477e-bc59-816154364f90/cli/2026-04-29T13-11-39-282Z-352d6793/manifest.json"
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-04-30"
     },
     {
       "id": "20260429-linear-69a0e91c-0b3c-4be9-8cf0-d0ead9f1df3a",
@@ -5911,12 +6036,22 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-29",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/linear-69a0e91c-0b3c-4be9-8cf0-d0ead9f1df3a.md",
         "task": "tasks/tasks-linear-69a0e91c-0b3c-4be9-8cf0-d0ead9f1df3a.md",
         "agent_task": ".agent/task/linear-69a0e91c-0b3c-4be9-8cf0-d0ead9f1df3a.md",
         "docs": "docs/TECH_SPEC-linear-69a0e91c-0b3c-4be9-8cf0-d0ead9f1df3a.md"
+      },
+      "status": "done",
+      "completed_at": "2026-04-29",
+      "approvals": {
+        "docs_freshness_lifecycle_sync": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-422 Done/completed during CO-575 docs freshness maintenance."
+        }
       }
     },
     {
@@ -5927,7 +6062,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-28",
+      "last_review": "2026-05-22",
       "approvals": {
         "standalone_review": {
           "reviewer": "codex-orchestrator review",
@@ -5942,6 +6077,12 @@
           "status": "complete",
           "evidence": "out/linear-67a294b8-748d-4b8d-92ae-a884b2be7d63/manual/20260429T020000Z-validation/19-elegance-review.md",
           "summary": "Explicit minimality pass kept the fix to the existing non-interactive worker-cap seam and required docs/task mirrors; no simplification edits were needed."
+        },
+        "docs_freshness_lifecycle_sync": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-415 Done/completed during CO-575 docs freshness maintenance."
         }
       },
       "paths": {
@@ -5949,7 +6090,9 @@
         "task": "tasks/tasks-linear-67a294b8-748d-4b8d-92ae-a884b2be7d63.md",
         "agent_task": ".agent/task/linear-67a294b8-748d-4b8d-92ae-a884b2be7d63.md",
         "docs": "docs/TECH_SPEC-linear-67a294b8-748d-4b8d-92ae-a884b2be7d63.md"
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-04-28"
     },
     {
       "id": "20260428-linear-f14ac3d6-cf71-4f9a-8172-b71370a480e1",
@@ -5959,7 +6102,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-28",
+      "last_review": "2026-05-22",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -5975,6 +6118,12 @@
           "status": "reproduced",
           "evidence": "out/linear-f14ac3d6-cf71-4f9a-8172-b71370a480e1/before/docs-freshness-maintenance.json",
           "summary": "Reproduced docs:freshness:maintain block_unowned_repo_debt with owner_issue=CO-401, configured_owner_terminal, and blocking_changed_paths=[]."
+        },
+        "docs_freshness_lifecycle_sync": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-420 Done/completed during CO-575 docs freshness maintenance."
         }
       },
       "paths": {
@@ -5982,7 +6131,9 @@
         "task": "tasks/tasks-linear-f14ac3d6-cf71-4f9a-8172-b71370a480e1.md",
         "agent_task": ".agent/task/linear-f14ac3d6-cf71-4f9a-8172-b71370a480e1.md",
         "docs": "docs/TECH_SPEC-linear-f14ac3d6-cf71-4f9a-8172-b71370a480e1.md"
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-04-30"
     },
     {
       "id": "20260428-linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306",
@@ -5992,7 +6143,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-28",
+      "last_review": "2026-05-22",
       "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:maintain",
       "paths": {
         "spec": "tasks/specs/linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306.md",
@@ -6000,6 +6151,16 @@
         "agent_task": ".agent/task/linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306.md",
         "docs": "docs/TECH_SPEC-linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306.md",
         "docs_review_manifest": ".runs/linear-9e002e3b-2936-49e0-8a4a-2fa2bd360306/cli/2026-04-28T23-35-34-002Z-debc0887/manifest.json"
+      },
+      "status": "done",
+      "completed_at": "2026-04-29",
+      "approvals": {
+        "docs_freshness_lifecycle_sync": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-409 Done/completed during CO-575 docs freshness maintenance."
+        }
       }
     },
     {
@@ -6010,7 +6171,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-28",
+      "last_review": "2026-05-22",
       "approvals": {
         "docs_packet": {
           "reviewer": "provider worker parent lane",
@@ -6025,18 +6186,24 @@
           "status": "failed_external_blocker_classified",
           "manifest": ".runs/linear-9f955ebd-e00b-46ad-b25c-280029328841-docs-review-late/cli/2026-04-28T09-59-19-147Z-34cd1a71/manifest.json",
           "summary": "Late docs-review passed docs:check and failed at docs:freshness:maintain on external rolling freshness owner verification with blocking_changed_paths=[]; hold/retry decision is to keep that blocker with the docs freshness owner and not widen CO-417."
+        },
+        "docs_freshness_lifecycle_sync": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-417 Done/completed during CO-575 docs freshness maintenance."
         }
       },
       "paths": {
         "spec": "tasks/specs/linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
         "task": "tasks/tasks-linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
         "agent_task": ".agent/task/linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-9f955ebd-e00b-46ad-b25c-280029328841.md"
-        }
-      }
+        "docs": "docs/TECH_SPEC-linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
+        "prd": "docs/PRD-linear-9f955ebd-e00b-46ad-b25c-280029328841.md",
+        "action_plan": "docs/ACTION_PLAN-linear-9f955ebd-e00b-46ad-b25c-280029328841.md"
+      },
+      "status": "done",
+      "completed_at": "2026-04-28"
     },
     {
       "id": "20260428-linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3",
@@ -6046,7 +6213,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-28",
+      "last_review": "2026-05-22",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -6055,18 +6222,24 @@
           "manifest": ".runs/linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3-co400-docs-packet/cli/2026-04-28T06-08-44-375Z-8927b586/manifest.json",
           "source_anchor": "ctx:sha256:f92e935a0e7a99898f24e320414e1c8a7cc9bc966dbf796b8c606abad73b6446#chunk:c000001",
           "summary": "Docs-first packet created for CO-400 from parent-provided child-lane instructions, CO-400 memory context, and read-only local source search. The referenced source payload path was absent in this child checkout. The packet preserves issue-context label projection as live Linear current-state authority across GraphQL, ProviderLinearIssueContext, live parsing, cached parse/write, summary/CLI JSON output, and focused facade/CLI tests, while rejecting fallback projection and omitted-label unlabeled inference."
+        },
+        "docs_freshness_lifecycle_sync": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-400 Done/completed during CO-575 docs freshness maintenance."
         }
       },
       "paths": {
         "spec": "tasks/specs/linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3.md",
         "task": "tasks/tasks-linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3.md",
         "agent_task": ".agent/task/linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3.md"
-        }
-      }
+        "docs": "docs/TECH_SPEC-linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3.md",
+        "prd": "docs/PRD-linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3.md",
+        "action_plan": "docs/ACTION_PLAN-linear-6dfd5b1c-ee27-46e4-b31c-7742ea3bdaa3.md"
+      },
+      "status": "done",
+      "completed_at": "2026-04-29"
     },
     {
       "id": "20260427-linear-0354e9d0-84ee-4340-b098-a9c685c191b5",
@@ -6194,11 +6367,9 @@
         "spec": "tasks/specs/linear-5ef45396-4546-4699-9d4a-c69fb9179868.md",
         "task": "tasks/tasks-linear-5ef45396-4546-4699-9d4a-c69fb9179868.md",
         "agent_task": ".agent/task/linear-5ef45396-4546-4699-9d4a-c69fb9179868.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-5ef45396-4546-4699-9d4a-c69fb9179868.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-5ef45396-4546-4699-9d4a-c69fb9179868.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-5ef45396-4546-4699-9d4a-c69fb9179868.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-5ef45396-4546-4699-9d4a-c69fb9179868.md",
+        "prd": "docs/PRD-linear-5ef45396-4546-4699-9d4a-c69fb9179868.md",
+        "action_plan": "docs/ACTION_PLAN-linear-5ef45396-4546-4699-9d4a-c69fb9179868.md"
       },
       "notes": {}
     },
@@ -6646,11 +6817,9 @@
         "spec": "tasks/specs/linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md",
         "task": "tasks/tasks-linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md",
         "agent_task": ".agent/task/linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md",
+        "prd": "docs/PRD-linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md",
+        "action_plan": "docs/ACTION_PLAN-linear-9473c8b2-3fcb-48e6-8fd1-d3993dd3caa7.md"
       }
     },
     {
@@ -6730,11 +6899,9 @@
         "spec": "tasks/specs/linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md",
         "task": "tasks/tasks-linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md",
         "agent_task": ".agent/task/linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md",
+        "prd": "docs/PRD-linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md",
+        "action_plan": "docs/ACTION_PLAN-linear-cb51b492-6f6e-4eca-a9a2-589833218f80.md"
       },
       "status": "in_progress"
     },
@@ -7187,11 +7354,9 @@
         "spec": "tasks/specs/linear-56c2656d-853f-43f9-91af-455970800060-archive-core-lane-checks.md",
         "task": "tasks/tasks-linear-56c2656d-853f-43f9-91af-455970800060.md",
         "agent_task": ".agent/task/linear-56c2656d-853f-43f9-91af-455970800060.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-56c2656d-853f-43f9-91af-455970800060.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-56c2656d-853f-43f9-91af-455970800060.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-56c2656d-853f-43f9-91af-455970800060.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-56c2656d-853f-43f9-91af-455970800060.md",
+        "prd": "docs/PRD-linear-56c2656d-853f-43f9-91af-455970800060.md",
+        "action_plan": "docs/ACTION_PLAN-linear-56c2656d-853f-43f9-91af-455970800060.md"
       },
       "status": "in_progress"
     },
@@ -7332,11 +7497,9 @@
         "spec": "tasks/specs/linear-267f73e1-6347-496d-ad78-2f4177bfe450-codex-0125-appserver-control-seam.md",
         "task": "tasks/tasks-linear-267f73e1-6347-496d-ad78-2f4177bfe450.md",
         "agent_task": ".agent/task/linear-267f73e1-6347-496d-ad78-2f4177bfe450.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-267f73e1-6347-496d-ad78-2f4177bfe450.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-267f73e1-6347-496d-ad78-2f4177bfe450.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-267f73e1-6347-496d-ad78-2f4177bfe450.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-267f73e1-6347-496d-ad78-2f4177bfe450.md",
+        "prd": "docs/PRD-linear-267f73e1-6347-496d-ad78-2f4177bfe450.md",
+        "action_plan": "docs/ACTION_PLAN-linear-267f73e1-6347-496d-ad78-2f4177bfe450.md"
       },
       "status": "in_progress"
     },
@@ -7714,11 +7877,9 @@
         "spec": "tasks/specs/linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
         "task": "tasks/tasks-linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
         "agent_task": ".agent/task/linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
+        "prd": "docs/PRD-linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md",
+        "action_plan": "docs/ACTION_PLAN-linear-09b7afc2-529a-40cc-975c-57c33f2bb596.md"
       },
       "status": "done",
       "completed_at": null
@@ -7736,11 +7897,9 @@
         "spec": "tasks/specs/linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",
         "task": "tasks/tasks-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",
         "agent_task": ".agent/task/linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",
+        "prd": "docs/PRD-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md",
+        "action_plan": "docs/ACTION_PLAN-linear-dc06b7ed-89e6-4662-911c-52a2991cbf7a.md"
       },
       "status": "in_progress",
       "approvals": {
@@ -7785,11 +7944,9 @@
         "spec": "tasks/specs/linear-703362d6-afdb-42e7-852f-5dd64a314849.md",
         "task": "tasks/tasks-linear-703362d6-afdb-42e7-852f-5dd64a314849.md",
         "agent_task": ".agent/task/linear-703362d6-afdb-42e7-852f-5dd64a314849.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-703362d6-afdb-42e7-852f-5dd64a314849.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-703362d6-afdb-42e7-852f-5dd64a314849.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-703362d6-afdb-42e7-852f-5dd64a314849.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-703362d6-afdb-42e7-852f-5dd64a314849.md",
+        "prd": "docs/PRD-linear-703362d6-afdb-42e7-852f-5dd64a314849.md",
+        "action_plan": "docs/ACTION_PLAN-linear-703362d6-afdb-42e7-852f-5dd64a314849.md"
       },
       "status": "in_progress"
     },
@@ -7825,11 +7982,9 @@
         "spec": "tasks/specs/linear-e17b8d21-d5f8-4152-8c19-2991f782f830.md",
         "task": "tasks/tasks-linear-e17b8d21-d5f8-4152-8c19-2991f782f830.md",
         "agent_task": ".agent/task/linear-e17b8d21-d5f8-4152-8c19-2991f782f830.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-e17b8d21-d5f8-4152-8c19-2991f782f830.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-e17b8d21-d5f8-4152-8c19-2991f782f830.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-e17b8d21-d5f8-4152-8c19-2991f782f830.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-e17b8d21-d5f8-4152-8c19-2991f782f830.md",
+        "prd": "docs/PRD-linear-e17b8d21-d5f8-4152-8c19-2991f782f830.md",
+        "action_plan": "docs/ACTION_PLAN-linear-e17b8d21-d5f8-4152-8c19-2991f782f830.md"
       },
       "status": "in_progress"
     },
@@ -7841,7 +7996,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-28",
+      "last_review": "2026-05-22",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -7866,18 +8021,24 @@
           "manifest": ".runs/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c/cli/2026-04-28T04-50-04-951Z-a8df80f3/manifest.json",
           "source_anchor": "ctx:sha256:71b3705dcb95cb3d85f4202978c8c661ce6ca70898a38c2971762666659af3f2#chunk:c000001",
           "summary": "Docs packet refreshed for the post-PR #658 explicit recovery recurrence. It preserves provider_refresh_lifecycle_stuck, control-host recover, /api/v1/provider-worker/recover, stale_control_host_owner, fetch failed, refresh request timeout, CO-403, and CO-399; implementation target is recovery-path stale lifecycle reset without weakening normal refresh/rehydrate stuck-lifecycle diagnostics."
+        },
+        "docs_freshness_lifecycle_sync": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-330 Done/completed during CO-575 docs freshness maintenance."
         }
       },
       "paths": {
         "spec": "tasks/specs/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
         "task": "tasks/tasks-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
         "agent_task": ".agent/task/linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md"
-        }
-      }
+        "docs": "docs/TECH_SPEC-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
+        "prd": "docs/PRD-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md",
+        "action_plan": "docs/ACTION_PLAN-linear-ac7cefc8-ed87-4591-86cf-63b07bc20c2c.md"
+      },
+      "status": "done",
+      "completed_at": "2026-04-30"
     },
     {
       "id": "20260423-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7",
@@ -7902,11 +8063,9 @@
         "spec": "tasks/specs/linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md",
         "task": "tasks/tasks-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md",
         "agent_task": ".agent/task/linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md",
+        "prd": "docs/PRD-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md",
+        "action_plan": "docs/ACTION_PLAN-linear-9d8bb7c9-3ca1-422e-9cdf-ef90a4fbe7b7.md"
       }
     },
     {
@@ -7923,11 +8082,9 @@
         "spec": "tasks/specs/linear-8d010b73-9338-4f35-9494-a9a3d773d284.md",
         "task": "tasks/tasks-linear-8d010b73-9338-4f35-9494-a9a3d773d284.md",
         "agent_task": ".agent/task/linear-8d010b73-9338-4f35-9494-a9a3d773d284.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-8d010b73-9338-4f35-9494-a9a3d773d284.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-8d010b73-9338-4f35-9494-a9a3d773d284.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-8d010b73-9338-4f35-9494-a9a3d773d284.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-8d010b73-9338-4f35-9494-a9a3d773d284.md",
+        "prd": "docs/PRD-linear-8d010b73-9338-4f35-9494-a9a3d773d284.md",
+        "action_plan": "docs/ACTION_PLAN-linear-8d010b73-9338-4f35-9494-a9a3d773d284.md"
       },
       "status": "in_progress",
       "approvals": {
@@ -7973,11 +8130,9 @@
         "spec": "tasks/specs/linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
         "task": "tasks/tasks-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
         "agent_task": ".agent/task/linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
+        "prd": "docs/PRD-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md",
+        "action_plan": "docs/ACTION_PLAN-linear-37c1035e-d319-4306-8a41-648f2ab836e6.md"
       },
       "status": "done",
       "completed_at": null
@@ -8014,11 +8169,9 @@
         "spec": "tasks/specs/linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",
         "task": "tasks/tasks-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",
         "agent_task": ".agent/task/linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",
+        "prd": "docs/PRD-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md",
+        "action_plan": "docs/ACTION_PLAN-linear-4ea68a3d-3832-4161-bab7-84dceeceeb46.md"
       },
       "status": "done",
       "completed_at": null
@@ -8055,12 +8208,10 @@
         "spec": "tasks/specs/linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
         "task": "tasks/tasks-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
         "agent_task": ".agent/task/linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md"
-        },
-        "findings": "docs/findings/linear-3c52bf66-f805-4537-8671-ad1dec2f4623-docs-freshness-classification.md"
+        "docs": "docs/TECH_SPEC-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+        "findings": "docs/findings/linear-3c52bf66-f805-4537-8671-ad1dec2f4623-docs-freshness-classification.md",
+        "prd": "docs/PRD-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md",
+        "action_plan": "docs/ACTION_PLAN-linear-3c52bf66-f805-4537-8671-ad1dec2f4623.md"
       },
       "status": "done",
       "completed_at": null
@@ -8097,11 +8248,9 @@
         "spec": "tasks/specs/linear-919ecdfa-9be9-4d93-995b-7f8e4a784e6f.md",
         "task": "tasks/tasks-linear-919ecdfa-9be9-4d93-995b-7f8e4a784e6f.md",
         "agent_task": ".agent/task/linear-919ecdfa-9be9-4d93-995b-7f8e4a784e6f.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-919ecdfa-9be9-4d93-995b-7f8e4a784e6f.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-919ecdfa-9be9-4d93-995b-7f8e4a784e6f.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-919ecdfa-9be9-4d93-995b-7f8e4a784e6f.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-919ecdfa-9be9-4d93-995b-7f8e4a784e6f.md",
+        "prd": "docs/PRD-linear-919ecdfa-9be9-4d93-995b-7f8e4a784e6f.md",
+        "action_plan": "docs/ACTION_PLAN-linear-919ecdfa-9be9-4d93-995b-7f8e4a784e6f.md"
       },
       "status": "in_progress"
     },
@@ -8136,11 +8285,9 @@
         "spec": "tasks/specs/linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
         "task": "tasks/tasks-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
         "agent_task": ".agent/task/linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
+        "prd": "docs/PRD-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md",
+        "action_plan": "docs/ACTION_PLAN-linear-ed46eae2-f0f5-402f-9dc7-dd8dbc36e61f.md"
       },
       "status": "in_progress"
     },
@@ -8176,11 +8323,9 @@
         "spec": "tasks/specs/linear-f667a32d-b8db-4717-8565-429409026f92.md",
         "task": "tasks/tasks-linear-f667a32d-b8db-4717-8565-429409026f92.md",
         "agent_task": ".agent/task/linear-f667a32d-b8db-4717-8565-429409026f92.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-f667a32d-b8db-4717-8565-429409026f92.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-f667a32d-b8db-4717-8565-429409026f92.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-f667a32d-b8db-4717-8565-429409026f92.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-f667a32d-b8db-4717-8565-429409026f92.md",
+        "prd": "docs/PRD-linear-f667a32d-b8db-4717-8565-429409026f92.md",
+        "action_plan": "docs/ACTION_PLAN-linear-f667a32d-b8db-4717-8565-429409026f92.md"
       },
       "status": "in_progress"
     },
@@ -8215,11 +8360,9 @@
         "spec": "tasks/specs/linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
         "task": "tasks/tasks-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
         "agent_task": ".agent/task/linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
+        "prd": "docs/PRD-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md",
+        "action_plan": "docs/ACTION_PLAN-linear-7b3de1c1-f420-4203-bb8c-494dadecaa88.md"
       },
       "status": "done",
       "completed_at": null
@@ -8256,11 +8399,9 @@
         "spec": "tasks/specs/linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
         "task": "tasks/tasks-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
         "agent_task": ".agent/task/linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
+        "prd": "docs/PRD-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md",
+        "action_plan": "docs/ACTION_PLAN-linear-6ef38dcf-eee6-4e2a-a261-179a040b52f3.md"
       },
       "status": "in_progress"
     },
@@ -8331,11 +8472,9 @@
         "spec": "tasks/specs/linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
         "task": "tasks/tasks-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
         "agent_task": ".agent/task/linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
+        "prd": "docs/PRD-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md",
+        "action_plan": "docs/ACTION_PLAN-linear-d9c8d1b2-3b38-42ef-9087-556870e2d88f.md"
       },
       "status": "in_progress"
     },
@@ -8378,11 +8517,9 @@
         "spec": "tasks/specs/linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
         "task": "tasks/tasks-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
         "agent_task": ".agent/task/linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
+        "prd": "docs/PRD-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md",
+        "action_plan": "docs/ACTION_PLAN-linear-0297d59b-66c3-4bfe-b019-fe2fa423063d.md"
       },
       "status": "in_progress"
     },
@@ -8582,9 +8719,7 @@
         "spec": "tasks/specs/linear-20102af9-9eb4-44d1-8988-c5de7869d990.md",
         "task": "tasks/tasks-linear-20102af9-9eb4-44d1-8988-c5de7869d990.md",
         "agent_task": ".agent/task/linear-20102af9-9eb4-44d1-8988-c5de7869d990.md",
-        "docs": {
-          "TECH_SPEC": "tasks/specs/linear-20102af9-9eb4-44d1-8988-c5de7869d990.md"
-        }
+        "docs": "tasks/specs/linear-20102af9-9eb4-44d1-8988-c5de7869d990.md"
       },
       "status": "in_progress"
     },
@@ -8628,11 +8763,9 @@
         "spec": "tasks/specs/linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6-control-host-refresh-retained-released-not-active-claim-metadata.md",
         "task": "tasks/tasks-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md",
         "agent_task": ".agent/task/linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md",
+        "prd": "docs/PRD-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md",
+        "action_plan": "docs/ACTION_PLAN-linear-d2306cf9-2c2f-4242-bbaa-2e86456221a6.md"
       },
       "status": "in_progress"
     },
@@ -8668,11 +8801,9 @@
         "spec": "tasks/specs/linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
         "task": "tasks/tasks-linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
         "agent_task": ".agent/task/linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
+        "prd": "docs/PRD-linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md",
+        "action_plan": "docs/ACTION_PLAN-linear-39a559e9-8da2-444d-93e6-2c3ad216f730.md"
       },
       "status": "done",
       "completed_at": null
@@ -8690,11 +8821,9 @@
         "spec": "tasks/specs/linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
         "task": "tasks/tasks-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
         "agent_task": ".agent/task/linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
+        "prd": "docs/PRD-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md",
+        "action_plan": "docs/ACTION_PLAN-linear-61ddd0d1-664b-4060-949b-33eb4e7255ac.md"
       },
       "status": "done",
       "completed_at": null,
@@ -8742,11 +8871,9 @@
         "spec": "tasks/specs/linear-45363c7e-c083-4eaa-911f-8fc7873141d8.md",
         "task": "tasks/tasks-linear-45363c7e-c083-4eaa-911f-8fc7873141d8.md",
         "agent_task": ".agent/task/linear-45363c7e-c083-4eaa-911f-8fc7873141d8.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-45363c7e-c083-4eaa-911f-8fc7873141d8.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-45363c7e-c083-4eaa-911f-8fc7873141d8.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-45363c7e-c083-4eaa-911f-8fc7873141d8.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-45363c7e-c083-4eaa-911f-8fc7873141d8.md",
+        "prd": "docs/PRD-linear-45363c7e-c083-4eaa-911f-8fc7873141d8.md",
+        "action_plan": "docs/ACTION_PLAN-linear-45363c7e-c083-4eaa-911f-8fc7873141d8.md"
       },
       "status": "in_progress"
     },
@@ -8789,11 +8916,9 @@
         "spec": "tasks/specs/linear-937a8e46-5f29-49b6-8272-83db7a3f1a83.md",
         "task": "tasks/tasks-linear-937a8e46-5f29-49b6-8272-83db7a3f1a83.md",
         "agent_task": ".agent/task/linear-937a8e46-5f29-49b6-8272-83db7a3f1a83.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-937a8e46-5f29-49b6-8272-83db7a3f1a83.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-937a8e46-5f29-49b6-8272-83db7a3f1a83.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-937a8e46-5f29-49b6-8272-83db7a3f1a83.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-937a8e46-5f29-49b6-8272-83db7a3f1a83.md",
+        "prd": "docs/PRD-linear-937a8e46-5f29-49b6-8272-83db7a3f1a83.md",
+        "action_plan": "docs/ACTION_PLAN-linear-937a8e46-5f29-49b6-8272-83db7a3f1a83.md"
       },
       "status": "done",
       "completed_at": null
@@ -8861,11 +8986,9 @@
         "spec": "tasks/specs/linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4.md",
         "task": "tasks/tasks-linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4.md",
         "agent_task": ".agent/task/linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4.md",
+        "prd": "docs/PRD-linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4.md",
+        "action_plan": "docs/ACTION_PLAN-linear-89c4cb0d-4423-4b1d-865f-25a768b9d7b4.md"
       },
       "status": "in_progress"
     },
@@ -8899,11 +9022,9 @@
         "spec": "tasks/specs/linear-810a1d48-4f5e-4557-ab38-8068d77f678c.md",
         "task": "tasks/tasks-linear-810a1d48-4f5e-4557-ab38-8068d77f678c.md",
         "agent_task": ".agent/task/linear-810a1d48-4f5e-4557-ab38-8068d77f678c.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-810a1d48-4f5e-4557-ab38-8068d77f678c.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-810a1d48-4f5e-4557-ab38-8068d77f678c.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-810a1d48-4f5e-4557-ab38-8068d77f678c.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-810a1d48-4f5e-4557-ab38-8068d77f678c.md",
+        "prd": "docs/PRD-linear-810a1d48-4f5e-4557-ab38-8068d77f678c.md",
+        "action_plan": "docs/ACTION_PLAN-linear-810a1d48-4f5e-4557-ab38-8068d77f678c.md"
       },
       "status": "done",
       "completed_at": null
@@ -8939,7 +9060,9 @@
         "spec": "tasks/specs/linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
         "task": "tasks/tasks-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
         "agent_task": ".agent/task/linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
-        "docs": "docs/TECH_SPEC-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md"
+        "docs": "docs/TECH_SPEC-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
+        "prd": "docs/PRD-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md",
+        "action_plan": "docs/ACTION_PLAN-linear-1c101ebc-4b86-4c1f-b04d-0455e50fbacb.md"
       },
       "status": "in_progress"
     },
@@ -8993,7 +9116,9 @@
         "spec": "tasks/specs/linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md",
         "task": "tasks/tasks-linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md",
         "agent_task": ".agent/task/linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md",
-        "docs": "docs/TECH_SPEC-linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md"
+        "docs": "docs/TECH_SPEC-linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md",
+        "prd": "docs/PRD-linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md",
+        "action_plan": "docs/ACTION_PLAN-linear-63dbed8c-522b-4c10-8a62-86ebb823ee29.md"
       },
       "status": "in_progress"
     },
@@ -9029,11 +9154,9 @@
         "spec": "tasks/specs/linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
         "task": "tasks/tasks-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
         "agent_task": ".agent/task/linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
+        "prd": "docs/PRD-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md",
+        "action_plan": "docs/ACTION_PLAN-linear-30d86aaa-8afb-4e47-8de1-f2ab493a15a9.md"
       },
       "status": "done",
       "completed_at": null
@@ -9070,11 +9193,9 @@
         "spec": "tasks/specs/linear-9dacc402-e9b6-40c4-b657-d4b91b68c941.md",
         "task": "tasks/tasks-linear-9dacc402-e9b6-40c4-b657-d4b91b68c941.md",
         "agent_task": ".agent/task/linear-9dacc402-e9b6-40c4-b657-d4b91b68c941.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-9dacc402-e9b6-40c4-b657-d4b91b68c941.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-9dacc402-e9b6-40c4-b657-d4b91b68c941.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-9dacc402-e9b6-40c4-b657-d4b91b68c941.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-9dacc402-e9b6-40c4-b657-d4b91b68c941.md",
+        "prd": "docs/PRD-linear-9dacc402-e9b6-40c4-b657-d4b91b68c941.md",
+        "action_plan": "docs/ACTION_PLAN-linear-9dacc402-e9b6-40c4-b657-d4b91b68c941.md"
       },
       "status": "done",
       "completed_at": null
@@ -9092,11 +9213,9 @@
         "spec": "tasks/specs/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13.md",
         "task": "tasks/tasks-linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13.md",
         "agent_task": ".agent/task/linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13.md",
+        "prd": "docs/PRD-linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13.md",
+        "action_plan": "docs/ACTION_PLAN-linear-a68cdc5b-e6fd-47fb-a0c4-a2c4575c7d13.md"
       },
       "status": "in_progress",
       "approvals": {
@@ -9143,9 +9262,7 @@
         "spec": "tasks/specs/linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md",
         "task": "tasks/tasks-linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md",
         "agent_task": ".agent/task/linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md",
-        "docs": {
-          "TECH_SPEC": "docs/TECH_SPEC-linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-025f5748-bed9-4512-9fd6-53ad57dd1466.md"
       },
       "status": "done",
       "completed_at": null
@@ -9279,12 +9396,10 @@
         "spec": "tasks/specs/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md",
         "task": "tasks/tasks-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md",
         "agent_task": ".agent/task/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md",
-          "classification": "docs/findings/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4-docs-freshness-classification.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md",
+        "findings": "docs/findings/linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4-docs-freshness-classification.md",
+        "prd": "docs/PRD-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md",
+        "action_plan": "docs/ACTION_PLAN-linear-8f605d1a-e4ec-4acf-bb8a-bb3a2a1027c4.md"
       },
       "status": "in_progress"
     },
@@ -9320,11 +9435,9 @@
         "spec": "tasks/specs/linear-49206921-3c8d-4db6-bfd9-62414509e96a.md",
         "task": "tasks/tasks-linear-49206921-3c8d-4db6-bfd9-62414509e96a.md",
         "agent_task": ".agent/task/linear-49206921-3c8d-4db6-bfd9-62414509e96a.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-49206921-3c8d-4db6-bfd9-62414509e96a.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-49206921-3c8d-4db6-bfd9-62414509e96a.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-49206921-3c8d-4db6-bfd9-62414509e96a.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-49206921-3c8d-4db6-bfd9-62414509e96a.md",
+        "prd": "docs/PRD-linear-49206921-3c8d-4db6-bfd9-62414509e96a.md",
+        "action_plan": "docs/ACTION_PLAN-linear-49206921-3c8d-4db6-bfd9-62414509e96a.md"
       },
       "status": "done",
       "completed_at": null
@@ -9361,9 +9474,7 @@
         "spec": "tasks/specs/linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md",
         "task": "tasks/tasks-linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md",
         "agent_task": ".agent/task/linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md",
-        "docs": {
-          "TECH_SPEC": "docs/TECH_SPEC-linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-4c1c8aed-2724-4072-9218-74b55e0cc4a7.md"
       },
       "status": "done",
       "completed_at": null
@@ -9400,9 +9511,9 @@
         "spec": "tasks/specs/linear-7988e9a6-8258-4cff-b585-fadc31741ce1.md",
         "task": "tasks/tasks-linear-7988e9a6-8258-4cff-b585-fadc31741ce1.md",
         "agent_task": ".agent/task/linear-7988e9a6-8258-4cff-b585-fadc31741ce1.md",
-        "docs": {
-          "TECH_SPEC": "docs/TECH_SPEC-linear-7988e9a6-8258-4cff-b585-fadc31741ce1.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-7988e9a6-8258-4cff-b585-fadc31741ce1.md",
+        "prd": "docs/PRD-linear-7988e9a6-8258-4cff-b585-fadc31741ce1.md",
+        "action_plan": "docs/ACTION_PLAN-linear-7988e9a6-8258-4cff-b585-fadc31741ce1.md"
       },
       "status": "in_progress"
     },
@@ -9438,9 +9549,7 @@
         "spec": "tasks/specs/linear-12bea7bd-4716-4c9a-a49c-74d29151bedf.md",
         "task": "tasks/tasks-linear-12bea7bd-4716-4c9a-a49c-74d29151bedf.md",
         "agent_task": ".agent/task/linear-12bea7bd-4716-4c9a-a49c-74d29151bedf.md",
-        "docs": {
-          "TECH_SPEC": "docs/TECH_SPEC-linear-12bea7bd-4716-4c9a-a49c-74d29151bedf.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-12bea7bd-4716-4c9a-a49c-74d29151bedf.md"
       },
       "status": "done",
       "completed_at": null
@@ -10857,7 +10966,9 @@
         "spec": "tasks/specs/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md",
         "task": "tasks/tasks-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md",
         "agent_task": ".agent/task/linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md",
-        "docs": "docs/TECH_SPEC-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md"
+        "docs": "docs/TECH_SPEC-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md",
+        "prd": "docs/PRD-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md",
+        "action_plan": "docs/ACTION_PLAN-linear-59f9a097-fe3e-4b9b-9d3a-aa3ab1a3d42c.md"
       },
       "status": "in_progress"
     },
@@ -11417,7 +11528,9 @@
         "spec": "tasks/specs/linear-a2949fd4-2319-4cd0-acd1-68e6404766f3.md",
         "task": "tasks/tasks-linear-a2949fd4-2319-4cd0-acd1-68e6404766f3.md",
         "agent_task": ".agent/task/linear-a2949fd4-2319-4cd0-acd1-68e6404766f3.md",
-        "docs": "docs/TECH_SPEC-linear-a2949fd4-2319-4cd0-acd1-68e6404766f3.md"
+        "docs": "docs/TECH_SPEC-linear-a2949fd4-2319-4cd0-acd1-68e6404766f3.md",
+        "prd": "docs/PRD-linear-a2949fd4-2319-4cd0-acd1-68e6404766f3.md",
+        "action_plan": "docs/ACTION_PLAN-linear-a2949fd4-2319-4cd0-acd1-68e6404766f3.md"
       },
       "status": "in_progress"
     },
@@ -16720,7 +16833,9 @@
         "spec": "tasks/specs/1315-coordinator-symphony-post-worker-retry-queue-ownership.md",
         "task": "tasks/tasks-1315-coordinator-symphony-post-worker-retry-queue-ownership.md",
         "agent_task": ".agent/task/1315-coordinator-symphony-post-worker-retry-queue-ownership.md",
-        "docs": "docs/TECH_SPEC-coordinator-symphony-post-worker-retry-queue-ownership.md"
+        "docs": "docs/TECH_SPEC-coordinator-symphony-post-worker-retry-queue-ownership.md",
+        "prd": "docs/PRD-coordinator-symphony-post-worker-retry-queue-ownership.md",
+        "action_plan": "docs/ACTION_PLAN-coordinator-symphony-post-worker-retry-queue-ownership.md"
       },
       "status": "in_progress",
       "approvals": {
@@ -16802,7 +16917,10 @@
         "spec": "tasks/specs/1311-coordinator-symphony-full-parity-hardening-and-closure.md",
         "task": "tasks/tasks-1311-coordinator-symphony-full-parity-hardening-and-closure.md",
         "agent_task": ".agent/task/1311-coordinator-symphony-full-parity-hardening-and-closure.md",
-        "docs": "docs/TECH_SPEC-coordinator-symphony-full-parity-hardening-and-closure.md"
+        "docs": "docs/TECH_SPEC-coordinator-symphony-full-parity-hardening-and-closure.md",
+        "findings": "docs/findings/1311-symphony-full-parity-hardening-and-closure-deliberation.md",
+        "prd": "docs/PRD-coordinator-symphony-full-parity-hardening-and-closure.md",
+        "action_plan": "docs/ACTION_PLAN-coordinator-symphony-full-parity-hardening-and-closure.md"
       },
       "status": "in_progress",
       "approvals": {
@@ -16825,12 +16943,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-20",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1310-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
         "task": "tasks/tasks-1310-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
         "agent_task": ".agent/task/1310-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-full-parity-audit-and-closure-truthfulness-reassessment.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-20",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -16846,7 +16977,10 @@
         "spec": "tasks/specs/1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
         "task": "tasks/tasks-1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
         "agent_task": ".agent/task/1309-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
-        "docs": "docs/TECH_SPEC-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md"
+        "docs": "docs/TECH_SPEC-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
+        "findings": "docs/findings/1309-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up-deliberation.md",
+        "prd": "docs/PRD-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md",
+        "action_plan": "docs/ACTION_PLAN-coordinator-live-provider-child-run-delegation-guard-launch-provenance-test-hermeticity-follow-up.md"
       },
       "status": "in_progress",
       "approvals": {
@@ -16874,7 +17008,10 @@
         "spec": "tasks/specs/1308-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
         "task": "tasks/tasks-1308-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
         "agent_task": ".agent/task/1308-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
-        "docs": "docs/TECH_SPEC-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md"
+        "docs": "docs/TECH_SPEC-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
+        "findings": "docs/findings/1308-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up-deliberation.md",
+        "prd": "docs/PRD-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md",
+        "action_plan": "docs/ACTION_PLAN-coordinator-live-provider-child-run-cli-command-surface-subprocess-completion-follow-up.md"
       },
       "status": "in_progress",
       "approvals": {
@@ -16902,7 +17039,10 @@
         "spec": "tasks/specs/1307-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md",
         "task": "tasks/tasks-1307-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md",
         "agent_task": ".agent/task/1307-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md",
-        "docs": "docs/TECH_SPEC-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md"
+        "docs": "docs/TECH_SPEC-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md",
+        "findings": "docs/findings/1307-live-provider-child-run-test-stage-terminal-completion-follow-up-deliberation.md",
+        "prd": "docs/PRD-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md",
+        "action_plan": "docs/ACTION_PLAN-coordinator-live-provider-child-run-test-stage-terminal-completion-follow-up.md"
       },
       "status": "in_progress",
       "approvals": {
@@ -16930,7 +17070,10 @@
         "spec": "tasks/specs/1306-coordinator-live-provider-child-run-test-stage-regression-follow-up.md",
         "task": "tasks/tasks-1306-coordinator-live-provider-child-run-test-stage-regression-follow-up.md",
         "agent_task": ".agent/task/1306-coordinator-live-provider-child-run-test-stage-regression-follow-up.md",
-        "docs": "docs/TECH_SPEC-coordinator-live-provider-child-run-test-stage-regression-follow-up.md"
+        "docs": "docs/TECH_SPEC-coordinator-live-provider-child-run-test-stage-regression-follow-up.md",
+        "findings": "docs/findings/1306-live-provider-child-run-test-stage-regression-follow-up-deliberation.md",
+        "prd": "docs/PRD-coordinator-live-provider-child-run-test-stage-regression-follow-up.md",
+        "action_plan": "docs/ACTION_PLAN-coordinator-live-provider-child-run-test-stage-regression-follow-up.md"
       },
       "status": "in_progress",
       "approvals": {
@@ -16958,7 +17101,10 @@
         "spec": "tasks/specs/1305-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md",
         "task": "tasks/tasks-1305-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md",
         "agent_task": ".agent/task/1305-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md",
-        "docs": "docs/TECH_SPEC-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md"
+        "docs": "docs/TECH_SPEC-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md",
+        "findings": "docs/findings/1305-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment-deliberation.md",
+        "prd": "docs/PRD-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md",
+        "action_plan": "docs/ACTION_PLAN-coordinator-live-provider-child-run-task-identity-and-delegation-guard-contract-alignment.md"
       },
       "status": "in_progress",
       "approvals": {
@@ -16999,12 +17145,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-20",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
         "task": "tasks/tasks-1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
         "agent_task": ".agent/task/1303-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-parity-linear-autonomous-intake-and-run-handoff.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-19",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -19245,7 +19404,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-16",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md",
         "task": "tasks/tasks-1195-coordinator-symphony-aligned-orchestrator-resume-preparation-shell-extraction.md",
@@ -19258,8 +19417,19 @@
           "date": "2026-05-16",
           "status": "validated",
           "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        },
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
         }
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-03-14"
     },
     {
       "id": "20260314-1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction",
@@ -19269,7 +19439,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-16",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
         "task": "tasks/tasks-1194-coordinator-symphony-aligned-orchestrator-start-preparation-shell-extraction.md",
@@ -19282,8 +19452,19 @@
           "date": "2026-05-16",
           "status": "validated",
           "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        },
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
         }
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-03-14"
     },
     {
       "id": "20260314-1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction",
@@ -19293,12 +19474,14 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-16",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
         "task": "tasks/tasks-1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
         "agent_task": ".agent/task/1193-coordinator-symphony-aligned-orchestrator-control-plane-lifecycle-shell-extraction.md",
-        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-with-control-plane-lifecycle-shell-extraction.md"
+        "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-with-control-plane-lifecycle-shell-extraction.md",
+        "prd": "docs/PRD-coordinator-symphony-aligned-orchestrator-with-control-plane-lifecycle-shell-extraction.md",
+        "action_plan": "docs/ACTION_PLAN-coordinator-symphony-aligned-orchestrator-with-control-plane-lifecycle-shell-extraction.md"
       },
       "approvals": {
         "co545_stale_spec_reclassification": {
@@ -19306,8 +19489,19 @@
           "date": "2026-05-16",
           "status": "validated",
           "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        },
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
         }
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-03-14"
     },
     {
       "id": "20260314-1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction",
@@ -19317,7 +19511,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-16",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction.md",
         "task": "tasks/tasks-1192-coordinator-symphony-aligned-orchestrator-pipeline-route-entry-shell-extraction.md",
@@ -19330,8 +19524,19 @@
           "date": "2026-05-16",
           "status": "validated",
           "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        },
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
         }
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-03-14"
     },
     {
       "id": "20260314-1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction",
@@ -19341,7 +19546,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-16",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction.md",
         "task": "tasks/tasks-1191-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction.md",
@@ -19354,8 +19559,19 @@
           "date": "2026-05-16",
           "status": "validated",
           "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        },
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
         }
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-03-14"
     },
     {
       "id": "20260314-1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction",
@@ -19365,7 +19581,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-16",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction.md",
         "task": "tasks/tasks-1190-coordinator-symphony-aligned-orchestrator-run-lifecycle-orchestration-shell-extraction.md",
@@ -19378,8 +19594,19 @@
           "date": "2026-05-16",
           "status": "validated",
           "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        },
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
         }
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-03-14"
     },
     {
       "id": "20260314-1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction",
@@ -19389,7 +19616,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-16",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction.md",
         "task": "tasks/tasks-1189-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-shell-extraction.md",
@@ -19402,8 +19629,19 @@
           "date": "2026-05-16",
           "status": "validated",
           "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        },
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
         }
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-03-14"
     },
     {
       "id": "20260314-1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation",
@@ -19413,7 +19651,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-16",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation.md",
         "task": "tasks/tasks-1188-coordinator-symphony-aligned-orchestrator-run-lifecycle-task-manager-tracker-delegation.md",
@@ -19426,8 +19664,19 @@
           "date": "2026-05-16",
           "status": "validated",
           "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        },
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
         }
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-03-14"
     },
     {
       "id": "20260314-1187-coordinator-symphony-aligned-orchestrator-plan-target-tracker-shell-extraction",
@@ -19437,7 +19686,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-16",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1187-coordinator-symphony-aligned-orchestrator-plan-target-tracker-shell-extraction.md",
         "task": "tasks/tasks-1187-coordinator-symphony-aligned-orchestrator-plan-target-tracker-shell-extraction.md",
@@ -19450,8 +19699,19 @@
           "date": "2026-05-16",
           "status": "validated",
           "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        },
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
         }
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-03-14"
     },
     {
       "id": "20260314-1186-coordinator-symphony-aligned-orchestrator-execution-route-adapter-shell-extraction",
@@ -19461,7 +19721,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-16",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1186-coordinator-symphony-aligned-orchestrator-execution-route-adapter-shell-extraction.md",
         "task": "tasks/tasks-1186-coordinator-symphony-aligned-orchestrator-execution-route-adapter-shell-extraction.md",
@@ -19474,8 +19734,19 @@
           "date": "2026-05-16",
           "status": "validated",
           "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        },
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
         }
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-03-14"
     },
     {
       "id": "20260314-1185-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction",
@@ -19485,7 +19756,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-16",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1185-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md",
         "task": "tasks/tasks-1185-coordinator-symphony-aligned-orchestrator-execution-mode-policy-extraction.md",
@@ -19498,8 +19769,19 @@
           "date": "2026-05-16",
           "status": "validated",
           "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        },
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
         }
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-03-14"
     },
     {
       "id": "20260314-1184-coordinator-symphony-aligned-orchestrator-execution-routing-decision-shell-extraction",
@@ -19509,7 +19791,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-16",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1184-coordinator-symphony-aligned-orchestrator-execution-routing-decision-shell-extraction.md",
         "task": "tasks/tasks-1184-coordinator-symphony-aligned-orchestrator-execution-routing-decision-shell-extraction.md",
@@ -19522,8 +19804,19 @@
           "date": "2026-05-16",
           "status": "validated",
           "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        },
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
         }
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-03-14"
     },
     {
       "id": "20260314-1183-coordinator-symphony-aligned-orchestrator-cloud-route-fallback-contract-extraction",
@@ -19533,7 +19826,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-16",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1183-coordinator-symphony-aligned-orchestrator-cloud-route-fallback-contract-extraction.md",
         "task": "tasks/tasks-1183-coordinator-symphony-aligned-orchestrator-cloud-route-fallback-contract-extraction.md",
@@ -19546,8 +19839,19 @@
           "date": "2026-05-16",
           "status": "validated",
           "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        },
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
         }
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-03-14"
     },
     {
       "id": "20260314-1182-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction",
@@ -19557,7 +19861,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-05-16",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1182-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction.md",
         "task": "tasks/tasks-1182-coordinator-symphony-aligned-orchestrator-local-route-shell-extraction.md",
@@ -19570,8 +19874,19 @@
           "date": "2026-05-16",
           "status": "validated",
           "summary": "CO-545 reviewed this stale Apr 14/15 task spec and reclassified the spec frontmatter/registry row inactive done; the task-index row keeps review evidence without marking the full packet terminal, avoiding unrelated terminal-packet archive scope."
+        },
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
         }
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-03-14"
     },
     {
       "id": "20260314-1181-coordinator-symphony-aligned-orchestrator-cloud-route-preflight-and-reroute-shell-extraction",
@@ -19581,12 +19896,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1181-coordinator-symphony-aligned-orchestrator-cloud-route-preflight-and-reroute-shell-extraction.md",
         "task": "tasks/tasks-1181-coordinator-symphony-aligned-orchestrator-cloud-route-preflight-and-reroute-shell-extraction.md",
         "agent_task": ".agent/task/1181-coordinator-symphony-aligned-orchestrator-cloud-route-preflight-and-reroute-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-route-preflight-and-reroute-shell-extraction.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-14",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -19597,12 +19925,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1180-coordinator-symphony-aligned-orchestrator-execution-route-state-assembly-extraction.md",
         "task": "tasks/tasks-1180-coordinator-symphony-aligned-orchestrator-execution-route-state-assembly-extraction.md",
         "agent_task": ".agent/task/1180-coordinator-symphony-aligned-orchestrator-execution-route-state-assembly-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-execution-route-state-assembly-extraction.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-14",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -19613,12 +19954,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1179-coordinator-symphony-aligned-orchestrator-local-execution-lifecycle-shell-extraction.md",
         "task": "tasks/tasks-1179-coordinator-symphony-aligned-orchestrator-local-execution-lifecycle-shell-extraction.md",
         "agent_task": ".agent/task/1179-coordinator-symphony-aligned-orchestrator-local-execution-lifecycle-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-local-execution-lifecycle-shell-extraction.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-14",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -19629,12 +19983,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1178-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction.md",
         "task": "tasks/tasks-1178-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction.md",
         "agent_task": ".agent/task/1178-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-execution-lifecycle-shell-extraction.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-14",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -19645,12 +20012,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1177-coordinator-symphony-aligned-orchestrator-cloud-target-preflight-resolution-and-sibling-skip-shell-extraction.md",
         "task": "tasks/tasks-1177-coordinator-symphony-aligned-orchestrator-cloud-target-preflight-resolution-and-sibling-skip-shell-extraction.md",
         "agent_task": ".agent/task/1177-coordinator-symphony-aligned-orchestrator-cloud-target-preflight-resolution-and-sibling-skip-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-target-preflight-resolution-and-sibling-skip-shell-extraction.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-14",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -19661,12 +20041,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction.md",
         "task": "tasks/tasks-1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction.md",
         "agent_task": ".agent/task/1176-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-target-completion-shell-extraction.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-14",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -19677,12 +20070,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1175-coordinator-symphony-aligned-orchestrator-cloud-target-running-state-and-update-shell-extraction.md",
         "task": "tasks/tasks-1175-coordinator-symphony-aligned-orchestrator-cloud-target-running-state-and-update-shell-extraction.md",
         "agent_task": ".agent/task/1175-coordinator-symphony-aligned-orchestrator-cloud-target-running-state-and-update-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-target-running-state-and-update-shell-extraction.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-14",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -19693,12 +20099,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1174-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
         "task": "tasks/tasks-1174-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
         "agent_task": ".agent/task/1174-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-target-missing-env-failure-contract-extraction.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-14",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -19709,12 +20128,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction.md",
         "task": "tasks/tasks-1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction.md",
         "agent_task": ".agent/task/1173-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-target-execution-request-contract-extraction.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-14",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -19725,12 +20157,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1172-coordinator-symphony-aligned-orchestrator-shared-cloud-preflight-request-contract-extraction.md",
         "task": "tasks/tasks-1172-coordinator-symphony-aligned-orchestrator-shared-cloud-preflight-request-contract-extraction.md",
         "agent_task": ".agent/task/1172-coordinator-symphony-aligned-orchestrator-shared-cloud-preflight-request-contract-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-shared-cloud-preflight-request-contract-extraction.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-14",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -19741,12 +20186,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction.md",
         "task": "tasks/tasks-1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction.md",
         "agent_task": ".agent/task/1171-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-cloud-preflight-request-assembly-extraction.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-14",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -19757,12 +20215,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract.md",
         "task": "tasks/tasks-1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract.md",
         "agent_task": ".agent/task/1170-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-execution-routing-fallback-manifest-contract.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-14",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -19773,12 +20244,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1169-coordinator-symphony-aligned-orchestrator-execution-routing-policy-splitting.md",
         "task": "tasks/tasks-1169-coordinator-symphony-aligned-orchestrator-execution-routing-policy-splitting.md",
         "agent_task": ".agent/task/1169-coordinator-symphony-aligned-orchestrator-execution-routing-policy-splitting.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-execution-routing-policy-splitting.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-14",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -19789,12 +20273,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1168-coordinator-symphony-aligned-orchestrator-start-resume-control-plane-launch-shell-extraction.md",
         "task": "tasks/tasks-1168-coordinator-symphony-aligned-orchestrator-start-resume-control-plane-launch-shell-extraction.md",
         "agent_task": ".agent/task/1168-coordinator-symphony-aligned-orchestrator-start-resume-control-plane-launch-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-start-resume-control-plane-launch-shell-extraction.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-14",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -19805,12 +20302,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1167-coordinator-symphony-aligned-orchestrator-auto-scout-evidence-recorder-extraction.md",
         "task": "tasks/tasks-1167-coordinator-symphony-aligned-orchestrator-auto-scout-evidence-recorder-extraction.md",
         "agent_task": ".agent/task/1167-coordinator-symphony-aligned-orchestrator-auto-scout-evidence-recorder-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-auto-scout-evidence-recorder-extraction.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-14",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -19821,12 +20331,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1166-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-manifest-contract.md",
         "task": "tasks/tasks-1166-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-manifest-contract.md",
         "agent_task": ".agent/task/1166-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-manifest-contract.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-resume-pre-start-failure-manifest-contract.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-14",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -19837,12 +20360,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1165-coordinator-symphony-aligned-orchestrator-public-run-entry-bootstrap-and-handoff-reassessment.md",
         "task": "tasks/tasks-1165-coordinator-symphony-aligned-orchestrator-public-run-entry-bootstrap-and-handoff-reassessment.md",
         "agent_task": ".agent/task/1165-coordinator-symphony-aligned-orchestrator-public-run-entry-bootstrap-and-handoff-reassessment.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-public-run-entry-bootstrap-and-handoff-reassessment.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-14",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -19853,12 +20389,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-03-14",
+      "last_review": "2026-05-22",
       "paths": {
         "spec": "tasks/specs/1164-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
         "task": "tasks/tasks-1164-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
         "agent_task": ".agent/task/1164-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md",
         "docs": "docs/TECH_SPEC-coordinator-symphony-aligned-orchestrator-perform-run-lifecycle-execution-and-run-error-shell-extraction.md"
+      },
+      "status": "done",
+      "completed_at": "2026-03-14",
+      "approvals": {
+        "docs_freshness_terminal_metadata_sync_20260522": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_metadata_synced",
+          "checked_items": 0,
+          "unchecked_items": 0,
+          "evidence": "out/linear-aacc40b3-4f99-49af-8386-996f693e2642/terminal-metadata-sync-20260522.json",
+          "summary": "Both task checklist mirrors had zero open checklist items during CO-575 docs freshness maintenance, so the historical packet was marked terminal for implementation-docs archival instead of remaining live rolling freshness debt."
+        }
       }
     },
     {
@@ -24415,7 +24964,7 @@
       "title": "Agent-First Adoption Steering Skill",
       "path": "tasks/tasks-0978-agent-first-adoption-steering-skill.md",
       "kind": "run",
-      "status": "in-progress",
+      "status": "done",
       "gate": {
         "phase": "agent-first-adoption-steering-skill-planning",
         "status": "succeeded",
@@ -24423,7 +24972,16 @@
         "run_id": "2026-02-25T03-48-09-988Z-0e0cd9c1"
       },
       "created_at": "2026-02-25",
-      "completed_at": null
+      "completed_at": "2026-02-25",
+      "last_review": "2026-05-22",
+      "approvals": {
+        "docs_freshness_lifecycle_sync": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_verified",
+          "summary": "CO-575 docs freshness maintenance: checklist complete; marked terminal before archive eligibility review."
+        }
+      }
     },
     {
       "id": "0979",
@@ -24431,7 +24989,7 @@
       "title": "Standalone Review Runtime Bounding + Telemetry",
       "path": "tasks/tasks-0979-standalone-review-runtime-telemetry.md",
       "kind": "run",
-      "status": "in-progress",
+      "status": "done",
       "gate": {
         "phase": "standalone-review-runtime-telemetry-planning",
         "status": "succeeded",
@@ -24439,7 +24997,16 @@
         "run_id": "2026-02-25T04-08-45-193Z-9f6bc5da"
       },
       "created_at": "2026-02-25",
-      "completed_at": null
+      "completed_at": "2026-02-25",
+      "last_review": "2026-05-22",
+      "approvals": {
+        "docs_freshness_lifecycle_sync": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_verified",
+          "summary": "CO-575 docs freshness maintenance: checklist complete; marked terminal before archive eligibility review."
+        }
+      }
     },
     {
       "id": "0980",
@@ -25843,7 +26410,9 @@
         "spec": "tasks/specs/linear-b1835ea5-3d28-493a-934e-1b38048270ce.md",
         "task": "tasks/tasks-linear-b1835ea5-3d28-493a-934e-1b38048270ce.md",
         "agent_task": ".agent/task/linear-b1835ea5-3d28-493a-934e-1b38048270ce.md",
-        "docs": "docs/TECH_SPEC-linear-b1835ea5-3d28-493a-934e-1b38048270ce.md"
+        "docs": "docs/TECH_SPEC-linear-b1835ea5-3d28-493a-934e-1b38048270ce.md",
+        "prd": "docs/PRD-linear-b1835ea5-3d28-493a-934e-1b38048270ce.md",
+        "action_plan": "docs/ACTION_PLAN-linear-b1835ea5-3d28-493a-934e-1b38048270ce.md"
       },
       "status": "in_progress"
     },
@@ -26153,11 +26722,9 @@
         "spec": "tasks/specs/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
         "task": "tasks/tasks-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
         "agent_task": ".agent/task/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
-          "TECH_SPEC": "tasks/specs/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md"
-        }
+        "docs": "tasks/specs/linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
+        "prd": "docs/PRD-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md",
+        "action_plan": "docs/ACTION_PLAN-linear-e2852b4f-09d0-4220-b0ac-b763170eacb2.md"
       },
       "status": "done",
       "completed_at": null
@@ -26193,11 +26760,9 @@
         "spec": "tasks/specs/linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md",
         "task": "tasks/tasks-linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md",
         "agent_task": ".agent/task/linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md",
+        "prd": "docs/PRD-linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md",
+        "action_plan": "docs/ACTION_PLAN-linear-d469c73d-a540-427c-9088-5d4791c6f8ca.md"
       },
       "status": "done",
       "completed_at": null
@@ -26234,11 +26799,9 @@
         "spec": "tasks/specs/linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
         "task": "tasks/tasks-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
         "agent_task": ".agent/task/linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
+        "prd": "docs/PRD-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md",
+        "action_plan": "docs/ACTION_PLAN-linear-5d1836b2-98e7-452a-93be-a17c64b3b5fe.md"
       },
       "status": "in_progress"
     },
@@ -26274,11 +26837,9 @@
         "spec": "tasks/specs/linear-b2712a15-b04f-4a4e-aac8-35f614abb01b.md",
         "task": "tasks/tasks-linear-b2712a15-b04f-4a4e-aac8-35f614abb01b.md",
         "agent_task": ".agent/task/linear-b2712a15-b04f-4a4e-aac8-35f614abb01b.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-b2712a15-b04f-4a4e-aac8-35f614abb01b.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-b2712a15-b04f-4a4e-aac8-35f614abb01b.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-b2712a15-b04f-4a4e-aac8-35f614abb01b.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-b2712a15-b04f-4a4e-aac8-35f614abb01b.md",
+        "prd": "docs/PRD-linear-b2712a15-b04f-4a4e-aac8-35f614abb01b.md",
+        "action_plan": "docs/ACTION_PLAN-linear-b2712a15-b04f-4a4e-aac8-35f614abb01b.md"
       },
       "status": "in_progress"
     },
@@ -26464,11 +27025,9 @@
         "spec": "tasks/specs/linear-b131706d-e40f-42db-8f29-9f1ddd636187.md",
         "task": "tasks/tasks-linear-b131706d-e40f-42db-8f29-9f1ddd636187.md",
         "agent_task": ".agent/task/linear-b131706d-e40f-42db-8f29-9f1ddd636187.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-b131706d-e40f-42db-8f29-9f1ddd636187.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-b131706d-e40f-42db-8f29-9f1ddd636187.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-b131706d-e40f-42db-8f29-9f1ddd636187.md"
-        }
+        "docs": "docs/TECH_SPEC-linear-b131706d-e40f-42db-8f29-9f1ddd636187.md",
+        "prd": "docs/PRD-linear-b131706d-e40f-42db-8f29-9f1ddd636187.md",
+        "action_plan": "docs/ACTION_PLAN-linear-b131706d-e40f-42db-8f29-9f1ddd636187.md"
       }
     },
     {
@@ -26479,7 +27038,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-28",
+      "last_review": "2026-05-22",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -26494,6 +27053,12 @@
           "status": "captured",
           "manifest": ".runs/linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86-docs-review/cli/2026-04-28T04-00-54-422Z-c41e56c9/manifest.json",
           "summary": "Docs-review evidence was captured for the CO-407 packet; parent lane later revalidated docs:check and docs:freshness on current origin/main before PR handoff."
+        },
+        "docs_freshness_lifecycle_sync": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-407 Done/completed during CO-575 docs freshness maintenance."
         }
       },
       "paths": {
@@ -26501,7 +27066,9 @@
         "task": "tasks/tasks-linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86.md",
         "agent_task": ".agent/task/linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86.md",
         "docs": "tasks/specs/linear-4d0b9243-78dd-492b-99fc-ce34d5de1b86-co-status-healthy-ui-timeout.md"
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-05-21"
     },
     {
       "id": "20260428-linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec",
@@ -26511,18 +27078,25 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-28",
-      "approvals": {},
+      "last_review": "2026-05-22",
+      "approvals": {
+        "docs_freshness_lifecycle_sync": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-406 Done/completed during CO-575 docs freshness maintenance."
+        }
+      },
       "paths": {
         "spec": "tasks/specs/linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md",
         "task": "tasks/tasks-linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md",
         "agent_task": ".agent/task/linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md",
-        "docs": {
-          "PRD": "docs/PRD-linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md",
-          "TECH_SPEC": "docs/TECH_SPEC-linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md",
-          "ACTION_PLAN": "docs/ACTION_PLAN-linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md"
-        }
-      }
+        "docs": "docs/TECH_SPEC-linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md",
+        "prd": "docs/PRD-linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md",
+        "action_plan": "docs/ACTION_PLAN-linear-8e9e3747-77fa-4d28-879a-0fdc07fb1eec.md"
+      },
+      "status": "done",
+      "completed_at": "2026-05-05"
     },
     {
       "id": "linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba",
@@ -26532,7 +27106,7 @@
       "owners": [
         "Codex"
       ],
-      "last_review": "2026-04-28",
+      "last_review": "2026-05-22",
       "approvals": {
         "docs_packet_child_lane": {
           "reviewer": "bounded same-issue docs child lane",
@@ -26541,6 +27115,12 @@
           "manifest": ".runs/linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba-docs-packet/cli/2026-04-28T12-03-31-458Z-f7277f31/manifest.json",
           "source_anchor": "ctx:sha256:abfa2d4776ef4351126ffc600e3e5d6a6fd85919935405d0589023547317c6a5#chunk:c000001",
           "summary": "Docs-first packet created for CO-405 from parent-provided issue context only. The referenced source payload path was absent in this child checkout. The packet preserves the narrow command-intent contract: repo-local validation commands attempted by bounded review must terminate as command-intent violations with validation-suite or validation-runner provenance, telemetry must separate boundary diagnostics from product findings, and retry behavior must stay scope-preserving, read-only, and fail-closed on repeated validation intent."
+        },
+        "docs_freshness_lifecycle_sync": {
+          "reviewer": "CO-575 maintenance",
+          "date": "2026-05-22",
+          "status": "terminal_verified",
+          "summary": "Live Linear issue-context verified CO-405 Done/completed during CO-575 docs freshness maintenance."
         }
       },
       "paths": {
@@ -26548,7 +27128,9 @@
         "task": "tasks/tasks-linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba.md",
         "agent_task": ".agent/task/linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba.md",
         "docs": "tasks/specs/linear-e9b66c8a-4cb9-48d3-8060-0efac15b29ba.md"
-      }
+      },
+      "status": "done",
+      "completed_at": "2026-04-29"
     },
     {
       "id": "20260427-linear-fd05f8a0-420a-4313-a462-690881c0a45c",
