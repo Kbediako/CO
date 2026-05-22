@@ -58,7 +58,7 @@ describe('runReviewCliLaunchShell', () => {
 
     expect(runPassthroughCommand).toHaveBeenCalledWith(
       '/node',
-      ['--loader', 'ts-node/esm', '/repo/scripts/run-review.ts'],
+      ['--loader', '/repo/node_modules/ts-node/esm.mjs', '/repo/scripts/run-review.ts'],
       {
         cwd: process.cwd(),
         env: process.env
@@ -141,7 +141,7 @@ describe('runReviewCliLaunchShell', () => {
 
     expect(runPassthroughCommand).toHaveBeenCalledWith(
       '/node',
-      ['--loader', 'ts-node/esm', '/repo/scripts/run-review.ts'],
+      ['--loader', '/repo/node_modules/ts-node/esm.mjs', '/repo/scripts/run-review.ts'],
       {
         cwd: process.cwd(),
         env: process.env

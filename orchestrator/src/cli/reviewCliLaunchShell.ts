@@ -85,10 +85,11 @@ function resolveReviewRunner(dependencies: ReviewCliLaunchShellDependencies): Ex
   }
 
   if (sourceRunnerExists) {
-    if (dependencies.resolveModule('ts-node/esm', join(packageRoot, 'package.json')) !== null) {
+    const tsNodeLoader = dependencies.resolveModule('ts-node/esm', join(packageRoot, 'package.json'));
+    if (tsNodeLoader !== null) {
       return {
         command: dependencies.execPath,
-        args: ['--loader', 'ts-node/esm', sourceRunner]
+        args: ['--loader', tsNodeLoader, sourceRunner]
       };
     }
     throw new Error(
