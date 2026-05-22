@@ -1,6 +1,107 @@
 {
   "items": [
     {
+      "id": "20260522-linear-91f04f3e-5a43-491a-915e-bf6229760676",
+      "title": "CO-549 retained released provider-intake claim refresh-churn",
+      "relates_to": "tasks/tasks-linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-22",
+      "canonical_owner_key": "control-host:retained-released-provider-intake-claim-refresh-churn:v1",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=control-host:retained-released-provider-intake-claim-refresh-churn:v1",
+      "evidence": [
+        "docs/PRD-linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+        "docs/TECH_SPEC-linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+        "docs/ACTION_PLAN-linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+        "tasks/specs/linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+        "tasks/tasks-linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+        ".agent/task/linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-05-22",
+          "status": "accepted_parent_imported",
+          "manifest": ".runs/linear-91f04f3e-5a43-491a-915e-bf6229760676-docs-packet/cli/2026-05-22T17-17-43-494Z-baf35b73/manifest.json",
+          "source_anchor": "ctx:sha256:f72b364feaf6bd93fd0c27b52223f5cdcf732463e37d74bd29a6ed501f27e7eb#chunk:c000001",
+          "summary": "Docs-first packet preserves CO-549 as retained released provider-intake claim refresh-churn; parent accepted the docs-only patch, verified the authoritative source payload, and kept Linear/workpad/PR lifecycle parent-owned."
+        },
+        "parallelization": {
+          "reviewer": "CO-549 provider worker",
+          "date": "2026-05-22",
+          "status": "parallelize_now_recorded",
+          "summary": "Pre-turn matrix identified an independent docs-packet child lane; child run completed and the parent accepted the patch after scoped verification."
+        },
+        "final_standalone_review": {
+          "reviewer": "codex-orchestrator review",
+          "date": "2026-05-22",
+          "status": "succeeded_clean",
+          "telemetry": ".runs/linear-91f04f3e-5a43-491a-915e-bf6229760676/cli/2026-05-22T17-14-59-738Z-b24ccf26/review/telemetry.json",
+          "contract": ".runs/linear-91f04f3e-5a43-491a-915e-bf6229760676/cli/2026-05-22T17-14-59-738Z-b24ccf26/review/contract.json",
+          "summary": "Manifest-backed standalone review ran under FORCE_CODEX_REVIEW=1 and reports review_outcome=clean-success, review_verdict=clean, contract_validation=valid, and contract_overall_verdict=clean."
+        },
+        "elegance_review": {
+          "reviewer": "parent provider worker",
+          "date": "2026-05-22",
+          "status": "clean",
+          "evidence": "out/linear-91f04f3e-5a43-491a-915e-bf6229760676/manual/elegance-review.md",
+          "summary": "Explicit minimality pass found no avoidable abstraction or scope expansion; the source change remains one accumulator plus one summarized progress flush and the long fixture is retained to prove active-claim revalidation."
+        }
+      },
+      "validation": {
+        "status": "review_clean_pr_pending",
+        "passed": [
+          "docs-first packet drafted",
+          "task registry and freshness mirrors updated",
+          "source payload verified from authoritative issue workspace",
+          "tasks/index.json JSON parse passed",
+          "docs/docs-freshness-registry.json JSON parse passed",
+          "scoped git diff whitespace check passed",
+          "protected-term grep passed",
+          "same-issue docs child lane accepted",
+          "targeted retained released deferral regression passed",
+          "Backlog not-active focused provider-intake subset passed",
+          "full orchestrator/tests/ProviderIssueHandoff.test.ts passed",
+          "node scripts/delegation-guard.mjs passed",
+          "node scripts/spec-guard.mjs --dry-run passed",
+          "npm run build passed",
+          "npm run lint passed with three existing warnings",
+          "npm run test passed",
+          "npm run docs:check passed",
+          "npm run docs:freshness passed",
+          "npm run repo:stewardship passed",
+          "node scripts/diff-budget.mjs passed",
+          "manifest-backed standalone review clean",
+          "explicit elegance/minimality pass complete",
+          "npm run pack:smoke passed"
+        ],
+        "pending": [
+          "PR lifecycle",
+          "ready-review drain",
+          "Linear review handoff"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+        "prd": "docs/PRD-linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+        "docs": "docs/TECH_SPEC-linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+        "action_plan": "docs/ACTION_PLAN-linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+        "spec": "tasks/specs/linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+        "task": "tasks/tasks-linear-91f04f3e-5a43-491a-915e-bf6229760676.md"
+      },
+      "source_issue": {
+        "id": "91f04f3e-5a43-491a-915e-bf6229760676",
+        "identifier": "CO-549"
+      }
+    },
+    {
       "id": "20260522-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce",
       "title": "CO-578 snapshot mutable review manifest evidence before contract validation",
       "relates_to": "tasks/tasks-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",

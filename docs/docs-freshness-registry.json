@@ -5409,6 +5409,21 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91f04f3e-5a43-491a-915e-bf6229760676",
+        "identifier": "CO-549"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
+    },
+    {
       "path": ".agent/task/linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -11893,6 +11908,21 @@
       "cadence_days": 30
     },
     {
+      "path": "docs/ACTION_PLAN-linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91f04f3e-5a43-491a-915e-bf6229760676",
+        "identifier": "CO-549"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
+    },
+    {
       "path": "docs/ACTION_PLAN-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -13807,6 +13837,36 @@
       "status": "active",
       "last_review": "2026-04-04",
       "cadence_days": 90
+    },
+    {
+      "path": "docs/PRD-linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91f04f3e-5a43-491a-915e-bf6229760676",
+        "identifier": "CO-549"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91f04f3e-5a43-491a-915e-bf6229760676",
+        "identifier": "CO-549"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": "docs/book/archive/codex-cli-0124-adoption.md",
@@ -35733,6 +35793,21 @@
       "cadence_days": 30
     },
     {
+      "path": "tasks/specs/linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91f04f3e-5a43-491a-915e-bf6229760676",
+        "identifier": "CO-549"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
+    },
+    {
       "path": "tasks/specs/linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -42584,6 +42659,21 @@
       "status": "active",
       "last_review": "2026-04-23",
       "cadence_days": 30
+    },
+    {
+      "path": "tasks/tasks-linear-91f04f3e-5a43-491a-915e-bf6229760676.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "91f04f3e-5a43-491a-915e-bf6229760676",
+        "identifier": "CO-549"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
     },
     {
       "path": "tasks/tasks-linear-93785af4-9df9-4713-8a63-b0caddb5796f.md",
