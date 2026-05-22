@@ -42,6 +42,13 @@ async function writeRunManifest(
   return manifestPath;
 }
 
+async function writeProviderLinearWorkerProof(
+  manifestPath: string,
+  proof: Record<string, unknown>
+): Promise<void> {
+  await writeJsonFile(join(dirname(manifestPath), 'provider-linear-worker-proof.json'), proof);
+}
+
 function buildProviderWorkerManifest(
   taskId: string,
   runId: string,
@@ -742,6 +749,354 @@ describe('createSelectedRunProjectionReader', () => {
       rawStatus: 'failed',
       displayStatus: 'failed',
       statusReason: null
+    });
+  });
+
+  it('reconciles failed outer provider wrapper after successful worker handoff out of current failed status', async () => {
+    const sandbox = await makeSandbox();
+    const taskId = 'linear-aa075f78-940e-423b-a886-6f0f8012ae18';
+    const runId = '2026-05-19T04-04-49-244Z-066924c1';
+    const controlRunId = 'control-host';
+    const issueId = 'aa075f78-940e-423b-a886-6f0f8012ae18';
+    const manifestPath = await writeRunManifest(
+      sandbox,
+      taskId,
+      runId,
+      buildProviderWorkerManifest(taskId, runId, {
+        issue_id: issueId,
+        issue_identifier: 'CO-562',
+        issue_title: 'CO: hide passive owner claims from retry and failed status',
+        status: 'failed',
+        completed_at: '2026-05-19T07:10:47.354Z',
+        updated_at: '2026-05-19T07:10:47.389Z',
+        summary:
+          "Configuration mode: repo-authoritative.\nStage 'Run provider linear worker' failed with exit code 1.",
+        commands: [
+          {
+            id: 'provider-linear-worker',
+            title: 'Run provider linear worker',
+            status: 'failed',
+            completed_at: '2026-05-19T07:10:47.347Z',
+            exit_code: 1,
+            summary: 'Provider linear worker failed after successful issue_review_handoff.'
+          }
+        ]
+      })
+    );
+    await writeProviderLinearWorkerProof(manifestPath, {
+      issue_id: issueId,
+      issue_identifier: 'CO-562',
+      owner_phase: 'ended',
+      owner_status: 'succeeded',
+      end_reason: 'issue_review_handoff',
+      attempt_started_at: '2026-05-19T04:04:52.083Z',
+      updated_at: '2026-05-19T07:10:46.377Z',
+      workspace_path: '/Users/kbediako/Code/CO/.workspaces/linear-aa075f78-940e-423b-a886-6f0f8012ae18',
+      turn_count: 1,
+      pid: null,
+      thread_id: null,
+      latest_turn_id: null,
+      latest_session_id: null,
+      latest_session_id_source: null,
+      last_event: null,
+      last_message: null,
+      last_event_at: null,
+      tokens: {},
+      rate_limits: null,
+      linear_audit: null
+    });
+    const controlManifestPath = await writeRunManifest(sandbox, 'local-mcp', controlRunId, {
+      task_id: 'local-mcp',
+      run_id: controlRunId,
+      status: 'in_progress',
+      started_at: '2026-05-19T07:30:00.000Z',
+      updated_at: '2026-05-19T07:35:00.000Z'
+    });
+    const providerIntakeState = buildProviderIntakeState(
+      [
+        buildProviderIntakeClaim(taskId, runId, manifestPath, {
+          provider_key: `linear:${issueId}`,
+          issue_id: issueId,
+          issue_identifier: 'CO-562',
+          issue_title: 'CO: hide passive owner claims from retry and failed status',
+          issue_state: 'Done',
+          issue_state_type: 'completed',
+          issue_updated_at: '2026-05-19T07:33:21.789Z',
+          state: 'released',
+          reason: 'provider_issue_released:not_active',
+          updated_at: '2026-05-19T07:33:21.789Z',
+          retry_queued: null,
+          retry_attempt: null,
+          retry_due_at: null,
+          retry_error: null,
+          merge_closeout: {
+            status: 'merged',
+            pr: {
+              url: 'https://github.com/asabeko/CO/pull/840',
+              owner: 'asabeko',
+              repo: 'CO',
+              number: 840
+            },
+            snapshot: {
+              state: 'MERGED',
+              merged_at: '2026-05-19T07:30:01.000Z'
+            }
+          } as ProviderIntakeClaimRecord['merge_closeout']
+        })
+      ],
+      { updated_at: '2026-05-19T07:33:21.789Z' }
+    );
+
+    const collection = await discoverCompatibilityCollectionContexts(
+      buildProjectionContext({
+        manifestPath: controlManifestPath,
+        runId: controlRunId,
+        providerIntakeState
+      })
+    );
+
+    expect(collection.running).toHaveLength(0);
+    expect(collection.retrying).toHaveLength(0);
+    expect(collection.all).toHaveLength(1);
+    expect(collection.all[0]).toMatchObject({
+      issueIdentifier: 'CO-562',
+      rawStatus: 'succeeded',
+      displayStatus: 'succeeded',
+      statusReason: 'provider_worker_successful_handoff',
+      lastError: null,
+      providerRetryState: null,
+      providerDebugSnapshot: {
+        worker: {
+          owner_phase: 'ended',
+          owner_status: 'succeeded'
+        }
+      }
+    });
+    expect(collection.all[0]?.summary).toContain('failed outer provider wrapper');
+    expect(collection.all[0]?.summary).toContain('issue_review_handoff');
+
+    const statusProjection = buildCompatibilityProjectionSnapshot({
+      selected: null,
+      running: collection.running,
+      retrying: collection.retrying,
+      codexTotals: {
+        input_tokens: 0,
+        output_tokens: 0,
+        reasoning_output_tokens: 0,
+        total_tokens: 0,
+        seconds_running: 0
+      },
+      rateLimits: null,
+      dispatchPilot: null,
+      tracked: null,
+      providerIntake: null,
+      providerWorkflow: null,
+      polling: null
+    });
+    expect(statusProjection.running).toHaveLength(0);
+    expect(statusProjection.retrying).toHaveLength(0);
+    expect(statusProjection.issues).toHaveLength(0);
+
+    const reconciliation = JSON.parse(
+      await readFile(join(dirname(manifestPath), 'provider-linear-worker-reconciliation.json'), 'utf8')
+    );
+    expect(reconciliation).toMatchObject({
+      status: 'reconciled',
+      reconciled_status: 'succeeded',
+      reason: 'provider_worker_successful_handoff',
+      manifest: {
+        status: 'failed',
+        run_id: runId,
+        task_id: taskId
+      },
+      provider_claim: {
+        state: 'released',
+        reason: 'provider_issue_released:not_active',
+        issue_state: 'Done',
+        issue_state_type: 'completed'
+      }
+    });
+    expect(reconciliation.summary).toContain('failed outer provider wrapper');
+  });
+
+  it('keeps failed owner proof visible even with terminal Linear state and no retry metadata', async () => {
+    const sandbox = await makeSandbox();
+    const taskId = 'linear-aa075f78-940e-423b-a886-6f0f8012ae18';
+    const runId = '2026-05-19T04-04-49-244Z-failed-proof';
+    const controlRunId = 'control-host';
+    const issueId = 'aa075f78-940e-423b-a886-6f0f8012ae18';
+    const manifestPath = await writeRunManifest(
+      sandbox,
+      taskId,
+      runId,
+      buildProviderWorkerManifest(taskId, runId, {
+        issue_id: issueId,
+        issue_identifier: 'CO-562',
+        status: 'failed',
+        completed_at: '2026-05-19T07:10:47.354Z',
+        updated_at: '2026-05-19T07:10:47.389Z',
+        summary:
+          "Configuration mode: repo-authoritative.\nStage 'Run provider linear worker' failed with exit code 1."
+      })
+    );
+    await writeProviderLinearWorkerProof(manifestPath, {
+      issue_id: issueId,
+      issue_identifier: 'CO-562',
+      owner_phase: 'ended',
+      owner_status: 'failed',
+      end_reason: 'implementation_failed',
+      attempt_started_at: '2026-05-19T04:04:52.083Z',
+      updated_at: '2026-05-19T07:10:46.377Z',
+      turn_count: 1,
+      pid: null,
+      thread_id: null,
+      latest_turn_id: null,
+      latest_session_id: null,
+      latest_session_id_source: null,
+      last_event: null,
+      last_message: null,
+      last_event_at: null,
+      tokens: {},
+      rate_limits: null,
+      linear_audit: null
+    });
+    const controlManifestPath = await writeRunManifest(sandbox, 'local-mcp', controlRunId, {
+      task_id: 'local-mcp',
+      run_id: controlRunId,
+      status: 'in_progress',
+      started_at: '2026-05-19T07:30:00.000Z',
+      updated_at: '2026-05-19T07:35:00.000Z'
+    });
+    const providerIntakeState = buildProviderIntakeState([
+      buildProviderIntakeClaim(taskId, runId, manifestPath, {
+        provider_key: `linear:${issueId}`,
+        issue_id: issueId,
+        issue_identifier: 'CO-562',
+        issue_state: 'Done',
+        issue_state_type: 'completed',
+        state: 'released',
+        reason: 'provider_issue_released:not_active',
+        updated_at: '2026-05-19T07:33:21.789Z',
+        retry_queued: null,
+        retry_attempt: null,
+        retry_due_at: null,
+        retry_error: null
+      })
+    ]);
+
+    const collection = await discoverCompatibilityCollectionContexts(
+      buildProjectionContext({
+        manifestPath: controlManifestPath,
+        runId: controlRunId,
+        providerIntakeState
+      })
+    );
+
+    expect(collection.running).toHaveLength(0);
+    expect(collection.retrying).toHaveLength(0);
+    expect(collection.all).toHaveLength(1);
+    expect(collection.all[0]).toMatchObject({
+      issueIdentifier: 'CO-562',
+      rawStatus: 'failed',
+      displayStatus: 'failed',
+      statusReason: null,
+      providerDebugSnapshot: {
+        worker: {
+          owner_phase: 'ended',
+          owner_status: 'failed'
+        }
+      }
+    });
+    expect(collection.all[0]?.lastError).toContain("Stage 'Run provider linear worker' failed");
+  });
+
+  it('keeps active retry metadata visible despite successful handoff proof', async () => {
+    const sandbox = await makeSandbox();
+    const taskId = 'linear-aa075f78-940e-423b-a886-6f0f8012ae18';
+    const runId = '2026-05-19T04-04-49-244Z-retry-metadata';
+    const controlRunId = 'control-host';
+    const issueId = 'aa075f78-940e-423b-a886-6f0f8012ae18';
+    const manifestPath = await writeRunManifest(
+      sandbox,
+      taskId,
+      runId,
+      buildProviderWorkerManifest(taskId, runId, {
+        issue_id: issueId,
+        issue_identifier: 'CO-562',
+        status: 'failed',
+        completed_at: '2026-05-19T07:10:47.354Z',
+        updated_at: '2026-05-19T07:10:47.389Z',
+        summary:
+          "Configuration mode: repo-authoritative.\nStage 'Run provider linear worker' failed with exit code 1."
+      })
+    );
+    await writeProviderLinearWorkerProof(manifestPath, {
+      issue_id: issueId,
+      issue_identifier: 'CO-562',
+      owner_phase: 'ended',
+      owner_status: 'succeeded',
+      end_reason: 'issue_review_handoff',
+      attempt_started_at: '2026-05-19T04:04:52.083Z',
+      updated_at: '2026-05-19T07:10:46.377Z',
+      turn_count: 1,
+      pid: null,
+      thread_id: null,
+      latest_turn_id: null,
+      latest_session_id: null,
+      latest_session_id_source: null,
+      last_event: null,
+      last_message: null,
+      last_event_at: null,
+      tokens: {},
+      rate_limits: null,
+      linear_audit: null
+    });
+    const controlManifestPath = await writeRunManifest(sandbox, 'local-mcp', controlRunId, {
+      task_id: 'local-mcp',
+      run_id: controlRunId,
+      status: 'in_progress',
+      started_at: '2026-05-19T07:30:00.000Z',
+      updated_at: '2026-05-19T07:35:00.000Z'
+    });
+    const providerIntakeState = buildProviderIntakeState([
+      buildProviderIntakeClaim(taskId, runId, manifestPath, {
+        provider_key: `linear:${issueId}`,
+        issue_id: issueId,
+        issue_identifier: 'CO-562',
+        issue_state: 'In Progress',
+        issue_state_type: 'started',
+        state: 'resumable',
+        reason: 'worker_failed_retryable',
+        updated_at: '2026-05-19T07:33:21.789Z',
+        retry_queued: true,
+        retry_attempt: 2,
+        retry_due_at: '2026-05-19T08:00:00.000Z',
+        retry_error: 'old failure'
+      })
+    ]);
+
+    const collection = await discoverCompatibilityCollectionContexts(
+      buildProjectionContext({
+        manifestPath: controlManifestPath,
+        runId: controlRunId,
+        providerIntakeState
+      })
+    );
+
+    expect(collection.running).toHaveLength(0);
+    expect(collection.retrying).toHaveLength(0);
+    expect(collection.all).toHaveLength(1);
+    expect(collection.all[0]).toMatchObject({
+      issueIdentifier: 'CO-562',
+      rawStatus: 'failed',
+      displayStatus: 'failed',
+      statusReason: null,
+      providerRetryState: {
+        active: true,
+        attempt: 2,
+        due_at: '2026-05-19T08:00:00.000Z',
+        error: 'old failure'
+      }
     });
   });
 

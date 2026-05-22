@@ -59,3 +59,11 @@ When reporting a failure, cite the specific `findings[].source_path` and `findin
 ## Operator Notes
 
 Run the gauge before concluding that CO STATUS is trustworthy when intake state is old, a worker heartbeat has not moved, retry queues look stuck, or Linear headroom is low. A `degraded` verdict is not automatically a stop condition, but it should be cited in review or handoff notes. A `stale` or `contradictory` strict failure means the worker/operator should inspect the cited artifacts before continuing orchestration.
+
+## Failed Wrapper After Terminal Handoff
+
+When `co-status --format json` includes a provider-worker run whose `provider manifest` / `outer provider manifest` failed in `Run provider linear worker`, check the worker proof and provider-intake claim before relaunching anything.
+
+- Treat the wrapper failure as informational when the same run has `worker proof` with `owner_phase=ended`, `owner_status=succeeded`, and `end_reason=issue_review_handoff`, the Linear issue is terminal such as `Done`, and retry state is inactive (`retrying=0`, no retry attempt, no retry due time, no retry error, and no queued retry). Inspect `provider-linear-worker-reconciliation.json`, the original `manifest.json`, and `provider-linear-worker-proof.json` for diagnostics; do not restart or relaunch solely to clear the failed wrapper status.
+- Restart or relaunch only when freshness evidence is stale or contradictory, the worker proof is missing/non-terminal/failed, Linear is still active, or retry metadata shows an active or scheduled recovery. Use the cited freshness-gauge source paths to decide whether this is a control-host freshness problem, a real failed implementation worker, or a retry/recovery lane.
+- Create a follow-up when the wrapper failure is informational for queue health but still points to a distinct tool or agent-loop defect. Preserve the failed wrapper stage, proof path, Linear state, and retry-state evidence in the follow-up instead of editing historical manifests or provider-intake state by hand.
