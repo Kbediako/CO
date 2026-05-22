@@ -44,6 +44,10 @@ import {
 import { DEFAULT_ATTACH_REQUEST_TIMEOUT_MS } from './coStatusAttachCliShell.js';
 import { findPackageRoot } from './utils/packageInfo.js';
 import { sanitizeProviderOverrideEnv } from './utils/providerOverrideEnv.js';
+import {
+  inspectSourceRootFreshness,
+  type SourceRootFreshnessInspection
+} from './utils/sourceRootFreshness.js';
 import { sanitizeRunId } from '../persistence/sanitizeRunId.js';
 import { sanitizeTaskId } from '../persistence/sanitizeTaskId.js';
 
@@ -83,6 +87,7 @@ interface ControlHostSupervisionStatusPayload {
     stderr_path: string;
   };
   config: ControlHostSupervisionConfig | null;
+  configured_runtime_freshness: SourceRootFreshnessInspection | null;
   state: ControlHostSupervisionState | null;
   persisted_state: ControlHostSupervisionState | null;
   launch_agent: ControlHostSupervisionLaunchAgentStatus;
@@ -349,6 +354,7 @@ async function restartControlHostSupervision(flags: ArgMap): Promise<void> {
     throw new Error('control-host supervision restart requires an installed config.');
   }
   const config = resolved.config;
+  const runtimeFreshness = inspectControlHostSupervisionConfiguredRuntimeFreshness(config);
   const serviceTarget = resolveControlHostSupervisionServiceTarget(resolved.label);
   const restart = await restartExistingControlHostSupervision(
     {
@@ -364,6 +370,7 @@ async function restartControlHostSupervision(flags: ArgMap): Promise<void> {
     service_target: serviceTarget,
     config_path: resolved.paths.configPath,
     plist_path: resolved.paths.plistPath,
+    runtime_freshness: runtimeFreshness,
     previous_child_pid: restart.previousChildPid,
     child_pid: restart.childPid,
     cleanup: {
@@ -381,7 +388,7 @@ async function restartControlHostSupervision(flags: ArgMap): Promise<void> {
   emitOutput(
     format,
     payload,
-    `Restarted control-host supervision for ${resolved.label} via ${serviceTarget}. ${restartDetail}`
+    `Restarted control-host supervision for ${resolved.label} via ${serviceTarget}. Configured runtime freshness: ${formatControlHostSupervisionRuntimeFreshness(runtimeFreshness)}. ${restartDetail}`
   );
 }
 
@@ -1174,6 +1181,9 @@ function buildControlHostSupervisionStatusPayload(input: {
       stderr_path: input.resolved.paths.stderrLogPath
     },
     config: input.resolved.config,
+    configured_runtime_freshness: input.resolved.config
+      ? inspectControlHostSupervisionConfiguredRuntimeFreshness(input.resolved.config)
+      : null,
     state: effectiveState,
     persisted_state: input.state,
     launch_agent: input.launchAgent,
@@ -1224,6 +1234,9 @@ function formatControlHostSupervisionStatus(
     lines.push(`Repo root: ${payload.config.repoRoot}`);
     lines.push(`CLI entrypoint: ${payload.config.cliEntrypoint}`);
     lines.push(
+      `Configured runtime freshness: ${formatControlHostSupervisionRuntimeFreshness(payload.configured_runtime_freshness)}`
+    );
+    lines.push(
       `Task/run/pipeline: ${payload.config.taskId} / ${payload.config.runId} / ${payload.config.pipelineId}`
     );
     lines.push(
@@ -1273,6 +1286,29 @@ function formatControlHostSupervisionStatus(
     lines.push(`launchctl: ${payload.service.summary}`);
   }
   return lines.join('\n');
+}
+
+function inspectControlHostSupervisionConfiguredRuntimeFreshness(
+  config: ControlHostSupervisionConfig
+): SourceRootFreshnessInspection {
+  return inspectSourceRootFreshness({
+    intendedRepoRoot: config.repoRoot,
+    commandPath: config.cliEntrypoint,
+    packageRoot: config.repoRoot,
+    cwd: config.repoRoot
+  });
+}
+
+function formatControlHostSupervisionRuntimeFreshness(
+  freshness: SourceRootFreshnessInspection | null
+): string {
+  if (!freshness) {
+    return 'unavailable';
+  }
+  const drift = freshness.drift_classes.length > 0
+    ? ` drift=${freshness.drift_classes.join(',')}`
+    : '';
+  return `${freshness.status} entrypoint=${freshness.entrypoint_kind}${drift}`;
 }
 
 function formatControlHostSupervisionLiveHealthSource(

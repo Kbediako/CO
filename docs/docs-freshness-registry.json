@@ -44207,6 +44207,102 @@
       "cadence_days": 30
     },
     {
+      "path": ".agent/task/linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "813d1f69-7777-4dd4-8709-90d9121339d4",
+        "identifier": "CO-567",
+        "url": "https://linear.app/asabeko/issue/CO-567/co-enforce-generated-runtime-freshness-after-shared-root-fast-forward"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "813d1f69-7777-4dd4-8709-90d9121339d4",
+        "identifier": "CO-567",
+        "url": "https://linear.app/asabeko/issue/CO-567/co-enforce-generated-runtime-freshness-after-shared-root-fast-forward"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
+    },
+    {
+      "path": "docs/PRD-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "813d1f69-7777-4dd4-8709-90d9121339d4",
+        "identifier": "CO-567",
+        "url": "https://linear.app/asabeko/issue/CO-567/co-enforce-generated-runtime-freshness-after-shared-root-fast-forward"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "813d1f69-7777-4dd4-8709-90d9121339d4",
+        "identifier": "CO-567",
+        "url": "https://linear.app/asabeko/issue/CO-567/co-enforce-generated-runtime-freshness-after-shared-root-fast-forward"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
+    },
+    {
+      "path": "tasks/specs/linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "813d1f69-7777-4dd4-8709-90d9121339d4",
+        "identifier": "CO-567",
+        "url": "https://linear.app/asabeko/issue/CO-567/co-enforce-generated-runtime-freshness-after-shared-root-fast-forward"
+      },
+      "doc_class": "active_spec",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
+    },
+    {
+      "path": "tasks/tasks-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-22",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "813d1f69-7777-4dd4-8709-90d9121339d4",
+        "identifier": "CO-567",
+        "url": "https://linear.app/asabeko/issue/CO-567/co-enforce-generated-runtime-freshness-after-shared-root-fast-forward"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-22",
+      "next_review": "2026-06-21"
+    },
+    {
       "path": ".agent/task/linear-7aeca30c-c52c-4213-9d40-0ac0cf81b316.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
@@ -44312,7 +44408,7 @@
       "path": "docs/PRD-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-21",
+      "last_review": "2026-05-22",
       "cadence_days": 30,
       "source_issue": {
         "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
@@ -44322,14 +44418,14 @@
       "doc_class": "task_packet",
       "lifecycle_state": "active",
       "created_at": "2026-05-21",
-      "next_review": "2026-06-20",
+      "next_review": "2026-06-21",
       "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
     },
     {
       "path": "docs/TECH_SPEC-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-21",
+      "last_review": "2026-05-22",
       "cadence_days": 30,
       "source_issue": {
         "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
@@ -44339,14 +44435,14 @@
       "doc_class": "task_packet",
       "lifecycle_state": "active",
       "created_at": "2026-05-21",
-      "next_review": "2026-06-20",
+      "next_review": "2026-06-21",
       "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
     },
     {
       "path": "docs/ACTION_PLAN-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-21",
+      "last_review": "2026-05-22",
       "cadence_days": 30,
       "source_issue": {
         "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
@@ -44356,14 +44452,14 @@
       "doc_class": "task_packet",
       "lifecycle_state": "active",
       "created_at": "2026-05-21",
-      "next_review": "2026-06-20",
+      "next_review": "2026-06-21",
       "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
     },
     {
       "path": "tasks/specs/linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-21",
+      "last_review": "2026-05-22",
       "cadence_days": 30,
       "source_issue": {
         "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
@@ -44373,14 +44469,14 @@
       "doc_class": "task_packet",
       "lifecycle_state": "active",
       "created_at": "2026-05-21",
-      "next_review": "2026-06-20",
+      "next_review": "2026-06-21",
       "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
     },
     {
       "path": "tasks/tasks-linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-21",
+      "last_review": "2026-05-22",
       "cadence_days": 30,
       "source_issue": {
         "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
@@ -44390,14 +44486,14 @@
       "doc_class": "task_packet",
       "lifecycle_state": "active",
       "created_at": "2026-05-21",
-      "next_review": "2026-06-20",
+      "next_review": "2026-06-21",
       "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
     },
     {
       "path": ".agent/task/linear-91fd1820-50cd-4d33-97b6-8d62b64ce22f.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
-      "last_review": "2026-05-21",
+      "last_review": "2026-05-22",
       "cadence_days": 30,
       "source_issue": {
         "id": "91fd1820-50cd-4d33-97b6-8d62b64ce22f",
@@ -44407,7 +44503,7 @@
       "doc_class": "task_packet",
       "lifecycle_state": "active",
       "created_at": "2026-05-21",
-      "next_review": "2026-06-20",
+      "next_review": "2026-06-21",
       "notes": "CO-574 docs-first packet for control-host machine-status probe timeout and accepted/no-run provider recovery recurrence; CO-575 docs freshness owner repair remains blocked by this lane."
     }
   ]

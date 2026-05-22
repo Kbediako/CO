@@ -225,6 +225,89 @@ function createStaleSupervisedControlHostOwner() {
   };
 }
 
+function createStaleGeneratedRuntimeControlHostOwner() {
+  return {
+    status: 'owned',
+    reason: null,
+    updated_at: '2026-05-20T05:36:30.000Z',
+    owner: {
+      owner_token: 'stale-generated-runtime-owner-token',
+      status: 'owned',
+      pid: 123,
+      ppid: 1,
+      hostname: 'host.local',
+      acquired_at: '2026-05-20T05:35:00.000Z',
+      updated_at: '2026-05-20T05:36:30.000Z',
+      released_at: null,
+      repo_root: '/repo',
+      task_id: 'local-mcp',
+      run_id: 'control-host',
+      run_dir: '/repo/.runs/local-mcp/cli/control-host',
+      pipeline_id: 'provider-linear-worker',
+      lock_dir: '/repo/.runs/control-host-owner.lock',
+      owner_path: '/repo/.runs/control-host-owner.json',
+      source_root_freshness: {
+        schema_version: 1,
+        status: 'warning',
+        observed_at: '2026-05-20T05:36:30.000Z',
+        intended_repo_root: '/repo',
+        intended_repo_root_realpath: '/repo',
+        command_path: '/repo/dist/bin/codex-orchestrator.js',
+        command_path_realpath: '/repo/dist/bin/codex-orchestrator.js',
+        package_root: '/repo',
+        package_root_realpath: '/repo',
+        source_root: '/repo',
+        source_root_realpath: '/repo',
+        entrypoint_kind: 'dist',
+        base_ref: 'origin/main',
+        source_checkout: {
+          status: 'current',
+          repo_root: '/repo',
+          inside_git_worktree: true,
+          base_ref: 'origin/main',
+          ahead: 0,
+          behind: 0,
+          dirty: { status: 'clean', changed_paths: 0, detail: 'clean' },
+          head: null,
+          upstream: null,
+          detail: 'current'
+        },
+        intended_checkout: {
+          status: 'current',
+          repo_root: '/repo',
+          inside_git_worktree: true,
+          base_ref: 'origin/main',
+          ahead: 0,
+          behind: 0,
+          dirty: { status: 'clean', changed_paths: 0, detail: 'clean' },
+          head: null,
+          upstream: null,
+          detail: 'current'
+        },
+        drift_classes: ['source_vs_dist_drift'],
+        provenance: {
+          command_path_source: 'explicit',
+          package_root_source: 'explicit',
+          source_root_source: 'package_root',
+          command_path_inside_package: true,
+          package_root_matches_intended: true,
+          source_root_matches_intended: true,
+          source_entry_exists: true,
+          dist_entry_exists: true
+        },
+        guidance: [
+          'The process is using dist while a source entrypoint exists; rebuild dist or restore the source loader before relying on fresh TypeScript changes.'
+        ],
+        detail: 'Detected source/root drift: source_vs_dist_drift.'
+      }
+    },
+    attempted_owner: null,
+    diagnostic_path: null,
+    lock_dir: '/repo/.runs/control-host-owner.lock',
+    owner_path: '/repo/.runs/control-host-owner.json'
+  };
+}
+
 function createControlHostOwnerForRepo(repoRoot: string, sourceRootFreshness: unknown) {
   return {
     status: 'owned',
@@ -980,6 +1063,54 @@ describe('createProviderIssueHandoffService', () => {
       retry_attempt: null,
       retry_due_at: null,
       retry_error: null
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks direct provider issue starts while stale generated runtime is authoritative', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.polling = { control_host_owner: createStaleGeneratedRuntimeControlHostOwner() };
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-stale-generated-runtime',
+        manifestPath: join(paths.runDir, 'run-stale-generated-runtime.json')
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue(),
+      deliveryId: 'delivery-stale-generated-runtime',
+      event: 'Issue',
+      action: 'update',
+      webhookTimestamp: 1_742_360_000_000
+    });
+
+    expect(result).toMatchObject({
+      kind: 'ignored',
+      reason: 'stale_supervised_control_host_source'
+    });
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      provider_key: 'linear:lin-issue-1',
+      state: 'ignored',
+      reason: 'stale_supervised_control_host_source',
+      task_id: 'linear-lin-issue-1',
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: null,
+      launch_token: null
     });
     expect(persist).toHaveBeenCalledTimes(1);
   });
@@ -37595,6 +37726,79 @@ describe('createProviderIssueHandoffService', () => {
       retry_attempt: 1,
       retry_due_at: '2026-03-19T04:30:10.000Z',
       retry_error: 'retryable failure pending rerun'
+    });
+  });
+
+  it('fails refresh closed before retry resume while stale generated runtime is authoritative', async () => {
+    const { paths } = await createHostPaths();
+    const state = createProviderIntakeState();
+    state.polling = { control_host_owner: createStaleGeneratedRuntimeControlHostOwner() };
+    state.claims.push({
+      provider: 'linear',
+      provider_key: 'linear:lin-issue-558',
+      issue_id: 'lin-issue-558',
+      issue_identifier: 'CO-558',
+      issue_title: 'Replace terminal docs freshness maintenance owner',
+      issue_state: 'Ready',
+      issue_state_type: 'unstarted',
+      issue_updated_at: '2026-05-20T05:36:00.000Z',
+      task_id: 'linear-co-558',
+      mapping_source: 'provider_id_fallback',
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      accepted_at: '2026-05-20T05:36:05.000Z',
+      updated_at: '2026-05-20T05:36:10.000Z',
+      last_delivery_id: 'delivery-co-558',
+      last_event: 'Issue',
+      last_action: 'update',
+      last_webhook_timestamp: 1_747_721_765_000,
+      run_id: 'run-co-558-failed',
+      run_manifest_path: join(paths.runDir, 'run-co-558-failed-manifest.json'),
+      worker_host: null,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-05-20T05:46:10.000Z',
+      retry_error: 'provider_issue_rehydrated_resumable_run'
+    });
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-558',
+        identifier: 'CO-558',
+        updated_at: '2026-05-20T05:36:00.000Z'
+      })
+    }));
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue
+    });
+
+    await expect(service.refresh()).rejects.toThrow('stale_supervised_control_host_source');
+
+    expect(resolveTrackedIssue).not.toHaveBeenCalled();
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      run_id: 'run-co-558-failed',
+      launch_token: null,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-05-20T05:46:10.000Z',
+      retry_error: 'provider_issue_rehydrated_resumable_run'
     });
   });
 

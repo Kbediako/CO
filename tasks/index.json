@@ -106,6 +106,74 @@
       ]
     },
     {
+      "id": "20260522-linear-813d1f69-7777-4dd4-8709-90d9121339d4",
+      "title": "CO-567 generated runtime freshness after shared-root fast-forward",
+      "relates_to": "tasks/tasks-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-22",
+      "evidence": [
+        "docs/PRD-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+        "docs/TECH_SPEC-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+        "docs/ACTION_PLAN-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+        "tasks/specs/linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+        "tasks/tasks-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+        ".agent/task/linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json",
+        "orchestrator/src/cli/control/controlHostOwnership.ts",
+        "orchestrator/src/cli/control/controlHostSupervision.ts",
+        "orchestrator/src/cli/controlHostSupervisionCliShell.ts",
+        "orchestrator/tests/ControlHostOwnership.test.ts",
+        "orchestrator/tests/ControlHostSupervision.test.ts",
+        "orchestrator/tests/ProviderIssueHandoff.test.ts",
+        ".runs/linear-813d1f69-7777-4dd4-8709-90d9121339d4-docs-packet/cli/2026-05-21T22-28-18-510Z-a4a4af98/manifest.json",
+        ".runs/linear-813d1f69-7777-4dd4-8709-90d9121339d4-docs-packet/cli/2026-05-21T22-28-18-510Z-a4a4af98/provider-linear-child-lane.patch"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue child lane docs-packet plus parent provider worker",
+          "date": "2026-05-22",
+          "status": "accepted_for_parent_integration",
+          "manifest": ".runs/linear-813d1f69-7777-4dd4-8709-90d9121339d4-docs-packet/cli/2026-05-21T22-28-18-510Z-a4a4af98/manifest.json",
+          "canonical_owner_key": "co-shared-root:post-merge-build-runtime-freshness:v1",
+          "summary": "Docs-only child lane bootstrapped the six-file CO-567 generated runtime freshness packet; parent verified and accepted the patch for integration before validation."
+        }
+      },
+      "paths": {
+        "spec": "tasks/specs/linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+        "task": "tasks/tasks-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+        "agent_task": ".agent/task/linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+        "prd": "docs/PRD-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+        "docs": "docs/TECH_SPEC-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md",
+        "action_plan": "docs/ACTION_PLAN-linear-813d1f69-7777-4dd4-8709-90d9121339d4.md"
+      },
+      "source_issue": {
+        "id": "813d1f69-7777-4dd4-8709-90d9121339d4",
+        "identifier": "CO-567",
+        "url": "https://linear.app/asabeko/issue/CO-567/co-enforce-generated-runtime-freshness-after-shared-root-fast-forward"
+      },
+      "related_issues": [
+        {
+          "identifier": "CO-113",
+          "relation": "prior_completed_attempt"
+        },
+        {
+          "identifier": "CO-566",
+          "relation": "recurrence_provider_recovery"
+        },
+        {
+          "identifier": "CO-558",
+          "relation": "recurrence_docs_freshness_owner"
+        }
+      ],
+      "canonical_owner_key": "co-shared-root:post-merge-build-runtime-freshness:v1"
+    },
+    {
       "id": "20260521-linear-f7007d31-6a20-43e8-8f38-ca774a890683",
       "title": "CO-572 current-endpoint status timeout root-cause repair",
       "relates_to": "tasks/tasks-linear-f7007d31-6a20-43e8-8f38-ca774a890683.md",
