@@ -11,7 +11,14 @@
 - Pre-implementation issue-quality review: The Linear issue packet is sufficiently specific and includes acceptance criteria, non-goals, root-cause source pointer, current evidence, and related blockers.
 - Fallback / refactor decision: This touches stale mutable-evidence behavior; choose `remove fallback` for the active-manifest/runner-log citation seam in `buildAgentLoopBundle(...)`.
 - Durable retention evidence: Not applicable because no fallback is retained.
-- Large-refactor check: A narrow bundle-construction change is acceptable because validator authority stays centralized and strict.
+- Large-refactor decision: A narrow bundle-construction change is acceptable because validator authority stays centralized and strict.
+- Minor-seam decision: The active-manifest/runner-log citation seam is removed by snapshot construction rather than retained behind a new fallback or prompt-only rule.
+
+## Fallback / Refactor Decision
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| review contract agent-loop input | Mutable active manifest/runner-log citation seam | remove fallback | CO-578 | Generated nested refs point at live active artifacts | before 2026-05-22 | 2026-05-22 | Removed in CO-578 | Generated agent-loop refs point at immutable review-owned snapshots and embedded bundle content is read from the same snapshots | Focused mutation regression, manifest-backed review, and full gates |
 
 ## Milestones & Sequencing
 1. Open issue execution: read live Linear context, create one workpad, transition to `In Progress`, record parallelization, and launch a bounded tests child lane.

@@ -22,6 +22,15 @@
 - [x] `validateEvidenceRefs(...)` strict stale-hash behavior remains unchanged.
 - [x] `docs/standalone-review-guide.md` documents that active run state must be cited through review-owned snapshots.
 
+## Fallback / Refactor Decision
+
+Large-refactor decision: A narrow bundle-construction change is sufficient because validator authority remains centralized and strict.
+Minor-seam decision: The stale mutable-evidence seam is removed in CO-578 rather than retained or hidden behind prompt wording.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| review contract agent-loop input | Mutable active manifest/runner-log citation seam | remove fallback | CO-578 | Generated nested refs point at live active artifacts | before 2026-05-22 | 2026-05-22 | Removed in CO-578 | Generated agent-loop refs point at immutable review-owned snapshots and embedded bundle content is read from the same snapshots | Focused mutation regression, manifest-backed review, and full gates |
+
 ## Validation
 - [x] Focused review-contract regression passes. Evidence: `npx vitest run tests/review-contract.spec.ts` passed 23 tests.
 - [x] `node scripts/delegation-guard.mjs`

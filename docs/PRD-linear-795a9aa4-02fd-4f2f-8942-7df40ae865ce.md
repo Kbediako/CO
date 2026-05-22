@@ -56,8 +56,12 @@
 
 ## Fallback / Refactor Decision
 - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? `Yes`, because this removes a stale mutable-evidence seam.
-- Decision: `remove fallback` for the active-manifest citation seam. Owner: CO-578. Trigger: generated agent-loop bundle currently publishes mutable live run artifacts as source refs. Introduced date: before 2026-05-22. Review date: 2026-05-22. Maximum lifetime: removal in this issue. Removal condition: generated agent-loop refs point at immutable review-owned snapshots and regressions cover live artifact mutation. Validation: focused regression plus full review-wrapper gates.
-- Large-refactor check: A narrow fix is acceptable because authority is not split across multiple lifecycle phases; the seam is localized to input bundle construction and evidence refs, while the strict validator remains unchanged.
+- Large-refactor decision: A narrow fix is acceptable because authority is not split across multiple lifecycle phases; the seam is localized to input bundle construction and evidence refs, while the strict validator remains unchanged.
+- Minor-seam decision: This issue removes the stale mutable-evidence seam directly instead of adding another compatibility branch.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| review contract agent-loop input | Mutable active manifest/runner-log citation seam | remove fallback | CO-578 | Generated nested refs point at live active artifacts | before 2026-05-22 | 2026-05-22 | Removed in CO-578 | Generated agent-loop refs point at immutable review-owned snapshots and embedded bundle content is read from the same snapshots | Focused mutation regression, manifest-backed review, and full gates |
 
 ## Open Questions
 - None blocking; child-lane regression work may refine exact snapshot filenames.

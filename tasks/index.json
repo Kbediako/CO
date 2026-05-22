@@ -20,10 +20,7 @@
         "tasks/tasks-linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
         ".agent/task/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce.md",
         "tasks/index.json",
-        "docs/docs-freshness-registry.json",
-        ".runs/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce/cli/2026-05-22T15-30-57-133Z-4e238242/review/telemetry.json",
-        ".runs/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce/cli/2026-05-22T15-30-57-133Z-4e238242/review/contract.json",
-        "out/linear-795a9aa4-02fd-4f2f-8942-7df40ae865ce/manual/20260523T020500Z-elegance-review.md"
+        "docs/docs-freshness-registry.json"
       ],
       "approvals": {
         "issue_context": {
