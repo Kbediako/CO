@@ -18,6 +18,8 @@ import {
   buildInitialControlHostSupervisionState,
   evaluateControlHostSupervisionHealthPayload,
   evaluateControlHostSupervisionProbeTimeoutDiagnostic,
+  formatControlHostSupervisionMachineStatusDegradedMessage,
+  readControlHostSupervisionMachineStatusDegraded,
   readControlHostSupervisionHealthDiagnostic,
   parseControlHostSupervisionCsv,
   resolveControlHostSupervisionPaths,
@@ -788,6 +790,7 @@ async function probeControlHostHealth(
   options: {
     minPollingUpdatedAt?: string | null;
     restartHistory?: ControlHostSupervisionRestartRecord[] | null;
+    now?: string | null;
   } = {},
   commandRunner: typeof runCommand = runCommand
 ): Promise<{
@@ -826,7 +829,8 @@ async function probeControlHostHealth(
     const timeoutQuarantine = evaluateControlHostSupervisionProbeTimeoutDiagnostic(diagnostic, {
       minPollingUpdatedAt: options.minPollingUpdatedAt ?? null,
       restartHistory: options.restartHistory ?? null,
-      maxZeroWipPollingAgeMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000
+      maxZeroWipPollingAgeMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000,
+      now: options.now ?? null
     });
     if (timeoutQuarantine) {
       return {
@@ -852,7 +856,8 @@ async function probeControlHostHealth(
       const timeoutQuarantine = evaluateControlHostSupervisionProbeTimeoutDiagnostic(diagnostic, {
         minPollingUpdatedAt: options.minPollingUpdatedAt ?? null,
         restartHistory: options.restartHistory ?? null,
-        maxZeroWipPollingAgeMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000
+        maxZeroWipPollingAgeMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000,
+        now: options.now ?? null
       });
       if (timeoutQuarantine) {
         return {
@@ -893,11 +898,45 @@ async function probeControlHostHealth(
     };
   }
 
+  const machineStatusDegraded = readControlHostSupervisionMachineStatusDegraded(payload);
+  if (machineStatusDegraded) {
+    const persistedDiagnostic =
+      machineStatusDegraded.reason === 'read_timeout'
+        ? await readControlHostSupervisionProbeTimeoutDiagnostic(config, env)
+        : null;
+    const timeoutQuarantine =
+      machineStatusDegraded.reason === 'read_timeout'
+        ? evaluateControlHostSupervisionProbeTimeoutDiagnostic(persistedDiagnostic, {
+            minPollingUpdatedAt: options.minPollingUpdatedAt ?? null,
+            restartHistory: options.restartHistory ?? null,
+            maxZeroWipPollingAgeMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000,
+            now: options.now ?? null
+          })
+        : null;
+    if (timeoutQuarantine?.reason === 'active_worker_probe_timeout_quarantine') {
+      return {
+        healthy: timeoutQuarantine.healthy,
+        reason: timeoutQuarantine.reason,
+        message: timeoutQuarantine.message,
+        probeDurationMs,
+        diagnostic: persistedDiagnostic
+      };
+    }
+    return {
+      healthy: false,
+      reason: 'machine_status_degraded',
+      message: formatControlHostSupervisionMachineStatusDegradedMessage(machineStatusDegraded),
+      probeDurationMs,
+      diagnostic: persistedDiagnostic ?? readControlHostSupervisionHealthDiagnostic(payload)
+    };
+  }
+
   const diagnostic = readControlHostSupervisionHealthDiagnostic(payload);
   const evaluation = evaluateControlHostSupervisionHealthPayload(payload, {
     minPollingUpdatedAt: options.minPollingUpdatedAt ?? null,
     staleRestartRequiredGraceMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000,
-    restartHistory: options.restartHistory ?? null
+    restartHistory: options.restartHistory ?? null,
+    now: options.now ?? null
   });
   return {
     healthy: evaluation.healthy,

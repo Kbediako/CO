@@ -116,7 +116,7 @@ interface InternalControlCompatibilityRuntimeSnapshot extends ControlCompatibili
 
 export interface ControlRuntimeSnapshot {
   readSelectedRunSnapshot(): Promise<ControlSelectedRunRuntimeSnapshot>;
-  readMachineStatus(): Promise<ControlMachineStatusSnapshot>;
+  readMachineStatus(signal?: AbortSignal): Promise<ControlMachineStatusSnapshot>;
   readCompatibilityProjection(signal?: AbortSignal): Promise<ControlCompatibilityProjectionSnapshot>;
   readDispatchEvaluation(): Promise<{
     issueIdentifier: string | null;
@@ -402,12 +402,13 @@ function createControlRuntimeSnapshot(
     };
   }
 
-  async function readMachineStatus(): Promise<ControlMachineStatusSnapshot> {
+  async function readMachineStatus(signal?: AbortSignal): Promise<ControlMachineStatusSnapshot> {
+    throwIfAborted(signal);
     const providerIntakeAuthority = readProviderIntakeAuthorityState(context);
     const authorityContext = buildProviderIntakeAuthorityContext(context, providerIntakeAuthority);
     const providerIntake = buildProviderIntakeSummary(providerIntakeAuthority.state);
     const providerWorkflow = context.providerWorkflowConfigStore?.snapshot() ?? null;
-    return {
+    const snapshot = {
       providerIntake,
       runningClaims: (providerIntakeAuthority.state?.claims ?? []).filter(
         (claim) => claim.state === 'running' && isActiveProviderIntakeClaim(claim)
@@ -422,6 +423,8 @@ function createControlRuntimeSnapshot(
         }
       ).maxConcurrentAgents
     };
+    throwIfAborted(signal);
+    return snapshot;
   }
 
   async function readDispatchEvaluation(): Promise<{

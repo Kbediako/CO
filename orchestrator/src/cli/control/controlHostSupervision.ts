@@ -136,6 +136,12 @@ export interface ControlHostSupervisionHealthDiagnostic {
   running_workers: ControlHostSupervisionRunningWorkerSnapshot[];
 }
 
+export interface ControlHostSupervisionMachineStatusDegraded {
+  reason: string;
+  message: string;
+  timeout_ms: number | null;
+}
+
 export interface ControlHostSupervisionRestartRecord {
   requested_at: string;
   reason: string;
@@ -157,6 +163,7 @@ export interface ControlHostSupervisionHealthEvaluation {
     | 'active_worker_restart_quarantine'
     | 'active_worker_probe_timeout_quarantine'
     | 'fresh_zero_wip_probe_timeout'
+    | 'machine_status_degraded'
     | 'invalid_payload';
   message: string;
 }
@@ -424,6 +431,31 @@ function normalizeStoredControlHostSupervisionHealthDiagnostic(
   };
 }
 
+export function readControlHostSupervisionMachineStatusDegraded(
+  payload: unknown
+): ControlHostSupervisionMachineStatusDegraded | null {
+  if (!isRecord(payload)) {
+    return null;
+  }
+  const degraded = payload.machine_status_degraded;
+  if (!isRecord(degraded)) {
+    return null;
+  }
+  return {
+    reason: readNonEmptyString(degraded.reason) ?? 'unknown',
+    message: readNonEmptyString(degraded.message) ?? 'machine-status read degraded.',
+    timeout_ms: readFiniteNumber(degraded.timeout_ms)
+  };
+}
+
+export function formatControlHostSupervisionMachineStatusDegradedMessage(
+  degraded: ControlHostSupervisionMachineStatusDegraded
+): string {
+  const timeoutSuffix =
+    degraded.timeout_ms === null ? '' : ` after ${Math.max(0, Math.round(degraded.timeout_ms))}ms`;
+  return `co-status machine-status degraded (${degraded.reason}${timeoutSuffix}): ${degraded.message}`;
+}
+
 export function evaluateControlHostSupervisionHealthPayload(
   payload: unknown,
   options: {
@@ -443,6 +475,14 @@ export function evaluateControlHostSupervisionHealthPayload(
   }
   const polling = isRecord(payload.polling) ? payload.polling : null;
   const diagnostic = readControlHostSupervisionHealthDiagnostic(payload);
+  const machineStatusDegraded = readControlHostSupervisionMachineStatusDegraded(payload);
+  if (machineStatusDegraded) {
+    return {
+      healthy: false,
+      reason: 'machine_status_degraded',
+      message: formatControlHostSupervisionMachineStatusDegradedMessage(machineStatusDegraded)
+    };
+  }
   if (!polling) {
     return {
       healthy: true,
@@ -706,7 +746,7 @@ export function evaluateControlHostSupervisionProbeTimeoutDiagnostic(
     ) {
       break;
     }
-    if (record.reason !== 'probe_timeout') {
+    if (!isControlHostSupervisionProbeTimeoutRestartRecord(record)) {
       return null;
     }
     const recordSignature = buildControlHostSupervisionRestartSignature(record.diagnostic);
@@ -720,6 +760,18 @@ export function evaluateControlHostSupervisionProbeTimeoutDiagnostic(
     };
   }
   return null;
+}
+
+function isControlHostSupervisionProbeTimeoutRestartRecord(
+  record: ControlHostSupervisionRestartRecord
+): boolean {
+  if (record.reason === 'probe_timeout') {
+    return true;
+  }
+  return (
+    record.reason === 'machine_status_degraded' &&
+    /\bmachine-status degraded \(read_timeout(?: after \d+ms)?\)/u.test(record.message)
+  );
 }
 
 function isProviderRefreshLifecycleRestartRequiredDiagnostic(

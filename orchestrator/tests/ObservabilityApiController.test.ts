@@ -385,7 +385,7 @@ describe('ObservabilityApiController', () => {
     expect(recovered).toBe(true);
   });
 
-  it('rejects accepted pending-revalidation recover acknowledgements without launch evidence', async () => {
+  it('keeps accepted pending-revalidation recover acknowledgements without launch evidence queued while recovery runs', async () => {
     const { res, state } = createResponseRecorder();
     const recovery = createDeferred<void>();
     let recovered = false;
@@ -458,13 +458,12 @@ describe('ObservabilityApiController', () => {
       provider: 'linear',
       issue_id: 'lin-issue-468',
       action: 'nudge',
-      kind: 'skipped',
-      reason: 'provider_worker_recover_no_launch_evidence',
-      queued: false,
+      kind: 'queued',
+      reason: 'provider_worker_recover_queued',
+      queued: true,
       coalesced: false,
-      async: false,
-      claim: {
-        provider: 'linear',
+      async: true,
+      accepted: {
         issue_id: 'lin-issue-468',
         issue_identifier: 'CO-468',
         issue_state: 'Ready',
@@ -479,13 +478,14 @@ describe('ObservabilityApiController', () => {
         launch_token_present: false,
         updated_at: '2026-05-01T13:00:01.000Z'
       },
+      claim: null,
       traceability: {
         decision: 'acknowledged',
-        reason: 'provider_worker_recover_no_launch_evidence',
+        reason: 'provider_worker_recover_queued',
         issue_identifier: 'CO-468'
       }
     });
-    expect(state.body).not.toHaveProperty('accepted');
+    expect(state.body).not.toHaveProperty('accepted.launch_token');
     expect(state.body).not.toHaveProperty('claim.launch_token');
     expect(requestProviderWorkerRecover).toHaveBeenCalledTimes(1);
     expect(recovered).toBe(false);
@@ -514,21 +514,22 @@ describe('ObservabilityApiController', () => {
       provider: 'linear',
       issue_id: 'CO-468',
       action: 'nudge',
-      kind: 'skipped',
-      reason: 'provider_worker_recover_no_launch_evidence',
-      queued: false,
+      kind: 'queued',
+      reason: 'provider_worker_recover_already_in_progress',
+      queued: true,
       coalesced: true,
-      async: false,
+      async: true,
       in_flight_action: 'nudge',
-      claim: {
+      accepted: {
         issue_id: 'lin-issue-468',
         issue_identifier: 'CO-468',
         run_id: null,
         run_manifest_path: null,
         launch_token_present: false
-      }
+      },
+      claim: null
     });
-    expect(retry.state.body).not.toHaveProperty('accepted');
+    expect(retry.state.body).not.toHaveProperty('accepted.launch_token');
     expect(retry.state.body).not.toHaveProperty('claim.launch_token');
     expect(requestProviderWorkerRecover).toHaveBeenCalledTimes(1);
 
