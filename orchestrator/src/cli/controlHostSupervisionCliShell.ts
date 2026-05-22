@@ -18,6 +18,8 @@ import {
   buildInitialControlHostSupervisionState,
   evaluateControlHostSupervisionHealthPayload,
   evaluateControlHostSupervisionProbeTimeoutDiagnostic,
+  formatControlHostSupervisionMachineStatusDegradedMessage,
+  readControlHostSupervisionMachineStatusDegraded,
   readControlHostSupervisionHealthDiagnostic,
   parseControlHostSupervisionCsv,
   resolveControlHostSupervisionPaths,
@@ -890,6 +892,35 @@ async function probeControlHostHealth(
       message: `co-status probe returned invalid JSON: ${(error as Error).message}`,
       probeDurationMs,
       diagnostic: null
+    };
+  }
+
+  const machineStatusDegraded = readControlHostSupervisionMachineStatusDegraded(payload);
+  if (machineStatusDegraded) {
+    const persistedDiagnostic = await readControlHostSupervisionProbeTimeoutDiagnostic(config, env);
+    const timeoutQuarantine =
+      machineStatusDegraded.reason === 'read_timeout'
+        ? evaluateControlHostSupervisionProbeTimeoutDiagnostic(persistedDiagnostic, {
+            minPollingUpdatedAt: options.minPollingUpdatedAt ?? null,
+            restartHistory: options.restartHistory ?? null,
+            maxZeroWipPollingAgeMs: config.healthIntervalSeconds * config.unhealthyThreshold * 1_000
+          })
+        : null;
+    if (timeoutQuarantine?.reason === 'active_worker_probe_timeout_quarantine') {
+      return {
+        healthy: timeoutQuarantine.healthy,
+        reason: timeoutQuarantine.reason,
+        message: timeoutQuarantine.message,
+        probeDurationMs,
+        diagnostic: persistedDiagnostic
+      };
+    }
+    return {
+      healthy: false,
+      reason: 'machine_status_degraded',
+      message: formatControlHostSupervisionMachineStatusDegradedMessage(machineStatusDegraded),
+      probeDurationMs,
+      diagnostic: persistedDiagnostic ?? readControlHostSupervisionHealthDiagnostic(payload)
     };
   }
 
