@@ -227,6 +227,93 @@ describe('runCoStatusCliShell', () => {
     });
   });
 
+  it('blocks text machine-status mode when generated runtime freshness is stale', async () => {
+    const error = vi.fn();
+    const setExitCode = vi.fn();
+
+    await runCoStatusCliShell(
+      {
+        flags: {
+          'machine-status': true
+        },
+        printHelp: vi.fn()
+      },
+      {
+        inspectRuntimeFreshness: () => createStaleGeneratedRuntimeFreshness(),
+        setExitCode,
+        error
+      }
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining('co-status blocked: co-status is running generated dist')
+    );
+  });
+
+  it.each([
+    ['--operator-dashboard', { 'operator-dashboard': true }],
+    ['--dashboard', { dashboard: true }]
+  ])('blocks stale generated runtime for %s json even with machine-status flag', async (_flagName, dashboardFlag) => {
+    const root = await mkdtemp(join(tmpdir(), 'co-status-shell-'));
+    tempDirs.push(root);
+    process.env.CODEX_ORCHESTRATOR_ROOT = root;
+
+    const runDir = join(root, '.runs', 'local-mcp', 'cli', 'control-host');
+    await mkdir(runDir, { recursive: true });
+
+    const server = await startUiServer();
+    servers.add(server.instance);
+
+    await writeFile(
+      join(runDir, 'manifest.json'),
+      JSON.stringify({
+        run_id: 'control-host',
+        task_id: 'local-mcp',
+        status: 'in_progress'
+      }),
+      'utf8'
+    );
+    await writeFile(join(runDir, 'control_auth.json'), JSON.stringify({ token: 'snapshot-token' }), 'utf8');
+    await writeFile(
+      join(runDir, 'control_endpoint.json'),
+      JSON.stringify({
+        base_url: server.baseUrl,
+        token_path: 'control_auth.json'
+      }),
+      'utf8'
+    );
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const setExitCode = vi.fn();
+
+    await runCoStatusCliShell(
+      {
+        flags: {
+          format: 'json',
+          'machine-status': true,
+          ...dashboardFlag,
+          'run-dir': runDir
+        },
+        printHelp: vi.fn()
+      },
+      {
+        inspectRuntimeFreshness: () => createStaleGeneratedRuntimeFreshness(),
+        setExitCode
+      }
+    );
+
+    expect(setExitCode).toHaveBeenCalledWith(1);
+    expect(server.requests).toEqual([]);
+    expect(log).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(String(log.mock.calls[0]?.[0])) as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      mode: 'co_status_runtime_freshness',
+      status: 'blocked',
+      reason: 'stale_generated_runtime'
+    });
+  });
+
   it.each([
     ['--operator-dashboard', { 'operator-dashboard': true }],
     ['--dashboard', { dashboard: true }]

@@ -174,10 +174,14 @@ export async function runCoStatusCliShell(
   assertAttachCompatibleFlags(params.flags);
   const format: OutputFormat = readStringFlag(params.flags, 'format') === 'json' ? 'json' : 'text';
   const explicitMachineStatus = readBooleanFlag(params.flags, 'machine-status');
+  const requestedDashboardJson =
+    readBooleanFlag(params.flags, 'dashboard') || readBooleanFlag(params.flags, 'operator-dashboard');
+  const explicitMachineStatusJsonSnapshot =
+    format === 'json' && explicitMachineStatus && !requestedDashboardJson;
   const runtimeFreshnessBlock = resolveCoStatusRuntimeFreshnessBlock(
     dependencies.inspectRuntimeFreshness()
   );
-  if (runtimeFreshnessBlock && !explicitMachineStatus) {
+  if (runtimeFreshnessBlock && !explicitMachineStatusJsonSnapshot) {
     emitCoStatusRuntimeFreshnessBlock(runtimeFreshnessBlock, format, dependencies);
     return;
   }
@@ -186,10 +190,9 @@ export async function runCoStatusCliShell(
     return;
   }
 
-  const dataset =
-    readBooleanFlag(params.flags, 'dashboard') || readBooleanFlag(params.flags, 'operator-dashboard')
-      ? await readCoStatusJsonDataset({ flags: params.flags })
-      : await readCoStatusMachineStatusDataset({ flags: params.flags });
+  const dataset = requestedDashboardJson
+    ? await readCoStatusJsonDataset({ flags: params.flags })
+    : await readCoStatusMachineStatusDataset({ flags: params.flags });
   dependencies.log(JSON.stringify(dataset, null, 2));
 }
 
