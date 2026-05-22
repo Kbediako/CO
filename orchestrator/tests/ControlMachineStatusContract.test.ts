@@ -281,12 +281,15 @@ describe('control machine status contract', () => {
     expect(machineStatus.providerWorkflow).toEqual(providerWorkflow);
   });
 
-  it('returns degraded fail-closed machine-status json when the read path times out', async () => {
+  it('returns degraded fail-closed machine-status json when the read path times out before reader abort handling', async () => {
     vi.useFakeTimers();
     try {
       const { res, state } = createResponseRecorder();
       let observedSignal: AbortSignal | undefined;
       let abortReason: unknown;
+      const readerAbortError = Object.assign(new Error('reader observed abort'), {
+        name: 'AbortError'
+      });
       const handledPromise = handleMachineStatusRequest({
         req: {
           method: 'GET',
@@ -301,7 +304,7 @@ describe('control machine status contract', () => {
                 'abort',
                 () => {
                   abortReason = signal.reason;
-                  reject(signal.reason);
+                  reject(readerAbortError);
                 },
                 { once: true }
               );

@@ -83,8 +83,8 @@ async function readMachineStatusDatasetWithControllerTimeout(
       new Promise<never>((_, reject) => {
         timer = setTimeout(
           () => {
-            abortController.abort(timeoutError);
             reject(timeoutError);
+            abortController.abort(timeoutError);
           },
           timeoutMs
         );
