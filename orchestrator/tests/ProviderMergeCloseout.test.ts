@@ -1094,6 +1094,173 @@ describe('runProviderDeterministicMergeCloseout', () => {
     }
   });
 
+  it('fails closed when docs freshness owner finalizer evidence is malformed', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'provider-merge-closeout-docs-finalizer-malformed-'));
+    try {
+      await writeDocsFreshnessFixtureRepo({
+        repoRoot,
+        catalog: canonicalDocsFreshnessCatalog(),
+        maintainDecision: ownerMaintenanceDecision({
+          freshness_decision: 'pass_with_owned_rolling_debt',
+          owner_issue: 'CO-444',
+          owner_issue_action: { mode: 'update_existing', issue: 'CO-444', reason: 'succeeded' },
+          owner_finalizer: {},
+          candidate_cohorts: [
+            {
+              id: 'co-420-apr-28-march-28-task-packet-mirror',
+              canonical_owner_key: 'baseline_cohort_id:co-420-apr-28-march-28-task-packet-mirror',
+              owner_issue: 'CO-444'
+            }
+          ],
+          blocking_changed_paths: []
+        })
+      });
+      const { result, transitionIssueState } = await runMergedCloseoutFixture({
+        repoRoot,
+        useDefaultDocsFreshnessResolver: true
+      });
+
+      expect(result).toMatchObject({
+        status: 'action_required',
+        reason: 'docs_freshness_owner_evidence_unavailable',
+        docs_freshness_owner: {
+          status: 'evidence_unavailable',
+          terminal_transition_blocked: true,
+          reason: 'owner_finalizer_malformed',
+          owner_finalizer: {}
+        },
+        linear_transition: {
+          target_state: 'Blocked'
+        }
+      });
+      expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
+        stateName: 'Blocked'
+      }));
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed when docs freshness owner finalizer contradicts active candidate debt', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'provider-merge-closeout-docs-finalizer-stale-na-'));
+    try {
+      await writeDocsFreshnessFixtureRepo({
+        repoRoot,
+        catalog: canonicalDocsFreshnessCatalog(),
+        maintainDecision: ownerMaintenanceDecision({
+          freshness_decision: 'pass_with_owned_rolling_debt',
+          owner_issue: 'CO-444',
+          owner_issue_action: { mode: 'update_existing', issue: 'CO-444', reason: 'succeeded' },
+          owner_finalizer: {
+            status: 'not_applicable',
+            active_owner_issue: null,
+            active_owner_issues: [],
+            active_owner_records: [],
+            active_canonical_owner_key: null,
+            ignored_terminal_owner_issues: []
+          },
+          candidate_cohorts: [
+            {
+              id: 'co-420-apr-28-march-28-task-packet-mirror',
+              canonical_owner_key: 'baseline_cohort_id:co-420-apr-28-march-28-task-packet-mirror',
+              owner_issue: 'CO-444'
+            }
+          ],
+          blocking_changed_paths: []
+        })
+      });
+      const { result, transitionIssueState } = await runMergedCloseoutFixture({
+        repoRoot,
+        useDefaultDocsFreshnessResolver: true
+      });
+
+      expect(result).toMatchObject({
+        status: 'action_required',
+        reason: 'docs_freshness_owner_evidence_unavailable',
+        docs_freshness_owner: {
+          status: 'evidence_unavailable',
+          terminal_transition_blocked: true,
+          reason: 'owner_finalizer_malformed',
+          owner_finalizer: {
+            status: 'not_applicable'
+          }
+        },
+        linear_transition: {
+          target_state: 'Blocked'
+        }
+      });
+      expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
+        stateName: 'Blocked'
+      }));
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed when docs freshness owner finalizer active owners do not match candidates', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'provider-merge-closeout-docs-finalizer-stale-passed-'));
+    try {
+      await writeDocsFreshnessFixtureRepo({
+        repoRoot,
+        catalog: canonicalDocsFreshnessCatalog(),
+        maintainDecision: ownerMaintenanceDecision({
+          freshness_decision: 'pass_with_owned_rolling_debt',
+          owner_issue: 'CO-444',
+          owner_issue_action: { mode: 'update_existing', issue: 'CO-444', reason: 'succeeded' },
+          owner_finalizer: {
+            status: 'passed_active_owner_finalizer',
+            active_owner_issue: 'CO-568',
+            active_owner_issues: ['CO-568'],
+            active_owner_records: [
+              {
+                owner_issue: 'CO-568',
+                canonical_owner_key: 'baseline_cohort_id:other-active-owner',
+                cohort_id: 'other-active-owner'
+              }
+            ],
+            active_canonical_owner_key: 'baseline_cohort_id:other-active-owner',
+            ignored_terminal_owner_issues: []
+          },
+          candidate_cohorts: [
+            {
+              id: 'co-420-apr-28-march-28-task-packet-mirror',
+              canonical_owner_key: 'baseline_cohort_id:co-420-apr-28-march-28-task-packet-mirror',
+              owner_issue: 'CO-444'
+            }
+          ],
+          blocking_changed_paths: []
+        })
+      });
+      const { result, transitionIssueState } = await runMergedCloseoutFixture({
+        repoRoot,
+        useDefaultDocsFreshnessResolver: true
+      });
+
+      expect(result).toMatchObject({
+        status: 'action_required',
+        reason: 'docs_freshness_owner_evidence_unavailable',
+        docs_freshness_owner: {
+          status: 'evidence_unavailable',
+          terminal_transition_blocked: true,
+          reason: 'owner_finalizer_malformed',
+          owner_finalizer: {
+            status: 'passed_active_owner_finalizer',
+            active_owner_issue: 'CO-568',
+            active_owner_issues: ['CO-568']
+          }
+        },
+        linear_transition: {
+          target_state: 'Blocked'
+        }
+      });
+      expect(transitionIssueState).toHaveBeenCalledWith(expect.objectContaining({
+        stateName: 'Blocked'
+      }));
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
   it('fails closed when docs freshness maintain exits non-zero after printing parseable JSON', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'provider-merge-closeout-docs-maintain-nonzero-'));
     try {

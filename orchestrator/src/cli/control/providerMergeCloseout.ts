@@ -1880,7 +1880,17 @@ async function readDocsFreshnessMaintainOwnerEvidence(input: {
       normalized.freshness_decision === 'pass_with_owned_rolling_debt' ||
       input.policyOwnerIssue === input.issueIdentifier);
   const ownerFinalizerMissing = ownerFinalizerRequired && !ownerFinalizer;
-  const ownerFinalizerBlocksCurrentIssue = ownerFinalizer
+  const ownerFinalizerMalformed =
+    ownerFinalizerRequired && ownerFinalizer
+      ? !docsFreshnessOwnerFinalizerIsUsable({
+          ownerFinalizer,
+          freshnessDecision: normalized.freshness_decision,
+          ownerIssue: normalized.owner_issue,
+          ownerIssueAction: normalized.owner_issue_action,
+          candidateCohorts: normalized.candidate_cohorts
+        })
+      : false;
+  const ownerFinalizerBlocksCurrentIssue = ownerFinalizer && !ownerFinalizerMalformed
     ? docsFreshnessOwnerFinalizerBlocksIssue(ownerFinalizer, input.issueIdentifier)
     : false;
   const terminalTransitionBlocked =
@@ -1888,9 +1898,10 @@ async function readDocsFreshnessMaintainOwnerEvidence(input: {
     commandFailed ||
     freshnessDecisionBlocks ||
     ownerFinalizerMissing ||
+    ownerFinalizerMalformed ||
     ownerFinalizerBlocksCurrentIssue;
   const status: ProviderDocsFreshnessOwnerCloseoutRecord['status'] =
-    parsed.error || commandFailed || freshnessDecisionMissing || ownerFinalizerMissing
+    parsed.error || commandFailed || freshnessDecisionMissing || ownerFinalizerMissing || ownerFinalizerMalformed
       ? 'evidence_unavailable'
       : 'evidence_checked';
   const reason = parsed.error
@@ -1903,9 +1914,11 @@ async function readDocsFreshnessMaintainOwnerEvidence(input: {
           ? 'current_issue_owns_docs_freshness_rolling_debt'
           : ownerFinalizerMissing
             ? 'owner_finalizer_missing'
-            : ownerFinalizerBlocksCurrentIssue
-              ? 'current_issue_owns_docs_freshness_rolling_debt'
-              : 'owner_finalizer_allows_terminal_transition';
+            : ownerFinalizerMalformed
+              ? 'owner_finalizer_malformed'
+              : ownerFinalizerBlocksCurrentIssue
+                ? 'current_issue_owns_docs_freshness_rolling_debt'
+                : 'owner_finalizer_allows_terminal_transition';
   return {
     status,
     terminal_transition_blocked: terminalTransitionBlocked,
@@ -2005,11 +2018,7 @@ function normalizeDocsFreshnessMaintainDecision(value: Record<string, unknown> |
   };
 }
 
-function docsFreshnessOwnerFinalizerBlocksIssue(
-  ownerFinalizer: Record<string, unknown>,
-  issueIdentifier: string
-): boolean {
-  const status = normalizeOptionalString(ownerFinalizer.status);
+function docsFreshnessOwnerFinalizerActiveOwnerIssues(ownerFinalizer: Record<string, unknown>): Set<string> {
   const activeOwnerIssues = new Set<string>();
   const activeOwnerIssue = normalizeOptionalString(ownerFinalizer.active_owner_issue);
   if (activeOwnerIssue) {
@@ -2034,10 +2043,108 @@ function docsFreshnessOwnerFinalizerBlocksIssue(
       }
     }
   }
+  return activeOwnerIssues;
+}
+
+function docsFreshnessOwnerFinalizerActiveOwnerRecords(ownerFinalizer: Record<string, unknown>): Set<string> {
+  const activeOwnerRecords = new Set<string>();
+  if (!Array.isArray(ownerFinalizer.active_owner_records)) {
+    return activeOwnerRecords;
+  }
+  for (const record of ownerFinalizer.active_owner_records) {
+    if (!record || typeof record !== 'object') {
+      continue;
+    }
+    const ownerIssue = normalizeOptionalString((record as Record<string, unknown>).owner_issue);
+    if (!ownerIssue) {
+      continue;
+    }
+    const canonicalOwnerKey = normalizeOptionalString((record as Record<string, unknown>).canonical_owner_key);
+    activeOwnerRecords.add(docsFreshnessOwnerRecordKey(ownerIssue, canonicalOwnerKey));
+  }
+  return activeOwnerRecords;
+}
+
+function docsFreshnessCandidateOwnerRecords(input: {
+  ownerIssue: string | null;
+  ownerIssueAction: Record<string, unknown> | null;
+  candidateCohorts: Record<string, unknown>[];
+}): Set<string> {
+  const candidateOwnerRecords = new Set<string>();
+  for (const cohort of input.candidateCohorts) {
+    const cohortAction =
+      cohort.owner_issue_action && typeof cohort.owner_issue_action === 'object'
+        ? (cohort.owner_issue_action as Record<string, unknown>)
+        : null;
+    const ownerIssue =
+      normalizeOptionalString(cohortAction?.issue) ??
+      normalizeOptionalString(cohort.owner_issue) ??
+      input.ownerIssue ??
+      normalizeOptionalString(cohortAction?.existing_issue) ??
+      normalizeOptionalString(input.ownerIssueAction?.existing_issue);
+    if (!ownerIssue) {
+      continue;
+    }
+    const canonicalOwnerKey =
+      normalizeOptionalString(cohort.canonical_owner_key) ??
+      normalizeOptionalString((cohort.owner_issue_resolution as Record<string, unknown> | undefined)?.canonical_owner_key) ??
+      normalizeOptionalString(cohortAction?.canonical_owner_key) ??
+      normalizeOptionalString(input.ownerIssueAction?.canonical_owner_key) ??
+      'docs:freshness:maintain';
+    candidateOwnerRecords.add(docsFreshnessOwnerRecordKey(ownerIssue, canonicalOwnerKey));
+  }
+  return candidateOwnerRecords;
+}
+
+function docsFreshnessOwnerRecordKey(ownerIssue: string, canonicalOwnerKey: string | null): string {
+  return `${ownerIssue}\u0000${canonicalOwnerKey ?? ''}`;
+}
+
+function docsFreshnessOwnerFinalizerIsUsable(input: {
+  ownerFinalizer: Record<string, unknown>;
+  freshnessDecision: string | null;
+  ownerIssue: string | null;
+  ownerIssueAction: Record<string, unknown> | null;
+  candidateCohorts: Record<string, unknown>[];
+}): boolean {
+  const status = normalizeOptionalString(input.ownerFinalizer.status);
+  if (!status) {
+    return false;
+  }
+  if (status.startsWith('blocked_')) {
+    return true;
+  }
+  const candidateOwnerRecords = docsFreshnessCandidateOwnerRecords(input);
+  const activeOwnedDebt =
+    candidateOwnerRecords.size > 0 || input.freshnessDecision === 'pass_with_owned_rolling_debt';
+  if (status === 'not_applicable') {
+    return !activeOwnedDebt;
+  }
+  if (status === 'passed_active_owner_finalizer' || status === 'passed_exact_canonical_owner_precedence') {
+    const activeOwnerIssues = docsFreshnessOwnerFinalizerActiveOwnerIssues(input.ownerFinalizer);
+    const activeOwnerRecords = docsFreshnessOwnerFinalizerActiveOwnerRecords(input.ownerFinalizer);
+    if (activeOwnerIssues.size === 0 || activeOwnerRecords.size === 0 || candidateOwnerRecords.size === 0) {
+      return false;
+    }
+    for (const candidateOwnerRecord of candidateOwnerRecords) {
+      if (!activeOwnerRecords.has(candidateOwnerRecord)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+function docsFreshnessOwnerFinalizerBlocksIssue(
+  ownerFinalizer: Record<string, unknown>,
+  issueIdentifier: string
+): boolean {
+  const status = normalizeOptionalString(ownerFinalizer.status);
   if (status?.startsWith('blocked_')) {
     return true;
   }
-  return activeOwnerIssues.has(issueIdentifier);
+  return docsFreshnessOwnerFinalizerActiveOwnerIssues(ownerFinalizer).has(issueIdentifier);
 }
 
 async function runProviderMergeCloseoutCommand(input: {
