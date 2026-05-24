@@ -6418,6 +6418,18 @@ export function createProviderIssueHandoffService(
               pollDispatchBudget.canDispatchWhilePreservingFreshDiscoverySlot(
                 resolution.trackedIssue
               );
+            const releasedStartClaim = latestRunStaleForTrackedIssue
+              ? {
+                  ...claim,
+                  ...clearProviderRetryFields(),
+                  run_id: null,
+                  run_manifest_path: null,
+                  worker_host: null,
+                  launch_source: null,
+                  launch_token: null,
+                  launch_started_at: null
+                }
+              : claim;
             if (
               !canDispatchReleasedStart ||
               !canDispatchReleasedStartWhilePreservingFreshDiscoverySlot
@@ -6432,9 +6444,7 @@ export function createProviderIssueHandoffService(
                 )
               ) {
                 const handoffResult = await launchStartForTrackedIssue({
-                  claim: latestRunStaleForTrackedIssue
-                    ? { ...claim, ...clearProviderRetryFields() }
-                    : claim,
+                  claim: releasedStartClaim,
                   trackedIssue: resolution.trackedIssue,
                   reason: 'provider_issue_refresh_start_launched',
                   previousRun: latestRunStaleForTrackedIssue ? null : latestRun,
@@ -6467,9 +6477,7 @@ export function createProviderIssueHandoffService(
               continue;
             }
             const handoffResult = await launchStartForTrackedIssue({
-              claim: latestRunStaleForTrackedIssue
-                ? { ...claim, ...clearProviderRetryFields() }
-                : claim,
+              claim: releasedStartClaim,
               trackedIssue: resolution.trackedIssue,
               reason: 'provider_issue_refresh_start_launched',
               previousRun: latestRunStaleForTrackedIssue ? null : latestRun,

@@ -94,6 +94,7 @@
 - 2026-05-24: Rework review rerun found a P2 gap where absent or stale retained claim metadata could still let an older failed run outvote a newer Rework issue. Fixed by making trusted tracked issue freshness authoritative for stale-run reclaim and adding absent/stale claim-cache regressions.
 - 2026-05-24: Rework review rerun found a P1 gap where due retry dispatch could treat queued latest runs as stale and launch duplicates. Fixed by gating stale-run replacement to failed/canceled resume-eligible runs and adding queued-run protection coverage.
 - 2026-05-24: CodeRabbit current-head review found two remaining stale-run seams: cached terminal release used `started_at` as issue freshness proof, and released-claim Rework relaunch still passed stale failed-run retry identity into fresh starts. Fixed by requiring explicit `issue_updated_at` for cached-terminal freshness and by carrying the stale-run predicate into released refresh starts with retry clearing.
+- 2026-05-24: CodeRabbit follow-up found stale released Rework fresh-launch inputs could still carry old run identity, launch provenance, or worker host into `launchStartForTrackedIssue` capacity/fresh-start handling. Fixed by clearing run identity/provenance alongside retry fields before launch and adding a stale worker-host regression.
 - 2026-05-24: Enforced gpt-5.5/xhigh standalone review rerun returned clean with a valid contract and zero findings; explicit elegance pass kept the local status gate plus explicit regression fixtures as the smallest safe shape.
 
 ## Notes

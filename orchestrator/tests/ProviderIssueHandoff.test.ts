@@ -36327,6 +36327,10 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_released:not_active',
       run_id: runId,
       run_manifest_path: childPaths.manifestPath,
+      worker_host: 'stale-worker-host',
+      launch_source: 'control-host',
+      launch_token: 'stale-launch-token',
+      launch_started_at: '2026-03-19T04:20:06.000Z',
       retry_queued: true,
       retry_attempt: 3,
       retry_due_at: '2026-03-19T04:35:00.000Z',
@@ -36341,12 +36345,48 @@ describe('createProviderIssueHandoffService', () => {
       })),
       resume: vi.fn(async () => undefined)
     };
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(),
+      refresh: vi.fn(),
+      snapshot: () => ({
+        status: 'ready' as const,
+        pipeline_id: 'provider-linear-worker',
+        source_path: '/repo/codex.orchestrator.json',
+        snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        last_reload_attempt_at: null,
+        last_success_at: null,
+        last_error_at: null,
+        last_error: null,
+        terminal_cleanup: null,
+        worker_hosts: [
+          {
+            name: 'fresh-worker-host',
+            transport: 'ssh' as const,
+            ssh_destination: 'codex@fresh-worker-host',
+            ssh_options: [],
+            max_concurrent_agents: 1,
+            node_path: null
+          },
+          {
+            name: 'stale-worker-host',
+            transport: 'ssh' as const,
+            ssh_destination: 'codex@stale-worker-host',
+            ssh_options: [],
+            max_concurrent_agents: 1,
+            node_path: null
+          }
+        ]
+      }),
+      getLaunchConfigPath: vi.fn(),
+      recordTerminalCleanupResult: vi.fn()
+    };
 
     const service = createProviderIssueHandoffService({
       paths,
       state,
       persist,
       launcher,
+      providerWorkflowConfigStore,
       startPipelineId: 'diagnostics',
       resolveTrackedIssue: async () => ({
         kind: 'ready',
@@ -36370,6 +36410,7 @@ describe('createProviderIssueHandoffService', () => {
       issueId: 'lin-issue-555-released-stale-failed',
       issueIdentifier: 'CO-555',
       issueUpdatedAt: '2026-03-19T04:40:00.000Z',
+      workerHost: 'fresh-worker-host',
       launchToken: expect.any(String)
     }));
     expect(state.claims[0]).toMatchObject({
@@ -36381,12 +36422,142 @@ describe('createProviderIssueHandoffService', () => {
       task_id: 'linear-lin-issue-555-released-stale-failed',
       run_id: 'run-reopened-without-stale-retry',
       run_manifest_path: '/tmp/provider-run/reopened-without-stale-retry-manifest.json',
+      worker_host: 'fresh-worker-host',
       retry_queued: null,
       retry_attempt: null,
       retry_due_at: null,
       retry_error: null,
       launch_source: 'control-host',
       launch_token: expect.any(String)
+    });
+  });
+
+  it('clears stale failed retry identity when released Rework relaunch is capacity blocked', async () => {
+    const { root, paths } = await createHostPaths();
+    const taskId = 'task-co-555-released-stale-failed-blocked';
+    const runId = 'run-co-555-released-stale-failed-blocked';
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(childEnv, runId);
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: runId,
+        task_id: taskId,
+        status: 'failed',
+        summary: 'Old failed provider worker should not survive a blocked Rework relaunch.',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-555-released-stale-failed-blocked',
+        issue_identifier: 'CO-555',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        started_at: '2026-03-19T04:20:05.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const occupyingEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-admission-occupant'
+    };
+    const occupyingPaths = resolveRunPaths(occupyingEnv, 'run-admission-occupant');
+    await mkdir(occupyingPaths.runDir, { recursive: true });
+    await writeFile(
+      occupyingPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-admission-occupant',
+        task_id: 'task-admission-occupant',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-admission-occupant',
+        issue_identifier: 'CO-999',
+        issue_updated_at: '2026-03-19T04:39:00.000Z',
+        updated_at: '2026-03-19T04:39:30.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      provider_key: 'linear:lin-issue-555-released-stale-failed-blocked',
+      issue_id: 'lin-issue-555-released-stale-failed-blocked',
+      issue_identifier: 'CO-555',
+      issue_title: 'Released claim with stale failed retry identity and no capacity',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: taskId,
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: runId,
+      run_manifest_path: childPaths.manifestPath,
+      retry_queued: true,
+      retry_attempt: 3,
+      retry_due_at: '2026-03-19T04:35:00.000Z',
+      retry_error: 'old failed worker retry metadata'
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-should-not-start',
+        manifestPath: '/tmp/provider-run/should-not-start.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    let featureToggleReads = 0;
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics',
+      readFeatureToggles: () => {
+        featureToggleReads += 1;
+        return {
+          agent: {
+            max_concurrent_agents: featureToggleReads <= 1 ? 3 : 1
+          }
+        };
+      },
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-555-released-stale-failed-blocked',
+          identifier: 'CO-555',
+          state: 'Rework',
+          state_type: 'started',
+          updated_at: '2026-03-19T04:40:00.000Z'
+        })
+      })
+    });
+
+    await service.refresh();
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      state: 'accepted',
+      reason: 'provider_issue_refresh_start_blocked:max_concurrency',
+      issue_state: 'Rework',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:40:00.000Z',
+      task_id: 'linear-lin-issue-555-released-stale-failed-blocked',
+      run_id: null,
+      run_manifest_path: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
     });
   });
 
