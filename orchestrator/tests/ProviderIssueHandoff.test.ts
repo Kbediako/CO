@@ -46810,6 +46810,95 @@ describe('createProviderIssueHandoffService', () => {
     expect(persist).toHaveBeenCalled();
   });
 
+  it('releases cached terminal Duplicate retry-resumable WIP even when run identity is stale', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-24T00:12:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const taskId = 'task-co-534-terminal-duplicate-drifted-run';
+    const runId = 'run-co-534-current-resumable';
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(childEnv, runId);
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: runId,
+        task_id: taskId,
+        status: 'failed',
+        summary: 'Current failed worker discovered after stale duplicate claim identity drifted.',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-534-drifted-run',
+        issue_identifier: 'CO-534',
+        issue_updated_at: '2026-05-22T21:01:23.149Z',
+        updated_at: '2026-05-22T21:05:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      provider_key: 'linear:lin-issue-534-drifted-run',
+      issue_id: 'lin-issue-534-drifted-run',
+      issue_identifier: 'CO-534',
+      issue_title: 'Stale duplicate retry claim with drifted run identity',
+      issue_state: 'Duplicate',
+      issue_state_type: 'duplicate',
+      issue_updated_at: '2026-05-23T22:01:00.000Z',
+      task_id: taskId,
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      run_id: 'run-co-534-previous-stale',
+      run_manifest_path: join(root, '.runs', taskId, 'previous-stale', 'manifest.json'),
+      retry_queued: true,
+      retry_attempt: 2,
+      retry_due_at: '2026-05-24T00:20:00.000Z',
+      retry_error: 'review contract telemetry missing'
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'skip' as const,
+      reason: 'provider_issue_refresh_resolution_unavailable'
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue
+    });
+
+    await service.refresh();
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    const expectedClaim = {
+      issue_state: 'Duplicate',
+      issue_state_type: 'duplicate',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: 'run-co-534-previous-stale',
+      run_manifest_path: join(root, '.runs', taskId, 'previous-stale', 'manifest.json'),
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    };
+    expect(state.claims[0]).toMatchObject(expectedClaim);
+    expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
+    expect(persist).toHaveBeenCalled();
+  });
+
   it('does not schedule retry timers for terminal claims with retained retry metadata', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-24T00:12:00.000Z'));
@@ -46865,6 +46954,103 @@ describe('createProviderIssueHandoffService', () => {
     expect(launcher.resume).not.toHaveBeenCalled();
   });
 
+  it('launches newer active Rework issues when no stale failed-run claim is retained', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-23T22:06:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const taskId = 'task-co-555-old-failed-no-claim';
+    const runId = 'run-co-555-old-failed-no-claim';
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(childEnv, runId);
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: runId,
+        task_id: taskId,
+        status: 'failed',
+        summary: 'Old failed provider worker without retained claim state.',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-555-no-claim',
+        issue_identifier: 'CO-555',
+        issue_updated_at: '2026-05-18T19:20:24.441Z',
+        updated_at: '2026-05-18T22:41:06.044Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-555-rework-no-claim-fresh',
+        manifestPath: '/tmp/provider-run/co-555-rework-no-claim-fresh-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    const result = await service.handleAcceptedTrackedIssue({
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-555-no-claim',
+        identifier: 'CO-555',
+        title: 'Terminal retry recurrence fix',
+        state: 'Rework',
+        state_type: 'started',
+        updated_at: '2026-05-23T22:05:45.427Z'
+      }),
+      deliveryId: null,
+      event: 'poll_tick',
+      action: 'reconcile',
+      webhookTimestamp: null
+    });
+
+    expect(result.kind).toBe('start');
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-555-no-claim',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-555-no-claim',
+      issueIdentifier: 'CO-555',
+      issueUpdatedAt: '2026-05-23T22:05:45.427Z',
+      residentSessionSeed: null,
+      launchToken: expect.any(String)
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      issue_identifier: 'CO-555',
+      issue_state: 'Rework',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-23T22:05:45.427Z',
+      state: 'starting',
+      reason: 'provider_issue_start_launched',
+      run_id: 'run-co-555-rework-no-claim-fresh',
+      run_manifest_path: '/tmp/provider-run/co-555-rework-no-claim-fresh-manifest.json',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-555',
+      state: 'starting',
+      run_id: 'run-co-555-rework-no-claim-fresh',
+      retry_queued: null
+    });
+  });
+
   it('launches newer active Rework issues instead of preserving stale failed-run retry WIP', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-23T22:06:00.000Z'));
@@ -46904,7 +47090,7 @@ describe('createProviderIssueHandoffService', () => {
       issue_title: 'Terminal retry recurrence fix',
       issue_state: 'Rework',
       issue_state_type: 'started',
-      issue_updated_at: '2026-05-23T22:05:45.427Z',
+      issue_updated_at: '2026-05-18T19:10:00.000Z',
       task_id: taskId,
       state: 'resumable',
       reason: 'provider_issue_rehydrated_resumable_run',
@@ -47089,6 +47275,236 @@ describe('createProviderIssueHandoffService', () => {
       state: 'starting',
       run_id: 'run-co-555-rework-poll-fresh',
       retry_queued: null
+    });
+  });
+
+  it('launches newer active Rework issues from due retry dispatch instead of resuming stale failed runs', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-23T22:06:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const taskId = 'task-co-555-old-failed-retry-dispatch';
+    const runId = 'run-co-555-old-failed-retry-dispatch';
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(childEnv, runId);
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: runId,
+        task_id: taskId,
+        status: 'failed',
+        summary: 'Old failed provider worker before CO-555 retry dispatch.',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-555-retry-dispatch',
+        issue_identifier: 'CO-555',
+        issue_updated_at: '2026-05-18T19:20:24.441Z',
+        updated_at: '2026-05-18T22:41:06.044Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      provider_key: 'linear:lin-issue-555-retry-dispatch',
+      issue_id: 'lin-issue-555-retry-dispatch',
+      issue_identifier: 'CO-555',
+      issue_title: 'Terminal retry recurrence fix',
+      issue_state: 'Rework',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-23T22:05:45.427Z',
+      task_id: taskId,
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      run_id: runId,
+      run_manifest_path: childPaths.manifestPath,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-05-23T22:06:01.000Z',
+      retry_error: 'old failed provider worker'
+    }));
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-555-rework-retry-dispatch-fresh',
+        manifestPath: '/tmp/provider-run/co-555-rework-retry-dispatch-fresh-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-555-retry-dispatch',
+        identifier: 'CO-555',
+        title: 'Terminal retry recurrence fix',
+        state: 'Rework',
+        state_type: 'started',
+        updated_at: '2026-05-23T22:05:45.427Z'
+      })
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    expect(service).toBeDefined();
+    await waitForMockCalls(setTimeoutSpy);
+    vi.setSystemTime(new Date('2026-05-23T22:06:01.001Z'));
+    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    await flushAsyncWork();
+    await waitForMockCalls(launcher.start, 1, 1024);
+
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-555-retry-dispatch',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-555-retry-dispatch',
+      issueIdentifier: 'CO-555',
+      issueUpdatedAt: '2026-05-23T22:05:45.427Z',
+      residentSessionSeed: null,
+      launchToken: expect.any(String)
+    }));
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      issue_identifier: 'CO-555',
+      issue_state: 'Rework',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-23T22:05:45.427Z',
+      state: 'starting',
+      reason: 'provider_issue_retry_start_launched',
+      run_id: 'run-co-555-rework-retry-dispatch-fresh',
+      run_manifest_path: '/tmp/provider-run/co-555-rework-retry-dispatch-fresh-manifest.json',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-555',
+      state: 'starting',
+      run_id: 'run-co-555-rework-retry-dispatch-fresh',
+      retry_queued: null
+    });
+  });
+
+  it('keeps queued runs protected when due retry dispatch sees a newer Rework issue', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-23T22:06:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const taskId = 'task-co-555-queued-retry-dispatch';
+    const runId = 'run-co-555-queued-retry-dispatch';
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(childEnv, runId);
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: runId,
+        task_id: taskId,
+        status: 'queued',
+        summary: 'Queued provider worker must not be duplicated by due retry dispatch.',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-555-queued-retry-dispatch',
+        issue_identifier: 'CO-555',
+        issue_updated_at: '2026-05-18T19:20:24.441Z',
+        updated_at: '2026-05-18T22:41:06.044Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      provider_key: 'linear:lin-issue-555-queued-retry-dispatch',
+      issue_id: 'lin-issue-555-queued-retry-dispatch',
+      issue_identifier: 'CO-555',
+      issue_title: 'Terminal retry recurrence fix',
+      issue_state: 'Rework',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-18T19:20:24.441Z',
+      task_id: taskId,
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      run_id: runId,
+      run_manifest_path: childPaths.manifestPath,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-05-23T22:06:01.000Z',
+      retry_error: 'old queued provider worker'
+    }));
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-555-queued-duplicate',
+        manifestPath: '/tmp/provider-run/co-555-queued-duplicate-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-555-queued-retry-dispatch',
+        identifier: 'CO-555',
+        title: 'Terminal retry recurrence fix',
+        state: 'Rework',
+        state_type: 'started',
+        updated_at: '2026-05-23T22:05:45.427Z'
+      })
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    expect(service).toBeDefined();
+    await waitForMockCalls(setTimeoutSpy);
+    vi.setSystemTime(new Date('2026-05-23T22:06:01.001Z'));
+    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    await flushAsyncWork();
+    await waitForMockCalls(resolveTrackedIssue, 1, 1024);
+    await flushAsyncWork();
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      issue_identifier: 'CO-555',
+      issue_state: 'Rework',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-18T19:20:24.441Z',
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      run_id: runId,
+      run_manifest_path: childPaths.manifestPath,
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-05-23T22:06:01.000Z',
+      retry_error: 'old queued provider worker'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-555',
+      state: 'resumable',
+      run_id: runId,
+      retry_queued: true
     });
   });
 

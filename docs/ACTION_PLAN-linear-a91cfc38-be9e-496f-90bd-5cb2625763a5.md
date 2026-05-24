@@ -30,6 +30,8 @@
   - rehydration restores terminal issues as active retry claims
   - cached terminal issue metadata cannot release without a fresh Linear fetch
   - stale retry timers or older failed runs keep terminal or freshly reworked issues retry-visible
+  - absent or stale retained claim metadata can let an older failed run outvote a newer `Rework` issue update
+  - due retry dispatch can treat queued/latest active runs as stale and launch duplicates
   - only a single projection hides the row
   - non-terminal retry/resumable workers stop counting as active
 - Pre-implementation issue-quality review:
@@ -76,9 +78,12 @@
 - Checks / tests:
   - focused provider-intake and provider-handoff terminal retry regressions
   - cached terminal `Duplicate`/duplicate rehydrate regression with refresh disabled/unavailable
+  - cached terminal `Duplicate`/duplicate rehydrate regression with stale `run_id`/`run_manifest_path`
   - retry queue terminal-suppression regression for stale retry fields
-  - newer active `Rework` issue update regression that ignores older failed/resume-eligible runs for retry rehydration
+  - newer active `Rework` issue update regression that ignores older failed/resume-eligible runs for retry rehydration, including absent/stale retained claim-cache cases
   - poll/refresh-path `Rework` issue update regression that ignores older failed/resume-eligible runs without relaunching generic non-Rework failed proof diagnostics
+  - due retry-dispatch `Rework` issue update regression that starts fresh instead of preserving or resuming stale failed-run retry WIP
+  - due retry-dispatch queued-run protection regression that does not start a duplicate worker
   - full `ProviderIssueHandoff` coverage after review feedback
   - delegation guard, spec guard, build, lint, test, docs gates, repo stewardship, diff budget, pack smoke
   - manifest-backed standalone review and explicit elegance pass

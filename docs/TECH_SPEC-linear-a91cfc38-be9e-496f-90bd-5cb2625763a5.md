@@ -48,14 +48,17 @@ This lane removes stale terminal retry/resumable active-WIP behavior while retai
 - Contract name: provider-intake retained terminal audit evidence.
 - Owning surface: provider-intake control-host claim persistence and status projection.
 - Steady-state proof: terminal retry/run metadata is retained only as inactive source-labeled audit evidence and never consumes active WIP.
-- Tests/docs: focused `ProviderIntakeState` and `ProviderIssueHandoff` regressions, including cached terminal release and stale failed-run reclaim, plus this CO-555 packet.
+- Tests/docs: focused `ProviderIntakeState` and `ProviderIssueHandoff` regressions, including cached terminal release, cached terminal run-identity drift, stale failed-run reclaim with absent/stale retained claim cache, due retry-dispatch reclaim, and due retry queued-run protection, plus this CO-555 packet.
 - Non-expiring rationale: retained audit evidence is durable operator traceability, not temporary compatibility debt; remove only after a reviewed archival replacement preserves equivalent evidence.
 
 ## Validation Plan
 - Focused `ProviderIntakeState` terminal and non-terminal retry coverage.
 - Focused `ProviderIssueHandoff` terminal queued/rehydration coverage.
 - Cached terminal `Duplicate`/duplicate rehydration coverage with refresh disabled/unavailable.
+- Cached terminal `Duplicate`/duplicate rehydration coverage with stale `run_id`/`run_manifest_path`.
 - Terminal-aware retry queue scheduling coverage.
-- Stale failed-run versus newer active `Rework` issue reclaim coverage.
+- Stale failed-run versus newer active `Rework` issue reclaim coverage, including absent/stale retained claim-cache cases.
+- Due retry-dispatch stale failed-run versus newer active `Rework` issue reclaim coverage.
+- Due retry-dispatch queued-run protection coverage.
 - Full provider-worker validation floor after merge with `origin/main`.
 - Manifest-backed standalone review, explicit elegance pass, and PR ready-review drain.
