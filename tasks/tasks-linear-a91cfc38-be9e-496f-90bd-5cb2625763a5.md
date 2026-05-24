@@ -22,7 +22,7 @@
 - [x] Rework recurrence packet refreshed after CO-534 exposed cached-terminal and stale-run gaps. Evidence: 2026-05-24 docs/spec/checklist updates plus GPT Pro consult summary.
 
 ## Acceptance Criteria
-- [x] Terminal Linear states (`Done`/completed, canceled/cancelled, duplicate, archived/trashed where surfaced) take precedence over `retry_queued`, `resumable`, and resume-eligible historical run status for active WIP accounting. Evidence: shared terminal predicate now gates active/retry helpers and projection retry state.
+- [x] Terminal Linear states (`Done`/completed, canceled, duplicate, archived/trashed where surfaced) take precedence over `retry_queued`, `resumable`, and resume-eligible historical run status for active WIP accounting. Evidence: shared terminal predicate now gates active/retry helpers and projection retry state.
 - [x] Rehydration paths that find resume-eligible runs for terminal issues preserve audit evidence but downgrade/release/ignore the active claim instead of queuing retry WIP. Evidence: provider issue handoff rehydration releases terminal retry/resumable claims and clears retry WIP fields.
 - [x] `co-status`, freshness-gauge, and quota-hygiene surfaces no longer count terminal retryable/resumable claims as active or retrying, while still surfacing retained terminal audit evidence. Evidence: runtime and selected-run retry projections use terminal-aware helpers and retained retry metadata reports inactive.
 - [x] Regression coverage includes a CO-512-shaped fixture: live issue Done/completed plus stale failed/resume-eligible run plus `retry_queued=true` must not produce an active claim or selected active issue. Evidence: `ProviderIntakeState.test.ts` and `ProviderIssueHandoff.test.ts` CO-512-shaped tests.
@@ -67,7 +67,7 @@
 - [x] Update runtime and selected-run retry projections. Evidence: `controlRuntime.ts` and `selectedRunProjection.ts` suppress terminal retry state.
 - [x] Add focused regression coverage. Evidence: `ProviderIntakeState.test.ts`, `ProviderIssueHandoff.test.ts`, and `ControlRuntime.test.ts`.
 - [x] Rework cached-terminal release and retry-queue scheduling. Evidence: cached terminal release path plus terminal-aware retry queue scheduling/dispatch helpers.
-- [x] Rework stale failed-run freshness checks for active issue reclaim. Evidence: stale-run reclaim requires current `Rework` issue freshness from the trusted tracked issue input and only applies to failed/cancelled resume-eligible latest runs, avoiding broad relaunch of generic failed proof diagnostics or duplicate launches for queued runs.
+- [x] Rework stale failed-run freshness checks for active issue reclaim. Evidence: stale-run reclaim requires current `Rework` issue freshness from the trusted tracked issue input and only applies to failed/canceled resume-eligible latest runs, avoiding broad relaunch of generic failed proof diagnostics or duplicate launches for queued runs.
 - [x] Add CO-534/CO-555 recurrence regressions for cached Duplicate release, identity-drift cached terminal release, terminal retry queue suppression, newer Rework reclaim, absent/stale retained claim cache, due retry-dispatch reclaim, and due retry queued-run protection. Evidence: focused recurrence slices and full `ProviderIssueHandoff.test.ts` pass after review feedback.
 
 ## Validation
@@ -92,7 +92,8 @@
 - 2026-05-24: Enforced standalone review found a P1 poll/refresh stale-run gap; fixed by passing claim freshness into that branch and constraining stale-run reclaim to live `Rework` updates so generic failed-run proof diagnostics remain retry-visible.
 - 2026-05-24: Rework review rerun after the current-main refresh found P1 gaps for cached terminal identity drift and due retry dispatch. Fixed by separating cached terminal classification from exact run identity, keeping release side effects identity-bound, and applying stale Rework freshness before owned/retry-dispatch paths can requeue or resume older failed runs.
 - 2026-05-24: Rework review rerun found a P2 gap where absent or stale retained claim metadata could still let an older failed run outvote a newer Rework issue. Fixed by making trusted tracked issue freshness authoritative for stale-run reclaim and adding absent/stale claim-cache regressions.
-- 2026-05-24: Rework review rerun found a P1 gap where due retry dispatch could treat queued latest runs as stale and launch duplicates. Fixed by gating stale-run replacement to failed/cancelled resume-eligible runs and adding queued-run protection coverage.
+- 2026-05-24: Rework review rerun found a P1 gap where due retry dispatch could treat queued latest runs as stale and launch duplicates. Fixed by gating stale-run replacement to failed/canceled resume-eligible runs and adding queued-run protection coverage.
+- 2026-05-24: CodeRabbit current-head review found two remaining stale-run seams: cached terminal release used `started_at` as issue freshness proof, and released-claim Rework relaunch still passed stale failed-run retry identity into fresh starts. Fixed by requiring explicit `issue_updated_at` for cached-terminal freshness and by carrying the stale-run predicate into released refresh starts with retry clearing.
 - 2026-05-24: Enforced gpt-5.5/xhigh standalone review rerun returned clean with a valid contract and zero findings; explicit elegance pass kept the local status gate plus explicit regression fixtures as the smallest safe shape.
 
 ## Notes

@@ -36284,6 +36284,112 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('relaunches a released Rework claim without carrying stale failed retry identity', async () => {
+    const { root, paths } = await createHostPaths();
+    const taskId = 'task-co-555-released-stale-failed';
+    const runId = 'run-co-555-released-stale-failed';
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(childEnv, runId);
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: runId,
+        task_id: taskId,
+        status: 'failed',
+        summary: 'Old failed provider worker should not seed a Rework relaunch.',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-555-released-stale-failed',
+        issue_identifier: 'CO-555',
+        issue_updated_at: '2026-03-19T04:20:00.000Z',
+        started_at: '2026-03-19T04:20:05.000Z',
+        updated_at: '2026-03-19T04:30:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      provider_key: 'linear:lin-issue-555-released-stale-failed',
+      issue_id: 'lin-issue-555-released-stale-failed',
+      issue_identifier: 'CO-555',
+      issue_title: 'Released claim with stale failed retry identity',
+      issue_state: 'Done',
+      issue_state_type: 'completed',
+      issue_updated_at: '2026-03-19T04:20:00.000Z',
+      task_id: taskId,
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: runId,
+      run_manifest_path: childPaths.manifestPath,
+      retry_queued: true,
+      retry_attempt: 3,
+      retry_due_at: '2026-03-19T04:35:00.000Z',
+      retry_error: 'old failed worker retry metadata'
+    }));
+
+    const persist = vi.fn(async () => undefined);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-reopened-without-stale-retry',
+        manifestPath: '/tmp/provider-run/reopened-without-stale-retry-manifest.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics',
+      resolveTrackedIssue: async () => ({
+        kind: 'ready',
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-555-released-stale-failed',
+          identifier: 'CO-555',
+          state: 'Rework',
+          state_type: 'started',
+          updated_at: '2026-03-19T04:40:00.000Z'
+        })
+      })
+    });
+
+    await service.refresh();
+
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(launcher.start).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'linear-lin-issue-555-released-stale-failed',
+      pipelineId: 'diagnostics',
+      provider: 'linear',
+      issueId: 'lin-issue-555-released-stale-failed',
+      issueIdentifier: 'CO-555',
+      issueUpdatedAt: '2026-03-19T04:40:00.000Z',
+      launchToken: expect.any(String)
+    }));
+    expect(state.claims[0]).toMatchObject({
+      state: 'starting',
+      reason: 'provider_issue_refresh_start_launched',
+      issue_state: 'Rework',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-03-19T04:40:00.000Z',
+      task_id: 'linear-lin-issue-555-released-stale-failed',
+      run_id: 'run-reopened-without-stale-retry',
+      run_manifest_path: '/tmp/provider-run/reopened-without-stale-retry-manifest.json',
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null,
+      launch_source: 'control-host',
+      launch_token: expect.any(String)
+    });
+  });
+
   it('prefers the discovered previous run worker_host over a stale claim when refresh relaunches a released claim', async () => {
     const { root, paths } = await createHostPaths();
     const childEnv = {
@@ -46889,6 +46995,94 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_released:not_active',
       run_id: 'run-co-534-previous-stale',
       run_manifest_path: join(root, '.runs', taskId, 'previous-stale', 'manifest.json'),
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    };
+    expect(state.claims[0]).toMatchObject(expectedClaim);
+    expect(getPersistedState().claims[0]).toMatchObject(expectedClaim);
+    expect(persist).toHaveBeenCalled();
+  });
+
+  it('releases cached terminal Duplicate WIP when a legacy run only has a newer started_at', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-24T00:12:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const taskId = 'task-co-534-terminal-duplicate-started-at-only';
+    const runId = 'run-co-534-started-at-only';
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(childEnv, runId);
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: runId,
+        task_id: taskId,
+        status: 'failed',
+        summary: 'Legacy failed worker restarted after the issue was marked Duplicate.',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-534-started-at-only',
+        issue_identifier: 'CO-534',
+        started_at: '2026-05-24T00:10:00.000Z',
+        updated_at: '2026-05-24T00:11:00.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      provider_key: 'linear:lin-issue-534-started-at-only',
+      issue_id: 'lin-issue-534-started-at-only',
+      issue_identifier: 'CO-534',
+      issue_title: 'Terminal duplicate retry claim with legacy started_at-only run',
+      issue_state: 'Duplicate',
+      issue_state_type: 'duplicate',
+      issue_updated_at: '2026-05-23T22:01:00.000Z',
+      task_id: taskId,
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      run_id: runId,
+      run_manifest_path: childPaths.manifestPath,
+      retry_queued: true,
+      retry_attempt: 2,
+      retry_due_at: '2026-05-24T00:20:00.000Z',
+      retry_error: 'legacy started_at must not prove issue freshness'
+    }));
+
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => null),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue: async () => ({
+        kind: 'skip' as const,
+        reason: 'provider_issue_refresh_resolution_unavailable'
+      })
+    });
+
+    await service.refresh();
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    const expectedClaim = {
+      issue_state: 'Duplicate',
+      issue_state_type: 'duplicate',
+      state: 'released',
+      reason: 'provider_issue_released:not_active',
+      run_id: runId,
+      run_manifest_path: childPaths.manifestPath,
       retry_queued: null,
       retry_attempt: null,
       retry_due_at: null,

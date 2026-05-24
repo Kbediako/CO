@@ -2852,7 +2852,7 @@ export function createProviderIssueHandoffService(
         return true;
       }
       const issueFreshness = compareTrackedIssueUpdatedAt({
-        existingIssueUpdatedAt: input.run.issueUpdatedAt ?? input.run.startedAt ?? null,
+        existingIssueUpdatedAt: input.run.issueUpdatedAt ?? null,
         nextIssueUpdatedAt: input.claim.issue_updated_at ?? null
       });
       return issueFreshness !== 'older';
@@ -6302,17 +6302,17 @@ export function createProviderIssueHandoffService(
             if (refreshedReleasedNonStartedActiveRun) {
               continue;
             }
+            const latestRunResumeEligibleForTrackedIssue = Boolean(
+              latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)
+            );
+            const latestRunStaleForTrackedIssue =
+              latestRun && latestRunResumeEligibleForTrackedIssue
+                ? isProviderIssueRunStaleForTrackedIssue({
+                    run: latestRun,
+                    trackedIssue: resolution.trackedIssue
+                  })
+                : false;
             if (resolution.kind === 'owned') {
-              const latestRunResumeEligibleForTrackedIssue = Boolean(
-                latestRun && latestRun.status && RESUME_ELIGIBLE_STATUSES.has(latestRun.status)
-              );
-              const latestRunStaleForTrackedIssue =
-                latestRun && latestRunResumeEligibleForTrackedIssue
-                  ? isProviderIssueRunStaleForTrackedIssue({
-                      run: latestRun,
-                      trackedIssue: resolution.trackedIssue
-                    })
-                  : false;
               const currentClaim =
                 latestRunStaleForTrackedIssue
                   ? {
@@ -6432,10 +6432,13 @@ export function createProviderIssueHandoffService(
                 )
               ) {
                 const handoffResult = await launchStartForTrackedIssue({
-                  claim,
+                  claim: latestRunStaleForTrackedIssue
+                    ? { ...claim, ...clearProviderRetryFields() }
+                    : claim,
                   trackedIssue: resolution.trackedIssue,
                   reason: 'provider_issue_refresh_start_launched',
-                  previousRun: latestRun
+                  previousRun: latestRunStaleForTrackedIssue ? null : latestRun,
+                  clearRetryOnSuccessfulStart: latestRunStaleForTrackedIssue
                 });
                 if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
                   noteOccupiedPollDispatchSlot(
@@ -6464,10 +6467,13 @@ export function createProviderIssueHandoffService(
               continue;
             }
             const handoffResult = await launchStartForTrackedIssue({
-              claim,
+              claim: latestRunStaleForTrackedIssue
+                ? { ...claim, ...clearProviderRetryFields() }
+                : claim,
               trackedIssue: resolution.trackedIssue,
               reason: 'provider_issue_refresh_start_launched',
-              previousRun: latestRun
+              previousRun: latestRunStaleForTrackedIssue ? null : latestRun,
+              clearRetryOnSuccessfulStart: latestRunStaleForTrackedIssue
             });
             if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
               noteOccupiedPollDispatchSlot(
