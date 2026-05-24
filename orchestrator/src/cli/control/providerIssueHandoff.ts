@@ -2204,14 +2204,19 @@ export function createProviderIssueHandoffService(
     reason: string;
     failureReason?: string;
     previousRun?: ProviderIssueRunRecord | null;
+    failureRetryClaim?: ProviderIntakeClaimRecord;
     preserveRetryAttempt?: boolean;
     clearRetryOnSuccessfulStart?: boolean;
     seedRetryAttemptFromPreviousRun?: boolean;
+    seedFailureRetryAttemptWithoutPreviousRun?: boolean;
     excludeCurrentClaimFromAdmission?: boolean;
   }): Promise<ProviderIssueHandoffResult> => {
     return await runWithConfiguredWorkerHostsCache(async () => {
       assertProviderHandoffSourceFreshnessTrusted();
       const taskId = buildProviderFallbackTaskId(input.trackedIssue);
+      const failureRetryClaim = input.failureRetryClaim ?? input.claim;
+      const preserveFailureRetryAttempt =
+        input.preserveRetryAttempt === true || failureRetryClaim.retry_queued === true;
       const preferredWorkerHost = resolvePreferredStartWorkerHost({
         claimWorkerHost: input.claim.worker_host ?? null,
         previousRun: input.previousRun ?? null
@@ -2283,11 +2288,10 @@ export function createProviderIssueHandoffService(
           merge_closeout: null,
           passive_release: null,
           ...buildQueuedProviderRetryFields({
-            claim: input.claim,
+            claim: failureRetryClaim,
             previousRun: input.previousRun ?? null,
             error: (error as Error)?.message ?? String(error),
-            preserveCurrentAttempt:
-              input.preserveRetryAttempt === true || input.claim.retry_queued === true,
+            preserveCurrentAttempt: preserveFailureRetryAttempt,
             seedInitialAttemptWithoutPreviousRun: true,
             delayType: 'failure'
           })
@@ -2360,11 +2364,12 @@ export function createProviderIssueHandoffService(
           merge_closeout: null,
           passive_release: null,
           ...buildQueuedProviderRetryFields({
-            claim: input.claim,
+            claim: failureRetryClaim,
             previousRun: input.previousRun ?? null,
             error: (error as Error)?.message ?? String(error),
-            preserveCurrentAttempt:
-              input.preserveRetryAttempt === true || input.claim.retry_queued === true,
+            preserveCurrentAttempt: preserveFailureRetryAttempt,
+            seedInitialAttemptWithoutPreviousRun:
+              input.seedFailureRetryAttemptWithoutPreviousRun === true,
             delayType: 'failure'
           })
         }, { rollbackOnPersistFailure: false });
@@ -2912,14 +2917,7 @@ export function createProviderIssueHandoffService(
       releaseClaim: Parameters<typeof upsertProviderIntakeClaim>[1];
       run: ProviderIssueRunRecord | null;
     }): Promise<boolean> => {
-      const releaseRun =
-        input.run &&
-        (
-          hasProviderClaimRunIdentityMatch(input.claim, input.run) ||
-          hasProviderClaimRunIdentityMatch(input.releaseClaim, input.run)
-        )
-          ? input.run
-          : null;
+      const releaseRun = input.run;
       let hasPendingReleaseCancel = false;
       if (shouldAttemptReleaseCancel(releaseRun)) {
         await retryReleaseCancel({
@@ -4047,8 +4045,10 @@ export function createProviderIssueHandoffService(
                 reason: PROVIDER_RETRY_START_LAUNCHED_REASON,
                 failureReason: PROVIDER_RETRY_START_FAILED_REASON,
                 previousRun: null,
+                failureRetryClaim: claim,
                 preserveRetryAttempt: false,
                 clearRetryOnSuccessfulStart: true,
+                seedFailureRetryAttemptWithoutPreviousRun: true,
                 excludeCurrentClaimFromAdmission: true
               });
               return;
@@ -4146,8 +4146,10 @@ export function createProviderIssueHandoffService(
             reason: startReason,
             failureReason: startFailureReason,
             previousRun: latestRunIsStaleForTrackedIssue ? null : latestRun,
+            failureRetryClaim: latestRunIsStaleForTrackedIssue ? claim : undefined,
             preserveRetryAttempt: !latestRunIsStaleForTrackedIssue,
             clearRetryOnSuccessfulStart: latestRunIsStaleForTrackedIssue,
+            seedFailureRetryAttemptWithoutPreviousRun: latestRunIsStaleForTrackedIssue,
             excludeCurrentClaimFromAdmission: latestRunIsStaleForTrackedIssue
           });
         });
@@ -4866,7 +4868,9 @@ export function createProviderIssueHandoffService(
               latestRun: ProviderIssueRunRecord | null;
               latestClaimBase: typeof latestClaimBase;
               latestRetryStateBase: typeof latestRetryStateBase;
+              failureRetryStateBase: typeof latestRetryStateBase;
               retryingFailedRelaunch: boolean;
+              seedFailureRetryAttemptWithoutPreviousRun: boolean;
               inflightClaim: ProviderIntakeClaimRecord;
               workerHost: string | null;
               launchToken: string;
@@ -4881,7 +4885,9 @@ export function createProviderIssueHandoffService(
                 latestRun: ProviderIssueRunRecord | null;
                 latestClaimBase: typeof latestClaimBase;
                 latestRetryStateBase: typeof latestRetryStateBase;
+                failureRetryStateBase: typeof latestRetryStateBase;
                 retryingFailedRelaunch: boolean;
+                seedFailureRetryAttemptWithoutPreviousRun: boolean;
                 inflightClaim: ProviderIntakeClaimRecord;
                 workerHost: string | null;
                 launchToken: string;
@@ -4929,6 +4935,10 @@ export function createProviderIssueHandoffService(
             ProviderIntakeClaimRecord,
             'retry_queued' | 'retry_attempt' | 'retry_due_at'
           > = lockedExistingForFreshLaunch ?? clearProviderRetryFields();
+          const lockedFailureRetryStateBaseForFreshLaunch: Pick<
+            ProviderIntakeClaimRecord,
+            'retry_queued' | 'retry_attempt' | 'retry_due_at'
+          > = lockedExisting ?? clearProviderRetryFields();
           const lockedPreferredWorkerHost = resolvePreferredStartWorkerHost({
             claimWorkerHost: lockedExistingForFreshLaunch?.worker_host ?? null,
             previousRun: lockedLatestRunForFreshLaunch
@@ -4986,9 +4996,9 @@ export function createProviderIssueHandoffService(
             });
           const lockedExplicitCompletedDuplicateRecovery =
             lockedExplicitCompletedDuplicateRecoveryFreshness === 'newer';
-            const lockedHasResumableRun = Boolean(
-              lockedLatestRunResumeEligible && !lockedLatestRunStaleForTrackedIssue
-            );
+          const lockedHasResumableRun = Boolean(
+            lockedLatestRunResumeEligible && !lockedLatestRunStaleForTrackedIssue
+          );
 
           if (
             (lockedExisting?.state === 'released' && latestExisting?.state !== 'released') ||
@@ -5094,12 +5104,12 @@ export function createProviderIssueHandoffService(
               mapping_source: lockedExisting?.mapping_source ?? mappingSource,
               state: 'accepted',
               reason: blockedReason,
-                run_id:
-                  lockedLatestRunForFreshLaunch?.runId ??
-                  (lockedLatestRunStaleForTrackedIssue ? null : lockedExisting?.run_id ?? null),
-                run_manifest_path:
-                  lockedLatestRunForFreshLaunch?.manifestPath ??
-                  (lockedLatestRunStaleForTrackedIssue ? null : lockedExisting?.run_manifest_path ?? null),
+              run_id:
+                lockedLatestRunForFreshLaunch?.runId ??
+                (lockedLatestRunStaleForTrackedIssue ? null : lockedExisting?.run_id ?? null),
+              run_manifest_path:
+                lockedLatestRunForFreshLaunch?.manifestPath ??
+                (lockedLatestRunStaleForTrackedIssue ? null : lockedExisting?.run_manifest_path ?? null),
               worker_host: lockedPreferredWorkerHost,
               launch_source: null,
               launch_token: null,
@@ -5131,13 +5141,13 @@ export function createProviderIssueHandoffService(
 
           let lockedWorkerHost: string | null = lockedPreferredWorkerHost;
           try {
-              lockedWorkerHost = await selectLaunchWorkerHost({
-                claim: {
-                  provider_key: providerKey,
-                  worker_host: lockedPreferredWorkerHost
-                },
-                previousRun: lockedLatestRunForFreshLaunch
-              });
+            lockedWorkerHost = await selectLaunchWorkerHost({
+              claim: {
+                provider_key: providerKey,
+                worker_host: lockedPreferredWorkerHost
+              },
+              previousRun: lockedLatestRunForFreshLaunch
+            });
           } catch (error) {
             const claim = await upsertProviderClaimAndPersist({
               ...lockedLatestClaimBase,
@@ -5154,8 +5164,8 @@ export function createProviderIssueHandoffService(
               merge_closeout: null,
               passive_release: null,
               ...buildQueuedProviderRetryFields({
-                  claim: lockedLatestRetryStateBaseForFreshLaunch,
-                  previousRun: lockedLatestRunForFreshLaunch,
+                claim: lockedFailureRetryStateBaseForFreshLaunch,
+                previousRun: lockedLatestRunForFreshLaunch,
                 error: (error as Error)?.message ?? String(error),
                 preserveCurrentAttempt: lockedExisting?.retry_queued === true,
                 seedInitialAttemptWithoutPreviousRun: true,
@@ -5183,8 +5193,8 @@ export function createProviderIssueHandoffService(
             merge_closeout: null,
             passive_release: null,
             ...buildProviderRetryLaunchFields({
-                claim: lockedLatestRetryStateBaseForFreshLaunch,
-                previousRun: lockedLatestRunForFreshLaunch,
+              claim: lockedLatestRetryStateBaseForFreshLaunch,
+              previousRun: lockedLatestRunForFreshLaunch,
               preserveCurrentAttempt: lockedExisting?.retry_queued === true,
               seedFromPreviousRun: lockedRetryingFailedRelaunch
             })
@@ -5193,10 +5203,12 @@ export function createProviderIssueHandoffService(
           return {
             kind: 'launch',
             latestExisting: lockedExisting,
-              latestRun: lockedLatestRunForFreshLaunch,
+            latestRun: lockedLatestRunForFreshLaunch,
             latestClaimBase: lockedLatestClaimBase,
-              latestRetryStateBase: lockedLatestRetryStateBaseForFreshLaunch,
+            latestRetryStateBase: lockedLatestRetryStateBaseForFreshLaunch,
+            failureRetryStateBase: lockedFailureRetryStateBaseForFreshLaunch,
             retryingFailedRelaunch: lockedRetryingFailedRelaunch,
+            seedFailureRetryAttemptWithoutPreviousRun: lockedLatestRunStaleForTrackedIssue,
             inflightClaim,
             workerHost: lockedWorkerHost,
             launchToken
@@ -5215,7 +5227,9 @@ export function createProviderIssueHandoffService(
         latestRun: reservedLatestRun,
         latestClaimBase: reservedLatestClaimBase,
         latestRetryStateBase: reservedLatestRetryStateBase,
+        failureRetryStateBase: reservedFailureRetryStateBase,
         retryingFailedRelaunch: reservedRetryingFailedRelaunch,
+        seedFailureRetryAttemptWithoutPreviousRun: reservedSeedFailureRetryAttemptWithoutPreviousRun,
         inflightClaim,
         workerHost,
         launchToken
@@ -5259,10 +5273,12 @@ export function createProviderIssueHandoffService(
           merge_closeout: null,
           passive_release: null,
           ...buildQueuedProviderRetryFields({
-            claim: reservedLatestRetryStateBase,
+            claim: reservedFailureRetryStateBase,
             previousRun: reservedLatestRun,
             error: (error as Error)?.message ?? String(error),
             preserveCurrentAttempt: reservedLatestExisting?.retry_queued === true,
+            seedInitialAttemptWithoutPreviousRun:
+              reservedSeedFailureRetryAttemptWithoutPreviousRun,
             delayType: 'failure'
           })
         }, { rollbackOnPersistFailure: false });
@@ -6444,10 +6460,12 @@ export function createProviderIssueHandoffService(
                   claim: releasedStartClaim,
                   trackedIssue: resolution.trackedIssue,
                   reason: 'provider_issue_refresh_start_launched',
-                  previousRun: latestRunStaleForTrackedIssue ? null : latestRun,
-                  clearRetryOnSuccessfulStart: latestRunStaleForTrackedIssue,
-                  excludeCurrentClaimFromAdmission: latestRunStaleForTrackedIssue
-                });
+                    previousRun: latestRunStaleForTrackedIssue ? null : latestRun,
+                    failureRetryClaim: latestRunStaleForTrackedIssue ? claim : undefined,
+                    clearRetryOnSuccessfulStart: latestRunStaleForTrackedIssue,
+                    seedFailureRetryAttemptWithoutPreviousRun: latestRunStaleForTrackedIssue,
+                    excludeCurrentClaimFromAdmission: latestRunStaleForTrackedIssue
+                  });
                 if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
                   noteOccupiedPollDispatchSlot(
                     resolveClaimPollDispatchSlotKey(claimProviderKey, handoffResult.claim),
@@ -6478,10 +6496,12 @@ export function createProviderIssueHandoffService(
               claim: releasedStartClaim,
               trackedIssue: resolution.trackedIssue,
               reason: 'provider_issue_refresh_start_launched',
-              previousRun: latestRunStaleForTrackedIssue ? null : latestRun,
-              clearRetryOnSuccessfulStart: latestRunStaleForTrackedIssue,
-              excludeCurrentClaimFromAdmission: latestRunStaleForTrackedIssue
-            });
+                previousRun: latestRunStaleForTrackedIssue ? null : latestRun,
+                failureRetryClaim: latestRunStaleForTrackedIssue ? claim : undefined,
+                clearRetryOnSuccessfulStart: latestRunStaleForTrackedIssue,
+                seedFailureRetryAttemptWithoutPreviousRun: latestRunStaleForTrackedIssue,
+                excludeCurrentClaimFromAdmission: latestRunStaleForTrackedIssue
+              });
             if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
               noteOccupiedPollDispatchSlot(
                 resolveClaimPollDispatchSlotKey(claimProviderKey, handoffResult.claim),
@@ -6591,12 +6611,14 @@ export function createProviderIssueHandoffService(
             if (resolution.kind === 'owned' && latestRunStaleForTrackedIssue) {
               const handoffResult = await launchStartForTrackedIssue({
                 claim: clearStaleProviderRunIdentityFromClaim(claim),
-                trackedIssue: resolution.trackedIssue,
-                reason: 'provider_issue_refresh_start_launched',
-                previousRun: null,
-                clearRetryOnSuccessfulStart: true,
-                excludeCurrentClaimFromAdmission: true
-              });
+                  trackedIssue: resolution.trackedIssue,
+                  reason: 'provider_issue_refresh_start_launched',
+                  previousRun: null,
+                  failureRetryClaim: claim,
+                  clearRetryOnSuccessfulStart: true,
+                  seedFailureRetryAttemptWithoutPreviousRun: true,
+                  excludeCurrentClaimFromAdmission: true
+                });
               if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
                 noteOccupiedPollDispatchSlot(
                   resolveClaimPollDispatchSlotKey(claimProviderKey, handoffResult.claim),
@@ -6918,10 +6940,14 @@ export function createProviderIssueHandoffService(
             }
             const handoffResult = await launchStartForTrackedIssue({
               claim: currentClaim,
-              trackedIssue: resolution.trackedIssue,
-              reason: 'provider_issue_refresh_start_launched',
-              excludeCurrentClaimFromAdmission: latestRunStaleForTrackedIssue
-            });
+                trackedIssue: resolution.trackedIssue,
+                reason: 'provider_issue_refresh_start_launched',
+                previousRun: latestRunStaleForTrackedIssue ? null : undefined,
+                failureRetryClaim: latestRunStaleForTrackedIssue ? claim : undefined,
+                clearRetryOnSuccessfulStart: latestRunStaleForTrackedIssue,
+                seedFailureRetryAttemptWithoutPreviousRun: latestRunStaleForTrackedIssue,
+                excludeCurrentClaimFromAdmission: latestRunStaleForTrackedIssue
+              });
             if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
               noteOccupiedPollDispatchSlot(
                 resolveClaimPollDispatchSlotKey(claimProviderKey, handoffResult.claim),

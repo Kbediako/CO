@@ -47888,6 +47888,240 @@ describe('createProviderIssueHandoffService', () => {
     });
   });
 
+  it('preserves retry scheduling when due retry stale-run Rework relaunch fails to start', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-23T22:06:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const taskId = 'task-co-555-old-failed-retry-dispatch-failure';
+    const runId = 'run-co-555-old-failed-retry-dispatch-failure';
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(childEnv, runId);
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: runId,
+        task_id: taskId,
+        status: 'failed',
+        summary: 'Old failed provider worker before CO-555 due retry launch failure.',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-555-retry-dispatch-failure',
+        issue_identifier: 'CO-555',
+        issue_updated_at: '2026-05-18T19:20:24.441Z',
+        updated_at: '2026-05-18T22:41:06.044Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      provider_key: 'linear:lin-issue-555-retry-dispatch-failure',
+      issue_id: 'lin-issue-555-retry-dispatch-failure',
+      issue_identifier: 'CO-555',
+      issue_title: 'Terminal retry recurrence fix',
+      issue_state: 'Rework',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-23T22:05:45.427Z',
+      task_id: taskId,
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      run_id: runId,
+      run_manifest_path: childPaths.manifestPath,
+      worker_host: 'stale-worker-host',
+      launch_source: 'control-host',
+      launch_token: 'stale-launch-token',
+      launch_started_at: '2026-05-18T19:20:30.000Z',
+      retry_queued: true,
+      retry_attempt: 2,
+      retry_due_at: '2026-05-23T22:06:01.000Z',
+      retry_error: 'old failed provider worker'
+    }));
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => {
+        throw new Error('transient launch failure');
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-555-retry-dispatch-failure',
+        identifier: 'CO-555',
+        title: 'Terminal retry recurrence fix',
+        state: 'Rework',
+        state_type: 'started',
+        updated_at: '2026-05-23T22:05:45.427Z'
+      })
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    expect(service).toBeDefined();
+    await waitForMockCalls(setTimeoutSpy);
+    vi.setSystemTime(new Date('2026-05-23T22:06:01.001Z'));
+    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    await flushAsyncWork();
+    await waitForMockCalls(launcher.start, 1, 1024);
+    await waitForMockCalls(persist, 1, QUEUED_RETRY_SETTLE_TURNS);
+
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      issue_identifier: 'CO-555',
+      issue_state: 'Rework',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-23T22:05:45.427Z',
+      state: 'handoff_failed',
+      reason: 'provider_issue_retry_start_failed:transient launch failure',
+      task_id: 'linear-lin-issue-555-retry-dispatch-failure',
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: 'control-host',
+      launch_token: expect.any(String),
+      retry_queued: true,
+      retry_attempt: 2,
+      retry_due_at: expect.any(String),
+      retry_error: 'transient launch failure'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-555',
+      state: 'handoff_failed',
+      run_id: null,
+      retry_queued: true,
+      retry_attempt: 2
+    });
+    expect(Number.isFinite(Date.parse(state.claims[0]?.retry_due_at ?? ''))).toBe(true);
+  });
+
+  it('preserves retry scheduling when stale-run fresh-launch reservation fails to start', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-23T22:06:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const taskId = 'task-co-555-direct-stale-failed-launch';
+    const runId = 'run-co-555-direct-stale-failed-launch';
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(childEnv, runId);
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: runId,
+        task_id: taskId,
+        status: 'failed',
+        summary: 'Old failed provider worker before direct Rework launch failure.',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-555-direct-stale-failed-launch',
+        issue_identifier: 'CO-555',
+        issue_updated_at: '2026-05-18T19:20:24.441Z',
+        updated_at: '2026-05-18T22:41:06.044Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      provider_key: 'linear:lin-issue-555-direct-stale-failed-launch',
+      issue_id: 'lin-issue-555-direct-stale-failed-launch',
+      issue_identifier: 'CO-555',
+      issue_title: 'Direct stale Rework launch failure',
+      issue_state: 'Rework',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-23T22:05:45.427Z',
+      task_id: taskId,
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      run_id: runId,
+      run_manifest_path: childPaths.manifestPath,
+      worker_host: 'stale-worker-host',
+      launch_source: 'control-host',
+      launch_token: 'stale-launch-token',
+      launch_started_at: '2026-05-18T19:20:30.000Z',
+      retry_queued: true,
+      retry_attempt: 4,
+      retry_due_at: '2026-05-23T22:06:01.000Z',
+      retry_error: 'old failed provider worker'
+    }));
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => {
+        throw new Error('transient launch failure');
+      }),
+      resume: vi.fn(async () => undefined)
+    };
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      startPipelineId: 'diagnostics'
+    });
+
+    await expect(
+      service.handleAcceptedTrackedIssue({
+        trackedIssue: createTrackedIssue({
+          id: 'lin-issue-555-direct-stale-failed-launch',
+          identifier: 'CO-555',
+          title: 'Direct stale Rework launch failure',
+          state: 'Rework',
+          state_type: 'started',
+          updated_at: '2026-05-23T22:05:45.427Z'
+        }),
+        deliveryId: 'delivery-co-555-direct-stale-failed-launch',
+        event: 'Issue',
+        action: 'update',
+        webhookTimestamp: 1_779_112_801_000
+      })
+    ).rejects.toThrow(
+      'Failed to start provider issue CO-555: provider_issue_start_failed:transient launch failure'
+    );
+
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      issue_identifier: 'CO-555',
+      issue_state: 'Rework',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-23T22:05:45.427Z',
+      state: 'handoff_failed',
+      reason: 'provider_issue_start_failed:transient launch failure',
+      task_id: 'linear-lin-issue-555-direct-stale-failed-launch',
+      run_id: null,
+      run_manifest_path: null,
+      launch_source: 'control-host',
+      launch_token: expect.any(String),
+      retry_queued: true,
+      retry_attempt: 4,
+      retry_due_at: expect.any(String),
+      retry_error: 'transient launch failure'
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-555',
+      state: 'handoff_failed',
+      run_id: null,
+      retry_queued: true,
+      retry_attempt: 4
+    });
+    expect(Number.isFinite(Date.parse(state.claims[0]?.retry_due_at ?? ''))).toBe(true);
+  });
+
   it('clears stale failed retry identity when due retry stale-run Rework relaunch is capacity blocked', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-23T22:06:00.000Z'));
@@ -48258,7 +48492,7 @@ describe('createProviderIssueHandoffService', () => {
     await expect(access(workspacePath)).rejects.toThrow();
   });
 
-  it('cancels an active child run when rehydrate releases terminal live Linear truth', async () => {
+    it('cancels an active child run when rehydrate releases terminal live Linear truth even after claim identity drift', async () => {
     const { root, paths } = await createHostPaths();
     const taskId = 'task-co-512-terminal-active';
     const runId = 'run-co-512-active';
@@ -48297,12 +48531,12 @@ describe('createProviderIssueHandoffService', () => {
       issue_state: 'In Progress',
       issue_state_type: 'started',
       issue_updated_at: '2026-05-18T19:10:00.000Z',
-      task_id: taskId,
-      state: 'running',
-      reason: 'provider_issue_rehydrated_active_run',
-      run_id: runId,
-      run_manifest_path: childPaths.manifestPath
-    }));
+        task_id: taskId,
+        state: 'running',
+        reason: 'provider_issue_rehydrated_active_run',
+        run_id: 'run-co-512-previous-stale',
+        run_manifest_path: join(root, '.runs', taskId, 'previous-stale', 'manifest.json')
+      }));
 
     const { persist, getPersistedState } = createPersistSnapshotSpy(state);
     const launcher = {
