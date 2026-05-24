@@ -1001,6 +1001,76 @@ last_review: ${lastReview}
     expect(decision.totals.terminal_lifecycle_entries).toBe(1);
   });
 
+  it('keeps terminal task-index specs with open checklist obligations in pre-expiry debt', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-terminal-open-spec-'));
+    createdDirs.push(repoRoot);
+    const specPath = 'tasks/specs/linear-terminal-open-spec.md';
+    const lastReview = reviewDateDaysAgo(27);
+    await writeFixture(repoRoot, {
+      entries: [{ path: specPath, lastReview }],
+      catalogPatterns: [
+        {
+          glob: 'tasks/specs/*.md',
+          doc_class: 'task_packet'
+        }
+      ]
+    });
+    await writeFile(
+      join(repoRoot, specPath),
+      `---
+id: 20260517-linear-terminal-open-spec
+title: Terminal source with local checklist debt
+status: in_progress
+last_review: ${lastReview}
+---
+
+# Spec
+
+- [x] Source issue was marked terminal.
+- [ ] Resolve local checklist obligations before this packet can be archived.
+`,
+      'utf8'
+    );
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(
+      join(repoRoot, 'tasks/index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260517-linear-terminal-open-spec',
+              title: 'Terminal source with local checklist debt',
+              status: 'done',
+              completed_at: '2026-05-17T00:00:00.000Z',
+              paths: {
+                spec: specPath,
+                task: 'tasks/tasks-linear-terminal-open-spec.md'
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const { decision, shouldBlock } = await runMaintain(repoRoot);
+
+    expect(shouldBlock).toBe(true);
+    expect(decision.freshness_decision).toBe('block_spec_guard_pre_expiry');
+    expect(decision.totals.spec_guard_pre_expiry_entries).toBe(1);
+    expect(decision.spec_guard_pre_expiry_entries).toEqual([
+      expect.objectContaining({
+        path: specPath,
+        days_until_expiry: 3,
+        failure_kind: 'active_spec_pre_expiry'
+      })
+    ]);
+    expect(decision.sample_paths.spec_guard_pre_expiry_paths).toEqual([specPath]);
+    expect(decision.totals.terminal_lifecycle_entries).toBe(0);
+  });
+
   it('does not warn for inactive specs with spec-guard frontmatter formatting', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-maintain-frontmatter-parity-'));
     createdDirs.push(repoRoot);
@@ -1138,6 +1208,16 @@ last_review: ${lastReview}
     const historicalPath = 'tasks/tasks-1164-historical.md';
     await writeFixture(repoRoot, {
       entries: [{ path: historicalPath, daysOld: 31 }]
+    });
+    await writeLinearIssueContextHelper(repoRoot, {
+      source_setup: {},
+      issue: {
+        id: 'co-175-id',
+        state: { name: 'In Progress', type: 'started' },
+        workspace_id: 'workspace-1',
+        team: { id: 'team-1' },
+        project: { id: 'project-1' }
+      }
     });
 
     const { decision, shouldBlock } = await runMaintain(repoRoot);
@@ -1911,6 +1991,481 @@ last_review: ${lastReview}
             copyable_command: null
           })
         ]
+      })
+    );
+  });
+
+  it('keeps exact canonical owner precedence when finalizer checks a terminal global owner', () => {
+    const lastReview = '2026-03-23';
+    const canonicalOwnerKey =
+      'docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          owner_issue: 'CO-300',
+          owner_issue_state: 'Done',
+          owner_issue_state_type: 'completed',
+          owner_issue_is_terminal: true,
+          canonical_owner_issues: [
+            {
+              canonical_owner_key: canonicalOwnerKey,
+              owner_issue: 'CO-320'
+            }
+          ]
+        }),
+        stale_entries: [
+          {
+            path: 'tasks/tasks-1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md',
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'tasks/tasks-*',
+            task_number: '1321',
+            last_review: lastReview,
+            cadence_days: 30,
+            age_days: 31,
+            overdue_days: 1
+          }
+        ],
+        rolling_cohort_entries: [],
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 1,
+          rolling_cohort_entries: 0,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: { status: 'succeeded' },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main',
+        canonicalOwnerIssueVerifications: [
+          {
+            issue: 'CO-320',
+            issue_id: '2b99df6c-e17c-4fac-a146-ed4dedc989e5',
+            canonical_owner_key: canonicalOwnerKey,
+            state: 'Blocked',
+            state_type: 'started',
+            is_terminal: false,
+            usable: true,
+            same_project: true,
+            verification_status: 'succeeded',
+            checked_at: null,
+            source: 'linear issue-context',
+            error: null
+          }
+        ]
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('pass_with_owned_rolling_debt');
+    expect(decision.candidate_cohorts[0]).toEqual(
+      expect.objectContaining({
+        canonical_owner_key: canonicalOwnerKey,
+        owner_issue: 'CO-320',
+        owner_issue_action: expect.objectContaining({
+          mode: 'update_existing',
+          issue: 'CO-320',
+          canonical_owner_key: canonicalOwnerKey
+        })
+      })
+    );
+
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(decision, {
+      env: { LINEAR_API_KEY: 'token' } as NodeJS.ProcessEnv,
+      ownerFinalizerVerifications: [
+        {
+          issue: 'CO-300',
+          canonical_owner_key: 'docs:freshness:maintain',
+          state: 'Done',
+          state_type: 'completed',
+          is_terminal: true,
+          usable: false,
+          verification_status: 'succeeded'
+        },
+        {
+          issue: 'CO-320',
+          canonical_owner_key: canonicalOwnerKey,
+          state: 'Blocked',
+          state_type: 'started',
+          is_terminal: false,
+          usable: true,
+          verification_status: 'succeeded'
+        }
+      ]
+    });
+
+    expect(ownerActionEvidence.actions[0]).toEqual(
+      expect.objectContaining({
+        owner_issue: 'CO-320',
+        mode: 'update_existing',
+        canonical_owner_key: canonicalOwnerKey
+      })
+    );
+    expect(ownerActionEvidence.should_block).toBe(false);
+    expect(ownerActionEvidence.owner_finalizer).toEqual(
+      expect.objectContaining({
+        status: 'passed_exact_canonical_owner_precedence',
+        active_owner_issue: 'CO-320',
+        active_canonical_owner_key: canonicalOwnerKey,
+        ignored_terminal_owner_issues: ['CO-300']
+      })
+    );
+  });
+
+  it('prefers exact keyed finalizer verification over a same-issue unkeyed fallback', () => {
+    const canonicalOwnerKey = 'baseline_cohort_id:fixture-owner';
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(
+      {
+        freshness_decision: 'pass_with_owned_rolling_debt',
+        owner_issue: 'CO-300',
+        owner_issue_action: {
+          mode: 'update_existing_multiple',
+          issues: ['CO-320'],
+          canonical_owner_keys: [canonicalOwnerKey],
+          reason: 'canonical_owner_key_match_multiple'
+        },
+        candidate_cohorts: [
+          {
+            id: 'fixture-owner',
+            canonical_owner_key: canonicalOwnerKey,
+            owner_issue: 'CO-320',
+            owner_issue_action: {
+              mode: 'update_existing',
+              issue: 'CO-320',
+              canonical_owner_key: canonicalOwnerKey
+            },
+            sample_paths: ['tasks/tasks-1164-historical.md']
+          }
+        ]
+      },
+      {
+        env: { LINEAR_API_KEY: 'token' } as NodeJS.ProcessEnv,
+        ownerFinalizerVerifications: [
+          {
+            issue: 'CO-320',
+            canonical_owner_key: null,
+            state: 'In Progress',
+            state_type: 'started',
+            is_terminal: false,
+            usable: true,
+            verification_status: 'succeeded'
+          },
+          {
+            issue: 'CO-320',
+            canonical_owner_key: canonicalOwnerKey,
+            state: 'Done',
+            state_type: 'completed',
+            is_terminal: true,
+            usable: true,
+            verification_status: 'succeeded'
+          }
+        ]
+      }
+    );
+
+    expect(ownerActionEvidence.status).toBe('blocked_terminal_owner');
+    expect(ownerActionEvidence.required_actions).toBe(1);
+    expect(ownerActionEvidence.should_block).toBe(true);
+    expect(ownerActionEvidence.owner_finalizer).toEqual(
+      expect.objectContaining({
+        status: 'blocked_terminal_owner',
+        blocking_owner_issue: 'CO-320',
+        canonical_owner_key: canonicalOwnerKey,
+        reason: 'owner_terminal_after_candidate_resolution'
+      })
+    );
+  });
+
+  it('reports exact-key precedence when an exact active verification wins over a same-issue unkeyed terminal fallback', () => {
+    const canonicalOwnerKey = 'baseline_cohort_id:fixture-owner';
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(
+      {
+        freshness_decision: 'pass_with_owned_rolling_debt',
+        owner_issue: 'CO-300',
+        owner_issue_action: {
+          mode: 'update_existing_multiple',
+          issues: ['CO-320'],
+          canonical_owner_keys: [canonicalOwnerKey],
+          reason: 'canonical_owner_key_match_multiple'
+        },
+        candidate_cohorts: [
+          {
+            id: 'fixture-owner',
+            canonical_owner_key: canonicalOwnerKey,
+            owner_issue: 'CO-320',
+            owner_issue_action: {
+              mode: 'update_existing',
+              issue: 'CO-320',
+              canonical_owner_key: canonicalOwnerKey
+            },
+            sample_paths: ['tasks/tasks-1164-historical.md']
+          }
+        ]
+      },
+      {
+        env: { LINEAR_API_KEY: 'token' } as NodeJS.ProcessEnv,
+        ownerFinalizerVerifications: [
+          {
+            issue: 'CO-320',
+            canonical_owner_key: null,
+            state: 'Done',
+            state_type: 'completed',
+            is_terminal: true,
+            usable: true,
+            verification_status: 'succeeded'
+          },
+          {
+            issue: 'CO-320',
+            canonical_owner_key: canonicalOwnerKey,
+            state: 'In Progress',
+            state_type: 'started',
+            is_terminal: false,
+            usable: true,
+            verification_status: 'succeeded'
+          }
+        ]
+      }
+    );
+
+    expect(ownerActionEvidence.status).toBe('action_required');
+    expect(ownerActionEvidence.should_block).toBe(false);
+    expect(ownerActionEvidence.owner_finalizer).toEqual(
+      expect.objectContaining({
+        status: 'passed_exact_canonical_owner_precedence',
+        active_owner_issue: 'CO-320',
+        active_canonical_owner_key: canonicalOwnerKey,
+        ignored_terminal_owner_issues: ['CO-320']
+      })
+    );
+  });
+
+  it('blocks when owner finalization finds the resolved canonical owner terminal', () => {
+    const lastReview = '2026-03-23';
+    const canonicalOwnerKey =
+      'docs_freshness_candidate|doc_class:task_packet|path_family:tasks/tasks-*|last_review:2026-03-23|cadence_days:30';
+    const decision = buildDocsFreshnessMaintenanceDecision(
+      {
+        rolling_freshness_policy: rollingFreshnessPolicy({
+          owner_issue: 'CO-300',
+          owner_issue_state: 'Done',
+          owner_issue_state_type: 'completed',
+          owner_issue_is_terminal: true,
+          canonical_owner_issues: [
+            {
+              canonical_owner_key: canonicalOwnerKey,
+              owner_issue: 'CO-320'
+            }
+          ]
+        }),
+        stale_entries: [
+          {
+            path: 'tasks/tasks-1321-coordinator-live-linear-unassigned-active-claim-alignment-and-recovery.md',
+            doc_class: 'task_packet',
+            doc_class_label: 'Task Packet',
+            path_family: 'tasks/tasks-*',
+            task_number: '1321',
+            last_review: lastReview,
+            cadence_days: 30,
+            age_days: 31,
+            overdue_days: 1
+          }
+        ],
+        rolling_cohort_entries: [],
+        totals: {
+          docs_scanned: 1,
+          registry_entries: 1,
+          missing_in_registry: 0,
+          missing_on_disk: 0,
+          invalid_entries: 0,
+          stale_entries: 1,
+          rolling_cohort_entries: 0,
+          uncatalogued_docs: 0
+        }
+      },
+      {
+        changedPaths: [],
+        taskId: 'fixture',
+        specGuard: { status: 'succeeded' },
+        diffStatus: 'ok',
+        diffBaseRef: 'origin/main',
+        canonicalOwnerIssueVerifications: [
+          {
+            issue: 'CO-320',
+            issue_id: '2b99df6c-e17c-4fac-a146-ed4dedc989e5',
+            canonical_owner_key: canonicalOwnerKey,
+            state: 'In Progress',
+            state_type: 'started',
+            is_terminal: false,
+            usable: true,
+            same_project: true,
+            verification_status: 'succeeded',
+            checked_at: null,
+            source: 'linear issue-context',
+            error: null
+          }
+        ]
+      }
+    );
+
+    expect(decision.freshness_decision).toBe('pass_with_owned_rolling_debt');
+    expect(decision.candidate_cohorts[0]).toEqual(
+      expect.objectContaining({
+        owner_issue: 'CO-320',
+        owner_issue_action: expect.objectContaining({
+          mode: 'update_existing',
+          issue: 'CO-320',
+          canonical_owner_key: canonicalOwnerKey
+        })
+      })
+    );
+
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(decision, {
+      env: { LINEAR_API_KEY: 'token' } as NodeJS.ProcessEnv,
+      dryRunLinearActions: true,
+      ownerFinalizerVerifications: [
+        {
+          issue: 'CO-320',
+          canonical_owner_key: canonicalOwnerKey,
+          state: 'Done',
+          state_type: 'completed',
+          is_terminal: true,
+          usable: false,
+          verification_status: 'succeeded'
+        }
+      ]
+    });
+
+    expect(ownerActionEvidence.actions[0]).toEqual(
+      expect.objectContaining({
+        owner_issue: 'CO-320',
+        mode: 'update_existing',
+        canonical_owner_key: canonicalOwnerKey
+      })
+    );
+    expect(ownerActionEvidence.status).toBe('blocked_terminal_owner');
+    expect(ownerActionEvidence.required_actions).toBe(1);
+    expect(ownerActionEvidence.should_block).toBe(true);
+    expect(ownerActionEvidence.owner_finalizer).toEqual(
+      expect.objectContaining({
+        status: 'blocked_terminal_owner',
+        blocking_owner_issue: 'CO-320',
+        canonical_owner_key: canonicalOwnerKey,
+        reason: 'owner_terminal_after_candidate_resolution'
+      })
+    );
+  });
+
+  it('blocks when resolved owner finalizer verification is unusable', () => {
+    const canonicalOwnerKey = 'baseline_cohort_id:fixture-owner';
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(
+      {
+        freshness_decision: 'pass_with_owned_rolling_debt',
+        owner_issue: 'CO-300',
+        owner_issue_action: {
+          mode: 'update_existing_multiple',
+          issues: ['CO-320'],
+          canonical_owner_keys: [canonicalOwnerKey],
+          reason: 'canonical_owner_key_match_multiple'
+        },
+        candidate_cohorts: [
+          {
+            id: 'fixture-owner',
+            canonical_owner_key: canonicalOwnerKey,
+            owner_issue: 'CO-320',
+            owner_issue_action: {
+              mode: 'update_existing',
+              issue: 'CO-320',
+              canonical_owner_key: canonicalOwnerKey
+            },
+            sample_paths: ['tasks/tasks-1164-historical.md']
+          }
+        ]
+      },
+      {
+        env: { LINEAR_API_KEY: 'token' } as NodeJS.ProcessEnv,
+        ownerFinalizerVerifications: [
+          {
+            issue: 'CO-320',
+            canonical_owner_key: canonicalOwnerKey,
+            state: null,
+            state_type: null,
+            is_terminal: false,
+            usable: false,
+            verification_status: 'failed'
+          }
+        ]
+      }
+    );
+
+    expect(ownerActionEvidence.status).toBe('blocked_owner_verification_unavailable');
+    expect(ownerActionEvidence.required_actions).toBe(1);
+    expect(ownerActionEvidence.should_block).toBe(true);
+    expect(ownerActionEvidence.owner_finalizer).toEqual(
+      expect.objectContaining({
+        status: 'blocked_owner_verification_unavailable',
+        blocking_owner_issue: 'CO-320',
+        canonical_owner_key: canonicalOwnerKey,
+        reason: 'owner_verification_failed',
+        verification_status: 'failed'
+      })
+    );
+  });
+
+  it('blocks when an active owner finalizer verification is missing', () => {
+    const canonicalOwnerKey = 'baseline_cohort_id:fixture-owner';
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(
+      {
+        freshness_decision: 'pass_with_owned_rolling_debt',
+        owner_issue: 'CO-300',
+        owner_issue_action: {
+          mode: 'update_existing_multiple',
+          issues: ['CO-320'],
+          canonical_owner_keys: [canonicalOwnerKey],
+          reason: 'canonical_owner_key_match_multiple'
+        },
+        candidate_cohorts: [
+          {
+            id: 'fixture-owner',
+            canonical_owner_key: canonicalOwnerKey,
+            owner_issue: 'CO-320',
+            owner_issue_action: {
+              mode: 'update_existing',
+              issue: 'CO-320',
+              canonical_owner_key: canonicalOwnerKey
+            },
+            sample_paths: ['tasks/tasks-1164-historical.md']
+          }
+        ]
+      },
+      {
+        env: { LINEAR_API_KEY: 'token' } as NodeJS.ProcessEnv,
+        ownerFinalizerVerifications: []
+      }
+    );
+
+    expect(ownerActionEvidence.status).toBe('blocked_owner_verification_unavailable');
+    expect(ownerActionEvidence.required_actions).toBe(1);
+    expect(ownerActionEvidence.should_block).toBe(true);
+    expect(ownerActionEvidence.owner_finalizer).toEqual(
+      expect.objectContaining({
+        status: 'blocked_owner_verification_unavailable',
+        blocking_owner_issue: 'CO-320',
+        active_owner_issue: 'CO-320',
+        active_owner_issues: ['CO-320'],
+        canonical_owner_key: canonicalOwnerKey,
+        active_canonical_owner_key: canonicalOwnerKey,
+        reason: 'owner_verification_unavailable',
+        verification_status: null,
+        state: null,
+        state_type: null,
+        cohort_id: 'fixture-owner',
+        sample_paths: ['tasks/tasks-1164-historical.md']
       })
     );
   });
@@ -2771,6 +3326,59 @@ last_review: ${lastReview}
     expect(decision.freshness_decision).toBe('pass_with_owned_rolling_debt');
     expect(decision.recommended_action).toContain('owner issues CO-320 and CO-321');
     expect(decision.recommended_action).not.toContain('configured owner CO-300 is terminal');
+
+    const ownerActionEvidence = buildDocsFreshnessOwnerActionEvidence(decision, {
+      env: { LINEAR_API_KEY: 'token' } as NodeJS.ProcessEnv,
+      ownerFinalizerVerifications: [
+        {
+          issue: 'CO-300',
+          canonical_owner_key: 'docs:freshness:maintain',
+          state: 'Done',
+          state_type: 'completed',
+          is_terminal: true,
+          usable: false,
+          verification_status: 'succeeded'
+        },
+        {
+          issue: 'CO-320',
+          canonical_owner_key: tasksCanonicalOwnerKey,
+          state: 'Blocked',
+          state_type: 'started',
+          is_terminal: false,
+          usable: true,
+          verification_status: 'succeeded'
+        },
+        {
+          issue: 'CO-321',
+          canonical_owner_key: prdCanonicalOwnerKey,
+          state: 'In Progress',
+          state_type: 'started',
+          is_terminal: false,
+          usable: true,
+          verification_status: 'succeeded'
+        }
+      ]
+    });
+
+    expect(ownerActionEvidence.owner_finalizer).toEqual(
+      expect.objectContaining({
+        status: 'passed_exact_canonical_owner_precedence',
+        active_owner_issue: 'CO-320',
+        active_owner_issues: ['CO-320', 'CO-321'],
+        active_canonical_owner_key: tasksCanonicalOwnerKey,
+        ignored_terminal_owner_issues: ['CO-300']
+      })
+    );
+    expect(ownerActionEvidence.owner_finalizer.active_owner_records).toEqual([
+      expect.objectContaining({
+        owner_issue: 'CO-320',
+        canonical_owner_key: tasksCanonicalOwnerKey
+      }),
+      expect.objectContaining({
+        owner_issue: 'CO-321',
+        canonical_owner_key: prdCanonicalOwnerKey
+      })
+    ]);
   });
 
   it('keeps a copyable command on consolidated owner action evidence', () => {
@@ -3374,10 +3982,17 @@ last_review: ${lastReview}
     );
     expect(decision.owner_action_evidence).toEqual(
       expect.objectContaining({
-        status: 'credentials_missing',
+        status: 'blocked_owner_verification_unavailable',
         write_status: 'credentials_missing',
         should_block: true,
         required_actions: 1,
+        owner_finalizer: expect.objectContaining({
+          status: 'blocked_owner_verification_unavailable',
+          blocking_owner_issue: 'CO-175',
+          canonical_owner_key: baselineCanonicalOwnerKey,
+          reason: 'owner_verification_unavailable',
+          verification_status: 'unavailable'
+        }),
         actions: [
           expect.objectContaining({
             route_id: 'co-430-terminal-owner-replacement',
@@ -3610,8 +4225,15 @@ last_review: ${lastReview}
     ]);
     expect(decision.owner_action_evidence).toEqual(
       expect.objectContaining({
-        status: 'credentials_missing',
+        status: 'blocked_owner_verification_unavailable',
+        write_status: 'credentials_missing',
         should_block: true,
+        owner_finalizer: expect.objectContaining({
+          status: 'blocked_owner_verification_unavailable',
+          blocking_owner_issue: 'CO-175',
+          reason: 'owner_verification_unavailable',
+          verification_status: 'unavailable'
+        }),
         actions: [
           expect.objectContaining({
             route_id: 'co-429-completed-lane-registry-residue',
@@ -3643,6 +4265,16 @@ last_review: ${lastReview}
           }
         ]
       })
+    });
+    await writeLinearIssueContextHelper(repoRoot, {
+      source_setup: {},
+      issue: {
+        id: 'co-175-id',
+        state: { name: 'In Progress', type: 'started' },
+        workspace_id: 'workspace-1',
+        team: { id: 'team-1' },
+        project: { id: 'project-1' }
+      }
     });
 
     const { decision, shouldBlock } = await runMaintain(repoRoot);

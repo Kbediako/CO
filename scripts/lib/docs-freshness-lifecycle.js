@@ -1,9 +1,22 @@
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { normalizeTaskKey, parseIsoDateOrTimestamp } from './docs-helpers.js';
 
 export const TERMINAL_PENDING_ARCHIVE_STATUS = 'terminal_pending_archive';
 export const PRESERVED_HISTORICAL_STUB_STATUS = 'preserved_historical_stub';
 export const RETAINED_TERMINAL_PACKET_STATUS = 'retained_terminal_packet';
+export const ACTIVE_LIFECYCLE_STATUS = 'active';
+export const ARCHIVED_LIFECYCLE_STATUS = 'archived';
+export const DEPRECATED_LIFECYCLE_STATUS = 'deprecated';
+
+export const EFFECTIVE_LIFECYCLE_STATUSES = new Set([
+  ACTIVE_LIFECYCLE_STATUS,
+  ARCHIVED_LIFECYCLE_STATUS,
+  DEPRECATED_LIFECYCLE_STATUS,
+  PRESERVED_HISTORICAL_STUB_STATUS,
+  RETAINED_TERMINAL_PACKET_STATUS,
+  TERMINAL_PENDING_ARCHIVE_STATUS
+]);
 
 export const TERMINAL_TASK_STATUSES = new Set([
   'succeeded',
@@ -110,6 +123,297 @@ function formatDate(date) {
 
 export function isTaskPacketLifecyclePath(docPath) {
   return TASK_PACKET_PATH_FAMILIES.has(classifyTaskPacketPathFamily(docPath));
+}
+
+const OPEN_CHECKLIST_ITEM_PATTERN = /^\s*(?:[-*+]|\d+[.)])\s+\[ \](?:\s+.*)?$/u;
+const MARKDOWN_LIST_ITEM_PATTERN = /^([ \t]*)([-*+]|\d+[.)])([ \t]+)/u;
+const MARKDOWN_FENCE_PATTERN = /^([ \t]*)(`{3,}|~{3,})(.*)$/u;
+const RAW_HTML_BLOCK_TAGS = new Set(['pre', 'script', 'style', 'textarea']);
+
+function leadingIndentWidth(line) {
+  let width = 0;
+  for (const char of line) {
+    if (char === ' ') {
+      width += 1;
+      continue;
+    }
+    if (char === '\t') {
+      width += 4;
+      continue;
+    }
+    break;
+  }
+  return width;
+}
+
+function whitespaceWidth(value) {
+  let width = 0;
+  for (const char of value) {
+    width += char === '\t' ? 4 : 1;
+  }
+  return width;
+}
+
+function parseMarkdownListItem(line) {
+  const match = line.match(MARKDOWN_LIST_ITEM_PATTERN);
+  if (!match) {
+    return null;
+  }
+  const markerIndentWidth = leadingIndentWidth(match[1]);
+  const marker = match[2];
+  const gapWidth = whitespaceWidth(match[3]);
+  return {
+    markerIndentWidth,
+    contentIndentWidth: markerIndentWidth + marker.length + gapWidth
+  };
+}
+
+function parseMarkdownFence(line) {
+  const match = line.match(MARKDOWN_FENCE_PATTERN);
+  if (!match) {
+    return null;
+  }
+  return {
+    indentWidth: leadingIndentWidth(match[1]),
+    char: match[2][0],
+    length: match[2].length,
+    tail: match[3]
+  };
+}
+
+function closesMarkdownFence(line, fence) {
+  const closingFence = matchingMarkdownFenceMarker(line, fence);
+  return Boolean(
+    closingFence &&
+      closingFence.indentWidth >= fence.baseIndentWidth &&
+      closingFence.indentWidth - fence.baseIndentWidth <= 3
+  );
+}
+
+function matchingMarkdownFenceMarker(line, fence) {
+  const closingFence = parseMarkdownFence(line);
+  if (
+    !closingFence ||
+    closingFence.char !== fence.char ||
+    closingFence.length < fence.length ||
+    closingFence.tail.trim() !== ''
+  ) {
+    return null;
+  }
+  return closingFence;
+}
+
+function parseMarkdownHtmlBlock(line) {
+  const indentWidth = leadingIndentWidth(line);
+  const trimmed = line.trimStart();
+  if (trimmed.startsWith('<!--')) {
+    return {
+      type: 'comment',
+      indentWidth,
+      closed: trimmed.includes('-->')
+    };
+  }
+
+  const tagMatch = trimmed.match(/^<([A-Za-z][A-Za-z0-9-]*)(?=[\s>/])[^>]*>/u);
+  if (!tagMatch) {
+    return null;
+  }
+  const tagName = tagMatch[1].toLowerCase();
+  if (!RAW_HTML_BLOCK_TAGS.has(tagName)) {
+    return null;
+  }
+  return {
+    type: 'tag',
+    tagName,
+    indentWidth,
+    closed: new RegExp(`</\\s*${tagName}\\s*>`, 'iu').test(trimmed)
+  };
+}
+
+function closesMarkdownHtmlBlock(line, htmlBlock) {
+  const trimmed = line.trimStart();
+  if (htmlBlock.type === 'comment') {
+    return trimmed.includes('-->');
+  }
+  return new RegExp(`</\\s*${htmlBlock.tagName}\\s*>`, 'iu').test(trimmed);
+}
+
+function popListContextsForIndent(listContexts, indentWidth) {
+  while (listContexts.length > 0 && indentWidth < listContexts[listContexts.length - 1].contentIndentWidth) {
+    listContexts.pop();
+  }
+}
+
+function currentListContentIndent(listContexts) {
+  return listContexts.length > 0 ? listContexts[listContexts.length - 1].contentIndentWidth : 0;
+}
+
+function isMarkdownParagraphContinuation(line) {
+  const trimmed = line.trimStart();
+  if (/^(?:#{1,6}\s|>|-{3,}\s*$|\*{3,}\s*$|_{3,}\s*$)/u.test(trimmed)) {
+    return false;
+  }
+  return trimmed.length > 0;
+}
+
+export function extractOpenChecklistItems(content) {
+  if (typeof content !== 'string' || content.length === 0) {
+    return [];
+  }
+  const openItems = [];
+  const listContexts = [];
+  let fence = null;
+  let htmlBlock = null;
+  let indentedCodeBlock = null;
+  let previousWasBlank = true;
+
+  for (const line of content.split(/\r?\n/)) {
+    const indentWidth = leadingIndentWidth(line);
+    const isBlank = line.trim().length === 0;
+
+    if (fence) {
+      if (closesMarkdownFence(line, fence)) {
+        fence = null;
+        previousWasBlank = false;
+        continue;
+      }
+      if (fence.listDepth === 0 || isBlank || indentWidth >= fence.baseIndentWidth) {
+        previousWasBlank = false;
+        continue;
+      }
+      if (matchingMarkdownFenceMarker(line, fence)) {
+        fence = null;
+        previousWasBlank = false;
+        continue;
+      }
+      fence = null;
+    }
+
+    if (htmlBlock) {
+      if (closesMarkdownHtmlBlock(line, htmlBlock)) {
+        htmlBlock = null;
+        previousWasBlank = false;
+        continue;
+      }
+      if (htmlBlock.listDepth === 0 || isBlank || indentWidth >= htmlBlock.baseIndentWidth) {
+        previousWasBlank = false;
+        continue;
+      }
+      htmlBlock = null;
+    }
+
+    if (isBlank) {
+      if (!indentedCodeBlock) {
+        previousWasBlank = true;
+      }
+      continue;
+    }
+
+    if (indentedCodeBlock) {
+      if (
+        indentWidth >= indentedCodeBlock.codeIndentWidth &&
+        listContexts.length === indentedCodeBlock.listDepth
+      ) {
+        previousWasBlank = false;
+        continue;
+      }
+      indentedCodeBlock = null;
+    }
+
+    const listItem = parseMarkdownListItem(line);
+    const openingFence = parseMarkdownFence(line);
+    const openingHtmlBlock = parseMarkdownHtmlBlock(line);
+    if (
+      listContexts.length > 0 &&
+      !previousWasBlank &&
+      indentWidth < currentListContentIndent(listContexts) &&
+      !listItem &&
+      !openingFence &&
+      !openingHtmlBlock &&
+      isMarkdownParagraphContinuation(line)
+    ) {
+      previousWasBlank = false;
+      continue;
+    }
+
+    popListContextsForIndent(listContexts, indentWidth);
+
+    const baseIndentWidth = currentListContentIndent(listContexts);
+    const relativeIndentWidth = indentWidth - baseIndentWidth;
+    if (openingFence && relativeIndentWidth >= 0 && relativeIndentWidth <= 3) {
+      fence = {
+        char: openingFence.char,
+        length: openingFence.length,
+        baseIndentWidth,
+        listDepth: listContexts.length
+      };
+      previousWasBlank = false;
+      continue;
+    }
+
+    if (openingHtmlBlock && relativeIndentWidth >= 0 && relativeIndentWidth <= 3) {
+      if (!openingHtmlBlock.closed) {
+        htmlBlock = {
+          type: openingHtmlBlock.type,
+          tagName: openingHtmlBlock.tagName,
+          baseIndentWidth,
+          listDepth: listContexts.length
+        };
+      }
+      previousWasBlank = false;
+      continue;
+    }
+
+    if (previousWasBlank && relativeIndentWidth >= 4) {
+      indentedCodeBlock = {
+        codeIndentWidth: baseIndentWidth + 4,
+        listDepth: listContexts.length
+      };
+      previousWasBlank = false;
+      continue;
+    }
+
+    if (listItem) {
+      popListContextsForIndent(listContexts, listItem.markerIndentWidth);
+      const listBaseIndentWidth = currentListContentIndent(listContexts);
+      const listRelativeIndentWidth = listItem.markerIndentWidth - listBaseIndentWidth;
+      if (listRelativeIndentWidth >= 0 && listRelativeIndentWidth <= 3) {
+        listContexts.push(listItem);
+        if (OPEN_CHECKLIST_ITEM_PATTERN.test(line)) {
+          openItems.push(line.trim());
+        }
+        previousWasBlank = false;
+        continue;
+      }
+    }
+
+    if (listContexts.length > 0 && indentWidth >= currentListContentIndent(listContexts)) {
+      previousWasBlank = false;
+      continue;
+    }
+
+    listContexts.length = 0;
+    previousWasBlank = false;
+  }
+  return openItems;
+}
+
+function collectOpenChecklistObligations(paths, contentByPath) {
+  const obligations = [];
+  if (!contentByPath || typeof contentByPath.get !== 'function') {
+    return obligations;
+  }
+  for (const docPath of paths) {
+    const content = contentByPath.get(docPath);
+    const open_items = extractOpenChecklistItems(content);
+    if (open_items.length > 0) {
+      obligations.push({
+        path: docPath,
+        open_items
+      });
+    }
+  }
+  return obligations;
 }
 
 export function isTerminalTaskStatus(status) {
@@ -298,14 +602,51 @@ function shouldReplaceTaskIndexEntry(existing, candidate) {
   return candidateReviewDate > existingReviewDate;
 }
 
-export function buildTaskPacketLifecycleIndex(items) {
+export async function readTaskPacketLifecycleContentMap(repoRoot, items) {
+  const contentByPath = new Map();
+  const resolvedRepoRoot = path.resolve(repoRoot);
+  const sourceItems = Array.isArray(items) ? items : [];
+  const indexedPaths = new Set();
+  for (const item of sourceItems) {
+    for (const docPath of collectIndexedTaskPacketPaths(item)) {
+      indexedPaths.add(docPath);
+    }
+  }
+  await Promise.all(
+    [...indexedPaths].map(async (docPath) => {
+      const resolvedPath = path.resolve(resolvedRepoRoot, docPath);
+      const relativeToRoot = path.relative(resolvedRepoRoot, resolvedPath);
+      if (relativeToRoot.startsWith('..') || path.isAbsolute(relativeToRoot)) {
+        return;
+      }
+      try {
+        contentByPath.set(docPath, await readFile(resolvedPath, 'utf8'));
+      } catch (error) {
+        if (error?.code !== 'ENOENT') {
+          throw error;
+        }
+        // Missing linked packet paths are handled by the command-level registry checks.
+      }
+    })
+  );
+  return contentByPath;
+}
+
+export async function buildTaskPacketLifecycleIndexForRepo(repoRoot, items) {
+  const contentByPath = await readTaskPacketLifecycleContentMap(repoRoot, items);
+  return buildTaskPacketLifecycleIndex(items, { contentByPath });
+}
+
+export function buildTaskPacketLifecycleIndex(items, options = {}) {
   const byPath = new Map();
   const terminalItems = [];
   const taskItemsByPath = new Map();
+  const activeTerminalSourceItemsByPath = new Map();
   const sourceItems = Array.isArray(items) ? items : [];
   const indexedItems = [];
   const primaryOwnersByPath = new Map();
   const aliasOwnersByPath = new Map();
+  const contentByPath = options.contentByPath instanceof Map ? options.contentByPath : new Map();
 
   const addOwner = (ownersByPath, docPath, ownerKey) => {
     if (!ownersByPath.has(docPath)) {
@@ -377,20 +718,36 @@ export function buildTaskPacketLifecycleIndex(items) {
 
     const completedAt = normalizeOptionalString(item.completed_at);
     const completedDate = completedAt ? parseIsoDateOrTimestamp(completedAt) : null;
+    const terminalPaths = [
+      ...primaryPaths.filter((primaryPath) => canUsePrimaryPathForTaskIndex(primaryPath, ownerKey)),
+      ...aliasPaths.filter((aliasPath) => canUseAliasPathForTaskIndex(aliasPath, ownerKey))
+    ];
+    const localOpenChecklistObligations = collectOpenChecklistObligations(terminalPaths, contentByPath);
     const taskLifecycle = {
       task_id: normalizeOptionalString(item.id) ?? taskKey,
       task_key: taskKey,
       title: normalizeOptionalString(item.title),
       status: normalizeOptionalString(item.status),
       completed_at: completedDate ? formatDate(completedDate) : null,
-      source_issue: readSourceIssue(item)
+      source_issue: readSourceIssue(item),
+      local_open_checklist_obligations: localOpenChecklistObligations
     };
     terminalItems.push(taskLifecycle);
 
-    const terminalPaths = [
-      ...primaryPaths.filter((primaryPath) => canUsePrimaryPathForTaskIndex(primaryPath, ownerKey)),
-      ...aliasPaths.filter((aliasPath) => canUseAliasPathForTaskIndex(aliasPath, ownerKey))
-    ];
+    if (localOpenChecklistObligations.length > 0) {
+      for (const docPath of terminalPaths) {
+        activeTerminalSourceItemsByPath.set(docPath, {
+          ...taskLifecycle,
+          path: docPath,
+          path_family: classifyTaskPacketPathFamily(docPath),
+          lifecycle_state: ACTIVE_LIFECYCLE_STATUS,
+          terminal_source_lifecycle_state: TERMINAL_PENDING_ARCHIVE_STATUS,
+          recommended_action: 'resolve_local_checklist_obligations_before_archive'
+        });
+      }
+      continue;
+    }
+
     for (const docPath of terminalPaths) {
       byPath.set(docPath, {
         ...taskLifecycle,
@@ -405,6 +762,7 @@ export function buildTaskPacketLifecycleIndex(items) {
   return {
     byPath,
     terminalItems,
-    taskItemsByPath
+    taskItemsByPath,
+    activeTerminalSourceItemsByPath
   };
 }

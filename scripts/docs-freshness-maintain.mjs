@@ -10,7 +10,7 @@ import { promisify } from 'node:util';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
 import { collectDocFiles, computeAgeInDays, parseIsoDate, toPosixPath } from './lib/docs-helpers.js';
 import {
-  buildTaskPacketLifecycleIndex,
+  buildTaskPacketLifecycleIndexForRepo,
   collectTaskIndexItems,
   isTaskPacketLifecyclePath,
   isTerminalTaskStatus
@@ -405,10 +405,10 @@ async function loadTerminalTaskLifecycleIndex(repoRoot) {
   try {
     const raw = await readFile(path.join(repoRoot, 'tasks/index.json'), 'utf8');
     const parsed = JSON.parse(raw);
-    return buildTaskPacketLifecycleIndex(collectTaskIndexItems(parsed));
+    return buildTaskPacketLifecycleIndexForRepo(repoRoot, collectTaskIndexItems(parsed));
   } catch (error) {
     if (error?.code === 'ENOENT') {
-      return buildTaskPacketLifecycleIndex([]);
+      return buildTaskPacketLifecycleIndexForRepo(repoRoot, []);
     }
     throw error;
   }
@@ -1420,24 +1420,215 @@ function buildOwnerActionEvidenceResult(decision, actions, { env = process.env, 
   };
 }
 
+function normalizeOwnerFinalizerVerification(value) {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const issue = normalizeOptionalString(value.issue ?? value.owner_issue);
+  if (!issue) {
+    return null;
+  }
+  return {
+    issue,
+    canonical_owner_key: normalizeOptionalString(value.canonical_owner_key),
+    state: normalizeOptionalString(value.state),
+    state_type: normalizeOptionalString(value.state_type),
+    is_terminal: isTerminalWorkflowState({
+      state: normalizeOptionalString(value.state),
+      stateType: normalizeOptionalString(value.state_type),
+      isTerminal: normalizeOptionalBoolean(value.is_terminal)
+    }),
+    usable: value.usable === true,
+    verification_status: normalizeOptionalString(value.verification_status)
+  };
+}
+
+function ownerFinalizerRecordsForDecision(decision) {
+  const cohorts = Array.isArray(decision?.candidate_cohorts) ? decision.candidate_cohorts : [];
+  return cohorts
+    .map((cohort) => {
+      const ownerIssue = normalizeOptionalString(ownerActionIssueForCohort(cohort, decision));
+      if (!ownerIssue) {
+        return null;
+      }
+      return {
+        owner_issue: ownerIssue,
+        canonical_owner_key: docsFreshnessOwnerKeyForDecision(decision, cohort),
+        cohort_id: normalizeOptionalString(cohort?.id),
+        sample_paths: Array.isArray(cohort?.sample_paths) ? cohort.sample_paths.slice(0, 10) : []
+      };
+    })
+    .filter(Boolean);
+}
+
+function exactVerificationMatchesFinalizerRecord(verification, record) {
+  return (
+    Boolean(record?.canonical_owner_key) &&
+    verification?.issue === record.owner_issue &&
+    verification?.canonical_owner_key === record.canonical_owner_key
+  );
+}
+
+function fallbackVerificationMatchesFinalizerRecord(verification, record) {
+  return verification?.issue === record?.owner_issue && !verification?.canonical_owner_key;
+}
+
+function selectOwnerFinalizerVerification(verifications, record) {
+  return (
+    verifications.find((candidate) => exactVerificationMatchesFinalizerRecord(candidate, record)) ??
+    verifications.find((candidate) => fallbackVerificationMatchesFinalizerRecord(candidate, record)) ??
+    null
+  );
+}
+
+function ownerFinalizerVerificationsForDecision(decision) {
+  return [
+    decision?.owner_issue_verification ?? null,
+    ...(Array.isArray(decision?.canonical_owner_issue_verifications)
+      ? decision.canonical_owner_issue_verifications
+      : [])
+  ].filter(Boolean);
+}
+
+function ownerFinalizerRecordPayload(record) {
+  return {
+    owner_issue: record.owner_issue,
+    canonical_owner_key: record.canonical_owner_key,
+    cohort_id: record.cohort_id,
+    sample_paths: record.sample_paths
+  };
+}
+
+function blockedOwnerFinalizerRecordPayload(record, activeOwnerIssues, activeOwnerRecords, reason, verification = null) {
+  return {
+    status: 'blocked_owner_verification_unavailable',
+    blocking_owner_issue: record.owner_issue,
+    active_owner_issue: record.owner_issue,
+    active_owner_issues: activeOwnerIssues,
+    active_owner_records: activeOwnerRecords,
+    canonical_owner_key: record.canonical_owner_key,
+    active_canonical_owner_key: record.canonical_owner_key,
+    reason,
+    verification_status: verification?.verification_status ?? null,
+    state: verification?.state ?? null,
+    state_type: verification?.state_type ?? null,
+    cohort_id: record.cohort_id,
+    sample_paths: record.sample_paths,
+    ignored_terminal_owner_issues: []
+  };
+}
+
+function buildDocsFreshnessOwnerFinalizer(decision, ownerFinalizerVerifications = []) {
+  const records = ownerFinalizerRecordsForDecision(decision);
+  if (records.length === 0) {
+    return {
+      status: 'not_applicable',
+      active_owner_issue: null,
+      active_owner_issues: [],
+      active_owner_records: [],
+      active_canonical_owner_key: null,
+      ignored_terminal_owner_issues: []
+    };
+  }
+
+  const activeOwnerRecords = records.map(ownerFinalizerRecordPayload);
+  const activeOwnerIssues = uniqueSorted(activeOwnerRecords.map((record) => record.owner_issue));
+  const verifications = (Array.isArray(ownerFinalizerVerifications) ? ownerFinalizerVerifications : [])
+    .map(normalizeOwnerFinalizerVerification)
+    .filter(Boolean);
+  for (const record of records) {
+    const verification = selectOwnerFinalizerVerification(verifications, record);
+    if (!verification) {
+      return blockedOwnerFinalizerRecordPayload(
+        record,
+        activeOwnerIssues,
+        activeOwnerRecords,
+        'owner_verification_unavailable'
+      );
+    }
+    if (verification?.is_terminal) {
+      return {
+        status: 'blocked_terminal_owner',
+        blocking_owner_issue: record.owner_issue,
+        active_owner_issue: record.owner_issue,
+        active_owner_issues: activeOwnerIssues,
+        active_owner_records: activeOwnerRecords,
+        canonical_owner_key: record.canonical_owner_key,
+        active_canonical_owner_key: record.canonical_owner_key,
+        reason: 'owner_terminal_after_candidate_resolution',
+        state: verification.state,
+        state_type: verification.state_type,
+        cohort_id: record.cohort_id,
+        sample_paths: record.sample_paths,
+        ignored_terminal_owner_issues: []
+      };
+    }
+    if (verification && (verification.usable !== true || verification.verification_status !== 'succeeded')) {
+      return blockedOwnerFinalizerRecordPayload(
+        record,
+        activeOwnerIssues,
+        activeOwnerRecords,
+        verification?.verification_status === 'failed' ? 'owner_verification_failed' : 'owner_verification_unavailable',
+        verification
+      );
+    }
+  }
+
+  const activeRecord = records[0];
+  const ignoredTerminalOwnerIssues = uniqueSorted(
+    verifications
+      .filter(
+        (verification) =>
+          verification.is_terminal &&
+          !records.some((record) => selectOwnerFinalizerVerification(verifications, record) === verification)
+      )
+      .map((verification) => verification.issue)
+  );
+
+  return {
+    status:
+      ignoredTerminalOwnerIssues.length > 0
+        ? 'passed_exact_canonical_owner_precedence'
+        : 'passed_active_owner_finalizer',
+    active_owner_issue: activeRecord.owner_issue,
+    active_owner_issues: activeOwnerIssues,
+    active_owner_records: activeOwnerRecords,
+    active_canonical_owner_key: activeRecord.canonical_owner_key,
+    ignored_terminal_owner_issues: ignoredTerminalOwnerIssues
+  };
+}
+
 export function buildDocsFreshnessOwnerActionEvidence(
   decision,
-  {
+  options = {}
+) {
+  const {
     env = process.env,
     dryRunLinearActions = false
-  } = {}
-) {
+  } = options;
+  const ownerFinalizerVerificationsProvided = Object.prototype.hasOwnProperty.call(
+    options,
+    'ownerFinalizerVerifications'
+  );
+  const ownerFinalizerVerifications = ownerFinalizerVerificationsProvided
+    ? options.ownerFinalizerVerifications
+    : ownerFinalizerVerificationsForDecision(decision);
   const cohorts = Array.isArray(decision?.candidate_cohorts) ? decision.candidate_cohorts : [];
   if (cohorts.length === 0) {
     const preExpiryOwnerAction = buildSpecGuardPreExpiryOwnerAction(decision);
     if (preExpiryOwnerAction) {
-      return buildOwnerActionEvidenceResult(decision, [preExpiryOwnerAction], { env, dryRunLinearActions });
+      const result = buildOwnerActionEvidenceResult(decision, [preExpiryOwnerAction], { env, dryRunLinearActions });
+      return {
+        ...result,
+        owner_finalizer: buildDocsFreshnessOwnerFinalizer(decision, ownerFinalizerVerifications)
+      };
     }
     return {
       status: 'not_applicable',
       write_status: 'not_required',
       should_block: false,
-      actions: []
+      actions: [],
+      owner_finalizer: buildDocsFreshnessOwnerFinalizer(decision, ownerFinalizerVerifications)
     };
   }
 
@@ -1465,7 +1656,21 @@ export function buildDocsFreshnessOwnerActionEvidence(
   }
   const consolidatedAction = buildConsolidatedOwnerAction(decision, rawActions);
   const actions = consolidatedAction ? [consolidatedAction] : rawActions;
-  return buildOwnerActionEvidenceResult(decision, actions, { env, dryRunLinearActions });
+  const result = buildOwnerActionEvidenceResult(decision, actions, { env, dryRunLinearActions });
+  const ownerFinalizer = buildDocsFreshnessOwnerFinalizer(decision, ownerFinalizerVerifications);
+  const ownerFinalizerBlocks = ownerFinalizer.status.startsWith('blocked_');
+  const ownerFinalizerOwnsStatus =
+    ownerFinalizerBlocks &&
+    (ownerFinalizerVerificationsProvided ||
+      result.status === 'resolved' ||
+      ownerFinalizer.verification_status !== null);
+  return {
+    ...result,
+    status: ownerFinalizerOwnsStatus ? ownerFinalizer.status : result.status,
+    should_block: result.should_block || ownerFinalizerBlocks,
+    required_actions: ownerFinalizerBlocks ? Math.max(result.required_actions, 1) : result.required_actions,
+    owner_finalizer: ownerFinalizer
+  };
 }
 
 function isoDateFromTimestamp(value) {
@@ -2933,8 +3138,10 @@ export async function runDocsFreshnessMaintain(
   if (!skipOwnerActionEvidence) {
     decision.owner_action_evidence = buildDocsFreshnessOwnerActionEvidence(decision, {
       env,
-      dryRunLinearActions
+      dryRunLinearActions,
+      ownerFinalizerVerifications: [ownerIssueVerification, ...canonicalOwnerIssueVerifications].filter(Boolean)
     });
+    decision.owner_finalizer = decision.owner_action_evidence.owner_finalizer ?? null;
     decision.repo_gate = buildDocsFreshnessRepoGate(decision);
   }
 

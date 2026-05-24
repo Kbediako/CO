@@ -3,6 +3,10 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { renderDocsFreshnessMarkdown, runDocsFreshness } from '../scripts/docs-freshness.mjs';
+import {
+  extractOpenChecklistItems,
+  readTaskPacketLifecycleContentMap
+} from '../scripts/lib/docs-freshness-lifecycle.js';
 
 const createdDirs: string[] = [];
 
@@ -132,6 +136,227 @@ async function writeRollingDocsFixture(
 }
 
 describe('docs freshness reporting', () => {
+  it('ignores checklist-looking items inside fenced Markdown blocks', () => {
+    expect(
+      extractOpenChecklistItems(
+        [
+          '# Example',
+          '',
+          '```md',
+          '- [ ] Example syntax, not live work.',
+          '```',
+          '',
+          '~~~',
+          '- [ ] Another fenced example.',
+          '~~~',
+          '',
+          '- [ ] Actual open work.'
+        ].join('\n')
+      )
+    ).toEqual(['- [ ] Actual open work.']);
+  });
+
+  it('ignores checklist-looking items inside indented Markdown code blocks without hiding nested obligations', () => {
+    expect(
+      extractOpenChecklistItems(
+        [
+          '# Example',
+          '',
+          '    - [ ] Example syntax, not live work.',
+          '    - [ ] Another indented example.',
+          '',
+          '- Parent obligation group',
+          '    - [ ] Nested open obligation.',
+          '',
+          '- Blank-separated parent obligation group',
+          '',
+          '    - [ ] Blank-separated nested open obligation.',
+          '',
+          '- Parent with continuation text',
+          '    supporting detail inside the parent list item.',
+          '',
+          '    - [ ] Nested obligation after continuation text.',
+          '',
+          '- [x] Closed parent with an example',
+          '',
+          '        - [ ] Example syntax nested in code, not live work.',
+          '',
+          '    - [ ] Nested obligation after code example.',
+          '',
+          '- Fenced parent obligation group',
+          '',
+          '    ```md',
+          '    - [ ] Fenced example nested in code, not live work.',
+          '    ```',
+          '',
+          '    - [ ] Nested obligation after fenced code example.',
+          '',
+          '- [ ] Actual open work.'
+        ].join('\n')
+      )
+    ).toEqual([
+      '- [ ] Nested open obligation.',
+      '- [ ] Blank-separated nested open obligation.',
+      '- [ ] Nested obligation after continuation text.',
+      '- [ ] Nested obligation after code example.',
+      '- [ ] Nested obligation after fenced code example.',
+      '- [ ] Actual open work.'
+    ]);
+  });
+
+  it('tracks list content indentation so continuations do not hide later obligations', () => {
+    const cases = [
+      {
+        name: 'CommonMark continuation keeps parent context',
+        markdown: [
+          '- Parent with continuation text',
+          '  supporting detail at the parent content indent.',
+          '',
+          '    - [ ] Nested obligation after two-space continuation.'
+        ],
+        expected: ['- [ ] Nested obligation after two-space continuation.']
+      },
+      {
+        name: 'lazy continuation keeps parent context',
+        markdown: [
+          '- Parent with lazy continuation',
+          'still same list item paragraph.',
+          '',
+          '    - [ ] Nested obligation after lazy continuation.'
+        ],
+        expected: ['- [ ] Nested obligation after lazy continuation.']
+      },
+      {
+        name: 'top-level four-space task-looking line is indented code',
+        markdown: ['# Example', '', '    - [ ] Example syntax, not live work.', '', '- [ ] Actual open work.'],
+        expected: ['- [ ] Actual open work.']
+      },
+      {
+        name: 'multi-digit ordered parent content indent preserves nested task',
+        markdown: ['10. Parent item', '    continuation text.', '', '    - [ ] Nested obligation.'],
+        expected: ['- [ ] Nested obligation.']
+      },
+      {
+        name: 'grandchild task remains visible after child context exists',
+        markdown: ['- Parent', '    - Child', '', '        - [ ] Grandchild obligation.'],
+        expected: ['- [ ] Grandchild obligation.']
+      },
+      {
+        name: 'list-contained code under child does not hide following grandchild task',
+        markdown: [
+          '- Parent',
+          '    - Child',
+          '',
+          '            - [ ] Grandchild code example, not live work.',
+          '',
+          '        - [ ] Grandchild obligation after code.'
+        ],
+        expected: ['- [ ] Grandchild obligation after code.']
+      },
+      {
+        name: 'outdented paragraph clears list context before indented code',
+        markdown: ['- Parent', '', 'Outside paragraph.', '', '    - [ ] Code example, not live work.'],
+        expected: []
+      },
+      {
+        name: 'unterminated fence hides checklist-looking examples through EOF',
+        markdown: ['```md', '- [ ] Example syntax, not live work.'],
+        expected: []
+      },
+      {
+        name: 'list-scoped unterminated fence ends when the parent list item ends',
+        markdown: [
+          '- Parent with local fenced example',
+          '',
+          '  ```md',
+          '  - [ ] Fenced example, not live work.',
+          '',
+          '- [ ] Actual open work.'
+        ],
+        expected: ['- [ ] Actual open work.']
+      },
+      {
+        name: 'outdented fence close after list-scoped fence does not hide following work',
+        markdown: [
+          '- Parent with local fenced example',
+          '',
+          '  ```md',
+          '  - [ ] Fenced example, not live work.',
+          '```',
+          '- [ ] Actual open work.'
+        ],
+        expected: ['- [ ] Actual open work.']
+      },
+      {
+        name: 'fence-looking content with info does not close fenced block',
+        markdown: ['```md', '```example', '- [ ] Still fenced example, not live work.', '```', '- [ ] Actual open work.'],
+        expected: ['- [ ] Actual open work.']
+      },
+      {
+        name: 'raw HTML comments and pre blocks do not report checklist-looking examples',
+        markdown: [
+          '# Example',
+          '',
+          '<!--',
+          '- [ ] Commented example, not live work.',
+          '-->',
+          '',
+          '<pre>',
+          '- [ ] Raw HTML example, not live work.',
+          '</pre>',
+          '',
+          '<!-- - [ ] Single-line comment example, not live work. -->',
+          '',
+          '<pre>- [ ] Single-line raw HTML example, not live work.</pre>',
+          '',
+          '- [ ] Actual open work.'
+        ],
+        expected: ['- [ ] Actual open work.']
+      },
+      {
+        name: 'list-scoped raw HTML blocks end when the parent list item ends',
+        markdown: [
+          '- Parent with local raw HTML example',
+          '',
+          '  <!--',
+          '  - [ ] Commented example, not live work.',
+          '',
+          '- [ ] Actual open work.'
+        ],
+        expected: ['- [ ] Actual open work.']
+      },
+      {
+        name: 'empty unchecked checklist markers remain open obligations',
+        markdown: ['- [ ]', '1. [ ]   ', '- [ ] Actual open work.'],
+        expected: ['- [ ]', '1. [ ]', '- [ ] Actual open work.']
+      }
+    ];
+
+    for (const testCase of cases) {
+      expect(extractOpenChecklistItems(testCase.markdown.join('\n')), testCase.name).toEqual(testCase.expected);
+    }
+  });
+
+  it('fails closed on non-missing task packet lifecycle read errors', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-lifecycle-read-error-'));
+    createdDirs.push(repoRoot);
+
+    await mkdir(join(repoRoot, 'tasks', 'tasks-dir.md'), { recursive: true });
+
+    await expect(
+      readTaskPacketLifecycleContentMap(repoRoot, [
+        {
+          id: '20260524-linear-read-error',
+          key: 'linear-read-error',
+          status: 'done',
+          paths: {
+            task: 'tasks/tasks-dir.md'
+          }
+        }
+      ])
+    ).rejects.toMatchObject({ code: 'EISDIR' });
+  });
+
   it('fails closed when the docs catalog is missing', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-missing-catalog-'));
     createdDirs.push(repoRoot);
@@ -376,6 +601,130 @@ describe('docs freshness reporting', () => {
     expect(report.totals.invalid_entries).toBe(0);
   });
 
+  it('rejects preserved historical stubs that still contain open checklist obligations', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-preserved-historical-stub-open-checklist-'));
+    createdDirs.push(repoRoot);
+
+    const stubPath = 'tasks/tasks-linear-open-stub.md';
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(
+      join(repoRoot, stubPath),
+      '# Historical stub\n\n- [ ] Resolve the local lifecycle obligation before preserving this stub.\n',
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: stubPath,
+          status: 'preserved_historical_stub',
+          last_review: '2025-01-01',
+          cadence_days: 1
+        }
+      ],
+      catalogPatterns: [
+        {
+          glob: 'tasks/**/*.md',
+          doc_class: 'task_packet'
+        }
+      ]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.invalid_entries).toBe(1);
+    expect(report.invalid_entries).toEqual([
+      {
+        path: stubPath,
+        issues: ['preserved_historical_stub cannot contain open checklist obligations']
+      }
+    ]);
+  });
+
+  it('rejects preserved historical stubs when linked packet paths still contain open checklist obligations', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-preserved-linked-open-checklist-'));
+    createdDirs.push(repoRoot);
+
+    const taskKey = 'linear-preserved-linked-open-checklist';
+    const agentPath = `.agent/task/${taskKey}.md`;
+    const taskPath = `tasks/tasks-${taskKey}.md`;
+    await Promise.all([
+      mkdir(join(repoRoot, '.agent', 'task'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
+    await writeFile(join(repoRoot, agentPath), '# Historical stub\n\nStub retained for historical continuity.\n', 'utf8');
+    await writeFile(
+      join(repoRoot, taskPath),
+      [
+        '# Terminal packet with active local work',
+        '',
+        '- [x] Source issue was marked terminal.',
+        '- [ ] Resolve the linked lifecycle obligation before preserving siblings.'
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: `20260522-${taskKey}`,
+              title: 'Preserved linked open checklist fixture',
+              status: 'done',
+              completed_at: reviewDateDaysAgo(1),
+              paths: {
+                agent_task: agentPath,
+                task: taskPath
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: agentPath,
+          status: 'preserved_historical_stub',
+          last_review: '2025-01-01',
+          cadence_days: 1
+        },
+        {
+          path: taskPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: reviewDateDaysAgo(1),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [
+        { glob: '.agent/task/*.md', doc_class: 'task_mirror' },
+        { glob: 'tasks/**/*.md', doc_class: 'task_packet' }
+      ]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.invalid_entries).toBe(1);
+    expect(report.invalid_entries).toEqual([
+      {
+        path: agentPath,
+        issues: ['preserved_historical_stub cannot contain open checklist obligations']
+      }
+    ]);
+  });
+
   it('rejects preserved historical stub status on ordinary task packet content', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-preserved-historical-stub-invalid-'));
     createdDirs.push(repoRoot);
@@ -419,7 +768,7 @@ describe('docs freshness reporting', () => {
     );
   });
 
-  it('accepts retained terminal packets without treating full packet content as archive stubs', async () => {
+  it('accepts retained terminal packets with closed local checklist obligations', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-retained-terminal-packet-'));
     createdDirs.push(repoRoot);
 
@@ -428,7 +777,7 @@ describe('docs freshness reporting', () => {
     await mkdir(join(repoRoot, 'tasks'), { recursive: true });
     await writeFile(
       join(repoRoot, packetPath),
-      '# Task Checklist\n\n- [ ] Historical unchecked item remains visible in the retained packet.\n',
+      '# Task Checklist\n\n- [x] Historical checklist item remains visible in the retained packet.\n',
       'utf8'
     );
     await writeFile(
@@ -521,6 +870,148 @@ describe('docs freshness reporting', () => {
         })
       ])
     );
+  });
+
+  it('rejects retained terminal packets with open checklist obligations', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-retained-terminal-open-checklist-'));
+    createdDirs.push(repoRoot);
+
+    const taskKey = 'linear-retained-terminal-open-checklist';
+    const packetPath = `tasks/tasks-${taskKey}.md`;
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(
+      join(repoRoot, packetPath),
+      '# Task Checklist\n\n- [ ] Historical unchecked item remains visible in the retained packet.\n',
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: `20260524-${taskKey}`,
+              key: taskKey,
+              status: 'done',
+              last_review: reviewDateDaysAgo(0),
+              paths: {
+                task: packetPath
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: packetPath,
+          status: 'retained_terminal_packet',
+          last_review: '2025-01-01',
+          cadence_days: 365,
+          retained_reason: 'Linear source issue is terminal; full packet retained for historical audit.'
+        }
+      ],
+      catalogPatterns: [{ glob: 'tasks/**/*.md', doc_class: 'task_packet' }]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.invalid_entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: packetPath,
+          issues: expect.arrayContaining(['retained_terminal_packet cannot contain open checklist obligations'])
+        })
+      ])
+    );
+    expect(report.totals.retained_terminal_packet_entries).toBe(0);
+  });
+
+  it('rejects retained terminal packet history when linked sibling packets have open checklist obligations', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-retained-terminal-linked-open-checklist-'));
+    createdDirs.push(repoRoot);
+
+    const taskKey = 'linear-retained-terminal-linked-open-checklist';
+    const packetPath = `.agent/task/${taskKey}.md`;
+    const linkedPath = `docs/ACTION_PLAN-${taskKey}.md`;
+    await Promise.all([
+      mkdir(join(repoRoot, '.agent', 'task'), { recursive: true }),
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
+    await writeFile(join(repoRoot, packetPath), '# Archived continuity stub\n', 'utf8');
+    await writeFile(
+      join(repoRoot, linkedPath),
+      '# Linked historical action plan\n\n- [ ] Historical sibling obligation remains visible.\n',
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: `20260524-${taskKey}`,
+              key: taskKey,
+              status: 'done',
+              last_review: reviewDateDaysAgo(0),
+              paths: {
+                agent_task: packetPath,
+                action_plan: linkedPath
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: packetPath,
+          status: 'retained_terminal_packet',
+          last_review: '2025-01-01',
+          cadence_days: 365,
+          retained_reason: 'Archived sibling packet still resolves to linked local checklist obligations.'
+        },
+        {
+          path: linkedPath,
+          status: 'active',
+          owner: 'Codex',
+          last_review: reviewDateDaysAgo(0),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [
+        { glob: '.agent/task/*.md', doc_class: 'task_mirror' },
+        { glob: 'docs/ACTION_PLAN-*.md', doc_class: 'task_packet' }
+      ]
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.invalid_entries).toBe(1);
+    expect(report.invalid_entries).toEqual([
+      expect.objectContaining({
+        path: packetPath,
+        issues: expect.arrayContaining(['retained_terminal_packet cannot contain open checklist obligations'])
+      })
+    ]);
+    expect(report.totals.retained_terminal_packet_entries).toBe(0);
   });
 
   it('writes a class-separated markdown summary when requested', async () => {
@@ -1304,6 +1795,172 @@ describe('docs freshness reporting', () => {
     expect(report.totals.terminal_lifecycle_entries).toBe(0);
   });
 
+  it('keeps terminal task-index rows with open local checklist obligations active outside declared cohorts', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-terminal-open-checklist-active-'));
+    createdDirs.push(repoRoot);
+    const packetPath = 'tasks/tasks-open-checklist-terminal-source.md';
+
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
+    await writeFile(
+      join(repoRoot, packetPath),
+      [
+        '# Terminal source issue with local checklist debt',
+        '',
+        '- [x] Terminal source issue was closed upstream.',
+        '- [ ] Archive or reclassify the visible docs freshness obligation.'
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260522-open-checklist-terminal-source',
+              title: 'Open checklist terminal source',
+              status: 'done',
+              completed_at: reviewDateDaysAgo(1),
+              paths: {
+                task: packetPath
+              },
+              source_issue: {
+                identifier: 'CO-999'
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: packetPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: reviewDateDaysAgo(31),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [{ glob: 'tasks/**/*.md', doc_class: 'task_packet' }],
+      catalogPolicies: {
+        rolling_freshness_cohorts: rollingFreshnessPolicy({ max_entries: 300 })
+      }
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.terminal_lifecycle_entries).toBe(0);
+    expect(report.totals.rolling_cohort_entries).toBe(0);
+    expect(report.totals.stale_entries).toBe(1);
+    expect(report.stale_entries).toEqual([
+      expect.objectContaining({
+        path: packetPath,
+        registry_status: 'active',
+        terminal_source_lifecycle_state: 'terminal_pending_archive',
+        task_number: null
+      })
+    ]);
+  });
+
+  it('keeps terminal open-checklist rows visible in declared rolling cohorts', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-terminal-open-checklist-prefix-'));
+    createdDirs.push(repoRoot);
+    const packetPath = 'tasks/tasks-open-checklist-terminal-source.md';
+
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
+    await writeFile(
+      join(repoRoot, packetPath),
+      [
+        '# Terminal source issue with local checklist debt',
+        '',
+        '- [x] Terminal source issue was closed upstream.',
+        '- [ ] Archive or reclassify the visible docs freshness obligation.'
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260522-open-checklist-terminal-source',
+              title: 'Open checklist terminal source',
+              status: 'done',
+              completed_at: reviewDateDaysAgo(1),
+              paths: {
+                task: packetPath
+              },
+              source_issue: {
+                identifier: 'CO-999'
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: packetPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: reviewDateDaysAgo(31),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [{ glob: 'tasks/**/*.md', doc_class: 'task_packet' }],
+      catalogPolicies: {
+        rolling_freshness_cohorts: rollingFreshnessPolicy({
+          max_entries: 300,
+          baseline_cohorts: [
+            {
+              id: 'fixture-terminal-source-prefix',
+              last_review: reviewDateDaysAgo(31),
+              cadence_days: 30,
+              path_families: ['tasks/tasks-*'],
+              path_prefixes: [packetPath]
+            }
+          ]
+        })
+      }
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(false);
+    expect(report.totals.terminal_lifecycle_entries).toBe(0);
+    expect(report.totals.stale_entries).toBe(0);
+    expect(report.totals.rolling_cohort_entries).toBe(1);
+    expect(report.rolling_cohort_entries).toEqual([
+      expect.objectContaining({
+        path: packetPath,
+        registry_status: 'active',
+        terminal_source_lifecycle_state: 'terminal_pending_archive'
+      })
+    ]);
+  });
+
   it('routes legacy tasks[] terminal task packet rows to lifecycle action', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-legacy-tasks-terminal-lifecycle-'));
     createdDirs.push(repoRoot);
@@ -1537,6 +2194,144 @@ describe('docs freshness reporting', () => {
     expect(report.totals.stale_entries).toBe(0);
     expect(report.totals.rolling_cohort_entries).toBe(0);
     expect(report.totals.terminal_lifecycle_entries).toBe(0);
+  });
+
+  it('rejects archived task packets that still contain open checklist obligations', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-archived-open-checklist-'));
+    createdDirs.push(repoRoot);
+    const packetPath = 'tasks/tasks-archived-open-checklist.md';
+
+    await mkdir(join(repoRoot, 'tasks'), { recursive: true });
+    await writeFile(
+      join(repoRoot, packetPath),
+      [
+        '# Archived packet with unfinished local work',
+        '',
+        '- [x] Mark source issue terminal.',
+        '- [ ] Remove or route the still-visible docs freshness obligation.'
+      ].join('\n'),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: packetPath,
+          owner: 'Codex',
+          status: 'archived',
+          lifecycle_state: 'archived',
+          last_review: reviewDateDaysAgo(31),
+          cadence_days: 30,
+          archived_at: reviewDateDaysAgo(1),
+          archive_reason: 'Fixture terminal packet retained as history.'
+        }
+      ],
+      catalogPatterns: [{ glob: 'tasks/**/*.md', doc_class: 'task_packet' }],
+      catalogPolicies: {
+        rolling_freshness_cohorts: rollingFreshnessPolicy({ max_entries: 300 })
+      }
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.invalid_entries).toBe(1);
+    expect(report.invalid_entries).toEqual([
+      {
+        path: packetPath,
+        issues: ['archived task packet cannot contain open checklist obligations']
+      }
+    ]);
+  });
+
+  it('rejects archived task packets when linked packet paths still contain open checklist obligations', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-archived-linked-open-checklist-'));
+    createdDirs.push(repoRoot);
+    const taskKey = 'linked-open-checklist';
+    const taskPath = `tasks/tasks-${taskKey}.md`;
+    const prdPath = `docs/PRD-${taskKey}.md`;
+
+    await Promise.all([
+      mkdir(join(repoRoot, 'docs'), { recursive: true }),
+      mkdir(join(repoRoot, 'tasks'), { recursive: true })
+    ]);
+    await writeFile(join(repoRoot, prdPath), '# Archived sibling packet\n', 'utf8');
+    await writeFile(
+      join(repoRoot, taskPath),
+      [
+        '# Terminal packet with active local work',
+        '',
+        '- [x] Source issue was marked terminal.',
+        '- [ ] Resolve the linked lifecycle obligation before archiving siblings.'
+      ].join('\n'),
+      'utf8'
+    );
+    await writeFile(
+      join(repoRoot, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: `20260522-${taskKey}`,
+              title: 'Archived linked open checklist fixture',
+              status: 'done',
+              completed_at: reviewDateDaysAgo(1),
+              paths: {
+                prd: prdPath,
+                task: taskPath
+              }
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    await writeDocsFreshnessFixture(repoRoot, {
+      registryEntries: [
+        {
+          path: prdPath,
+          owner: 'Codex',
+          status: 'archived',
+          lifecycle_state: 'archived',
+          last_review: reviewDateDaysAgo(31),
+          cadence_days: 30,
+          archived_at: reviewDateDaysAgo(1),
+          archive_reason: 'Fixture terminal packet retained as history.'
+        },
+        {
+          path: taskPath,
+          owner: 'Codex',
+          status: 'active',
+          last_review: reviewDateDaysAgo(1),
+          cadence_days: 30
+        }
+      ],
+      catalogPatterns: [
+        { glob: 'docs/*.md', doc_class: 'task_packet' },
+        { glob: 'tasks/**/*.md', doc_class: 'task_packet' }
+      ],
+      catalogPolicies: {
+        rolling_freshness_cohorts: rollingFreshnessPolicy({ max_entries: 300 })
+      }
+    });
+
+    const { report, hasFailures } = await runDocsFreshness(repoRoot, {
+      outRoot: join(repoRoot, 'out'),
+      taskId: 'fixture'
+    });
+
+    expect(hasFailures).toBe(true);
+    expect(report.totals.invalid_entries).toBe(1);
+    expect(report.invalid_entries).toEqual([
+      {
+        path: prdPath,
+        issues: ['archived task packet cannot contain open checklist obligations']
+      }
+    ]);
   });
 
   it('keeps archived rows with closed task status out of active docs freshness debt', async () => {

@@ -5,11 +5,15 @@ import { readFile } from 'node:fs/promises';
 import process from 'node:process';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
 import { normalizeDocsCatalog, resolveDocsCatalogEntry } from './lib/docs-catalog.js';
-import { collectIndexedTaskPacketPaths, isTerminalTaskStatus } from './lib/docs-freshness-lifecycle.js';
+import {
+  collectIndexedTaskPacketPaths,
+  collectTaskIndexItems,
+  extractOpenChecklistItems,
+  isTerminalTaskStatus
+} from './lib/docs-freshness-lifecycle.js';
 import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 import { hasArchiveStubMarker, parseArchiveStubMetadata } from './lib/archive-stub.js';
 
-const OPEN_CHECKLIST_ITEM_PATTERN = /^\s*(?:[-*+]|\d+[.)])\s+\[ \]\s+.+$/gmu;
 const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
 const DOCS_CATALOG_PATH = 'docs/docs-catalog.json';
 const TASKS_INDEX_PATH = 'tasks/index.json';
@@ -106,13 +110,6 @@ async function readCurrentCandidateContents(repoRoot, relativePath) {
     }
   }
   return contents;
-}
-
-function extractOpenChecklistItems(content) {
-  if (typeof content !== 'string' || content.length === 0) {
-    return [];
-  }
-  return Array.from(content.matchAll(OPEN_CHECKLIST_ITEM_PATTERN), (match) => match[0].trim());
 }
 
 function collectStringPaths(value, paths = []) {
@@ -245,7 +242,7 @@ function summarizeRegistryEntry(registry, docPath) {
 }
 
 function summarizeTaskIndexEntries(taskIndex, docPath) {
-  const items = Array.isArray(taskIndex?.items) ? taskIndex.items : [];
+  const items = collectTaskIndexItems(taskIndex);
   return items
     .filter((item) => JSON.stringify(item).includes(docPath))
     .map((item) => ({
@@ -371,7 +368,7 @@ function mergeLinkedChecklistMaps(target, source) {
 async function buildLinkedOpenChecklistMap(repoRoot, taskIndex, targetPaths = [], baseRef = null, currentSource = null) {
   const map = new Map();
   const targetPathSet = new Set(targetPaths);
-  const items = Array.isArray(taskIndex?.items) ? taskIndex.items : [];
+  const items = collectTaskIndexItems(taskIndex);
   for (const item of items) {
     const itemPaths = collectItemPaths(item);
     if (targetPathSet.size > 0 && !itemPaths.some((itemPath) => targetPathSet.has(itemPath))) {

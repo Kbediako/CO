@@ -374,6 +374,121 @@ describe('audit-archive-stub-unchecked script', () => {
     });
   });
 
+  it('fails when a registry-only archive hides a legacy tasks[] linked open checklist packet', async () => {
+    const repo = await initGitRepo();
+    await writeFile(
+      join(repo, 'docs', 'docs-freshness-registry.json'),
+      JSON.stringify(
+        {
+          entries: [
+            {
+              path: 'tasks/specs/linear-legacy-example.md',
+              status: 'active',
+              last_review: '2026-05-01',
+              cadence_days: 30
+            },
+            {
+              path: 'tasks/tasks-linear-legacy-example.md',
+              status: 'active',
+              last_review: '2026-05-01',
+              cadence_days: 30
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+    await writeFile(
+      join(repo, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [],
+          tasks: [
+            {
+              id: 'linear-legacy-example',
+              paths: {
+                spec: 'tasks/specs/linear-legacy-example.md',
+                task: 'tasks/tasks-linear-legacy-example.md'
+              }
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+    await mkdir(join(repo, 'tasks', 'specs'), { recursive: true });
+    await writeFile(
+      join(repo, 'tasks', 'specs', 'linear-legacy-example.md'),
+      ['---', 'status: in_progress', 'last_review: 2026-05-01', '---', '', '# Spec', ''].join('\n')
+    );
+    await writeFile(
+      join(repo, 'tasks', 'tasks-linear-legacy-example.md'),
+      '# Checklist\n\n- [ ] Complete legacy review handoff before archiving.\n'
+    );
+    await runGit(repo, ['add', '.']);
+    await runGit(repo, ['commit', '-m', 'base']);
+
+    await writeFile(
+      join(repo, 'docs', 'docs-freshness-registry.json'),
+      JSON.stringify(
+        {
+          entries: [
+            {
+              path: 'tasks/specs/linear-legacy-example.md',
+              status: 'archived',
+              last_review: '2026-05-18',
+              cadence_days: 365
+            },
+            {
+              path: 'tasks/tasks-linear-legacy-example.md',
+              status: 'active',
+              last_review: '2026-05-18',
+              cadence_days: 30
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+    await runGit(repo, ['add', '.']);
+    await runGit(repo, ['commit', '-m', 'archive registry only']);
+
+    let failure: (Error & { stdout?: string }) | null = null;
+    try {
+      await execFileAsync('node', [scriptPath, '--base', 'HEAD~1', '--format', 'json'], {
+        cwd: repo,
+        env: {
+          ...process.env,
+          CODEX_ORCHESTRATOR_ROOT: repo
+        }
+      });
+    } catch (error) {
+      failure = error as Error & { stdout?: string };
+    }
+
+    expect(failure).not.toBeNull();
+    const report = JSON.parse(failure?.stdout ?? '{}');
+    expect(report.findings_count).toBe(1);
+    expect(report.findings[0]).toMatchObject({
+      path: 'tasks/specs/linear-legacy-example.md',
+      registry_archive_without_stub: true,
+      active_source_reasons: expect.arrayContaining([
+        'frontmatter status in_progress',
+        'linked checklist has unchecked items'
+      ]),
+      linked_unchecked_checklists: [
+        expect.objectContaining({
+          path: 'tasks/tasks-linear-legacy-example.md',
+          unchecked_checklist_items: 1,
+          unchecked_checklist_samples: ['- [ ] Complete legacy review handoff before archiving.']
+        })
+      ]
+    });
+  });
+
   it('fails when a registry-only archive hides normal document content without packet hints', async () => {
     const repo = await initGitRepo();
     await writeFile(
