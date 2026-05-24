@@ -12,12 +12,13 @@
 - Canonical owner marker: `codex-orchestrator:canonical-owner-key=baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance`
 - Cohort id: `co-558-may-19-apr-18-task-report-maintenance`
 - Terminal historical owner evidence: `CO-568 terminal`
-- Configured owner evidence: `CO-579`
+- Configured global owner evidence: `CO-579`
+- Live exact owner issue: `CO-581`
 - Source breakdown: `{"rolling_window":71}`
 
 ## Summary
 - Problem Statement: `CO-581` needs a docs-first packet and registry mirrors for the May 19 retained `docs:freshness:maintain` rolling-debt cohort keyed by `baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance`.
-- Desired Outcome: packet and registry evidence keep the canonical owner key, marker, cohort id, configured historical owner evidence, source anchor, and non-goals visible before any parent-owned owner verification, implementation, validation, Linear update, PR lifecycle, or handoff.
+- Desired Outcome: packet and registry evidence keep the canonical owner key, marker, cohort id, configured global owner evidence, live exact owner issue, source anchor, and non-goals visible before any parent-owned owner verification, implementation, validation, Linear update, PR lifecycle, or handoff.
 
 ## User Request Translation
 - Create only the docs-first packet and registry mirror files for Linear issue `CO-581`.
@@ -96,8 +97,12 @@
 - Guardrail: changes remain uncommitted for parent patch export.
 
 ## Fallback / Refactor Decision
-- Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? No.
-- This docs-only packet does not add or retain runtime fallback behavior. Parent-owned implementation must preserve fail-closed maintenance behavior and keep any fallback/refactor decisions in the parent lane.
+- Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? Yes.
+- The parent lane touched the governed `docs freshness` ownership surface by re-homing an exact-key rolling cohort owner. The retained rolling cohort remains an expiring fallback only until its configured rolling-window expiry; this lane does not add a new runtime fallback or weaken freshness gates.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `docs freshness` exact-key owner override | May 19 retained rolling cohort remains owner-backed through `canonical_owner_issues[]` instead of blind `last_review` refresh or historical packet deletion. | expire fallback | CO-581 | Terminal `CO-568` could no longer serve as live owner while the May 19 rolling cohort was still inside its freshness window. | 2026-05-18 | 2026-05-24 | 2026-05-25 | Refresh, archive, reclassify, or let the May 19 cohort expire; if live owner verification fails before expiry, reuse or create the exact canonical owner and intentionally re-home `docs/docs-catalog.json`. | `node scripts/spec-guard.mjs --dry-run`, `npm run docs:freshness`, and `npm run docs:freshness:maintain -- --format json`. |
 
 ## Open Questions
 - Parent lane must verify live owner truth in the authoritative workspace before any owner mutation, catalog update, or lifecycle transition.

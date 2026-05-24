@@ -70,7 +70,8 @@
       "notes": {
         "cohort_id": "co-558-may-19-apr-18-task-report-maintenance",
         "terminal_historical_owner_evidence": "CO-568 terminal",
-        "configured_owner_evidence": "CO-579",
+        "configured_global_owner_evidence": "CO-579",
+        "live_exact_owner_issue": "CO-581",
         "source_breakdown": "{\"rolling_window\":71}",
         "protected_terms": "docs:freshness:maintain; canonical owner key; terminal-owner replacement; completed-lane registry residue; rolling-debt cohort; co-430-terminal-owner-replacement; dry-run/no-token copyable body",
         "sample_paths": ".agent/task/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md; .agent/task/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md; .agent/task/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md",

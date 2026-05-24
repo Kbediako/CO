@@ -14,7 +14,8 @@
 - Canonical owner marker: `codex-orchestrator:canonical-owner-key=baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance`
 - Cohort id: `co-558-may-19-apr-18-task-report-maintenance`
 - Terminal historical owner evidence: `CO-568 terminal`
-- Configured owner evidence: `CO-579`
+- Configured global owner evidence: `CO-579`
+- Live exact owner issue: `CO-581`
 - Source breakdown: `{"rolling_window":71}`
 - Sample paths:
   - `.agent/task/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md`
@@ -47,6 +48,15 @@
 - [x] Parent verifies source payload in the authoritative workspace after import.
 - [x] Parent verifies live owner truth before any owner update, catalog update, or lifecycle transition.
 - [x] Parent runs focused docs freshness validation after importing this packet.
+
+## Fallback Expiry / Refactor Decision
+- [x] Fallback / refactor decision captured for the parent-owned guide/catalog owner re-home.
+- [x] Large-refactor check recorded: CO-581 stays scoped to the exact May 19 owner re-home; CO-580 remains the broader lifecycle/finalizer consolidation lane.
+- [x] Minor-seam decision recorded: acceptable only because one bounded fallback decision exists for the exact canonical owner key and retained rolling-window expiry.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `docs freshness` exact-key owner override | May 19 retained rolling cohort remains owner-backed through `canonical_owner_issues[]` instead of blind `last_review` refresh or historical packet deletion. | expire fallback | CO-581 | Terminal `CO-568` could no longer serve as live owner while the May 19 rolling cohort was still inside its freshness window. | 2026-05-18 | 2026-05-24 | 2026-05-25 | Refresh, archive, reclassify, or let the May 19 cohort expire; if live owner verification fails before expiry, reuse or create the exact canonical owner and intentionally re-home `docs/docs-catalog.json`. | `node scripts/spec-guard.mjs --dry-run`, `npm run docs:freshness`, and `npm run docs:freshness:maintain -- --format json`. |
 
 ## Validation
 - [x] Child scoped JSON parse check. Evidence: `jq empty tasks/index.json` and `jq empty docs/docs-freshness-registry.json` exited 0.

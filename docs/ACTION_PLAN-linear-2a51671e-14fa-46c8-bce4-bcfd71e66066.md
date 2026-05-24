@@ -33,8 +33,14 @@
 - Pre-implementation issue-quality review:
   - 2026-05-24: accepted framing is a docs-first exact-key retained-cohort owner packet, not a global freshness owner re-home, date refresh, historical cleanup, catalog repair, or provider-worker implementation lane.
 - Fallback / refactor decision:
-  - No new runtime fallback or seam is introduced by this docs-only packet.
-  - Parent must preserve fail-closed docs freshness behavior and route any larger owner-authority split back to the parent lane.
+  - Applies to fallback, compatibility, legacy, stale, cached, break-glass, or minor-seam behavior? Yes.
+  - The parent lane touches the governed `docs freshness` ownership surface by replacing a terminal exact-key owner while retaining the rolling cohort until its configured expiry.
+  - large refactor check: keep CO-581 scoped to the exact May 19 owner re-home; CO-580 remains the broader lifecycle/finalizer consolidation lane.
+  - minor seam behavior is acceptable only with one bounded fallback decision for the exact canonical owner key and the original rolling-window expiry.
+
+| Surface | Fallback / seam | Decision | Owner | Trigger | Introduced date | Review date | Maximum lifetime | Removal condition | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `docs freshness` exact-key owner override | May 19 retained rolling cohort remains owner-backed through `canonical_owner_issues[]` instead of blind `last_review` refresh or historical packet deletion. | expire fallback | CO-581 | Terminal `CO-568` could no longer serve as live owner while the May 19 rolling cohort was still inside its freshness window. | 2026-05-18 | 2026-05-24 | 2026-05-25 | Refresh, archive, reclassify, or let the May 19 cohort expire; if live owner verification fails before expiry, reuse or create the exact canonical owner and intentionally re-home `docs/docs-catalog.json`. | `node scripts/spec-guard.mjs --dry-run`, `npm run docs:freshness`, and `npm run docs:freshness:maintain -- --format json`. |
 
 ## Milestones & Sequencing
 1. Create the docs-first packet:
