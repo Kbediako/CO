@@ -1,6 +1,94 @@
 {
   "items": [
     {
+      "id": "20260524-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08",
+      "title": "CO-568 preserve CO-558 May 19 retained docs freshness cohort owner",
+      "relates_to": "tasks/tasks-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-24",
+      "canonical_owner_key": "baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance",
+      "evidence": [
+        "docs/PRD-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
+        "docs/TECH_SPEC-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
+        "docs/ACTION_PLAN-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
+        "tasks/specs/linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
+        "tasks/tasks-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
+        ".agent/task/linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-05-24",
+          "status": "created_child_validation_passed",
+          "manifest": ".runs/linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08-docs-packet/cli/2026-05-24T19-56-21-361Z-69fdbf55/manifest.json",
+          "source_anchor": "ctx:sha256:bf22c28e17074f82cb454de2914f37fd21db5f3ce911e5f8204df826038433fb#chunk:c000001",
+          "child_source_anchor": "ctx:sha256:0123b3115bb28200d7ad0abd28a5f7221cbf7643bc4a27808c2fe68adbce991d#chunk:c000001",
+          "summary": "Docs-first packet preserves the CO-568 exact-key retained May 19 docs freshness cohort owner contract while keeping implementation and lifecycle parent-owned. Parent reconciled the accepted child packet to the prompt source anchor, route, source breakdown, and issue sample paths."
+        }
+      },
+      "validation": {
+        "status": "parent_validation_passed_review_handoff_pending",
+        "passed": [
+          "docs-first packet drafted",
+          "task registry and freshness mirrors updated",
+          "jq empty tasks/index.json",
+          "jq empty docs/docs-freshness-registry.json",
+          "registry contains six active CO-568 rows",
+          "protected-term check found all 17 required terms and sample paths",
+          "changed-file scope check listed only declared files",
+          "trailing-whitespace scan returned no matches",
+          "git diff --check for tracked modified files passed",
+          "diff-only ASCII check for tracked additions plus new packet files passed",
+          "parent source hash verified as bf22c28e17074f82cb454de2914f37fd21db5f3ce911e5f8204df826038433fb",
+          "docs:freshness:maintain reported freshness_decision=pass_with_owned_rolling_debt required_actions=0 should_block=false",
+          "docs:freshness:maintain owner_finalizer.status=passed_exact_canonical_owner_precedence active_owner_issue=CO-568",
+          "docs-review child stream review_verdict=clean contract_validation.status=valid contract_overall_verdict=clean",
+          "node scripts/delegation-guard.mjs",
+          "node scripts/spec-guard.mjs --dry-run",
+          "npm run build",
+          "npm run lint",
+          "npm run test",
+          "npm run docs:check",
+          "npm run docs:freshness",
+          "npm run repo:stewardship",
+          "node scripts/diff-budget.mjs"
+        ],
+        "pending": [
+          "Linear review handoff"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
+        "prd": "docs/PRD-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
+        "docs": "docs/TECH_SPEC-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
+        "action_plan": "docs/ACTION_PLAN-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
+        "spec": "tasks/specs/linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
+        "task": "tasks/tasks-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md"
+      },
+      "source_issue": {
+        "id": "e8f55d3d-1975-4da0-9b33-4307f7d63a08",
+        "identifier": "CO-568",
+        "url": "https://linear.app/asabeko/issue/CO-568"
+      },
+      "notes": {
+        "cohort_id": "co-558-may-19-apr-18-task-report-maintenance",
+        "configured_historical_owner_evidence": "CO-558 terminal",
+        "source_breakdown": "{\"rolling_window\":131}",
+        "protected_terms": "docs:freshness:maintain; canonical owner key; terminal-owner replacement; completed-lane registry residue; rolling-debt cohort; co-430-terminal-owner-replacement; dry-run/no-token copyable body",
+        "sample_paths": ".agent/task/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md; .agent/task/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md; .agent/task/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md",
+        "parent_owned": "Parent owns authoritative issue source, live owner truth, implementation, validation, Linear/workpad state, PR lifecycle, and review handoff."
+      }
+    },
+    {
       "id": "20260524-linear-0509ba11-5b44-40d0-9880-822b068053c3",
       "title": "CO-580 centralize docs freshness lifecycle resolver and owner finalizer",
       "relates_to": "tasks/tasks-linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
