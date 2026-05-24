@@ -33,6 +33,7 @@ const PROVIDER_MERGE_CLOSEOUT_COMMAND_TIMEOUT_MS = 15_000;
 const PROVIDER_MERGE_CLOSEOUT_DOCS_FRESHNESS_TIMEOUT_MS = 120_000;
 const PROVIDER_MERGE_CLOSEOUT_MERGE_METHOD = 'squash';
 const DOCS_FRESHNESS_MAINTAIN_OWNER_KEY = 'docs:freshness:maintain';
+const PASSING_DOCS_FRESHNESS_MAINTAIN_DECISIONS = new Set(['clean', 'pass_with_owned_rolling_debt']);
 
 export type ProviderMergeCloseoutStatus =
   | 'watching'
@@ -131,6 +132,7 @@ export interface ProviderDocsFreshnessOwnerCloseoutRecord {
   owner_issue: string | null;
   owner_issue_action: Record<string, unknown> | null;
   owner_issue_verification: Record<string, unknown> | null;
+  owner_finalizer: Record<string, unknown> | null;
   repo_gate: Record<string, unknown> | null;
   candidate_cohorts: Record<string, unknown>[];
   blocking_changed_paths: string[] | null;
@@ -1720,6 +1722,7 @@ async function resolveProviderDocsFreshnessOwnerCloseout(input: {
       owner_issue: null,
       owner_issue_action: null,
       owner_issue_verification: null,
+      owner_finalizer: null,
       repo_gate: null,
       candidate_cohorts: [],
       blocking_changed_paths: null,
@@ -1745,6 +1748,7 @@ async function resolveProviderDocsFreshnessOwnerCloseout(input: {
       owner_issue: null,
       owner_issue_action: null,
       owner_issue_verification: null,
+      owner_finalizer: null,
       repo_gate: null,
       candidate_cohorts: [],
       blocking_changed_paths: null,
@@ -1770,6 +1774,7 @@ async function resolveProviderDocsFreshnessOwnerCloseout(input: {
       owner_issue: null,
       owner_issue_action: null,
       owner_issue_verification: null,
+      owner_finalizer: null,
       repo_gate: null,
       candidate_cohorts: [],
       blocking_changed_paths: null,
@@ -1859,18 +1864,59 @@ async function readDocsFreshnessMaintainOwnerEvidence(input: {
 
   const parsed = parseDocsFreshnessMaintainJson(stdout);
   const normalized = normalizeDocsFreshnessMaintainDecision(parsed.value);
+  const commandFailed = !ok;
+  const freshnessDecisionMissing = !parsed.error && !normalized.freshness_decision;
+  const freshnessDecisionBlocks =
+    !parsed.error &&
+    Boolean(
+      freshnessDecisionMissing ||
+        !PASSING_DOCS_FRESHNESS_MAINTAIN_DECISIONS.has(normalized.freshness_decision ?? '')
+    );
+  const ownerFinalizer = normalized.owner_finalizer;
+  const ownerFinalizerRequired =
+    !parsed.error &&
+    !freshnessDecisionBlocks &&
+    (normalized.candidate_cohorts.length > 0 ||
+      normalized.freshness_decision === 'pass_with_owned_rolling_debt' ||
+      input.policyOwnerIssue === input.issueIdentifier);
+  const ownerFinalizerMissing = ownerFinalizerRequired && !ownerFinalizer;
+  const ownerFinalizerBlocksCurrentIssue = ownerFinalizer
+    ? docsFreshnessOwnerFinalizerBlocksIssue(ownerFinalizer, input.issueIdentifier)
+    : false;
+  const terminalTransitionBlocked =
+    Boolean(parsed.error) ||
+    commandFailed ||
+    freshnessDecisionBlocks ||
+    ownerFinalizerMissing ||
+    ownerFinalizerBlocksCurrentIssue;
+  const status: ProviderDocsFreshnessOwnerCloseoutRecord['status'] =
+    parsed.error || commandFailed || freshnessDecisionMissing || ownerFinalizerMissing
+      ? 'evidence_unavailable'
+      : 'evidence_checked';
+  const reason = parsed.error
+    ? 'docs_freshness_owner_evidence_unavailable'
+    : commandFailed
+      ? 'docs_freshness_owner_command_failed'
+      : freshnessDecisionMissing
+        ? 'freshness_decision_missing'
+        : freshnessDecisionBlocks
+          ? 'current_issue_owns_docs_freshness_rolling_debt'
+          : ownerFinalizerMissing
+            ? 'owner_finalizer_missing'
+            : ownerFinalizerBlocksCurrentIssue
+              ? 'current_issue_owns_docs_freshness_rolling_debt'
+              : 'owner_finalizer_allows_terminal_transition';
   return {
-    status: parsed.error ? 'evidence_unavailable' : 'evidence_checked',
-    terminal_transition_blocked: true,
-    reason: parsed.error
-      ? 'docs_freshness_owner_evidence_unavailable'
-      : 'current_issue_owns_docs_freshness_rolling_debt',
+    status,
+    terminal_transition_blocked: terminalTransitionBlocked,
+    reason,
     policy_owner_issue: input.policyOwnerIssue,
     policy_canonical_owner_key: input.policyCanonicalOwnerKey,
     freshness_decision: normalized.freshness_decision,
     owner_issue: normalized.owner_issue,
     owner_issue_action: normalized.owner_issue_action,
     owner_issue_verification: normalized.owner_issue_verification,
+    owner_finalizer: ownerFinalizer,
     repo_gate: normalized.repo_gate,
     candidate_cohorts: normalized.candidate_cohorts,
     blocking_changed_paths: normalized.blocking_changed_paths,
@@ -1912,6 +1958,7 @@ function normalizeDocsFreshnessMaintainDecision(value: Record<string, unknown> |
   owner_issue: string | null;
   owner_issue_action: Record<string, unknown> | null;
   owner_issue_verification: Record<string, unknown> | null;
+  owner_finalizer: Record<string, unknown> | null;
   repo_gate: Record<string, unknown> | null;
   candidate_cohorts: Record<string, unknown>[];
   blocking_changed_paths: string[] | null;
@@ -1929,6 +1976,15 @@ function normalizeDocsFreshnessMaintainDecision(value: Record<string, unknown> |
     value?.repo_gate && typeof value.repo_gate === 'object'
       ? (value.repo_gate as Record<string, unknown>)
       : null;
+  const ownerFinalizer =
+    value?.owner_finalizer && typeof value.owner_finalizer === 'object'
+      ? (value.owner_finalizer as Record<string, unknown>)
+      : value?.owner_action_evidence &&
+          typeof value.owner_action_evidence === 'object' &&
+          (value.owner_action_evidence as Record<string, unknown>).owner_finalizer &&
+          typeof (value.owner_action_evidence as Record<string, unknown>).owner_finalizer === 'object'
+        ? ((value.owner_action_evidence as Record<string, unknown>).owner_finalizer as Record<string, unknown>)
+        : null;
   const candidateCohorts = Array.isArray(value?.candidate_cohorts)
     ? value.candidate_cohorts.filter((cohort): cohort is Record<string, unknown> =>
         Boolean(cohort && typeof cohort === 'object')
@@ -1939,6 +1995,7 @@ function normalizeDocsFreshnessMaintainDecision(value: Record<string, unknown> |
     owner_issue: normalizeOptionalString(value?.owner_issue),
     owner_issue_action: ownerIssueAction,
     owner_issue_verification: ownerIssueVerification,
+    owner_finalizer: ownerFinalizer,
     repo_gate: repoGate,
     candidate_cohorts: candidateCohorts,
     blocking_changed_paths: Array.isArray(value?.blocking_changed_paths)
@@ -1946,6 +2003,42 @@ function normalizeDocsFreshnessMaintainDecision(value: Record<string, unknown> |
       : null,
     report_path: normalizeOptionalString(value?.report_path)
   };
+}
+
+function docsFreshnessOwnerFinalizerBlocksIssue(
+  ownerFinalizer: Record<string, unknown>,
+  issueIdentifier: string
+): boolean {
+  const status = normalizeOptionalString(ownerFinalizer.status);
+  const blockingOwnerIssue = normalizeOptionalString(ownerFinalizer.blocking_owner_issue);
+  const activeOwnerIssues = new Set<string>();
+  const activeOwnerIssue = normalizeOptionalString(ownerFinalizer.active_owner_issue);
+  if (activeOwnerIssue) {
+    activeOwnerIssues.add(activeOwnerIssue);
+  }
+  if (Array.isArray(ownerFinalizer.active_owner_issues)) {
+    for (const issue of ownerFinalizer.active_owner_issues) {
+      const normalizedIssue = normalizeOptionalString(issue);
+      if (normalizedIssue) {
+        activeOwnerIssues.add(normalizedIssue);
+      }
+    }
+  }
+  if (Array.isArray(ownerFinalizer.active_owner_records)) {
+    for (const record of ownerFinalizer.active_owner_records) {
+      if (!record || typeof record !== 'object') {
+        continue;
+      }
+      const normalizedIssue = normalizeOptionalString((record as Record<string, unknown>).owner_issue);
+      if (normalizedIssue) {
+        activeOwnerIssues.add(normalizedIssue);
+      }
+    }
+  }
+  if (status === 'blocked_terminal_owner') {
+    return blockingOwnerIssue === issueIdentifier || activeOwnerIssues.has(issueIdentifier);
+  }
+  return activeOwnerIssues.has(issueIdentifier);
 }
 
 async function runProviderMergeCloseoutCommand(input: {

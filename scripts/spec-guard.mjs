@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 import { parseArgs, hasFlag } from './lib/cli-args.js';
 import { computeAgeInDays, parseIsoDate } from './lib/docs-helpers.js';
 import { maybeLoadDocsCatalog, resolveDocsCatalogEntry } from './lib/docs-catalog.js';
-import { buildTaskPacketLifecycleIndex, collectTaskIndexItems } from './lib/docs-freshness-lifecycle.js';
+import { buildTaskPacketLifecycleIndexForRepo, collectTaskIndexItems } from './lib/docs-freshness-lifecycle.js';
 import { hasArchiveStubMarker, isValidArchiveStubForPath } from './lib/archive-stub.js';
 
 const execFileAsync = promisify(execFile);
@@ -1457,12 +1457,12 @@ async function loadTerminalTaskLifecycleIndex() {
   try {
     const raw = await readFile('tasks/index.json', 'utf8');
     const parsed = JSON.parse(raw);
-    return buildTaskPacketLifecycleIndex(collectTaskIndexItems(parsed));
+    return buildTaskPacketLifecycleIndexForRepo(process.cwd(), collectTaskIndexItems(parsed));
   } catch (error) {
     const code =
       error && typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
     if (code === 'ENOENT') {
-      return buildTaskPacketLifecycleIndex([]);
+      return buildTaskPacketLifecycleIndexForRepo(process.cwd(), []);
     }
     throw error;
   }

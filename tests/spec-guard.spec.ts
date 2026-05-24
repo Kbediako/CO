@@ -673,6 +673,57 @@ describe('spec-guard script', () => {
     expect(stdout.trim()).toContain('✅ Spec guard: OK');
   });
 
+  it('does not skip terminal task-index spec rows that still carry open checklist obligations', async () => {
+    const repo = await initRepository();
+
+    await writeFile(
+      join(repo, 'tasks/specs/0001-initial.md'),
+      [
+        '---',
+        'status: in_progress',
+        'last_review: 2000-01-01',
+        '---',
+        '',
+        '# Terminal source issue with active local spec debt',
+        '',
+        '- [x] Source issue was marked terminal.',
+        '- [ ] Refresh or archive this spec before it can leave active freshness evidence.'
+      ].join('\n')
+    );
+    await writeFile(
+      join(repo, 'tasks/index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260513-0001-initial',
+              title: 'Terminal source with open checklist fixture',
+              status: 'done',
+              completed_at: '2026-05-13T00:00:00.000Z',
+              paths: {
+                spec: 'tasks/specs/0001-initial.md',
+                task: 'tasks/tasks-0001-initial.md'
+              },
+              source_issue: {
+                identifier: 'CO-999'
+              }
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    const { stdout } = await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: specGuardEnv()
+    });
+
+    expect(stdout).toContain('❌ Spec guard: issues detected');
+    expect(stdout).toContain("tasks/specs/0001-initial.md: last_review 2000-01-01");
+  });
+
   it('reports owner-backed stale active specs as rolling freshness cohort debt', async () => {
     const repo = await initRepository();
     const staleReviewDate = reviewDateDaysAgo(31);

@@ -1,6 +1,48 @@
 {
   "items": [
     {
+      "id": "20260524-linear-0509ba11-5b44-40d0-9880-822b068053c3",
+      "title": "CO-580 centralize docs freshness lifecycle resolver and owner finalizer",
+      "relates_to": "tasks/tasks-linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-24",
+      "canonical_owner_key": "docs:freshness:lifecycle-resolver",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=docs:freshness:lifecycle-resolver",
+      "evidence": [
+        "docs/PRD-linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
+        "docs/TECH_SPEC-linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
+        "docs/ACTION_PLAN-linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
+        "tasks/specs/linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
+        "tasks/tasks-linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
+        ".agent/task/linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "paths": {
+        "agent_task": ".agent/task/linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
+        "prd": "docs/PRD-linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
+        "docs": "docs/TECH_SPEC-linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
+        "action_plan": "docs/ACTION_PLAN-linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
+        "spec": "tasks/specs/linear-0509ba11-5b44-40d0-9880-822b068053c3.md",
+        "task": "tasks/tasks-linear-0509ba11-5b44-40d0-9880-822b068053c3.md"
+      },
+      "source_issue": {
+        "id": "0509ba11-5b44-40d0-9880-822b068053c3",
+        "identifier": "CO-580",
+        "url": "https://linear.app/asabeko/issue/CO-580/co-centralize-docs-freshness-lifecycle-resolver-and-owner-finalizer"
+      },
+      "notes": {
+        "source_issue": "CO-579 follow-up for shared docs freshness lifecycle resolver and owner finalizer.",
+        "red_tests": "Accepted tests-red child lane 2026-05-24T10-12-35-198Z-8f973f14; parent RED run reproduced five intended failures before production implementation."
+      }
+    },
+    {
       "id": "20260524-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993",
       "title": "CO-579 replace terminal CO-575 docs freshness maintenance owner",
       "relates_to": "tasks/tasks-linear-5634bf98-fe59-41f5-8623-60c9ef0b2993.md",

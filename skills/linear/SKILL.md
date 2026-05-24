@@ -195,8 +195,11 @@ codex-orchestrator linear create-follow-up \
 
 For recurring baseline debt, prefer canonical-owner reuse/update over a fresh issue. Inspect the `candidate_cohorts` emitted by machine output such as `docs:freshness:maintain`, choose the intended cohort, and pass that cohort's exact `canonical_owner_key`; the helper reuses only open same-team same-project issues stamped with the exact marker and treats `Done`, `Duplicate`, and `Cancelled`/`Canceled` issues as evidence only.
 
+When the maintenance output includes `owner_finalizer`, treat it as the owner closeout authority. `blocked_terminal_owner` means the issue must not move to terminal; route the debt through the exact canonical owner key instead of manually swapping owner metadata or closing the short-lived owner lane. `not_applicable` only means no active candidates currently resolve to an owner, not that a terminal owner is reusable later.
+
 ```bash
 jq '.candidate_cohorts[] | {id, status, canonical_owner_key, sample_paths}' out/<task-id>/docs-freshness-maintenance.json
+jq '.owner_finalizer' out/<task-id>/docs-freshness-maintenance.json
 # After selecting the intended cohort, replace <cohort-id> with its id.
 canonical_owner_key="$(jq -er '.candidate_cohorts[] | select(.id == "<cohort-id>") | .canonical_owner_key // empty' out/<task-id>/docs-freshness-maintenance.json)"
 codex-orchestrator linear create-follow-up \
@@ -217,6 +220,7 @@ codex-orchestrator linear create-follow-up \
 - Use the Linear issue id, not the human identifier, for helper commands.
 - When you discover a meaningful out-of-scope improvement, use `create-follow-up` so the issue stays in the same project, starts in `Backlog` when newly created, records intent checksum/non-goals/not-done-if, requires a parity matrix for parity/alignment lanes, and returns the reused or created follow-up identifier/URL for workpad references.
 - For recurring baseline debt, pass the deterministic `--canonical-owner-key` from machine output before creating follow-ups. Do not file a fresh issue when an open same-team same-project owner is already stamped with that exact marker.
+- For docs freshness owner closeout, cite `owner_finalizer` from `docs:freshness:maintain`; do not treat terminal Linear state as local archive readiness or use manual owner swaps to bypass `blocked_terminal_owner`.
 - Treat `CODEX_ORCHESTRATOR_REPO_CONFIG_PATH` and `CODEX_ORCHESTRATOR_PACKAGE_ROOT` as provider-lane-only overrides. Child streams and repo-local validation/test subprocesses should strip them unless the subprocess explicitly needs provider snapshot/package-root behavior.
 - Prefer an installed global `linear` skill when available, and fall back to this bundled `skills/linear/SKILL.md` copy only when no global skill is installed.
 - Keep exactly one active `## Codex Workpad` comment current. Refresh it after each meaningful milestone, immediately before review or merge handoffs, after rework, and after merge completion. Final closeout stays in the same workpad comment. Do not create duplicate progress or terminal summary comments.

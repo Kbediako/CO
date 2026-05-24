@@ -45,6 +45,7 @@ The maintenance report is the machine-readable decision future workers should ci
 - `owner_issue`
 - `owner_issue_action`
 - `owner_issue_verification`
+- `owner_finalizer`
 - `owner_action_evidence`
 - `fallback_expiry`
 - `candidate_cohorts`
@@ -59,6 +60,8 @@ The maintenance report is the machine-readable decision future workers should ci
 
 Canonical owner routing uses the exact `canonical_owner_key` and `canonical_owner_marker` from the maintenance report. The marker is the stable owner identity, not the issue title, owner issue number, or a fuzzy title/body match. For the docs freshness maintenance owner family, the protected marker is `codex-orchestrator:canonical-owner-key=docs:freshness:maintain`.
 
+`owner_finalizer` is the terminal-closeout contract. When active freshness candidates resolve to a global owner or exact cohort owner, `docs:freshness:maintain` records every resolved active owner in `active_owner_issues[]` and `active_owner_records[]` while keeping `active_owner_issue` as a compatibility summary. A terminal or otherwise unusable resolved owner must emit `status=blocked_terminal_owner`, and provider merge closeout must block `Done` for any active owner issue instead of letting that owner become terminal while the debt still resolves to it. `not_applicable` means no active freshness candidates currently resolve to an owner; it is not evidence that historical terminal owners can be reused later.
+
 Before an owner is usable, automation must verify live owner state. Open same-project issues with the exact marker are reused and updated. Terminal, canceled, duplicate, out-of-project, or state-unverified owners are historical evidence only and require replacement action. Missing exact-marker owners must emit create-action evidence. Dry-run and no-token paths must not mutate Linear, but they must still emit copyable create/update bodies in `owner_action_evidence.actions[]` so the parent/provider lane can apply the action without re-inventing the issue text.
 
 Provider-worker gates use this decision in `docs-review` and `implementation-gate`. They may pass with `pass_with_owned_rolling_debt` only when the debt is in an eligible historical class, the policy owner issue is present, the rows are still inside the rolling window and caps, `spec-guard` is clean, and the current diff/task packet has no blocking freshness paths. The underlying `docs:freshness` JSON still preserves the raw stale and rolling row evidence.
@@ -70,6 +73,19 @@ Exact canonical owner overrides are narrower than the global owner issue. `docs:
 Owned rolling debt is an `expire fallback`, not an indefinite exception. Every retained cohort emitted by `docs:freshness:maintain` carries `fallback_expiry` metadata with the owner, trigger, review date, maximum lifetime, `expires_after`, removal condition, and validation evidence. The maximum lifetime is the configured rolling window after normal cadence expiry, so the fallback must be removed by refreshing, archiving, reclassifying, or re-homing to a verified live same-project owner before that date.
 
 After a `docs:freshness:maintain` owner PR merges, do not treat the merge as proof that retained cohort debt is resolved. If `docs:freshness:maintain` still reports `pass_with_owned_rolling_debt` or `rolling_freshness_cohorts` still contains the retained cohort, keep the merged owner issue in `Backlog` as the non-terminal owner while no active repair is underway. That Backlog posture preserves exact-marker reuse without consuming an active worker lane; move the issue out of `Backlog` only to refresh the cohort, archive completed historical packets, reclassify rows from verified lifecycle evidence, or re-home the cohort to another verified live same-project owner. Closing the merged owner issue to `Done`, `Canceled`, `Duplicate`, or any other terminal state while the retained cohort remains visible will make the next maintenance run fail closed as terminal-owner debt.
+
+## Effective Lifecycle Resolver
+The shared lifecycle boundary lives in `scripts/lib/docs-freshness-lifecycle.js`. `docs:freshness`, `spec-guard`, `docs:freshness:maintain`, archive-stub validation, and the docs checks that consume those reports must use that resolver or preserve the same effective lifecycle semantics.
+
+The resolver separates source issue state from local packet completion:
+
+- `active`: the local doc or packet remains current and can age into ordinary stale or rolling debt.
+- `terminal_pending_archive`: terminal source issue evidence exists, but the local packet still needs archive, reclassification, or retained-history handling.
+- `archived`: the packet is closed locally and must not contain open checklist obligations.
+- `deprecated`: the surface remains registered with explicit lifecycle status instead of overloading `done`.
+- `preserved_historical_stub`: only a minimal task-key continuity stub remains active for resolver purposes.
+
+Terminal Linear state is evidence, not local completion. If a terminal task-index row links to a packet with open checklist items, the resolver keeps that path effectively active and adds `terminal_source_lifecycle_state=terminal_pending_archive` plus `local_open_checklist_obligations`. That row may still match a declared rolling cohort, but it must not become archive-ready, and archive-stub validation must reject archived task packets that still contain open checklist obligations.
 
 ## Preserved Historical Stub Status
 Some historical task-key stubs remain authoritative because current repo tooling still resolves their canonical task key from that path even after the rest of the historical packet is gone. Those rows should use docs-freshness registry status `preserved_historical_stub`.

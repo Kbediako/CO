@@ -19,8 +19,11 @@ import {
 } from './lib/docs-catalog.js';
 import {
   buildTaskPacketLifecycleIndex,
+  buildTaskPacketLifecycleIndexForRepo,
   classifyTaskPacketPathFamily,
   collectTaskIndexItems,
+  EFFECTIVE_LIFECYCLE_STATUSES,
+  extractOpenChecklistItems,
   isTaskPacketLifecyclePath,
   isTerminalTaskStatus,
   normalizeDocPath,
@@ -32,14 +35,7 @@ import { resolveEnvironmentPaths } from './lib/run-manifests.js';
 
 const DEFAULT_REGISTRY_PATH = 'docs/docs-freshness-registry.json';
 const TASKS_INDEX_PATH = 'tasks/index.json';
-const STATUS_VALUES = new Set([
-  'active',
-  'archived',
-  'deprecated',
-  PRESERVED_HISTORICAL_STUB_STATUS,
-  RETAINED_TERMINAL_PACKET_STATUS,
-  TERMINAL_PENDING_ARCHIVE_STATUS
-]);
+const STATUS_VALUES = EFFECTIVE_LIFECYCLE_STATUSES;
 const OWNER_REQUIRED_STATUSES = new Set(['active', 'deprecated', TERMINAL_PENDING_ARCHIVE_STATUS]);
 const STALE_ELIGIBLE_STATUSES = new Set(['active', 'deprecated', TERMINAL_PENDING_ARCHIVE_STATUS]);
 const OWNER_PLACEHOLDERS = new Set(['tbd', 'unassigned', 'owner']);
@@ -119,7 +115,7 @@ async function loadTaskLifecycleIndex(repoRoot) {
   }
   const raw = await readFile(tasksIndexPath, 'utf8');
   const parsed = JSON.parse(raw);
-  return buildTaskPacketLifecycleIndex(collectTaskIndexItems(parsed));
+  return buildTaskPacketLifecycleIndexForRepo(repoRoot, collectTaskIndexItems(parsed));
 }
 
 function classifyPath(docPath, catalog) {
@@ -604,6 +600,20 @@ function applyRollingFreshnessPolicy(rawStaleEntries, docsCatalog) {
   };
 }
 
+function buildActiveTerminalSourceMetadata(activeTerminalSourceLifecycle) {
+  if (!activeTerminalSourceLifecycle) {
+    return {};
+  }
+  return {
+    terminal_source_lifecycle_state: activeTerminalSourceLifecycle.terminal_source_lifecycle_state,
+    local_open_checklist_obligations: activeTerminalSourceLifecycle.local_open_checklist_obligations,
+    terminal_task_id: activeTerminalSourceLifecycle.task_id,
+    terminal_task_key: activeTerminalSourceLifecycle.task_key,
+    terminal_task_status: activeTerminalSourceLifecycle.status,
+    terminal_source_issue: activeTerminalSourceLifecycle.source_issue
+  };
+}
+
 function summarizeItems(items, renderItem) {
   if (!Array.isArray(items) || items.length === 0) {
     return 'none';
@@ -828,13 +838,15 @@ export async function runDocsFreshness(
     }
 
     let entryContent = null;
+    let entryOpenChecklistItems = [];
     if (entryPath) {
       const abs = path.resolve(repoRoot, entryPath);
       if (!(await pathExists(abs))) {
         missingOnDisk.push(entryPath);
         metricsByClass.push({ doc_class: docClass, metric: 'missing_on_disk' });
-      } else if (status === PRESERVED_HISTORICAL_STUB_STATUS) {
+      } else if (status === PRESERVED_HISTORICAL_STUB_STATUS || isTaskPacketLifecyclePath(entryPath)) {
         entryContent = await readFile(abs, 'utf8');
+        entryOpenChecklistItems = extractOpenChecklistItems(entryContent);
       }
     }
 
@@ -845,9 +857,36 @@ export async function runDocsFreshness(
       issues.push('preserved_historical_stub requires a historical task continuity stub');
     }
 
+    const activeTerminalSourceLifecycle = entryPath
+      ? lifecycleIndex.activeTerminalSourceItemsByPath?.get(entryPath) ?? null
+      : null;
+    const hasLinkedOpenChecklistObligations = Boolean(
+      activeTerminalSourceLifecycle &&
+        Array.isArray(activeTerminalSourceLifecycle.local_open_checklist_obligations) &&
+        activeTerminalSourceLifecycle.local_open_checklist_obligations.length > 0
+    );
+
+    if (
+      (status === 'archived' || entry?.lifecycle_state === 'archived') &&
+      isTaskPacketLifecyclePath(entryPath) &&
+      (entryOpenChecklistItems.length > 0 || hasLinkedOpenChecklistObligations)
+    ) {
+      issues.push('archived task packet cannot contain open checklist obligations');
+    }
+
+    if (
+      status === PRESERVED_HISTORICAL_STUB_STATUS &&
+      isTaskPacketLifecyclePath(entryPath) &&
+      (entryOpenChecklistItems.length > 0 || hasLinkedOpenChecklistObligations)
+    ) {
+      issues.push('preserved_historical_stub cannot contain open checklist obligations');
+    }
+
     const retainedTerminalLifecycle =
       status === RETAINED_TERMINAL_PACKET_STATUS && entryPath
-        ? lifecycleIndex.byPath.get(entryPath) ?? explicitTerminalTaskStatusLifecycle(taskStatus, entryPath)
+        ? lifecycleIndex.byPath.get(entryPath) ??
+          lifecycleIndex.activeTerminalSourceItemsByPath?.get(entryPath) ??
+          explicitTerminalTaskStatusLifecycle(taskStatus, entryPath)
         : null;
     if (status === RETAINED_TERMINAL_PACKET_STATUS) {
       if (!isTaskPacketLifecyclePath(entryPath)) {
@@ -858,6 +897,9 @@ export async function runDocsFreshness(
       }
       if (!retainedTerminalLifecycle) {
         issues.push('retained_terminal_packet requires terminal task lifecycle evidence');
+      }
+      if (entryOpenChecklistItems.length > 0 || hasLinkedOpenChecklistObligations) {
+        issues.push('retained_terminal_packet cannot contain open checklist obligations');
       }
     }
 
@@ -898,12 +940,17 @@ export async function runDocsFreshness(
           : lifecycleIndex.byPath.get(entryPath) ??
             explicitTerminalPendingLifecycle(status, entryPath) ??
             explicitTerminalTaskStatusLifecycle(taskStatus, entryPath);
+        const activeTerminalSourceMetadata = buildActiveTerminalSourceMetadata(
+          lifecycleIndex.activeTerminalSourceItemsByPath?.get(entryPath)
+        );
         const registryLifecycleMetadata = {
           ...(STALE_ELIGIBLE_STATUSES.has(status) ? {} : { registry_status: status }),
+          ...(activeTerminalSourceMetadata.terminal_source_lifecycle_state ? { registry_status: status } : {}),
           ...(taskStatus ? { task_status: taskStatus } : {}),
           ...(typeof entry?.lifecycle_state === 'string' && entry.lifecycle_state.trim()
             ? { lifecycle_state: entry.lifecycle_state.trim() }
-            : {})
+            : {}),
+          ...activeTerminalSourceMetadata
         };
         if (reviewSourceMetadata.last_review_source === TASKS_INDEX_PATH) {
           taskIndexReviewOverrides.push({
