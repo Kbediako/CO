@@ -204,6 +204,72 @@ describe('docs freshness reporting', () => {
     ]);
   });
 
+  it('tracks list content indentation so continuations do not hide later obligations', () => {
+    const cases = [
+      {
+        name: 'CommonMark continuation keeps parent context',
+        markdown: [
+          '- Parent with continuation text',
+          '  supporting detail at the parent content indent.',
+          '',
+          '    - [ ] Nested obligation after two-space continuation.'
+        ],
+        expected: ['- [ ] Nested obligation after two-space continuation.']
+      },
+      {
+        name: 'lazy continuation keeps parent context',
+        markdown: [
+          '- Parent with lazy continuation',
+          'still same list item paragraph.',
+          '',
+          '    - [ ] Nested obligation after lazy continuation.'
+        ],
+        expected: ['- [ ] Nested obligation after lazy continuation.']
+      },
+      {
+        name: 'top-level four-space task-looking line is indented code',
+        markdown: ['# Example', '', '    - [ ] Example syntax, not live work.', '', '- [ ] Actual open work.'],
+        expected: ['- [ ] Actual open work.']
+      },
+      {
+        name: 'multi-digit ordered parent content indent preserves nested task',
+        markdown: ['10. Parent item', '    continuation text.', '', '    - [ ] Nested obligation.'],
+        expected: ['- [ ] Nested obligation.']
+      },
+      {
+        name: 'grandchild task remains visible after child context exists',
+        markdown: ['- Parent', '    - Child', '', '        - [ ] Grandchild obligation.'],
+        expected: ['- [ ] Grandchild obligation.']
+      },
+      {
+        name: 'list-contained code under child does not hide following grandchild task',
+        markdown: [
+          '- Parent',
+          '    - Child',
+          '',
+          '            - [ ] Grandchild code example, not live work.',
+          '',
+          '        - [ ] Grandchild obligation after code.'
+        ],
+        expected: ['- [ ] Grandchild obligation after code.']
+      },
+      {
+        name: 'outdented paragraph clears list context before indented code',
+        markdown: ['- Parent', '', 'Outside paragraph.', '', '    - [ ] Code example, not live work.'],
+        expected: []
+      },
+      {
+        name: 'unterminated fence hides checklist-looking examples through EOF',
+        markdown: ['```md', '- [ ] Example syntax, not live work.'],
+        expected: []
+      }
+    ];
+
+    for (const testCase of cases) {
+      expect(extractOpenChecklistItems(testCase.markdown.join('\n')), testCase.name).toEqual(testCase.expected);
+    }
+  });
+
   it('fails closed on non-missing task packet lifecycle read errors', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docs-freshness-lifecycle-read-error-'));
     createdDirs.push(repoRoot);

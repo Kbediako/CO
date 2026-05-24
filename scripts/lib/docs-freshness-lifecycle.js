@@ -125,8 +125,9 @@ export function isTaskPacketLifecyclePath(docPath) {
   return TASK_PACKET_PATH_FAMILIES.has(classifyTaskPacketPathFamily(docPath));
 }
 
-const OPEN_CHECKLIST_ITEM_PATTERN = /^\s*(?:[-*+]|\d+[.)])\s+\[ \]\s+.+$/gmu;
-const MARKDOWN_LIST_ITEM_PATTERN = /^\s*(?:[-*+]|\d+[.)])\s+/u;
+const OPEN_CHECKLIST_ITEM_PATTERN = /^\s*(?:[-*+]|\d+[.)])\s+\[ \]\s+.+$/u;
+const MARKDOWN_LIST_ITEM_PATTERN = /^([ \t]*)([-*+]|\d+[.)])([ \t]+)/u;
+const MARKDOWN_FENCE_PATTERN = /^([ \t]*)(`{3,}|~{3,})/u;
 
 function leadingIndentWidth(line) {
   let width = 0;
@@ -144,87 +145,164 @@ function leadingIndentWidth(line) {
   return width;
 }
 
-function stripMarkdownCodeBlocks(content) {
-  const keptLines = [];
-  let fence = null;
-  let indentedCodeBlock = false;
-  let indentedCodeBlockMinimumWidth = 0;
-  let previousWasBlank = true;
-  let listContextIndentWidth = null;
-
-  for (const line of content.split(/\r?\n/)) {
-    const match = line.match(/^\s*(`{3,}|~{3,})/u);
-    if (match) {
-      const marker = match[1];
-      const char = marker[0];
-      if (!fence) {
-        const markerIndentWidth = leadingIndentWidth(line);
-        const preservesListContext =
-          listContextIndentWidth !== null && markerIndentWidth >= listContextIndentWidth + 4;
-        fence = { char, length: marker.length, preservesListContext };
-        if (!preservesListContext) {
-          listContextIndentWidth = null;
-        }
-        continue;
-      }
-      if (char === fence.char && marker.length >= fence.length) {
-        const preservesListContext = fence.preservesListContext;
-        fence = null;
-        if (!preservesListContext) {
-          listContextIndentWidth = null;
-        }
-        continue;
-      }
-    }
-    if (!fence) {
-      const isBlank = line.trim().length === 0;
-      const isIndented = /^(?: {4,}|\t)/u.test(line);
-      const indentWidth = isIndented ? leadingIndentWidth(line) : 0;
-      const hasListContext = listContextIndentWidth !== null;
-      const isListContainedCodeBlock =
-        previousWasBlank && hasListContext && indentWidth >= listContextIndentWidth + 8;
-      const continuesIndentedCodeBlock = indentedCodeBlock && indentWidth >= indentedCodeBlockMinimumWidth;
-      const startsIndentedCodeBlock = previousWasBlank && (!hasListContext || isListContainedCodeBlock);
-
-      if (isIndented && (continuesIndentedCodeBlock || startsIndentedCodeBlock)) {
-        if (!continuesIndentedCodeBlock) {
-          indentedCodeBlockMinimumWidth =
-            isListContainedCodeBlock && listContextIndentWidth !== null ? listContextIndentWidth + 8 : 4;
-        }
-        indentedCodeBlock = true;
-        continue;
-      }
-
-      if (isBlank) {
-        if (indentedCodeBlock) {
-          previousWasBlank = true;
-          continue;
-        }
-        keptLines.push(line);
-        previousWasBlank = true;
-        continue;
-      }
-
-      indentedCodeBlock = false;
-      indentedCodeBlockMinimumWidth = 0;
-      keptLines.push(line);
-      previousWasBlank = false;
-      if (MARKDOWN_LIST_ITEM_PATTERN.test(line)) {
-        listContextIndentWidth = leadingIndentWidth(line);
-      } else if (!(isIndented && hasListContext && indentWidth >= listContextIndentWidth + 4)) {
-        listContextIndentWidth = null;
-      }
-    }
+function whitespaceWidth(value) {
+  let width = 0;
+  for (const char of value) {
+    width += char === '\t' ? 4 : 1;
   }
-  return keptLines.join('\n');
+  return width;
+}
+
+function parseMarkdownListItem(line) {
+  const match = line.match(MARKDOWN_LIST_ITEM_PATTERN);
+  if (!match) {
+    return null;
+  }
+  const markerIndentWidth = leadingIndentWidth(match[1]);
+  const marker = match[2];
+  const gapWidth = whitespaceWidth(match[3]);
+  return {
+    markerIndentWidth,
+    contentIndentWidth: markerIndentWidth + marker.length + gapWidth
+  };
+}
+
+function parseMarkdownFence(line) {
+  const match = line.match(MARKDOWN_FENCE_PATTERN);
+  if (!match) {
+    return null;
+  }
+  return {
+    indentWidth: leadingIndentWidth(match[1]),
+    char: match[2][0],
+    length: match[2].length
+  };
+}
+
+function popListContextsForIndent(listContexts, indentWidth) {
+  while (listContexts.length > 0 && indentWidth < listContexts[listContexts.length - 1].contentIndentWidth) {
+    listContexts.pop();
+  }
+}
+
+function currentListContentIndent(listContexts) {
+  return listContexts.length > 0 ? listContexts[listContexts.length - 1].contentIndentWidth : 0;
+}
+
+function isMarkdownParagraphContinuation(line) {
+  const trimmed = line.trimStart();
+  if (/^(?:#{1,6}\s|>|-{3,}\s*$|\*{3,}\s*$|_{3,}\s*$)/u.test(trimmed)) {
+    return false;
+  }
+  return trimmed.length > 0;
 }
 
 export function extractOpenChecklistItems(content) {
   if (typeof content !== 'string' || content.length === 0) {
     return [];
   }
-  const checklistContent = stripMarkdownCodeBlocks(content);
-  return Array.from(checklistContent.matchAll(OPEN_CHECKLIST_ITEM_PATTERN), (match) => match[0].trim());
+  const openItems = [];
+  const listContexts = [];
+  let fence = null;
+  let indentedCodeBlock = null;
+  let previousWasBlank = true;
+
+  for (const line of content.split(/\r?\n/)) {
+    const indentWidth = leadingIndentWidth(line);
+    const isBlank = line.trim().length === 0;
+
+    if (fence) {
+      const closingFence = parseMarkdownFence(line);
+      if (
+        closingFence &&
+        closingFence.char === fence.char &&
+        closingFence.length >= fence.length &&
+        closingFence.indentWidth - fence.baseIndentWidth <= 3
+      ) {
+        fence = null;
+      }
+      previousWasBlank = false;
+      continue;
+    }
+
+    if (isBlank) {
+      if (!indentedCodeBlock) {
+        previousWasBlank = true;
+      }
+      continue;
+    }
+
+    if (indentedCodeBlock) {
+      if (
+        indentWidth >= indentedCodeBlock.codeIndentWidth &&
+        listContexts.length === indentedCodeBlock.listDepth
+      ) {
+        previousWasBlank = false;
+        continue;
+      }
+      indentedCodeBlock = null;
+    }
+
+    const listItem = parseMarkdownListItem(line);
+    const openingFence = parseMarkdownFence(line);
+    if (
+      listContexts.length > 0 &&
+      !previousWasBlank &&
+      indentWidth < currentListContentIndent(listContexts) &&
+      !listItem &&
+      !openingFence &&
+      isMarkdownParagraphContinuation(line)
+    ) {
+      previousWasBlank = false;
+      continue;
+    }
+
+    popListContextsForIndent(listContexts, indentWidth);
+
+    const baseIndentWidth = currentListContentIndent(listContexts);
+    const relativeIndentWidth = indentWidth - baseIndentWidth;
+    if (openingFence && relativeIndentWidth >= 0 && relativeIndentWidth <= 3) {
+      fence = {
+        char: openingFence.char,
+        length: openingFence.length,
+        baseIndentWidth
+      };
+      previousWasBlank = false;
+      continue;
+    }
+
+    if (previousWasBlank && relativeIndentWidth >= 4) {
+      indentedCodeBlock = {
+        codeIndentWidth: baseIndentWidth + 4,
+        listDepth: listContexts.length
+      };
+      previousWasBlank = false;
+      continue;
+    }
+
+    if (listItem) {
+      popListContextsForIndent(listContexts, listItem.markerIndentWidth);
+      const listBaseIndentWidth = currentListContentIndent(listContexts);
+      const listRelativeIndentWidth = listItem.markerIndentWidth - listBaseIndentWidth;
+      if (listRelativeIndentWidth >= 0 && listRelativeIndentWidth <= 3) {
+        listContexts.push(listItem);
+        if (OPEN_CHECKLIST_ITEM_PATTERN.test(line)) {
+          openItems.push(line.trim());
+        }
+        previousWasBlank = false;
+        continue;
+      }
+    }
+
+    if (listContexts.length > 0 && indentWidth >= currentListContentIndent(listContexts)) {
+      previousWasBlank = false;
+      continue;
+    }
+
+    listContexts.length = 0;
+    previousWasBlank = false;
+  }
+  return openItems;
 }
 
 function collectOpenChecklistObligations(paths, contentByPath) {
