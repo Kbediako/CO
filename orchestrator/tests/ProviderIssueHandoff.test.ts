@@ -47461,6 +47461,10 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_rehydrated_resumable_run',
       run_id: runId,
       run_manifest_path: childPaths.manifestPath,
+      worker_host: 'stale-worker-host',
+      launch_source: 'control-host',
+      launch_token: 'stale-launch-token',
+      launch_started_at: '2026-05-18T19:20:30.000Z',
       retry_queued: true,
       retry_attempt: 1,
       retry_due_at: '2026-05-23T22:07:12.798Z',
@@ -47474,11 +47478,47 @@ describe('createProviderIssueHandoffService', () => {
       })),
       resume: vi.fn(async () => undefined)
     };
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(),
+      refresh: vi.fn(),
+      snapshot: () => ({
+        status: 'ready' as const,
+        pipeline_id: 'provider-linear-worker',
+        source_path: '/repo/codex.orchestrator.json',
+        snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        last_reload_attempt_at: null,
+        last_success_at: null,
+        last_error_at: null,
+        last_error: null,
+        terminal_cleanup: null,
+        worker_hosts: [
+          {
+            name: 'fresh-worker-host',
+            transport: 'ssh' as const,
+            ssh_destination: 'codex@fresh-worker-host',
+            ssh_options: [],
+            max_concurrent_agents: 1,
+            node_path: null
+          },
+          {
+            name: 'stale-worker-host',
+            transport: 'ssh' as const,
+            ssh_destination: 'codex@stale-worker-host',
+            ssh_options: [],
+            max_concurrent_agents: 1,
+            node_path: null
+          }
+        ]
+      }),
+      getLaunchConfigPath: vi.fn(),
+      recordTerminalCleanupResult: vi.fn()
+    };
     const service = createProviderIssueHandoffService({
       paths,
       state,
       persist,
       launcher,
+      providerWorkflowConfigStore,
       startPipelineId: 'diagnostics'
     });
 
@@ -47505,6 +47545,7 @@ describe('createProviderIssueHandoffService', () => {
       issueId: 'lin-issue-555',
       issueIdentifier: 'CO-555',
       issueUpdatedAt: '2026-05-23T22:05:45.427Z',
+      workerHost: 'fresh-worker-host',
       residentSessionSeed: null,
       launchToken: expect.any(String)
     }));
@@ -47518,6 +47559,7 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_start_launched',
       run_id: 'run-co-555-rework-fresh',
       run_manifest_path: '/tmp/provider-run/co-555-rework-fresh-manifest.json',
+      worker_host: 'fresh-worker-host',
       retry_queued: null,
       retry_attempt: null,
       retry_due_at: null,
@@ -47576,6 +47618,10 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_rehydrated_resumable_run',
       run_id: runId,
       run_manifest_path: childPaths.manifestPath,
+      worker_host: 'stale-worker-host',
+      launch_source: 'control-host',
+      launch_token: 'stale-launch-token',
+      launch_started_at: '2026-05-18T19:20:30.000Z',
       retry_queued: true,
       retry_attempt: 1,
       retry_due_at: '2026-05-23T22:07:12.798Z',
@@ -47589,11 +47635,47 @@ describe('createProviderIssueHandoffService', () => {
       })),
       resume: vi.fn(async () => undefined)
     };
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(),
+      refresh: vi.fn(),
+      snapshot: () => ({
+        status: 'ready' as const,
+        pipeline_id: 'provider-linear-worker',
+        source_path: '/repo/codex.orchestrator.json',
+        snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        last_reload_attempt_at: null,
+        last_success_at: null,
+        last_error_at: null,
+        last_error: null,
+        terminal_cleanup: null,
+        worker_hosts: [
+          {
+            name: 'fresh-worker-host',
+            transport: 'ssh' as const,
+            ssh_destination: 'codex@fresh-worker-host',
+            ssh_options: [],
+            max_concurrent_agents: 1,
+            node_path: null
+          },
+          {
+            name: 'stale-worker-host',
+            transport: 'ssh' as const,
+            ssh_destination: 'codex@stale-worker-host',
+            ssh_options: [],
+            max_concurrent_agents: 1,
+            node_path: null
+          }
+        ]
+      }),
+      getLaunchConfigPath: vi.fn(),
+      recordTerminalCleanupResult: vi.fn()
+    };
     const service = createProviderIssueHandoffService({
       paths,
       state,
       persist,
       launcher,
+      providerWorkflowConfigStore,
       startPipelineId: 'diagnostics'
     });
 
@@ -47617,6 +47699,7 @@ describe('createProviderIssueHandoffService', () => {
       issueId: 'lin-issue-555-poll',
       issueIdentifier: 'CO-555',
       issueUpdatedAt: '2026-05-23T22:05:45.427Z',
+      workerHost: 'fresh-worker-host',
       residentSessionSeed: null,
       launchToken: expect.any(String)
     }));
@@ -47630,6 +47713,7 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_refresh_start_launched',
       run_id: 'run-co-555-rework-poll-fresh',
       run_manifest_path: '/tmp/provider-run/co-555-rework-poll-fresh-manifest.json',
+      worker_host: 'fresh-worker-host',
       retry_queued: null,
       retry_attempt: null,
       retry_due_at: null,
@@ -47688,6 +47772,10 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_rehydrated_resumable_run',
       run_id: runId,
       run_manifest_path: childPaths.manifestPath,
+      worker_host: 'stale-worker-host',
+      launch_source: 'control-host',
+      launch_token: 'stale-launch-token',
+      launch_started_at: '2026-05-18T19:20:30.000Z',
       retry_queued: true,
       retry_attempt: 1,
       retry_due_at: '2026-05-23T22:06:01.000Z',
@@ -47700,6 +47788,41 @@ describe('createProviderIssueHandoffService', () => {
         manifestPath: '/tmp/provider-run/co-555-rework-retry-dispatch-fresh-manifest.json'
       })),
       resume: vi.fn(async () => undefined)
+    };
+    const providerWorkflowConfigStore = {
+      bootstrap: vi.fn(),
+      refresh: vi.fn(),
+      snapshot: () => ({
+        status: 'ready' as const,
+        pipeline_id: 'provider-linear-worker',
+        source_path: '/repo/codex.orchestrator.json',
+        snapshot_path: '/repo/.runs/local-mcp/cli/control-host/provider-workflow.last-known-good.json',
+        last_reload_attempt_at: null,
+        last_success_at: null,
+        last_error_at: null,
+        last_error: null,
+        terminal_cleanup: null,
+        worker_hosts: [
+          {
+            name: 'fresh-worker-host',
+            transport: 'ssh' as const,
+            ssh_destination: 'codex@fresh-worker-host',
+            ssh_options: [],
+            max_concurrent_agents: 1,
+            node_path: null
+          },
+          {
+            name: 'stale-worker-host',
+            transport: 'ssh' as const,
+            ssh_destination: 'codex@stale-worker-host',
+            ssh_options: [],
+            max_concurrent_agents: 1,
+            node_path: null
+          }
+        ]
+      }),
+      getLaunchConfigPath: vi.fn(),
+      recordTerminalCleanupResult: vi.fn()
     };
     const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     const resolveTrackedIssue = vi.fn(async () => ({
@@ -47718,6 +47841,7 @@ describe('createProviderIssueHandoffService', () => {
       state,
       persist,
       launcher,
+      providerWorkflowConfigStore,
       resolveTrackedIssue,
       startPipelineId: 'diagnostics'
     });
@@ -47736,6 +47860,7 @@ describe('createProviderIssueHandoffService', () => {
       issueId: 'lin-issue-555-retry-dispatch',
       issueIdentifier: 'CO-555',
       issueUpdatedAt: '2026-05-23T22:05:45.427Z',
+      workerHost: 'fresh-worker-host',
       residentSessionSeed: null,
       launchToken: expect.any(String)
     }));
@@ -47749,6 +47874,7 @@ describe('createProviderIssueHandoffService', () => {
       reason: 'provider_issue_retry_start_launched',
       run_id: 'run-co-555-rework-retry-dispatch-fresh',
       run_manifest_path: '/tmp/provider-run/co-555-rework-retry-dispatch-fresh-manifest.json',
+      worker_host: 'fresh-worker-host',
       retry_queued: null,
       retry_attempt: null,
       retry_due_at: null,
@@ -47758,6 +47884,155 @@ describe('createProviderIssueHandoffService', () => {
       issue_identifier: 'CO-555',
       state: 'starting',
       run_id: 'run-co-555-rework-retry-dispatch-fresh',
+      retry_queued: null
+    });
+  });
+
+  it('clears stale failed retry identity when due retry stale-run Rework relaunch is capacity blocked', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-23T22:06:00.000Z'));
+
+    const { root, paths } = await createHostPaths();
+    const taskId = 'task-co-555-old-failed-retry-dispatch-blocked';
+    const runId = 'run-co-555-old-failed-retry-dispatch-blocked';
+    const childEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId
+    };
+    const childPaths = resolveRunPaths(childEnv, runId);
+    await mkdir(childPaths.runDir, { recursive: true });
+    await writeFile(
+      childPaths.manifestPath,
+      JSON.stringify({
+        run_id: runId,
+        task_id: taskId,
+        status: 'failed',
+        summary: 'Old failed provider worker before CO-555 due retry capacity block.',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-555-retry-dispatch-blocked',
+        issue_identifier: 'CO-555',
+        issue_updated_at: '2026-05-18T19:20:24.441Z',
+        updated_at: '2026-05-18T22:41:06.044Z'
+      }),
+      'utf8'
+    );
+    const occupyingEnv = {
+      repoRoot: root,
+      runsRoot: join(root, '.runs'),
+      outRoot: join(root, 'out'),
+      taskId: 'task-co-555-retry-dispatch-occupant'
+    };
+    const occupyingPaths = resolveRunPaths(
+      occupyingEnv,
+      'run-co-555-retry-dispatch-occupant'
+    );
+    await mkdir(occupyingPaths.runDir, { recursive: true });
+    await writeFile(
+      occupyingPaths.manifestPath,
+      JSON.stringify({
+        run_id: 'run-co-555-retry-dispatch-occupant',
+        task_id: 'task-co-555-retry-dispatch-occupant',
+        pipeline_id: 'provider-linear-worker',
+        status: 'in_progress',
+        issue_provider: 'linear',
+        issue_id: 'lin-issue-555-retry-dispatch-occupant',
+        issue_identifier: 'CO-997',
+        issue_updated_at: '2026-05-23T22:05:00.000Z',
+        updated_at: '2026-05-23T22:05:30.000Z'
+      }),
+      'utf8'
+    );
+
+    const state = createProviderIntakeState();
+    state.claims.push(createProviderClaim({
+      provider_key: 'linear:lin-issue-555-retry-dispatch-blocked',
+      issue_id: 'lin-issue-555-retry-dispatch-blocked',
+      issue_identifier: 'CO-555',
+      issue_title: 'Terminal retry recurrence fix',
+      issue_state: 'Rework',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-23T22:05:45.427Z',
+      task_id: taskId,
+      state: 'resumable',
+      reason: 'provider_issue_rehydrated_resumable_run',
+      run_id: runId,
+      run_manifest_path: childPaths.manifestPath,
+      worker_host: 'stale-worker-host',
+      launch_source: 'control-host',
+      launch_token: 'stale-launch-token',
+      launch_started_at: '2026-05-18T19:20:30.000Z',
+      retry_queued: true,
+      retry_attempt: 1,
+      retry_due_at: '2026-05-23T22:06:01.000Z',
+      retry_error: 'old failed provider worker'
+    }));
+    const { persist, getPersistedState } = createPersistSnapshotSpy(state);
+    const launcher = {
+      start: vi.fn(async () => ({
+        runId: 'run-co-555-retry-dispatch-blocked-should-not-start',
+        manifestPath: '/tmp/provider-run/co-555-retry-dispatch-blocked-should-not-start.json'
+      })),
+      resume: vi.fn(async () => undefined)
+    };
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const resolveTrackedIssue = vi.fn(async () => ({
+      kind: 'ready' as const,
+      trackedIssue: createTrackedIssue({
+        id: 'lin-issue-555-retry-dispatch-blocked',
+        identifier: 'CO-555',
+        title: 'Terminal retry recurrence fix',
+        state: 'Rework',
+        state_type: 'started',
+        updated_at: '2026-05-23T22:05:45.427Z'
+      })
+    }));
+    const service = createProviderIssueHandoffService({
+      paths,
+      state,
+      persist,
+      launcher,
+      readFeatureToggles: () => ({
+        agent: {
+          max_concurrent_agents: 1
+        }
+      }),
+      resolveTrackedIssue,
+      startPipelineId: 'diagnostics'
+    });
+
+    expect(service).toBeDefined();
+    await waitForMockCalls(setTimeoutSpy);
+    vi.setSystemTime(new Date('2026-05-23T22:06:01.001Z'));
+    getLatestScheduledTimeoutCallback(setTimeoutSpy)();
+    await flushAsyncWork();
+    await waitForMockCalls(persist, 1, QUEUED_RETRY_SETTLE_TURNS);
+
+    expect(launcher.start).not.toHaveBeenCalled();
+    expect(launcher.resume).not.toHaveBeenCalled();
+    expect(state.claims[0]).toMatchObject({
+      issue_identifier: 'CO-555',
+      issue_state: 'Rework',
+      issue_state_type: 'started',
+      issue_updated_at: '2026-05-23T22:05:45.427Z',
+      state: 'accepted',
+      reason: 'provider_issue_retry_start_blocked:max_concurrency',
+      task_id: 'linear-lin-issue-555-retry-dispatch-blocked',
+      run_id: null,
+      run_manifest_path: null,
+      worker_host: null,
+      launch_source: null,
+      launch_token: null,
+      retry_queued: null,
+      retry_attempt: null,
+      retry_due_at: null,
+      retry_error: null
+    });
+    expect(getPersistedState().claims[0]).toMatchObject({
+      issue_identifier: 'CO-555',
+      state: 'accepted',
+      run_id: null,
       retry_queued: null
     });
   });

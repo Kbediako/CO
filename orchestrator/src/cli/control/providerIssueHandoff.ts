@@ -2207,6 +2207,7 @@ export function createProviderIssueHandoffService(
     preserveRetryAttempt?: boolean;
     clearRetryOnSuccessfulStart?: boolean;
     seedRetryAttemptFromPreviousRun?: boolean;
+    excludeCurrentClaimFromAdmission?: boolean;
   }): Promise<ProviderIssueHandoffResult> => {
     return await runWithConfiguredWorkerHostsCache(async () => {
       assertProviderHandoffSourceFreshnessTrusted();
@@ -2217,7 +2218,9 @@ export function createProviderIssueHandoffService(
       });
       const admissionGate = await createProviderAdmissionGate({
         excludeClaimProviderKey:
-          input.claim.retry_queued === true ? input.claim.provider_key : null
+          input.excludeCurrentClaimFromAdmission === true || input.claim.retry_queued === true
+            ? input.claim.provider_key
+            : null
       });
       if (!admissionGate.canDispatch(input.trackedIssue)) {
         const claim = await upsertProviderClaimAndPersist({
@@ -4039,13 +4042,14 @@ export function createProviderIssueHandoffService(
           if (resolution.kind === 'owned') {
             if (latestRun && latestRunIsStaleForTrackedIssue) {
               await launchStartForTrackedIssue({
-                claim,
+                claim: clearStaleProviderRunIdentityFromClaim(claim),
                 trackedIssue: resolution.trackedIssue,
                 reason: PROVIDER_RETRY_START_LAUNCHED_REASON,
                 failureReason: PROVIDER_RETRY_START_FAILED_REASON,
-                previousRun: latestRun,
+                previousRun: null,
                 preserveRetryAttempt: false,
-                clearRetryOnSuccessfulStart: true
+                clearRetryOnSuccessfulStart: true,
+                excludeCurrentClaimFromAdmission: true
               });
               return;
             }
@@ -4135,13 +4139,16 @@ export function createProviderIssueHandoffService(
               ? PROVIDER_POST_WORKER_EXIT_START_FAILED_REASON
               : PROVIDER_RETRY_START_FAILED_REASON;
           await launchStartForTrackedIssue({
-            claim,
+            claim: latestRunIsStaleForTrackedIssue
+              ? clearStaleProviderRunIdentityFromClaim(claim)
+              : claim,
             trackedIssue: resolution.trackedIssue,
             reason: startReason,
             failureReason: startFailureReason,
-            previousRun: latestRun,
+            previousRun: latestRunIsStaleForTrackedIssue ? null : latestRun,
             preserveRetryAttempt: !latestRunIsStaleForTrackedIssue,
-            clearRetryOnSuccessfulStart: latestRunIsStaleForTrackedIssue
+            clearRetryOnSuccessfulStart: latestRunIsStaleForTrackedIssue,
+            excludeCurrentClaimFromAdmission: latestRunIsStaleForTrackedIssue
           });
         });
       }));
@@ -4895,10 +4902,6 @@ export function createProviderIssueHandoffService(
             ...claimBase,
             accepted_at: lockedExisting?.accepted_at ?? claimBase.accepted_at
           };
-          const lockedLatestRetryStateBase: Pick<
-            ProviderIntakeClaimRecord,
-            'retry_queued' | 'retry_attempt' | 'retry_due_at'
-          > = lockedExisting ?? clearProviderRetryFields();
           const lockedActiveRun =
             lockedAttachableDiscoveredRuns.find((run) => run.status === 'in_progress') ?? null;
           const lockedQueuedRun =
@@ -4918,10 +4921,16 @@ export function createProviderIssueHandoffService(
               : false;
           const lockedLatestRunForFreshLaunch =
             lockedLatestRunStaleForTrackedIssue ? null : lockedLatestRun;
-          const lockedLatestRetryStateBaseForFreshLaunch =
-            lockedLatestRunStaleForTrackedIssue ? clearProviderRetryFields() : lockedLatestRetryStateBase;
+          const lockedExistingForFreshLaunch =
+            lockedLatestRunStaleForTrackedIssue && lockedExisting
+              ? clearStaleProviderRunIdentityFromClaim(lockedExisting)
+              : lockedExisting;
+          const lockedLatestRetryStateBaseForFreshLaunch: Pick<
+            ProviderIntakeClaimRecord,
+            'retry_queued' | 'retry_attempt' | 'retry_due_at'
+          > = lockedExistingForFreshLaunch ?? clearProviderRetryFields();
           const lockedPreferredWorkerHost = resolvePreferredStartWorkerHost({
-            claimWorkerHost: lockedExisting?.worker_host ?? null,
+            claimWorkerHost: lockedExistingForFreshLaunch?.worker_host ?? null,
             previousRun: lockedLatestRunForFreshLaunch
           });
           const lockedSourceFreshnessPolicy = resolveProviderHandoffSourceFreshnessPolicy();
@@ -6315,10 +6324,7 @@ export function createProviderIssueHandoffService(
             if (resolution.kind === 'owned') {
               const currentClaim =
                 latestRunStaleForTrackedIssue
-                  ? {
-                      ...claim,
-                      ...clearProviderRetryFields()
-                    }
+                  ? clearStaleProviderRunIdentityFromClaim(claim)
                   : claim.retry_queued === true
                     ? await ensureQueuedProviderRetryDeadline({
                         claim,
@@ -6419,16 +6425,7 @@ export function createProviderIssueHandoffService(
                 resolution.trackedIssue
               );
             const releasedStartClaim = latestRunStaleForTrackedIssue
-              ? {
-                  ...claim,
-                  ...clearProviderRetryFields(),
-                  run_id: null,
-                  run_manifest_path: null,
-                  worker_host: null,
-                  launch_source: null,
-                  launch_token: null,
-                  launch_started_at: null
-                }
+              ? clearStaleProviderRunIdentityFromClaim(claim)
               : claim;
             if (
               !canDispatchReleasedStart ||
@@ -6589,12 +6586,27 @@ export function createProviderIssueHandoffService(
                     trackedIssue: resolution.trackedIssue
                   })
                 : false;
+            if (resolution.kind === 'owned' && latestRunStaleForTrackedIssue) {
+              const handoffResult = await launchStartForTrackedIssue({
+                claim: clearStaleProviderRunIdentityFromClaim(claim),
+                trackedIssue: resolution.trackedIssue,
+                reason: 'provider_issue_refresh_start_launched',
+                previousRun: null,
+                clearRetryOnSuccessfulStart: true,
+                excludeCurrentClaimFromAdmission: true
+              });
+              if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
+                noteOccupiedPollDispatchSlot(
+                  resolveClaimPollDispatchSlotKey(claimProviderKey, handoffResult.claim),
+                  claimProviderKey,
+                  resolution.trackedIssue
+                );
+              }
+              continue;
+            }
             const currentClaim =
               latestRunStaleForTrackedIssue
-                ? {
-                    ...claim,
-                    ...clearProviderRetryFields()
-                  }
+                ? clearStaleProviderRunIdentityFromClaim(claim)
                 : claim.retry_queued === true
                   ? await ensureQueuedProviderRetryDeadline({
                       claim,
@@ -6760,10 +6772,7 @@ export function createProviderIssueHandoffService(
               : false;
           const currentClaim =
             latestRunStaleForTrackedIssue
-              ? {
-                  ...claim,
-                  ...clearProviderRetryFields()
-                }
+              ? clearStaleProviderRunIdentityFromClaim(claim)
               : claim.retry_queued === true
                 ? await ensureQueuedProviderRetryDeadline({
                     claim,
@@ -6908,7 +6917,8 @@ export function createProviderIssueHandoffService(
             const handoffResult = await launchStartForTrackedIssue({
               claim: currentClaim,
               trackedIssue: resolution.trackedIssue,
-              reason: 'provider_issue_refresh_start_launched'
+              reason: 'provider_issue_refresh_start_launched',
+              excludeCurrentClaimFromAdmission: latestRunStaleForTrackedIssue
             });
             if (shouldCountProviderAdmissionResultForPollBudget(handoffResult)) {
               noteOccupiedPollDispatchSlot(
@@ -10054,6 +10064,39 @@ function clearProviderRetryFields(): Pick<
     retry_attempt: null,
     retry_due_at: null,
     retry_error: null
+  };
+}
+
+function clearStaleProviderRunIdentityFromClaim(
+  claim: ProviderIntakeClaimRecord
+): ProviderIntakeClaimRecord {
+  return {
+    ...claim,
+    ...clearStaleProviderRunIdentityFields()
+  };
+}
+
+function clearStaleProviderRunIdentityFields(): Pick<
+  ProviderIntakeClaimRecord,
+  | 'run_id'
+  | 'run_manifest_path'
+  | 'worker_host'
+  | 'launch_source'
+  | 'launch_token'
+  | 'launch_started_at'
+  | 'retry_queued'
+  | 'retry_attempt'
+  | 'retry_due_at'
+  | 'retry_error'
+> {
+  return {
+    ...clearProviderRetryFields(),
+    run_id: null,
+    run_manifest_path: null,
+    worker_host: null,
+    launch_source: null,
+    launch_token: null,
+    launch_started_at: null
   };
 }
 
