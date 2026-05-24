@@ -3,6 +3,108 @@
   "generated_at": "2026-05-24",
   "entries": [
     {
+      "path": ".agent/task/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
+        "identifier": "CO-581",
+        "url": "https://linear.app/asabeko/issue/CO-581"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+    },
+    {
+      "path": "docs/ACTION_PLAN-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
+        "identifier": "CO-581",
+        "url": "https://linear.app/asabeko/issue/CO-581"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+    },
+    {
+      "path": "docs/PRD-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
+        "identifier": "CO-581",
+        "url": "https://linear.app/asabeko/issue/CO-581"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+    },
+    {
+      "path": "docs/TECH_SPEC-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
+        "identifier": "CO-581",
+        "url": "https://linear.app/asabeko/issue/CO-581"
+      },
+      "doc_class": "task_packet",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+    },
+    {
+      "path": "tasks/specs/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
+        "identifier": "CO-581",
+        "url": "https://linear.app/asabeko/issue/CO-581"
+      },
+      "doc_class": "active_spec",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+    },
+    {
+      "path": "tasks/tasks-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+      "owner": "Codex (top-level agent), Review agent",
+      "status": "active",
+      "last_review": "2026-05-24",
+      "cadence_days": 30,
+      "source_issue": {
+        "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
+        "identifier": "CO-581",
+        "url": "https://linear.app/asabeko/issue/CO-581"
+      },
+      "doc_class": "task_mirror",
+      "lifecycle_state": "active",
+      "created_at": "2026-05-24",
+      "next_review": "2026-06-23",
+      "notes": "CO-581 docs-first packet for exact-key retained May 19 docs freshness cohort owner."
+    },
+    {
       "path": ".agent/task/linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
       "owner": "Codex (top-level agent), Review agent",
       "status": "active",
