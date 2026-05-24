@@ -80,7 +80,7 @@
 - [x] Rework validation after 2026-05-24 recurrence. Evidence: focused recurrence slice, full `ProviderIssueHandoff.test.ts`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run repo:stewardship`, `node scripts/spec-guard.mjs --dry-run`, `node scripts/diff-budget.mjs`, `git diff --check`, and `npm run pack:smoke` passed after the poll-path P1 fix.
 - [x] Rework standalone review rerun after poll-path P1 fix. Evidence: enforced `codex-orchestrator review --uncommitted` completed clean with valid contract, zero findings, and review telemetry at `.runs/linear-a91cfc38-be9e-496f-90bd-5cb2625763a5-guard/cli/2026-05-23T22-38-02-147Z-9116bec1/review/telemetry.json`.
 - [x] Explicit rework elegance/minimality pass. Evidence: reviewed new helpers and regressions after clean review; retained two local helpers because cached-terminal release needs an explicit claim-field projection and stale-run reclaim needs a Rework-scoped proof-diagnostic guard.
-- [ ] External docs freshness owner replacement. Evidence: `npm run docs:freshness` and `npm run docs:freshness:maintain -- --check --format json` still fail because canonical owner CO-575 is terminal while successor CO-579 packet traceability is pending.
+- [x] External docs freshness handoff blocker cleared. Evidence: after merging current `origin/main`, `npm run docs:freshness`, `npm run docs:check`, `node scripts/spec-guard.mjs --dry-run`, and `node scripts/docs-freshness-maintain.mjs --check --format json` pass for this branch; the maintenance report has `freshness_decision=pass_with_owned_rolling_debt`, `blocks_handoff=false`, and warning-level terminal-owner succession remains separately routed.
 
 ## Progress Log
 - 2026-05-18: Live issue-context read confirmed CO-555 was `Ready`, then moved to `In Progress`.
@@ -90,7 +90,7 @@
 - 2026-05-18: PR #834 opened and attached; ready-review stopped because the branch was behind `main`; current-main merge applied cleanly and post-merge validation is underway.
 - 2026-05-24: CO-534 recurrence showed terminal cached `Duplicate` metadata could still rehydrate as retry/resumable and CO-555 `Rework` could be held by an older failed run; reopened CO-555 for root-cause rework.
 - 2026-05-24: Enforced standalone review found a P1 poll/refresh stale-run gap; fixed by passing claim freshness into that branch and constraining stale-run reclaim to live `Rework` updates so generic failed-run proof diagnostics remain retry-visible.
-- 2026-05-24: Rework review rerun returned clean with a valid enforced contract; current remaining blocker is external docs freshness ownership (`CO-575` terminal, `CO-579` successor traceability pending).
+- 2026-05-24: Rework review rerun returned clean with a valid enforced contract; after CO-579 landed on `origin/main`, the external docs freshness blocker was rechecked and no longer blocks CO-555 handoff (`docs:freshness:maintain` reports `blocks_handoff=false`).
 
 ## Notes
 - Parent orchestration remains responsible for PR feedback drain, Linear state handoff, and final workpad closeout.

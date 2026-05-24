@@ -1886,7 +1886,7 @@
         }
       },
       "validation": {
-        "status": "rework_review_clean_docs_freshness_blocked",
+        "status": "rework_review_clean_current_main_validation",
         "passed": [
           "live issue-context",
           "Ready -> In Progress transition",
@@ -1918,13 +1918,13 @@
           "post-fix git diff --check",
           "post-fix pack smoke",
           "post-fix enforced standalone review clean with valid contract",
-          "post-fix explicit elegance/minimality pass"
+          "post-fix explicit elegance/minimality pass",
+          "current-main docs:freshness handoff blocker cleared with blocks_handoff=false"
         ],
         "pending": [
           "CodeRabbit re-review acknowledgement",
           "PR ready-review drain",
-          "Linear In Review handoff",
-          "external docs freshness owner replacement for terminal CO-575 via CO-579 packet traceability"
+          "Linear In Review handoff"
         ]
       },
       "paths": {
