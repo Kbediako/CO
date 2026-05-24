@@ -19,6 +19,7 @@
 - [x] ACTION_PLAN created for implementation, validation, review, PR drain, and handoff sequencing. Evidence: `docs/ACTION_PLAN-linear-a91cfc38-be9e-496f-90bd-5cb2625763a5.md`.
 - [x] Checklist mirrored to `.agent/task`. Evidence: `.agent/task/linear-a91cfc38-be9e-496f-90bd-5cb2625763a5.md`.
 - [x] Task registration updated in canonical `tasks/index.json` `items[]` shape. Evidence: `tasks/index.json`.
+- [x] Rework recurrence packet refreshed after CO-534 exposed cached-terminal and stale-run gaps. Evidence: 2026-05-24 docs/spec/checklist updates plus GPT Pro consult summary.
 
 ## Acceptance Criteria
 - [x] Terminal Linear states (`Done`/completed, canceled/cancelled, duplicate, archived/trashed where surfaced) take precedence over `retry_queued`, `resumable`, and resume-eligible historical run status for active WIP accounting. Evidence: shared terminal predicate now gates active/retry helpers and projection retry state.
@@ -28,6 +29,9 @@
 - [x] Regression coverage includes the CO-554-shaped completed-retry fixture: cached `state=completed`, `reason=provider_issue_rehydrated_completed_run`, `retry_queued=true`, cached `issue_state=In Progress`/`started`, fresh live `Done`/`completed`, expected retry cleared/inactive and no start/resume/requeue. Evidence: `ProviderIssueHandoff.test.ts` exact CO-554-shaped rehydrate test plus `ControlRuntime.test.ts` terminal selected-retry clearing projection test.
 - [x] Existing non-terminal retry/resumable workers remain active and retry-visible. Evidence: non-terminal retry-resumable provider-intake regression.
 - [x] No manual `provider-intake-state.json` edits are required. Evidence: no state files changed; supported control-host logic converges the stale claim.
+- [x] Cached terminal `Duplicate`/duplicate metadata releases stale retry/resumable claims when refresh is disabled or unavailable, without requiring `passive_release` metadata or exact run identity as a classification prerequisite. Evidence: CO-534-shaped cached Duplicate rehydrate regression releases and clears retry fields without a fresh Linear fetch.
+- [x] Terminal claims with stale `retry_queued=true`, `retry_attempt`, and valid `retry_due_at` are not scheduled by the retry queue. Evidence: terminal stale retry metadata regression asserts no retry timer, no start, and no resume.
+- [x] Newer active Linear issue updates, including CO-555 `Rework`, supersede older failed/resume-eligible runs and admit fresh work instead of preserving stale `resumable` retry WIP. Evidence: direct accepted-issue and poll/refresh regressions launch fresh Rework work while preserving generic non-Rework failed-run retry diagnostics.
 
 ## Protected Issue Terms
 - [x] `provider-intake-state.json`
@@ -62,6 +66,9 @@
 - [x] Implement terminal-aware rehydration release and capacity helpers. Evidence: `providerIssueHandoff.ts` releases terminal retry/resumable claims and excludes terminal queued claims from poll/admission occupancy.
 - [x] Update runtime and selected-run retry projections. Evidence: `controlRuntime.ts` and `selectedRunProjection.ts` suppress terminal retry state.
 - [x] Add focused regression coverage. Evidence: `ProviderIntakeState.test.ts`, `ProviderIssueHandoff.test.ts`, and `ControlRuntime.test.ts`.
+- [x] Rework cached-terminal release and retry-queue scheduling. Evidence: cached terminal release path plus terminal-aware retry queue scheduling/dispatch helpers.
+- [x] Rework stale failed-run freshness checks for active issue reclaim. Evidence: stale failed-run reclaim requires current `Rework` issue freshness and claim freshness, avoiding broad relaunch of generic failed proof diagnostics.
+- [x] Add CO-534/CO-555 recurrence regressions for cached Duplicate release, terminal retry queue suppression, and newer Rework reclaim. Evidence: focused recurrence slice and full `ProviderIssueHandoff.test.ts` pass.
 
 ## Validation
 - [x] Same-issue child lane. Evidence: `terminal-retry-tests` run `2026-05-18T19-23-32-870Z-f45dcca5` completed successfully; parent invalidated stale patch metadata and reimplemented final tests directly.
@@ -70,6 +77,10 @@
 - [x] Manifest-backed standalone review. Evidence: latest enforced review completed with `review_verdict=clean`, `contract_validation.status=valid`, `contract_overall_verdict=clean`, and zero findings after the side-effect short-circuit fix.
 - [x] Explicit elegance/minimality pass. Evidence: manual post-review checklist found no avoidable abstraction; retained one shared terminal predicate plus local rehydration release side-effect helper and narrow projection clearing.
 - [ ] PR ready-review drain. Evidence: pending after post-merge validation and branch push.
+- [x] Rework validation after 2026-05-24 recurrence. Evidence: focused recurrence slice, full `ProviderIssueHandoff.test.ts`, `npm run build`, `npm run lint`, `npm run test`, `npm run docs:check`, `npm run repo:stewardship`, `node scripts/spec-guard.mjs --dry-run`, `node scripts/diff-budget.mjs`, `git diff --check`, and `npm run pack:smoke` passed after the poll-path P1 fix.
+- [x] Rework standalone review rerun after poll-path P1 fix. Evidence: enforced `codex-orchestrator review --uncommitted` completed clean with valid contract, zero findings, and review telemetry at `.runs/linear-a91cfc38-be9e-496f-90bd-5cb2625763a5-guard/cli/2026-05-23T22-38-02-147Z-9116bec1/review/telemetry.json`.
+- [x] Explicit rework elegance/minimality pass. Evidence: reviewed new helpers and regressions after clean review; retained two local helpers because cached-terminal release needs an explicit claim-field projection and stale-run reclaim needs a Rework-scoped proof-diagnostic guard.
+- [ ] External docs freshness owner replacement. Evidence: `npm run docs:freshness` and `npm run docs:freshness:maintain -- --check --format json` still fail because canonical owner CO-575 is terminal while successor CO-579 packet traceability is pending.
 
 ## Progress Log
 - 2026-05-18: Live issue-context read confirmed CO-555 was `Ready`, then moved to `In Progress`.
@@ -77,6 +88,9 @@
 - 2026-05-18: Implemented terminal-aware provider-intake active/retry and rehydration release behavior.
 - 2026-05-18: Validation floor passed before the PR opened; standalone review rerun returned clean after fixing terminal poll occupancy.
 - 2026-05-18: PR #834 opened and attached; ready-review stopped because the branch was behind `main`; current-main merge applied cleanly and post-merge validation is underway.
+- 2026-05-24: CO-534 recurrence showed terminal cached `Duplicate` metadata could still rehydrate as retry/resumable and CO-555 `Rework` could be held by an older failed run; reopened CO-555 for root-cause rework.
+- 2026-05-24: Enforced standalone review found a P1 poll/refresh stale-run gap; fixed by passing claim freshness into that branch and constraining stale-run reclaim to live `Rework` updates so generic failed-run proof diagnostics remain retry-visible.
+- 2026-05-24: Rework review rerun returned clean with a valid enforced contract; current remaining blocker is external docs freshness ownership (`CO-575` terminal, `CO-579` successor traceability pending).
 
 ## Notes
 - Parent orchestration remains responsible for PR feedback drain, Linear state handoff, and final workpad closeout.

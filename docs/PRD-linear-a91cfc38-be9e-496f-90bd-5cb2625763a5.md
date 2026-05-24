@@ -5,7 +5,7 @@
 - Linear URL: https://linear.app/asabeko/issue/CO-555/co-exclude-terminal-retryable-provider-claims-from-active-wip
 - Task registry id: `20260518-linear-a91cfc38-be9e-496f-90bd-5cb2625763a5`
 - MCP Task ID: `linear-a91cfc38-be9e-496f-90bd-5cb2625763a5`
-- Source evidence: live `linear issue-context` on 2026-05-18 plus parent-provided CO-512 control-host/provider-intake evidence after PR #829 merged.
+- Source evidence: live `linear issue-context` on 2026-05-18 plus parent-provided CO-512 control-host/provider-intake evidence after PR #829 merged; 2026-05-24 CO-534/CO-555 recurrence where cached terminal `Duplicate` metadata and newer `Rework` Linear truth lost to stale retry/resumable run metadata.
 
 ## Summary
 - Problem Statement: after CO-512 moved to Linear `Done` / completed, `provider-intake-state.json` could rehydrate the retained failed run as `state=resumable`, `reason=provider_issue_rehydrated_resumable_run`, and `retry_queued=true`, causing `co-status` and related provider-intake projections to count the terminal issue as active WIP.
@@ -16,6 +16,9 @@
 - Success criteria / acceptance:
   - Terminal Linear states such as `Done` / completed, canceled, duplicate, archived, or trashed override `retry_queued`, `resumable`, and historical resume eligibility.
   - Rehydration preserves audit evidence but releases or ignores terminal retry/resumable claims instead of queuing retry WIP.
+  - Cached terminal metadata is release-authoritative during rehydrate when no fresher non-terminal Linear metadata is available; a fresh Linear fetch is preferred but not required for every terminal release.
+  - Retry timers use terminal-aware predicates and never fire solely because stale `retry_queued=true`, `retry_attempt`, or `retry_due_at` survived on a terminal claim.
+  - A newer active Linear issue update, such as CO-555 `Rework`, can reclaim work from an older failed/resume-eligible run instead of being rehydrated as stale `resumable` retry WIP.
   - `co-status`, freshness-gauge, and quota-hygiene surfaces exclude terminal retryable claims from active and retrying projections.
   - CO-512-shaped regression coverage proves Done/completed plus stale resume-eligible retry does not become active.
   - Non-terminal retry/resumable claims remain active and retry-visible.
@@ -35,8 +38,12 @@
   - `resumable`
   - `issue_state=Done`
   - `issue_state_type=completed`
+  - `issue_state=Duplicate`
+  - `issue_state_type=duplicate`
   - `active_issue_identifiers`
   - `isActiveProviderIntakeClaim`
+  - `run_id`
+  - `run_manifest_path`
   - terminal Linear truth
   - no manual state edits
 - Nearby wrong interpretations to reject:
@@ -44,6 +51,8 @@
   - relaunching CO-512
   - suppressing only one UI/status surface
   - treating cached run status as stronger than terminal live Linear state
+  - requiring fresh Linear fetch or `passive_release` metadata before terminal cached issue metadata can release
+  - using exact run identity as a terminal-classification prerequisite instead of a cleanup/audit guard
   - dropping retained audit metadata entirely
 
 ## Parity / Alignment Matrix
@@ -51,18 +60,25 @@
 | Surface | Current truth | Reference truth | Target truth | Explicitly out-of-scope differences |
 | --- | --- | --- | --- | --- |
 | Active provider-intake claim selection | `retry_queued=true` or `state=resumable` can mark a claim active before terminal issue metadata is considered. | Live terminal Linear issue truth is stronger than retry/resume metadata. | Terminal issue metadata makes the claim non-active before retry/resumable checks. | Non-terminal retry workers and unrelated queue policy. |
-| Rehydrated resume-eligible historical run | A terminal issue can be rehydrated as `provider_issue_rehydrated_resumable_run`. | Terminal live issue truth must release retry WIP while retaining audit evidence. | Rehydration writes a released/non-active audit row or ignores active retry queuing for terminal issues. | Manual state-file cleanup or issue-specific CO-512 branching. |
+| Rehydrated resume-eligible historical run | A terminal issue can be rehydrated as `provider_issue_rehydrated_resumable_run`. | Terminal issue truth, live or cached fallback, must release retry WIP while retaining audit evidence. | Rehydration writes a released/non-active audit row or ignores active retry queuing for terminal issues without requiring live Linear fetch for every release. | Manual state-file cleanup or issue-specific CO-512/CO-534 branching. |
+| Stale resume-eligible run versus newer active issue | Older failed runs can outvote a newer active Linear issue update and keep the issue `resumable`. | Current Linear issue update recency is the authority for whether a new worker should be admitted. | Resume-eligible runs older than the tracked issue update do not block fresh launch/reclaim. | Successful completed-run merge/review closeout semantics. |
 | Status/freshness/quota surfaces | Terminal retry metadata can inflate `retrying`, `active_issue_identifiers`, and selected active issue output. | Operator WIP surfaces should count only non-terminal active work. | Terminal retry metadata is surfaced as inactive retained audit evidence, not active/retrying WIP. | Dashboard redesign or unrelated quota-hygiene automation. |
 
 ## Not Done If
 - A terminal Linear issue can still appear in `provider_intake.active_issue_identifiers` because `retry_queued` or `state=resumable` bypasses terminal issue-state exclusion.
 - `nudge` can classify a terminal issue as ignored/non-active but a later rehydration restores an active retry claim.
+- Cached terminal `Duplicate`/duplicate metadata cannot release a retry/resumable claim when refresh is disabled or unavailable.
+- A stale failed run with older `issue_updated_at` prevents a newer CO-555 `Rework` issue update from admitting fresh work.
+- A terminal claim with valid stale retry fields remains scheduled in the retry queue.
 - The fix only patches the current CO-512 row instead of the provider-intake/retry selection logic.
 - Existing non-terminal retry/resumable workers stop appearing as active or retry-visible.
 
 ## Goals
 - Make terminal Linear issue truth the first active-WIP predicate for provider-intake claims.
 - Release terminal retry/resumable rehydration attempts while preserving audit evidence.
+- Release cached terminal retry/resumable rehydration attempts without making fresh Linear fetch a hard dependency.
+- Let newer active Linear issue updates supersede stale failed/resume-eligible runs.
+- Keep retry scheduling terminal-aware.
 - Keep non-terminal retry/resumable claims active.
 - Add focused CO-512-shaped regression coverage and broader provider-intake/handoff coverage for terminal queued/retry occupancy.
 
