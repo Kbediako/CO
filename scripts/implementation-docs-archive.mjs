@@ -15,9 +15,12 @@ import {
   toPosixPath
 } from './lib/docs-helpers.js';
 import {
+  buildTaskPacketLifecycleIndex,
   collectIndexedTaskPacketPaths,
+  isTaskPacketLifecyclePath,
   isTerminalTaskStatus,
   isTerminalTaskItem,
+  RETAINED_TERMINAL_PACKET_STATUS,
   TERMINAL_PENDING_ARCHIVE_STATUS
 } from './lib/docs-freshness-lifecycle.js';
 import { resolveEnvironmentPaths } from './lib/run-manifests.js';
@@ -81,6 +84,36 @@ function clearArchivedRegistryTaskStatus(entry) {
     }
   }
   return changed;
+}
+
+function normalizeRegistryTaskStatus(entry) {
+  for (const key of REGISTRY_TASK_STATUS_FIELDS) {
+    const value = entry?.[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim().toLowerCase();
+    }
+  }
+  return null;
+}
+
+function retainedTerminalPacketEvidence(registryEntry, relativePath, terminalLifecycleByPath) {
+  const taskStatus = normalizeRegistryTaskStatus(registryEntry);
+  if (taskStatus && isTerminalTaskStatus(taskStatus) && isTaskPacketLifecyclePath(relativePath)) {
+    return {
+      retained_terminal_evidence: 'registry_task_status',
+      task_status: taskStatus
+    };
+  }
+  const terminalLifecycle = terminalLifecycleByPath.get(relativePath);
+  if (terminalLifecycle) {
+    return {
+      retained_terminal_evidence: 'task_index_terminal',
+      task_key: terminalLifecycle.task_key,
+      task_id: terminalLifecycle.task_id,
+      source_issue: terminalLifecycle.source_issue
+    };
+  }
+  return null;
 }
 
 function formatDate(date) {
@@ -152,6 +185,10 @@ function isTaskPacketDocReference(relativePath, taskKey) {
 
 function isPreservedHistoricalStubStatus(status) {
   return status === PRESERVED_HISTORICAL_STUB_STATUS;
+}
+
+function isRetainedTerminalPacketStatus(status) {
+  return status === RETAINED_TERMINAL_PACKET_STATUS;
 }
 
 function isApprovedPreservedHistoricalStubPath(relativePath) {
@@ -556,6 +593,7 @@ async function main() {
 
   const tasksIndex = JSON.parse(tasksRaw);
   const items = Array.isArray(tasksIndex?.items) ? tasksIndex.items : [];
+  const taskLifecycleIndex = buildTaskPacketLifecycleIndex(items);
 
   const docRegexes = policy.docPatterns.map((pattern) => globToRegExp(pattern));
   const excludeSet = new Set(policy.excludePaths);
@@ -570,6 +608,7 @@ async function main() {
   const taskLinkedDocs = new Set();
   const taskCandidates = [];
   const taskCandidateKeys = new Set();
+  const terminalTaskPacketPaths = new Set();
   const reportOnlyTerminalEligibility = new Map();
   const reportOnlyRetentionEligibility = new Map();
   const linkedOpenChecklistByPath = new Map();
@@ -769,6 +808,11 @@ async function main() {
 
     const ageDays = computeAgeInDays(fallbackTerminalDate, today);
     for (const pathValue of indexedDocPaths) {
+      const terminalLifecycle = taskLifecycleIndex.byPath.get(pathValue);
+      if (!terminalLifecycle || terminalLifecycle.task_key !== taskKey) {
+        continue;
+      }
+      terminalTaskPacketPaths.add(pathValue);
       if (excludeSet.has(pathValue)) {
         continue;
       }
@@ -823,6 +867,7 @@ async function main() {
       if (excludeSet.has(relativePath)) {
         continue;
       }
+      terminalTaskPacketPaths.add(relativePath);
       addTaskCandidate({
         path: relativePath,
         taskKey: taskContext.taskKey,
@@ -1075,6 +1120,17 @@ async function main() {
       continue;
     }
 
+    const retainedEvidence = retainedTerminalPacketEvidence(registryEntry, relativePath, taskLifecycleIndex.byPath);
+    if (isRetainedTerminalPacketStatus(status) && retainedEvidence) {
+      report.skipped.push({
+        path: relativePath,
+        reason: RETAINED_TERMINAL_PACKET_STATUS,
+        context: { ...candidate, lineCount, status, ...retainedEvidence }
+      });
+      report.totals.skipped += 1;
+      continue;
+    }
+
     if (status === 'archived' && isFindingsPath(relativePath)) {
       report.skipped.push({
         path: relativePath,
@@ -1129,11 +1185,13 @@ async function main() {
     const lineCount = content.split('\n').length;
     const registryEntry = registryMap.get(normalizedRelativePath);
     const status = typeof registryEntry?.status === 'string' ? registryEntry.status : '';
+    const taskStatus = normalizeRegistryTaskStatus(registryEntry);
     const reviewDate = parseIsoDate(registryEntry?.last_review ?? null);
 
     const strayContext = {
       type: 'stray',
       status: status || null,
+      ...(taskStatus ? { task_status: taskStatus } : {}),
       last_review: registryEntry?.last_review ?? null,
       lineCount
     };
@@ -1154,6 +1212,17 @@ async function main() {
         path: normalizedRelativePath,
         reason: PRESERVED_HISTORICAL_STUB_STATUS,
         context: strayContext
+      });
+      report.totals.skipped += 1;
+      continue;
+    }
+
+    const retainedEvidence = retainedTerminalPacketEvidence(registryEntry, normalizedRelativePath, taskLifecycleIndex.byPath);
+    if (isRetainedTerminalPacketStatus(status) && retainedEvidence) {
+      report.skipped.push({
+        path: normalizedRelativePath,
+        reason: RETAINED_TERMINAL_PACKET_STATUS,
+        context: { ...strayContext, ...retainedEvidence }
       });
       report.totals.skipped += 1;
       continue;

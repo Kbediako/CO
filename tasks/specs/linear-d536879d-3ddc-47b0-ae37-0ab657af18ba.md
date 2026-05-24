@@ -5,7 +5,10 @@ relates_to: docs/PRD-linear-d536879d-3ddc-47b0-ae37-0ab657af18ba.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-01
+last_review: 2026-05-24
+status: done
+review_notes:
+  - "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-459 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
 ---
 
 ## Canonical Reference

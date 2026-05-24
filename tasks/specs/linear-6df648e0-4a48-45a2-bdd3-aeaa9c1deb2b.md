@@ -1,10 +1,10 @@
 ---
 id: 20260430-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b
 title: "CO-444 re-home docs:freshness:maintain owner after terminal CO-441"
-status: in_progress
+status: done
 owner: Codex
 created: 2026-04-30
-last_review: 2026-04-30
+last_review: 2026-05-24
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md
@@ -12,6 +12,7 @@ related_action_plan: docs/ACTION_PLAN-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2
 related_tasks:
   - tasks/tasks-linear-6df648e0-4a48-45a2-bdd3-aeaa9c1deb2b.md
 review_notes:
+  - "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-444 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
   - 2026-04-30: Bounded child lane created the packet and registry mirrors.
   - 2026-04-30: Parent reproduced the terminal CO-441 owner blocker and re-homed live metadata to CO-444.
 canonical_owner_marker: codex-orchestrator:canonical-owner-key=docs:freshness:maintain

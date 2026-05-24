@@ -1,10 +1,10 @@
 ---
 id: 20260501-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc
 title: "CO-454 resolve March 31 docs freshness candidate cohorts"
-status: in_progress
+status: done
 owner: Codex
 created: 2026-05-01
-last_review: 2026-05-01
+last_review: 2026-05-24
 review_cadence_days: 30
 risk_level: high
 related_prd: docs/PRD-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md
@@ -13,6 +13,7 @@ related_action_plan: docs/ACTION_PLAN-linear-9aedac3e-09df-4859-b818-b6f2d4dc8cc
 related_tasks:
   - tasks/tasks-linear-9aedac3e-09df-4859-b818-b6f2d4dc8ccc.md
 review_notes:
+  - "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-454 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
   - 2026-05-01: PR #736 Core Lane surfaced the owned March 31 active-spec failure; live Linear audit confirmed CO-54, CO-45, CO-52, CO-55, and CO-56 are `Done`, so this branch reclassified those five specs to inactive `done`, archived their 30 registry rows, and validated `spec-guard`, `docs:freshness`, `docs:freshness:maintain -- --format json`, and `docs:check`.
   - 2026-05-01: Traceability packet branch created the packet and registry mirrors needed before Backlog promotion.
 canonical_owner_marker: codex-orchestrator:canonical-owner-key=docs:freshness:maintain

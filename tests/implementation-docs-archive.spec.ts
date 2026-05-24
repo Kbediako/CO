@@ -2587,6 +2587,375 @@ describe('implementation-docs-archive script', () => {
     ).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
+  it('does not auto-archive retained terminal packet docs for completed task packets', async () => {
+    const repo = await initRepository({
+      policyOverrides: {
+        doc_patterns: ['docs/PRD-*.md'],
+        retain_days: 0,
+        max_lines: 1
+      },
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'docs/PRD-archive-test.md',
+            status: 'retained_terminal_packet',
+            last_review: '2025-01-01',
+            cadence_days: 365
+          }
+        ]
+      },
+      taskOverrides: {
+        status: 'completed',
+        completed_at: '2025-01-01',
+        paths: {
+          docs: 'docs/PRD-archive-test.md'
+        }
+      }
+    });
+
+    const docPath = join(repo, 'docs', 'PRD-archive-test.md');
+    const docContent = '# PRD Archive Test\n\nTerminal packet history stays on main.\n';
+    await writeFile(docPath, docContent);
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+
+    expect(report.totals.archived).toBe(0);
+    expect(report.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'docs/PRD-archive-test.md',
+          reason: 'retained_terminal_packet',
+          context: expect.objectContaining({
+            status: 'retained_terminal_packet'
+          })
+        })
+      ])
+    );
+    expect(await readFile(docPath, 'utf8')).toBe(docContent);
+    await expect(
+      readFile(
+        join(
+          repo,
+          'out',
+          'implementation-docs-archive-automation',
+          'docs-archive',
+          'docs',
+          'PRD-archive-test.md'
+        ),
+        'utf8'
+      )
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('does not use ambiguous terminal task-index paths as retained packet evidence', async () => {
+    const repo = await initRepository({
+      policyOverrides: {
+        doc_patterns: ['docs/PRD-*.md'],
+        retain_days: 0,
+        max_lines: 1
+      },
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'docs/PRD-archive-test.md',
+            status: 'retained_terminal_packet',
+            last_review: '2025-01-01',
+            cadence_days: 365
+          }
+        ]
+      }
+    });
+    await writeFile(
+      join(repo, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260422-1234-archive-test',
+              status: 'done',
+              completed_at: '2025-01-01'
+            },
+            {
+              id: '20260423-5678-archive-test',
+              status: 'done',
+              completed_at: '2025-01-02'
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+
+    expect(report.archived).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'docs/PRD-archive-test.md'
+        })
+      ])
+    );
+    expect(report.skipped).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'docs/PRD-archive-test.md',
+          reason: 'retained_terminal_packet'
+        })
+      ])
+    );
+  });
+
+  it('does not archive active packet rows through ambiguous terminal task-index aliases', async () => {
+    const repo = await initRepository({
+      policyOverrides: {
+        doc_patterns: ['docs/PRD-*.md'],
+        retain_days: 99999,
+        max_lines: 99999
+      },
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'docs/PRD-archive-test.md',
+            status: 'active',
+            last_review: '2025-01-01',
+            cadence_days: 365
+          }
+        ]
+      }
+    });
+    await writeFile(
+      join(repo, 'tasks', 'index.json'),
+      JSON.stringify(
+        {
+          items: [
+            {
+              id: '20260422-1234-archive-test',
+              status: 'done',
+              completed_at: '2025-01-01'
+            },
+            {
+              id: '20260423-5678-archive-test',
+              status: 'done',
+              completed_at: '2025-01-02'
+            }
+          ]
+        },
+        null,
+        2
+      )
+    );
+
+    await execFileAsync('node', [scriptPath, '--dry-run'], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+
+    expect(report.archived).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'docs/PRD-archive-test.md',
+          reason: expect.stringContaining('terminal_task_lifecycle')
+        })
+      ])
+    );
+    expect(report.archived).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'docs/PRD-archive-test.md'
+        })
+      ])
+    );
+  });
+
+  it('does not auto-archive retained terminal packet stray files', async () => {
+    const repo = await initRepository({
+      taskOverrides: {
+        status: 'in_progress'
+      },
+      policyOverrides: {
+        doc_patterns: ['tasks/tasks-*.md'],
+        stray_retain_days: 0,
+        max_lines: 1
+      },
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'tasks/tasks-linear-retained.md',
+            status: 'retained_terminal_packet',
+            task_status: 'done',
+            last_review: '2025-01-01',
+            cadence_days: 365
+          }
+        ]
+      }
+    });
+
+    const strayPath = join(repo, 'tasks', 'tasks-linear-retained.md');
+    const strayContent = '# Retained Terminal Packet\n\nTerminal packet history stays on main.\n';
+    await writeFile(strayPath, strayContent);
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+
+    expect(report.totals.archived).toBe(0);
+    expect(report.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-linear-retained.md',
+          reason: 'retained_terminal_packet',
+          context: expect.objectContaining({
+            status: 'retained_terminal_packet',
+            retained_terminal_evidence: 'registry_task_status',
+            task_status: 'done'
+          })
+        })
+      ])
+    );
+    expect(await readFile(strayPath, 'utf8')).toBe(strayContent);
+    await expect(
+      readFile(
+        join(
+          repo,
+          'out',
+          'implementation-docs-archive-automation',
+          'docs-archive',
+          'tasks',
+          'tasks-linear-retained.md'
+        ),
+        'utf8'
+      )
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('does not let retained terminal packet status alone bypass stray archive handling', async () => {
+    const repo = await initRepository({
+      taskOverrides: {
+        status: 'in_progress'
+      },
+      policyOverrides: {
+        doc_patterns: ['tasks/tasks-*.md'],
+        stray_retain_days: 0,
+        max_lines: 1
+      },
+      registry: {
+        generated_at: '2025-01-01',
+        entries: [
+          {
+            path: 'tasks/tasks-linear-retained.md',
+            status: 'retained_terminal_packet',
+            task_status: 'in_progress',
+            last_review: '2025-01-01',
+            cadence_days: 365
+          }
+        ]
+      }
+    });
+
+    const strayPath = join(repo, 'tasks', 'tasks-linear-retained.md');
+    await writeFile(strayPath, '# Retained Terminal Packet\n\nNonterminal stray packet must not be hidden.\n');
+
+    await execFileAsync('node', [scriptPath], {
+      cwd: repo,
+      env: {
+        ...process.env,
+        MCP_RUNNER_TASK_ID: 'implementation-docs-archive-automation',
+        CODEX_ORCHESTRATOR_ROOT: repo,
+        CODEX_ORCHESTRATOR_OUT_DIR: 'out'
+      }
+    });
+
+    const report = JSON.parse(
+      await readFile(
+        join(repo, 'out', 'implementation-docs-archive-automation', 'docs-archive-report.json'),
+        'utf8'
+      )
+    );
+
+    expect(report.totals.archived).toBe(1);
+    expect(report.archived).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-linear-retained.md',
+          reason: expect.stringContaining('retention_age'),
+          context: expect.objectContaining({
+            status: 'retained_terminal_packet',
+            task_status: 'in_progress'
+          })
+        })
+      ])
+    );
+    expect(report.skipped).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'tasks/tasks-linear-retained.md',
+          reason: 'retained_terminal_packet'
+        })
+      ])
+    );
+    expect(await readFile(strayPath, 'utf8')).toContain('<!-- docs-archive:stub -->');
+  });
+
   it('does not auto-archive preserved historical stub stray files', async () => {
     const repo = await initRepository({
       taskOverrides: {

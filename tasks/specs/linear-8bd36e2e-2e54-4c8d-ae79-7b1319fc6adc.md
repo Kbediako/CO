@@ -5,10 +5,13 @@ relates_to: docs/PRD-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md
 risk: high
 owners:
   - Codex
-last_review: 2026-05-01
+last_review: 2026-05-24
 related_action_plan: docs/ACTION_PLAN-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md
 task_checklists:
   - tasks/tasks-linear-8bd36e2e-2e54-4c8d-ae79-7b1319fc6adc.md
+status: done
+review_notes:
+  - "2026-05-24: CO-579 terminal lifecycle review: live Linear issue-context verified CO-461 is Done/completed; reclassified this spec inactive done instead of refreshing active pre-expiry metadata."
 ---
 
 # TECH_SPEC - CO-461 provider docs-review child-stream task identity guard compatibility

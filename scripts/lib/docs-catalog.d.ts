@@ -50,6 +50,7 @@ export function summarizeDocsByClass(
   invalid_entries: number;
   stale_entries: number;
   terminal_lifecycle_entries: number;
+  retained_terminal_packet_entries: number;
   uncatalogued_docs: number;
 }>;
 export function listBundledSkillNames(repoRoot: string): Promise<string[]>;
