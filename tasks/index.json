@@ -1,6 +1,84 @@
 {
   "items": [
     {
+      "id": "20260524-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066",
+      "title": "CO-581 preserve CO-558 May 19 retained docs freshness cohort owner",
+      "relates_to": "tasks/tasks-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+      "risk": "high",
+      "owners": [
+        "Codex"
+      ],
+      "status": "in_progress",
+      "last_review": "2026-05-24",
+      "canonical_owner_key": "baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance",
+      "canonical_owner_marker": "codex-orchestrator:canonical-owner-key=baseline_cohort_id:co-558-may-19-apr-18-task-report-maintenance",
+      "evidence": [
+        "docs/PRD-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+        "docs/TECH_SPEC-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+        "docs/ACTION_PLAN-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+        "tasks/specs/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+        "tasks/tasks-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+        ".agent/task/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+        "tasks/index.json",
+        "docs/TASKS.md",
+        "docs/docs-freshness-registry.json"
+      ],
+      "approvals": {
+        "docs_packet_child_lane": {
+          "reviewer": "bounded same-issue docs child lane",
+          "date": "2026-05-24",
+          "status": "created_child_validation_passed",
+          "manifest": ".runs/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066-docs-packet/cli/2026-05-24T22-14-44-538Z-a0cffa5b/manifest.json",
+          "source_anchor": "ctx:sha256:8824b9aeafca297dd598861836955314d72ed9c6909cafd917eb485e571fa786#chunk:c000001",
+          "summary": "Docs-first packet preserves the CO-581 exact-key retained May 19 docs freshness cohort owner contract; parent re-homed catalog/guide owner metadata from terminal CO-568 to live CO-581."
+        }
+      },
+      "validation": {
+        "status": "focused_parent_validation_passed_review_pending",
+        "passed": [
+          "docs-first packet drafted",
+          "task registry and freshness mirrors updated",
+          "source hash verified as 8824b9aeafca297dd598861836955314d72ed9c6909cafd917eb485e571fa786",
+          "jq empty tasks/index.json",
+          "jq empty docs/docs-freshness-registry.json",
+          "registry contains six active CO-581 rows",
+          "protected-term check found all required owner terms, source anchor, and sample paths",
+          "changed-file scope check listed only declared files",
+          "trailing-whitespace scan returned no matches",
+          "git diff --check for tracked modified files passed",
+          "parent docs:freshness:maintain reports CO-581 usable/In Progress for exact key",
+          "owner_finalizer.status=passed_exact_canonical_owner_precedence"
+        ],
+        "pending": [
+          "full repo validation and lifecycle handoff"
+        ]
+      },
+      "paths": {
+        "agent_task": ".agent/task/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+        "prd": "docs/PRD-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+        "docs": "docs/TECH_SPEC-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+        "tech_spec_mirror": "docs/TECH_SPEC-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+        "action_plan": "docs/ACTION_PLAN-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+        "spec": "tasks/specs/linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md",
+        "task": "tasks/tasks-linear-2a51671e-14fa-46c8-bce4-bcfd71e66066.md"
+      },
+      "source_issue": {
+        "id": "2a51671e-14fa-46c8-bce4-bcfd71e66066",
+        "identifier": "CO-581",
+        "url": "https://linear.app/asabeko/issue/CO-581"
+      },
+      "notes": {
+        "cohort_id": "co-558-may-19-apr-18-task-report-maintenance",
+        "terminal_historical_owner_evidence": "CO-568 terminal",
+        "configured_global_owner_evidence": "CO-579",
+        "live_exact_owner_issue": "CO-581",
+        "source_breakdown": "{\"rolling_window\":71}",
+        "protected_terms": "docs:freshness:maintain; canonical owner key; terminal-owner replacement; completed-lane registry residue; rolling-debt cohort; co-430-terminal-owner-replacement; dry-run/no-token copyable body",
+        "sample_paths": ".agent/task/1289-coordinator-symphony-aligned-start-cli-request-shell-extraction.md; .agent/task/1290-coordinator-symphony-aligned-start-cli-remaining-boundary-freeze-reassessment.md; .agent/task/1291-coordinator-symphony-aligned-flow-cli-boundary-reassessment-revisit.md",
+        "parent_owned": "Parent owns authoritative issue source, live owner truth, validation, Linear/workpad state, PR lifecycle, and review handoff. Parent re-homed exact-key catalog/guide owner metadata from CO-568 to CO-581."
+      }
+    },
+    {
       "id": "20260524-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08",
       "title": "CO-568 preserve CO-558 May 19 retained docs freshness cohort owner",
       "relates_to": "tasks/tasks-linear-e8f55d3d-1975-4da0-9b33-4307f7d63a08.md",
